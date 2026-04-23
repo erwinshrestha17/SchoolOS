@@ -1,0 +1,311 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") // Remove this line if you are using Prisma 7 with prisma.config.ts
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+enum Mode {
+  SINGLE
+  MULTI
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum AuthMethod {
+  PASSWORD
+  OTP
+  BOTH
+}
+
+enum OtpPurpose {
+  LOGIN
+  RESET
+  VERIFY
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ContractType {
+  PERMANENT
+  TEMPORARY
+  PART_TIME
+}
+
+// ==========================================
+// CORE AUTH & RBAC MODELS
+// ==========================================
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  mode      Mode     @default(SINGLE)
+  plan      String   @default("free")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  
+  users     User[]
+  roles     Role[]
+  classes   Class[]
+  students  Student[]
+  subjects  Subject[]
+  staff     Staff[]
+}
+
+model User {
+  id           String     @id @default(uuid())
+  tenantId     String
+  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+  email        String?
+  phone        String?
+  passwordHash String?
+  authMethod   AuthMethod @default(PASSWORD)
+  status       UserStatus @default(PENDING)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+
+  userRoles     UserRole[]
+  refreshTokens RefreshToken[]
+  otpCodes      OtpCode[]
+  auditLogs     AuditLog[]
+  student       Student?
+  staff         Staff?
+
+  @@unique([tenantId, email])
+  @@unique([tenantId, phone])
+}
+
+model Role {
+  id              String           @id @default(uuid())
+  tenantId        String
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  name            String
+  description     String?
+  isSystem        Boolean          @default(false)
+  
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@unique([tenantId, name])
+}
+
+model Permission {
+  id              String           @id @default(uuid())
+  resource        String
+  action          String
+  description     String?
+  
+  rolePermissions RolePermission[]
+
+  @@unique([resource, action])
+}
+
+model UserRole {
+  id           String   @id @default(uuid())
+  userId       String
+  roleId       String
+  tenantId     String
+  scopeId      String?  
+  assignedById String?
+  assignedAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId, scopeId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+// ==========================================
+// SECURITY & SESSION MANAGEMENT
+// ==========================================
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String
+  tokenHash  String    @unique
+  deviceId   String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model OtpCode {
+  id         String     @id @default(uuid())
+  userId     String
+  codeHash   String
+  purpose    OtpPurpose
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  tenantId   String
+  action     String
+  resource   String
+  resourceId String?
+  before     Json?
+  after      Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+// ==========================================
+// SCHOOL-OS SPECIFIC MODELS
+// ==========================================
+
+model Class {
+  id       String    @id @default(uuid())
+  tenantId String
+  name     String    // e.g., "Class 1", "Class 10", "Montessori"
+  level    Int       // Numeric level for sorting (e.g., 1, 10, -1 for ECE)
+  
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  students Student[]
+  subjects Subject[]
+
+  @@unique([tenantId, name])
+}
+
+model Subject {
+  id             String  @id @default(uuid())
+  tenantId       String
+  classId        String
+  name           String  // e.g., "Science", "Nepali"
+  code           String  // e.g., "SCI-101"
+  type           String  // COMPULSORY or OPTIONAL
+  
+  // Marks structure for exams
+  hasPractical   Boolean @default(false)
+  theoryMarks    Float?
+  practicalMarks Float?
+  passMarks      Float?
+
+  tenant         Tenant  @relation(fields: [tenantId], references: [id])
+  class          Class   @relation(fields: [classId], references: [id])
+
+  @@unique([tenantId, classId, code])
+}
+
+model Student {
+  id                String    @id @default(uuid())
+  tenantId          String
+  userId            String?   @unique // Optional: Linked if student gets login (Class 6+)
+  
+  // Core Identity
+  studentSystemId   String    @unique // e.g., SCH-YYYY-NNNN
+  firstNameEn       String
+  lastNameEn        String
+  firstNameNp       String?   // Nepali name required for official docs
+  lastNameNp        String?
+  dateOfBirth       DateTime
+  gender            Gender
+  bloodGroup        String?
+  nationality       String    @default("Nepali")
+  religion          String?
+  ethnicity         String?   // Caste
+  motherTongue      String?   // iEMIS required
+  disabilityFlag    String?   // iEMIS required (physical, visual, etc.)
+  nationalStudentId String?   // Linked to MoEST Student Registry
+  birthCertNumber   String?
+  photoUrl          String?   // Stored in Cloudflare R2
+  
+  // Admission Details
+  admissionDate     DateTime
+  admissionNumber   String?
+  previousSchool    String?
+  transferCertUrl   String?
+  mediumOfInstruct  String    @default("English")
+
+  // Academic Placement
+  classId           String
+  section           String?   // e.g., "A", "B"
+  rollNumber        Int?
+
+  // Medical Information (Encrypted at rest in app layer)
+  medicalConditions String?
+  severeAllergies   String?
+  medications       String?
+  specialNeeds      String?
+  emergencyName     String?
+  emergencyPhone    String?
+  doctorName        String?
+  doctorPhone       String?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  tenant            Tenant    @relation(fields: [tenantId], references: [id])
+  user              User?     @relation(fields: [userId], references: [id]) // Connects to Auth Module
+  class             Class     @relation(fields: [classId], references: [id])
+}
+
+model Staff {
+  id                String       @id @default(uuid())
+  tenantId          String
+  userId            String       @unique // Must have a login
+  
+  // Core Identity
+  employeeId        String       @unique
+  firstName         String
+  lastName          String
+  photoUrl          String?
+  dateOfBirth       DateTime
+  gender            Gender
+  address           String
+  
+  // HR & Compliance 
+  teacherRegistryId String?      // iEMIS required for teaching staff
+  citizenshipNo     String?      // Encrypted at rest
+  panNumber         String?      // Required for TDS calculation
+  bankAccount       String?
+  bankName          String?
+  
+  // Employment Details
+  qualifications    String?
+  experience        String?
+  joiningDate       DateTime
+  contractType      ContractType
+  probationEndDate  DateTime?
+
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  tenant            Tenant       @relation(fields: [tenantId], references: [id])
+  user              User         @relation(fields: [userId], references: [id]) // Connects to Auth Module
+}

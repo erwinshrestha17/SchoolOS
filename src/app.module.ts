@@ -14,7 +14,19 @@ import { ConfigModule } from './config/config.module';
 import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
-  imports: [PrismaModule, UsersModule, AuthModule, RolesModule, StudentsModule, ClassesModule, GradesModule, TenantsModule, RedisModule, ConfigModule, NotificationsModule],
+  imports: [
+    PrismaModule,
+    UsersModule,
+    AuthModule,
+    RolesModule,
+    StudentsModule,
+    ClassesModule,
+    GradesModule,
+    TenantsModule,
+    RedisModule,
+    ConfigModule,
+    NotificationsModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
