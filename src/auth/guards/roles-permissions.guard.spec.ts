@@ -1,3 +1,4 @@
+import { AuthMethod } from '@prisma/client';
 import { ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RolesPermissionsGuard } from './roles-permissions.guard';
@@ -25,6 +26,7 @@ describe('RolesPermissionsGuard', () => {
         tenantId: 'tenant-1',
         tenantSlug: 'school-a',
         email: 'admin@school.com',
+        authMethod: AuthMethod.PASSWORD,
         roles: [],
         permissions: [],
       },

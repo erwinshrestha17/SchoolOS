@@ -1,19 +1,40 @@
 import {
+  AuthMethod,
+  OtpPurpose,
+  UserStatus,
+  type Tenant,
+  type User,
+} from '@prisma/client';
+import {
+  BadRequestException,
   ForbiddenException,
+  HttpException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { AuditService } from '../audit/audit.service';
 import { ConfigService } from '../config/config.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthContext, JwtAccessPayload, JwtChallengePayload } from './auth.types';
+import {
+  generateOtpCode,
+  generateRefreshToken,
+  hashOtpCode,
+  hashToken,
+  parseCookie,
+} from './auth.utils';
+import { ConfirmMfaSetupDto } from './dto/confirm-mfa-setup.dto';
+import { ConfirmPasswordRecoveryDto } from './dto/confirm-password-recovery.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshSessionDto } from './dto/refresh-session.dto';
-import { AuthContext, JwtAccessPayload } from './auth.types';
-import { generateRefreshToken, hashToken, parseCookie } from './auth.utils';
+import { RequestOtpLoginDto } from './dto/request-otp-login.dto';
+import { RequestPasswordRecoveryDto } from './dto/request-password-recovery.dto';
+import { VerifyOtpLoginDto } from './dto/verify-otp-login.dto';
 
 @Injectable()
 export class AuthService {
@@ -22,15 +43,113 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async login(dto: LoginDto, response: Response, requestMeta?: RequestMeta) {
+    const { tenant, user } = await this.resolveTenantAndUser(dto.tenantSlug, dto.email);
+
+    if (user.authMethod === AuthMethod.OTP) {
+      throw new UnauthorizedException(
+        'This account uses OTP-only login. Request an OTP login challenge first.',
+      );
+    }
+
+    if (!user.passwordHash) {
+      throw new UnauthorizedException('Invalid tenant or credentials');
+    }
+
+    const passwordMatches = await bcrypt.compare(dto.password, user.passwordHash);
+
+    if (!passwordMatches) {
+      throw new UnauthorizedException('Invalid tenant or credentials');
+    }
+
+    if (user.authMethod === AuthMethod.BOTH) {
+      const challenge = await this.issueOtpChallenge({
+        user,
+        tenant,
+        purpose: OtpPurpose.LOGIN,
+        ttlMinutes: this.configService.otpTtlMinutes,
+        emailPurpose: 'login',
+      });
+
+      await this.auditService.record({
+        action: 'login_challenge',
+        resource: 'auth',
+        tenantId: user.tenantId,
+        userId: user.id,
+        ipAddress: requestMeta?.ipAddress,
+        userAgent: requestMeta?.userAgent,
+      });
+
+      return {
+        requiresMfa: true,
+        challengeToken: challenge.challengeToken,
+        challengeExpiresAt: challenge.expiresAt,
+        delivery: 'email_otp',
+      };
+    }
+
+    return this.completeAuthenticatedSession(user, tenant, response, requestMeta, {
+      action: 'login',
+    });
+  }
+
+  async requestOtpLogin(dto: RequestOtpLoginDto) {
+    const { tenant, user } = await this.resolveTenantAndUser(dto.tenantSlug, dto.email);
+
+    if (user.authMethod !== AuthMethod.OTP) {
+      throw new UnauthorizedException('This account does not support OTP-only login');
+    }
+
+    const challenge = await this.issueOtpChallenge({
+      user,
+      tenant,
+      purpose: OtpPurpose.LOGIN,
+      ttlMinutes: this.configService.otpTtlMinutes,
+      emailPurpose: 'login',
+    });
+
+    await this.auditService.record({
+      action: 'otp_login_request',
+      resource: 'auth',
+      tenantId: user.tenantId,
+      userId: user.id,
+    });
+
+    return {
+      challengeToken: challenge.challengeToken,
+      challengeExpiresAt: challenge.expiresAt,
+      delivery: 'email_otp',
+    };
+  }
+
+  async verifyOtpLogin(
+    dto: VerifyOtpLoginDto,
+    response: Response,
+    requestMeta?: RequestMeta,
+  ) {
+    const challenge = await this.verifyChallengeToken(dto.challengeToken, OtpPurpose.LOGIN);
+    const { tenant, user } = await this.resolveTenantAndUserById(
+      challenge.tenantId,
+      challenge.sub,
+    );
+
+    await this.consumeOtpCode(user.id, OtpPurpose.LOGIN, dto.code);
+
+    return this.completeAuthenticatedSession(user, tenant, response, requestMeta, {
+      action: user.authMethod === AuthMethod.BOTH ? 'login_mfa' : 'login_otp',
+    });
+  }
+
+  async requestPasswordRecovery(dto: RequestPasswordRecoveryDto) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { slug: dto.tenantSlug },
     });
 
     if (!tenant?.isActive) {
-      throw new UnauthorizedException('Invalid tenant or credentials');
+      return { success: true };
     }
 
     const user = await this.prisma.user.findUnique({
@@ -40,48 +159,130 @@ export class AuthService {
           email: dto.email,
         },
       },
-      include: this.userAuthInclude,
     });
 
-    if (!user?.passwordHash) {
-      throw new UnauthorizedException('Invalid tenant or credentials');
+    if (
+      !user ||
+      user.status !== UserStatus.ACTIVE ||
+      !user.email ||
+      user.authMethod === AuthMethod.OTP
+    ) {
+      return { success: true };
     }
 
-    const passwordMatches = await bcrypt.compare(
-      dto.password,
-      user.passwordHash,
-    );
+    const resetUrl = `${this.configService.passwordResetAppUrl.replace(/\/$/, '')}?tenantSlug=${encodeURIComponent(dto.tenantSlug)}&email=${encodeURIComponent(dto.email)}`;
 
-    if (!passwordMatches) {
-      throw new UnauthorizedException('Invalid tenant or credentials');
+    await this.issueOtpEmail({
+      user,
+      tenant,
+      purpose: OtpPurpose.RESET,
+      ttlMinutes: this.configService.passwordResetTtlMinutes,
+      emailPurpose: 'password_recovery',
+      resetUrl,
+    });
+
+    await this.auditService.record({
+      action: 'password_recovery_request',
+      resource: 'auth',
+      tenantId: user.tenantId,
+      userId: user.id,
+    });
+
+    return { success: true };
+  }
+
+  async confirmPasswordRecovery(dto: ConfirmPasswordRecoveryDto) {
+    const { tenant, user } = await this.resolveTenantAndUser(dto.tenantSlug, dto.email);
+
+    if (!user.passwordHash) {
+      throw new UnauthorizedException('Invalid recovery code');
     }
 
-    if (user.status !== UserStatus.ACTIVE) {
-      throw new ForbiddenException('User is not active');
-    }
+    await this.consumeOtpCode(user.id, OtpPurpose.RESET, dto.code);
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { lastLoginAt: new Date() },
+      data: {
+        passwordHash: await bcrypt.hash(
+          dto.newPassword,
+          this.configService.bcryptRounds,
+        ),
+      },
     });
 
-    const authContext = this.buildAuthContext(user, tenant.slug);
-    const session = await this.issueSession(authContext);
-    this.attachRefreshCookie(response, session.refreshToken);
+    await this.revokeUserSessions(user.id);
 
     await this.auditService.record({
-      action: 'login',
+      action: 'password_recovery_complete',
       resource: 'auth',
-      tenantId: authContext.tenantId,
-      userId: authContext.userId,
-      after: { email: authContext.email },
-      ipAddress: requestMeta?.ipAddress,
-      userAgent: requestMeta?.userAgent,
+      tenantId: tenant.id,
+      userId: user.id,
+    });
+
+    return { success: true };
+  }
+
+  async requestMfaSetup(auth: AuthContext) {
+    const { tenant, user } = await this.resolveTenantAndUserById(
+      auth.tenantId,
+      auth.userId,
+    );
+
+    if (!user.email) {
+      throw new BadRequestException('An email address is required to configure MFA');
+    }
+
+    await this.issueOtpEmail({
+      user,
+      tenant,
+      purpose: OtpPurpose.VERIFY,
+      ttlMinutes: this.configService.otpTtlMinutes,
+      emailPurpose: 'mfa_setup',
+    });
+
+    await this.auditService.record({
+      action: 'mfa_setup_request',
+      resource: 'auth',
+      tenantId: tenant.id,
+      userId: user.id,
+    });
+
+    return { success: true };
+  }
+
+  async confirmMfaSetup(auth: AuthContext, dto: ConfirmMfaSetupDto) {
+    if (![AuthMethod.PASSWORD, AuthMethod.BOTH, AuthMethod.OTP].includes(dto.authMethod)) {
+      throw new BadRequestException('Invalid auth method');
+    }
+
+    const { tenant, user } = await this.resolveTenantAndUserById(
+      auth.tenantId,
+      auth.userId,
+    );
+
+    await this.consumeOtpCode(user.id, OtpPurpose.VERIFY, dto.code);
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        authMethod: dto.authMethod,
+      },
+    });
+
+    await this.revokeUserSessions(user.id);
+
+    await this.auditService.record({
+      action: 'mfa_setup_confirm',
+      resource: 'auth',
+      tenantId: tenant.id,
+      userId: user.id,
+      before: { authMethod: user.authMethod },
+      after: { authMethod: dto.authMethod },
     });
 
     return {
-      accessToken: session.accessToken,
-      user: authContext,
+      authMethod: updatedUser.authMethod,
+      success: true,
     };
   }
 
@@ -116,9 +317,7 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token is invalid');
     }
 
-    if (existingSession.user.status !== UserStatus.ACTIVE) {
-      throw new ForbiddenException('User is not active');
-    }
+    this.assertUserIsActive(existingSession.user);
 
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: existingSession.user.tenantId },
@@ -133,10 +332,7 @@ export class AuthService {
       data: { revokedAt: new Date() },
     });
 
-    const authContext = this.buildAuthContext(
-      existingSession.user,
-      tenant.slug,
-    );
+    const authContext = this.buildAuthContext(existingSession.user, tenant.slug);
     const session = await this.issueSession(authContext);
     this.attachRefreshCookie(response, session.refreshToken);
 
@@ -198,6 +394,306 @@ export class AuthService {
     return { success: true };
   }
 
+  async getProfile(auth: AuthContext) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: auth.userId },
+      include: {
+        tenant: true,
+        staff: true,
+        student: {
+          include: {
+            class: true,
+          },
+        },
+        userRoles: {
+          include: {
+            role: {
+              include: {
+                rolePermissions: {
+                  include: {
+                    permission: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user || user.tenantId !== auth.tenantId) {
+      throw new NotFoundException('Authenticated user was not found');
+    }
+
+    const currentAuth = this.buildAuthContext(user, auth.tenantSlug);
+
+    return {
+      ...currentAuth,
+      tenant: {
+        id: user.tenant.id,
+        name: user.tenant.name,
+        slug: user.tenant.slug,
+        plan: user.tenant.plan,
+      },
+      profileType: user.staff ? 'staff' : user.student ? 'student' : 'user',
+      staff: user.staff
+        ? {
+            id: user.staff.id,
+            employeeId: user.staff.employeeId,
+            firstName: user.staff.firstName,
+            lastName: user.staff.lastName,
+          }
+        : null,
+      student: user.student
+        ? {
+            id: user.student.id,
+            studentSystemId: user.student.studentSystemId,
+            firstNameEn: user.student.firstNameEn,
+            lastNameEn: user.student.lastNameEn,
+            class: {
+              id: user.student.class.id,
+              name: user.student.class.name,
+            },
+          }
+        : null,
+    };
+  }
+
+  private async completeAuthenticatedSession(
+    user: UserWithRoles,
+    tenant: Tenant,
+    response: Response,
+    requestMeta?: RequestMeta,
+    audit?: { action: string },
+  ) {
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const authContext = this.buildAuthContext(user, tenant.slug);
+    const session = await this.issueSession(authContext);
+    this.attachRefreshCookie(response, session.refreshToken);
+
+    await this.auditService.record({
+      action: audit?.action ?? 'login',
+      resource: 'auth',
+      tenantId: authContext.tenantId,
+      userId: authContext.userId,
+      after: { email: authContext.email, authMethod: authContext.authMethod },
+      ipAddress: requestMeta?.ipAddress,
+      userAgent: requestMeta?.userAgent,
+    });
+
+    return {
+      accessToken: session.accessToken,
+      user: authContext,
+    };
+  }
+
+  private async resolveTenantAndUser(tenantSlug: string, email: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+    });
+
+    if (!tenant?.isActive) {
+      throw new UnauthorizedException('Invalid tenant or credentials');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: {
+        tenantId_email: {
+          tenantId: tenant.id,
+          email,
+        },
+      },
+      include: this.userAuthInclude,
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid tenant or credentials');
+    }
+
+    this.assertUserIsActive(user);
+
+    return { tenant, user };
+  }
+
+  private async resolveTenantAndUserById(tenantId: string, userId: string) {
+    const [tenant, user] = await Promise.all([
+      this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+      }),
+      this.prisma.user.findFirst({
+        where: {
+          id: userId,
+          tenantId,
+        },
+        include: this.userAuthInclude,
+      }),
+    ]);
+
+    if (!tenant?.isActive || !user) {
+      throw new UnauthorizedException('Invalid authentication context');
+    }
+
+    this.assertUserIsActive(user);
+
+    return { tenant, user };
+  }
+
+  private assertUserIsActive(user: { status: UserStatus }) {
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new ForbiddenException('User is not active');
+    }
+  }
+
+  private async issueOtpChallenge(input: IssueOtpInput) {
+    const code = await this.issueOtpEmail(input);
+    const challengeToken = await this.jwtService.signAsync<JwtChallengePayload>(
+      {
+        sub: input.user.id,
+        tenantId: input.tenant.id,
+        tenantSlug: input.tenant.slug,
+        purpose: input.purpose,
+      },
+      {
+        secret: this.configService.challengeSecret,
+        expiresIn: this.configService.challengeTokenTtl as never,
+      },
+    );
+
+    return {
+      challengeToken,
+      expiresAt: code.expiresAt,
+    };
+  }
+
+  private async issueOtpEmail(input: IssueOtpInput) {
+    if (!input.user.email) {
+      throw new BadRequestException('An email address is required for OTP delivery');
+    }
+
+    await this.assertOtpIssueAllowed(input.user.id, input.purpose);
+    await this.invalidateActiveOtps(input.user.id, input.purpose);
+
+    const code = generateOtpCode(this.configService.otpLength);
+    const expiresAt = new Date(Date.now() + input.ttlMinutes * 60 * 1000);
+
+    await this.prisma.otpCode.create({
+      data: {
+        userId: input.user.id,
+        codeHash: hashOtpCode(code),
+        purpose: input.purpose,
+        expiresAt,
+      },
+    });
+
+    await this.notificationsService.sendAuthCodeEmail({
+      to: input.user.email,
+      tenantName: input.tenant.name,
+      code,
+      purpose: input.emailPurpose,
+      resetUrl: input.resetUrl,
+    });
+
+    return { code, expiresAt };
+  }
+
+  private async verifyChallengeToken(token: string, purpose: OtpPurpose) {
+    let payload: JwtChallengePayload;
+
+    try {
+      payload = await this.jwtService.verifyAsync<JwtChallengePayload>(token, {
+        secret: this.configService.challengeSecret,
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid or expired challenge token');
+    }
+
+    if (payload.purpose !== purpose) {
+      throw new UnauthorizedException('Invalid challenge token purpose');
+    }
+
+    return payload;
+  }
+
+  private async consumeOtpCode(userId: string, purpose: OtpPurpose, code: string) {
+    const otpCode = await this.prisma.otpCode.findFirst({
+      where: {
+        userId,
+        purpose,
+        usedAt: null,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    if (!otpCode || otpCode.codeHash !== hashOtpCode(code)) {
+      throw new UnauthorizedException('Invalid or expired verification code');
+    }
+
+    await this.prisma.otpCode.update({
+      where: { id: otpCode.id },
+      data: { usedAt: new Date() },
+    });
+
+    return otpCode;
+  }
+
+  private async invalidateActiveOtps(userId: string, purpose: OtpPurpose) {
+    await this.prisma.otpCode.updateMany({
+      where: {
+        userId,
+        purpose,
+        usedAt: null,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+      data: {
+        usedAt: new Date(),
+      },
+    });
+  }
+
+  private async assertOtpIssueAllowed(userId: string, purpose: OtpPurpose) {
+    const recentOtpCount = await this.prisma.otpCode.count({
+      where: {
+        userId,
+        purpose,
+        createdAt: {
+          gte: new Date(
+            Date.now() - this.configService.otpIssueWindowMinutes * 60 * 1000,
+          ),
+        },
+      },
+    });
+
+    if (recentOtpCount >= this.configService.otpIssueLimit) {
+      throw new HttpException(
+        'Too many verification codes were requested. Please try again later.',
+        429,
+      );
+    }
+  }
+
+  private async revokeUserSessions(userId: string) {
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+  }
+
   private get userAuthInclude() {
     return {
       userRoles: {
@@ -221,6 +717,7 @@ export class AuthService {
       id: string;
       tenantId: string;
       email: string | null;
+      authMethod: AuthMethod;
       userRoles: Array<{
         role: {
           name: string;
@@ -235,9 +732,7 @@ export class AuthService {
     },
     tenantSlug: string,
   ): AuthContext {
-    const roles = Array.from(
-      new Set(user.userRoles.map(({ role }) => role.name)),
-    );
+    const roles = Array.from(new Set(user.userRoles.map(({ role }) => role.name)));
     const permissions = Array.from(
       new Set(
         user.userRoles.flatMap(({ role }) =>
@@ -253,6 +748,7 @@ export class AuthService {
       tenantId: user.tenantId,
       tenantSlug,
       email: user.email,
+      authMethod: user.authMethod,
       roles,
       permissions,
     };
@@ -264,6 +760,7 @@ export class AuthService {
       tenantId: authContext.tenantId,
       tenantSlug: authContext.tenantSlug,
       email: authContext.email,
+      authMethod: authContext.authMethod,
       roles: authContext.roles,
       permissions: authContext.permissions,
     };
@@ -288,9 +785,10 @@ export class AuthService {
   private attachRefreshCookie(response: Response, refreshToken: string) {
     response.cookie(this.configService.refreshCookieName, refreshToken, {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: this.configService.cookieSameSite,
       secure: this.configService.isProduction,
       path: '/',
+      domain: this.configService.cookieDomain,
       maxAge: this.configService.refreshTokenTtlDays * 24 * 60 * 60 * 1000,
     });
   }
@@ -298,9 +796,10 @@ export class AuthService {
   private clearRefreshCookie(response: Response) {
     response.clearCookie(this.configService.refreshCookieName, {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: this.configService.cookieSameSite,
       secure: this.configService.isProduction,
       path: '/',
+      domain: this.configService.cookieDomain,
     });
   }
 
@@ -311,7 +810,33 @@ export class AuthService {
   }
 }
 
-interface RequestMeta {
+type RequestMeta = {
   ipAddress?: string | null;
   userAgent?: string | null;
-}
+};
+
+type UserWithRoles = User & {
+  userRoles: Array<{
+    role: {
+      name: string;
+      rolePermissions: Array<{
+        permission: {
+          resource: string;
+          action: string;
+        };
+      }>;
+    };
+  }>;
+};
+
+type IssueOtpInput = {
+  user: {
+    id: string;
+    email: string | null;
+  };
+  tenant: Tenant;
+  purpose: OtpPurpose;
+  ttlMinutes: number;
+  emailPurpose: 'login' | 'password_recovery' | 'mfa_setup';
+  resetUrl?: string;
+};

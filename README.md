@@ -1,45 +1,158 @@
-# 🏰 Nestjs-Auth-RBAC
+# School OS Auth Backend
 
-A plug-and-play NestJS monorepo template that gives any new system (HotelOS, SchoolOS, EcomOS, etc.) complete auth, JWT tokens, RBAC, audit logging, and multi-tenancy in a single import. 
+Multi-tenant NestJS backend for school management with:
 
-**Zero auth code needed in consuming apps.** ## ⚡ Core Features
+- tenant registration for SaaS onboarding
+- JWT access tokens plus rotating refresh cookies
+- role and permission based access control
+- admin-managed users, staff, students, and classes
+- email OTP for MFA setup, OTP login, and password recovery
+- audit logging, throttling, and environment-driven CORS/cookie policy
 
-* **Universal AuthModule:** A dynamic module (`AuthModule.forRoot()`) that registers all submodules, guards, interceptors, and seeds in a single call.
-* **Bulletproof Token Strategy:** Short-lived access tokens (15 min) in memory, and long-lived opaque refresh tokens (7 days) stored securely via `httpOnly` cookies. Includes stolen token detection with automatic revocation.
-* **Granular RBAC:** Complete guard system utilizing `@Roles()` and `@Permissions()` decorators. 
-* **Multi-Tenancy Ready:** Single schema design with `tenantId` isolation across all tables. Seamlessly transition from single to multi-tenant by flipping the `multiTenant: true` flag.
-* **Audit Logging:** Global `AuditInterceptor` tracks all mutating requests automatically.
+## Core flows
 
-## 🛠 Tech Stack
+### Tenant and admin onboarding
+- `POST /tenants/register`
+- creates the school tenant
+- provisions default roles and permissions
+- creates the first admin account
 
-| Layer | Choice | Reason |
-| :--- | :--- | :--- |
-| **Runtime** | Node.js 20 LTS | Stable, massive ecosystem, best PostgreSQL support |
-| **Framework** | NestJS 10 | Enforced structure, native monorepo CLI, DI container, decorators |
-| **Build Orch.**| Turborepo | Caches builds, runs tasks in parallel, monorepo-native |
-| **ORM** | Prisma | Type-safe queries, auto-generated types from schema, best PG support |
-| **Cache/Queue**| Redis + BullMQ | Refresh token store, rate limiting, OTP delivery jobs |
-| **Security** | bcrypt (cost 12) | Industry standard cost balances security vs login latency |
+### Auth
+- `POST /auth/login`
+  - password login for `PASSWORD` users
+  - returns MFA challenge for `BOTH` users
+- `POST /auth/otp/request-login`
+  - starts OTP-only login for `OTP` users
+- `POST /auth/otp/verify`
+  - completes OTP or MFA login and issues a session
+- `POST /auth/password-recovery/request`
+- `POST /auth/password-recovery/confirm`
+- `POST /auth/mfa/setup/request`
+- `POST /auth/mfa/setup/confirm`
+- `POST /auth/refresh`
+- `POST /auth/logout`
+- `GET /auth/me`
 
-## 🚀 Quick Start
+### Admin operations
+- `GET /users`
+- `POST /users`
+- `PATCH /users/:id/status`
+- `POST /users/:id/reset-password`
+- `GET /roles`
+- `GET /roles/permissions`
+- `POST /roles`
+- `POST /roles/assign`
+- `POST /roles/:id/permissions`
+- `GET /classes`
+- `POST /classes`
+- `GET /staff`
+- `POST /staff`
+- `GET /students`
+- `POST /students`
+- `GET /tenants/me`
 
-Initialize the monorepo and bootstrap the core infrastructure:
+## Local setup
+
+1. Copy the env template.
 
 ```bash
-# 1. Scaffold the monorepo 
-npx create-turbo@latest corp --example with-nestjs 
+cp .env.example .env
+```
 
-# 2. Generate the auth library 
-nest g library auth --prefix corp 
+2. Generate Prisma client, run migrations, and seed the database.
 
-# 3. Generate the first app 
-nest g app auth-service 
+```bash
+pnpm prisma:generate
+pnpm db:migrate
+pnpm db:seed
+```
 
-# 4. Run Prisma migration 
-turbo run db:migrate 
+3. Start the API.
 
-# 5. Seed roles + superadmin 
-turbo run db:seed 
+```bash
+pnpm start:dev
+```
 
-# 6. Start all apps in dev mode 
-turbo run start:dev
+4. Verify build and tests.
+
+```bash
+pnpm type:check
+pnpm test --runInBand
+pnpm exec jest --config ./test/jest-e2e.json --runInBand
+```
+
+## Frontend domain and cookie policy
+
+The refresh token is stored in an `httpOnly` cookie. Configure these values to match the frontend you will deploy:
+
+- `FRONTEND_ORIGIN`
+  - primary frontend origin, for example `https://app.schoolos.com`
+- `FRONTEND_ORIGINS`
+  - comma-separated extra origins if you have multiple frontends
+- `COOKIE_DOMAIN`
+  - set this when frontend and backend share a parent domain
+- `COOKIE_SAME_SITE`
+  - use `none` for cross-site cookie delivery over HTTPS
+  - use `lax` for same-site or local development
+- `TRUST_PROXY`
+  - set `true` behind a reverse proxy or load balancer
+
+Recommended production example:
+
+```env
+NODE_ENV=production
+FRONTEND_ORIGIN=https://app.schoolos.com
+COOKIE_DOMAIN=.schoolos.com
+COOKIE_SAME_SITE=none
+TRUST_PROXY=true
+```
+
+## Email delivery
+
+Two delivery modes are supported:
+
+- `EMAIL_DELIVERY_MODE=log`
+  - development-safe mode
+  - OTP and recovery emails are logged by the backend
+- `EMAIL_DELIVERY_MODE=webhook`
+  - production integration mode
+  - backend sends a JSON POST to your configured mail service bridge
+
+When using webhook mode, configure:
+
+- `EMAIL_WEBHOOK_URL`
+- `EMAIL_WEBHOOK_TOKEN`
+- `EMAIL_FROM_ADDRESS`
+
+Webhook payload fields:
+
+- `from`
+- `to`
+- `subject`
+- `text`
+- `html`
+- `metadata`
+
+This keeps the auth backend provider-agnostic while still making recovery and OTP deployable behind your own mail service.
+
+## Security notes
+
+- access tokens are short-lived
+- refresh tokens are hashed in the database and rotated on refresh
+- password reset and MFA codes are hashed in the database and expire automatically
+- OTP issuance is rate-limited per user and purpose
+- user suspension and password reset revoke active refresh sessions
+- global request throttling is enabled
+- CORS is allowlisted from configured frontend origins only
+- security headers are added at the app boundary
+
+## Suggested deployment checklist
+
+- set strong random values for `JWT_SECRET` and `JWT_CHALLENGE_SECRET`
+- set `NODE_ENV=production`
+- set `FRONTEND_ORIGIN`, `COOKIE_DOMAIN`, and `COOKIE_SAME_SITE`
+- configure HTTPS at the edge
+- enable `TRUST_PROXY=true` if behind a proxy
+- connect `EMAIL_DELIVERY_MODE=webhook` to your mail system
+- run `pnpm prisma:generate`, `pnpm db:migrate`, and `pnpm db:seed`
+- run `pnpm type:check` and the test suite in CI before deploy

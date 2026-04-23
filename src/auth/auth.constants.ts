@@ -1,3 +1,13 @@
 export const AUTH_COOKIE_NAME = 'school_os_refresh_token';
 export const ACCESS_TOKEN_TTL = '15m';
 export const REFRESH_TOKEN_TTL_DAYS = 7;
+export const APP_RATE_LIMIT = 60;
+export const APP_RATE_TTL_MS = 60_000;
+export const AUTH_RATE_LIMIT = 5;
+export const AUTH_RATE_TTL_MS = 60_000;
+export const OTP_TTL_MINUTES = 10;
+export const PASSWORD_RESET_TTL_MINUTES = 15;
+export const OTP_ISSUE_LIMIT = 3;
+export const OTP_ISSUE_WINDOW_MINUTES = 15;
+export const OTP_LENGTH = 6;
+export const CHALLENGE_TOKEN_TTL = '10m';

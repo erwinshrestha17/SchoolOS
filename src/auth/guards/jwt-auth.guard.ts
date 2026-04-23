@@ -40,6 +40,7 @@ export class JwtAuthGuard implements CanActivate {
       tenantId: payload.tenantId,
       tenantSlug: payload.tenantSlug,
       email: payload.email,
+      authMethod: payload.authMethod,
       roles: payload.roles,
       permissions: payload.permissions,
     };

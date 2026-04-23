@@ -3,36 +3,19 @@ import { PrismaClient, AuthMethod, UserStatus, Mode } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
 import 'dotenv/config';
+import {
+  PERMISSION_CATALOG,
+  SYSTEM_ROLE_DEFINITIONS,
+  SYSTEM_ROLE_PERMISSIONS,
+} from './src/rbac/rbac.defaults';
 
 const adapter = new PrismaPg({
-  connectionString: 'postgresql://postgres:admin@localhost:5432/school_os?schema=public',
+  connectionString:
+    process.env.DATABASE_URL ??
+    'postgresql://postgres:admin@localhost:5432/school_os?schema=public',
 });
 
 const prisma = new PrismaClient({ adapter });
-
-const permissionCatalog = [
-  ['users', 'create', 'Create users inside a tenant'],
-  ['roles', 'read', 'Read roles and permission catalog'],
-  ['roles', 'create', 'Create custom roles'],
-  ['roles', 'assign', 'Assign roles to users'],
-  ['roles', 'manage_permissions', 'Attach permissions to roles'],
-];
-
-const systemRolePermissions: Record<string, string[]> = {
-  admin: [
-    'users:create',
-    'roles:read',
-    'roles:create',
-    'roles:assign',
-    'roles:manage_permissions',
-  ],
-  teacher: ['roles:read'],
-  student: [],
-  parent: [],
-  accountant: ['roles:read'],
-  librarian: ['roles:read'],
-  driver: [],
-};
 
 async function main() {
   console.log('Seeding database...');
@@ -50,54 +33,42 @@ async function main() {
   });
 
   // 2. Define SchoolOS Role Presets
-  const schoolRoles = [
-    'admin',
-    'teacher',
-    'student',
-    'parent',
-    'accountant',
-    'librarian',
-    'driver',
-  ];
-
-  for (const roleName of schoolRoles) {
+  for (const role of SYSTEM_ROLE_DEFINITIONS) {
     await prisma.role.upsert({
       where: {
         tenantId_name: {
           tenantId: tenant.id,
-          name: roleName,
+          name: role.name,
         },
       },
       update: {},
       create: {
         tenantId: tenant.id,
-        name: roleName,
+        name: role.name,
         isSystem: true,
-        description: `System preset role for ${roleName}`,
+        description: role.description,
       },
     });
   }
 
-  for (const [resource, action, description] of permissionCatalog) {
+  for (const permission of PERMISSION_CATALOG) {
     await prisma.permission.upsert({
       where: {
         resource_action: {
-          resource,
-          action,
+          resource: permission.resource,
+          action: permission.action,
         },
       },
       update: {
-        description,
+        description: permission.description,
       },
-      create: {
-        resource,
-        action,
-        description,
-      },
+      create: permission,
     });
   }
 
-  for (const [roleName, permissionKeys] of Object.entries(systemRolePermissions)) {
+  for (const [roleName, permissionKeys] of Object.entries(
+    SYSTEM_ROLE_PERMISSIONS,
+  )) {
     const role = await prisma.role.findUnique({
       where: {
         tenantId_name: {

@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { AuthMethod } from '@prisma/client';
 import { UsersService } from './users.service';
 import { AuthContext } from '../auth/auth.types';
 
@@ -26,6 +27,7 @@ describe('UsersService', () => {
       tenantId: 'tenant-1',
       tenantSlug: 'school-a',
       email: 'admin@school.com',
+      authMethod: AuthMethod.PASSWORD,
       roles: ['admin'],
       permissions: ['users:create'],
     };
