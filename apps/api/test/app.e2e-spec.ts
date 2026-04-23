@@ -88,13 +88,13 @@ describe('School OS Auth + RBAC integration', () => {
     const adminResponse = createResponseMock();
     const adminLogin = asSession(
       await authController.login(
-      {
-        tenantSlug: 'green-valley',
-        email: 'admin@greenvalley.com',
-        password: 'admin12345',
-      },
-      adminResponse as any,
-      createRequestMock() as any,
+        {
+          tenantSlug: 'green-valley',
+          email: 'admin@greenvalley.com',
+          password: 'admin12345',
+        },
+        adminResponse as any,
+        createRequestMock() as any,
       ),
     );
 
@@ -111,7 +111,9 @@ describe('School OS Auth + RBAC integration', () => {
     const adminProfile = await authController.me(adminRequest.auth);
     expect(adminProfile.tenant.slug).toBe('green-valley');
 
-    const tenantSummary = await tenantsController.getCurrentTenant(adminRequest.auth);
+    const tenantSummary = await tenantsController.getCurrentTenant(
+      adminRequest.auth,
+    );
     expect(tenantSummary.counts.users).toBe(1);
 
     const createdClass = await classesController.createClass(
@@ -124,7 +126,8 @@ describe('School OS Auth + RBAC integration', () => {
     expect(createdClass.name).toBe('Class 6');
 
     const teacherRole = prisma.__state.roles.find(
-      (role) => role.tenantId === registration.tenant.id && role.name === 'teacher',
+      (role) =>
+        role.tenantId === registration.tenant.id && role.name === 'teacher',
     );
     expect(teacherRole).toBeDefined();
 
@@ -149,13 +152,13 @@ describe('School OS Auth + RBAC integration', () => {
     const teacherResponse = createResponseMock();
     const teacherLogin = asSession(
       await authController.login(
-      {
-        tenantSlug: 'green-valley',
-        email: 'teacher@greenvalley.com',
-        password: 'teacher12345',
-      },
-      teacherResponse as any,
-      createRequestMock() as any,
+        {
+          tenantSlug: 'green-valley',
+          email: 'teacher@greenvalley.com',
+          password: 'teacher12345',
+        },
+        teacherResponse as any,
+        createRequestMock() as any,
       ),
     );
 
@@ -189,13 +192,13 @@ describe('School OS Auth + RBAC integration', () => {
 
     const teacherMfaChallenge = asChallenge(
       await authController.login(
-      {
-        tenantSlug: 'green-valley',
-        email: 'teacher@greenvalley.com',
-        password: 'teacher12345',
-      },
-      createResponseMock() as any,
-      createRequestMock() as any,
+        {
+          tenantSlug: 'green-valley',
+          email: 'teacher@greenvalley.com',
+          password: 'teacher12345',
+        },
+        createResponseMock() as any,
+        createRequestMock() as any,
       ),
     );
     expect(teacherMfaChallenge.requiresMfa).toBe(true);
@@ -223,7 +226,9 @@ describe('School OS Auth + RBAC integration', () => {
       ClassesController.prototype.listClasses,
       ClassesController,
     );
-    const teacherClasses = await classesController.listClasses(teacherRequest.auth);
+    const teacherClasses = await classesController.listClasses(
+      teacherRequest.auth,
+    );
     expect(teacherClasses).toHaveLength(1);
 
     const createdStudent = await studentsController.createStudent(
@@ -246,13 +251,13 @@ describe('School OS Auth + RBAC integration', () => {
     const studentResponse = createResponseMock();
     const studentLogin = asSession(
       await authController.login(
-      {
-        tenantSlug: 'green-valley',
-        email: 'student@greenvalley.com',
-        password: 'student12345',
-      },
-      studentResponse as any,
-      createRequestMock() as any,
+        {
+          tenantSlug: 'green-valley',
+          email: 'student@greenvalley.com',
+          password: 'student12345',
+        },
+        studentResponse as any,
+        createRequestMock() as any,
       ),
     );
 
@@ -385,13 +390,13 @@ describe('School OS Auth + RBAC integration', () => {
 
     const teacherPostRecoveryChallenge = asChallenge(
       await authController.login(
-      {
-        tenantSlug: 'green-valley',
-        email: 'teacher@greenvalley.com',
-        password: 'teacher99999',
-      },
-      createResponseMock() as any,
-      createRequestMock() as any,
+        {
+          tenantSlug: 'green-valley',
+          email: 'teacher@greenvalley.com',
+          password: 'teacher99999',
+        },
+        createResponseMock() as any,
+        createRequestMock() as any,
       ),
     );
     expect(teacherPostRecoveryChallenge.requiresMfa).toBe(true);
@@ -411,13 +416,13 @@ describe('School OS Auth + RBAC integration', () => {
     const secondTenantResponse = createResponseMock();
     const secondTenantLogin = asSession(
       await authController.login(
-      {
-        tenantSlug: 'blue-ridge',
-        email: 'admin@blueridge.com',
-        password: 'admin12345',
-      },
-      secondTenantResponse as any,
-      createRequestMock() as any,
+        {
+          tenantSlug: 'blue-ridge',
+          email: 'admin@blueridge.com',
+          password: 'admin12345',
+        },
+        secondTenantResponse as any,
+        createRequestMock() as any,
       ),
     );
 
@@ -606,7 +611,8 @@ async function createPrismaMock() {
   function permissionByKey(permissionKey: string) {
     return state.permissions.find(
       (permission) =>
-        buildPermissionKey(permission.resource, permission.action) === permissionKey,
+        buildPermissionKey(permission.resource, permission.action) ===
+        permissionKey,
     );
   }
 
@@ -614,7 +620,8 @@ async function createPrismaMock() {
     for (const roleDefinition of SYSTEM_ROLE_DEFINITIONS) {
       if (
         !state.roles.some(
-          (role) => role.tenantId === tenantId && role.name === roleDefinition.name,
+          (role) =>
+            role.tenantId === tenantId && role.name === roleDefinition.name,
         )
       ) {
         state.roles.push({
@@ -674,14 +681,16 @@ async function createPrismaMock() {
   const userWithRelations = (user: any) => ({
     ...user,
     tenant: state.tenants.find((tenant) => tenant.id === user.tenantId) ?? null,
-    staff:
-      state.staff.find((member) => member.userId === user.id) ?? null,
+    staff: state.staff.find((member) => member.userId === user.id) ?? null,
     student:
       state.students
         .filter((student) => student.userId === user.id)
         .map((student) => ({
           ...student,
-          class: state.classes.find((classroom) => classroom.id === student.classId) ?? null,
+          class:
+            state.classes.find(
+              (classroom) => classroom.id === student.classId,
+            ) ?? null,
         }))[0] ?? null,
     userRoles: state.userRoles
       .filter((membership) => membership.userId === user.id)
@@ -751,7 +760,7 @@ async function createPrismaMock() {
       }),
       findMany: jest.fn(async ({ where }: any = {}) => {
         return state.users
-          .filter((user) => (!where.tenantId || user.tenantId === where.tenantId))
+          .filter((user) => !where.tenantId || user.tenantId === where.tenantId)
           .map((user) => userWithRelations(user));
       }),
       update: jest.fn(async ({ where, data }: any) => {
@@ -792,7 +801,7 @@ async function createPrismaMock() {
       }),
       count: jest.fn(async ({ where }: any = {}) => {
         return state.users.filter(
-          (user) => (!where.tenantId || user.tenantId === where.tenantId),
+          (user) => !where.tenantId || user.tenantId === where.tenantId,
         ).length;
       }),
     },
@@ -974,7 +983,9 @@ async function createPrismaMock() {
         }
 
         if (where.id) {
-          return state.classes.find((classroom) => classroom.id === where.id) ?? null;
+          return (
+            state.classes.find((classroom) => classroom.id === where.id) ?? null
+          );
         }
 
         return null;
@@ -1033,23 +1044,26 @@ async function createPrismaMock() {
 
         return {
           ...student,
-          class: state.classes.find((classroom) => classroom.id === data.classId)!,
+          class: state.classes.find(
+            (classroom) => classroom.id === data.classId,
+          )!,
           user: data.userId
-            ? state.users.find((user) => user.id === data.userId) ?? null
+            ? (state.users.find((user) => user.id === data.userId) ?? null)
             : null,
         };
       }),
       findMany: jest.fn(async ({ where }: any = {}) => {
         return state.students
           .filter(
-            (student) =>
-              !where.tenantId || student.tenantId === where.tenantId,
+            (student) => !where.tenantId || student.tenantId === where.tenantId,
           )
           .map((student) => ({
             ...student,
-            class: state.classes.find((classroom) => classroom.id === student.classId)!,
+            class: state.classes.find(
+              (classroom) => classroom.id === student.classId,
+            )!,
             user: student.userId
-              ? state.users.find((user) => user.id === student.userId) ?? null
+              ? (state.users.find((user) => user.id === student.userId) ?? null)
               : null,
           }));
       }),
@@ -1062,8 +1076,9 @@ async function createPrismaMock() {
     staff: {
       findUnique: jest.fn(async ({ where }: any) => {
         return (
-          state.staff.find((member) => member.employeeId === where.employeeId) ??
-          null
+          state.staff.find(
+            (member) => member.employeeId === where.employeeId,
+          ) ?? null
         );
       }),
       create: jest.fn(async ({ data }: any) => {
@@ -1084,7 +1099,9 @@ async function createPrismaMock() {
       }),
       findMany: jest.fn(async ({ where }: any = {}) => {
         return state.staff
-          .filter((member) => !where.tenantId || member.tenantId === where.tenantId)
+          .filter(
+            (member) => !where.tenantId || member.tenantId === where.tenantId,
+          )
           .map((member) => ({
             ...member,
             user: userWithRelations(
@@ -1140,11 +1157,13 @@ async function createPrismaMock() {
         let count = 0;
         for (const token of state.refreshTokens) {
           const matchesTokenHash =
-            where.tokenHash === undefined || token.tokenHash === where.tokenHash;
+            where.tokenHash === undefined ||
+            token.tokenHash === where.tokenHash;
           const matchesUserId =
             where.userId === undefined || token.userId === where.userId;
           const matchesRevokedAt =
-            where.revokedAt === undefined || token.revokedAt === where.revokedAt;
+            where.revokedAt === undefined ||
+            token.revokedAt === where.revokedAt;
 
           if (matchesTokenHash && matchesUserId && matchesRevokedAt) {
             Object.assign(token, data);
@@ -1197,13 +1216,15 @@ async function createPrismaMock() {
       updateMany: jest.fn(async ({ where, data }: any) => {
         let count = 0;
         for (const otp of state.otpCodes) {
-          const matchesUser = where.userId === undefined || otp.userId === where.userId;
+          const matchesUser =
+            where.userId === undefined || otp.userId === where.userId;
           const matchesPurpose =
             where.purpose === undefined || otp.purpose === where.purpose;
           const matchesUsedAt =
             where.usedAt === undefined || otp.usedAt === where.usedAt;
           const matchesExpiry =
-            where.expiresAt?.gt === undefined || otp.expiresAt > where.expiresAt.gt;
+            where.expiresAt?.gt === undefined ||
+            otp.expiresAt > where.expiresAt.gt;
 
           if (matchesUser && matchesPurpose && matchesUsedAt && matchesExpiry) {
             Object.assign(otp, data);
@@ -1216,7 +1237,8 @@ async function createPrismaMock() {
       count: jest.fn(async ({ where }: any) => {
         return state.otpCodes.filter((otp) => {
           const matchesCreatedAt =
-            where.createdAt?.gte === undefined || otp.createdAt >= where.createdAt.gte;
+            where.createdAt?.gte === undefined ||
+            otp.createdAt >= where.createdAt.gte;
           return (
             otp.userId === where.userId &&
             otp.purpose === where.purpose &&

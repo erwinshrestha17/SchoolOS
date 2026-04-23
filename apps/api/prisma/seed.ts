@@ -1,4 +1,3 @@
-// seed.ts
 import { PrismaClient, AuthMethod, UserStatus, Mode } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
@@ -7,7 +6,11 @@ import {
   PERMISSION_CATALOG,
   SYSTEM_ROLE_DEFINITIONS,
   SYSTEM_ROLE_PERMISSIONS,
-} from './src/rbac/rbac.defaults';
+} from '../src/rbac/rbac.defaults';
+import {
+  DEFAULT_CHART_ACCOUNTS,
+  DEFAULT_FEE_HEADS,
+} from '../src/finance/finance.defaults';
 
 const adapter = new PrismaPg({
   connectionString:
@@ -29,6 +32,25 @@ async function main() {
       slug: 'default-school',
       mode: Mode.SINGLE,
       plan: 'Standard',
+    },
+  });
+
+  const academicYear = await prisma.academicYear.upsert({
+    where: {
+      tenantId_name: {
+        tenantId: tenant.id,
+        name: `${new Date().getUTCFullYear()}-${new Date().getUTCFullYear() + 1}`,
+      },
+    },
+    update: {
+      isCurrent: true,
+    },
+    create: {
+      tenantId: tenant.id,
+      name: `${new Date().getUTCFullYear()}-${new Date().getUTCFullYear() + 1}`,
+      startsOn: new Date(`${new Date().getUTCFullYear()}-04-01T00:00:00.000Z`),
+      endsOn: new Date(`${new Date().getUTCFullYear() + 1}-03-31T23:59:59.999Z`),
+      isCurrent: true,
     },
   });
 
@@ -112,6 +134,52 @@ async function main() {
     }
   }
 
+  for (const account of DEFAULT_CHART_ACCOUNTS) {
+    await prisma.chartAccount.upsert({
+      where: {
+        tenantId_code: {
+          tenantId: tenant.id,
+          code: account.code,
+        },
+      },
+      update: {
+        name: account.name,
+        type: account.type,
+      },
+      create: {
+        tenantId: tenant.id,
+        code: account.code,
+        name: account.name,
+        type: account.type,
+      },
+    });
+  }
+
+  for (const feeHead of DEFAULT_FEE_HEADS) {
+    await prisma.feeHead.upsert({
+      where: {
+        tenantId_code: {
+          tenantId: tenant.id,
+          code: feeHead.code,
+        },
+      },
+      update: {
+        name: feeHead.name,
+        frequency: feeHead.frequency,
+        defaultAmount: feeHead.defaultAmount,
+        vatApplicable: feeHead.vatApplicable,
+      },
+      create: {
+        tenantId: tenant.id,
+        code: feeHead.code,
+        name: feeHead.name,
+        frequency: feeHead.frequency,
+        defaultAmount: feeHead.defaultAmount,
+        vatApplicable: feeHead.vatApplicable,
+      },
+    });
+  }
+
   // 3. Create Super Admin User
   const adminRole = await prisma.role.findUnique({
     where: { tenantId_name: { tenantId: tenant.id, name: 'admin' } },
@@ -145,6 +213,7 @@ async function main() {
 
   console.log('✅ Seeding complete!');
   console.log('Admin login: admin@schoolos.com / admin123');
+  console.log(`Academic year ready: ${academicYear.name}`);
 }
 
 main()

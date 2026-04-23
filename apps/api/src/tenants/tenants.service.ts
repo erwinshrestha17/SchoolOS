@@ -1,7 +1,15 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Mode } from '@prisma/client';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Mode, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
+import {
+  DEFAULT_CHART_ACCOUNTS,
+  DEFAULT_FEE_HEADS,
+} from '../finance/finance.defaults';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   PERMISSION_CATALOG,
@@ -96,12 +104,14 @@ export class TenantsService {
       throw new NotFoundException('Tenant not found');
     }
 
-    const [userCount, staffCount, studentCount, classCount] = await Promise.all([
-      this.prisma.user.count({ where: { tenantId: actor.tenantId } }),
-      this.prisma.staff.count({ where: { tenantId: actor.tenantId } }),
-      this.prisma.student.count({ where: { tenantId: actor.tenantId } }),
-      this.prisma.class.count({ where: { tenantId: actor.tenantId } }),
-    ]);
+    const [userCount, staffCount, studentCount, classCount] = await Promise.all(
+      [
+        this.prisma.user.count({ where: { tenantId: actor.tenantId } }),
+        this.prisma.staff.count({ where: { tenantId: actor.tenantId } }),
+        this.prisma.student.count({ where: { tenantId: actor.tenantId } }),
+        this.prisma.class.count({ where: { tenantId: actor.tenantId } }),
+      ],
+    );
 
     return {
       id: tenant.id,
@@ -200,6 +210,89 @@ export class TenantsService {
           },
         });
       }
+    }
+
+    await this.ensureAcademicYearDefaults(tenantId);
+    await this.ensureFinanceDefaults(tenantId);
+  }
+
+  private async ensureAcademicYearDefaults(tenantId: string) {
+    const yearStart = new Date(
+      `${new Date().getFullYear()}-04-01T00:00:00.000Z`,
+    );
+    const yearEnd = new Date(
+      `${new Date().getFullYear() + 1}-03-31T23:59:59.999Z`,
+    );
+
+    await this.prisma.academicYear.upsert({
+      where: {
+        tenantId_name: {
+          tenantId,
+          name: `${yearStart.getUTCFullYear()}-${yearEnd.getUTCFullYear()}`,
+        },
+      },
+      update: {
+        startsOn: yearStart,
+        endsOn: yearEnd,
+        isCurrent: true,
+      },
+      create: {
+        tenantId,
+        name: `${yearStart.getUTCFullYear()}-${yearEnd.getUTCFullYear()}`,
+        startsOn: yearStart,
+        endsOn: yearEnd,
+        isCurrent: true,
+      },
+    });
+  }
+
+  private async ensureFinanceDefaults(tenantId: string) {
+    for (const account of DEFAULT_CHART_ACCOUNTS) {
+      await this.prisma.chartAccount.upsert({
+        where: {
+          tenantId_code: {
+            tenantId,
+            code: account.code,
+          },
+        },
+        update: {
+          name: account.name,
+          type: account.type,
+          isSystem: true,
+        },
+        create: {
+          tenantId,
+          code: account.code,
+          name: account.name,
+          type: account.type,
+          isSystem: true,
+        },
+      });
+    }
+
+    for (const feeHead of DEFAULT_FEE_HEADS) {
+      await this.prisma.feeHead.upsert({
+        where: {
+          tenantId_code: {
+            tenantId,
+            code: feeHead.code,
+          },
+        },
+        update: {
+          name: feeHead.name,
+          frequency: feeHead.frequency,
+          defaultAmount: new Prisma.Decimal(feeHead.defaultAmount),
+          vatApplicable: feeHead.vatApplicable,
+        },
+        create: {
+          tenantId,
+          code: feeHead.code,
+          name: feeHead.name,
+          frequency: feeHead.frequency,
+          defaultAmount: new Prisma.Decimal(feeHead.defaultAmount),
+          vatApplicable: feeHead.vatApplicable,
+        },
+      });
     }
   }
 }

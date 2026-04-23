@@ -1,0 +1,813 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Mode {
+  SINGLE
+  MULTI
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum AuthMethod {
+  PASSWORD
+  OTP
+  BOTH
+}
+
+enum OtpPurpose {
+  LOGIN
+  RESET
+  VERIFY
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ContractType {
+  PERMANENT
+  TEMPORARY
+  PART_TIME
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PROMOTED
+  TRANSFERRED
+  EXITED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  LEAVE
+}
+
+enum FeeFrequency {
+  ONE_TIME
+  MONTHLY
+  TERM
+  ANNUAL
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIAL
+  PAID
+  VOID
+}
+
+enum PaymentMethod {
+  CASH
+  BANK
+  CHEQUE
+  TRANSFER
+  MOBILE
+}
+
+enum JournalSourceType {
+  MANUAL
+  INVOICE
+  FEE_PAYMENT
+  ADJUSTMENT
+}
+
+enum JournalLineSide {
+  DEBIT
+  CREDIT
+}
+
+enum ChartAccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+enum NoticePriority {
+  NORMAL
+  URGENT
+  EMERGENCY
+}
+
+enum AudienceType {
+  ALL
+  CLASS
+  SECTION
+  ROLE
+}
+
+enum EventType {
+  GENERAL
+  EXAM
+  MEETING
+  HOLIDAY
+}
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  mode      Mode     @default(SINGLE)
+  plan      String   @default("free")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  users                 User[]
+  roles                 Role[]
+  classes               Class[]
+  students              Student[]
+  subjects              Subject[]
+  staff                 Staff[]
+  academicYears         AcademicYear[]
+  sections              Section[]
+  guardians             Guardian[]
+  studentGuardians      StudentGuardian[]
+  enrollments           Enrollment[]
+  attendanceSessions    AttendanceSession[]
+  attendanceRecords     AttendanceRecord[]
+  staffAttendance       StaffAttendance[]
+  feeHeads              FeeHead[]
+  feePlans              FeePlan[]
+  feePlanItems          FeePlanItem[]
+  studentFeeAssignments StudentFeeAssignment[]
+  invoices              Invoice[]
+  invoiceLines          InvoiceLine[]
+  payments              Payment[]
+  receipts              Receipt[]
+  chartAccounts         ChartAccount[]
+  journalEntries        JournalEntry[]
+  journalLines          JournalLine[]
+  notices               Notice[]
+  events                Event[]
+}
+
+model User {
+  id           String     @id @default(uuid())
+  tenantId     String
+  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+  email        String?
+  phone        String?
+  passwordHash String?
+  authMethod   AuthMethod @default(PASSWORD)
+  status       UserStatus @default(PENDING)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+
+  userRoles                   UserRole[]
+  refreshTokens               RefreshToken[]
+  otpCodes                    OtpCode[]
+  auditLogs                   AuditLog[]
+  student                     Student?             @relation("StudentUser")
+  staff                       Staff?               @relation("StaffUser")
+  guardian                    Guardian?            @relation("GuardianUser")
+  submittedAttendanceSessions AttendanceSession[]  @relation("SubmittedAttendanceSessions")
+  approvedStaffAttendance     StaffAttendance[]    @relation("ApprovedStaffAttendance")
+  collectedPayments           Payment[]            @relation("CollectedPayments")
+  journalEntries              JournalEntry[]       @relation("CreatedJournalEntries")
+  createdNotices              Notice[]             @relation("CreatedNotices")
+  createdEvents               Event[]              @relation("CreatedEvents")
+
+  @@unique([tenantId, email])
+  @@unique([tenantId, phone])
+}
+
+model Role {
+  id          String  @id @default(uuid())
+  tenantId    String
+  tenant      Tenant  @relation(fields: [tenantId], references: [id])
+  name        String
+  description String?
+  isSystem    Boolean @default(false)
+
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@unique([tenantId, name])
+}
+
+model Permission {
+  id          String  @id @default(uuid())
+  resource    String
+  action      String
+  description String?
+
+  rolePermissions RolePermission[]
+
+  @@unique([resource, action])
+}
+
+model UserRole {
+  id           String   @id @default(uuid())
+  userId       String
+  roleId       String
+  tenantId     String
+  scopeId      String?
+  assignedById String?
+  assignedAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId, scopeId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  deviceId  String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model OtpCode {
+  id        String     @id @default(uuid())
+  userId    String
+  codeHash  String
+  purpose   OtpPurpose
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  tenantId   String
+  action     String
+  resource   String
+  resourceId String?
+  before     Json?
+  after      Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+model AcademicYear {
+  id         String   @id @default(uuid())
+  tenantId   String
+  name       String
+  startsOn   DateTime
+  endsOn     DateTime
+  isCurrent  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant                 Tenant                 @relation(fields: [tenantId], references: [id])
+  enrollments            Enrollment[]
+  attendanceSessions     AttendanceSession[]
+  feePlans               FeePlan[]
+  studentFeeAssignments  StudentFeeAssignment[]
+  invoices               Invoice[]
+
+  @@unique([tenantId, name])
+}
+
+model Class {
+  id       String @id @default(uuid())
+  tenantId String
+  name     String
+  level    Int
+
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  students           Student[]
+  subjects           Subject[]
+  sections           Section[]
+  enrollments        Enrollment[]
+  attendanceSessions AttendanceSession[]
+  feePlans           FeePlan[]
+  notices            Notice[]
+  events             Event[]
+
+  @@unique([tenantId, name])
+}
+
+model Section {
+  id        String   @id @default(uuid())
+  tenantId  String
+  classId   String
+  name      String
+  capacity  Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  class              Class               @relation(fields: [classId], references: [id])
+  students           Student[]
+  enrollments        Enrollment[]
+  attendanceSessions AttendanceSession[]
+  notices            Notice[]
+  events             Event[]
+
+  @@unique([tenantId, classId, name])
+}
+
+model Subject {
+  id       String @id @default(uuid())
+  tenantId String
+  classId  String
+  name     String
+  code     String
+  type     String
+  hasPractical   Boolean @default(false)
+  theoryMarks    Float?
+  practicalMarks Float?
+  passMarks      Float?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  class  Class  @relation(fields: [classId], references: [id])
+
+  @@unique([tenantId, classId, code])
+}
+
+model Student {
+  id       String  @id @default(uuid())
+  tenantId String
+  userId   String? @unique
+  studentSystemId   String   @unique
+  firstNameEn       String
+  lastNameEn        String
+  firstNameNp       String?
+  lastNameNp        String?
+  dateOfBirth       DateTime
+  gender            Gender
+  bloodGroup        String?
+  nationality       String   @default("Nepali")
+  religion          String?
+  ethnicity         String?
+  motherTongue      String?
+  disabilityFlag    String?
+  nationalStudentId String?
+  birthCertNumber   String?
+  photoUrl          String?
+  admissionDate     DateTime
+  admissionNumber   String?
+  previousSchool    String?
+  transferCertUrl   String?
+  mediumOfInstruct  String   @default("English")
+  classId           String
+  sectionId         String?
+  section           String?
+  rollNumber        Int?
+  medicalConditions       String?
+  severeAllergies         String?
+  medications             String?
+  specialNeeds            String?
+  emergencyName           String?
+  emergencyPhone          String?
+  doctorName              String?
+  doctorPhone             String?
+  privacyConsentAt        DateTime?
+  dataProcessingConsentedAt DateTime?
+  medicalConsentAt        DateTime?
+  photoUsageConsentAt     DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  tenant                 Tenant                 @relation(fields: [tenantId], references: [id])
+  user                   User?                  @relation("StudentUser", fields: [userId], references: [id])
+  class                  Class                  @relation(fields: [classId], references: [id])
+  sectionRef             Section?               @relation(fields: [sectionId], references: [id])
+  guardianLinks          StudentGuardian[]
+  enrollments            Enrollment[]
+  attendanceRecords      AttendanceRecord[]
+  studentFeeAssignments  StudentFeeAssignment[]
+  invoices               Invoice[]
+  payments               Payment[]
+}
+
+model Guardian {
+  id               String   @id @default(uuid())
+  tenantId         String
+  userId           String?  @unique
+  fullName         String
+  relation         String
+  primaryPhone     String
+  secondaryPhone   String?
+  email            String?
+  occupation       String?
+  homeAddress      String?
+  wardNumber       String?
+  receivesAlerts   Boolean  @default(false)
+  privacyConsentAt DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
+  user         User?             @relation("GuardianUser", fields: [userId], references: [id])
+  studentLinks StudentGuardian[]
+
+  @@unique([tenantId, primaryPhone])
+}
+
+model StudentGuardian {
+  id             String   @id @default(uuid())
+  tenantId       String
+  studentId      String
+  guardianId     String
+  relation       String
+  isPrimary      Boolean  @default(false)
+  appLoginLinked Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  student  Student  @relation(fields: [studentId], references: [id])
+  guardian Guardian @relation(fields: [guardianId], references: [id])
+
+  @@unique([studentId, guardianId])
+}
+
+model Enrollment {
+  id                 String           @id @default(uuid())
+  tenantId           String
+  studentId          String
+  academicYearId     String
+  classId            String
+  sectionId          String?
+  rollNumber         Int?
+  admissionNumber    String?
+  admissionDate      DateTime
+  mediumOfInstruction String
+  status             EnrollmentStatus @default(ACTIVE)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  student      Student      @relation(fields: [studentId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
+  section      Section?     @relation(fields: [sectionId], references: [id])
+  invoices     Invoice[]
+
+  @@unique([tenantId, studentId, academicYearId])
+}
+
+model Staff {
+  id       String @id @default(uuid())
+  tenantId String
+  userId   String @unique
+  employeeId        String   @unique
+  firstName         String
+  lastName          String
+  firstNameNp       String?
+  lastNameNp        String?
+  photoUrl          String?
+  dateOfBirth       DateTime
+  gender            Gender
+  address           String
+  teacherRegistryId String?
+  citizenshipNo     String?
+  panNumber         String?
+  bankAccount       String?
+  bankName          String?
+  qualifications    String?
+  experience        String?
+  joiningDate       DateTime
+  contractType      ContractType
+  probationEndDate  DateTime?
+  privacyConsentAt  DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant            Tenant            @relation(fields: [tenantId], references: [id])
+  user              User              @relation("StaffUser", fields: [userId], references: [id])
+  attendanceRecords StaffAttendance[]
+}
+
+model AttendanceSession {
+  id             String   @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  classId        String
+  sectionId      String?
+  attendanceDate DateTime
+  submittedById  String?
+  submittedAt    DateTime?
+  lockAt         DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  academicYear AcademicYear  @relation(fields: [academicYearId], references: [id])
+  class        Class         @relation(fields: [classId], references: [id])
+  section      Section?      @relation(fields: [sectionId], references: [id])
+  submittedBy  User?         @relation("SubmittedAttendanceSessions", fields: [submittedById], references: [id])
+  records      AttendanceRecord[]
+
+  @@unique([tenantId, attendanceDate, classId, sectionId])
+}
+
+model AttendanceRecord {
+  id                  String           @id @default(uuid())
+  tenantId            String
+  attendanceSessionId String
+  studentId           String
+  status              AttendanceStatus @default(PRESENT)
+  remark              String?
+  lateAt              DateTime?
+  createdAt           DateTime         @default(now())
+
+  tenant            Tenant            @relation(fields: [tenantId], references: [id])
+  attendanceSession AttendanceSession @relation(fields: [attendanceSessionId], references: [id])
+  student           Student           @relation(fields: [studentId], references: [id])
+
+  @@unique([attendanceSessionId, studentId])
+}
+
+model StaffAttendance {
+  id             String           @id @default(uuid())
+  tenantId       String
+  staffId        String
+  attendanceDate DateTime
+  status         AttendanceStatus @default(PRESENT)
+  leaveType      String?
+  note           String?
+  checkInAt      DateTime?
+  approvedById   String?
+  createdAt      DateTime         @default(now())
+
+  tenant     Tenant @relation(fields: [tenantId], references: [id])
+  staff      Staff  @relation(fields: [staffId], references: [id])
+  approvedBy User?  @relation("ApprovedStaffAttendance", fields: [approvedById], references: [id])
+
+  @@unique([tenantId, staffId, attendanceDate])
+}
+
+model FeeHead {
+  id             String       @id @default(uuid())
+  tenantId       String
+  code           String
+  name           String
+  frequency      FeeFrequency
+  defaultAmount  Decimal      @db.Decimal(12, 2)
+  vatApplicable  Boolean      @default(true)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  feePlanItems  FeePlanItem[]
+  invoiceLines  InvoiceLine[]
+
+  @@unique([tenantId, code])
+}
+
+model FeePlan {
+  id             String   @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  classId        String?
+  code           String
+  name           String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant                 Tenant                 @relation(fields: [tenantId], references: [id])
+  academicYear           AcademicYear           @relation(fields: [academicYearId], references: [id])
+  class                  Class?                 @relation(fields: [classId], references: [id])
+  items                  FeePlanItem[]
+  studentFeeAssignments  StudentFeeAssignment[]
+
+  @@unique([tenantId, code])
+}
+
+model FeePlanItem {
+  id         String   @id @default(uuid())
+  tenantId   String
+  feePlanId  String
+  feeHeadId  String
+  amount     Decimal  @db.Decimal(12, 2)
+  createdAt  DateTime @default(now())
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  feePlan  FeePlan  @relation(fields: [feePlanId], references: [id])
+  feeHead  FeeHead  @relation(fields: [feeHeadId], references: [id])
+
+  @@unique([feePlanId, feeHeadId])
+}
+
+model StudentFeeAssignment {
+  id             String   @id @default(uuid())
+  tenantId       String
+  studentId      String
+  feePlanId      String
+  academicYearId String
+  assignedAt     DateTime @default(now())
+  isActive       Boolean  @default(true)
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  student      Student      @relation(fields: [studentId], references: [id])
+  feePlan      FeePlan      @relation(fields: [feePlanId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  @@unique([studentId, feePlanId, academicYearId])
+}
+
+model Invoice {
+  id             String        @id @default(uuid())
+  tenantId       String
+  studentId      String
+  academicYearId String
+  enrollmentId   String?
+  invoiceNumber  String
+  dueDate        DateTime
+  status         InvoiceStatus @default(ISSUED)
+  subtotal       Decimal       @db.Decimal(12, 2)
+  vatAmount      Decimal       @db.Decimal(12, 2)
+  totalAmount    Decimal       @db.Decimal(12, 2)
+  issuedAt       DateTime      @default(now())
+  paidAt         DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  student      Student       @relation(fields: [studentId], references: [id])
+  academicYear AcademicYear  @relation(fields: [academicYearId], references: [id])
+  enrollment   Enrollment?   @relation(fields: [enrollmentId], references: [id])
+  lines        InvoiceLine[]
+  payments     Payment[]
+
+  @@unique([tenantId, invoiceNumber])
+}
+
+model InvoiceLine {
+  id          String   @id @default(uuid())
+  tenantId    String
+  invoiceId   String
+  feeHeadId   String
+  description String
+  quantity    Int      @default(1)
+  unitAmount  Decimal  @db.Decimal(12, 2)
+  vatAmount   Decimal  @db.Decimal(12, 2)
+  totalAmount Decimal  @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  invoice  Invoice  @relation(fields: [invoiceId], references: [id])
+  feeHead  FeeHead  @relation(fields: [feeHeadId], references: [id])
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  tenantId        String
+  studentId       String
+  invoiceId       String
+  collectedById   String?
+  method          PaymentMethod
+  referenceNumber String?
+  amount          Decimal       @db.Decimal(12, 2)
+  paidAt          DateTime
+  narration       String?
+  createdAt       DateTime      @default(now())
+
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  student      Student  @relation(fields: [studentId], references: [id])
+  invoice      Invoice  @relation(fields: [invoiceId], references: [id])
+  collectedBy  User?    @relation("CollectedPayments", fields: [collectedById], references: [id])
+  receipt      Receipt?
+
+  @@index([tenantId, paidAt])
+}
+
+model Receipt {
+  id            String   @id @default(uuid())
+  tenantId      String
+  paymentId     String   @unique
+  receiptNumber String
+  issuedAt      DateTime @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@unique([tenantId, receiptNumber])
+}
+
+model ChartAccount {
+  id         String           @id @default(uuid())
+  tenantId   String
+  code       String
+  name       String
+  type       ChartAccountType
+  isSystem   Boolean          @default(true)
+  parentId   String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  tenant      Tenant         @relation(fields: [tenantId], references: [id])
+  parent      ChartAccount?  @relation("ChartAccountTree", fields: [parentId], references: [id])
+  children    ChartAccount[] @relation("ChartAccountTree")
+  journalLines JournalLine[]
+
+  @@unique([tenantId, code])
+}
+
+model JournalEntry {
+  id           String            @id @default(uuid())
+  tenantId     String
+  entryNumber  String
+  entryDate    DateTime
+  narration    String
+  sourceType   JournalSourceType
+  sourceId     String?
+  createdById  String?
+  createdAt    DateTime          @default(now())
+
+  tenant     Tenant        @relation(fields: [tenantId], references: [id])
+  createdBy  User?         @relation("CreatedJournalEntries", fields: [createdById], references: [id])
+  lines      JournalLine[]
+
+  @@unique([tenantId, entryNumber])
+}
+
+model JournalLine {
+  id             String          @id @default(uuid())
+  tenantId       String
+  journalEntryId String
+  chartAccountId String
+  side           JournalLineSide
+  amount         Decimal         @db.Decimal(12, 2)
+  description    String?
+  createdAt      DateTime        @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id])
+  chartAccount ChartAccount @relation(fields: [chartAccountId], references: [id])
+}
+
+model Notice {
+  id           String         @id @default(uuid())
+  tenantId     String
+  classId      String?
+  sectionId    String?
+  createdById  String?
+  title        String
+  body         String
+  priority     NoticePriority @default(NORMAL)
+  audienceType AudienceType   @default(ALL)
+  attachmentUrl String?
+  scheduledFor DateTime?
+  publishedAt  DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  class     Class?   @relation(fields: [classId], references: [id])
+  section   Section? @relation(fields: [sectionId], references: [id])
+  createdBy User?    @relation("CreatedNotices", fields: [createdById], references: [id])
+}
+
+model Event {
+  id           String       @id @default(uuid())
+  tenantId     String
+  classId      String?
+  sectionId    String?
+  createdById  String?
+  title        String
+  description  String?
+  eventType    EventType    @default(GENERAL)
+  audienceType AudienceType @default(ALL)
+  startsAt     DateTime
+  endsAt       DateTime?
+  location     String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  class     Class?   @relation(fields: [classId], references: [id])
+  section   Section? @relation(fields: [sectionId], references: [id])
+  createdBy User?    @relation("CreatedEvents", fields: [createdById], references: [id])
+}

@@ -2,6 +2,7 @@ import 'dotenv/config';
 
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ConfigService } from './config/config.service';
 import type { NextFunction, Request, Response } from 'express';
@@ -59,8 +60,21 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+
+  app.setGlobalPrefix('api/v1');
+
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('SchoolOS API')
+    .setDescription('Multi-tenant SchoolOS admin API')
+    .setVersion('1.0.0')
+    .addBearerAuth()
+    .build();
+
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/v1/docs', app, document);
+
   app.enableShutdownHooks();
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 4000);
 }
 bootstrap().catch((err) => {
   console.error('Error during bootstrap', err);

@@ -20,7 +20,11 @@ import { AuditService } from '../audit/audit.service';
 import { ConfigService } from '../config/config.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuthContext, JwtAccessPayload, JwtChallengePayload } from './auth.types';
+import {
+  AuthContext,
+  JwtAccessPayload,
+  JwtChallengePayload,
+} from './auth.types';
 import {
   generateOtpCode,
   generateRefreshToken,
@@ -47,7 +51,10 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto, response: Response, requestMeta?: RequestMeta) {
-    const { tenant, user } = await this.resolveTenantAndUser(dto.tenantSlug, dto.email);
+    const { tenant, user } = await this.resolveTenantAndUser(
+      dto.tenantSlug,
+      dto.email,
+    );
 
     if (user.authMethod === AuthMethod.OTP) {
       throw new UnauthorizedException(
@@ -59,7 +66,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid tenant or credentials');
     }
 
-    const passwordMatches = await bcrypt.compare(dto.password, user.passwordHash);
+    const passwordMatches = await bcrypt.compare(
+      dto.password,
+      user.passwordHash,
+    );
 
     if (!passwordMatches) {
       throw new UnauthorizedException('Invalid tenant or credentials');
@@ -91,16 +101,27 @@ export class AuthService {
       };
     }
 
-    return this.completeAuthenticatedSession(user, tenant, response, requestMeta, {
-      action: 'login',
-    });
+    return this.completeAuthenticatedSession(
+      user,
+      tenant,
+      response,
+      requestMeta,
+      {
+        action: 'login',
+      },
+    );
   }
 
   async requestOtpLogin(dto: RequestOtpLoginDto) {
-    const { tenant, user } = await this.resolveTenantAndUser(dto.tenantSlug, dto.email);
+    const { tenant, user } = await this.resolveTenantAndUser(
+      dto.tenantSlug,
+      dto.email,
+    );
 
     if (user.authMethod !== AuthMethod.OTP) {
-      throw new UnauthorizedException('This account does not support OTP-only login');
+      throw new UnauthorizedException(
+        'This account does not support OTP-only login',
+      );
     }
 
     const challenge = await this.issueOtpChallenge({
@@ -130,7 +151,10 @@ export class AuthService {
     response: Response,
     requestMeta?: RequestMeta,
   ) {
-    const challenge = await this.verifyChallengeToken(dto.challengeToken, OtpPurpose.LOGIN);
+    const challenge = await this.verifyChallengeToken(
+      dto.challengeToken,
+      OtpPurpose.LOGIN,
+    );
     const { tenant, user } = await this.resolveTenantAndUserById(
       challenge.tenantId,
       challenge.sub,
@@ -138,9 +162,15 @@ export class AuthService {
 
     await this.consumeOtpCode(user.id, OtpPurpose.LOGIN, dto.code);
 
-    return this.completeAuthenticatedSession(user, tenant, response, requestMeta, {
-      action: user.authMethod === AuthMethod.BOTH ? 'login_mfa' : 'login_otp',
-    });
+    return this.completeAuthenticatedSession(
+      user,
+      tenant,
+      response,
+      requestMeta,
+      {
+        action: user.authMethod === AuthMethod.BOTH ? 'login_mfa' : 'login_otp',
+      },
+    );
   }
 
   async requestPasswordRecovery(dto: RequestPasswordRecoveryDto) {
@@ -192,7 +222,10 @@ export class AuthService {
   }
 
   async confirmPasswordRecovery(dto: ConfirmPasswordRecoveryDto) {
-    const { tenant, user } = await this.resolveTenantAndUser(dto.tenantSlug, dto.email);
+    const { tenant, user } = await this.resolveTenantAndUser(
+      dto.tenantSlug,
+      dto.email,
+    );
 
     if (!user.passwordHash) {
       throw new UnauthorizedException('Invalid recovery code');
@@ -229,7 +262,9 @@ export class AuthService {
     );
 
     if (!user.email) {
-      throw new BadRequestException('An email address is required to configure MFA');
+      throw new BadRequestException(
+        'An email address is required to configure MFA',
+      );
     }
 
     await this.issueOtpEmail({
@@ -251,7 +286,11 @@ export class AuthService {
   }
 
   async confirmMfaSetup(auth: AuthContext, dto: ConfirmMfaSetupDto) {
-    if (![AuthMethod.PASSWORD, AuthMethod.BOTH, AuthMethod.OTP].includes(dto.authMethod)) {
+    if (
+      ![AuthMethod.PASSWORD, AuthMethod.BOTH, AuthMethod.OTP].includes(
+        dto.authMethod,
+      )
+    ) {
       throw new BadRequestException('Invalid auth method');
     }
 
@@ -332,7 +371,10 @@ export class AuthService {
       data: { revokedAt: new Date() },
     });
 
-    const authContext = this.buildAuthContext(existingSession.user, tenant.slug);
+    const authContext = this.buildAuthContext(
+      existingSession.user,
+      tenant.slug,
+    );
     const session = await this.issueSession(authContext);
     this.attachRefreshCookie(response, session.refreshToken);
 
@@ -571,7 +613,9 @@ export class AuthService {
 
   private async issueOtpEmail(input: IssueOtpInput) {
     if (!input.user.email) {
-      throw new BadRequestException('An email address is required for OTP delivery');
+      throw new BadRequestException(
+        'An email address is required for OTP delivery',
+      );
     }
 
     await this.assertOtpIssueAllowed(input.user.id, input.purpose);
@@ -618,7 +662,11 @@ export class AuthService {
     return payload;
   }
 
-  private async consumeOtpCode(userId: string, purpose: OtpPurpose, code: string) {
+  private async consumeOtpCode(
+    userId: string,
+    purpose: OtpPurpose,
+    code: string,
+  ) {
     const otpCode = await this.prisma.otpCode.findFirst({
       where: {
         userId,
@@ -732,7 +780,9 @@ export class AuthService {
     },
     tenantSlug: string,
   ): AuthContext {
-    const roles = Array.from(new Set(user.userRoles.map(({ role }) => role.name)));
+    const roles = Array.from(
+      new Set(user.userRoles.map(({ role }) => role.name)),
+    );
     const permissions = Array.from(
       new Set(
         user.userRoles.flatMap(({ role }) =>

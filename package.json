@@ -1,0 +1,16 @@
+{
+  "name": "schoolos",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @schoolos/api --filter @schoolos/web dev",
+    "build": "pnpm --filter @schoolos/api build && pnpm --filter @schoolos/web build",
+    "lint": "pnpm --filter @schoolos/api format:check && pnpm --filter @schoolos/web lint",
+    "typecheck": "pnpm --filter @schoolos/api typecheck && pnpm --filter @schoolos/web typecheck",
+    "test": "pnpm --filter @schoolos/api test && pnpm --filter @schoolos/web test",
+    "db:generate": "pnpm --filter @schoolos/api prisma:generate",
+    "db:migrate": "pnpm --filter @schoolos/api db:migrate",
+    "db:seed": "pnpm --filter @schoolos/api db:seed"
+  }
+}

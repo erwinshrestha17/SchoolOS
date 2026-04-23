@@ -1,8 +1,4 @@
-import {
-  AuthMethod,
-  OtpPurpose,
-  UserStatus,
-} from '@prisma/client';
+import { AuthMethod, OtpPurpose, UserStatus } from '@prisma/client';
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
@@ -64,9 +60,11 @@ describe('AuthService', () => {
       },
     };
     jwtService = {
-      signAsync: jest.fn().mockImplementation(async (payload: any) =>
-        payload.purpose ? 'challenge-token' : 'access-token',
-      ),
+      signAsync: jest
+        .fn()
+        .mockImplementation(async (payload: any) =>
+          payload.purpose ? 'challenge-token' : 'access-token',
+        ),
       verifyAsync: jest.fn().mockResolvedValue({
         sub: authUser.id,
         tenantId: authUser.tenantId,
@@ -125,12 +123,12 @@ describe('AuthService', () => {
 
     const result = asSession(
       await service.login(
-      {
-        tenantSlug: 'school-a',
-        email: authUser.email,
-        password: 'password123',
-      },
-      response,
+        {
+          tenantSlug: 'school-a',
+          email: authUser.email,
+          password: 'password123',
+        },
+        response,
       ),
     );
 
@@ -155,12 +153,12 @@ describe('AuthService', () => {
 
     const result = asChallenge(
       await service.login(
-      {
-        tenantSlug: 'school-a',
-        email: authUser.email,
-        password: 'password123',
-      },
-      response,
+        {
+          tenantSlug: 'school-a',
+          email: authUser.email,
+          password: 'password123',
+        },
+        response,
       ),
     );
 

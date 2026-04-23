@@ -9,7 +9,12 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from './guards/roles-permissions.guard';
 
 @Module({
-  imports: [JwtModule.register({}), ConfigModule, AuditModule, NotificationsModule],
+  imports: [
+    JwtModule.register({}),
+    ConfigModule,
+    AuditModule,
+    NotificationsModule,
+  ],
   controllers: [AuthController],
   providers: [AuthService, JwtAuthGuard, RolesPermissionsGuard],
   exports: [AuthService, JwtAuthGuard, RolesPermissionsGuard, JwtModule],

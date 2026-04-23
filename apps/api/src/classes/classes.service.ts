@@ -19,6 +19,7 @@ export class ClassesService {
           select: {
             students: true,
             subjects: true,
+            sections: true,
           },
         },
       },
@@ -31,6 +32,7 @@ export class ClassesService {
       level: classroom.level,
       studentCount: classroom._count.students,
       subjectCount: classroom._count.subjects,
+      sectionCount: classroom._count.sections,
     }));
   }
 

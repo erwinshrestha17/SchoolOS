@@ -8,6 +8,19 @@ type SendEmailInput = {
   metadata?: Record<string, string>;
 };
 
+type SendSmsInput = {
+  to: string;
+  message: string;
+  metadata?: Record<string, string>;
+};
+
+type SendPushNotificationInput = {
+  title: string;
+  body: string;
+  audience: string;
+  metadata?: Record<string, string>;
+};
+
 type SendAuthCodeEmailInput = {
   to: string;
   tenantName: string;
@@ -82,9 +95,7 @@ export class NotificationsService {
       });
 
       if (!response.ok) {
-        throw new Error(
-          `Email webhook failed with status ${response.status}`,
-        );
+        throw new Error(`Email webhook failed with status ${response.status}`);
       }
 
       return;
@@ -96,6 +107,31 @@ export class NotificationsService {
         to: input.to,
         subject: input.subject,
         text: input.text,
+        metadata: input.metadata ?? {},
+      }),
+    );
+  }
+
+  async sendSms(input: SendSmsInput) {
+    this.logger.log(
+      JSON.stringify({
+        mode: 'log',
+        channel: 'sms',
+        to: input.to,
+        message: input.message,
+        metadata: input.metadata ?? {},
+      }),
+    );
+  }
+
+  async sendPushNotification(input: SendPushNotificationInput) {
+    this.logger.log(
+      JSON.stringify({
+        mode: 'log',
+        channel: 'push',
+        title: input.title,
+        body: input.body,
+        audience: input.audience,
         metadata: input.metadata ?? {},
       }),
     );

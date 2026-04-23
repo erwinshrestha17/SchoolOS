@@ -1,0 +1,27 @@
+{
+  "name": "@schoolos/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "build": "echo \"@schoolos/core is source-only in this phase\"",
+    "lint": "echo \"@schoolos/core uses downstream package typechecks in this phase\"",
+    "typecheck": "echo \"@schoolos/core uses downstream package typechecks in this phase\"",
+    "test": "echo \"No tests for @schoolos/core\""
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  }
+}
