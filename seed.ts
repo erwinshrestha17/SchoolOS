@@ -1,8 +1,14 @@
-// prisma/seed.ts
+// seed.ts
 import { PrismaClient, AuthMethod, UserStatus, Mode } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
+import 'dotenv/config';
 
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({
+  connectionString: 'postgresql://postgres:admin@localhost:5432/school_os?schema=public',
+});
+
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log('Seeding database...');
@@ -53,6 +59,10 @@ async function main() {
     where: { tenantId_name: { tenantId: tenant.id, name: 'admin' } },
   });
 
+  if (!adminRole) {
+    throw new Error('Admin role was not created successfully.');
+  }
+
   const adminPassword = await bcrypt.hash('admin123', 12);
 
   await prisma.user.upsert({
@@ -68,7 +78,7 @@ async function main() {
       status: UserStatus.ACTIVE,
       userRoles: {
         create: {
-          roleId: adminRole!.id,
+          roleId: adminRole.id,
           tenantId: tenant.id,
         },
       },
@@ -76,14 +86,14 @@ async function main() {
   });
 
   console.log('✅ Seeding complete!');
-  console.log(`Admin login: admin@schoolos.com / admin123`);
+  console.log('Admin login: admin@schoolos.com / admin123');
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });

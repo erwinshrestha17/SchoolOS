@@ -6,7 +6,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL") // Remove this line if you are using Prisma 7 with prisma.config.ts
 }
 
 // ==========================================
@@ -59,13 +58,13 @@ model Tenant {
   plan      String   @default("free")
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
-  
-  users     User[]
-  roles     Role[]
-  classes   Class[]
-  students  Student[]
-  subjects  Subject[]
-  staff     Staff[]
+
+  users    User[]
+  roles    Role[]
+  classes  Class[]
+  students Student[]
+  subjects Subject[]
+  staff    Staff[]
 }
 
 model User {
@@ -92,13 +91,13 @@ model User {
 }
 
 model Role {
-  id              String           @id @default(uuid())
-  tenantId        String
-  tenant          Tenant           @relation(fields: [tenantId], references: [id])
-  name            String
-  description     String?
-  isSystem        Boolean          @default(false)
-  
+  id          String  @id @default(uuid())
+  tenantId    String
+  tenant      Tenant  @relation(fields: [tenantId], references: [id])
+  name        String
+  description String?
+  isSystem    Boolean @default(false)
+
   userRoles       UserRole[]
   rolePermissions RolePermission[]
 
@@ -106,11 +105,11 @@ model Role {
 }
 
 model Permission {
-  id              String           @id @default(uuid())
-  resource        String
-  action          String
-  description     String?
-  
+  id          String  @id @default(uuid())
+  resource    String
+  action      String
+  description String?
+
   rolePermissions RolePermission[]
 
   @@unique([resource, action])
@@ -121,7 +120,7 @@ model UserRole {
   userId       String
   roleId       String
   tenantId     String
-  scopeId      String?  
+  scopeId      String?
   assignedById String?
   assignedAt   DateTime @default(now())
 
@@ -146,25 +145,25 @@ model RolePermission {
 // ==========================================
 
 model RefreshToken {
-  id         String    @id @default(uuid())
-  userId     String
-  tokenHash  String    @unique
-  deviceId   String?
-  expiresAt  DateTime
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  deviceId  String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id])
 }
 
 model OtpCode {
-  id         String     @id @default(uuid())
-  userId     String
-  codeHash   String
-  purpose    OtpPurpose
-  expiresAt  DateTime
-  usedAt     DateTime?
-  createdAt  DateTime   @default(now())
+  id        String     @id @default(uuid())
+  userId    String
+  codeHash  String
+  purpose   OtpPurpose
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime   @default(now())
 
   user User @relation(fields: [userId], references: [id])
 }
@@ -190,11 +189,11 @@ model AuditLog {
 // ==========================================
 
 model Class {
-  id       String    @id @default(uuid())
+  id       String @id @default(uuid())
   tenantId String
-  name     String    // e.g., "Class 1", "Class 10", "Montessori"
-  level    Int       // Numeric level for sorting (e.g., 1, 10, -1 for ECE)
-  
+  name     String // e.g., "Class 1", "Class 10", "Montessori"
+  level    Int // Numeric level for sorting (e.g., 1, 10, -1 for ECE)
+
   tenant   Tenant    @relation(fields: [tenantId], references: [id])
   students Student[]
   subjects Subject[]
@@ -203,59 +202,59 @@ model Class {
 }
 
 model Subject {
-  id             String  @id @default(uuid())
-  tenantId       String
-  classId        String
-  name           String  // e.g., "Science", "Nepali"
-  code           String  // e.g., "SCI-101"
-  type           String  // COMPULSORY or OPTIONAL
-  
+  id       String @id @default(uuid())
+  tenantId String
+  classId  String
+  name     String // e.g., "Science", "Nepali"
+  code     String // e.g., "SCI-101"
+  type     String // COMPULSORY or OPTIONAL
+
   // Marks structure for exams
   hasPractical   Boolean @default(false)
   theoryMarks    Float?
   practicalMarks Float?
   passMarks      Float?
 
-  tenant         Tenant  @relation(fields: [tenantId], references: [id])
-  class          Class   @relation(fields: [classId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  class  Class  @relation(fields: [classId], references: [id])
 
   @@unique([tenantId, classId, code])
 }
 
 model Student {
-  id                String    @id @default(uuid())
-  tenantId          String
-  userId            String?   @unique // Optional: Linked if student gets login (Class 6+)
-  
+  id       String  @id @default(uuid())
+  tenantId String
+  userId   String? @unique // Optional: Linked if student gets login (Class 6+)
+
   // Core Identity
-  studentSystemId   String    @unique // e.g., SCH-YYYY-NNNN
+  studentSystemId   String   @unique // e.g., SCH-YYYY-NNNN
   firstNameEn       String
   lastNameEn        String
-  firstNameNp       String?   // Nepali name required for official docs
+  firstNameNp       String? // Nepali name required for official docs
   lastNameNp        String?
   dateOfBirth       DateTime
   gender            Gender
   bloodGroup        String?
-  nationality       String    @default("Nepali")
+  nationality       String   @default("Nepali")
   religion          String?
-  ethnicity         String?   // Caste
-  motherTongue      String?   // iEMIS required
-  disabilityFlag    String?   // iEMIS required (physical, visual, etc.)
-  nationalStudentId String?   // Linked to MoEST Student Registry
+  ethnicity         String? // Caste
+  motherTongue      String? // iEMIS required
+  disabilityFlag    String? // iEMIS required (physical, visual, etc.)
+  nationalStudentId String? // Linked to MoEST Student Registry
   birthCertNumber   String?
-  photoUrl          String?   // Stored in Cloudflare R2
-  
+  photoUrl          String? // Stored in Cloudflare R2
+
   // Admission Details
-  admissionDate     DateTime
-  admissionNumber   String?
-  previousSchool    String?
-  transferCertUrl   String?
-  mediumOfInstruct  String    @default("English")
+  admissionDate    DateTime
+  admissionNumber  String?
+  previousSchool   String?
+  transferCertUrl  String?
+  mediumOfInstruct String   @default("English")
 
   // Academic Placement
-  classId           String
-  section           String?   // e.g., "A", "B"
-  rollNumber        Int?
+  classId    String
+  section    String? // e.g., "A", "B"
+  rollNumber Int?
 
   // Medical Information (Encrypted at rest in app layer)
   medicalConditions String?
@@ -267,45 +266,45 @@ model Student {
   doctorName        String?
   doctorPhone       String?
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant            Tenant    @relation(fields: [tenantId], references: [id])
-  user              User?     @relation(fields: [userId], references: [id]) // Connects to Auth Module
-  class             Class     @relation(fields: [classId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id]) // Connects to Auth Module
+  class  Class  @relation(fields: [classId], references: [id])
 }
 
 model Staff {
-  id                String       @id @default(uuid())
-  tenantId          String
-  userId            String       @unique // Must have a login
-  
+  id       String @id @default(uuid())
+  tenantId String
+  userId   String @unique // Must have a login
+
   // Core Identity
-  employeeId        String       @unique
-  firstName         String
-  lastName          String
-  photoUrl          String?
-  dateOfBirth       DateTime
-  gender            Gender
-  address           String
-  
+  employeeId  String   @unique
+  firstName   String
+  lastName    String
+  photoUrl    String?
+  dateOfBirth DateTime
+  gender      Gender
+  address     String
+
   // HR & Compliance 
-  teacherRegistryId String?      // iEMIS required for teaching staff
-  citizenshipNo     String?      // Encrypted at rest
-  panNumber         String?      // Required for TDS calculation
+  teacherRegistryId String? // iEMIS required for teaching staff
+  citizenshipNo     String? // Encrypted at rest
+  panNumber         String? // Required for TDS calculation
   bankAccount       String?
   bankName          String?
-  
+
   // Employment Details
-  qualifications    String?
-  experience        String?
-  joiningDate       DateTime
-  contractType      ContractType
-  probationEndDate  DateTime?
+  qualifications   String?
+  experience       String?
+  joiningDate      DateTime
+  contractType     ContractType
+  probationEndDate DateTime?
 
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant            Tenant       @relation(fields: [tenantId], references: [id])
-  user              User         @relation(fields: [userId], references: [id]) // Connects to Auth Module
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id]) // Connects to Auth Module
 }
