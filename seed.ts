@@ -10,6 +10,30 @@ const adapter = new PrismaPg({
 
 const prisma = new PrismaClient({ adapter });
 
+const permissionCatalog = [
+  ['users', 'create', 'Create users inside a tenant'],
+  ['roles', 'read', 'Read roles and permission catalog'],
+  ['roles', 'create', 'Create custom roles'],
+  ['roles', 'assign', 'Assign roles to users'],
+  ['roles', 'manage_permissions', 'Attach permissions to roles'],
+];
+
+const systemRolePermissions: Record<string, string[]> = {
+  admin: [
+    'users:create',
+    'roles:read',
+    'roles:create',
+    'roles:assign',
+    'roles:manage_permissions',
+  ],
+  teacher: ['roles:read'],
+  student: [],
+  parent: [],
+  accountant: ['roles:read'],
+  librarian: ['roles:read'],
+  driver: [],
+};
+
 async function main() {
   console.log('Seeding database...');
 
@@ -52,6 +76,69 @@ async function main() {
         description: `System preset role for ${roleName}`,
       },
     });
+  }
+
+  for (const [resource, action, description] of permissionCatalog) {
+    await prisma.permission.upsert({
+      where: {
+        resource_action: {
+          resource,
+          action,
+        },
+      },
+      update: {
+        description,
+      },
+      create: {
+        resource,
+        action,
+        description,
+      },
+    });
+  }
+
+  for (const [roleName, permissionKeys] of Object.entries(systemRolePermissions)) {
+    const role = await prisma.role.findUnique({
+      where: {
+        tenantId_name: {
+          tenantId: tenant.id,
+          name: roleName,
+        },
+      },
+    });
+
+    if (!role) {
+      throw new Error(`Role ${roleName} was not created successfully.`);
+    }
+
+    await prisma.rolePermission.deleteMany({
+      where: {
+        roleId: role.id,
+      },
+    });
+
+    for (const permissionKey of permissionKeys) {
+      const [resource, action] = permissionKey.split(':');
+      const permission = await prisma.permission.findUnique({
+        where: {
+          resource_action: {
+            resource,
+            action,
+          },
+        },
+      });
+
+      if (!permission) {
+        throw new Error(`Permission ${permissionKey} was not created.`);
+      }
+
+      await prisma.rolePermission.create({
+        data: {
+          roleId: role.id,
+          permissionId: permission.id,
+        },
+      });
+    }
   }
 
   // 3. Create Super Admin User

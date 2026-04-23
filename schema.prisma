@@ -288,7 +288,7 @@ model Staff {
   gender      Gender
   address     String
 
-  // HR & Compliance 
+  // HR & Compliance
   teacherRegistryId String? // iEMIS required for teaching staff
   citizenshipNo     String? // Encrypted at rest
   panNumber         String? // Required for TDS calculation
