@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
-type AuditLogInput = {
+interface AuditLogInput {
   action: string;
   resource: string;
   tenantId: string;
@@ -12,7 +12,7 @@ type AuditLogInput = {
   after?: unknown;
   ipAddress?: string | null;
   userAgent?: string | null;
-};
+}
 
 @Injectable()
 export class AuditService {

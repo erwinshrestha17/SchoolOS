@@ -166,7 +166,9 @@ export class RolesService {
     });
 
     if (roles.length !== dto.roleIds.length) {
-      throw new NotFoundException('One or more roles do not exist in this tenant');
+      throw new NotFoundException(
+        'One or more roles do not exist in this tenant',
+      );
     }
 
     await this.prisma.userRole.deleteMany({

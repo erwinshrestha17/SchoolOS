@@ -13,11 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshSessionDto } from './dto/refresh-session.dto';
 import { AuthContext, JwtAccessPayload } from './auth.types';
-import {
-  generateRefreshToken,
-  hashToken,
-  parseCookie,
-} from './auth.utils';
+import { generateRefreshToken, hashToken, parseCookie } from './auth.utils';
 
 @Injectable()
 export class AuthService {
@@ -33,7 +29,7 @@ export class AuthService {
       where: { slug: dto.tenantSlug },
     });
 
-    if (!tenant || !tenant.isActive) {
+    if (!tenant?.isActive) {
       throw new UnauthorizedException('Invalid tenant or credentials');
     }
 
@@ -51,7 +47,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid tenant or credentials');
     }
 
-    const passwordMatches = await bcrypt.compare(dto.password, user.passwordHash);
+    const passwordMatches = await bcrypt.compare(
+      dto.password,
+      user.passwordHash,
+    );
 
     if (!passwordMatches) {
       throw new UnauthorizedException('Invalid tenant or credentials');
@@ -134,7 +133,10 @@ export class AuthService {
       data: { revokedAt: new Date() },
     });
 
-    const authContext = this.buildAuthContext(existingSession.user, tenant.slug);
+    const authContext = this.buildAuthContext(
+      existingSession.user,
+      tenant.slug,
+    );
     const session = await this.issueSession(authContext);
     this.attachRefreshCookie(response, session.refreshToken);
 
@@ -233,7 +235,9 @@ export class AuthService {
     },
     tenantSlug: string,
   ): AuthContext {
-    const roles = Array.from(new Set(user.userRoles.map(({ role }) => role.name)));
+    const roles = Array.from(
+      new Set(user.userRoles.map(({ role }) => role.name)),
+    );
     const permissions = Array.from(
       new Set(
         user.userRoles.flatMap(({ role }) =>
@@ -287,8 +291,7 @@ export class AuthService {
       sameSite: 'lax',
       secure: this.configService.isProduction,
       path: '/',
-      maxAge:
-        this.configService.refreshTokenTtlDays * 24 * 60 * 60 * 1000,
+      maxAge: this.configService.refreshTokenTtlDays * 24 * 60 * 60 * 1000,
     });
   }
 
@@ -308,7 +311,7 @@ export class AuthService {
   }
 }
 
-type RequestMeta = {
+interface RequestMeta {
   ipAddress?: string | null;
   userAgent?: string | null;
-};
+}

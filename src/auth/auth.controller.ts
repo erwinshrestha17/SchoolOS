@@ -1,11 +1,4 @@
-import {
-  Body,
-  Controller,
-  Headers,
-  Post,
-  Res,
-  Req,
-} from '@nestjs/common';
+import { Body, Controller, Headers, Post, Res, Req } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import type { AuthenticatedRequest } from './auth-request.interface';

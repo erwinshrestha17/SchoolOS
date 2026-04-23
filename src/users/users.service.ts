@@ -41,7 +41,9 @@ export class UsersService {
     });
 
     if (roles.length !== dto.roleIds.length) {
-      throw new NotFoundException('One or more roles do not exist in this tenant');
+      throw new NotFoundException(
+        'One or more roles do not exist in this tenant',
+      );
     }
 
     const passwordHash = await bcrypt.hash(

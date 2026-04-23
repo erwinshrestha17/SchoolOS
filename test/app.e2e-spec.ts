@@ -63,7 +63,7 @@ describe('School OS Auth + RBAC integration', () => {
         password: 'teacher12345',
         roleIds: [],
       },
-      adminRequest.auth!,
+      adminRequest.auth,
     );
 
     expect(createdUser.email).toBe('teacher@school-a.com');
@@ -78,7 +78,7 @@ describe('School OS Auth + RBAC integration', () => {
         userId: createdUser.id,
         roleIds: [teacherRole!.id],
       },
-      adminRequest.auth!,
+      adminRequest.auth,
     );
 
     expect(assignedRoles).toHaveLength(1);
@@ -102,7 +102,7 @@ describe('School OS Auth + RBAC integration', () => {
       RolesController,
     );
 
-    const visibleRoles = await rolesController.listRoles(teacherRequest.auth!);
+    const visibleRoles = await rolesController.listRoles(teacherRequest.auth);
     expect(visibleRoles.some((role) => role.name === 'teacher')).toBe(true);
 
     const tenantBResponse = createResponseMock();
@@ -130,7 +130,7 @@ describe('School OS Auth + RBAC integration', () => {
           userId: createdUser.id,
           roleIds: [teacherRole!.id],
         },
-        tenantBRequest.auth!,
+        tenantBRequest.auth,
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
 
@@ -205,7 +205,7 @@ function createRequestMock() {
 
 function createResponseMock() {
   return {
-    cookieCalls: [] as Array<{ name: string; value: string }>,
+    cookieCalls: [] as { name: string; value: string }[],
     clearedCookies: [] as string[],
     cookie(name: string, value: string) {
       this.cookieCalls.push({ name, value });
@@ -375,7 +375,9 @@ async function createPrismaMock() {
     tenant: {
       findUnique: jest.fn(async ({ where }: any) => {
         if (where.slug) {
-          return state.tenants.find((tenant) => tenant.slug === where.slug) ?? null;
+          return (
+            state.tenants.find((tenant) => tenant.slug === where.slug) ?? null
+          );
         }
 
         if (where.id) {

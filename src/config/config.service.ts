@@ -1,4 +1,6 @@
+// config.service.ts - replace your current one
 import { Injectable } from '@nestjs/common';
+import { ConfigService as NestConfigService } from '@nestjs/config';
 import {
   ACCESS_TOKEN_TTL,
   AUTH_COOKIE_NAME,
@@ -7,27 +9,31 @@ import {
 
 @Injectable()
 export class ConfigService {
+  constructor(private readonly config: NestConfigService) {}
+
   get jwtSecret() {
-    return process.env.JWT_SECRET ?? 'school-os-access-secret';
+    return this.config.get<string>('JWT_SECRET') ?? 'school-os-access-secret';
   }
 
   get accessTokenTtl() {
-    return process.env.JWT_ACCESS_TTL ?? ACCESS_TOKEN_TTL;
+    return this.config.get<string>('JWT_ACCESS_TTL') ?? ACCESS_TOKEN_TTL;
   }
 
   get refreshTokenTtlDays() {
-    return Number(process.env.JWT_REFRESH_TTL_DAYS ?? REFRESH_TOKEN_TTL_DAYS);
+    return Number(
+      this.config.get<string>('JWT_REFRESH_TTL_DAYS') ?? REFRESH_TOKEN_TTL_DAYS,
+    );
   }
 
   get bcryptRounds() {
-    return Number(process.env.BCRYPT_ROUNDS ?? 12);
+    return Number(this.config.get<string>('BCRYPT_ROUNDS') ?? 12);
   }
 
   get refreshCookieName() {
-    return process.env.REFRESH_COOKIE_NAME ?? AUTH_COOKIE_NAME;
+    return this.config.get<string>('REFRESH_COOKIE_NAME') ?? AUTH_COOKIE_NAME;
   }
 
   get isProduction() {
-    return process.env.NODE_ENV === 'production';
+    return this.config.get<string>('NODE_ENV') === 'production';
   }
 }

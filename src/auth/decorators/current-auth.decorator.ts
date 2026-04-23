@@ -1,6 +1,6 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { AuthContext } from '../auth.types';
-import { AuthenticatedRequest } from '../auth-request.interface';
+import { createParamDecorator, type ExecutionContext } from '@nestjs/common';
+import { type AuthContext } from '../auth.types';
+import { type AuthenticatedRequest } from '../auth-request.interface';
 
 export const CurrentAuth = createParamDecorator(
   (_data: unknown, context: ExecutionContext): AuthContext | undefined => {

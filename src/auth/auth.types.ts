@@ -1,17 +1,17 @@
-export type AuthContext = {
+export interface AuthContext {
   userId: string;
   tenantId: string;
   tenantSlug: string;
   email: string | null;
   roles: string[];
   permissions: string[];
-};
+}
 
-export type JwtAccessPayload = {
+export interface JwtAccessPayload {
   sub: string;
   tenantId: string;
   tenantSlug: string;
   email: string | null;
   roles: string[];
   permissions: string[];
-};
+}
