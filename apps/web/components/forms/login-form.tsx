@@ -14,9 +14,9 @@ export function LoginForm() {
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      tenantSlug: 'default-school',
-      email: 'admin@schoolos.com',
-      password: 'admin12345',
+      tenantSlug: '',
+      email: '',
+      password: '',
     },
   });
 
@@ -33,31 +33,41 @@ export function LoginForm() {
         <label className="label mb-2 block">Tenant Slug</label>
         <input {...register('tenantSlug')} />
         {errors.tenantSlug ? (
-          <p className="mt-2 text-sm text-[var(--accent-dark)]">{errors.tenantSlug.message}</p>
+          <p className="mt-2 text-sm text-[var(--accent-dark)]">
+            {errors.tenantSlug.message}
+          </p>
         ) : null}
       </div>
       <div>
         <label className="label mb-2 block">Email</label>
         <input {...register('email')} />
         {errors.email ? (
-          <p className="mt-2 text-sm text-[var(--accent-dark)]">{errors.email.message}</p>
+          <p className="mt-2 text-sm text-[var(--accent-dark)]">
+            {errors.email.message}
+          </p>
         ) : null}
       </div>
       <div>
         <label className="label mb-2 block">Password</label>
         <input type="password" {...register('password')} />
         {errors.password ? (
-          <p className="mt-2 text-sm text-[var(--accent-dark)]">{errors.password.message}</p>
+          <p className="mt-2 text-sm text-[var(--accent-dark)]">
+            {errors.password.message}
+          </p>
         ) : null}
       </div>
       <button className="rounded-2xl bg-[var(--ink)] px-5 py-3 font-semibold text-white">
         {mutation.isPending ? 'Signing in...' : 'Sign in'}
       </button>
       {mutation.isError ? (
-        <p className="text-sm text-[var(--accent-dark)]">{mutation.error.message}</p>
+        <p className="text-sm text-[var(--accent-dark)]">
+          {mutation.error.message}
+        </p>
       ) : null}
       {mutation.isSuccess ? (
-        <p className="text-sm text-[var(--teal)]">Login request completed. Refresh cookie flow is active on the API.</p>
+        <p className="text-sm text-[var(--teal)]">
+          Login request completed. Refresh cookie flow is active on the API.
+        </p>
       ) : null}
     </form>
   );
