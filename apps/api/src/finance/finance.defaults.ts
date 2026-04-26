@@ -13,12 +13,19 @@ export const DEFAULT_CHART_ACCOUNTS: Array<{
     type: ChartAccountType.LIABILITY,
   },
   { code: '2100', name: 'VAT Payable', type: ChartAccountType.LIABILITY },
+  { code: '2200', name: 'Salary Payable', type: ChartAccountType.LIABILITY },
+  {
+    code: '2300',
+    name: 'Statutory Deductions Payable',
+    type: ChartAccountType.LIABILITY,
+  },
   { code: '4000', name: 'Tuition Fee Income', type: ChartAccountType.INCOME },
   { code: '4010', name: 'Admission Fee Income', type: ChartAccountType.INCOME },
   { code: '4020', name: 'Exam Fee Income', type: ChartAccountType.INCOME },
   { code: '4030', name: 'Transport Fee Income', type: ChartAccountType.INCOME },
   { code: '4040', name: 'Library Fine Income', type: ChartAccountType.INCOME },
   { code: '5000', name: 'Operating Expenses', type: ChartAccountType.EXPENSE },
+  { code: '5010', name: 'Salary Expense', type: ChartAccountType.EXPENSE },
 ];
 
 export const DEFAULT_FEE_HEADS: Array<{

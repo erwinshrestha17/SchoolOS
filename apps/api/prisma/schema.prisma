@@ -82,6 +82,8 @@ enum JournalSourceType {
   MANUAL
   INVOICE
   FEE_PAYMENT
+  PAYROLL
+  CLOSING
   ADJUSTMENT
 }
 
@@ -195,6 +197,60 @@ enum ConsentType {
   MESSAGING
 }
 
+enum AssessmentType {
+  TERMINAL
+  CAS
+  PRACTICAL
+  PROJECT
+}
+
+enum GradeLockStatus {
+  DRAFT
+  LOCKED
+}
+
+enum HomeworkStatus {
+  ASSIGNED
+  SUBMITTED
+  REVIEWED
+  LATE
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  REVIEWED
+  APPROVED
+  POSTED
+  VOID
+}
+
+enum PayrollLineStatus {
+  DRAFT
+  APPROVED
+  POSTED
+}
+
+enum PayslipStatus {
+  DRAFT
+  ISSUED
+}
+
+enum AccountingPeriodStatus {
+  OPEN
+  CLOSED
+}
+
+enum ConversationType {
+  DIRECT
+  CLASS
+  SECTION
+}
+
+enum MessageStatus {
+  SENT
+  READ
+}
+
 model Tenant {
   id        String   @id @default(uuid())
   name      String
@@ -204,46 +260,65 @@ model Tenant {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  users                  User[]
-  roles                  Role[]
-  classes                Class[]
-  students               Student[]
-  subjects               Subject[]
-  staff                  Staff[]
-  academicYears          AcademicYear[]
-  sections               Section[]
-  guardians              Guardian[]
-  studentGuardians       StudentGuardian[]
-  enrollments            Enrollment[]
-  attendanceSessions     AttendanceSession[]
-  attendanceRecords      AttendanceRecord[]
-  staffAttendance        StaffAttendance[]
-  feeHeads               FeeHead[]
-  feePlans               FeePlan[]
-  feePlanItems           FeePlanItem[]
-  studentFeeAssignments  StudentFeeAssignment[]
-  invoices               Invoice[]
-  invoiceLines           InvoiceLine[]
-  payments               Payment[]
-  receipts               Receipt[]
-  chartAccounts          ChartAccount[]
-  journalEntries         JournalEntry[]
-  journalLines           JournalLine[]
-  notices                Notice[]
-  events                 Event[]
-  studentDocuments       StudentDocument[]
-  siblingGroups          SiblingGroup[]
-  siblingGroupMembers    SiblingGroupMember[]
-  attendanceConflicts    AttendanceConflict[]
-  feeBillingRuns         FeeBillingRun[]
-  discountRules          DiscountRule[]
-  feeWaivers             FeeWaiver[]
-  activityPosts          ActivityPost[]
-  activityAttachments    ActivityAttachment[]
-  activityPostStudents   ActivityPostStudent[]
-  moodLogs               MoodLog[]
-  notificationDeliveries NotificationDelivery[]
-  guardianConsents       GuardianConsent[]
+  users                    User[]
+  roles                    Role[]
+  classes                  Class[]
+  students                 Student[]
+  subjects                 Subject[]
+  staff                    Staff[]
+  academicYears            AcademicYear[]
+  sections                 Section[]
+  guardians                Guardian[]
+  studentGuardians         StudentGuardian[]
+  enrollments              Enrollment[]
+  attendanceSessions       AttendanceSession[]
+  attendanceRecords        AttendanceRecord[]
+  staffAttendance          StaffAttendance[]
+  feeHeads                 FeeHead[]
+  feePlans                 FeePlan[]
+  feePlanItems             FeePlanItem[]
+  studentFeeAssignments    StudentFeeAssignment[]
+  invoices                 Invoice[]
+  invoiceLines             InvoiceLine[]
+  payments                 Payment[]
+  receipts                 Receipt[]
+  chartAccounts            ChartAccount[]
+  journalEntries           JournalEntry[]
+  journalLines             JournalLine[]
+  notices                  Notice[]
+  events                   Event[]
+  studentDocuments         StudentDocument[]
+  siblingGroups            SiblingGroup[]
+  siblingGroupMembers      SiblingGroupMember[]
+  attendanceConflicts      AttendanceConflict[]
+  feeBillingRuns           FeeBillingRun[]
+  discountRules            DiscountRule[]
+  feeWaivers               FeeWaiver[]
+  activityPosts            ActivityPost[]
+  activityAttachments      ActivityAttachment[]
+  activityPostStudents     ActivityPostStudent[]
+  moodLogs                 MoodLog[]
+  notificationDeliveries   NotificationDelivery[]
+  guardianConsents         GuardianConsent[]
+  teacherAssignments       SubjectTeacherAssignment[]
+  examTerms                ExamTerm[]
+  assessmentComponents     AssessmentComponent[]
+  markEntries              MarkEntry[]
+  casRecords               CasRecord[]
+  reportCards              ReportCard[]
+  promotionRecords         PromotionRecord[]
+  timetableSlots           TimetableSlot[]
+  homeworkAssignments      HomeworkAssignment[]
+  homeworkSubmissions      HomeworkSubmission[]
+  staffContracts           StaffContract[]
+  payrollRuns              PayrollRun[]
+  payrollLines             PayrollLine[]
+  payslips                 Payslip[]
+  accountingPeriods        AccountingPeriod[]
+  conversations            Conversation[]
+  conversationParticipants ConversationParticipant[]
+  messages                 Message[]
+  messageReadReceipts      MessageReadReceipt[]
 }
 
 model User {
@@ -274,6 +349,7 @@ model User {
   approvedWaivers             FeeWaiver[]            @relation("ApprovedFeeWaivers")
   createdActivityPosts        ActivityPost[]         @relation("CreatedActivityPosts")
   notificationDeliveries      NotificationDelivery[] @relation("NotificationActor")
+  enteredMarks                MarkEntry[]            @relation("EnteredMarks")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
@@ -379,13 +455,20 @@ model AcademicYear {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  tenant                Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   enrollments           Enrollment[]
   attendanceSessions    AttendanceSession[]
   feePlans              FeePlan[]
   studentFeeAssignments StudentFeeAssignment[]
   invoices              Invoice[]
   feeBillingRuns        FeeBillingRun[]
+  teacherAssignments    SubjectTeacherAssignment[]
+  examTerms             ExamTerm[]
+  casRecords            CasRecord[]
+  reportCards           ReportCard[]
+  promotionRecords      PromotionRecord[]
+  timetableSlots        TimetableSlot[]
+  homeworkAssignments   HomeworkAssignment[]
 
   @@unique([tenantId, name])
 }
@@ -396,18 +479,26 @@ model Class {
   name     String
   level    Int
 
-  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  students           Student[]
-  subjects           Subject[]
-  sections           Section[]
-  enrollments        Enrollment[]
-  attendanceSessions AttendanceSession[]
-  feePlans           FeePlan[]
-  notices            Notice[]
-  events             Event[]
-  discountRules      DiscountRule[]
-  activityPosts      ActivityPost[]
-  moodLogs           MoodLog[]
+  tenant               Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  students             Student[]
+  subjects             Subject[]
+  sections             Section[]
+  enrollments          Enrollment[]
+  attendanceSessions   AttendanceSession[]
+  feePlans             FeePlan[]
+  notices              Notice[]
+  events               Event[]
+  discountRules        DiscountRule[]
+  activityPosts        ActivityPost[]
+  moodLogs             MoodLog[]
+  teacherAssignments   SubjectTeacherAssignment[]
+  casRecords           CasRecord[]
+  reportCards          ReportCard[]
+  promotionRecordsFrom PromotionRecord[]          @relation("PromotionFromClass")
+  promotionRecordsTo   PromotionRecord[]          @relation("PromotionToClass")
+  timetableSlots       TimetableSlot[]
+  homeworkAssignments  HomeworkAssignment[]
+  conversations        Conversation[]
 
   @@unique([tenantId, name])
 }
@@ -421,15 +512,23 @@ model Section {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  class              Class               @relation(fields: [classId], references: [id], onDelete: Restrict)
-  students           Student[]
-  enrollments        Enrollment[]
-  attendanceSessions AttendanceSession[]
-  notices            Notice[]
-  events             Event[]
-  activityPosts      ActivityPost[]
-  moodLogs           MoodLog[]
+  tenant               Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  class                Class                      @relation(fields: [classId], references: [id], onDelete: Restrict)
+  students             Student[]
+  enrollments          Enrollment[]
+  attendanceSessions   AttendanceSession[]
+  notices              Notice[]
+  events               Event[]
+  activityPosts        ActivityPost[]
+  moodLogs             MoodLog[]
+  teacherAssignments   SubjectTeacherAssignment[]
+  casRecords           CasRecord[]
+  reportCards          ReportCard[]
+  promotionRecordsFrom PromotionRecord[]          @relation("PromotionFromSection")
+  promotionRecordsTo   PromotionRecord[]          @relation("PromotionToSection")
+  timetableSlots       TimetableSlot[]
+  homeworkAssignments  HomeworkAssignment[]
+  conversations        Conversation[]
 
   @@unique([tenantId, classId, name])
 }
@@ -446,8 +545,14 @@ model Subject {
   practicalMarks Float?
   passMarks      Float?
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  class  Class  @relation(fields: [classId], references: [id], onDelete: Restrict)
+  tenant               Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  class                Class                      @relation(fields: [classId], references: [id], onDelete: Restrict)
+  teacherAssignments   SubjectTeacherAssignment[]
+  assessmentComponents AssessmentComponent[]
+  markEntries          MarkEntry[]
+  casRecords           CasRecord[]
+  timetableSlots       TimetableSlot[]
+  homeworkAssignments  HomeworkAssignment[]
 
   @@unique([tenantId, classId, code])
 }
@@ -496,22 +601,29 @@ model Student {
   createdAt                 DateTime  @default(now())
   updatedAt                 DateTime  @updatedAt
 
-  tenant                 Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  user                   User?                  @relation("StudentUser", fields: [userId], references: [id], onDelete: SetNull)
-  class                  Class                  @relation(fields: [classId], references: [id], onDelete: Restrict)
-  sectionRef             Section?               @relation(fields: [sectionId], references: [id], onDelete: SetNull)
-  guardianLinks          StudentGuardian[]
-  enrollments            Enrollment[]
-  attendanceRecords      AttendanceRecord[]
-  studentFeeAssignments  StudentFeeAssignment[]
-  invoices               Invoice[]
-  payments               Payment[]
-  documents              StudentDocument[]
-  siblingMemberships     SiblingGroupMember[]
-  activityTags           ActivityPostStudent[]
-  moodLogs               MoodLog[]
-  feeWaivers             FeeWaiver[]
-  notificationDeliveries NotificationDelivery[]
+  tenant                   Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user                     User?                     @relation("StudentUser", fields: [userId], references: [id], onDelete: SetNull)
+  class                    Class                     @relation(fields: [classId], references: [id], onDelete: Restrict)
+  sectionRef               Section?                  @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  guardianLinks            StudentGuardian[]
+  enrollments              Enrollment[]
+  attendanceRecords        AttendanceRecord[]
+  studentFeeAssignments    StudentFeeAssignment[]
+  invoices                 Invoice[]
+  payments                 Payment[]
+  documents                StudentDocument[]
+  siblingMemberships       SiblingGroupMember[]
+  activityTags             ActivityPostStudent[]
+  moodLogs                 MoodLog[]
+  feeWaivers               FeeWaiver[]
+  notificationDeliveries   NotificationDelivery[]
+  markEntries              MarkEntry[]
+  casRecords               CasRecord[]
+  reportCards              ReportCard[]
+  promotionRecords         PromotionRecord[]
+  homeworkSubmissions      HomeworkSubmission[]
+  conversations            Conversation[]
+  conversationParticipants ConversationParticipant[]
 
   @@unique([tenantId, studentSystemId])
   @@index([tenantId, classId, sectionId])
@@ -534,11 +646,15 @@ model Guardian {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  tenant                 Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  user                   User?                  @relation("GuardianUser", fields: [userId], references: [id], onDelete: SetNull)
-  studentLinks           StudentGuardian[]
-  consents               GuardianConsent[]
-  notificationDeliveries NotificationDelivery[]
+  tenant                   Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user                     User?                     @relation("GuardianUser", fields: [userId], references: [id], onDelete: SetNull)
+  studentLinks             StudentGuardian[]
+  consents                 GuardianConsent[]
+  notificationDeliveries   NotificationDelivery[]
+  conversations            Conversation[]
+  conversationParticipants ConversationParticipant[]
+  messages                 Message[]
+  messageReadReceipts      MessageReadReceipt[]
 
   @@unique([tenantId, primaryPhone])
 }
@@ -612,9 +728,17 @@ model Staff {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
-  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  user              User              @relation("StaffUser", fields: [userId], references: [id], onDelete: Cascade)
-  attendanceRecords StaffAttendance[]
+  tenant                   Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user                     User                       @relation("StaffUser", fields: [userId], references: [id], onDelete: Cascade)
+  attendanceRecords        StaffAttendance[]
+  teacherAssignments       SubjectTeacherAssignment[]
+  timetableSlots           TimetableSlot[]
+  homeworkAssignments      HomeworkAssignment[]
+  staffContracts           StaffContract[]
+  payrollLines             PayrollLine[]
+  payslips                 Payslip[]
+  conversationParticipants ConversationParticipant[]
+  messages                 Message[]
 }
 
 model AttendanceSession {
@@ -1189,4 +1313,436 @@ model GuardianConsent {
   guardian Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, guardianId, consentType])
+}
+
+model SubjectTeacherAssignment {
+  id             String   @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  subjectId      String
+  staffId        String
+  classId        String
+  sectionId      String?
+  createdAt      DateTime @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  staff        Staff        @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, academicYearId, subjectId, staffId, sectionId])
+  @@index([tenantId, classId, sectionId])
+}
+
+model ExamTerm {
+  id             String   @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  name           String
+  startsOn       DateTime
+  endsOn         DateTime
+  weightPercent  Decimal  @default(100) @db.Decimal(5, 2)
+  isLocked       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear          @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  components   AssessmentComponent[]
+  markEntries  MarkEntry[]
+  reportCards  ReportCard[]
+
+  @@unique([tenantId, academicYearId, name])
+}
+
+model AssessmentComponent {
+  id            String         @id @default(uuid())
+  tenantId      String
+  examTermId    String
+  subjectId     String
+  name          String
+  type          AssessmentType @default(TERMINAL)
+  maxMarks      Decimal        @db.Decimal(8, 2)
+  weightPercent Decimal        @default(100) @db.Decimal(5, 2)
+  passMarks     Decimal?       @db.Decimal(8, 2)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  examTerm    ExamTerm    @relation(fields: [examTermId], references: [id], onDelete: Cascade)
+  subject     Subject     @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  markEntries MarkEntry[]
+
+  @@unique([tenantId, examTermId, subjectId, name])
+}
+
+model MarkEntry {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  examTermId            String
+  assessmentComponentId String
+  subjectId             String
+  studentId             String
+  enteredById           String?
+  marksObtained         Decimal  @db.Decimal(8, 2)
+  remarks               String?
+  isLocked              Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  examTerm            ExamTerm            @relation(fields: [examTermId], references: [id], onDelete: Cascade)
+  assessmentComponent AssessmentComponent @relation(fields: [assessmentComponentId], references: [id], onDelete: Cascade)
+  subject             Subject             @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  student             Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  enteredBy           User?               @relation("EnteredMarks", fields: [enteredById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, assessmentComponentId, studentId])
+  @@index([tenantId, examTermId, studentId])
+}
+
+model CasRecord {
+  id             String   @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  subjectId      String
+  studentId      String
+  classId        String
+  sectionId      String?
+  category       String
+  score          Decimal  @db.Decimal(8, 2)
+  maxScore       Decimal  @db.Decimal(8, 2)
+  observedOn     DateTime
+  note           String?
+  createdAt      DateTime @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, academicYearId, studentId])
+}
+
+model ReportCard {
+  id             String          @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  examTermId     String
+  studentId      String
+  classId        String
+  sectionId      String?
+  totalMarks     Decimal         @db.Decimal(10, 2)
+  maxMarks       Decimal         @db.Decimal(10, 2)
+  percentage     Decimal         @db.Decimal(5, 2)
+  grade          String
+  gpa            Decimal         @db.Decimal(3, 2)
+  remarks        String?
+  status         GradeLockStatus @default(DRAFT)
+  lockedAt       DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  examTerm     ExamTerm     @relation(fields: [examTermId], references: [id], onDelete: Cascade)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, academicYearId, examTermId, studentId])
+  @@index([tenantId, classId, sectionId])
+}
+
+model PromotionRecord {
+  id             String   @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  studentId      String
+  fromClassId    String
+  fromSectionId  String?
+  toClassId      String?
+  toSectionId    String?
+  status         String   @default("READY")
+  remarks        String?
+  createdAt      DateTime @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fromClass    Class        @relation("PromotionFromClass", fields: [fromClassId], references: [id], onDelete: Restrict)
+  fromSection  Section?     @relation("PromotionFromSection", fields: [fromSectionId], references: [id], onDelete: SetNull)
+  toClass      Class?       @relation("PromotionToClass", fields: [toClassId], references: [id], onDelete: SetNull)
+  toSection    Section?     @relation("PromotionToSection", fields: [toSectionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, academicYearId, studentId])
+}
+
+model TimetableSlot {
+  id             String   @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  classId        String
+  sectionId      String?
+  subjectId      String
+  staffId        String
+  dayOfWeek      Int
+  startsAt       String
+  endsAt         String
+  room           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  staff        Staff        @relation(fields: [staffId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, academicYearId, classId, sectionId, dayOfWeek])
+  @@index([tenantId, staffId, dayOfWeek])
+}
+
+model HomeworkAssignment {
+  id                String   @id @default(uuid())
+  tenantId          String
+  academicYearId    String
+  classId           String
+  sectionId         String?
+  subjectId         String
+  assignedByStaffId String?
+  title             String
+  instructions      String
+  dueAt             DateTime
+  maxScore          Decimal? @db.Decimal(8, 2)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear    AcademicYear         @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class           Class                @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section         Section?             @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subject         Subject              @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  assignedByStaff Staff?               @relation(fields: [assignedByStaffId], references: [id], onDelete: SetNull)
+  submissions     HomeworkSubmission[]
+
+  @@index([tenantId, academicYearId, classId, sectionId])
+}
+
+model HomeworkSubmission {
+  id          String         @id @default(uuid())
+  tenantId    String
+  homeworkId  String
+  studentId   String
+  status      HomeworkStatus @default(ASSIGNED)
+  submittedAt DateTime?
+  score       Decimal?       @db.Decimal(8, 2)
+  feedback    String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  homework HomeworkAssignment @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  student  Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, homeworkId, studentId])
+  @@index([tenantId, studentId, status])
+}
+
+model StaffContract {
+  id             String    @id @default(uuid())
+  tenantId       String
+  staffId        String
+  contractNumber String
+  position       String
+  startDate      DateTime
+  endDate        DateTime?
+  baseSalary     Decimal   @db.Decimal(12, 2)
+  allowances     Decimal   @default(0) @db.Decimal(12, 2)
+  deductions     Decimal   @default(0) @db.Decimal(12, 2)
+  status         String    @default("ACTIVE")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff        Staff         @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  payrollLines PayrollLine[]
+
+  @@unique([tenantId, contractNumber])
+  @@index([tenantId, staffId, status])
+}
+
+model PayrollRun {
+  id              String           @id @default(uuid())
+  tenantId        String
+  periodMonth     Int
+  periodYear      Int
+  status          PayrollRunStatus @default(DRAFT)
+  grossAmount     Decimal          @default(0) @db.Decimal(12, 2)
+  deductionAmount Decimal          @default(0) @db.Decimal(12, 2)
+  netAmount       Decimal          @default(0) @db.Decimal(12, 2)
+  approvedAt      DateTime?
+  postedAt        DateTime?
+  journalEntryId  String?
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  lines    PayrollLine[]
+  payslips Payslip[]
+
+  @@unique([tenantId, periodMonth, periodYear])
+  @@index([tenantId, status])
+}
+
+model PayrollLine {
+  id             String            @id @default(uuid())
+  tenantId       String
+  payrollRunId   String
+  staffId        String
+  contractId     String?
+  grossSalary    Decimal           @db.Decimal(12, 2)
+  allowances     Decimal           @default(0) @db.Decimal(12, 2)
+  deductions     Decimal           @default(0) @db.Decimal(12, 2)
+  netSalary      Decimal           @db.Decimal(12, 2)
+  attendanceDays Int               @default(0)
+  workingDays    Int               @default(0)
+  status         PayrollLineStatus @default(DRAFT)
+  createdAt      DateTime          @default(now())
+
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  payrollRun PayrollRun     @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  staff      Staff          @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  contract   StaffContract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  payslip    Payslip?
+
+  @@unique([tenantId, payrollRunId, staffId])
+}
+
+model Payslip {
+  id              String        @id @default(uuid())
+  tenantId        String
+  payrollRunId    String
+  payrollLineId   String        @unique
+  staffId         String
+  payslipNumber   String
+  status          PayslipStatus @default(DRAFT)
+  grossSalary     Decimal       @db.Decimal(12, 2)
+  deductionAmount Decimal       @db.Decimal(12, 2)
+  netSalary       Decimal       @db.Decimal(12, 2)
+  issuedAt        DateTime?
+  createdAt       DateTime      @default(now())
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  payrollRun  PayrollRun  @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  payrollLine PayrollLine @relation(fields: [payrollLineId], references: [id], onDelete: Cascade)
+  staff       Staff       @relation(fields: [staffId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, payslipNumber])
+}
+
+model AccountingPeriod {
+  id                  String                 @id @default(uuid())
+  tenantId            String
+  name                String
+  startsOn            DateTime
+  endsOn              DateTime
+  status              AccountingPeriodStatus @default(OPEN)
+  closeJournalEntryId String?
+  closedAt            DateTime?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, name])
+  @@index([tenantId, status])
+}
+
+model Conversation {
+  id          String           @id @default(uuid())
+  tenantId    String
+  type        ConversationType @default(DIRECT)
+  title       String?
+  classId     String?
+  sectionId   String?
+  studentId   String?
+  guardianId  String?
+  createdById String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  tenant       Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  class        Class?                    @relation(fields: [classId], references: [id], onDelete: SetNull)
+  section      Section?                  @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  student      Student?                  @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  guardian     Guardian?                 @relation(fields: [guardianId], references: [id], onDelete: SetNull)
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([tenantId, type, classId, sectionId])
+}
+
+model ConversationParticipant {
+  id             String    @id @default(uuid())
+  tenantId       String
+  conversationId String
+  userId         String?
+  guardianId     String?
+  staffId        String?
+  studentId      String?
+  role           String
+  lastReadAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  guardian     Guardian?    @relation(fields: [guardianId], references: [id], onDelete: SetNull)
+  staff        Staff?       @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  student      Student?     @relation(fields: [studentId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, conversationId])
+}
+
+model Message {
+  id               String        @id @default(uuid())
+  tenantId         String
+  conversationId   String
+  senderUserId     String?
+  senderStaffId    String?
+  senderGuardianId String?
+  body             String
+  attachmentUrl    String?
+  status           MessageStatus @default(SENT)
+  createdAt        DateTime      @default(now())
+
+  tenant         Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  conversation   Conversation         @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderStaff    Staff?               @relation(fields: [senderStaffId], references: [id], onDelete: SetNull)
+  senderGuardian Guardian?            @relation(fields: [senderGuardianId], references: [id], onDelete: SetNull)
+  readReceipts   MessageReadReceipt[]
+
+  @@index([tenantId, conversationId, createdAt])
+}
+
+model MessageReadReceipt {
+  id           String   @id @default(uuid())
+  tenantId     String
+  messageId    String
+  readerUserId String?
+  guardianId   String?
+  readAt       DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  message  Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  guardian Guardian? @relation(fields: [guardianId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, messageId])
 }

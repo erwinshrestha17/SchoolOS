@@ -2,26 +2,47 @@ import type {
   AcademicYearSummary,
   AdmissionCreationResult,
   AdmissionSummary,
+  AccountingPeriodSummary,
+  AccountingReport,
   ActivityPost,
+  AssessmentComponentSummary,
   AttendanceAnalytics,
   AttendanceRoster,
   AuthSession,
+  CasRecordSummary,
   ClassSummary,
   ConsentRecord,
+  ConversationSummary,
   DefaulterSummary,
   DiscountRule,
   EventSummary,
+  ExamTermSummary,
   FeeBillingRun,
   FeeHeadSummary,
   FeePlanSummary,
+  HomeworkAssignmentSummary,
+  HomeworkSubmissionSummary,
   InvoiceSummary,
   JournalEntryView,
+  MarkEntrySummary,
+  MessageReadReceiptSummary,
+  MessageSummary,
   MoodLog,
   NotificationDelivery,
   NoticeSummary,
+  PayrollRunSummary,
+  PayslipSummary,
+  PromotionReadiness,
   ReceiptView,
+  ReportCardSummary,
+  RoleSummary,
   SectionSummary,
+  StaffSummary,
+  StaffContractSummary,
   StudentProfile,
+  SubjectSummary,
+  TeacherAssignmentSummary,
+  TimetableSlotSummary,
   WaiverRecord,
 } from '@schoolos/core';
 import { readStoredSession } from './session';
@@ -123,6 +144,41 @@ export const api = {
   createSection: (body: JsonBody) =>
     request<SectionSummary>('/sections', { method: 'POST', json: body }),
   listStudents: () => request<StudentProfile[]>('/students'),
+  listStaff: () => request<StaffSummary[]>('/staff'),
+  createStaff: (body: JsonBody) =>
+    request<StaffSummary>('/staff', { method: 'POST', json: body }),
+  listRoles: () => request<RoleSummary[]>('/roles'),
+  listSubjects: () => request<SubjectSummary[]>('/subjects'),
+  createSubject: (body: JsonBody) =>
+    request<SubjectSummary>('/subjects', { method: 'POST', json: body }),
+  listTeacherAssignments: () =>
+    request<TeacherAssignmentSummary[]>('/teacher-assignments'),
+  createTeacherAssignment: (body: JsonBody) =>
+    request<TeacherAssignmentSummary>('/teacher-assignments', {
+      method: 'POST',
+      json: body,
+    }),
+  listExamTerms: () => request<ExamTermSummary[]>('/academics/exams'),
+  createExamTerm: (body: JsonBody) =>
+    request<ExamTermSummary>('/academics/exams', { method: 'POST', json: body }),
+  createAssessmentComponent: (body: JsonBody) =>
+    request<AssessmentComponentSummary>('/academics/exams/components', {
+      method: 'POST',
+      json: body,
+    }),
+  listMarks: () => request<MarkEntrySummary[]>('/academics/marks'),
+  enterMark: (body: JsonBody) =>
+    request<MarkEntrySummary>('/academics/marks', { method: 'POST', json: body }),
+  listCasRecords: () => request<CasRecordSummary[]>('/academics/cas'),
+  createCasRecord: (body: JsonBody) =>
+    request<CasRecordSummary>('/academics/cas', { method: 'POST', json: body }),
+  listReportCards: () => request<ReportCardSummary[]>('/academics/report-cards'),
+  generateReportCard: (body: JsonBody) =>
+    request('/academics/report-cards', { method: 'POST', json: body }),
+  listPromotionReadiness: (params?: {
+    academicYearId?: string | null;
+    classId?: string | null;
+  }) => request<PromotionReadiness[]>(withQuery('/academics/promotions', params ?? {})),
   listAdmissions: () => request<AdmissionSummary[]>('/admissions'),
   createAdmission: (body: JsonBody) =>
     request<AdmissionCreationResult>('/admissions', { method: 'POST', json: body }),
@@ -181,6 +237,69 @@ export const api = {
     window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer');
   },
   listLedgerEntries: () => request<JournalEntryView[]>('/ledger/entries'),
+  listTimetable: () => request<TimetableSlotSummary[]>('/timetable'),
+  createTimetableSlot: (body: JsonBody) =>
+    request<TimetableSlotSummary>('/timetable', { method: 'POST', json: body }),
+  listHomework: () => request<HomeworkAssignmentSummary[]>('/homework'),
+  createHomework: (body: JsonBody) =>
+    request<HomeworkAssignmentSummary>('/homework', {
+      method: 'POST',
+      json: body,
+    }),
+  listHomeworkSubmissions: () =>
+    request<HomeworkSubmissionSummary[]>('/homework/submissions'),
+  reviewHomeworkSubmission: (body: JsonBody) =>
+    request<HomeworkSubmissionSummary>('/homework/submissions', {
+      method: 'POST',
+      json: body,
+    }),
+  listStaffContracts: () => request<StaffContractSummary[]>('/hr/contracts'),
+  createStaffContract: (body: JsonBody) =>
+    request<StaffContractSummary>('/hr/contracts', { method: 'POST', json: body }),
+  listPayrollRuns: () => request<PayrollRunSummary[]>('/payroll/runs'),
+  createPayrollRun: (body: JsonBody) =>
+    request<PayrollRunSummary>('/payroll/runs', { method: 'POST', json: body }),
+  approvePayrollRun: (id: string) =>
+    request<PayrollRunSummary>(`/payroll/runs/${id}/approve`, {
+      method: 'POST',
+      json: {},
+    }),
+  postPayrollRun: (id: string) =>
+    request<PayrollRunSummary>(`/payroll/runs/${id}/post`, {
+      method: 'POST',
+      json: {},
+    }),
+  listPayslips: () => request<PayslipSummary[]>('/payroll/payslips'),
+  listAccountingPeriods: () =>
+    request<AccountingPeriodSummary[]>('/accounting/periods'),
+  createAccountingPeriod: (body: JsonBody) =>
+    request<AccountingPeriodSummary>('/accounting/periods', {
+      method: 'POST',
+      json: body,
+    }),
+  listAccountingReports: () => request<AccountingReport>('/accounting/reports'),
+  closeAccountingPeriod: (id: string) =>
+    request<AccountingPeriodSummary>(`/accounting/closing/${id}`, {
+      method: 'POST',
+      json: {},
+    }),
+  listConversations: () =>
+    request<ConversationSummary[]>('/messaging/conversations'),
+  createConversation: (body: JsonBody) =>
+    request<ConversationSummary>('/messaging/conversations', {
+      method: 'POST',
+      json: body,
+    }),
+  listMessages: () => request<MessageSummary[]>('/messaging/messages'),
+  createMessage: (body: JsonBody) =>
+    request<MessageSummary>('/messaging/messages', { method: 'POST', json: body }),
+  listMessageReadReceipts: () =>
+    request<MessageReadReceiptSummary[]>('/messaging/read-receipts'),
+  markMessageRead: (body: JsonBody) =>
+    request<MessageReadReceiptSummary>('/messaging/read-receipts', {
+      method: 'POST',
+      json: body,
+    }),
   listActivityPosts: () => request<ActivityPost[]>('/activity-feed/posts'),
   createActivityPost: (body: JsonBody) =>
     request('/activity-feed/posts', { method: 'POST', json: body }),

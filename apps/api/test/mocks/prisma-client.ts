@@ -158,6 +158,8 @@ export const JournalSourceType = {
   MANUAL: 'MANUAL',
   INVOICE: 'INVOICE',
   FEE_PAYMENT: 'FEE_PAYMENT',
+  PAYROLL: 'PAYROLL',
+  CLOSING: 'CLOSING',
   ADJUSTMENT: 'ADJUSTMENT',
 } as const;
 
@@ -244,4 +246,58 @@ export const ConsentType = {
   MEDICAL: 'MEDICAL',
   PHOTO_USAGE: 'PHOTO_USAGE',
   MESSAGING: 'MESSAGING',
+} as const;
+
+export const AssessmentType = {
+  TERMINAL: 'TERMINAL',
+  CAS: 'CAS',
+  PRACTICAL: 'PRACTICAL',
+  PROJECT: 'PROJECT',
+} as const;
+
+export const GradeLockStatus = {
+  DRAFT: 'DRAFT',
+  LOCKED: 'LOCKED',
+} as const;
+
+export const HomeworkStatus = {
+  ASSIGNED: 'ASSIGNED',
+  SUBMITTED: 'SUBMITTED',
+  REVIEWED: 'REVIEWED',
+  LATE: 'LATE',
+} as const;
+
+export const PayrollRunStatus = {
+  DRAFT: 'DRAFT',
+  REVIEWED: 'REVIEWED',
+  APPROVED: 'APPROVED',
+  POSTED: 'POSTED',
+  VOID: 'VOID',
+} as const;
+
+export const PayrollLineStatus = {
+  DRAFT: 'DRAFT',
+  APPROVED: 'APPROVED',
+  POSTED: 'POSTED',
+} as const;
+
+export const PayslipStatus = {
+  DRAFT: 'DRAFT',
+  ISSUED: 'ISSUED',
+} as const;
+
+export const AccountingPeriodStatus = {
+  OPEN: 'OPEN',
+  CLOSED: 'CLOSED',
+} as const;
+
+export const ConversationType = {
+  DIRECT: 'DIRECT',
+  CLASS: 'CLASS',
+  SECTION: 'SECTION',
+} as const;
+
+export const MessageStatus = {
+  SENT: 'SENT',
+  READ: 'READ',
 } as const;

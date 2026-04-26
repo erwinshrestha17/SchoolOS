@@ -3,6 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { admissionFormSchema, type AdmissionFormInput } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { api } from '../../lib/api';
@@ -77,6 +78,8 @@ export function AdmissionForm() {
     const sectionClassId = section.classId ?? section.class?.id;
     return !selectedClassId || sectionClassId === selectedClassId;
   });
+  const hasAcademicYears = (academicYearsQuery.data ?? []).length > 0;
+  const hasClasses = (classesQuery.data ?? []).length > 0;
 
   const mutation = useMutation({
     mutationFn: api.createAdmission,
@@ -130,6 +133,23 @@ export function AdmissionForm() {
   return (
     <div className="grid gap-6">
       <form className="grid gap-4 md:grid-cols-2" onSubmit={form.handleSubmit(submitAdmission)}>
+      {!hasAcademicYears || !hasClasses ? (
+        <div className="md:col-span-2 rounded-[24px] border border-[var(--line)] bg-white/70 p-5">
+          <p className="label mb-2">Setup Required</p>
+          <p className="text-sm leading-6 text-[var(--muted)]">
+            Create at least one academic year and class before admitting a
+            student. Sections are optional, but they can also be created from
+            Settings.
+          </p>
+          <Link
+            href="/dashboard/settings"
+            className="mt-4 inline-flex rounded-full bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-white"
+          >
+            Open setup
+          </Link>
+        </div>
+      ) : null}
+
       <div>
         <label className="label mb-2 block">First name (EN)</label>
         <input {...form.register('firstNameEn')} />
@@ -173,7 +193,9 @@ export function AdmissionForm() {
       <div>
         <label className="label mb-2 block">Academic year</label>
         <select {...form.register('academicYearId')}>
-          <option value="">Select academic year</option>
+          <option value="">
+            {hasAcademicYears ? 'Select academic year' : 'Create academic year in Settings'}
+          </option>
           {(academicYearsQuery.data ?? []).map((year) => (
             <option key={year.id} value={year.id}>
               {year.name}
@@ -184,7 +206,7 @@ export function AdmissionForm() {
       <div>
         <label className="label mb-2 block">Class</label>
         <select {...form.register('classId')}>
-          <option value="">Select class</option>
+          <option value="">{hasClasses ? 'Select class' : 'Create class in Settings'}</option>
           {(classesQuery.data ?? []).map((classroom) => (
             <option key={classroom.id} value={classroom.id}>
               {classroom.name}
@@ -195,7 +217,9 @@ export function AdmissionForm() {
       <div>
         <label className="label mb-2 block">Section</label>
         <select {...form.register('sectionId')}>
-          <option value="">No section yet</option>
+          <option value="">
+            {hasClasses ? 'No section yet' : 'Create a class before section'}
+          </option>
           {availableSections.map((section) => (
             <option key={section.id} value={section.id}>
               {section.class?.name ? `${section.class.name} / ` : ''}
@@ -268,7 +292,7 @@ export function AdmissionForm() {
 
       <button
         className="rounded-2xl bg-[var(--teal)] px-5 py-3 font-semibold text-white md:col-span-2"
-        disabled={mutation.isPending}
+        disabled={mutation.isPending || !hasAcademicYears || !hasClasses}
       >
         {mutation.isPending ? 'Creating admission...' : 'Create admission'}
       </button>

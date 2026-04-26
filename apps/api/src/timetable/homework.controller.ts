@@ -1,0 +1,45 @@
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { Permissions } from '../auth/decorators/permissions.decorator';
+import type { AuthContext } from '../auth/auth.types';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { CreateHomeworkDto } from './dto/create-homework.dto';
+import { ReviewHomeworkSubmissionDto } from './dto/review-homework-submission.dto';
+import { TimetableService } from './timetable.service';
+
+@Controller('homework')
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+export class HomeworkController {
+  constructor(private readonly timetableService: TimetableService) {}
+
+  @Get()
+  @Permissions('homework:read')
+  listHomework(@CurrentAuth() auth: AuthContext) {
+    return this.timetableService.listHomework(auth);
+  }
+
+  @Post()
+  @Permissions('homework:create')
+  createHomework(
+    @Body() dto: CreateHomeworkDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.createHomework(dto, auth);
+  }
+
+  @Get('submissions')
+  @Permissions('homework:read')
+  listSubmissions(@CurrentAuth() auth: AuthContext) {
+    return this.timetableService.listHomeworkSubmissions(auth);
+  }
+
+  @Post('submissions')
+  @Permissions('homework:review')
+  reviewSubmission(
+    @Body() dto: ReviewHomeworkSubmissionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.reviewHomeworkSubmission(dto, auth);
+  }
+}

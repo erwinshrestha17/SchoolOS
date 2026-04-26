@@ -9,17 +9,18 @@ export default function DashboardPage() {
       requiredPermissions={['tenants:read']}
     >
       <section className="grid gap-4 md:grid-cols-3">
-        <MetricCard label="Admissions queued" value="12" accent="linear-gradient(180deg, #ca5d2e, #7f2f11)" />
-        <MetricCard label="Attendance submitted" value="83%" accent="linear-gradient(180deg, #1f6f67, #0f4944)" />
-        <MetricCard label="Outstanding invoices" value="Rs 128k" accent="linear-gradient(180deg, #c6a15b, #8d6b2c)" />
+        <MetricCard label="Phase 1 core" value="Live" accent="linear-gradient(180deg, #ca5d2e, #7f2f11)" />
+        <MetricCard label="Phase 2 academic cycle" value="Ready" accent="linear-gradient(180deg, #1f6f67, #0f4944)" />
+        <MetricCard label="Ledger-backed workflows" value="Fees + Payroll" accent="linear-gradient(180deg, #c6a15b, #8d6b2c)" />
       </section>
 
       <section className="shell-card rounded-[32px] p-8">
         <p className="label mb-3">Implementation Notes</p>
         <div className="grid gap-3 text-sm leading-6 text-[var(--muted)]">
           <p>API routes are versioned under `/api/v1` and documented with Swagger.</p>
-          <p>Multi-tenant RBAC remains the control plane across users, attendance, finance, and communications.</p>
-          <p>Deferred modules are visible in navigation but intentionally not implemented as fake flows.</p>
+          <p>Multi-tenant RBAC remains the control plane across users, attendance, academics, finance, HR, payroll, accounting, and communications.</p>
+          <p>Phase 2 adds subjects, exams, CAS, report cards, timetable, homework, HR contracts, payroll journals, accounting reports, and parent-teacher messaging.</p>
+          <p>Library, transport, AI narratives, and mobile apps remain visible as deferred modules instead of fake implementations.</p>
         </div>
       </section>
     </AppShell>

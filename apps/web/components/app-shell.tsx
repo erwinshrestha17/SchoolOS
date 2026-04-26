@@ -37,10 +37,35 @@ const navItems: Array<{
     label: 'Notices & Events',
     permission: 'notices:create',
   },
+  {
+    href: '/dashboard/academics',
+    label: 'Academics',
+    permission: 'academics:manage',
+  },
+  {
+    href: '/dashboard/timetable',
+    label: 'Timetable & Homework',
+    permission: 'timetable:manage',
+  },
+  {
+    href: '/dashboard/payroll',
+    label: 'HR & Payroll',
+    permission: 'payroll:manage',
+  },
+  {
+    href: '/dashboard/accounting',
+    label: 'Accounting',
+    permission: 'accounting:read',
+  },
+  {
+    href: '/dashboard/messaging',
+    label: 'Messaging',
+    permission: 'messaging:create',
+  },
   { href: '/dashboard/settings', label: 'Settings', permission: 'roles:read' },
 ];
 
-const deferredItems = ['Academics', 'Library', 'Transport', 'Payroll'];
+const deferredItems = ['Library', 'Transport', 'AI narratives', 'Mobile apps'];
 
 export function AppShell({
   title,
@@ -143,8 +168,8 @@ export function AppShell({
               Nepal-ready school operations
             </h1>
             <p className="mt-3 text-sm text-[var(--muted)]">
-              Multi-tenant admin workspace for admissions, attendance, finance,
-              and communications.
+              Multi-tenant admin workspace for admissions, academics, HR,
+              finance, and communications.
             </p>
           </div>
 

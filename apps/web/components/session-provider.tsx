@@ -59,11 +59,6 @@ export function SessionProvider({ children }: PropsWithChildren) {
           return;
         }
 
-        if (existingSession) {
-          setStatus('authenticated');
-          return;
-        }
-
         clearStoredSession();
         setSession(null);
         setStatus('anonymous');

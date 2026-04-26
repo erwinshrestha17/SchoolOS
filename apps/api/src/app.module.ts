@@ -5,7 +5,9 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AcademicYearsModule } from './academic-years/academic-years.module';
 import { ActivityFeedModule } from './activity-feed/activity-feed.module';
+import { AccountingModule } from './accounting/accounting.module';
 import { AdmissionsModule } from './admissions/admissions.module';
+import { AcademicsModule } from './academics/academics.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
@@ -26,6 +28,9 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { APP_RATE_LIMIT, APP_RATE_TTL_MS } from './auth/auth.constants';
 import { FinanceModule } from './finance/finance.module';
 import { CommunicationsModule } from './communications/communications.module';
+import { TimetableModule } from './timetable/timetable.module';
+import { PayrollModule } from './payroll/payroll.module';
+import { MessagingModule } from './messaging/messaging.module';
 
 @Module({
   imports: [
@@ -54,6 +59,11 @@ import { CommunicationsModule } from './communications/communications.module';
     FinanceModule,
     ActivityFeedModule,
     CommunicationsModule,
+    AcademicsModule,
+    TimetableModule,
+    PayrollModule,
+    AccountingModule,
+    MessagingModule,
     TenantsModule,
     RedisModule,
     NotificationsModule,
