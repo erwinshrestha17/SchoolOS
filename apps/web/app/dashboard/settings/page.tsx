@@ -2,7 +2,11 @@ import { AppShell } from '../../../components/app-shell';
 
 export default function SettingsPage() {
   return (
-    <AppShell eyebrow="Settings" title="Roles, deployment model, and rollout posture">
+    <AppShell
+      eyebrow="Settings"
+      title="Roles, deployment model, and rollout posture"
+      requiredPermissions={['roles:read']}
+    >
       <section className="shell-card rounded-[32px] p-8">
         <p className="label mb-3">Guardrails</p>
         <div className="grid gap-3 text-sm leading-6 text-[var(--muted)]">

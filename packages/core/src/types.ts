@@ -1,11 +1,19 @@
+import type { PermissionKey } from './permissions';
+
+export type AuthSessionUser = {
+  id: string;
+  tenantId: string;
+  tenantSlug: string;
+  email: string | null;
+  authMethod: string;
+  roles: string[];
+  permissions: PermissionKey[];
+};
+
 export type AuthSession = {
   accessToken: string;
-  accessTokenExpiresAt: string;
-  user: {
-    id: string;
-    email: string | null;
-    roles: Array<{ id: string; name: string }>;
-  };
+  accessTokenExpiresAt: string | null;
+  user: AuthSessionUser;
   tenant: TenantSummary;
 };
 

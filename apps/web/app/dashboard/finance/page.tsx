@@ -3,7 +3,11 @@ import { FinanceForm } from '../../../components/forms/finance-form';
 
 export default function FinancePage() {
   return (
-    <AppShell eyebrow="Finance" title="Fee setup, collection, and ledger demo">
+    <AppShell
+      eyebrow="Finance"
+      title="Fee setup, collection, and ledger demo"
+      requiredPermissions={['fees:manage']}
+    >
       <FinanceForm />
     </AppShell>
   );

@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { LoginForm } from '../../components/forms/login-form';
 
@@ -19,7 +20,9 @@ export default function LoginPage() {
         </section>
 
         <section className="shell-card rounded-[36px] p-8">
-          <LoginForm />
+          <Suspense fallback={<p className="text-sm text-[var(--muted)]">Loading login form...</p>}>
+            <LoginForm />
+          </Suspense>
         </section>
       </div>
     </main>

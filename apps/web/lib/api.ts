@@ -1,14 +1,39 @@
+import type { AuthSession } from '@schoolos/core';
+import { readStoredSession } from './session';
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
 
 type JsonBody = Record<string, unknown>;
 
-async function request<T>(path: string, init?: RequestInit & { json?: JsonBody }) {
+export type AuthChallengeResponse = {
+  requiresMfa: true;
+  challengeToken: string;
+  challengeExpiresAt: string;
+  delivery: string;
+};
+
+type RequestOptions = RequestInit & {
+  auth?: boolean;
+  json?: JsonBody;
+};
+
+function getAccessToken() {
+  return readStoredSession()?.accessToken;
+}
+
+async function request<T>(path: string, init?: RequestOptions) {
+  const accessToken = init?.auth === false ? null : getAccessToken();
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      ...(accessToken
+        ? {
+            Authorization: `Bearer ${accessToken}`,
+          }
+        : {}),
       ...(init?.headers ?? {}),
     },
     body: init?.json ? JSON.stringify(init.json) : init?.body,
@@ -22,10 +47,34 @@ async function request<T>(path: string, init?: RequestInit & { json?: JsonBody }
   return (await response.json()) as T;
 }
 
+export function isAuthSession(
+  value: AuthSession | AuthChallengeResponse,
+): value is AuthSession {
+  return 'accessToken' in value;
+}
+
 export const api = {
-  login: (body: JsonBody) => request('/auth/login', { method: 'POST', json: body }),
+  login: (body: JsonBody) =>
+    request<AuthSession | AuthChallengeResponse>('/auth/login', {
+      method: 'POST',
+      json: body,
+      auth: false,
+    }),
+  refreshSession: () =>
+    request<AuthSession>('/auth/refresh', {
+      method: 'POST',
+      json: {},
+      auth: false,
+    }),
+  logout: () =>
+    request<{ success: true }>('/auth/logout', {
+      method: 'POST',
+      json: {},
+      auth: false,
+    }),
+  getProfile: () => request('/auth/me'),
   registerTenant: (body: JsonBody) =>
-    request('/tenants/register', { method: 'POST', json: body }),
+    request('/tenants/register', { method: 'POST', json: body, auth: false }),
   createAdmission: (body: JsonBody) =>
     request('/admissions', { method: 'POST', json: body }),
   submitAttendance: (body: JsonBody) =>

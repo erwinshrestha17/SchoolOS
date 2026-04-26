@@ -3,7 +3,11 @@ import { CommunicationsForm } from '../../../components/forms/communications-for
 
 export default function NoticesPage() {
   return (
-    <AppShell eyebrow="Communications" title="Notices, events, and audience targeting">
+    <AppShell
+      eyebrow="Communications"
+      title="Notices, events, and audience targeting"
+      requiredPermissions={['notices:create']}
+    >
       <CommunicationsForm />
     </AppShell>
   );

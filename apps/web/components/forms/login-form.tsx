@@ -3,10 +3,17 @@
 import { loginSchema, type LoginInput } from '@schoolos/core';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { api } from '../../lib/api';
+import { api, isAuthSession } from '../../lib/api';
+import { useSession } from '../session-provider';
 
 export function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { setAuthenticatedSession } = useSession();
+  const [challengeMessage, setChallengeMessage] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -22,6 +29,18 @@ export function LoginForm() {
 
   const mutation = useMutation({
     mutationFn: api.login,
+    onSuccess: (result) => {
+      if (isAuthSession(result)) {
+        setChallengeMessage(null);
+        setAuthenticatedSession(result);
+        router.push(searchParams.get('next') ?? '/dashboard');
+        return;
+      }
+
+      setChallengeMessage(
+        `MFA challenge issued via ${result.delivery}. Expires at ${new Date(result.challengeExpiresAt).toLocaleTimeString()}.`,
+      );
+    },
   });
 
   return (
@@ -64,9 +83,13 @@ export function LoginForm() {
           {mutation.error.message}
         </p>
       ) : null}
-      {mutation.isSuccess ? (
+      {challengeMessage ? (
+        <p className="text-sm text-[var(--accent)]">{challengeMessage}</p>
+      ) : null}
+      {mutation.isSuccess && !challengeMessage ? (
         <p className="text-sm text-[var(--teal)]">
-          Login request completed. Refresh cookie flow is active on the API.
+          Login request completed. Refresh cookie flow is active and the
+          dashboard session has been stored in the browser.
         </p>
       ) : null}
     </form>

@@ -387,10 +387,7 @@ export class AuthService {
       userAgent: requestMeta?.userAgent,
     });
 
-    return {
-      accessToken: session.accessToken,
-      user: authContext,
-    };
+    return this.buildAuthSession(session.accessToken, authContext, tenant);
   }
 
   async logout(
@@ -527,10 +524,7 @@ export class AuthService {
       userAgent: requestMeta?.userAgent,
     });
 
-    return {
-      accessToken: session.accessToken,
-      user: authContext,
-    };
+    return this.buildAuthSession(session.accessToken, authContext, tenant);
   }
 
   private async resolveTenantAndUser(tenantSlug: string, email: string) {
@@ -830,6 +824,42 @@ export class AuthService {
     });
 
     return { accessToken, refreshToken };
+  }
+
+  private buildAuthSession(
+    accessToken: string,
+    authContext: AuthContext,
+    tenant: Tenant,
+  ) {
+    const decoded =
+      typeof this.jwtService.decode === 'function'
+        ? ((this.jwtService.decode(accessToken) as { exp?: number } | null) ??
+          null)
+        : null;
+
+    return {
+      accessToken,
+      accessTokenExpiresAt: decoded?.exp
+        ? new Date(decoded.exp * 1000).toISOString()
+        : null,
+      tenant: {
+        id: tenant.id,
+        name: tenant.name,
+        slug: tenant.slug,
+        plan: tenant.plan,
+        mode: tenant.mode,
+        isActive: tenant.isActive,
+      },
+      user: {
+        id: authContext.userId,
+        tenantId: authContext.tenantId,
+        tenantSlug: authContext.tenantSlug,
+        email: authContext.email,
+        authMethod: authContext.authMethod,
+        roles: authContext.roles,
+        permissions: authContext.permissions,
+      },
+    };
   }
 
   private attachRefreshCookie(response: Response, refreshToken: string) {

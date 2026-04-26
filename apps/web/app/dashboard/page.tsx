@@ -3,7 +3,11 @@ import { MetricCard } from '../../components/metric-card';
 
 export default function DashboardPage() {
   return (
-    <AppShell eyebrow="Overview" title="Admin command center">
+    <AppShell
+      eyebrow="Overview"
+      title="Admin command center"
+      requiredPermissions={['tenants:read']}
+    >
       <section className="grid gap-4 md:grid-cols-3">
         <MetricCard label="Admissions queued" value="12" accent="linear-gradient(180deg, #ca5d2e, #7f2f11)" />
         <MetricCard label="Attendance submitted" value="83%" accent="linear-gradient(180deg, #1f6f67, #0f4944)" />
