@@ -60,6 +60,16 @@ pnpm dev
 - `pnpm db:migrate`
 - `pnpm db:seed`
 
+## Default Login Credentials
+
+After running `pnpm db:seed`, the following admin account is available:
+
+| Field       | Value               |
+|-------------|---------------------|
+| Tenant Slug | `default-school`    |
+| Email       | `admin@schoolos.com`|
+| Password    | `admin123`          |
+
 ## Current Phase 1 Surface Area
 
 - Tenant onboarding and admin login
