@@ -2,7 +2,7 @@
   "moduleFileExtensions": ["js", "json", "ts"],
   "rootDir": ".",
   "moduleNameMapper": {
-    "^@prisma/client$": "<rootDir>/test/mocks/prisma-client.ts"
+    "^@prisma/client$": "<rootDir>/mocks/prisma-client.ts"
   },
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",

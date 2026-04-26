@@ -118,6 +118,24 @@ export class ConfigService {
     return process.env.EMAIL_FROM_ADDRESS ?? 'no-reply@schoolos.local';
   }
 
+  get storageProvider(): 'local' | 'r2' {
+    const provider = process.env.STORAGE_PROVIDER?.toLowerCase();
+
+    return provider === 'r2' ? 'r2' : 'local';
+  }
+
+  get localStorageRoot() {
+    return process.env.LOCAL_STORAGE_ROOT ?? 'storage';
+  }
+
+  get localStoragePublicBaseUrl() {
+    return process.env.LOCAL_STORAGE_PUBLIC_BASE_URL ?? '/storage';
+  }
+
+  get r2PublicBaseUrl() {
+    return process.env.R2_PUBLIC_BASE_URL;
+  }
+
   get passwordResetAppUrl() {
     return process.env.PASSWORD_RESET_APP_URL ?? this.frontendOrigins[0];
   }

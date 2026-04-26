@@ -15,8 +15,11 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { CollectPaymentDto } from './dto/collect-payment.dto';
+import { CreateDiscountRuleDto } from './dto/create-discount-rule.dto';
 import { CreateFeeHeadDto } from './dto/create-fee-head.dto';
 import { CreateFeePlanDto } from './dto/create-fee-plan.dto';
+import { CreateFeeWaiverDto } from './dto/create-fee-waiver.dto';
+import { GenerateBillingRunDto } from './dto/generate-billing-run.dto';
 import { resolveCashAccountCode } from './finance.defaults';
 
 @Injectable()
@@ -162,6 +165,268 @@ export class FinanceService {
     return feePlan;
   }
 
+  async listBillingRuns(actor: AuthContext) {
+    return this.prisma.feeBillingRun.findMany({
+      where: { tenantId: actor.tenantId },
+      include: {
+        academicYear: true,
+        feePlan: true,
+        invoices: true,
+      },
+      orderBy: [{ generatedAt: 'desc' }],
+    });
+  }
+
+  async generateBillingRun(dto: GenerateBillingRunDto, actor: AuthContext) {
+    const academicYear = await this.prisma.academicYear.findFirst({
+      where: { id: dto.academicYearId, tenantId: actor.tenantId },
+    });
+
+    if (!academicYear) {
+      throw new NotFoundException('Academic year not found in this tenant');
+    }
+
+    if (dto.feePlanId) {
+      const feePlan = await this.prisma.feePlan.findFirst({
+        where: { id: dto.feePlanId, tenantId: actor.tenantId },
+      });
+
+      if (!feePlan) {
+        throw new NotFoundException('Fee plan not found in this tenant');
+      }
+    }
+
+    const assignments = await this.prisma.studentFeeAssignment.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        academicYearId: dto.academicYearId,
+        isActive: true,
+        ...(dto.feePlanId ? { feePlanId: dto.feePlanId } : {}),
+      },
+      include: {
+        student: true,
+        feePlan: {
+          include: {
+            items: {
+              include: {
+                feeHead: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (assignments.length === 0) {
+      throw new NotFoundException(
+        'No active fee assignments found for this billing run',
+      );
+    }
+
+    const run = await this.prisma.feeBillingRun.create({
+      data: {
+        tenantId: actor.tenantId,
+        academicYearId: dto.academicYearId,
+        feePlanId: dto.feePlanId ?? null,
+        runMonth: dto.runMonth,
+        runYear: dto.runYear,
+        generatedById: actor.userId,
+        notes: dto.notes ?? null,
+      },
+    });
+
+    const invoices: Array<
+      Awaited<ReturnType<typeof this.prisma.invoice.create>>
+    > = [];
+
+    for (const assignment of assignments) {
+      const invoiceNumber = await this.generateInvoiceNumber(actor.tenantId);
+      const calculated = await this.calculateInvoiceLines({
+        tenantId: actor.tenantId,
+        classId: assignment.student.classId,
+        feePlanId: assignment.feePlanId,
+        items: assignment.feePlan.items,
+      });
+
+      invoices.push(
+        await this.prisma.invoice.create({
+          data: {
+            tenantId: actor.tenantId,
+            studentId: assignment.studentId,
+            academicYearId: dto.academicYearId,
+            billingRunId: run.id,
+            invoiceNumber,
+            dueDate: new Date(dto.dueDate),
+            subtotal: calculated.subtotal,
+            vatAmount: calculated.vatAmount,
+            totalAmount: calculated.totalAmount,
+            lines: {
+              create: calculated.lines,
+            },
+          },
+          include: {
+            student: true,
+            lines: true,
+          },
+        }),
+      );
+    }
+
+    await this.auditService.record({
+      action: 'generate',
+      resource: 'fee_billing_run',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: run.id,
+      after: {
+        academicYearId: dto.academicYearId,
+        feePlanId: dto.feePlanId ?? null,
+        invoiceCount: invoices.length,
+      },
+    });
+
+    return {
+      ...run,
+      invoices,
+    };
+  }
+
+  async listDiscountRules(actor: AuthContext) {
+    return this.prisma.discountRule.findMany({
+      where: { tenantId: actor.tenantId },
+      include: {
+        feeHead: true,
+        class: true,
+        feePlan: true,
+      },
+      orderBy: [{ createdAt: 'desc' }],
+    });
+  }
+
+  async createDiscountRule(dto: CreateDiscountRuleDto, actor: AuthContext) {
+    const discount = await this.prisma.discountRule.create({
+      data: {
+        tenantId: actor.tenantId,
+        name: dto.name,
+        type: dto.type,
+        feeHeadId: dto.feeHeadId ?? null,
+        classId: dto.classId ?? null,
+        feePlanId: dto.feePlanId ?? null,
+        percentOff:
+          dto.percentOff === undefined
+            ? null
+            : new Prisma.Decimal(dto.percentOff),
+        amountOff:
+          dto.amountOff === undefined
+            ? null
+            : new Prisma.Decimal(dto.amountOff),
+      },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'discount_rule',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: discount.id,
+      after: {
+        name: discount.name,
+        type: discount.type,
+      },
+    });
+
+    return discount;
+  }
+
+  async listWaivers(actor: AuthContext) {
+    return this.prisma.feeWaiver.findMany({
+      where: { tenantId: actor.tenantId },
+      include: {
+        student: true,
+        feeHead: true,
+        approvedBy: true,
+      },
+      orderBy: [{ createdAt: 'desc' }],
+    });
+  }
+
+  async createWaiver(dto: CreateFeeWaiverDto, actor: AuthContext) {
+    const student = await this.prisma.student.findFirst({
+      where: { id: dto.studentId, tenantId: actor.tenantId },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    const invoice = dto.invoiceId
+      ? await this.prisma.invoice.findFirst({
+          where: { id: dto.invoiceId, tenantId: actor.tenantId },
+          include: { payments: true },
+        })
+      : null;
+
+    if (dto.invoiceId && !invoice) {
+      throw new NotFoundException('Invoice not found in this tenant');
+    }
+
+    const amount = new Prisma.Decimal(dto.amount);
+
+    const waiver = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.feeWaiver.create({
+        data: {
+          tenantId: actor.tenantId,
+          studentId: dto.studentId,
+          feeHeadId: dto.feeHeadId ?? null,
+          invoiceId: dto.invoiceId ?? null,
+          amount,
+          reason: dto.reason,
+          approvedById: actor.userId,
+          approvedAt: new Date(),
+        },
+      });
+
+      if (invoice) {
+        const paidAmount = invoice.payments.reduce(
+          (sum, payment) => sum.add(payment.amount),
+          new Prisma.Decimal(0),
+        );
+        const newTotal = invoice.totalAmount.sub(amount);
+        const safeTotal = newTotal.gt(0) ? newTotal : new Prisma.Decimal(0);
+
+        await tx.invoice.update({
+          where: { id: invoice.id },
+          data: {
+            subtotal: invoice.subtotal.sub(amount).gt(0)
+              ? invoice.subtotal.sub(amount)
+              : new Prisma.Decimal(0),
+            totalAmount: safeTotal,
+            status: paidAmount.gte(safeTotal)
+              ? InvoiceStatus.PAID
+              : invoice.status,
+          },
+        });
+      }
+
+      return created;
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'fee_waiver',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: waiver.id,
+      after: {
+        studentId: dto.studentId,
+        invoiceId: dto.invoiceId ?? null,
+        amount: dto.amount,
+      },
+    });
+
+    return waiver;
+  }
+
   async listInvoices(actor: AuthContext) {
     const invoices = await this.prisma.invoice.findMany({
       where: { tenantId: actor.tenantId },
@@ -187,6 +452,53 @@ export class FinanceService {
         0,
       ),
     }));
+  }
+
+  async listDefaulters(actor: AuthContext) {
+    const today = new Date();
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        dueDate: { lt: today },
+        status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
+      },
+      include: {
+        student: {
+          include: {
+            class: true,
+            sectionRef: true,
+          },
+        },
+        payments: true,
+      },
+      orderBy: [{ dueDate: 'asc' }],
+    });
+
+    return invoices.map((invoice) => {
+      const paidAmount = invoice.payments.reduce(
+        (sum, payment) => sum + Number(payment.amount),
+        0,
+      );
+      const outstanding = Number(invoice.totalAmount) - paidAmount;
+      const daysOverdue = Math.max(
+        0,
+        Math.floor((today.getTime() - invoice.dueDate.getTime()) / 86_400_000),
+      );
+
+      return {
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        studentId: invoice.studentId,
+        studentName:
+          `${invoice.student.firstNameEn} ${invoice.student.lastNameEn}`.trim(),
+        className: invoice.student.class.name,
+        sectionName: invoice.student.sectionRef?.name ?? null,
+        dueDate: invoice.dueDate,
+        outstanding,
+        daysOverdue,
+        agingBucket: getAgingBucket(daysOverdue),
+      };
+    });
   }
 
   async assignFeePlansForEnrollment(input: {
@@ -361,6 +673,7 @@ export class FinanceService {
             create: {
               tenantId: actor.tenantId,
               receiptNumber,
+              pdfUrl: `/api/v1/receipts/${receiptNumber}.pdf`,
             },
           },
         },
@@ -501,6 +814,67 @@ export class FinanceService {
     }));
   }
 
+  async listReceipts(actor: AuthContext) {
+    const receipts = await this.prisma.receipt.findMany({
+      where: { tenantId: actor.tenantId },
+      include: {
+        payment: {
+          include: {
+            invoice: true,
+            student: true,
+          },
+        },
+      },
+      orderBy: [{ issuedAt: 'desc' }],
+    });
+
+    return receipts.map((receipt) => ({
+      id: receipt.id,
+      receiptNumber: receipt.receiptNumber,
+      issuedAt: receipt.issuedAt,
+      pdfUrl: receipt.pdfUrl,
+      paymentId: receipt.paymentId,
+      amount: Number(receipt.payment.amount),
+      method: receipt.payment.method,
+      invoiceNumber: receipt.payment.invoice.invoiceNumber,
+      student: {
+        id: receipt.payment.student.id,
+        name: `${receipt.payment.student.firstNameEn} ${receipt.payment.student.lastNameEn}`.trim(),
+      },
+    }));
+  }
+
+  async getReceiptPdf(receiptNumber: string, actor: AuthContext) {
+    const receipt = await this.prisma.receipt.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        receiptNumber,
+      },
+      include: {
+        payment: {
+          include: {
+            invoice: true,
+            student: true,
+          },
+        },
+      },
+    });
+
+    if (!receipt) {
+      throw new NotFoundException('Receipt not found in this tenant');
+    }
+
+    return buildSimpleReceiptPdf([
+      'SchoolOS Fee Receipt',
+      `Receipt: ${receipt.receiptNumber}`,
+      `Invoice: ${receipt.payment.invoice.invoiceNumber}`,
+      `Student: ${receipt.payment.student.firstNameEn} ${receipt.payment.student.lastNameEn}`,
+      `Amount: Rs ${Number(receipt.payment.amount).toFixed(2)}`,
+      `Method: ${receipt.payment.method}`,
+      `Paid at: ${receipt.payment.paidAt.toISOString()}`,
+    ]);
+  }
+
   async listLedgerEntries(actor: AuthContext) {
     return this.prisma.journalEntry.findMany({
       where: { tenantId: actor.tenantId },
@@ -545,6 +919,89 @@ export class FinanceService {
 
     return `JE-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, '0')}`;
   }
+
+  private async calculateInvoiceLines(input: {
+    tenantId: string;
+    classId: string;
+    feePlanId: string;
+    items: Array<{
+      feeHeadId: string;
+      amount: Prisma.Decimal;
+      feeHead: {
+        id: string;
+        code: string;
+        name: string;
+        vatApplicable: boolean;
+      };
+    }>;
+  }) {
+    const discounts = await this.prisma.discountRule.findMany({
+      where: {
+        tenantId: input.tenantId,
+        isActive: true,
+        OR: [
+          { classId: input.classId },
+          { feePlanId: input.feePlanId },
+          { feeHeadId: { in: input.items.map((item) => item.feeHeadId) } },
+        ],
+      },
+    });
+
+    let subtotal = new Prisma.Decimal(0);
+    let vatAmount = new Prisma.Decimal(0);
+
+    const lines = input.items.map((item) => {
+      const matchingDiscounts = discounts.filter(
+        (discount) =>
+          (!discount.classId || discount.classId === input.classId) &&
+          (!discount.feePlanId || discount.feePlanId === input.feePlanId) &&
+          (!discount.feeHeadId || discount.feeHeadId === item.feeHeadId),
+      );
+      let discountAmount = new Prisma.Decimal(0);
+
+      for (const discount of matchingDiscounts) {
+        if (discount.percentOff) {
+          discountAmount = discountAmount.add(
+            item.amount.mul(discount.percentOff).div(100),
+          );
+        }
+
+        if (discount.amountOff) {
+          discountAmount = discountAmount.add(discount.amountOff);
+        }
+      }
+
+      const cappedDiscount = discountAmount.gt(item.amount)
+        ? item.amount
+        : discountAmount;
+      const discountedAmount = item.amount.sub(cappedDiscount);
+      const lineVat = item.feeHead.vatApplicable
+        ? discountedAmount.mul(0.13)
+        : new Prisma.Decimal(0);
+
+      subtotal = subtotal.add(discountedAmount);
+      vatAmount = vatAmount.add(lineVat);
+
+      return {
+        tenantId: input.tenantId,
+        feeHeadId: item.feeHeadId,
+        description: cappedDiscount.gt(0)
+          ? `${item.feeHead.name} after discount`
+          : item.feeHead.name,
+        quantity: 1,
+        unitAmount: discountedAmount,
+        vatAmount: lineVat,
+        totalAmount: discountedAmount.add(lineVat),
+      };
+    });
+
+    return {
+      lines,
+      subtotal,
+      vatAmount,
+      totalAmount: subtotal.add(vatAmount),
+    };
+  }
 }
 
 function resolveIncomeAccountCode(feeHeadCode: string) {
@@ -588,4 +1045,73 @@ function allocatePaymentAcrossLines(
 
     return { ...line, totalAmount: proportional };
   });
+}
+
+function getAgingBucket(daysOverdue: number) {
+  if (daysOverdue <= 30) {
+    return '1-30';
+  }
+
+  if (daysOverdue <= 60) {
+    return '31-60';
+  }
+
+  if (daysOverdue <= 90) {
+    return '61-90';
+  }
+
+  return '90+';
+}
+
+function buildSimpleReceiptPdf(lines: string[]) {
+  const content = [
+    'BT',
+    '/F1 16 Tf',
+    '72 770 Td',
+    ...lines.flatMap((line, index) => [
+      `(${escapePdfText(line)}) Tj`,
+      index === 0 ? '/F1 11 Tf' : '',
+      '0 -24 Td',
+    ]),
+    'ET',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+
+  const chunks = ['%PDF-1.4\n'];
+  const offsets = [0];
+
+  for (const [index, object] of objects.entries()) {
+    offsets.push(Buffer.byteLength(chunks.join('')));
+    chunks.push(`${index + 1} 0 obj\n${object}\nendobj\n`);
+  }
+
+  const xrefOffset = Buffer.byteLength(chunks.join(''));
+  chunks.push(`xref\n0 ${objects.length + 1}\n`);
+  chunks.push('0000000000 65535 f \n');
+
+  for (const offset of offsets.slice(1)) {
+    chunks.push(`${String(offset).padStart(10, '0')} 00000 n \n`);
+  }
+
+  chunks.push(
+    `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`,
+  );
+
+  return Buffer.from(chunks.join(''), 'utf8');
+}
+
+function escapePdfText(value: string) {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/\(/g, '\\(')
+    .replace(/\)/g, '\\)');
 }

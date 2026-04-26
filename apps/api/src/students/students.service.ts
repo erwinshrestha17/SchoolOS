@@ -138,10 +138,6 @@ export class StudentsService {
       where: { tenantId: actor.tenantId },
     });
 
-    return `${normalizeSlug(actor.tenantSlug)}-${new Date().getFullYear()}-STU-${String(count + 1).padStart(4, '0')}`;
+    return `SCH-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
   }
-}
-
-function normalizeSlug(slug: string) {
-  return slug.replace(/[^a-z0-9]/gi, '').toUpperCase();
 }

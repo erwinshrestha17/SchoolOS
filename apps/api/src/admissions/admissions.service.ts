@@ -5,6 +5,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { FinanceService } from '../finance/finance.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { StudentRecordsService } from '../student-records/student-records.service';
 import { UsersService } from '../users/users.service';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
 
@@ -14,6 +15,7 @@ export class AdmissionsService {
     private readonly prisma: PrismaService,
     private readonly usersService: UsersService,
     private readonly financeService: FinanceService,
+    private readonly studentRecordsService: StudentRecordsService,
     private readonly notificationsService: NotificationsService,
     private readonly auditService: AuditService,
   ) {}
@@ -126,7 +128,8 @@ export class AdmissionsService {
         tenantId: actor.tenantId,
         userId: linkedUserId,
         studentSystemId:
-          dto.studentSystemId ?? (await this.generateStudentSystemId(actor)),
+          dto.studentSystemId ??
+          (await this.generateStudentSystemId(actor, academicYear.startsOn)),
         firstNameEn: dto.firstNameEn,
         lastNameEn: dto.lastNameEn,
         firstNameNp: dto.firstNameNp ?? null,
@@ -249,6 +252,22 @@ export class AdmissionsService {
       dueDate: new Date(dto.admissionDate),
     });
 
+    const documents: Array<
+      Awaited<ReturnType<StudentRecordsService['uploadDocument']>>
+    > = [];
+
+    for (const documentInput of dto.documents ?? []) {
+      documents.push(
+        await this.studentRecordsService.uploadDocument(
+          {
+            ...documentInput,
+            studentId: student.id,
+          },
+          actor,
+        ),
+      );
+    }
+
     await this.auditService.record({
       action: 'create',
       resource: 'admission',
@@ -281,6 +300,7 @@ export class AdmissionsService {
         fullName: link.guardian.fullName,
         relation: link.relation,
       })),
+      documents,
       invoice: initialInvoice
         ? {
             id: initialInvoice.id,
@@ -291,11 +311,11 @@ export class AdmissionsService {
     };
   }
 
-  private async generateStudentSystemId(actor: AuthContext) {
+  private async generateStudentSystemId(actor: AuthContext, startsOn: Date) {
     const count = await this.prisma.student.count({
       where: { tenantId: actor.tenantId },
     });
 
-    return `${actor.tenantSlug.replace(/[^a-z0-9]/gi, '').toUpperCase()}-${new Date().getUTCFullYear()}-STU-${String(count + 1).padStart(4, '0')}`;
+    return `SCH-${startsOn.getUTCFullYear()}-${String(count + 1).padStart(4, '0')}`;
   }
 }

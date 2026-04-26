@@ -1,56 +1,205 @@
 'use client';
 
-import { admissionFormSchema, type AdmissionFormInput } from '@schoolos/core';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation } from '@tanstack/react-query';
+import { admissionFormSchema, type AdmissionFormInput } from '@schoolos/core';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { api } from '../../lib/api';
+import { fileToBase64Payload } from '../../lib/files';
+
+const today = new Date().toISOString().slice(0, 10);
 
 export function AdmissionForm() {
+  const queryClient = useQueryClient();
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [documentKind, setDocumentKind] = useState('BIRTH_CERTIFICATE');
+
+  const academicYearsQuery = useQuery({
+    queryKey: ['academic-years'],
+    queryFn: api.listAcademicYears,
+  });
+  const classesQuery = useQuery({
+    queryKey: ['classes'],
+    queryFn: api.listClasses,
+  });
+  const sectionsQuery = useQuery({
+    queryKey: ['sections'],
+    queryFn: api.listSections,
+  });
+
   const form = useForm<AdmissionFormInput>({
     resolver: zodResolver(admissionFormSchema),
     defaultValues: {
+      dateOfBirth: '',
+      admissionDate: today,
+      gender: 'FEMALE',
       mediumOfInstruction: 'English',
-      guardians: [{ fullName: '', relation: 'mother', primaryPhone: '', isPrimary: true }],
+      guardians: [
+        {
+          fullName: '',
+          relation: 'mother',
+          primaryPhone: '',
+          isPrimary: true,
+        },
+      ],
     },
   });
 
+  const selectedClassId = form.watch('classId');
   const guardians = useFieldArray({
     control: form.control,
     name: 'guardians',
   });
 
-  const mutation = useMutation({
-    mutationFn: api.createAdmission,
+  useEffect(() => {
+    const currentAcademicYear = academicYearsQuery.data?.find((year) => year.isCurrent);
+    const firstAcademicYear = currentAcademicYear ?? academicYearsQuery.data?.[0];
+
+    if (firstAcademicYear && !form.getValues('academicYearId')) {
+      form.setValue('academicYearId', firstAcademicYear.id);
+    }
+  }, [academicYearsQuery.data, form]);
+
+  useEffect(() => {
+    const firstClass = classesQuery.data?.[0];
+
+    if (firstClass && !form.getValues('classId')) {
+      form.setValue('classId', firstClass.id);
+    }
+  }, [classesQuery.data, form]);
+
+  const availableSections = (sectionsQuery.data ?? []).filter((section) => {
+    const sectionClassId = section.classId ?? section.class?.id;
+    return !selectedClassId || sectionClassId === selectedClassId;
   });
 
+  const mutation = useMutation({
+    mutationFn: api.createAdmission,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['students'] });
+      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      form.reset({
+        ...form.getValues(),
+        firstNameEn: '',
+        lastNameEn: '',
+        firstNameNp: '',
+        lastNameNp: '',
+        dateOfBirth: '',
+        admissionDate: today,
+        admissionNumber: '',
+        rollNumber: null,
+        guardians: [
+          {
+            fullName: '',
+            relation: 'mother',
+            primaryPhone: '',
+            isPrimary: true,
+          },
+        ],
+      });
+      setDocumentFile(null);
+    },
+  });
+
+  async function submitAdmission(values: AdmissionFormInput) {
+    const documentPayload = documentFile
+      ? {
+          ...(await fileToBase64Payload(documentFile)),
+          kind: documentKind,
+          title: documentFile.name,
+        }
+      : null;
+
+    mutation.mutate({
+      ...values,
+      sectionId: values.sectionId || null,
+      admissionDate: new Date(values.admissionDate).toISOString(),
+      dateOfBirth: new Date(values.dateOfBirth).toISOString(),
+      documents: documentPayload ? [documentPayload] : [],
+    });
+  }
+
   return (
-    <form
-      className="grid gap-4 md:grid-cols-2"
-      onSubmit={form.handleSubmit((values) =>
-        mutation.mutate({
-          ...values,
-          gender: 'FEMALE',
-          admissionDate: new Date().toISOString(),
-        }),
-      )}
-    >
-      {[
-        ['firstNameEn', 'First name (EN)'],
-        ['lastNameEn', 'Last name (EN)'],
-        ['firstNameNp', 'First name (NP)'],
-        ['lastNameNp', 'Last name (NP)'],
-        ['dateOfBirth', 'Date of birth'],
-        ['academicYearId', 'Academic year ID'],
-        ['classId', 'Class ID'],
-        ['sectionId', 'Section ID'],
-        ['mediumOfInstruction', 'Medium'],
-      ].map(([name, label]) => (
-        <div key={name}>
-          <label className="label mb-2 block">{label}</label>
-          <input {...form.register(name as keyof AdmissionFormInput)} />
-        </div>
-      ))}
+    <form className="grid gap-4 md:grid-cols-2" onSubmit={form.handleSubmit(submitAdmission)}>
+      <div>
+        <label className="label mb-2 block">First name (EN)</label>
+        <input {...form.register('firstNameEn')} />
+      </div>
+      <div>
+        <label className="label mb-2 block">Last name (EN)</label>
+        <input {...form.register('lastNameEn')} />
+      </div>
+      <div>
+        <label className="label mb-2 block">First name (NP)</label>
+        <input {...form.register('firstNameNp')} />
+      </div>
+      <div>
+        <label className="label mb-2 block">Last name (NP)</label>
+        <input {...form.register('lastNameNp')} />
+      </div>
+      <div>
+        <label className="label mb-2 block">Date of birth</label>
+        <input type="date" {...form.register('dateOfBirth')} />
+      </div>
+      <div>
+        <label className="label mb-2 block">Gender</label>
+        <select {...form.register('gender')}>
+          <option value="FEMALE">Female</option>
+          <option value="MALE">Male</option>
+          <option value="OTHER">Other</option>
+        </select>
+      </div>
+      <div>
+        <label className="label mb-2 block">Admission date</label>
+        <input type="date" {...form.register('admissionDate')} />
+      </div>
+      <div>
+        <label className="label mb-2 block">Admission number</label>
+        <input placeholder="Optional school admission number" {...form.register('admissionNumber')} />
+      </div>
+      <div>
+        <label className="label mb-2 block">Academic year</label>
+        <select {...form.register('academicYearId')}>
+          <option value="">Select academic year</option>
+          {(academicYearsQuery.data ?? []).map((year) => (
+            <option key={year.id} value={year.id}>
+              {year.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="label mb-2 block">Class</label>
+        <select {...form.register('classId')}>
+          <option value="">Select class</option>
+          {(classesQuery.data ?? []).map((classroom) => (
+            <option key={classroom.id} value={classroom.id}>
+              {classroom.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="label mb-2 block">Section</label>
+        <select {...form.register('sectionId')}>
+          <option value="">No section yet</option>
+          {availableSections.map((section) => (
+            <option key={section.id} value={section.id}>
+              {section.class?.name ? `${section.class.name} / ` : ''}
+              {section.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="label mb-2 block">Roll number</label>
+        <input type="number" min={1} {...form.register('rollNumber')} />
+      </div>
+      <div>
+        <label className="label mb-2 block">Medium</label>
+        <input {...form.register('mediumOfInstruction')} />
+      </div>
 
       <div className="md:col-span-2 rounded-[24px] border border-[var(--line)] bg-white/60 p-4">
         <div className="mb-4 flex items-center justify-between">
@@ -86,12 +235,43 @@ export function AdmissionForm() {
         </div>
       </div>
 
-      <button className="rounded-2xl bg-[var(--teal)] px-5 py-3 font-semibold text-white md:col-span-2">
+      <div className="md:col-span-2 rounded-[24px] border border-[var(--line)] bg-white/60 p-4">
+        <p className="label mb-4">Admission document</p>
+        <div className="grid gap-3 md:grid-cols-[220px_1fr]">
+          <select value={documentKind} onChange={(event) => setDocumentKind(event.target.value)}>
+            <option value="BIRTH_CERTIFICATE">Birth certificate</option>
+            <option value="TRANSFER_CERTIFICATE">Transfer certificate</option>
+            <option value="PHOTO">Photo</option>
+            <option value="ID_CARD">Guardian ID</option>
+            <option value="OTHER">Other</option>
+          </select>
+          <input
+            type="file"
+            onChange={(event) => setDocumentFile(event.target.files?.[0] ?? null)}
+          />
+        </div>
+      </div>
+
+      {Object.keys(form.formState.errors).length > 0 ? (
+        <p className="md:col-span-2 text-sm text-[var(--accent-dark)]">
+          Please complete the required student, class, and guardian details.
+        </p>
+      ) : null}
+
+      <button
+        className="rounded-2xl bg-[var(--teal)] px-5 py-3 font-semibold text-white md:col-span-2"
+        disabled={mutation.isPending}
+      >
         {mutation.isPending ? 'Creating admission...' : 'Create admission'}
       </button>
+      {mutation.isError ? (
+        <p className="md:col-span-2 text-sm text-[var(--accent-dark)]">
+          {mutation.error.message}
+        </p>
+      ) : null}
       {mutation.isSuccess ? (
         <p className="md:col-span-2 text-sm text-[var(--teal)]">
-          Admission created. The backend will link guardians, create enrollment, and auto-generate the initial invoice when fee plans exist.
+          Admission created with guardian linkage, enrollment, optional document metadata, and fee side effects.
         </p>
       ) : null}
     </form>

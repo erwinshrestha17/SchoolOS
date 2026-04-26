@@ -4,6 +4,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AcademicYearsModule } from './academic-years/academic-years.module';
+import { ActivityFeedModule } from './activity-feed/activity-feed.module';
 import { AdmissionsModule } from './admissions/admissions.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
@@ -19,6 +20,8 @@ import { ConfigModule } from './config/config.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditModule } from './audit/audit.module';
 import { StaffModule } from './staff/staff.module';
+import { StorageModule } from './storage/storage.module';
+import { StudentRecordsModule } from './student-records/student-records.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { APP_RATE_LIMIT, APP_RATE_TTL_MS } from './auth/auth.constants';
 import { FinanceModule } from './finance/finance.module';
@@ -34,6 +37,7 @@ import { CommunicationsModule } from './communications/communications.module';
       },
     ]),
     PrismaModule,
+    StorageModule,
     AuditModule,
     UsersModule,
     AuthModule,
@@ -41,12 +45,14 @@ import { CommunicationsModule } from './communications/communications.module';
     AcademicYearsModule,
     SectionsModule,
     StudentsModule,
+    StudentRecordsModule,
     AdmissionsModule,
     StaffModule,
     ClassesModule,
     GradesModule,
     AttendanceModule,
     FinanceModule,
+    ActivityFeedModule,
     CommunicationsModule,
     TenantsModule,
     RedisModule,

@@ -25,6 +25,23 @@ export const guardianSchema = z.object({
   isPrimary: z.boolean().default(false)
 });
 
+export const studentDocumentFormSchema = z.object({
+  kind: z
+    .enum([
+      'BIRTH_CERTIFICATE',
+      'TRANSFER_CERTIFICATE',
+      'PHOTO',
+      'ID_CARD',
+      'ENROLLMENT_CONFIRMATION',
+      'OTHER'
+    ])
+    .default('BIRTH_CERTIFICATE'),
+  title: z.string().optional().nullable(),
+  fileName: z.string().min(1),
+  contentType: z.string().min(1),
+  base64Content: z.string().min(1)
+});
+
 export const admissionFormSchema = z.object({
   firstNameEn: z.string().min(1),
   lastNameEn: z.string().min(1),
@@ -36,10 +53,84 @@ export const admissionFormSchema = z.object({
   academicYearId: z.string().min(1),
   classId: z.string().min(1),
   sectionId: z.string().optional().nullable(),
+  rollNumber: z.coerce.number().int().positive().optional().nullable(),
+  admissionNumber: z.string().optional().nullable(),
   mediumOfInstruction: z.string().default('English'),
-  guardians: z.array(guardianSchema).min(1)
+  guardians: z.array(guardianSchema).min(1),
+  documents: z.array(studentDocumentFormSchema).optional()
+});
+
+export const attendanceExceptionSchema = z.object({
+  studentId: z.string().min(1),
+  status: z.enum(['ABSENT', 'LATE', 'LEAVE']),
+  remark: z.string().optional().nullable(),
+  lateAt: z.string().optional().nullable()
+});
+
+export const attendanceSubmissionSchema = z.object({
+  academicYearId: z.string().min(1),
+  classId: z.string().min(1),
+  sectionId: z.string().optional().nullable(),
+  attendanceDate: z.string().min(1),
+  exceptions: z.array(attendanceExceptionSchema).default([])
+});
+
+export const feeHeadFormSchema = z.object({
+  code: z.string().min(2),
+  name: z.string().min(2),
+  frequency: z.enum(['ONE_TIME', 'MONTHLY', 'TERM', 'ANNUAL']).default('MONTHLY'),
+  defaultAmount: z.coerce.number().positive(),
+  vatApplicable: z.boolean().default(true)
+});
+
+export const feePlanFormSchema = z.object({
+  academicYearId: z.string().min(1),
+  classId: z.string().optional().nullable(),
+  code: z.string().min(2),
+  name: z.string().min(2),
+  feeHeadId: z.string().min(1),
+  amount: z.coerce.number().positive()
+});
+
+export const paymentCollectionSchema = z.object({
+  invoiceId: z.string().min(1),
+  amount: z.coerce.number().positive(),
+  method: z.enum(['CASH', 'BANK', 'CHEQUE', 'TRANSFER', 'MOBILE']).default('CASH'),
+  referenceNumber: z.string().optional().nullable(),
+  narration: z.string().optional().nullable()
+});
+
+export const activityPostFormSchema = z.object({
+  classId: z.string().min(1),
+  sectionId: z.string().optional().nullable(),
+  title: z.string().min(2),
+  caption: z.string().min(2),
+  category: z
+    .enum(['LEARNING', 'OUTDOOR_PLAY', 'ART_AND_CRAFT', 'CELEBRATION', 'SPORTS', 'GENERAL'])
+    .default('GENERAL'),
+  studentIds: z.array(z.string()).default([]),
+  attachments: z.array(studentDocumentFormSchema.pick({
+    fileName: true,
+    contentType: true,
+    base64Content: true
+  })).min(1).max(5)
+});
+
+export const moodLogFormSchema = z.object({
+  classId: z.string().min(1),
+  sectionId: z.string().optional().nullable(),
+  studentId: z.string().optional().nullable(),
+  mood: z.enum(['CALM', 'ENGAGED', 'EXCITED', 'UNSETTLED', 'TIRED']),
+  note: z.string().optional().nullable(),
+  logDate: z.string().min(1)
 });
 
 export type TenantRegistrationInput = z.input<typeof tenantRegistrationSchema>;
 export type LoginInput = z.input<typeof loginSchema>;
 export type AdmissionFormInput = z.input<typeof admissionFormSchema>;
+export type AttendanceSubmissionInput = z.input<typeof attendanceSubmissionSchema>;
+export type FeeHeadFormInput = z.input<typeof feeHeadFormSchema>;
+export type FeePlanFormInput = z.input<typeof feePlanFormSchema>;
+export type PaymentCollectionInput = z.input<typeof paymentCollectionSchema>;
+export type ActivityPostFormInput = z.input<typeof activityPostFormSchema>;
+export type MoodLogFormInput = z.input<typeof moodLogFormSchema>;

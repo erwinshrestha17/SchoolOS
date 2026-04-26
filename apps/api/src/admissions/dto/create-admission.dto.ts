@@ -13,6 +13,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { UploadStudentDocumentDto } from '../../student-records/dto/upload-student-document.dto';
 
 class GuardianInputDto {
   @IsString()
@@ -132,6 +133,12 @@ export class CreateAdmissionDto {
   @ValidateNested({ each: true })
   @Type(() => GuardianInputDto)
   guardians!: GuardianInputDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UploadStudentDocumentDto)
+  documents?: UploadStudentDocumentDto[];
 
   @IsOptional()
   @IsBoolean()

@@ -28,6 +28,11 @@ const navItems: Array<{
     permission: 'fees:manage',
   },
   {
+    href: '/dashboard/activity',
+    label: 'Activity Feed',
+    permission: 'activity_feed:create',
+  },
+  {
     href: '/dashboard/notices',
     label: 'Notices & Events',
     permission: 'notices:create',

@@ -96,6 +96,16 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Read guardian records inside a tenant',
   },
   {
+    resource: 'student_documents',
+    action: 'manage',
+    description: 'Upload and manage student documents inside a tenant',
+  },
+  {
+    resource: 'siblings',
+    action: 'manage',
+    description: 'Manage sibling groups for fee discounts and family views',
+  },
+  {
     resource: 'enrollments',
     action: 'create',
     description: 'Create student enrollment records and side effects',
@@ -126,9 +136,24 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Read attendance sessions and analytics',
   },
   {
+    resource: 'attendance',
+    action: 'review_conflicts',
+    description: 'Review conflicting attendance submissions',
+  },
+  {
     resource: 'fees',
     action: 'manage',
     description: 'Manage fee heads, plans, and student assignments',
+  },
+  {
+    resource: 'fees',
+    action: 'bill',
+    description: 'Generate recurring fee invoices and billing runs',
+  },
+  {
+    resource: 'fees',
+    action: 'discount',
+    description: 'Manage discounts and waivers',
   },
   {
     resource: 'payments',
@@ -136,9 +161,24 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Collect payments and issue receipts',
   },
   {
+    resource: 'receipts',
+    action: 'read',
+    description: 'Read payment receipts and receipt PDFs',
+  },
+  {
     resource: 'ledger',
     action: 'read',
     description: 'Read ledger entries and journal lines',
+  },
+  {
+    resource: 'activity_feed',
+    action: 'create',
+    description: 'Create classroom activity feed posts and mood logs',
+  },
+  {
+    resource: 'activity_feed',
+    action: 'read',
+    description: 'Read activity feed posts and mood logs',
   },
   {
     resource: 'notices',
@@ -159,6 +199,16 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     resource: 'events',
     action: 'read',
     description: 'Read school events',
+  },
+  {
+    resource: 'communications',
+    action: 'read_deliveries',
+    description: 'Read notification delivery records',
+  },
+  {
+    resource: 'consents',
+    action: 'manage',
+    description: 'Capture and revoke guardian consent records',
   },
   {
     resource: 'tenants',
@@ -207,20 +257,30 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'classes:read',
     'sections:read',
     'students:read',
+    'activity_feed:create',
+    'activity_feed:read',
     'attendance:mark',
     'attendance:read',
     'notices:read',
     'events:read',
   ],
-  student: ['notices:read', 'events:read'],
-  parent: ['students:read', 'notices:read', 'events:read'],
+  student: ['notices:read', 'events:read', 'activity_feed:read'],
+  parent: [
+    'students:read',
+    'notices:read',
+    'events:read',
+    'activity_feed:read',
+  ],
   accountant: [
     'roles:read',
     'users:read',
     'staff:read',
     'students:read',
     'fees:manage',
+    'fees:bill',
+    'fees:discount',
     'payments:collect',
+    'receipts:read',
     'ledger:read',
   ],
   librarian: ['roles:read', 'classes:read', 'sections:read', 'students:read'],

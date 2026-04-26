@@ -6,6 +6,9 @@ import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { CreateFeeHeadDto } from './dto/create-fee-head.dto';
 import { CreateFeePlanDto } from './dto/create-fee-plan.dto';
+import { CreateDiscountRuleDto } from './dto/create-discount-rule.dto';
+import { CreateFeeWaiverDto } from './dto/create-fee-waiver.dto';
+import { GenerateBillingRunDto } from './dto/generate-billing-run.dto';
 import { FinanceService } from './finance.service';
 
 @Controller('fees')
@@ -47,5 +50,56 @@ export class FeesController {
   @Permissions('fees:manage')
   listInvoices(@CurrentAuth() auth: AuthContext) {
     return this.financeService.listInvoices(auth);
+  }
+
+  @Get('billing-runs')
+  @Permissions('fees:bill')
+  listBillingRuns(@CurrentAuth() auth: AuthContext) {
+    return this.financeService.listBillingRuns(auth);
+  }
+
+  @Post('billing-runs')
+  @Permissions('fees:bill')
+  generateBillingRun(
+    @Body() dto: GenerateBillingRunDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.generateBillingRun(dto, auth);
+  }
+
+  @Get('defaulters')
+  @Permissions('fees:manage')
+  listDefaulters(@CurrentAuth() auth: AuthContext) {
+    return this.financeService.listDefaulters(auth);
+  }
+
+  @Get('discounts')
+  @Permissions('fees:discount')
+  listDiscounts(@CurrentAuth() auth: AuthContext) {
+    return this.financeService.listDiscountRules(auth);
+  }
+
+  @Post('discounts')
+  @Permissions('fees:discount')
+  createDiscount(
+    @Body() dto: CreateDiscountRuleDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.createDiscountRule(dto, auth);
+  }
+
+  @Get('waivers')
+  @Permissions('fees:discount')
+  listWaivers(@CurrentAuth() auth: AuthContext) {
+    return this.financeService.listWaivers(auth);
+  }
+
+  @Post('waivers')
+  @Permissions('fees:discount')
+  createWaiver(
+    @Body() dto: CreateFeeWaiverDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.createWaiver(dto, auth);
   }
 }

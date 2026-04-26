@@ -600,6 +600,9 @@ async function createPrismaMock() {
     classes: [] as any[],
     students: [] as any[],
     staff: [] as any[],
+    academicYears: [] as any[],
+    chartAccounts: [] as any[],
+    feeHeads: [] as any[],
     otpCodes: [] as any[],
     refreshTokens: [] as any[],
     auditLogs: [] as any[],
@@ -1030,6 +1033,75 @@ async function createPrismaMock() {
           (classroom) =>
             !where.tenantId || classroom.tenantId === where.tenantId,
         ).length;
+      }),
+    },
+    academicYear: {
+      upsert: jest.fn(async ({ where, update, create }: any) => {
+        const existing = state.academicYears.find(
+          (year) =>
+            year.tenantId === where.tenantId_name.tenantId &&
+            year.name === where.tenantId_name.name,
+        );
+
+        if (existing) {
+          Object.assign(existing, update);
+          return existing;
+        }
+
+        const academicYear = {
+          id: nextId('academic-year'),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          ...create,
+        };
+        state.academicYears.push(academicYear);
+        return academicYear;
+      }),
+    },
+    chartAccount: {
+      upsert: jest.fn(async ({ where, update, create }: any) => {
+        const existing = state.chartAccounts.find(
+          (account) =>
+            account.tenantId === where.tenantId_code.tenantId &&
+            account.code === where.tenantId_code.code,
+        );
+
+        if (existing) {
+          Object.assign(existing, update);
+          return existing;
+        }
+
+        const chartAccount = {
+          id: nextId('account'),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          ...create,
+        };
+        state.chartAccounts.push(chartAccount);
+        return chartAccount;
+      }),
+    },
+    feeHead: {
+      upsert: jest.fn(async ({ where, update, create }: any) => {
+        const existing = state.feeHeads.find(
+          (head) =>
+            head.tenantId === where.tenantId_code.tenantId &&
+            head.code === where.tenantId_code.code,
+        );
+
+        if (existing) {
+          Object.assign(existing, update);
+          return existing;
+        }
+
+        const feeHead = {
+          id: nextId('fee-head'),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          ...create,
+        };
+        state.feeHeads.push(feeHead);
+        return feeHead;
       }),
     },
     student: {

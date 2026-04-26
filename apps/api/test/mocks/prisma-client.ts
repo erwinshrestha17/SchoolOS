@@ -106,11 +106,36 @@ export const AttendanceStatus = {
   LEAVE: 'LEAVE',
 } as const;
 
+export const AttendanceConflictStatus = {
+  NONE: 'NONE',
+  FLAGGED: 'FLAGGED',
+  REVIEWED: 'REVIEWED',
+} as const;
+
 export const FeeFrequency = {
   ONE_TIME: 'ONE_TIME',
   MONTHLY: 'MONTHLY',
   TERM: 'TERM',
   ANNUAL: 'ANNUAL',
+} as const;
+
+export const BillingRunStatus = {
+  DRAFT: 'DRAFT',
+  GENERATED: 'GENERATED',
+  VOID: 'VOID',
+} as const;
+
+export const DiscountType = {
+  SIBLING: 'SIBLING',
+  SCHOLARSHIP: 'SCHOLARSHIP',
+  STAFF_CHILD: 'STAFF_CHILD',
+  MANUAL: 'MANUAL',
+} as const;
+
+export const WaiverStatus = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
 } as const;
 
 export const InvoiceStatus = {
@@ -149,6 +174,20 @@ export const ChartAccountType = {
   EXPENSE: 'EXPENSE',
 } as const;
 
+export const StorageProvider = {
+  LOCAL: 'LOCAL',
+  R2: 'R2',
+} as const;
+
+export const StudentDocumentKind = {
+  BIRTH_CERTIFICATE: 'BIRTH_CERTIFICATE',
+  TRANSFER_CERTIFICATE: 'TRANSFER_CERTIFICATE',
+  PHOTO: 'PHOTO',
+  ID_CARD: 'ID_CARD',
+  ENROLLMENT_CONFIRMATION: 'ENROLLMENT_CONFIRMATION',
+  OTHER: 'OTHER',
+} as const;
+
 export const NoticePriority = {
   NORMAL: 'NORMAL',
   URGENT: 'URGENT',
@@ -167,4 +206,42 @@ export const EventType = {
   EXAM: 'EXAM',
   MEETING: 'MEETING',
   HOLIDAY: 'HOLIDAY',
+} as const;
+
+export const ActivityCategory = {
+  LEARNING: 'LEARNING',
+  OUTDOOR_PLAY: 'OUTDOOR_PLAY',
+  ART_AND_CRAFT: 'ART_AND_CRAFT',
+  CELEBRATION: 'CELEBRATION',
+  SPORTS: 'SPORTS',
+  GENERAL: 'GENERAL',
+} as const;
+
+export const MoodValue = {
+  CALM: 'CALM',
+  ENGAGED: 'ENGAGED',
+  EXCITED: 'EXCITED',
+  UNSETTLED: 'UNSETTLED',
+  TIRED: 'TIRED',
+} as const;
+
+export const NotificationChannel = {
+  EMAIL: 'EMAIL',
+  SMS: 'SMS',
+  PUSH: 'PUSH',
+} as const;
+
+export const NotificationStatus = {
+  QUEUED: 'QUEUED',
+  SENT: 'SENT',
+  FAILED: 'FAILED',
+  SKIPPED: 'SKIPPED',
+} as const;
+
+export const ConsentType = {
+  PRIVACY: 'PRIVACY',
+  DATA_PROCESSING: 'DATA_PROCESSING',
+  MEDICAL: 'MEDICAL',
+  PHOTO_USAGE: 'PHOTO_USAGE',
+  MESSAGING: 'MESSAGING',
 } as const;
