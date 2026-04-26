@@ -211,6 +211,66 @@ async function main() {
     },
   });
 
+  // 4. Create Classes
+  console.log('Seeding classes and sections...');
+
+  const classDefinitions = [
+    { name: 'Nursery',  level: 0 },
+    { name: 'LKG',      level: 1 },
+    { name: 'UKG',      level: 2 },
+    { name: 'Class 1',  level: 3 },
+    { name: 'Class 2',  level: 4 },
+    { name: 'Class 3',  level: 5 },
+    { name: 'Class 4',  level: 6 },
+    { name: 'Class 5',  level: 7 },
+    { name: 'Class 6',  level: 8 },
+    { name: 'Class 7',  level: 9 },
+    { name: 'Class 8',  level: 10 },
+    { name: 'Class 9',  level: 11 },
+    { name: 'Class 10', level: 12 },
+  ];
+
+  const createdClasses: { id: string; name: string }[] = [];
+
+  for (const classDef of classDefinitions) {
+    const cls = await prisma.class.upsert({
+      where: {
+        tenantId_name: { tenantId: tenant.id, name: classDef.name },
+      },
+      update: {},
+      create: {
+        tenantId: tenant.id,
+        name: classDef.name,
+        level: classDef.level,
+      },
+    });
+    createdClasses.push(cls);
+  }
+
+  // 5. Create Sections A and B for each class
+  const sectionNames = ['A', 'B'];
+
+  for (const cls of createdClasses) {
+    for (const sectionName of sectionNames) {
+      await prisma.section.upsert({
+        where: {
+          tenantId_classId_name: {
+            tenantId: tenant.id,
+            classId: cls.id,
+            name: sectionName,
+          },
+        },
+        update: {},
+        create: {
+          tenantId: tenant.id,
+          classId: cls.id,
+          name: sectionName,
+        },
+      });
+    }
+  }
+
+  console.log(`✅ Created ${createdClasses.length} classes with sections A & B each.`);
   console.log('✅ Seeding complete!');
   console.log('Admin login: admin@schoolos.com / admin123');
   console.log(`Academic year ready: ${academicYear.name}`);

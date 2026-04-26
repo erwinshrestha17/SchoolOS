@@ -2,8 +2,9 @@ import { StudentDocumentKind } from '@prisma/client';
 import { IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class UploadStudentDocumentDto {
+  @IsOptional()
   @IsString()
-  studentId!: string;
+  studentId?: string;
 
   @IsEnum(StudentDocumentKind)
   kind!: StudentDocumentKind;

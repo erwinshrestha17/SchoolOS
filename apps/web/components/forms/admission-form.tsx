@@ -88,7 +88,6 @@ export function AdmissionForm() {
         dateOfBirth: '',
         admissionDate: today,
         admissionNumber: '',
-        rollNumber: null,
         guardians: [
           {
             fullName: '',
@@ -191,10 +190,6 @@ export function AdmissionForm() {
             </option>
           ))}
         </select>
-      </div>
-      <div>
-        <label className="label mb-2 block">Roll number</label>
-        <input type="number" min={1} {...form.register('rollNumber')} />
       </div>
       <div>
         <label className="label mb-2 block">Medium</label>

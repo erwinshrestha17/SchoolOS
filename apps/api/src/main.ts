@@ -3,6 +3,7 @@ import 'dotenv/config';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 import { ConfigService } from './config/config.service';
 import type { NextFunction, Request, Response } from 'express';
@@ -11,6 +12,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   const httpAdapter = app.getHttpAdapter().getInstance();
+
+  app.use(json({ limit: '10mb' }));
+  app.use(urlencoded({ limit: '10mb', extended: true }));
 
   if (typeof httpAdapter.disable === 'function') {
     httpAdapter.disable('x-powered-by');
