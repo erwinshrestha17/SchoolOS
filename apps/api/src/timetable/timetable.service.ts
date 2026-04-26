@@ -34,6 +34,41 @@ export class TimetableService {
     });
   }
 
+  async listTeacherWorkload(actor: AuthContext) {
+    const staff = await this.prisma.staff.findMany({
+      where: { tenantId: actor.tenantId },
+      include: {
+        timetableSlots: {
+          include: {
+            subject: true,
+            class: true,
+            section: true,
+          },
+        },
+        homeworkAssignments: true,
+      },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+    });
+
+    return staff.map((member) => {
+      const teachingMinutes = member.timetableSlots.reduce(
+        (sum, slot) => sum + minutesBetween(slot.startsAt, slot.endsAt),
+        0,
+      );
+
+      return {
+        staffId: member.id,
+        employeeId: member.employeeId,
+        staffName: `${member.firstName} ${member.lastName}`.trim(),
+        slotCount: member.timetableSlots.length,
+        homeworkCount: member.homeworkAssignments.length,
+        teachingMinutes,
+        weeklyHours: Math.round((teachingMinutes / 60) * 10) / 10,
+        slots: member.timetableSlots,
+      };
+    });
+  }
+
   async createTimetableSlot(dto: CreateTimetableSlotDto, actor: AuthContext) {
     if (dto.startsAt >= dto.endsAt) {
       throw new ConflictException('Start time must be before end time');
@@ -314,4 +349,11 @@ export function timesOverlap(
   endB: string,
 ) {
   return startA < endB && endA > startB;
+}
+
+export function minutesBetween(startsAt: string, endsAt: string) {
+  const [startHour = 0, startMinute = 0] = startsAt.split(':').map(Number);
+  const [endHour = 0, endMinute = 0] = endsAt.split(':').map(Number);
+
+  return Math.max(0, endHour * 60 + endMinute - (startHour * 60 + startMinute));
 }

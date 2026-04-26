@@ -91,6 +91,10 @@ export function PayrollForm() {
     mutationFn: api.createPayrollRun,
     onSuccess: invalidate,
   });
+  const reviewMutation = useMutation({
+    mutationFn: api.reviewPayrollRun,
+    onSuccess: invalidate,
+  });
   const approveMutation = useMutation({
     mutationFn: api.approvePayrollRun,
     onSuccess: invalidate,
@@ -268,7 +272,7 @@ export function PayrollForm() {
         <p className="label mb-4">Run Approval & Ledger Posting</p>
         <div className="grid gap-3">
           {(payrollRunsQuery.data ?? []).slice(0, 5).map((item) => (
-            <div key={item.id} className="grid gap-3 rounded-2xl border border-[var(--line)] bg-white/55 p-4 md:grid-cols-[1fr_auto_auto] md:items-center">
+            <div key={item.id} className="grid gap-3 rounded-2xl border border-[var(--line)] bg-white/55 p-4 md:grid-cols-[1fr_auto_auto_auto] md:items-center">
               <div>
                 <p className="font-semibold">
                   {item.periodMonth}/{item.periodYear} / {item.status}
@@ -280,7 +284,15 @@ export function PayrollForm() {
               <button
                 type="button"
                 className="rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold"
-                disabled={item.status === 'POSTED' || approveMutation.isPending}
+                disabled={item.status !== 'DRAFT' || reviewMutation.isPending}
+                onClick={() => reviewMutation.mutate(item.id)}
+              >
+                Review
+              </button>
+              <button
+                type="button"
+                className="rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold"
+                disabled={item.status !== 'REVIEWED' || approveMutation.isPending}
                 onClick={() => approveMutation.mutate(item.id)}
               >
                 Approve
@@ -288,7 +300,7 @@ export function PayrollForm() {
               <button
                 type="button"
                 className="rounded-full bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                disabled={item.status === 'POSTED' || postMutation.isPending}
+                disabled={item.status !== 'APPROVED' || postMutation.isPending}
                 onClick={() => postMutation.mutate(item.id)}
               >
                 Post journal
@@ -328,7 +340,14 @@ export function PayrollForm() {
         />
       </div>
 
-      {[staffMutation, contractMutation, runMutation, approveMutation, postMutation].map((mutation, index) =>
+      {[
+        staffMutation,
+        contractMutation,
+        runMutation,
+        reviewMutation,
+        approveMutation,
+        postMutation,
+      ].map((mutation, index) =>
         mutation.isError ? (
           <p key={index} className="text-sm text-[var(--accent-dark)]">
             {mutation.error.message}

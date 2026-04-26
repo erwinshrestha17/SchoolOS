@@ -608,6 +608,20 @@ export type PromotionReadiness = {
   locked: boolean;
 };
 
+export type PromotionResult = {
+  promotion: {
+    id: string;
+    studentId: string;
+    fromClassId: string;
+    fromSectionId: string | null;
+    toClassId: string | null;
+    toSectionId: string | null;
+    status: string;
+    remarks: string | null;
+  };
+  targetEnrollment: EnrollmentRecord;
+};
+
 export type TimetableSlotSummary = {
   id: string;
   academicYearId: string;
@@ -628,6 +642,17 @@ export type TimetableSlotSummary = {
     lastName: string;
     employeeId: string;
   };
+};
+
+export type TeacherWorkloadSummary = {
+  staffId: string;
+  employeeId: string;
+  staffName: string;
+  slotCount: number;
+  homeworkCount: number;
+  teachingMinutes: number;
+  weeklyHours: number;
+  slots: TimetableSlotSummary[];
 };
 
 export type HomeworkAssignmentSummary = {

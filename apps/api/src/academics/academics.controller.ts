@@ -10,6 +10,7 @@ import { CreateCasRecordDto } from './dto/create-cas-record.dto';
 import { CreateExamTermDto } from './dto/create-exam-term.dto';
 import { EnterMarkDto } from './dto/enter-mark.dto';
 import { GenerateReportCardDto } from './dto/generate-report-card.dto';
+import { PromoteStudentDto } from './dto/promote-student.dto';
 
 @Controller('academics')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -91,5 +92,14 @@ export class AcademicsController {
       academicYearId,
       classId,
     );
+  }
+
+  @Post('promotions')
+  @Permissions('academics:manage')
+  promoteStudent(
+    @Body() dto: PromoteStudentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsService.promoteStudent(dto, auth);
   }
 }

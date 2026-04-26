@@ -1,6 +1,7 @@
 import {
   calculatePayrollLine,
   calculatePayrollTotals,
+  getPayrollRunActions,
 } from './payroll.service';
 
 describe('payroll calculations', () => {
@@ -31,6 +32,24 @@ describe('payroll calculations', () => {
       grossAmount: 75000,
       deductionAmount: 1750,
       netAmount: 73250,
+    });
+  });
+
+  it('enforces draft to reviewed to approved to posted workflow actions', () => {
+    expect(getPayrollRunActions('DRAFT')).toEqual({
+      canReview: true,
+      canApprove: false,
+      canPost: false,
+    });
+    expect(getPayrollRunActions('REVIEWED')).toEqual({
+      canReview: false,
+      canApprove: true,
+      canPost: false,
+    });
+    expect(getPayrollRunActions('APPROVED')).toEqual({
+      canReview: false,
+      canApprove: false,
+      canPost: true,
     });
   });
 });

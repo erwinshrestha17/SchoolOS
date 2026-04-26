@@ -18,6 +18,12 @@ export class TimetableController {
     return this.timetableService.listTimetable(auth);
   }
 
+  @Get('workload')
+  @Permissions('timetable:read')
+  listTeacherWorkload(@CurrentAuth() auth: AuthContext) {
+    return this.timetableService.listTeacherWorkload(auth);
+  }
+
   @Post()
   @Permissions('timetable:manage')
   createSlot(

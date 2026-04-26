@@ -49,6 +49,10 @@ export function TimetableHomeworkForm() {
     queryKey: ['timetable'],
     queryFn: api.listTimetable,
   });
+  const workloadQuery = useQuery({
+    queryKey: ['teacher-workload'],
+    queryFn: api.listTeacherWorkload,
+  });
   const homeworkQuery = useQuery({
     queryKey: ['homework'],
     queryFn: api.listHomework,
@@ -119,6 +123,7 @@ export function TimetableHomeworkForm() {
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['timetable'] });
+    void queryClient.invalidateQueries({ queryKey: ['teacher-workload'] });
     void queryClient.invalidateQueries({ queryKey: ['homework'] });
     void queryClient.invalidateQueries({ queryKey: ['homework-submissions'] });
     void queryClient.invalidateQueries({ queryKey: ['deliveries'] });
@@ -370,7 +375,7 @@ export function TimetableHomeworkForm() {
         </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid gap-6 xl:grid-cols-4">
         <SummaryList
           title="Timetable"
           items={(timetableQuery.data ?? []).slice(0, 6).map((item) => ({
@@ -395,14 +400,23 @@ export function TimetableHomeworkForm() {
             secondary: item.feedback ?? 'Awaiting feedback',
           }))}
         />
+        <SummaryList
+          title="Teacher Workload"
+          items={(workloadQuery.data ?? []).slice(0, 6).map((item) => ({
+            id: item.staffId,
+            primary: `${item.staffName} / ${item.weeklyHours}h weekly`,
+            secondary: `${item.slotCount} slots / ${item.homeworkCount} homework tasks`,
+          }))}
+        />
       </div>
 
-      {[slotMutation, homeworkMutation, reviewMutation].map((mutation, index) =>
-        mutation.isError ? (
-          <p key={index} className="text-sm text-[var(--accent-dark)]">
-            {mutation.error.message}
-          </p>
-        ) : null,
+      {[slotMutation, homeworkMutation, reviewMutation].map(
+        (mutation, index) =>
+          mutation.isError ? (
+            <p key={index} className="text-sm text-[var(--accent-dark)]">
+              {mutation.error.message}
+            </p>
+          ) : null,
       )}
     </div>
   );

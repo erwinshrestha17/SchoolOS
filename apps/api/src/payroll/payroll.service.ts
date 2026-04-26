@@ -222,9 +222,20 @@ export class PayrollService {
 
   async approvePayrollRun(id: string, actor: AuthContext) {
     const run = await this.getPayrollRunOrThrow(id, actor);
+    const actions = getPayrollRunActions(run.status);
 
     if (run.status === PayrollRunStatus.POSTED) {
       throw new ConflictException('Posted payroll cannot be re-approved');
+    }
+
+    if (run.status === PayrollRunStatus.APPROVED) {
+      return run;
+    }
+
+    if (!actions.canApprove) {
+      throw new ConflictException(
+        'Payroll run must be reviewed before approval',
+      );
     }
 
     await this.prisma.payrollLine.updateMany({
@@ -248,11 +259,43 @@ export class PayrollService {
     });
   }
 
+  async reviewPayrollRun(id: string, actor: AuthContext) {
+    const run = await this.getPayrollRunOrThrow(id, actor);
+    const actions = getPayrollRunActions(run.status);
+
+    if (run.status === PayrollRunStatus.POSTED) {
+      throw new ConflictException('Posted payroll cannot be reviewed');
+    }
+
+    if (!actions.canReview) {
+      return run;
+    }
+
+    return this.prisma.payrollRun.update({
+      where: { id: run.id },
+      data: { status: PayrollRunStatus.REVIEWED },
+      include: {
+        lines: {
+          include: {
+            staff: true,
+          },
+        },
+      },
+    });
+  }
+
   async postPayrollRun(id: string, actor: AuthContext) {
     const run = await this.getPayrollRunOrThrow(id, actor);
+    const actions = getPayrollRunActions(run.status);
 
     if (run.status === PayrollRunStatus.POSTED) {
       return run;
+    }
+
+    if (!actions.canPost) {
+      throw new ConflictException(
+        'Payroll run must be approved before posting',
+      );
     }
 
     const entryNumber = await this.generateJournalEntryNumber(actor.tenantId);
@@ -473,6 +516,14 @@ export function calculatePayrollTotals(
     }),
     { grossAmount: 0, deductionAmount: 0, netAmount: 0 },
   );
+}
+
+export function getPayrollRunActions(status: PayrollRunStatus | string) {
+  return {
+    canReview: status === PayrollRunStatus.DRAFT,
+    canApprove: status === PayrollRunStatus.REVIEWED,
+    canPost: status === PayrollRunStatus.APPROVED,
+  };
 }
 
 function getPayrollPeriod(periodYear: number, periodMonth: number) {

@@ -14,6 +14,7 @@ import { CreateExamTermDto } from './dto/create-exam-term.dto';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { EnterMarkDto } from './dto/enter-mark.dto';
 import { GenerateReportCardDto } from './dto/generate-report-card.dto';
+import { PromoteStudentDto } from './dto/promote-student.dto';
 
 @Injectable()
 export class AcademicsService {
@@ -562,9 +563,152 @@ export class AcademicsService {
       examTerm: card.examTerm.name,
       percentage: Number(card.percentage),
       grade: card.grade,
-      status: Number(card.percentage) >= 35 ? 'READY' : 'REVIEW',
+      status: getPromotionStatus(Number(card.percentage)),
       locked: card.status === GradeLockStatus.LOCKED,
     }));
+  }
+
+  async promoteStudent(dto: PromoteStudentDto, actor: AuthContext) {
+    const [student, sourceYear, targetYear] = await Promise.all([
+      this.prisma.student.findFirst({
+        where: { id: dto.studentId, tenantId: actor.tenantId },
+      }),
+      this.ensureAcademicYear(actor, dto.academicYearId),
+      this.ensureAcademicYear(actor, dto.targetAcademicYearId),
+    ]);
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    await this.ensureClass(actor, dto.toClassId);
+
+    if (sourceYear.id === targetYear.id) {
+      throw new ConflictException('Target academic year must be different');
+    }
+
+    if (dto.toSectionId) {
+      await this.ensureSection(actor, dto.toSectionId, dto.toClassId);
+    }
+
+    const lockedReportCards = await this.prisma.reportCard.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        academicYearId: dto.academicYearId,
+        studentId: dto.studentId,
+        status: GradeLockStatus.LOCKED,
+      },
+      orderBy: [{ updatedAt: 'desc' }],
+    });
+
+    if (lockedReportCards.length === 0) {
+      throw new ConflictException(
+        'At least one locked report card is required before promotion',
+      );
+    }
+
+    const averagePercentage =
+      lockedReportCards.reduce(
+        (sum, card) => sum + Number(card.percentage),
+        0,
+      ) / lockedReportCards.length;
+
+    if (getPromotionStatus(averagePercentage) !== 'READY') {
+      throw new ConflictException(
+        'Student requires academic review before promotion',
+      );
+    }
+
+    const promotion = await this.prisma.$transaction(async (tx) => {
+      await tx.enrollment.updateMany({
+        where: {
+          tenantId: actor.tenantId,
+          academicYearId: dto.academicYearId,
+          studentId: dto.studentId,
+          status: 'ACTIVE',
+        },
+        data: { status: 'PROMOTED' },
+      });
+
+      const targetEnrollment = await tx.enrollment.upsert({
+        where: {
+          tenantId_studentId_academicYearId: {
+            tenantId: actor.tenantId,
+            studentId: dto.studentId,
+            academicYearId: dto.targetAcademicYearId,
+          },
+        },
+        update: {
+          classId: dto.toClassId,
+          sectionId: dto.toSectionId ?? null,
+          status: 'ACTIVE',
+        },
+        create: {
+          tenantId: actor.tenantId,
+          studentId: dto.studentId,
+          academicYearId: dto.targetAcademicYearId,
+          classId: dto.toClassId,
+          sectionId: dto.toSectionId ?? null,
+          rollNumber: student.rollNumber,
+          admissionNumber: student.admissionNumber,
+          admissionDate: new Date(),
+          mediumOfInstruction: student.mediumOfInstruct,
+          status: 'ACTIVE',
+        },
+      });
+
+      await tx.student.update({
+        where: { id: student.id },
+        data: {
+          classId: dto.toClassId,
+          sectionId: dto.toSectionId ?? null,
+          section: null,
+        },
+      });
+
+      const createdPromotion = await tx.promotionRecord.create({
+        data: {
+          tenantId: actor.tenantId,
+          academicYearId: dto.academicYearId,
+          studentId: dto.studentId,
+          fromClassId: student.classId,
+          fromSectionId: student.sectionId ?? null,
+          toClassId: dto.toClassId,
+          toSectionId: dto.toSectionId ?? null,
+          status: 'PROMOTED',
+          remarks: dto.remarks ?? null,
+        },
+        include: {
+          student: true,
+          fromClass: true,
+          fromSection: true,
+          toClass: true,
+          toSection: true,
+        },
+      });
+
+      return {
+        promotion: createdPromotion,
+        targetEnrollment,
+      };
+    });
+
+    await this.auditService.record({
+      action: 'promote',
+      resource: 'promotion_record',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: promotion.promotion.id,
+      after: {
+        studentId: dto.studentId,
+        fromAcademicYearId: dto.academicYearId,
+        targetAcademicYearId: dto.targetAcademicYearId,
+        toClassId: dto.toClassId,
+        averagePercentage,
+      },
+    });
+
+    return promotion;
   }
 
   private async ensureAcademicYear(actor: AuthContext, id: string) {
@@ -666,4 +810,8 @@ export function calculateMoestGrade(percentage: number) {
   }
 
   return { grade: 'NG', gpa: 0 };
+}
+
+export function getPromotionStatus(percentage: number) {
+  return percentage >= 35 ? 'READY' : 'REVIEW';
 }

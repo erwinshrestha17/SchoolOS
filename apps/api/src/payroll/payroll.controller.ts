@@ -33,6 +33,12 @@ export class PayrollController {
     return this.payrollService.approvePayrollRun(id, auth);
   }
 
+  @Post('runs/:id/review')
+  @Permissions('payroll:manage')
+  reviewRun(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+    return this.payrollService.reviewPayrollRun(id, auth);
+  }
+
   @Post('runs/:id/post')
   @Permissions('payroll:manage')
   postRun(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {

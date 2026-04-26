@@ -33,6 +33,7 @@ import type {
   PayrollRunSummary,
   PayslipSummary,
   PromotionReadiness,
+  PromotionResult,
   ReceiptView,
   ReportCardSummary,
   RoleSummary,
@@ -42,6 +43,7 @@ import type {
   StudentProfile,
   SubjectSummary,
   TeacherAssignmentSummary,
+  TeacherWorkloadSummary,
   TimetableSlotSummary,
   WaiverRecord,
 } from '@schoolos/core';
@@ -179,6 +181,11 @@ export const api = {
     academicYearId?: string | null;
     classId?: string | null;
   }) => request<PromotionReadiness[]>(withQuery('/academics/promotions', params ?? {})),
+  promoteStudent: (body: JsonBody) =>
+    request<PromotionResult>('/academics/promotions', {
+      method: 'POST',
+      json: body,
+    }),
   listAdmissions: () => request<AdmissionSummary[]>('/admissions'),
   createAdmission: (body: JsonBody) =>
     request<AdmissionCreationResult>('/admissions', { method: 'POST', json: body }),
@@ -238,6 +245,8 @@ export const api = {
   },
   listLedgerEntries: () => request<JournalEntryView[]>('/ledger/entries'),
   listTimetable: () => request<TimetableSlotSummary[]>('/timetable'),
+  listTeacherWorkload: () =>
+    request<TeacherWorkloadSummary[]>('/timetable/workload'),
   createTimetableSlot: (body: JsonBody) =>
     request<TimetableSlotSummary>('/timetable', { method: 'POST', json: body }),
   listHomework: () => request<HomeworkAssignmentSummary[]>('/homework'),
@@ -259,6 +268,11 @@ export const api = {
   listPayrollRuns: () => request<PayrollRunSummary[]>('/payroll/runs'),
   createPayrollRun: (body: JsonBody) =>
     request<PayrollRunSummary>('/payroll/runs', { method: 'POST', json: body }),
+  reviewPayrollRun: (id: string) =>
+    request<PayrollRunSummary>(`/payroll/runs/${id}/review`, {
+      method: 'POST',
+      json: {},
+    }),
   approvePayrollRun: (id: string) =>
     request<PayrollRunSummary>(`/payroll/runs/${id}/approve`, {
       method: 'POST',

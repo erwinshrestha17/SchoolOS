@@ -1,4 +1,4 @@
-import { calculateMoestGrade } from './academics.service';
+import { calculateMoestGrade, getPromotionStatus } from './academics.service';
 
 describe('calculateMoestGrade', () => {
   it('maps Nepal-ready grading bands for report cards', () => {
@@ -10,5 +10,12 @@ describe('calculateMoestGrade', () => {
     expect(calculateMoestGrade(42)).toEqual({ grade: 'C', gpa: 2 });
     expect(calculateMoestGrade(36)).toEqual({ grade: 'D', gpa: 1.6 });
     expect(calculateMoestGrade(32)).toEqual({ grade: 'NG', gpa: 0 });
+  });
+});
+
+describe('getPromotionStatus', () => {
+  it('requires academic review below the promotion threshold', () => {
+    expect(getPromotionStatus(34.99)).toBe('REVIEW');
+    expect(getPromotionStatus(35)).toBe('READY');
   });
 });

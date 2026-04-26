@@ -64,6 +64,14 @@ export function AcademicsForm() {
     remarks: 'Ready for next academic milestone',
     lock: true,
   });
+  const [promotion, setPromotion] = useState({
+    academicYearId: '',
+    targetAcademicYearId: '',
+    studentId: '',
+    toClassId: '',
+    toSectionId: '',
+    remarks: 'Promoted after locked report card review',
+  });
 
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years'],
@@ -123,6 +131,19 @@ export function AcademicsForm() {
       setReport((current) =>
         current.academicYearId ? current : { ...current, academicYearId: year.id },
       );
+      setPromotion((current) =>
+        current.academicYearId ? current : { ...current, academicYearId: year.id },
+      );
+    }
+
+    const targetYear = academicYearsQuery.data?.find((item) => item.id !== year?.id);
+
+    if (targetYear) {
+      setPromotion((current) =>
+        current.targetAcademicYearId
+          ? current
+          : { ...current, targetAcademicYearId: targetYear.id },
+      );
     }
   }, [academicYearsQuery.data]);
 
@@ -133,6 +154,9 @@ export function AcademicsForm() {
       setSubject((current) => (current.classId ? current : { ...current, classId: firstClass.id }));
       setAssignment((current) => (current.classId ? current : { ...current, classId: firstClass.id }));
       setCas((current) => (current.classId ? current : { ...current, classId: firstClass.id }));
+      setPromotion((current) =>
+        current.toClassId ? current : { ...current, toClassId: firstClass.id },
+      );
     }
   }, [classesQuery.data]);
 
@@ -204,6 +228,9 @@ export function AcademicsForm() {
             },
       );
       setReport((current) => (current.studentId ? current : { ...current, studentId: firstStudent.id }));
+      setPromotion((current) =>
+        current.studentId ? current : { ...current, studentId: firstStudent.id },
+      );
     }
   }, [studentsQuery.data]);
 
@@ -244,9 +271,16 @@ export function AcademicsForm() {
     mutationFn: api.generateReportCard,
     onSuccess: invalidateAcademics,
   });
+  const promotionMutation = useMutation({
+    mutationFn: api.promoteStudent,
+    onSuccess: invalidateAcademics,
+  });
 
   const sectionsForClass = (sectionsQuery.data ?? []).filter(
     (sectionItem) => sectionItem.classId === assignment.classId || sectionItem.classId === cas.classId,
+  );
+  const promotionSections = (sectionsQuery.data ?? []).filter(
+    (sectionItem) => sectionItem.classId === promotion.toClassId,
   );
 
   return (
@@ -479,7 +513,7 @@ export function AcademicsForm() {
         </section>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid gap-6 xl:grid-cols-4">
         <section className="shell-card rounded-[28px] p-6">
           <p className="label mb-4">Marks Entry</p>
           <div className="grid gap-3">
@@ -624,6 +658,105 @@ export function AcademicsForm() {
             </button>
           </div>
         </section>
+
+        <section className="shell-card rounded-[28px] p-6">
+          <p className="label mb-4">Promotion</p>
+          <div className="grid gap-3">
+            <select
+              value={promotion.studentId}
+              onChange={(event) =>
+                setPromotion((current) => ({ ...current, studentId: event.target.value }))
+              }
+            >
+              <option value="">Student</option>
+              {(studentsQuery.data ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.studentSystemId}
+                </option>
+              ))}
+            </select>
+            <div className="grid gap-3 md:grid-cols-2">
+              <select
+                value={promotion.academicYearId}
+                onChange={(event) =>
+                  setPromotion((current) => ({ ...current, academicYearId: event.target.value }))
+                }
+              >
+                <option value="">From year</option>
+                {(academicYearsQuery.data ?? []).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={promotion.targetAcademicYearId}
+                onChange={(event) =>
+                  setPromotion((current) => ({
+                    ...current,
+                    targetAcademicYearId: event.target.value,
+                  }))
+                }
+              >
+                <option value="">Target year</option>
+                {(academicYearsQuery.data ?? []).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <select
+              value={promotion.toClassId}
+              onChange={(event) =>
+                setPromotion((current) => ({
+                  ...current,
+                  toClassId: event.target.value,
+                  toSectionId: '',
+                }))
+              }
+            >
+              <option value="">Target class</option>
+              {(classesQuery.data ?? []).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={promotion.toSectionId}
+              onChange={(event) =>
+                setPromotion((current) => ({ ...current, toSectionId: event.target.value }))
+              }
+            >
+              <option value="">Target whole class</option>
+              {promotionSections.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="rounded-2xl bg-[var(--accent)] px-5 py-3 font-semibold text-white disabled:opacity-50"
+              disabled={
+                !promotion.studentId ||
+                !promotion.academicYearId ||
+                !promotion.targetAcademicYearId ||
+                !promotion.toClassId ||
+                promotionMutation.isPending
+              }
+              onClick={() =>
+                promotionMutation.mutate({
+                  ...promotion,
+                  toSectionId: promotion.toSectionId || null,
+                })
+              }
+            >
+              {promotionMutation.isPending ? 'Promoting...' : 'Promote student'}
+            </button>
+          </div>
+        </section>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-3">
@@ -688,6 +821,7 @@ export function AcademicsForm() {
         markMutation,
         casMutation,
         reportMutation,
+        promotionMutation,
       ].map((mutation, index) =>
         mutation.isError ? (
           <p key={index} className="text-sm text-[var(--accent-dark)]">
