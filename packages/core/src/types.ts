@@ -79,6 +79,61 @@ export type StudentProfile = {
   guardians?: GuardianProfile[];
 };
 
+export type AdmissionSummary = {
+  id: string;
+  studentSystemId: string;
+  fullNameEn: string;
+  fullNameNp: string | null;
+  className: string;
+  sectionName: string | null;
+  rollNumber: number | null;
+  documentCount: number;
+  guardians: Array<{
+    id: string;
+    fullName: string;
+    relation: string;
+    primaryPhone: string;
+    isPrimary: boolean;
+  }>;
+  latestEnrollment: {
+    id: string;
+    academicYear: string;
+    status: string;
+  } | null;
+  latestInvoice: {
+    id: string;
+    invoiceNumber: string;
+    status: string;
+    totalAmount: number;
+  } | null;
+};
+
+export type AdmissionCreationResult = {
+  student: {
+    id: string;
+    studentSystemId: string;
+    fullNameEn: string;
+  };
+  enrollment: {
+    id: string;
+    academicYearId: string;
+    classId: string;
+    sectionId: string | null;
+    rollNumber: number | null;
+  };
+  guardians: Array<{
+    id: string;
+    fullName: string;
+    relation: string;
+  }>;
+  documents: StudentDocument[];
+  invoice: {
+    id: string;
+    invoiceNumber: string;
+    totalAmount: number;
+  } | null;
+};
+
 export type AttendanceSummary = {
   sessionId: string;
   attendanceDate: string;
@@ -141,9 +196,28 @@ export type JournalEntryView = {
 export type NoticeSummary = {
   id: string;
   title: string;
+  body?: string;
   priority: string;
   audienceType: string;
+  classId?: string | null;
+  sectionId?: string | null;
+  scheduledFor?: string | null;
   publishedAt: string | null;
+  createdAt?: string;
+};
+
+export type EventSummary = {
+  id: string;
+  title: string;
+  description: string | null;
+  eventType: string;
+  audienceType: string;
+  classId: string | null;
+  sectionId: string | null;
+  startsAt: string;
+  endsAt: string | null;
+  location: string | null;
+  createdAt: string;
 };
 
 export type AcademicYearSummary = {
@@ -223,6 +297,19 @@ export type AttendanceRoster = {
     conflictStatus: string;
   } | null;
   students: AttendanceRosterStudent[];
+};
+
+export type AttendanceAnalytics = {
+  sessionsReviewed: number;
+  latestSessions: Array<
+    AttendanceSummary & {
+      conflictStatus: string;
+    }
+  >;
+  absenceHotlist: Array<{
+    studentId: string;
+    absenceCount: number;
+  }>;
 };
 
 export type AttendanceConflict = {
@@ -342,15 +429,31 @@ export type ActivityPost = {
   sectionId: string | null;
   publishedAt: string | null;
   attachments: ActivityAttachment[];
-  studentTags: Array<{ studentId: string }>;
+  studentTags: Array<{
+    studentId: string;
+    student?: {
+      id: string;
+      studentSystemId: string;
+      firstNameEn: string;
+      lastNameEn: string;
+    };
+  }>;
 };
 
 export type MoodLog = {
   id: string;
+  classId?: string;
+  sectionId?: string | null;
   studentId: string | null;
   mood: string;
   logDate: string;
   note: string | null;
+  student?: {
+    id: string;
+    studentSystemId: string;
+    firstNameEn: string;
+    lastNameEn: string;
+  } | null;
 };
 
 export type NotificationDelivery = {

@@ -53,11 +53,35 @@ export const admissionFormSchema = z.object({
   academicYearId: z.string().min(1),
   classId: z.string().min(1),
   sectionId: z.string().optional().nullable(),
-  rollNumber: z.coerce.number().int().positive().optional().nullable(),
+  rollNumber: z.preprocess(
+    (value) => (value === '' ? null : value),
+    z.coerce.number().int().positive().nullable()
+  ).optional(),
   admissionNumber: z.string().optional().nullable(),
   mediumOfInstruction: z.string().default('English'),
   guardians: z.array(guardianSchema).min(1),
   documents: z.array(studentDocumentFormSchema).optional()
+});
+
+export const academicYearFormSchema = z.object({
+  name: z.string().min(2),
+  startsOn: z.string().min(1),
+  endsOn: z.string().min(1),
+  isCurrent: z.boolean().default(false)
+});
+
+export const classFormSchema = z.object({
+  name: z.string().min(1),
+  level: z.coerce.number().int().min(0)
+});
+
+export const sectionFormSchema = z.object({
+  classId: z.string().min(1),
+  name: z.string().min(1),
+  capacity: z.preprocess(
+    (value) => (value === '' ? null : value),
+    z.coerce.number().int().positive().nullable()
+  ).optional()
 });
 
 export const attendanceExceptionSchema = z.object({
@@ -100,6 +124,24 @@ export const paymentCollectionSchema = z.object({
   narration: z.string().optional().nullable()
 });
 
+export const discountRuleFormSchema = z.object({
+  name: z.string().min(2),
+  type: z.enum(['SIBLING', 'SCHOLARSHIP', 'STAFF_CHILD', 'MANUAL']),
+  feeHeadId: z.string().optional().nullable(),
+  classId: z.string().optional().nullable(),
+  feePlanId: z.string().optional().nullable(),
+  percentOff: z.coerce.number().min(0).optional().nullable(),
+  amountOff: z.coerce.number().min(0).optional().nullable()
+});
+
+export const feeWaiverFormSchema = z.object({
+  studentId: z.string().min(1),
+  invoiceId: z.string().optional().nullable(),
+  feeHeadId: z.string().optional().nullable(),
+  amount: z.coerce.number().positive(),
+  reason: z.string().min(2)
+});
+
 export const activityPostFormSchema = z.object({
   classId: z.string().min(1),
   sectionId: z.string().optional().nullable(),
@@ -128,9 +170,14 @@ export const moodLogFormSchema = z.object({
 export type TenantRegistrationInput = z.input<typeof tenantRegistrationSchema>;
 export type LoginInput = z.input<typeof loginSchema>;
 export type AdmissionFormInput = z.input<typeof admissionFormSchema>;
+export type AcademicYearFormInput = z.input<typeof academicYearFormSchema>;
+export type ClassFormInput = z.input<typeof classFormSchema>;
+export type SectionFormInput = z.input<typeof sectionFormSchema>;
 export type AttendanceSubmissionInput = z.input<typeof attendanceSubmissionSchema>;
 export type FeeHeadFormInput = z.input<typeof feeHeadFormSchema>;
 export type FeePlanFormInput = z.input<typeof feePlanFormSchema>;
 export type PaymentCollectionInput = z.input<typeof paymentCollectionSchema>;
+export type DiscountRuleFormInput = z.input<typeof discountRuleFormSchema>;
+export type FeeWaiverFormInput = z.input<typeof feeWaiverFormSchema>;
 export type ActivityPostFormInput = z.input<typeof activityPostFormSchema>;
 export type MoodLogFormInput = z.input<typeof moodLogFormSchema>;

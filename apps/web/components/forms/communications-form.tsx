@@ -13,6 +13,7 @@ export function CommunicationsForm() {
     audienceType: 'ALL',
     classId: '',
     sectionId: '',
+    scheduledFor: '',
   });
   const [event, setEvent] = useState({
     title: 'Parent-teacher meeting',
@@ -37,6 +38,14 @@ export function CommunicationsForm() {
     queryKey: ['notification-deliveries'],
     queryFn: api.listNotificationDeliveries,
   });
+  const noticesQuery = useQuery({
+    queryKey: ['notices'],
+    queryFn: api.listNotices,
+  });
+  const eventsQuery = useQuery({
+    queryKey: ['events'],
+    queryFn: api.listEvents,
+  });
 
   useEffect(() => {
     const firstClass = classesQuery.data?.[0];
@@ -58,12 +67,18 @@ export function CommunicationsForm() {
 
   const noticeMutation = useMutation({
     mutationFn: api.createNotice,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
+      void queryClient.invalidateQueries({ queryKey: ['notices'] });
+    },
   });
 
   const eventMutation = useMutation({
     mutationFn: api.createEvent,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
+      void queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
   });
 
   return (
@@ -130,6 +145,19 @@ export function CommunicationsForm() {
                 ))}
               </select>
             ) : null}
+            <label className="grid gap-2 text-sm text-[var(--muted)]">
+              Schedule for later
+              <input
+                type="datetime-local"
+                value={notice.scheduledFor}
+                onChange={(event) =>
+                  setNotice((current) => ({
+                    ...current,
+                    scheduledFor: event.target.value,
+                  }))
+                }
+              />
+            </label>
             <button
               className="rounded-2xl bg-[var(--ink)] px-5 py-3 font-semibold text-white"
               onClick={() =>
@@ -140,10 +168,17 @@ export function CommunicationsForm() {
                   audienceType: notice.audienceType,
                   classId: notice.audienceType === 'ALL' ? null : notice.classId || null,
                   sectionId: notice.audienceType === 'SECTION' ? notice.sectionId || null : null,
+                  scheduledFor: notice.scheduledFor
+                    ? new Date(notice.scheduledFor).toISOString()
+                    : null,
                 })
               }
             >
-              {noticeMutation.isPending ? 'Publishing...' : 'Publish notice'}
+              {noticeMutation.isPending
+                ? 'Publishing...'
+                : notice.scheduledFor
+                  ? 'Schedule notice'
+                  : 'Publish notice'}
             </button>
           </div>
         </div>
@@ -250,6 +285,49 @@ export function CommunicationsForm() {
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="shell-card rounded-[28px] p-6">
+          <p className="label mb-4">Notices</p>
+          <div className="grid gap-3">
+            {(noticesQuery.data ?? []).slice(0, 6).map((item) => (
+              <div key={item.id} className="rounded-2xl border border-[var(--line)] bg-white/55 p-4">
+                <p className="font-semibold">{item.title}</p>
+                <p className="text-sm text-[var(--muted)]">
+                  {item.priority} / {item.audienceType} /{' '}
+                  {item.publishedAt
+                    ? `published ${new Date(item.publishedAt).toLocaleString()}`
+                    : item.scheduledFor
+                      ? `scheduled ${new Date(item.scheduledFor).toLocaleString()}`
+                      : 'draft'}
+                </p>
+              </div>
+            ))}
+            {noticesQuery.data?.length === 0 ? (
+              <p className="text-sm text-[var(--muted)]">No notices yet.</p>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="shell-card rounded-[28px] p-6">
+          <p className="label mb-4">Events</p>
+          <div className="grid gap-3">
+            {(eventsQuery.data ?? []).slice(0, 6).map((item) => (
+              <div key={item.id} className="rounded-2xl border border-[var(--line)] bg-white/55 p-4">
+                <p className="font-semibold">{item.title}</p>
+                <p className="text-sm text-[var(--muted)]">
+                  {item.eventType} / {item.audienceType} /{' '}
+                  {new Date(item.startsAt).toLocaleString()}
+                  {item.location ? ` / ${item.location}` : ''}
+                </p>
+              </div>
+            ))}
+            {eventsQuery.data?.length === 0 ? (
+              <p className="text-sm text-[var(--muted)]">No events yet.</p>
+            ) : null}
+          </div>
+        </section>
       </div>
 
       <section className="shell-card rounded-[28px] p-6">

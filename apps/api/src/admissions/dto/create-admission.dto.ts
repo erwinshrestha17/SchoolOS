@@ -6,8 +6,10 @@ import {
   IsDateString,
   IsEmail,
   IsEnum,
+  IsInt,
   IsOptional,
   IsString,
+  Min,
   MinLength,
   ValidateIf,
   ValidateNested,
@@ -95,6 +97,12 @@ export class CreateAdmissionDto {
   @IsOptional()
   @IsString()
   admissionNumber?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  rollNumber?: number;
 
   @IsOptional()
   @IsString()

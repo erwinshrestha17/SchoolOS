@@ -47,6 +47,10 @@ export function ActivityFeedForm() {
     queryKey: ['mood-logs'],
     queryFn: api.listMoodLogs,
   });
+  const deliveriesQuery = useQuery({
+    queryKey: ['notification-deliveries'],
+    queryFn: api.listNotificationDeliveries,
+  });
 
   useEffect(() => {
     const firstClass = classesQuery.data?.[0];
@@ -76,6 +80,7 @@ export function ActivityFeedForm() {
     mutationFn: api.createActivityPost,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['activity-posts'] });
+      void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
       setFiles(null);
       setPost((current) => ({ ...current, studentIds: [] }));
     },
@@ -107,6 +112,10 @@ export function ActivityFeedForm() {
         : [...current.studentIds, studentId],
     }));
   }
+
+  const activityDeliveries = (deliveriesQuery.data ?? []).filter(
+    (delivery) => delivery.sourceType === 'activity_post',
+  );
 
   return (
     <div className="grid gap-6">
@@ -303,8 +312,40 @@ export function ActivityFeedForm() {
           <div className="grid gap-3">
             {(postsQuery.data ?? []).slice(0, 5).map((item) => (
               <div key={item.id} className="rounded-2xl border border-[var(--line)] bg-white/55 p-4">
-                <p className="font-semibold">{item.title}</p>
-                <p className="text-sm text-[var(--muted)]">{item.caption ?? item.body}</p>
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="font-semibold">{item.title}</p>
+                    <p className="text-sm text-[var(--muted)]">
+                      {item.category} / {item.audienceType}
+                    </p>
+                  </div>
+                  <p className="rounded-full border border-[var(--line)] px-3 py-1 text-xs text-[var(--muted)]">
+                    {item.attachments.length} photos
+                  </p>
+                </div>
+                <p className="mt-3 text-sm text-[var(--muted)]">{item.caption ?? item.body}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {item.attachments.map((attachment) => (
+                    <span
+                      key={attachment.id}
+                      className="rounded-full border border-[var(--line)] px-3 py-1 text-xs text-[var(--muted)]"
+                    >
+                      {attachment.fileName}
+                    </span>
+                  ))}
+                </div>
+                {item.studentTags.length > 0 ? (
+                  <p className="mt-3 text-sm text-[var(--muted)]">
+                    Tagged:{' '}
+                    {item.studentTags
+                      .map((tag) =>
+                        tag.student
+                          ? `${tag.student.firstNameEn} ${tag.student.lastNameEn}`.trim()
+                          : tag.studentId,
+                      )
+                      .join(', ')}
+                  </p>
+                ) : null}
               </div>
             ))}
             {postsQuery.data?.length === 0 ? (
@@ -317,7 +358,12 @@ export function ActivityFeedForm() {
           <div className="grid gap-3">
             {(moodLogsQuery.data ?? []).slice(0, 5).map((item) => (
               <div key={item.id} className="rounded-2xl border border-[var(--line)] bg-white/55 p-4">
-                <p className="font-semibold">{item.mood}</p>
+                <p className="font-semibold">
+                  {item.mood}
+                  {item.student
+                    ? ` / ${item.student.firstNameEn} ${item.student.lastNameEn}`
+                    : ' / Class mood'}
+                </p>
                 <p className="text-sm text-[var(--muted)]">
                   {new Date(item.logDate).toLocaleDateString()}
                   {item.note ? ` / ${item.note}` : ''}
@@ -330,6 +376,23 @@ export function ActivityFeedForm() {
           </div>
         </section>
       </div>
+
+      <section className="shell-card rounded-[28px] p-6">
+        <p className="label mb-4">Activity Delivery Records</p>
+        <div className="grid gap-3 md:grid-cols-2">
+          {activityDeliveries.slice(0, 6).map((delivery) => (
+            <div key={delivery.id} className="rounded-2xl border border-[var(--line)] bg-white/55 p-4">
+              <p className="font-semibold">{delivery.title}</p>
+              <p className="text-sm text-[var(--muted)]">
+                {delivery.channel} / {delivery.status} / {delivery.destination ?? 'no destination'}
+              </p>
+            </div>
+          ))}
+          {activityDeliveries.length === 0 ? (
+            <p className="text-sm text-[var(--muted)]">No activity delivery records yet.</p>
+          ) : null}
+        </div>
+      </section>
 
       {[postMutation, moodMutation].map((mutationState, index) =>
         mutationState.isError ? (

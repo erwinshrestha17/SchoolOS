@@ -121,6 +121,19 @@ export class CommunicationsService {
       },
     });
 
+    await this.recordDeliveryRecords({
+      actor,
+      sourceType: 'event',
+      sourceId: event.id,
+      eventId: event.id,
+      audienceType: event.audienceType,
+      classId: event.classId,
+      sectionId: event.sectionId,
+      title: event.title,
+      body: event.description ?? event.title,
+      channels: [NotificationChannel.PUSH],
+    });
+
     await this.auditService.record({
       action: 'create',
       resource: 'event',

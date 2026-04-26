@@ -37,6 +37,10 @@ export function AttendanceForm() {
       }),
     enabled: Boolean(academicYearId && classId),
   });
+  const analyticsQuery = useQuery({
+    queryKey: ['attendance-analytics'],
+    queryFn: api.listAttendanceAnalytics,
+  });
 
   useEffect(() => {
     const currentAcademicYear = academicYearsQuery.data?.find((year) => year.isCurrent);
@@ -87,6 +91,17 @@ export function AttendanceForm() {
   }
 
   const roster = rosterQuery.data?.students ?? [];
+  const rosterTotals = roster.reduce(
+    (totals, student) => {
+      const status = exceptions[student.id] ?? student.status ?? 'PRESENT';
+
+      return {
+        ...totals,
+        [status]: (totals[status] ?? 0) + 1,
+      };
+    },
+    { PRESENT: 0, ABSENT: 0, LATE: 0, LEAVE: 0 } as Record<string, number>,
+  );
 
   return (
     <div className="grid gap-4">
@@ -145,6 +160,15 @@ export function AttendanceForm() {
             onChange={(event) => setAttendanceDate(event.target.value)}
           />
         </label>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-4">
+        {['PRESENT', 'ABSENT', 'LATE', 'LEAVE'].map((status) => (
+          <div key={status} className="rounded-2xl border border-[var(--line)] bg-white/60 p-4">
+            <p className="label mb-2">{status}</p>
+            <p className="text-3xl font-black text-[var(--ink)]">{rosterTotals[status] ?? 0}</p>
+          </div>
+        ))}
       </div>
 
       {rosterQuery.isLoading ? (
@@ -217,10 +241,16 @@ export function AttendanceForm() {
       </button>
 
       {rosterQuery.data?.existingSession ? (
-        <p className="text-sm text-[var(--muted)]">
-          Existing session lock: {new Date(rosterQuery.data.existingSession.lockAt).toLocaleString()}.
-          Resubmissions before lock are flagged for review.
-        </p>
+        <div className="rounded-2xl border border-[var(--line)] bg-white/60 p-4 text-sm text-[var(--muted)]">
+          <p>
+            Existing session lock:{' '}
+            {new Date(rosterQuery.data.existingSession.lockAt).toLocaleString()}.
+          </p>
+          <p>
+            Conflict status: {rosterQuery.data.existingSession.conflictStatus}.
+            Resubmissions before lock are flagged for review.
+          </p>
+        </div>
       ) : null}
       {mutation.isError ? (
         <p className="text-sm text-[var(--accent-dark)]">{mutation.error.message}</p>
@@ -230,6 +260,44 @@ export function AttendanceForm() {
           Attendance submitted. Absence delivery records are queued through the communications adapter.
         </p>
       ) : null}
+
+      <section className="shell-card rounded-[28px] p-6">
+        <p className="label mb-4">Recent Attendance Analytics</p>
+        <div className="grid gap-3 lg:grid-cols-[1.3fr_0.7fr]">
+          <div className="grid gap-3">
+            {(analyticsQuery.data?.latestSessions ?? []).slice(0, 5).map((session) => (
+              <div key={session.sessionId} className="rounded-2xl border border-[var(--line)] bg-white/55 p-4">
+                <p className="font-semibold">
+                  {session.className}
+                  {session.sectionName ? ` / ${session.sectionName}` : ''} /{' '}
+                  {new Date(session.attendanceDate).toLocaleDateString()}
+                </p>
+                <p className="text-sm text-[var(--muted)]">
+                  Present {session.totals.present}, absent {session.totals.absent},
+                  late {session.totals.late}, leave {session.totals.leave} /{' '}
+                  {session.conflictStatus}
+                </p>
+              </div>
+            ))}
+            {analyticsQuery.data?.latestSessions.length === 0 ? (
+              <p className="text-sm text-[var(--muted)]">No attendance sessions yet.</p>
+            ) : null}
+          </div>
+          <div className="rounded-2xl border border-[var(--line)] bg-white/55 p-4">
+            <p className="font-semibold">Absence Hotlist</p>
+            <div className="mt-3 grid gap-2 text-sm text-[var(--muted)]">
+              {(analyticsQuery.data?.absenceHotlist ?? []).slice(0, 5).map((item) => (
+                <span key={item.studentId}>
+                  {item.studentId}: {item.absenceCount} absences
+                </span>
+              ))}
+              {analyticsQuery.data?.absenceHotlist.length === 0 ? (
+                <span>No absence pattern yet.</span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

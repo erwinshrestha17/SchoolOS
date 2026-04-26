@@ -15,6 +15,10 @@ export function AdmissionForm() {
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [documentKind, setDocumentKind] = useState('BIRTH_CERTIFICATE');
 
+  const admissionsQuery = useQuery({
+    queryKey: ['admissions'],
+    queryFn: api.listAdmissions,
+  });
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years'],
     queryFn: api.listAcademicYears,
@@ -77,6 +81,7 @@ export function AdmissionForm() {
   const mutation = useMutation({
     mutationFn: api.createAdmission,
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admissions'] });
       void queryClient.invalidateQueries({ queryKey: ['students'] });
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
       form.reset({
@@ -88,6 +93,7 @@ export function AdmissionForm() {
         dateOfBirth: '',
         admissionDate: today,
         admissionNumber: '',
+        rollNumber: null,
         guardians: [
           {
             fullName: '',
@@ -119,8 +125,11 @@ export function AdmissionForm() {
     });
   }
 
+  const latestAdmission = mutation.data;
+
   return (
-    <form className="grid gap-4 md:grid-cols-2" onSubmit={form.handleSubmit(submitAdmission)}>
+    <div className="grid gap-6">
+      <form className="grid gap-4 md:grid-cols-2" onSubmit={form.handleSubmit(submitAdmission)}>
       <div>
         <label className="label mb-2 block">First name (EN)</label>
         <input {...form.register('firstNameEn')} />
@@ -156,6 +165,10 @@ export function AdmissionForm() {
       <div>
         <label className="label mb-2 block">Admission number</label>
         <input placeholder="Optional school admission number" {...form.register('admissionNumber')} />
+      </div>
+      <div>
+        <label className="label mb-2 block">Roll number</label>
+        <input type="number" min={1} placeholder="Optional roll number" {...form.register('rollNumber')} />
       </div>
       <div>
         <label className="label mb-2 block">Academic year</label>
@@ -269,6 +282,68 @@ export function AdmissionForm() {
           Admission created with guardian linkage, enrollment, optional document metadata, and fee side effects.
         </p>
       ) : null}
-    </form>
+      </form>
+
+      {latestAdmission ? (
+        <section className="rounded-[24px] border border-[var(--line)] bg-white/60 p-5">
+          <p className="label mb-3">Latest Admission Result</p>
+          <div className="grid gap-3 text-sm text-[var(--muted)] md:grid-cols-3">
+            <span>
+              Student: {latestAdmission.student.fullNameEn} /{' '}
+              {latestAdmission.student.studentSystemId}
+            </span>
+            <span>
+              Guardians: {latestAdmission.guardians.map((item) => item.fullName).join(', ')}
+            </span>
+            <span>
+              Invoice:{' '}
+              {latestAdmission.invoice
+                ? `${latestAdmission.invoice.invoiceNumber} / Rs ${latestAdmission.invoice.totalAmount}`
+                : 'No fee plan assigned yet'}
+            </span>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="rounded-[24px] border border-[var(--line)] bg-white/60 p-5">
+        <p className="label mb-4">Recent Admissions</p>
+        <div className="grid gap-3">
+          {(admissionsQuery.data ?? []).slice(0, 6).map((admission) => (
+            <div key={admission.id} className="rounded-2xl border border-[var(--line)] bg-white/55 p-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="font-semibold">
+                    {admission.fullNameEn} / {admission.studentSystemId}
+                  </p>
+                  <p className="text-sm text-[var(--muted)]">
+                    {admission.className}
+                    {admission.sectionName ? ` / ${admission.sectionName}` : ''}
+                    {admission.rollNumber ? ` / Roll ${admission.rollNumber}` : ''}
+                  </p>
+                </div>
+                <p className="rounded-full border border-[var(--line)] px-3 py-1 text-xs text-[var(--muted)]">
+                  {admission.documentCount} documents
+                </p>
+              </div>
+              <p className="mt-3 text-sm text-[var(--muted)]">
+                Guardians:{' '}
+                {admission.guardians.length > 0
+                  ? admission.guardians.map((guardian) => guardian.fullName).join(', ')
+                  : 'none'}
+              </p>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                Invoice:{' '}
+                {admission.latestInvoice
+                  ? `${admission.latestInvoice.invoiceNumber} / ${admission.latestInvoice.status} / Rs ${admission.latestInvoice.totalAmount}`
+                  : 'not generated'}
+              </p>
+            </div>
+          ))}
+          {admissionsQuery.data?.length === 0 ? (
+            <p className="text-sm text-[var(--muted)]">No admissions yet.</p>
+          ) : null}
+        </div>
+      </section>
+    </div>
   );
 }

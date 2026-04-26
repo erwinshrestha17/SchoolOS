@@ -38,6 +38,15 @@ export class AdmissionsService {
           },
           orderBy: { createdAt: 'desc' },
         },
+        invoices: {
+          orderBy: { issuedAt: 'desc' },
+          take: 1,
+        },
+        _count: {
+          select: {
+            documents: true,
+          },
+        },
       },
       orderBy: [{ createdAt: 'desc' }],
     });
@@ -52,6 +61,8 @@ export class AdmissionsService {
           : null,
       className: student.class.name,
       sectionName: student.sectionRef?.name ?? student.section ?? null,
+      rollNumber: student.rollNumber,
+      documentCount: student._count.documents,
       guardians: student.guardianLinks.map((link) => ({
         id: link.guardian.id,
         fullName: link.guardian.fullName,
@@ -64,6 +75,14 @@ export class AdmissionsService {
             id: student.enrollments[0].id,
             academicYear: student.enrollments[0].academicYear.name,
             status: student.enrollments[0].status,
+          }
+        : null,
+      latestInvoice: student.invoices[0]
+        ? {
+            id: student.invoices[0].id,
+            invoiceNumber: student.invoices[0].invoiceNumber,
+            status: student.invoices[0].status,
+            totalAmount: Number(student.invoices[0].totalAmount),
           }
         : null,
     }));
@@ -141,6 +160,7 @@ export class AdmissionsService {
         classId: dto.classId,
         sectionId: dto.sectionId ?? null,
         section: section?.name ?? null,
+        rollNumber: dto.rollNumber ?? null,
         nationality: dto.nationality ?? 'Nepali',
         motherTongue: dto.motherTongue ?? null,
         disabilityFlag: dto.disabilityFlag ?? null,
@@ -231,6 +251,7 @@ export class AdmissionsService {
         academicYearId: dto.academicYearId,
         classId: dto.classId,
         sectionId: dto.sectionId ?? null,
+        rollNumber: dto.rollNumber ?? null,
         admissionNumber: dto.admissionNumber ?? null,
         admissionDate: new Date(dto.admissionDate),
         mediumOfInstruction: dto.mediumOfInstruction ?? 'English',
@@ -294,6 +315,7 @@ export class AdmissionsService {
         academicYearId: enrollment.academicYearId,
         classId: enrollment.classId,
         sectionId: enrollment.sectionId,
+        rollNumber: enrollment.rollNumber,
       },
       guardians: guardianLinks.map((link) => ({
         id: link.guardian.id,

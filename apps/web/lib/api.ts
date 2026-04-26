@@ -1,12 +1,16 @@
 import type {
   AcademicYearSummary,
+  AdmissionCreationResult,
+  AdmissionSummary,
   ActivityPost,
+  AttendanceAnalytics,
   AttendanceRoster,
   AuthSession,
   ClassSummary,
   ConsentRecord,
   DefaulterSummary,
   DiscountRule,
+  EventSummary,
   FeeBillingRun,
   FeeHeadSummary,
   FeePlanSummary,
@@ -14,6 +18,7 @@ import type {
   JournalEntryView,
   MoodLog,
   NotificationDelivery,
+  NoticeSummary,
   ReceiptView,
   SectionSummary,
   StudentProfile,
@@ -22,7 +27,7 @@ import type {
 import { readStoredSession } from './session';
 
 const API_BASE_URL =
-process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000/api/v1'
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
 
 type JsonBody = Record<string, unknown>;
 
@@ -109,11 +114,18 @@ export const api = {
   registerTenant: (body: JsonBody) =>
     request('/tenants/register', { method: 'POST', json: body, auth: false }),
   listAcademicYears: () => request<AcademicYearSummary[]>('/academic-years'),
+  createAcademicYear: (body: JsonBody) =>
+    request<AcademicYearSummary>('/academic-years', { method: 'POST', json: body }),
   listClasses: () => request<ClassSummary[]>('/classes'),
+  createClass: (body: JsonBody) =>
+    request<ClassSummary>('/classes', { method: 'POST', json: body }),
   listSections: () => request<SectionSummary[]>('/sections'),
+  createSection: (body: JsonBody) =>
+    request<SectionSummary>('/sections', { method: 'POST', json: body }),
   listStudents: () => request<StudentProfile[]>('/students'),
+  listAdmissions: () => request<AdmissionSummary[]>('/admissions'),
   createAdmission: (body: JsonBody) =>
-    request('/admissions', { method: 'POST', json: body }),
+    request<AdmissionCreationResult>('/admissions', { method: 'POST', json: body }),
   listStudentDocuments: (studentId: string) =>
     request(withQuery('/student-documents', { studentId })),
   getAttendanceRoster: (params: {
@@ -122,7 +134,8 @@ export const api = {
     sectionId?: string | null;
     attendanceDate?: string | null;
   }) => request<AttendanceRoster>(withQuery('/attendance/rosters', params)),
-  listAttendanceAnalytics: () => request('/attendance/analytics'),
+  listAttendanceAnalytics: () =>
+    request<AttendanceAnalytics>('/attendance/analytics'),
   submitAttendance: (body: JsonBody) =>
     request('/attendance/sessions', { method: 'POST', json: body }),
   listFeeHeads: () => request<FeeHeadSummary[]>('/fees/heads'),
@@ -134,6 +147,10 @@ export const api = {
   listDefaulters: () => request<DefaulterSummary[]>('/fees/defaulters'),
   listDiscounts: () => request<DiscountRule[]>('/fees/discounts'),
   listWaivers: () => request<WaiverRecord[]>('/fees/waivers'),
+  createDiscount: (body: JsonBody) =>
+    request<DiscountRule>('/fees/discounts', { method: 'POST', json: body }),
+  createWaiver: (body: JsonBody) =>
+    request<WaiverRecord>('/fees/waivers', { method: 'POST', json: body }),
   createFeeHead: (body: JsonBody) =>
     request('/fees/heads', { method: 'POST', json: body }),
   createFeePlan: (body: JsonBody) =>
@@ -141,6 +158,28 @@ export const api = {
   collectPayment: (body: JsonBody) =>
     request('/payments', { method: 'POST', json: body }),
   listReceipts: () => request<ReceiptView[]>('/receipts'),
+  openReceiptPdf: async (receiptNumber: string) => {
+    const accessToken = getAccessToken();
+    const response = await fetch(
+      `${API_BASE_URL}/receipts/${encodeURIComponent(receiptNumber)}.pdf`,
+      {
+        credentials: 'include',
+        headers: accessToken
+          ? {
+              Authorization: `Bearer ${accessToken}`,
+            }
+          : undefined,
+      },
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `Request failed with status ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer');
+  },
   listLedgerEntries: () => request<JournalEntryView[]>('/ledger/entries'),
   listActivityPosts: () => request<ActivityPost[]>('/activity-feed/posts'),
   createActivityPost: (body: JsonBody) =>
@@ -148,10 +187,12 @@ export const api = {
   listMoodLogs: () => request<MoodLog[]>('/activity-feed/mood-logs'),
   createMoodLog: (body: JsonBody) =>
     request('/activity-feed/mood-logs', { method: 'POST', json: body }),
+  listNotices: () => request<NoticeSummary[]>('/notices'),
   createNotice: (body: JsonBody) =>
-    request('/notices', { method: 'POST', json: body }),
+    request<NoticeSummary>('/notices', { method: 'POST', json: body }),
+  listEvents: () => request<EventSummary[]>('/events'),
   createEvent: (body: JsonBody) =>
-    request('/events', { method: 'POST', json: body }),
+    request<EventSummary>('/events', { method: 'POST', json: body }),
   listNotificationDeliveries: () =>
     request<NotificationDelivery[]>('/communications/deliveries'),
   listConsents: () => request<ConsentRecord[]>('/consents'),

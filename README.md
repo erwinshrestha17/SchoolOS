@@ -49,6 +49,19 @@ pnpm db:seed
 pnpm dev
 ```
 
+Expected local URLs:
+
+| Service | URL |
+|---------|-----|
+| Web app | `http://localhost:3000` |
+| API | `http://localhost:4000/api/v1` |
+| Swagger | `http://localhost:4000/api/v1/docs` |
+
+If either server reports `EADDRINUSE`, another process is already listening on
+that port. Check it with `lsof -nP -iTCP:3000 -sTCP:LISTEN` or
+`lsof -nP -iTCP:4000 -sTCP:LISTEN`, stop the stale process, then run
+`unset PORT` before restarting `pnpm dev`.
+
 ## Workspace Commands
 
 - `pnpm dev`
