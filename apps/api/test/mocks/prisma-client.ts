@@ -248,6 +248,25 @@ export const ConsentType = {
   MESSAGING: 'MESSAGING',
 } as const;
 
+export const AttendanceSyncStatus = {
+  ACCEPTED: 'ACCEPTED',
+  CONFLICTED: 'CONFLICTED',
+  REJECTED: 'REJECTED',
+} as const;
+
+export const ActivityReactionType = {
+  HEART: 'HEART',
+  CLAP: 'CLAP',
+  STAR: 'STAR',
+} as const;
+
+export const DevelopmentalMilestoneStatus = {
+  EMERGING: 'EMERGING',
+  PROGRESSING: 'PROGRESSING',
+  ACHIEVED: 'ACHIEVED',
+  NEEDS_SUPPORT: 'NEEDS_SUPPORT',
+} as const;
+
 export const AssessmentType = {
   TERMINAL: 'TERMINAL',
   CAS: 'CAS',

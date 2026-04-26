@@ -5,14 +5,18 @@ import {
 } from '@nestjs/common';
 import {
   AudienceType,
+  ConsentType,
   InvoiceStatus,
   JournalLineSide,
   JournalSourceType,
+  NotificationChannel,
   PaymentMethod,
   Prisma,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
+import { buildSimplePdf } from '../common/pdf/simple-pdf';
+import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CollectPaymentDto } from './dto/collect-payment.dto';
 import { CreateDiscountRuleDto } from './dto/create-discount-rule.dto';
@@ -20,6 +24,7 @@ import { CreateFeeHeadDto } from './dto/create-fee-head.dto';
 import { CreateFeePlanDto } from './dto/create-fee-plan.dto';
 import { CreateFeeWaiverDto } from './dto/create-fee-waiver.dto';
 import { GenerateBillingRunDto } from './dto/generate-billing-run.dto';
+import { SendDefaulterRemindersDto } from './dto/send-defaulter-reminders.dto';
 import { resolveCashAccountCode } from './finance.defaults';
 
 @Injectable()
@@ -27,6 +32,7 @@ export class FinanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly communicationsService: CommunicationsService,
   ) {}
 
   async listFeeHeads(actor: AuthContext) {
@@ -454,13 +460,32 @@ export class FinanceService {
     }));
   }
 
-  async listDefaulters(actor: AuthContext) {
+  async listDefaulters(
+    actor: AuthContext,
+    filters: { classId?: string; feeHeadId?: string } = {},
+  ) {
     const today = new Date();
     const invoices = await this.prisma.invoice.findMany({
       where: {
         tenantId: actor.tenantId,
         dueDate: { lt: today },
         status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
+        ...(filters.classId
+          ? {
+              student: {
+                classId: filters.classId,
+              },
+            }
+          : {}),
+        ...(filters.feeHeadId
+          ? {
+              lines: {
+                some: {
+                  feeHeadId: filters.feeHeadId,
+                },
+              },
+            }
+          : {}),
       },
       include: {
         student: {
@@ -497,8 +522,90 @@ export class FinanceService {
         outstanding,
         daysOverdue,
         agingBucket: getAgingBucket(daysOverdue),
+        reportCardBlocked: invoice.reportCardBlocked || outstanding > 0,
+        hallTicketBlocked: invoice.hallTicketBlocked || outstanding > 0,
       };
     });
+  }
+
+  async sendDefaulterReminders(
+    dto: SendDefaulterRemindersDto,
+    actor: AuthContext,
+  ) {
+    const defaulters = await this.listDefaulters(actor, {
+      classId: dto.classId,
+      feeHeadId: dto.feeHeadId,
+    });
+    const selectedDefaulters = dto.invoiceIds?.length
+      ? defaulters.filter((defaulter) =>
+          dto.invoiceIds?.includes(defaulter.invoiceId),
+        )
+      : defaulters;
+    const channels = dto.channels?.length
+      ? dto.channels
+      : [
+          NotificationChannel.PUSH,
+          NotificationChannel.SMS,
+          NotificationChannel.EMAIL,
+        ];
+    const deliveryResults: Array<{ invoiceId: string; deliveryCount: number }> =
+      [];
+
+    for (const defaulter of selectedDefaulters) {
+      const delivery = await this.communicationsService.recordDeliveryRecords({
+        actor,
+        sourceType: 'fee_defaulter_reminder',
+        sourceId: defaulter.invoiceId,
+        audienceType: AudienceType.ALL,
+        studentIds: [defaulter.studentId],
+        title: 'Fee payment reminder',
+        body:
+          dto.message ??
+          `Outstanding fee balance Rs ${defaulter.outstanding.toFixed(
+            2,
+          )} is overdue for invoice ${defaulter.invoiceNumber}.`,
+        channels,
+        requiredConsentTypes: [ConsentType.MESSAGING],
+      });
+
+      deliveryResults.push({
+        invoiceId: defaulter.invoiceId,
+        deliveryCount: delivery.count,
+      });
+    }
+
+    if (selectedDefaulters.length > 0) {
+      await this.prisma.invoice.updateMany({
+        where: {
+          tenantId: actor.tenantId,
+          id: {
+            in: selectedDefaulters.map((defaulter) => defaulter.invoiceId),
+          },
+        },
+        data: {
+          reportCardBlocked: true,
+          hallTicketBlocked: true,
+        },
+      });
+    }
+
+    await this.auditService.record({
+      action: 'send',
+      resource: 'fee_defaulter_reminders',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        invoiceIds: selectedDefaulters.map((defaulter) => defaulter.invoiceId),
+        channels,
+      },
+    });
+
+    return {
+      requested: dto.invoiceIds?.length ?? defaulters.length,
+      reminded: selectedDefaulters.length,
+      channels,
+      deliveryResults,
+    };
   }
 
   async assignFeePlansForEnrollment(input: {
@@ -864,7 +971,7 @@ export class FinanceService {
       throw new NotFoundException('Receipt not found in this tenant');
     }
 
-    return buildSimpleReceiptPdf([
+    return buildSimplePdf([
       'SchoolOS Fee Receipt',
       `Receipt: ${receipt.receiptNumber}`,
       `Invoice: ${receipt.payment.invoice.invoiceNumber}`,
@@ -1061,57 +1168,4 @@ function getAgingBucket(daysOverdue: number) {
   }
 
   return '90+';
-}
-
-function buildSimpleReceiptPdf(lines: string[]) {
-  const content = [
-    'BT',
-    '/F1 16 Tf',
-    '72 770 Td',
-    ...lines.flatMap((line, index) => [
-      `(${escapePdfText(line)}) Tj`,
-      index === 0 ? '/F1 11 Tf' : '',
-      '0 -24 Td',
-    ]),
-    'ET',
-  ]
-    .filter(Boolean)
-    .join('\n');
-
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
-    `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`,
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-  ];
-
-  const chunks = ['%PDF-1.4\n'];
-  const offsets = [0];
-
-  for (const [index, object] of objects.entries()) {
-    offsets.push(Buffer.byteLength(chunks.join('')));
-    chunks.push(`${index + 1} 0 obj\n${object}\nendobj\n`);
-  }
-
-  const xrefOffset = Buffer.byteLength(chunks.join(''));
-  chunks.push(`xref\n0 ${objects.length + 1}\n`);
-  chunks.push('0000000000 65535 f \n');
-
-  for (const offset of offsets.slice(1)) {
-    chunks.push(`${String(offset).padStart(10, '0')} 00000 n \n`);
-  }
-
-  chunks.push(
-    `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`,
-  );
-
-  return Buffer.from(chunks.join(''), 'utf8');
-}
-
-function escapePdfText(value: string) {
-  return value
-    .replace(/\\/g, '\\\\')
-    .replace(/\(/g, '\\(')
-    .replace(/\)/g, '\\)');
 }

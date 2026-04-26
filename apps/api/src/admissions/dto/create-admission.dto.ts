@@ -134,7 +134,27 @@ export class CreateAdmissionDto {
 
   @IsOptional()
   @IsString()
+  severeAllergies?: string;
+
+  @IsOptional()
+  @IsString()
+  medications?: string;
+
+  @IsOptional()
+  @IsString()
   specialNeeds?: string;
+
+  @IsOptional()
+  @IsString()
+  doctorName?: string;
+
+  @IsOptional()
+  @IsString()
+  doctorPhone?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  confirmDuplicate?: boolean;
 
   @IsArray()
   @ArrayMinSize(1)

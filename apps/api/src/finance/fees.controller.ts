@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -9,6 +9,7 @@ import { CreateFeePlanDto } from './dto/create-fee-plan.dto';
 import { CreateDiscountRuleDto } from './dto/create-discount-rule.dto';
 import { CreateFeeWaiverDto } from './dto/create-fee-waiver.dto';
 import { GenerateBillingRunDto } from './dto/generate-billing-run.dto';
+import { SendDefaulterRemindersDto } from './dto/send-defaulter-reminders.dto';
 import { FinanceService } from './finance.service';
 
 @Controller('fees')
@@ -69,8 +70,21 @@ export class FeesController {
 
   @Get('defaulters')
   @Permissions('fees:manage')
-  listDefaulters(@CurrentAuth() auth: AuthContext) {
-    return this.financeService.listDefaulters(auth);
+  listDefaulters(
+    @CurrentAuth() auth: AuthContext,
+    @Query('classId') classId?: string,
+    @Query('feeHeadId') feeHeadId?: string,
+  ) {
+    return this.financeService.listDefaulters(auth, { classId, feeHeadId });
+  }
+
+  @Post('defaulters/reminders')
+  @Permissions('fees:manage')
+  sendDefaulterReminders(
+    @Body() dto: SendDefaulterRemindersDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.sendDefaulterReminders(dto, auth);
   }
 
   @Get('discounts')

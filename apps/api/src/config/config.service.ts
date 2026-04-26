@@ -132,6 +132,18 @@ export class ConfigService {
     return process.env.LOCAL_STORAGE_PUBLIC_BASE_URL ?? '/storage';
   }
 
+  get medicalEncryptionKey() {
+    if (process.env.MEDICAL_ENCRYPTION_KEY) {
+      return process.env.MEDICAL_ENCRYPTION_KEY;
+    }
+
+    if (this.isProduction) {
+      throw new Error('MEDICAL_ENCRYPTION_KEY is required in production');
+    }
+
+    return 'school-os-local-medical-encryption-key-change-me';
+  }
+
   get r2PublicBaseUrl() {
     return process.env.R2_PUBLIC_BASE_URL;
   }

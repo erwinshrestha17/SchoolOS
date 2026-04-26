@@ -5,8 +5,10 @@ import {
 } from '@nestjs/common';
 import {
   AttendanceConflictStatus,
+  AttendanceSyncStatus,
   AttendanceStatus,
   AudienceType,
+  ConsentType,
   NotificationChannel,
   Prisma,
 } from '@prisma/client';
@@ -14,7 +16,9 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ReviewAttendanceConflictDto } from './dto/review-attendance-conflict.dto';
 import { SubmitAttendanceDto } from './dto/submit-attendance.dto';
+import { SyncAttendanceDto } from './dto/sync-attendance.dto';
 
 @Injectable()
 export class AttendanceService {
@@ -216,6 +220,7 @@ export class AttendanceService {
         title: 'Attendance alert',
         body: 'A student was marked absent today.',
         channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
+        requiredConsentTypes: [ConsentType.MESSAGING],
       });
     }
 
@@ -229,6 +234,152 @@ export class AttendanceService {
       conflictStatus: session.conflictStatus,
       totals: summarizeAttendance(session.records),
     };
+  }
+
+  async syncAttendance(dto: SyncAttendanceDto, actor: AuthContext) {
+    const existingSync = await this.prisma.attendanceSyncSubmission.findUnique({
+      where: {
+        tenantId_clientSubmissionId: {
+          tenantId: actor.tenantId,
+          clientSubmissionId: dto.clientSubmissionId,
+        },
+      },
+    });
+
+    if (existingSync) {
+      return existingSync;
+    }
+
+    try {
+      const result = await this.submitAttendance(dto, actor);
+      const conflict =
+        result.conflictStatus === AttendanceConflictStatus.FLAGGED
+          ? await this.prisma.attendanceConflict.findFirst({
+              where: {
+                tenantId: actor.tenantId,
+                attendanceSessionId: result.sessionId,
+              },
+              orderBy: { createdAt: 'desc' },
+            })
+          : null;
+
+      return this.prisma.attendanceSyncSubmission.create({
+        data: {
+          tenantId: actor.tenantId,
+          clientSubmissionId: dto.clientSubmissionId,
+          attendanceSessionId: result.sessionId,
+          conflictId: conflict?.id ?? null,
+          academicYearId: dto.academicYearId,
+          classId: dto.classId,
+          sectionId: dto.sectionId ?? null,
+          attendanceDate: new Date(dto.attendanceDate),
+          deviceTimestamp: new Date(dto.deviceTimestamp),
+          syncStatus: conflict
+            ? AttendanceSyncStatus.CONFLICTED
+            : AttendanceSyncStatus.ACCEPTED,
+          submittedById: actor.userId,
+          payload: dto as unknown as Prisma.InputJsonValue,
+        },
+      });
+    } catch (error) {
+      await this.prisma.attendanceSyncSubmission.create({
+        data: {
+          tenantId: actor.tenantId,
+          clientSubmissionId: dto.clientSubmissionId,
+          academicYearId: dto.academicYearId,
+          classId: dto.classId,
+          sectionId: dto.sectionId ?? null,
+          attendanceDate: new Date(dto.attendanceDate),
+          deviceTimestamp: new Date(dto.deviceTimestamp),
+          syncStatus: AttendanceSyncStatus.REJECTED,
+          submittedById: actor.userId,
+          payload: {
+            dto,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          } as unknown as Prisma.InputJsonValue,
+        },
+      });
+
+      throw error instanceof ForbiddenException ||
+        error instanceof NotFoundException
+        ? error
+        : new ForbiddenException('Attendance sync was rejected');
+    }
+  }
+
+  async listConflicts(actor: AuthContext) {
+    const conflicts = await this.prisma.attendanceConflict.findMany({
+      where: { tenantId: actor.tenantId },
+      include: {
+        attendanceSession: {
+          include: {
+            class: true,
+            section: true,
+          },
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      take: 100,
+    });
+
+    return conflicts.map((conflict) => ({
+      id: conflict.id,
+      attendanceSessionId: conflict.attendanceSessionId,
+      status: conflict.status,
+      submittedById: conflict.submittedById,
+      reviewedById: conflict.reviewedById,
+      submittedAt: conflict.createdAt,
+      reviewedAt: conflict.reviewedAt,
+      resolutionNote: conflict.resolutionNote,
+      attendanceDate: conflict.attendanceSession.attendanceDate,
+      className: conflict.attendanceSession.class.name,
+      sectionName: conflict.attendanceSession.section?.name ?? null,
+    }));
+  }
+
+  async reviewConflict(
+    conflictId: string,
+    dto: ReviewAttendanceConflictDto,
+    actor: AuthContext,
+  ) {
+    const conflict = await this.prisma.attendanceConflict.findFirst({
+      where: {
+        id: conflictId,
+        tenantId: actor.tenantId,
+      },
+    });
+
+    if (!conflict) {
+      throw new NotFoundException('Attendance conflict not found');
+    }
+
+    const updated = await this.prisma.attendanceConflict.update({
+      where: { id: conflict.id },
+      data: {
+        status: AttendanceConflictStatus.REVIEWED,
+        resolutionNote: dto.resolutionNote ?? null,
+        reviewedById: actor.userId,
+        reviewedAt: new Date(),
+      },
+    });
+
+    await this.prisma.attendanceSession.update({
+      where: { id: conflict.attendanceSessionId },
+      data: { conflictStatus: AttendanceConflictStatus.REVIEWED },
+    });
+
+    await this.auditService.record({
+      action: 'review',
+      resource: 'attendance_conflict',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: conflict.id,
+      after: {
+        resolutionNote: dto.resolutionNote ?? null,
+      },
+    });
+
+    return updated;
   }
 
   async getRoster(
@@ -357,9 +508,41 @@ export class AttendanceService {
     });
 
     const studentAbsenceCounts = new Map<string, number>();
+    const studentTotals = new Map<
+      string,
+      { present: number; total: number; name: string; studentSystemId: string }
+    >();
+    const recordsByStudent = new Map<
+      string,
+      Array<{ attendanceDate: Date; status: AttendanceStatus }>
+    >();
 
     for (const session of sessions) {
       for (const record of session.records) {
+        const name =
+          `${record.student.firstNameEn} ${record.student.lastNameEn}`.trim();
+        const totals = studentTotals.get(record.studentId) ?? {
+          present: 0,
+          total: 0,
+          name,
+          studentSystemId: record.student.studentSystemId,
+        };
+        totals.total += 1;
+        if (
+          record.status === AttendanceStatus.PRESENT ||
+          record.status === AttendanceStatus.LATE
+        ) {
+          totals.present += 1;
+        }
+        studentTotals.set(record.studentId, totals);
+        recordsByStudent.set(record.studentId, [
+          ...(recordsByStudent.get(record.studentId) ?? []),
+          {
+            attendanceDate: session.attendanceDate,
+            status: record.status,
+          },
+        ]);
+
         if (record.status === AttendanceStatus.ABSENT) {
           studentAbsenceCounts.set(
             record.studentId,
@@ -383,6 +566,25 @@ export class AttendanceService {
         .map(([studentId, absenceCount]) => ({ studentId, absenceCount }))
         .sort((a, b) => b.absenceCount - a.absenceCount)
         .slice(0, 10),
+      consecutiveAbsences: Array.from(recordsByStudent.entries())
+        .map(([studentId, records]) => ({
+          studentId,
+          consecutiveAbsences: countConsecutiveAbsences(records),
+        }))
+        .filter((item) => item.consecutiveAbsences >= 2)
+        .sort((a, b) => b.consecutiveAbsences - a.consecutiveAbsences),
+      below80Warnings: Array.from(studentTotals.entries())
+        .map(([studentId, totals]) => ({
+          studentId,
+          studentSystemId: totals.studentSystemId,
+          fullNameEn: totals.name,
+          attendancePercent:
+            totals.total === 0
+              ? 100
+              : Math.round((totals.present / totals.total) * 10000) / 100,
+        }))
+        .filter((item) => item.attendancePercent < 80)
+        .sort((a, b) => a.attendancePercent - b.attendancePercent),
     };
   }
 }
@@ -401,4 +603,23 @@ function summarizeAttendance(records: Array<{ status: AttendanceStatus }>) {
     leave: records.filter((record) => record.status === AttendanceStatus.LEAVE)
       .length,
   };
+}
+
+function countConsecutiveAbsences(
+  records: Array<{ attendanceDate: Date; status: AttendanceStatus }>,
+) {
+  const sorted = [...records].sort(
+    (a, b) => b.attendanceDate.getTime() - a.attendanceDate.getTime(),
+  );
+  let count = 0;
+
+  for (const record of sorted) {
+    if (record.status !== AttendanceStatus.ABSENT) {
+      break;
+    }
+
+    count += 1;
+  }
+
+  return count;
 }

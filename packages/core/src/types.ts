@@ -282,6 +282,49 @@ export type StudentDocument = {
   uploadedAt: string;
 };
 
+export type GeneratedStudentDocument = {
+  id: string;
+  studentId: string;
+  kind: string;
+  title: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  pdfUrl: string;
+  generatedById: string | null;
+  generatedAt: string;
+};
+
+export type AdmissionDuplicateWarning = {
+  studentId: string;
+  studentSystemId: string;
+  fullNameEn: string;
+  dateOfBirth: string;
+  className: string;
+  sectionName: string | null;
+  rollNumber: number | null;
+};
+
+export type AdmissionDuplicateCheckResult = {
+  hasWarnings: boolean;
+  matches: AdmissionDuplicateWarning[];
+};
+
+export type BulkAdmissionImportResult = {
+  totalRows: number;
+  created: number;
+  validated: number;
+  failed: number;
+  results: Array<{
+    rowNumber: number;
+    status: 'created' | 'validated' | 'failed';
+    studentId?: string;
+    studentSystemId?: string;
+    errors?: string[];
+  }>;
+  errorReportCsv: string;
+};
+
 export type SiblingGroup = {
   id: string;
   name: string;
@@ -328,6 +371,16 @@ export type AttendanceAnalytics = {
     studentId: string;
     absenceCount: number;
   }>;
+  consecutiveAbsences?: Array<{
+    studentId: string;
+    consecutiveAbsences: number;
+  }>;
+  below80Warnings?: Array<{
+    studentId: string;
+    studentSystemId: string;
+    fullNameEn: string;
+    attendancePercent: number;
+  }>;
 };
 
 export type AttendanceConflict = {
@@ -338,6 +391,21 @@ export type AttendanceConflict = {
   reviewedById: string | null;
   submittedAt: string;
   reviewedAt: string | null;
+  resolutionNote?: string | null;
+  attendanceDate?: string;
+  className?: string;
+  sectionName?: string | null;
+};
+
+export type AttendanceSyncSubmission = {
+  id: string;
+  clientSubmissionId: string;
+  attendanceSessionId: string | null;
+  conflictId: string | null;
+  syncStatus: string;
+  attendanceDate: string;
+  deviceTimestamp: string | null;
+  createdAt: string;
 };
 
 export type FeeHeadSummary = {
@@ -380,6 +448,18 @@ export type DefaulterSummary = {
   outstanding: number;
   daysOverdue: number;
   agingBucket: string;
+  reportCardBlocked?: boolean;
+  hallTicketBlocked?: boolean;
+};
+
+export type DefaulterReminderResult = {
+  requested: number;
+  reminded: number;
+  channels: string[];
+  deliveryResults: Array<{
+    invoiceId: string;
+    deliveryCount: number;
+  }>;
 };
 
 export type DiscountRule = {
@@ -456,6 +536,31 @@ export type ActivityPost = {
       lastNameEn: string;
     };
   }>;
+  reactions?: ActivityReaction[];
+};
+
+export type ActivityReaction = {
+  id: string;
+  activityPostId: string;
+  guardianId: string | null;
+  studentId: string | null;
+  reaction: 'HEART' | 'CLAP' | 'STAR';
+  createdAt: string;
+};
+
+export type DevelopmentalMilestone = {
+  id: string;
+  classId: string;
+  sectionId: string | null;
+  studentId: string;
+  domain: string;
+  milestone: string;
+  status: 'EMERGING' | 'PROGRESSING' | 'ACHIEVED' | 'NEEDS_SUPPORT';
+  observationNote: string | null;
+  photoObjectKey: string | null;
+  photoUrl: string | null;
+  observedAt: string;
+  createdAt: string;
 };
 
 export type MoodLog = {
@@ -495,6 +600,16 @@ export type ConsentRecord = {
   granted: boolean;
   version: string;
   capturedAt: string;
+  revokedAt: string | null;
+};
+
+export type GuardianConsentStatus = {
+  guardianId: string;
+  consentType: string;
+  granted: boolean;
+  latestConsentId: string | null;
+  version: string | null;
+  capturedAt: string | null;
   revokedAt: string | null;
 };
 

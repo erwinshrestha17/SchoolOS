@@ -1,6 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
+import { buildSimplePdf } from '../common/pdf/simple-pdf';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { CreateStudentDto } from './dto/create-student.dto';
@@ -133,6 +139,80 @@ export class StudentsService {
     }));
   }
 
+  async generateStudentDocumentPdf(
+    studentId: string,
+    documentKind: string,
+    actor: AuthContext,
+  ) {
+    const normalizedKind = normalizeStudentDocumentKind(documentKind);
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: studentId,
+        tenantId: actor.tenantId,
+      },
+      include: {
+        tenant: true,
+        class: true,
+        sectionRef: true,
+        guardianLinks: {
+          include: {
+            guardian: true,
+          },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+        },
+        enrollments: {
+          include: {
+            academicYear: true,
+            section: true,
+          },
+          orderBy: [{ createdAt: 'desc' }],
+          take: 1,
+        },
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    const lines = buildStudentDocumentLines(student, normalizedKind);
+    const pdf = buildSimplePdf(lines);
+    const fileName = `${student.studentSystemId}-${normalizedKind}.pdf`;
+    const pdfUrl = `/api/v1/students/${student.id}/documents/${normalizedKind}.pdf`;
+
+    await this.prisma.generatedStudentDocument.create({
+      data: {
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        kind: normalizedKind,
+        title: getStudentDocumentTitle(normalizedKind),
+        fileName,
+        sizeBytes: pdf.byteLength,
+        pdfUrl,
+        generatedById: actor.userId,
+        metadata: {
+          studentSystemId: student.studentSystemId,
+          className: student.class.name,
+          sectionName: student.sectionRef?.name ?? student.section ?? null,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'generate',
+      resource: 'student_document_pdf',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: student.id,
+      after: {
+        kind: normalizedKind,
+        fileName,
+      },
+    });
+
+    return pdf;
+  }
+
   private async generateStudentSystemId(actor: AuthContext) {
     const count = await this.prisma.student.count({
       where: { tenantId: actor.tenantId },
@@ -140,4 +220,120 @@ export class StudentsService {
 
     return `SCH-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
   }
+}
+
+type GeneratedStudentDocumentKind =
+  | 'id-card'
+  | 'transfer-certificate'
+  | 'leaving-certificate'
+  | 'character-certificate';
+
+type StudentDocumentPayload = Prisma.StudentGetPayload<{
+  include: {
+    tenant: true;
+    class: true;
+    sectionRef: true;
+    guardianLinks: {
+      include: {
+        guardian: true;
+      };
+    };
+    enrollments: {
+      include: {
+        academicYear: true;
+        section: true;
+      };
+    };
+  };
+}>;
+
+function normalizeStudentDocumentKind(
+  kind: string,
+): GeneratedStudentDocumentKind {
+  const normalized = kind.toLowerCase().replace(/_/g, '-');
+
+  if (
+    normalized === 'id-card' ||
+    normalized === 'transfer-certificate' ||
+    normalized === 'leaving-certificate' ||
+    normalized === 'character-certificate'
+  ) {
+    return normalized;
+  }
+
+  throw new BadRequestException(
+    'Document kind must be id-card, transfer-certificate, leaving-certificate, or character-certificate',
+  );
+}
+
+function getStudentDocumentTitle(kind: GeneratedStudentDocumentKind) {
+  switch (kind) {
+    case 'id-card':
+      return 'Student ID Card';
+    case 'transfer-certificate':
+      return 'Transfer Certificate';
+    case 'leaving-certificate':
+      return 'Leaving Certificate';
+    case 'character-certificate':
+      return 'Character Certificate';
+  }
+}
+
+function buildStudentDocumentLines(
+  student: StudentDocumentPayload,
+  kind: GeneratedStudentDocumentKind,
+) {
+  const latestEnrollment = student.enrollments[0];
+  const primaryGuardian =
+    student.guardianLinks.find((link) => link.isPrimary)?.guardian ??
+    student.guardianLinks[0]?.guardian ??
+    null;
+  const fullName = `${student.firstNameEn} ${student.lastNameEn}`.trim();
+  const sectionName =
+    latestEnrollment?.section?.name ??
+    student.sectionRef?.name ??
+    student.section;
+  const baseLines = [
+    student.tenant.name,
+    getStudentDocumentTitle(kind),
+    `Generated: ${new Date().toISOString().slice(0, 10)}`,
+    `Student ID: ${student.studentSystemId}`,
+    `Name: ${fullName}`,
+    `Date of Birth: ${student.dateOfBirth.toISOString().slice(0, 10)}`,
+    `Class: ${student.class.name}`,
+    `Section: ${sectionName ?? 'N/A'}`,
+    `Roll No: ${student.rollNumber ?? latestEnrollment?.rollNumber ?? 'N/A'}`,
+    `Guardian: ${primaryGuardian?.fullName ?? 'N/A'}`,
+    `Guardian Phone: ${primaryGuardian?.primaryPhone ?? 'N/A'}`,
+  ];
+
+  if (kind === 'id-card') {
+    return [
+      ...baseLines,
+      'This card identifies the student as currently enrolled in the school.',
+    ];
+  }
+
+  if (kind === 'transfer-certificate') {
+    return [
+      ...baseLines,
+      `Admission Date: ${student.admissionDate.toISOString().slice(0, 10)}`,
+      'The student has been issued this transfer certificate on school request.',
+      'Fee and library clearance should be verified before final handover.',
+    ];
+  }
+
+  if (kind === 'leaving-certificate') {
+    return [
+      ...baseLines,
+      `Admission Date: ${student.admissionDate.toISOString().slice(0, 10)}`,
+      'This certifies that the student has completed the leaving process as recorded by the school.',
+    ];
+  }
+
+  return [
+    ...baseLines,
+    'This is to certify that the student has maintained good conduct as per available school records.',
+    'Issued for official use by the school administration.',
+  ];
 }

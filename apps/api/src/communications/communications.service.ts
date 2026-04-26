@@ -76,6 +76,7 @@ export class CommunicationsService {
           notice.priority === NoticePriority.EMERGENCY
             ? [NotificationChannel.PUSH, NotificationChannel.SMS]
             : [NotificationChannel.PUSH],
+        requiredConsentTypes: [ConsentType.MESSAGING],
       });
     }
 
@@ -132,6 +133,7 @@ export class CommunicationsService {
       title: event.title,
       body: event.description ?? event.title,
       channels: [NotificationChannel.PUSH],
+      requiredConsentTypes: [ConsentType.MESSAGING],
     });
 
     await this.auditService.record({
@@ -216,34 +218,100 @@ export class CommunicationsService {
     return consent;
   }
 
+  async getGuardianConsentStatus(guardianId: string, actor: AuthContext) {
+    const guardian = await this.prisma.guardian.findFirst({
+      where: { id: guardianId, tenantId: actor.tenantId },
+    });
+
+    if (!guardian) {
+      throw new NotFoundException('Guardian not found in this tenant');
+    }
+
+    const consents = await this.prisma.guardianConsent.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        guardianId,
+      },
+      orderBy: [{ capturedAt: 'desc' }],
+    });
+    const latestByType = new Map<ConsentType, (typeof consents)[number]>();
+
+    for (const consent of consents) {
+      if (!latestByType.has(consent.consentType)) {
+        latestByType.set(consent.consentType, consent);
+      }
+    }
+
+    return Object.values(ConsentType).map((consentType) => {
+      const latest = latestByType.get(consentType);
+
+      return {
+        guardianId,
+        consentType,
+        granted: Boolean(latest?.granted && !latest.revokedAt),
+        latestConsentId: latest?.id ?? null,
+        version: latest?.version ?? null,
+        capturedAt: latest?.capturedAt ?? null,
+        revokedAt: latest?.revokedAt ?? null,
+      };
+    });
+  }
+
   async recordDeliveryRecords(input: DeliveryRecordInput) {
     const recipients = await this.resolveAudienceRecipients(input);
+    const { allowedRecipients, skippedRecipients } =
+      await this.partitionRecipientsByConsent(input, recipients);
 
     if (recipients.length === 0) {
       return { count: 0 };
     }
 
     await this.prisma.notificationDelivery.createMany({
-      data: recipients.flatMap((recipient) =>
-        input.channels.map((channel) => ({
-          tenantId: input.actor.tenantId,
-          channel,
-          status: NotificationStatus.SENT,
-          sourceType: input.sourceType,
-          sourceId: input.sourceId,
-          audienceType: input.audienceType,
-          recipientUserId: recipient.userId,
-          guardianId: recipient.guardianId,
-          studentId: recipient.studentId,
-          noticeId: input.noticeId ?? null,
-          eventId: input.eventId ?? null,
-          activityPostId: input.activityPostId ?? null,
-          destination: resolveDestination(recipient, channel),
-          title: input.title,
-          body: input.body,
-          sentAt: new Date(),
-        })),
-      ),
+      data: [
+        ...allowedRecipients.flatMap((recipient) =>
+          input.channels.map((channel) => ({
+            tenantId: input.actor.tenantId,
+            channel,
+            status: NotificationStatus.SENT,
+            sourceType: input.sourceType,
+            sourceId: input.sourceId,
+            audienceType: input.audienceType,
+            recipientUserId: recipient.userId,
+            guardianId: recipient.guardianId,
+            studentId: recipient.studentId,
+            noticeId: input.noticeId ?? null,
+            eventId: input.eventId ?? null,
+            activityPostId: input.activityPostId ?? null,
+            destination: resolveDestination(recipient, channel),
+            title: input.title,
+            body: input.body,
+            sentAt: new Date(),
+          })),
+        ),
+        ...skippedRecipients.flatMap((recipient) =>
+          input.channels.map((channel) => ({
+            tenantId: input.actor.tenantId,
+            channel,
+            status: NotificationStatus.SKIPPED,
+            sourceType: input.sourceType,
+            sourceId: input.sourceId,
+            audienceType: input.audienceType,
+            recipientUserId: recipient.userId,
+            guardianId: recipient.guardianId,
+            studentId: recipient.studentId,
+            noticeId: input.noticeId ?? null,
+            eventId: input.eventId ?? null,
+            activityPostId: input.activityPostId ?? null,
+            destination: resolveDestination(recipient, channel),
+            title: input.title,
+            body: input.body,
+            errorMessage: `Missing required consent: ${input.requiredConsentTypes?.join(
+              ', ',
+            )}`,
+            sentAt: null,
+          })),
+        ),
+      ],
     });
 
     await this.auditService.record({
@@ -256,12 +324,19 @@ export class CommunicationsService {
         sourceType: input.sourceType,
         sourceId: input.sourceId,
         audienceType: input.audienceType,
-        recipientCount: recipients.length,
+        recipientCount: allowedRecipients.length,
+        skippedRecipientCount: skippedRecipients.length,
         channelCount: input.channels.length,
       },
     });
 
-    return { count: recipients.length * input.channels.length };
+    return {
+      count:
+        (allowedRecipients.length + skippedRecipients.length) *
+        input.channels.length,
+      sentCount: allowedRecipients.length * input.channels.length,
+      skippedCount: skippedRecipients.length * input.channels.length,
+    };
   }
 
   private async ensureAudienceRefs(
@@ -350,6 +425,76 @@ export class CommunicationsService {
 
     return recipients;
   }
+
+  private async partitionRecipientsByConsent(
+    input: DeliveryRecordInput,
+    recipients: DeliveryRecipient[],
+  ) {
+    const requiredConsentTypes = input.requiredConsentTypes ?? [];
+
+    if (requiredConsentTypes.length === 0) {
+      return {
+        allowedRecipients: recipients,
+        skippedRecipients: [],
+      };
+    }
+
+    const guardianIds = Array.from(
+      new Set(
+        recipients
+          .map((recipient) => recipient.guardianId)
+          .filter((guardianId): guardianId is string => Boolean(guardianId)),
+      ),
+    );
+    const consents = await this.prisma.guardianConsent.findMany({
+      where: {
+        tenantId: input.actor.tenantId,
+        guardianId: { in: guardianIds },
+        consentType: { in: requiredConsentTypes },
+      },
+      orderBy: [{ capturedAt: 'desc' }],
+    });
+    const latestByGuardianAndType = new Map<
+      string,
+      (typeof consents)[number]
+    >();
+
+    for (const consent of consents) {
+      const key = `${consent.guardianId}:${consent.consentType}`;
+      if (!latestByGuardianAndType.has(key)) {
+        latestByGuardianAndType.set(key, consent);
+      }
+    }
+
+    const allowedRecipients: DeliveryRecipient[] = [];
+    const skippedRecipients: DeliveryRecipient[] = [];
+
+    for (const recipient of recipients) {
+      if (!recipient.guardianId) {
+        allowedRecipients.push(recipient);
+        continue;
+      }
+
+      const hasAllConsents = requiredConsentTypes.every((consentType) => {
+        const latest = latestByGuardianAndType.get(
+          `${recipient.guardianId}:${consentType}`,
+        );
+
+        return Boolean(latest?.granted && !latest.revokedAt);
+      });
+
+      if (hasAllConsents) {
+        allowedRecipients.push(recipient);
+      } else {
+        skippedRecipients.push(recipient);
+      }
+    }
+
+    return {
+      allowedRecipients,
+      skippedRecipients,
+    };
+  }
 }
 
 type DeliveryRecordInput = {
@@ -366,6 +511,7 @@ type DeliveryRecordInput = {
   title: string;
   body: string;
   channels: NotificationChannel[];
+  requiredConsentTypes?: ConsentType[];
 };
 
 type DeliveryRecipient = {

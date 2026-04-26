@@ -62,6 +62,11 @@ that port. Check it with `lsof -nP -iTCP:3000 -sTCP:LISTEN` or
 `lsof -nP -iTCP:4000 -sTCP:LISTEN`, stop the stale process, then run
 `unset PORT` before restarting `pnpm dev`.
 
+Sensitive medical/compliance fields are encrypted at the app layer before they
+are stored. Local development uses a safe fallback key, but production must set
+`MEDICAL_ENCRYPTION_KEY` to a stable 32-byte hex/base64 value, or a long secret
+passphrase, before admitting students with medical data.
+
 ## Workspace Commands
 
 - `pnpm dev`

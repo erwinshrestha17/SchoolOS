@@ -1,6 +1,7 @@
 import {
   AudienceType,
   AuthMethod,
+  ConsentType,
   EventType,
   NotificationChannel,
   NotificationStatus,
@@ -103,6 +104,16 @@ describe('CommunicationsService', () => {
       },
     ]);
     prisma.notificationDelivery.createMany.mockResolvedValue({ count: 1 });
+    prisma.guardianConsent.findMany.mockResolvedValue([
+      {
+        id: 'consent-1',
+        guardianId: 'guardian-1',
+        consentType: ConsentType.MESSAGING,
+        granted: true,
+        revokedAt: null,
+        capturedAt: new Date('2026-04-01T00:00:00.000Z'),
+      },
+    ]);
 
     const result = await service.createEvent(
       {

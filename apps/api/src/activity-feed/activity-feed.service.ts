@@ -1,7 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   ActivityCategory,
   AudienceType,
+  ConsentType,
   NotificationChannel,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -10,6 +15,8 @@ import { CommunicationsService } from '../communications/communications.service'
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { CreateActivityPostDto } from './dto/create-activity-post.dto';
+import { CreateActivityReactionDto } from './dto/create-activity-reaction.dto';
+import { CreateDevelopmentalMilestoneDto } from './dto/create-developmental-milestone.dto';
 import { CreateMoodLogDto } from './dto/create-mood-log.dto';
 
 @Injectable()
@@ -35,6 +42,7 @@ export class ActivityFeedService {
             student: true,
           },
         },
+        reactions: true,
       },
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       take: 50,
@@ -150,6 +158,7 @@ export class ActivityFeedService {
       title: post.title,
       body: post.caption,
       channels: [NotificationChannel.PUSH],
+      requiredConsentTypes: [ConsentType.PHOTO_USAGE],
     });
 
     await this.auditService.record({
@@ -167,6 +176,86 @@ export class ActivityFeedService {
     });
 
     return post;
+  }
+
+  async createReaction(
+    postId: string,
+    dto: CreateActivityReactionDto,
+    actor: AuthContext,
+  ) {
+    if (!dto.guardianId && !dto.studentId) {
+      throw new BadRequestException(
+        'A guardianId or studentId is required for a reaction',
+      );
+    }
+
+    const post = await this.prisma.activityPost.findFirst({
+      where: { id: postId, tenantId: actor.tenantId },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Activity post not found in this tenant');
+    }
+
+    const [guardian, student] = await Promise.all([
+      dto.guardianId
+        ? this.prisma.guardian.findFirst({
+            where: { id: dto.guardianId, tenantId: actor.tenantId },
+          })
+        : Promise.resolve(null),
+      dto.studentId
+        ? this.prisma.student.findFirst({
+            where: { id: dto.studentId, tenantId: actor.tenantId },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    if (dto.guardianId && !guardian) {
+      throw new NotFoundException('Guardian not found in this tenant');
+    }
+
+    if (dto.studentId && !student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    const existing = await this.prisma.activityReaction.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        activityPostId: post.id,
+        reaction: dto.reaction,
+        guardianId: dto.guardianId ?? null,
+        studentId: dto.studentId ?? null,
+      },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    const reaction = await this.prisma.activityReaction.create({
+      data: {
+        tenantId: actor.tenantId,
+        activityPostId: post.id,
+        guardianId: dto.guardianId ?? null,
+        studentId: dto.studentId ?? null,
+        reaction: dto.reaction,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'react',
+      resource: 'activity_post',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: post.id,
+      after: {
+        reaction: dto.reaction,
+        guardianId: dto.guardianId ?? null,
+        studentId: dto.studentId ?? null,
+      },
+    });
+
+    return reaction;
   }
 
   async listMoodLogs(actor: AuthContext) {
@@ -239,4 +328,122 @@ export class ActivityFeedService {
 
     return moodLog;
   }
+
+  async listMilestones(
+    actor: AuthContext,
+    filters: { studentId?: string; month?: string } = {},
+  ) {
+    const monthRange = filters.month ? getMonthRange(filters.month) : null;
+
+    return this.prisma.developmentalMilestone.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        ...(filters.studentId ? { studentId: filters.studentId } : {}),
+        ...(monthRange
+          ? {
+              observedAt: {
+                gte: monthRange.start,
+                lt: monthRange.end,
+              },
+            }
+          : {}),
+      },
+      include: {
+        class: true,
+        section: true,
+        student: true,
+      },
+      orderBy: [{ observedAt: 'desc' }, { createdAt: 'desc' }],
+      take: 200,
+    });
+  }
+
+  async createMilestone(
+    dto: CreateDevelopmentalMilestoneDto,
+    actor: AuthContext,
+  ) {
+    const [classroom, section, student] = await Promise.all([
+      this.prisma.class.findFirst({
+        where: { id: dto.classId, tenantId: actor.tenantId },
+      }),
+      dto.sectionId
+        ? this.prisma.section.findFirst({
+            where: { id: dto.sectionId, tenantId: actor.tenantId },
+          })
+        : Promise.resolve(null),
+      this.prisma.student.findFirst({
+        where: {
+          id: dto.studentId,
+          tenantId: actor.tenantId,
+          classId: dto.classId,
+          ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
+        },
+      }),
+    ]);
+
+    if (!classroom) {
+      throw new NotFoundException('Class not found in this tenant');
+    }
+
+    if (dto.sectionId && !section) {
+      throw new NotFoundException('Section not found in this tenant');
+    }
+
+    if (!student) {
+      throw new NotFoundException(
+        'Student not found in this class/section tenant scope',
+      );
+    }
+
+    const milestone = await this.prisma.developmentalMilestone.create({
+      data: {
+        tenantId: actor.tenantId,
+        classId: dto.classId,
+        sectionId: dto.sectionId ?? null,
+        studentId: dto.studentId,
+        domain: dto.domain,
+        milestone: dto.milestone,
+        status: dto.status,
+        observationNote: dto.observationNote ?? null,
+        photoObjectKey: dto.photoObjectKey ?? null,
+        photoUrl: dto.photoUrl ?? null,
+        observedAt: new Date(dto.observedAt),
+        createdById: actor.userId,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'developmental_milestone',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: milestone.id,
+      after: {
+        studentId: milestone.studentId,
+        domain: milestone.domain,
+        status: milestone.status,
+      },
+    });
+
+    return milestone;
+  }
+}
+
+function getMonthRange(month: string) {
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    throw new BadRequestException('month must use YYYY-MM format');
+  }
+
+  const [yearText, monthText] = month.split('-');
+  const year = Number(yearText);
+  const monthIndex = Number(monthText) - 1;
+
+  if (monthIndex < 0 || monthIndex > 11) {
+    throw new BadRequestException('month must use YYYY-MM format');
+  }
+
+  return {
+    start: new Date(Date.UTC(year, monthIndex, 1)),
+    end: new Date(Date.UTC(year, monthIndex + 1, 1)),
+  };
 }

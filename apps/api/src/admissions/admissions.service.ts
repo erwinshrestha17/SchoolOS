@@ -1,12 +1,25 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { EnrollmentStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
+import { encryptSensitiveField } from '../common/security/field-encryption';
+import { ConfigService } from '../config/config.service';
 import { FinanceService } from '../finance/finance.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StudentRecordsService } from '../student-records/student-records.service';
 import { UsersService } from '../users/users.service';
+import {
+  buildAdmissionDtoFromCsvRow,
+  normalizeAdmissionName,
+  parseAdmissionCsv,
+} from './admissions.utils';
+import { BulkAdmissionImportDto } from './dto/bulk-admission-import.dto';
+import { CheckAdmissionDuplicateDto } from './dto/check-admission-duplicate.dto';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
 
 @Injectable()
@@ -18,6 +31,7 @@ export class AdmissionsService {
     private readonly studentRecordsService: StudentRecordsService,
     private readonly notificationsService: NotificationsService,
     private readonly auditService: AuditService,
+    private readonly configService: ConfigService,
   ) {}
 
   async listAdmissions(actor: AuthContext) {
@@ -115,6 +129,44 @@ export class AdmissionsService {
       throw new NotFoundException('Section not found in this tenant');
     }
 
+    const duplicateWarnings = await this.checkDuplicateAdmissions(
+      {
+        firstNameEn: dto.firstNameEn,
+        lastNameEn: dto.lastNameEn,
+        dateOfBirth: dto.dateOfBirth,
+      },
+      actor,
+    );
+
+    if (duplicateWarnings.matches.length > 0 && !dto.confirmDuplicate) {
+      throw new ConflictException({
+        message:
+          'Possible duplicate admission found. Resubmit with confirmDuplicate=true to continue.',
+        duplicates: duplicateWarnings.matches,
+      });
+    }
+
+    if (dto.rollNumber) {
+      const rollConflict = await this.findRollNumberConflict(dto, actor);
+
+      if (rollConflict) {
+        throw new ConflictException({
+          message:
+            'Roll number is already assigned in this academic year, class, and section.',
+          conflict: {
+            enrollmentId: rollConflict.id,
+            studentId: rollConflict.studentId,
+            studentSystemId: rollConflict.student.studentSystemId,
+            fullNameEn:
+              `${rollConflict.student.firstNameEn} ${rollConflict.student.lastNameEn}`.trim(),
+            className: rollConflict.class.name,
+            sectionName: rollConflict.section?.name ?? null,
+            rollNumber: rollConflict.rollNumber,
+          },
+        });
+      }
+    }
+
     let linkedUserId: string | null = null;
 
     if (dto.createLogin) {
@@ -167,10 +219,39 @@ export class AdmissionsService {
         mediumOfInstruct: dto.mediumOfInstruction ?? 'English',
         emergencyName: dto.emergencyName ?? null,
         emergencyPhone: dto.emergencyPhone ?? null,
-        medicalConditions: dto.medicalConditions ?? null,
-        specialNeeds: dto.specialNeeds ?? null,
+        medicalConditions: encryptSensitiveField(
+          dto.medicalConditions,
+          this.configService.medicalEncryptionKey,
+        ),
+        severeAllergies: encryptSensitiveField(
+          dto.severeAllergies,
+          this.configService.medicalEncryptionKey,
+        ),
+        medications: encryptSensitiveField(
+          dto.medications,
+          this.configService.medicalEncryptionKey,
+        ),
+        specialNeeds: encryptSensitiveField(
+          dto.specialNeeds,
+          this.configService.medicalEncryptionKey,
+        ),
+        doctorName: encryptSensitiveField(
+          dto.doctorName,
+          this.configService.medicalEncryptionKey,
+        ),
+        doctorPhone: encryptSensitiveField(
+          dto.doctorPhone,
+          this.configService.medicalEncryptionKey,
+        ),
         privacyConsentAt: new Date(),
         dataProcessingConsentedAt: new Date(),
+        medicalConsentAt:
+          dto.medicalConditions ||
+          dto.severeAllergies ||
+          dto.medications ||
+          dto.specialNeeds
+            ? new Date()
+            : null,
       },
     });
 
@@ -333,6 +414,130 @@ export class AdmissionsService {
     };
   }
 
+  async checkDuplicateAdmissions(
+    dto: CheckAdmissionDuplicateDto,
+    actor: AuthContext,
+  ) {
+    const candidates = await this.prisma.student.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        dateOfBirth: new Date(dto.dateOfBirth),
+        ...(dto.excludeStudentId ? { id: { not: dto.excludeStudentId } } : {}),
+      },
+      include: {
+        class: true,
+        sectionRef: true,
+      },
+      orderBy: [{ createdAt: 'desc' }],
+    });
+
+    const normalizedFirstName = normalizeAdmissionName(dto.firstNameEn);
+    const normalizedLastName = normalizeAdmissionName(dto.lastNameEn);
+    const matches = candidates
+      .filter(
+        (candidate) =>
+          normalizeAdmissionName(candidate.firstNameEn) ===
+            normalizedFirstName &&
+          normalizeAdmissionName(candidate.lastNameEn) === normalizedLastName,
+      )
+      .map((candidate) => ({
+        studentId: candidate.id,
+        studentSystemId: candidate.studentSystemId,
+        fullNameEn: `${candidate.firstNameEn} ${candidate.lastNameEn}`.trim(),
+        dateOfBirth: candidate.dateOfBirth,
+        className: candidate.class.name,
+        sectionName: candidate.sectionRef?.name ?? candidate.section ?? null,
+        rollNumber: candidate.rollNumber,
+      }));
+
+    return {
+      hasWarnings: matches.length > 0,
+      matches,
+    };
+  }
+
+  async bulkImport(dto: BulkAdmissionImportDto, actor: AuthContext) {
+    const rows = parseAdmissionCsv(dto.csvContent);
+    const results: Array<{
+      rowNumber: number;
+      status: 'created' | 'validated' | 'failed';
+      studentId?: string;
+      studentSystemId?: string;
+      errors?: string[];
+    }> = [];
+
+    for (const row of rows) {
+      const parsed = buildAdmissionDtoFromCsvRow(
+        row,
+        dto.confirmDuplicates ?? false,
+      );
+
+      if (!parsed.dto) {
+        results.push({
+          rowNumber: row.rowNumber,
+          status: 'failed',
+          errors: parsed.errors,
+        });
+        continue;
+      }
+
+      if (dto.dryRun) {
+        const duplicateWarnings = await this.checkDuplicateAdmissions(
+          {
+            firstNameEn: parsed.dto.firstNameEn,
+            lastNameEn: parsed.dto.lastNameEn,
+            dateOfBirth: parsed.dto.dateOfBirth,
+          },
+          actor,
+        );
+        const rollConflict = parsed.dto.rollNumber
+          ? await this.findRollNumberConflict(parsed.dto, actor)
+          : null;
+        const errors = [
+          ...(duplicateWarnings.matches.length > 0
+            ? ['possible duplicate admission']
+            : []),
+          ...(rollConflict ? ['roll number conflict'] : []),
+        ];
+
+        results.push({
+          rowNumber: row.rowNumber,
+          status: errors.length > 0 ? 'failed' : 'validated',
+          errors: errors.length > 0 ? errors : undefined,
+        });
+        continue;
+      }
+
+      try {
+        const created = await this.createAdmission(parsed.dto, actor);
+        results.push({
+          rowNumber: row.rowNumber,
+          status: 'created',
+          studentId: created.student.id,
+          studentSystemId: created.student.studentSystemId,
+        });
+      } catch (error) {
+        results.push({
+          rowNumber: row.rowNumber,
+          status: 'failed',
+          errors: [
+            error instanceof Error ? error.message : 'Unknown import error',
+          ],
+        });
+      }
+    }
+
+    return {
+      totalRows: rows.length,
+      created: results.filter((result) => result.status === 'created').length,
+      validated: results.filter((result) => result.status === 'validated')
+        .length,
+      failed: results.filter((result) => result.status === 'failed').length,
+      results,
+      errorReportCsv: buildBulkImportErrorCsv(results),
+    };
+  }
+
   private async generateStudentSystemId(actor: AuthContext, startsOn: Date) {
     const count = await this.prisma.student.count({
       where: { tenantId: actor.tenantId },
@@ -340,4 +545,46 @@ export class AdmissionsService {
 
     return `SCH-${startsOn.getUTCFullYear()}-${String(count + 1).padStart(4, '0')}`;
   }
+
+  private async findRollNumberConflict(
+    dto: Pick<
+      CreateAdmissionDto,
+      'academicYearId' | 'classId' | 'sectionId' | 'rollNumber'
+    >,
+    actor: AuthContext,
+  ) {
+    return this.prisma.enrollment.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        academicYearId: dto.academicYearId,
+        classId: dto.classId,
+        sectionId: dto.sectionId ?? null,
+        rollNumber: dto.rollNumber,
+        status: EnrollmentStatus.ACTIVE,
+      },
+      include: {
+        student: true,
+        class: true,
+        section: true,
+      },
+    });
+  }
+}
+
+function buildBulkImportErrorCsv(
+  results: Array<{ rowNumber: number; status: string; errors?: string[] }>,
+) {
+  const failedRows = results.filter((result) => result.status === 'failed');
+  const lines = [
+    'rowNumber,status,errors',
+    ...failedRows.map((result) =>
+      [
+        result.rowNumber,
+        result.status,
+        `"${(result.errors ?? []).join('; ').replace(/"/g, '""')}"`,
+      ].join(','),
+    ),
+  ];
+
+  return lines.join('\n');
 }
