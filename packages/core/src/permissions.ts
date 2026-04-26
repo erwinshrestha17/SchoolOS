@@ -65,6 +65,7 @@ export type PermissionKey =
   `${(typeof permissionCatalog)[number]['resource']}:${(typeof permissionCatalog)[number]['action']}`;
 
 export const systemRoleDefinitions = [
+  { name: 'super_admin', description: 'System preset role with every SchoolOS permission' },
   { name: 'admin', description: 'System preset role for admin' },
   { name: 'teacher', description: 'System preset role for teacher' },
   { name: 'student', description: 'System preset role for student' },
@@ -79,6 +80,7 @@ export function buildPermissionKey(resource: string, action: string) {
 }
 
 export const systemRolePermissions: Record<string, string[]> = {
+  super_admin: permissionCatalog.map(({ resource, action }) => buildPermissionKey(resource, action)),
   admin: permissionCatalog.map(({ resource, action }) => buildPermissionKey(resource, action)),
   teacher: [
     'roles:read',

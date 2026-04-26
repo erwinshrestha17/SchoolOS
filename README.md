@@ -75,13 +75,21 @@ that port. Check it with `lsof -nP -iTCP:3000 -sTCP:LISTEN` or
 
 ## Default Login Credentials
 
-After running `pnpm db:seed`, the following admin account is available:
+After running `pnpm db:seed`, the following local demo accounts are available:
 
 | Field       | Value               |
 |-------------|---------------------|
 | Tenant Slug | `default-school`    |
 | Email       | `admin@schoolos.com`|
 | Password    | `admin123`          |
+
+Use this account when you need every permission in the default tenant:
+
+| Field       | Value                     |
+|-------------|---------------------------|
+| Tenant Slug | `default-school`          |
+| Email       | `superadmin@schoolos.com` |
+| Password    | `superadmin123`           |
 
 ## Current Phase 1 Surface Area
 

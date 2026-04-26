@@ -299,6 +299,10 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
 
 export const SYSTEM_ROLE_DEFINITIONS = [
   {
+    name: 'super_admin',
+    description: 'System preset role with every SchoolOS permission',
+  },
+  {
     name: 'admin',
     description: 'System preset role for admin',
   },
@@ -329,6 +333,9 @@ export const SYSTEM_ROLE_DEFINITIONS = [
 ] as const;
 
 export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
+  super_admin: PERMISSION_CATALOG.map(({ resource, action }) =>
+    buildPermissionKey(resource, action),
+  ),
   admin: PERMISSION_CATALOG.map(({ resource, action }) =>
     buildPermissionKey(resource, action),
   ),

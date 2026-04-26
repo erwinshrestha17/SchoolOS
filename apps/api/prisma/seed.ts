@@ -180,35 +180,34 @@ async function main() {
     });
   }
 
-  // 3. Create Super Admin User
+  // 3. Create Default Admin Users
   const adminRole = await prisma.role.findUnique({
     where: { tenantId_name: { tenantId: tenant.id, name: 'admin' } },
+  });
+  const superAdminRole = await prisma.role.findUnique({
+    where: { tenantId_name: { tenantId: tenant.id, name: 'super_admin' } },
   });
 
   if (!adminRole) {
     throw new Error('Admin role was not created successfully.');
   }
 
-  const adminPassword = await bcrypt.hash('admin123', 12);
+  if (!superAdminRole) {
+    throw new Error('Super admin role was not created successfully.');
+  }
 
-  await prisma.user.upsert({
-    where: {
-      tenantId_email: { tenantId: tenant.id, email: 'admin@schoolos.com' },
-    },
-    update: {},
-    create: {
-      tenantId: tenant.id,
-      email: 'admin@schoolos.com',
-      passwordHash: adminPassword,
-      authMethod: AuthMethod.PASSWORD,
-      status: UserStatus.ACTIVE,
-      userRoles: {
-        create: {
-          roleId: adminRole.id,
-          tenantId: tenant.id,
-        },
-      },
-    },
+  await ensureSeedUserWithRole({
+    tenantId: tenant.id,
+    email: 'admin@schoolos.com',
+    password: 'admin123',
+    roleId: adminRole.id,
+  });
+
+  await ensureSeedUserWithRole({
+    tenantId: tenant.id,
+    email: 'superadmin@schoolos.com',
+    password: 'superadmin123',
+    roleId: superAdminRole.id,
   });
 
   // 4. Create Classes
@@ -273,7 +272,59 @@ async function main() {
   console.log(`✅ Created ${createdClasses.length} classes with sections A & B each.`);
   console.log('✅ Seeding complete!');
   console.log('Admin login: admin@schoolos.com / admin123');
+  console.log('Super admin login: superadmin@schoolos.com / superadmin123');
   console.log(`Academic year ready: ${academicYear.name}`);
+}
+
+async function ensureSeedUserWithRole({
+  tenantId,
+  email,
+  password,
+  roleId,
+}: {
+  tenantId: string;
+  email: string;
+  password: string;
+  roleId: string;
+}) {
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  const user = await prisma.user.upsert({
+    where: {
+      tenantId_email: { tenantId, email },
+    },
+    update: {
+      passwordHash,
+      authMethod: AuthMethod.PASSWORD,
+      status: UserStatus.ACTIVE,
+    },
+    create: {
+      tenantId,
+      email,
+      passwordHash,
+      authMethod: AuthMethod.PASSWORD,
+      status: UserStatus.ACTIVE,
+    },
+  });
+
+  const existingRole = await prisma.userRole.findFirst({
+    where: {
+      tenantId,
+      userId: user.id,
+      roleId,
+      scopeId: null,
+    },
+  });
+
+  if (!existingRole) {
+    await prisma.userRole.create({
+      data: {
+        tenantId,
+        userId: user.id,
+        roleId,
+      },
+    });
+  }
 }
 
 main()
