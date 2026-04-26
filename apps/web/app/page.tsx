@@ -14,12 +14,13 @@ export default function HomePage() {
             The web app is focused on admin and staff operations first.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link
-              href="/login"
-              className="rounded-full bg-[var(--ink)] px-5 py-3 font-semibold text-white"
-            >
-              Sign in
-            </Link>
+           <Link
+  href="/login"
+  className="rounded-full bg-amber-600 px-5 py-3 font-semibold text-white hover:bg-amber-700"
+
+>
+  Sign in
+</Link>
             <Link
               href="/register"
               className="rounded-full border border-[var(--line)] px-5 py-3 font-semibold"
