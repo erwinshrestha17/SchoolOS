@@ -2,24 +2,47 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 
+type EmailJobData = {
+  to: string;
+  subject: string;
+  text?: string;
+  html?: string;
+  metadata?: Record<string, unknown>;
+};
+
+type SmsJobData = {
+  to: string;
+  message: string;
+  metadata?: Record<string, unknown>;
+};
+
+type PushJobData = {
+  title: string;
+  body: string;
+  audience?: unknown;
+  metadata?: Record<string, unknown>;
+};
+
+type NotificationJobData = EmailJobData | SmsJobData | PushJobData;
+
 @Processor('notifications')
 export class NotificationsProcessor extends WorkerHost {
   private readonly logger = new Logger(NotificationsProcessor.name);
 
-  async process(job: Job<any, any, string>): Promise<any> {
+  async process(job: Job<NotificationJobData, void, string>): Promise<void> {
     switch (job.name) {
       case 'sendEmail':
-        return this.handleSendEmail(job.data);
+        return this.handleSendEmail(job.data as EmailJobData);
       case 'sendSms':
-        return this.handleSendSms(job.data);
+        return this.handleSendSms(job.data as SmsJobData);
       case 'sendPushNotification':
-        return this.handleSendPush(job.data);
+        return this.handleSendPush(job.data as PushJobData);
       default:
         this.logger.warn(`Unknown job name: ${job.name}`);
     }
   }
 
-  private async handleSendEmail(input: any) {
+  private async handleSendEmail(input: EmailJobData) {
     const mode = process.env.EMAIL_DELIVERY_MODE ?? 'log';
 
     if (mode === 'webhook') {
@@ -68,7 +91,7 @@ export class NotificationsProcessor extends WorkerHost {
     );
   }
 
-  private async handleSendSms(input: any) {
+  private async handleSendSms(input: SmsJobData) {
     this.logger.log(
       JSON.stringify({
         mode: 'log',
@@ -80,7 +103,7 @@ export class NotificationsProcessor extends WorkerHost {
     );
   }
 
-  private async handleSendPush(input: any) {
+  private async handleSendPush(input: PushJobData) {
     this.logger.log(
       JSON.stringify({
         mode: 'log',

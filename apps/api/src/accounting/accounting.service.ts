@@ -71,7 +71,9 @@ export class AccountingService {
     });
 
     if (existing) {
-      throw new ConflictException('Chart account code already exists in this tenant');
+      throw new ConflictException(
+        'Chart account code already exists in this tenant',
+      );
     }
 
     if (dto.parentId) {

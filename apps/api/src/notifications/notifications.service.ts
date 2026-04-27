@@ -36,7 +36,9 @@ import { Queue } from 'bullmq';
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(@InjectQueue('notifications') private notificationsQueue: Queue) {}
+  constructor(
+    @InjectQueue('notifications') private notificationsQueue: Queue,
+  ) {}
 
   async sendAuthCodeEmail(input: SendAuthCodeEmailInput) {
     const subject =

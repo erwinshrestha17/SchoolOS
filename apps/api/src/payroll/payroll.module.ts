@@ -10,7 +10,7 @@ import { PayrollProcessor } from './payroll.processor';
 
 @Module({
   imports: [
-    AuthModule, 
+    AuthModule,
     AuditModule,
     BullModule.registerQueue({
       name: 'payroll',

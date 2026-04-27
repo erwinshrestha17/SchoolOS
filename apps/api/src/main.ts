@@ -3,14 +3,18 @@ import 'dotenv/config';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { randomUUID } from 'crypto';
 import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ConfigService } from './config/config.service';
 import type { NextFunction, Request, Response } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+  configService.validateForRuntime();
+
   const httpAdapter = app.getHttpAdapter().getInstance();
 
   app.use(json({ limit: '10mb' }));
@@ -35,10 +39,18 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'X-Request-Id',
+    ],
   });
 
   app.use((req: Request, res: Response, next: NextFunction) => {
+    const requestId = req.header('x-request-id') ?? randomUUID();
+    (req as Request & { requestId: string }).requestId = requestId;
+    res.setHeader('X-Request-Id', requestId);
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Referrer-Policy', 'no-referrer');
@@ -64,6 +76,7 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   app.setGlobalPrefix('api/v1');
 
@@ -78,7 +91,7 @@ async function bootstrap() {
   SwaggerModule.setup('api/v1/docs', app, document);
 
   app.enableShutdownHooks();
-  await app.listen(process.env.PORT ?? 4000);
+  await app.listen(configService.port);
 }
 bootstrap().catch((err) => {
   console.error('Error during bootstrap', err);

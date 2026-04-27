@@ -1,6 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
-import type { AuthContext } from '../auth/auth.types';
-import type { PrismaService } from '../prisma/prisma.service';
+import type { AuthContext } from '../../auth/auth.types';
+import type { PrismaService } from '../../prisma/prisma.service';
 
 /**
  * Determines if the authenticated user is a parent-only role
@@ -59,7 +59,7 @@ export async function getParentStudentIds(
   }
 
   // Find the guardian record linked to this user
-  const guardian = await (prisma as any).guardian.findFirst({
+  const guardian = await prisma.guardian.findFirst({
     where: {
       tenantId: actor.tenantId,
       userId: actor.userId,
@@ -73,9 +73,7 @@ export async function getParentStudentIds(
     return []; // parent with no linked guardian record -> no access
   }
 
-  return guardian.studentLinks.map(
-    (link: { studentId: string }) => link.studentId,
-  );
+  return guardian.studentLinks.map((link) => link.studentId);
 }
 
 /**
@@ -90,7 +88,7 @@ export async function getStudentOwnId(
     return null; // no restriction
   }
 
-  const student = await (prisma as any).student.findFirst({
+  const student = await prisma.student.findFirst({
     where: {
       tenantId: actor.tenantId,
       userId: actor.userId,
@@ -111,7 +109,7 @@ export async function getStudentOwnId(
 export async function buildStudentScopeFilter(
   prisma: PrismaService,
   actor: AuthContext,
-): Promise<Record<string, any>> {
+): Promise<Record<string, unknown>> {
   const parentStudentIds = await getParentStudentIds(prisma, actor);
   if (parentStudentIds !== null) {
     return { studentId: { in: parentStudentIds } };

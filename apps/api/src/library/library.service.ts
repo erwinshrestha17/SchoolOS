@@ -252,8 +252,11 @@ export class LibraryService {
     let calculatedFine = 0;
     const now = new Date();
     if (now > issue.dueAt && !dto.markLost) {
-      const daysOverdue = Math.ceil((now.getTime() - issue.dueAt.getTime()) / (1000 * 60 * 60 * 24));
-      const finePerDay = this.configService.get<number>('LIBRARY_FINE_PER_DAY') ?? 10; // Default 10 currency units per day
+      const daysOverdue = Math.ceil(
+        (now.getTime() - issue.dueAt.getTime()) / (1000 * 60 * 60 * 24),
+      );
+      const finePerDay =
+        this.configService.get<number>('LIBRARY_FINE_PER_DAY') ?? 10; // Default 10 currency units per day
       calculatedFine = daysOverdue * finePerDay;
     }
 

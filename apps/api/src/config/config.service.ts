@@ -13,6 +13,21 @@ import {
 
 @Injectable()
 export class ConfigService {
+  validateForRuntime() {
+    const errors = [
+      ...this.validateNumericEnv(),
+      ...(this.isProduction ? this.validateProductionEnv() : []),
+    ];
+
+    if (errors.length > 0) {
+      throw new Error(
+        `Invalid SchoolOS API configuration:\n${errors
+          .map((error) => `- ${error}`)
+          .join('\n')}`,
+      );
+    }
+  }
+
   get jwtSecret() {
     return process.env.JWT_SECRET ?? 'school-os-access-secret';
   }
@@ -148,6 +163,18 @@ export class ConfigService {
     return process.env.R2_PUBLIC_BASE_URL;
   }
 
+  get port() {
+    return Number(process.env.PORT ?? 4000);
+  }
+
+  get redisHost() {
+    return process.env.REDIS_HOST ?? 'localhost';
+  }
+
+  get redisPort() {
+    return Number(process.env.REDIS_PORT ?? 6379);
+  }
+
   get passwordResetAppUrl() {
     return process.env.PASSWORD_RESET_APP_URL ?? this.frontendOrigins[0];
   }
@@ -160,5 +187,110 @@ export class ConfigService {
 
   get isProduction() {
     return process.env.NODE_ENV === 'production';
+  }
+
+  private validateNumericEnv() {
+    const errors: string[] = [];
+    const numericFields: Array<[string, number]> = [
+      ['PORT', this.port],
+      ['REDIS_PORT', this.redisPort],
+      ['JWT_REFRESH_TTL_DAYS', this.refreshTokenTtlDays],
+      ['BCRYPT_ROUNDS', this.bcryptRounds],
+      ['OTP_TTL_MINUTES', this.otpTtlMinutes],
+      ['PASSWORD_RESET_TTL_MINUTES', this.passwordResetTtlMinutes],
+      ['OTP_LENGTH', this.otpLength],
+      ['OTP_ISSUE_LIMIT', this.otpIssueLimit],
+      ['OTP_ISSUE_WINDOW_MINUTES', this.otpIssueWindowMinutes],
+    ];
+
+    for (const [name, value] of numericFields) {
+      if (!Number.isFinite(value) || value <= 0) {
+        errors.push(`${name} must be a positive number`);
+      }
+    }
+
+    if (this.bcryptRounds < 10) {
+      errors.push('BCRYPT_ROUNDS must be at least 10');
+    }
+
+    return errors;
+  }
+
+  private validateProductionEnv() {
+    const errors: string[] = [];
+
+    if (!process.env.DATABASE_URL) {
+      errors.push('DATABASE_URL is required in production');
+    }
+
+    this.requireProductionSecret(
+      errors,
+      'JWT_SECRET',
+      process.env.JWT_SECRET,
+      'school-os-access-secret',
+    );
+    this.requireProductionSecret(
+      errors,
+      'JWT_CHALLENGE_SECRET',
+      process.env.JWT_CHALLENGE_SECRET,
+      `${this.jwtSecret}-challenge`,
+    );
+    this.requireProductionSecret(
+      errors,
+      'MEDICAL_ENCRYPTION_KEY',
+      process.env.MEDICAL_ENCRYPTION_KEY,
+      'school-os-local-medical-encryption-key-change-me',
+    );
+
+    if (!process.env.FRONTEND_ORIGIN && !process.env.FRONTEND_ORIGINS?.trim()) {
+      errors.push(
+        'FRONTEND_ORIGIN or FRONTEND_ORIGINS is required in production',
+      );
+    }
+
+    if (!process.env.REDIS_HOST) {
+      errors.push('REDIS_HOST is required in production');
+    }
+
+    if (this.cookieSameSite === 'none' && !this.trustProxy) {
+      errors.push('TRUST_PROXY=true is required when COOKIE_SAME_SITE=none');
+    }
+
+    if (this.emailDeliveryMode === 'webhook') {
+      if (!this.emailWebhookUrl) {
+        errors.push(
+          'EMAIL_WEBHOOK_URL is required when EMAIL_DELIVERY_MODE=webhook',
+        );
+      }
+      if (!this.emailWebhookToken) {
+        errors.push(
+          'EMAIL_WEBHOOK_TOKEN is required when EMAIL_DELIVERY_MODE=webhook',
+        );
+      }
+    }
+
+    if (this.storageProvider === 'r2' && !this.r2PublicBaseUrl) {
+      errors.push('R2_PUBLIC_BASE_URL is required when STORAGE_PROVIDER=r2');
+    }
+
+    return errors;
+  }
+
+  private requireProductionSecret(
+    errors: string[],
+    name: string,
+    value: string | undefined,
+    unsafeDefault: string,
+  ) {
+    if (!value) {
+      errors.push(`${name} is required in production`);
+      return;
+    }
+
+    if (value === unsafeDefault || value.length < 32) {
+      errors.push(
+        `${name} must be at least 32 characters and not a local default`,
+      );
+    }
   }
 }

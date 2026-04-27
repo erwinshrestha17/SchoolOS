@@ -11,6 +11,8 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { ReadMessageDto } from './dto/read-message.dto';
 import { MessagingService } from './messaging.service';
 
+type MessageSentEvent = { tenantId: string };
+
 @Controller('messaging')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class MessagingController {
@@ -23,10 +25,19 @@ export class MessagingController {
   @Permissions('messaging:read')
   streamMessages(@CurrentAuth() auth: AuthContext): Observable<MessageEvent> {
     return fromEvent(this.eventEmitter, 'message.sent').pipe(
-      filter((payload: any) => payload.tenantId === auth.tenantId),
-      map((payload) => ({
-        data: payload,
-      } as MessageEvent)),
+      filter(
+        (payload): payload is MessageSentEvent =>
+          typeof payload === 'object' &&
+          payload !== null &&
+          'tenantId' in payload &&
+          payload.tenantId === auth.tenantId,
+      ),
+      map(
+        (payload) =>
+          ({
+            data: payload,
+          }) as MessageEvent,
+      ),
     );
   }
 

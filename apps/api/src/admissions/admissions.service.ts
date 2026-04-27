@@ -593,7 +593,9 @@ export class AdmissionsService {
     }
 
     if (!guardian.email) {
-      throw new BadRequestException('Guardian does not have an email address configured');
+      throw new BadRequestException(
+        'Guardian does not have an email address configured',
+      );
     }
 
     await this.notificationsService.sendEmail({
@@ -616,7 +618,11 @@ export class AdmissionsService {
     return { success: true };
   }
 
-  async transferStudent(studentId: string, dto: TransferStudentDto, actor: AuthContext) {
+  async transferStudent(
+    studentId: string,
+    dto: TransferStudentDto,
+    actor: AuthContext,
+  ) {
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, tenantId: actor.tenantId },
       include: {
@@ -631,7 +637,9 @@ export class AdmissionsService {
     }
 
     if (student.enrollments.length === 0) {
-      throw new BadRequestException('Student has no active enrollments to transfer');
+      throw new BadRequestException(
+        'Student has no active enrollments to transfer',
+      );
     }
 
     if (!dto.waiveFeeCheck) {
@@ -645,8 +653,9 @@ export class AdmissionsService {
 
       if (outstandingInvoices.length > 0) {
         throw new ConflictException({
-          message: 'Cannot generate transfer certificate because the student has outstanding fee balances.',
-          outstandingInvoices: outstandingInvoices.map(i => i.invoiceNumber),
+          message:
+            'Cannot generate transfer certificate because the student has outstanding fee balances.',
+          outstandingInvoices: outstandingInvoices.map((i) => i.invoiceNumber),
         });
       }
     }
@@ -691,13 +700,13 @@ export class AdmissionsService {
         class: true,
         sectionRef: true,
         guardianLinks: {
-          include: { guardian: true }
-        }
-      }
+          include: { guardian: true },
+        },
+      },
     });
 
     // Mock implementation of iEMIS format export
-    return students.map(s => ({
+    return students.map((s) => ({
       systemId: s.studentSystemId,
       fullName: `${s.firstNameEn} ${s.lastNameEn}`,
       dob: s.dateOfBirth.toISOString().split('T')[0],
@@ -734,21 +743,22 @@ export class AdmissionsService {
         0,
       );
       throw new ConflictException({
-        message: 'Cannot delete student with outstanding fee balances. Clear or waive all fees first.',
+        message:
+          'Cannot delete student with outstanding fee balances. Clear or waive all fees first.',
         outstandingInvoiceCount: outstandingInvoices.length,
         totalOutstandingAmount: totalOutstanding,
-        invoiceNumbers: outstandingInvoices.map(i => i.invoiceNumber),
+        invoiceNumbers: outstandingInvoices.map((i) => i.invoiceNumber),
       });
     }
 
-    // Proceed with soft-delete by marking all enrollments as WITHDRAWN
+    // Proceed with soft-delete by marking all enrollments as exited.
     await this.prisma.enrollment.updateMany({
       where: {
         tenantId: actor.tenantId,
         studentId: student.id,
         status: EnrollmentStatus.ACTIVE,
       },
-      data: { status: EnrollmentStatus.WITHDRAWN },
+      data: { status: EnrollmentStatus.EXITED },
     });
 
     await this.auditService.record({
@@ -792,14 +802,14 @@ export class AdmissionsService {
       );
     }
 
-    // Mark enrollments as PASSED_OUT
+    // Archive completed promotion records through the existing exit lifecycle.
     await this.prisma.enrollment.updateMany({
       where: {
         tenantId: actor.tenantId,
         studentId: student.id,
         status: { in: [EnrollmentStatus.PROMOTED] },
       },
-      data: { status: 'PASSED_OUT' as any },
+      data: { status: EnrollmentStatus.EXITED },
     });
 
     await this.auditService.record({

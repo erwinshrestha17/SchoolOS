@@ -15,6 +15,8 @@ export const permissionCatalog = [
   { resource: 'sections', action: 'read', description: 'Read sections inside a tenant' },
   { resource: 'students', action: 'create', description: 'Create student records inside a tenant' },
   { resource: 'students', action: 'read', description: 'Read student records inside a tenant' },
+  { resource: 'students', action: 'delete', description: 'Delete or withdraw student records' },
+  { resource: 'tenants', action: 'manage', description: 'Deactivate or manage tenants (super_admin only)' },
   { resource: 'guardians', action: 'create', description: 'Create guardian records inside a tenant' },
   { resource: 'guardians', action: 'read', description: 'Read guardian records inside a tenant' },
   { resource: 'student_documents', action: 'manage', description: 'Upload and manage student documents inside a tenant' },
@@ -26,6 +28,7 @@ export const permissionCatalog = [
   { resource: 'academics', action: 'manage', description: 'Manage subjects, exams, CAS, marks, and report cards' },
   { resource: 'academics', action: 'read', description: 'Read academic setup, marks, CAS, and report cards' },
   { resource: 'academics', action: 'enter_marks', description: 'Enter and update academic marks and CAS records' },
+  { resource: 'academics', action: 'manage_report_cards', description: 'Generate, lock, and publish academic report cards' },
   { resource: 'timetable', action: 'manage', description: 'Create timetable slots and teacher workload schedules' },
   { resource: 'timetable', action: 'read', description: 'Read timetable slots and teacher workload schedules' },
   { resource: 'homework', action: 'create', description: 'Publish homework assignments to class and student audiences' },
@@ -59,6 +62,7 @@ export const permissionCatalog = [
   { resource: 'library', action: 'manage', description: 'Manage books, copies, issue/return, fines, and lost items' },
   { resource: 'transport', action: 'read', description: 'Read routes, vehicles, enrollments, and transport logs' },
   { resource: 'transport', action: 'manage', description: 'Manage transport setup, enrollments, boarding, and delays' },
+  { resource: 'transport', action: 'operate', description: 'Record assigned route logs and transport delay updates' },
   { resource: 'consents', action: 'manage', description: 'Capture and revoke guardian consent records' },
   { resource: 'tenants', action: 'read', description: 'Read the current tenant profile' }
 ] as const;
@@ -113,7 +117,11 @@ export const systemRolePermissions: Record<string, string[]> = {
     .map(({ resource, action }) => buildPermissionKey(resource, action))
     .filter(
       (permission) =>
-        !['roles:manage_permissions', 'accounting:close'].includes(permission),
+        ![
+          'roles:manage_permissions',
+          'accounting:close',
+          'tenants:manage'
+        ].includes(permission),
     ),
   subject_teacher: [
     'roles:read',
@@ -182,6 +190,6 @@ export const systemRolePermissions: Record<string, string[]> = {
     'students:read',
     'events:read',
     'transport:read',
-    'transport:manage'
+    'transport:operate'
   ]
 };

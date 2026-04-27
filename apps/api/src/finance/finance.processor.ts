@@ -11,7 +11,7 @@ export class FinanceProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<any, any, string>): Promise<any> {
+  async process(job: Job<{ tenantId: string }, void, string>): Promise<void> {
     switch (job.name) {
       case 'calculateLateFees':
         return this.handleCalculateLateFees(job.data);
@@ -25,6 +25,8 @@ export class FinanceProcessor extends WorkerHost {
     // Placeholder logic for the deep dive requirement: "Late fee automatic calculation"
     // In a real scenario, this would loop through overdue invoices and apply penalties.
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    this.logger.log(`Completed late fee calculations for tenant ${input.tenantId}.`);
+    this.logger.log(
+      `Completed late fee calculations for tenant ${input.tenantId}.`,
+    );
   }
 }

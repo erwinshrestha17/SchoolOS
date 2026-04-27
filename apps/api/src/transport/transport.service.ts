@@ -158,7 +158,11 @@ export class TransportService {
   async listEnrollments(actor: AuthContext, routeId?: string) {
     let allowedRouteIds: string[] | undefined = undefined;
 
-    if (actor.roles.includes('driver') && !actor.roles.includes('super_admin') && !actor.roles.includes('admin')) {
+    if (
+      actor.roles.includes('driver') &&
+      !actor.roles.includes('super_admin') &&
+      !actor.roles.includes('admin')
+    ) {
       const staff = await this.prisma.staff.findFirst({
         where: { tenantId: actor.tenantId, userId: actor.userId },
       });
@@ -171,16 +175,18 @@ export class TransportService {
         where: { tenantId: actor.tenantId, staffId: staff.id },
       });
 
-      const vehicleIds = assignments.map(a => a.vehicleId);
+      const vehicleIds = assignments.map((a) => a.vehicleId);
 
       const routes = await this.prisma.transportRoute.findMany({
         where: { tenantId: actor.tenantId, vehicleId: { in: vehicleIds } },
       });
 
-      allowedRouteIds = routes.map(r => r.id);
+      allowedRouteIds = routes.map((r) => r.id);
 
       if (routeId && !allowedRouteIds.includes(routeId)) {
-        throw new ForbiddenException('You are not authorized to view the manifest for this route.');
+        throw new ForbiddenException(
+          'You are not authorized to view the manifest for this route.',
+        );
       }
     }
 

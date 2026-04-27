@@ -14,8 +14,8 @@ import { FinanceCron } from './finance.cron';
 
 @Module({
   imports: [
-    AuthModule, 
-    AuditModule, 
+    AuthModule,
+    AuditModule,
     CommunicationsModule,
     BullModule.registerQueue({
       name: 'finance',

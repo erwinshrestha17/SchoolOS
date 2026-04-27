@@ -8,6 +8,7 @@ import {
   AudienceType,
   ConsentType,
   NotificationChannel,
+  Prisma,
 } from '@prisma/client';
 import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../audit/audit.service';
@@ -19,7 +20,10 @@ import { CreateActivityPostDto } from './dto/create-activity-post.dto';
 import { CreateActivityReactionDto } from './dto/create-activity-reaction.dto';
 import { CreateDevelopmentalMilestoneDto } from './dto/create-developmental-milestone.dto';
 import { CreateMoodLogDto } from './dto/create-mood-log.dto';
-import { isParentOnly, getParentStudentIds } from '../common/security/parent-scope';
+import {
+  isParentOnly,
+  getParentStudentIds,
+} from '../common/security/parent-scope';
 
 @Injectable()
 export class ActivityFeedService {
@@ -44,7 +48,7 @@ export class ActivityFeedService {
     const monthRange = filters.month ? getMonthRange(filters.month) : null;
 
     // Parent scoping: parents can only see posts tagged with their children
-    let studentTagFilter = filters.studentId
+    let studentTagFilter: Prisma.ActivityPostWhereInput = filters.studentId
       ? { studentTags: { some: { studentId: filters.studentId } } }
       : {};
 
@@ -53,7 +57,7 @@ export class ActivityFeedService {
       if (parentStudentIds !== null) {
         studentTagFilter = {
           studentTags: { some: { studentId: { in: parentStudentIds } } },
-        } as any;
+        };
       }
     }
 
@@ -259,7 +263,14 @@ export class ActivityFeedService {
   }
 
   @OnEvent('student.admitted')
-  async handleStudentAdmitted(event: { tenantId: string; classId: string; sectionId?: string; studentId: string; studentName: string; actor: AuthContext }) {
+  async handleStudentAdmitted(event: {
+    tenantId: string;
+    classId: string;
+    sectionId?: string;
+    studentId: string;
+    studentName: string;
+    actor: AuthContext;
+  }) {
     const post = await this.prisma.activityPost.create({
       data: {
         tenantId: event.tenantId,
@@ -269,11 +280,13 @@ export class ActivityFeedService {
         title: 'New Student Welcome',
         caption: `Please welcome ${event.studentName} to the class!`,
         category: ActivityCategory.GENERAL,
-        audienceType: event.sectionId ? AudienceType.SECTION : AudienceType.CLASS,
+        audienceType: event.sectionId
+          ? AudienceType.SECTION
+          : AudienceType.CLASS,
         publishedAt: new Date(),
         studentTags: {
-          create: [{ tenantId: event.tenantId, studentId: event.studentId }]
-        }
+          create: [{ tenantId: event.tenantId, studentId: event.studentId }],
+        },
       },
       include: { attachments: true, studentTags: true },
     });
@@ -281,7 +294,14 @@ export class ActivityFeedService {
   }
 
   @OnEvent('homework.assigned')
-  async handleHomeworkAssigned(event: { tenantId: string; classId: string; sectionId?: string; homeworkId: string; title: string; actor: AuthContext }) {
+  async handleHomeworkAssigned(event: {
+    tenantId: string;
+    classId: string;
+    sectionId?: string;
+    homeworkId: string;
+    title: string;
+    actor: AuthContext;
+  }) {
     const post = await this.prisma.activityPost.create({
       data: {
         tenantId: event.tenantId,
@@ -291,7 +311,9 @@ export class ActivityFeedService {
         title: 'New Homework Assigned',
         caption: `A new homework assignment "${event.title}" has been posted. Please check the academics portal.`,
         category: ActivityCategory.LEARNING,
-        audienceType: event.sectionId ? AudienceType.SECTION : AudienceType.CLASS,
+        audienceType: event.sectionId
+          ? AudienceType.SECTION
+          : AudienceType.CLASS,
         publishedAt: new Date(),
       },
       include: { attachments: true, studentTags: true },
@@ -300,7 +322,12 @@ export class ActivityFeedService {
   }
 
   @OnEvent('exam.published')
-  async handleExamPublished(event: { tenantId: string; classId: string; examTermId: string; actor: AuthContext }) {
+  async handleExamPublished(event: {
+    tenantId: string;
+    classId: string;
+    examTermId: string;
+    actor: AuthContext;
+  }) {
     const post = await this.prisma.activityPost.create({
       data: {
         tenantId: event.tenantId,

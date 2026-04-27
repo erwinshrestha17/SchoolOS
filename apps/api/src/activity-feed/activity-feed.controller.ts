@@ -21,6 +21,8 @@ import { CreateActivityReactionDto } from './dto/create-activity-reaction.dto';
 import { CreateDevelopmentalMilestoneDto } from './dto/create-developmental-milestone.dto';
 import { CreateMoodLogDto } from './dto/create-mood-log.dto';
 
+type FeedPostEvent = { tenantId: string };
+
 @Controller('activity-feed')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class ActivityFeedController {
@@ -35,10 +37,19 @@ export class ActivityFeedController {
     // Uses RxJS to observe the event emitter and map it to an SSE MessageEvent.
     // Filters events to ensure the user only receives posts intended for their tenant.
     return fromEvent(this.eventEmitter, 'feed.post.created').pipe(
-      filter((payload: any) => payload.tenantId === auth.tenantId),
-      map((payload) => ({
-        data: payload,
-      } as MessageEvent)),
+      filter(
+        (payload): payload is FeedPostEvent =>
+          typeof payload === 'object' &&
+          payload !== null &&
+          'tenantId' in payload &&
+          payload.tenantId === auth.tenantId,
+      ),
+      map(
+        (payload) =>
+          ({
+            data: payload,
+          }) as MessageEvent,
+      ),
     );
   }
 

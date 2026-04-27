@@ -11,7 +11,9 @@ export class PayrollProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<any, any, string>): Promise<any> {
+  async process(
+    job: Job<{ tenantId: string; month: string }, void, string>,
+  ): Promise<void> {
     switch (job.name) {
       case 'generatePayslips':
         return this.handleGeneratePayslips(job.data);
@@ -20,11 +22,18 @@ export class PayrollProcessor extends WorkerHost {
     }
   }
 
-  private async handleGeneratePayslips(input: { tenantId: string; month: string }) {
-    this.logger.log(`Generating payslip PDFs for tenant ${input.tenantId} for month ${input.month}...`);
+  private async handleGeneratePayslips(input: {
+    tenantId: string;
+    month: string;
+  }) {
+    this.logger.log(
+      `Generating payslip PDFs for tenant ${input.tenantId} for month ${input.month}...`,
+    );
     // Placeholder logic for batch PDF generation
     // In reality, this would loop over all generated payroll records and create PDFs via PayrollService
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    this.logger.log(`Completed payslip generation for tenant ${input.tenantId}.`);
+    this.logger.log(
+      `Completed payslip generation for tenant ${input.tenantId}.`,
+    );
   }
 }

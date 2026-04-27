@@ -36,6 +36,7 @@ import { MessagingModule } from './messaging/messaging.module';
 import { LibraryModule } from './library/library.module';
 import { TransportModule } from './transport/transport.module';
 import { BullModule } from '@nestjs/bullmq';
+import { ConfigService } from './config/config.service';
 
 @Module({
   imports: [
@@ -48,11 +49,14 @@ import { BullModule } from '@nestjs/bullmq';
     ]),
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
-    BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379', 10),
-      },
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.redisHost,
+          port: configService.redisPort,
+        },
+      }),
     }),
     PrismaModule,
     StorageModule,

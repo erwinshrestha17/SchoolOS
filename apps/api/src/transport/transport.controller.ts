@@ -84,7 +84,7 @@ export class TransportController {
   }
 
   @Post('logs')
-  @Permissions('transport:manage')
+  @Permissions('transport:operate')
   recordLog(
     @Body() dto: RecordTransportLogDto,
     @CurrentAuth() auth: AuthContext,
@@ -93,7 +93,7 @@ export class TransportController {
   }
 
   @Post('delays')
-  @Permissions('transport:manage')
+  @Permissions('transport:operate')
   broadcastDelay(
     @Body() dto: BroadcastRouteDelayDto,
     @CurrentAuth() auth: AuthContext,

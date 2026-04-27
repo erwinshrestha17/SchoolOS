@@ -6,7 +6,7 @@ SchoolOS is now structured as a `pnpm` monorepo centered on a multi-tenant NestJ
 
 - `apps/api`
   - NestJS + Prisma backend
-  - auth, RBAC, admissions, attendance, finance, notices, and events
+  - auth, RBAC, admissions, attendance, finance, academics, payroll, accounting, library, transport, notices, and messaging
 - `apps/web`
   - Next.js App Router admin/staff frontend
   - tenant registration, login, dashboard, admissions, attendance, finance, and communications flows
@@ -56,6 +56,8 @@ Expected local URLs:
 | Web app | `http://localhost:3000` |
 | API | `http://localhost:4000/api/v1` |
 | Swagger | `http://localhost:4000/api/v1/docs` |
+| Health | `http://localhost:4000/api/v1/health` |
+| Readiness | `http://localhost:4000/api/v1/ready` |
 
 If either server reports `EADDRINUSE`, another process is already listening on
 that port. Check it with `lsof -nP -iTCP:3000 -sTCP:LISTEN` or
@@ -78,6 +80,14 @@ passphrase, before admitting students with medical data.
 - `pnpm db:migrate`
 - `pnpm db:seed`
 
+## Production Operations
+
+- Docker VPS baseline: [docs/production/docker-vps-runbook.md](/Users/erwin/Desktop/SchoolOS/docs/production/docker-vps-runbook.md)
+- Backup and restore baseline: [docs/production/backup-restore-runbook.md](/Users/erwin/Desktop/SchoolOS/docs/production/backup-restore-runbook.md)
+
+Production API startup validates required secrets, CORS origins, Redis, database,
+cookie, encryption, and provider settings before listening.
+
 ## Default Login Credentials
 
 After running `pnpm db:seed`, the following local demo accounts are available:
@@ -96,17 +106,16 @@ Use this account when you need every permission in the default tenant:
 | Email       | `superadmin@schoolos.com` |
 | Password    | `superadmin123`           |
 
-## Current Phase 1 Surface Area
+## Current Backend Surface Area
 
-- Tenant onboarding and admin login
-- Users, roles, staff, classes, academic years, and sections
-- Admissions with guardian linkage and enrollment records
-- Student attendance sessions with present-by-default submission
-- Fee heads, fee plans, invoices, payment collection, receipts, and journal entries
-- Notices and events with audience targeting
+- Platform/auth/RBAC with tenant onboarding, users, roles, super-admin support, refresh sessions, audit records, and provider-neutral adapters.
+- Phase 1 core: admissions, student documents/certificates, attendance, fees, activity feed, notices, consent, deliveries, receipts, and immutable ledger posting.
+- Phase 2 core: academics, timetable/homework, HR/payroll, accounting reports, and messaging.
+- Phase 3 core: library and transport backend APIs with delivery and finance integration foundations.
 
-## Deferred From This Phase
+## Deferred / Last
 
 - Parent and teacher mobile apps
-- Payroll, bank reconciliation, and budget management
-- Library, transport, and the full advanced academics surface
+- Real SMS/push/R2 provider credentials until adapters are selected
+- Payment gateways such as eSewa/Khalti until manual/bank/cash reconciliation is production-ready
+- AI integrations until consent, moderation, storage, and messaging foundations are production-ready

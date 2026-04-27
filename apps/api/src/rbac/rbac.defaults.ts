@@ -151,6 +151,11 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Enter and update academic marks and CAS records',
   },
   {
+    resource: 'academics',
+    action: 'manage_report_cards',
+    description: 'Generate, lock, and publish academic report cards',
+  },
+  {
     resource: 'timetable',
     action: 'manage',
     description: 'Create timetable slots and teacher workload schedules',
@@ -316,6 +321,11 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Manage transport setup, enrollments, boarding, and delays',
   },
   {
+    resource: 'transport',
+    action: 'operate',
+    description: 'Record assigned route logs and transport delay updates',
+  },
+  {
     resource: 'consents',
     action: 'manage',
     description: 'Capture and revoke guardian consent records',
@@ -405,7 +415,11 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     buildPermissionKey(resource, action),
   ).filter(
     (permission) =>
-      !['roles:manage_permissions', 'accounting:close', 'tenants:manage'].includes(permission),
+      ![
+        'roles:manage_permissions',
+        'accounting:close',
+        'tenants:manage',
+      ].includes(permission),
   ),
   subject_teacher: [
     'roles:read',
@@ -479,6 +493,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'students:read',
     'events:read',
     'transport:read',
+    'transport:operate',
   ],
 };
 

@@ -4,6 +4,46 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { ClsService } from 'nestjs-cls';
 
 export const TENANT_ID_KEY = 'tenantId';
+type TenantScopedArgs = {
+  where?: Record<string, unknown>;
+  data?: Record<string, unknown> | Array<Record<string, unknown>>;
+};
+
+const TENANT_SCOPE_EXCLUDED_MODELS = ['Tenant', 'Permission'];
+const TENANT_SCOPED_READ_WRITE_OPERATIONS = [
+  'findUnique',
+  'findFirst',
+  'findMany',
+  'update',
+  'updateMany',
+  'delete',
+  'deleteMany',
+  'count',
+];
+const TENANT_SCOPED_CREATE_OPERATIONS = ['create', 'createMany'];
+
+export function applyTenantScopeToArgs<TArgs>(
+  model: string,
+  operation: string,
+  args: TArgs,
+  tenantId?: string,
+) {
+  if (!tenantId || TENANT_SCOPE_EXCLUDED_MODELS.includes(model)) {
+    return args;
+  }
+
+  const scopedArgs = args as TenantScopedArgs;
+
+  if (TENANT_SCOPED_READ_WRITE_OPERATIONS.includes(operation)) {
+    scopedArgs.where = { ...(scopedArgs.where ?? {}), tenantId };
+  } else if (TENANT_SCOPED_CREATE_OPERATIONS.includes(operation)) {
+    scopedArgs.data = Array.isArray(scopedArgs.data)
+      ? scopedArgs.data.map((data) => ({ ...data, tenantId }))
+      : { ...(scopedArgs.data ?? {}), tenantId };
+  }
+
+  return args;
+}
 
 @Injectable()
 export class PrismaService
@@ -23,23 +63,10 @@ export class PrismaService
       query: {
         $allModels: {
           async $allOperations({ model, operation, args, query }) {
-            // Models that don't have tenantId or shouldn't be scoped automatically
-            const excludeModels = ['Tenant', 'Permission'];
-            if (excludeModels.includes(model)) {
-              return query(args);
-            }
-
             const tenantId = cls?.get(TENANT_ID_KEY);
-            if (tenantId) {
-              if (['findUnique', 'findFirst', 'findMany', 'update', 'updateMany', 'delete', 'deleteMany', 'count'].includes(operation)) {
-                (args as any).where = { ...(args as any).where, tenantId };
-              } else if (['create', 'createMany'].includes(operation)) {
-                (args as any).data = Array.isArray((args as any).data) 
-                  ? (args as any).data.map((d: any) => ({ ...d, tenantId }))
-                  : { ...(args as any).data, tenantId };
-              }
-            }
-            return query(args);
+            return query(
+              applyTenantScopeToArgs(model, operation, args, tenantId),
+            );
           },
         },
       },

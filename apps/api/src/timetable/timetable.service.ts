@@ -1,8 +1,10 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   AudienceType,
   HomeworkStatus,
@@ -23,6 +25,7 @@ export class TimetableService {
     private readonly prisma: PrismaService,
     private readonly communicationsService: CommunicationsService,
     private readonly auditService: AuditService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async listTimetable(actor: AuthContext) {
@@ -246,13 +249,25 @@ export class TimetableService {
   }
 
   async createHomework(dto: CreateHomeworkDto, actor: AuthContext) {
+    const actorStaffId = await this.resolveActorStaffId(actor);
+    const assignedByStaffId = this.resolveHomeworkAssignee(
+      dto,
+      actorStaffId,
+      actor,
+    );
+
     await this.ensureScheduleRefs(actor, {
       academicYearId: dto.academicYearId,
       classId: dto.classId,
       sectionId: dto.sectionId,
       subjectId: dto.subjectId,
-      staffId: dto.assignedByStaffId,
+      staffId: assignedByStaffId,
     });
+    await this.ensureSubjectTeacherHomeworkScope(
+      actor,
+      dto.subjectId,
+      actorStaffId,
+    );
 
     const students = await this.prisma.student.findMany({
       where: {
@@ -270,7 +285,7 @@ export class TimetableService {
         classId: dto.classId,
         sectionId: dto.sectionId ?? null,
         subjectId: dto.subjectId,
-        assignedByStaffId: dto.assignedByStaffId ?? null,
+        assignedByStaffId,
         title: dto.title,
         instructions: dto.instructions,
         dueAt: new Date(dto.dueAt),
@@ -301,6 +316,15 @@ export class TimetableService {
       title: `Homework: ${assignment.title}`,
       body: assignment.instructions,
       channels: [NotificationChannel.PUSH],
+    });
+
+    this.eventEmitter.emit('homework.assigned', {
+      tenantId: actor.tenantId,
+      classId: assignment.classId,
+      sectionId: assignment.sectionId ?? undefined,
+      homeworkId: assignment.id,
+      title: assignment.title,
+      actor,
     });
 
     await this.auditService.record({
@@ -341,13 +365,19 @@ export class TimetableService {
   ) {
     const submission = await this.prisma.homeworkSubmission.findFirst({
       where: { id: dto.submissionId, tenantId: actor.tenantId },
+      include: { homework: true },
     });
 
     if (!submission) {
       throw new NotFoundException('Homework submission not found');
     }
+    await this.ensureSubjectTeacherHomeworkScope(
+      actor,
+      submission.homework.subjectId,
+      await this.resolveActorStaffId(actor),
+    );
 
-    return this.prisma.homeworkSubmission.update({
+    const updated = await this.prisma.homeworkSubmission.update({
       where: { id: submission.id },
       data: {
         status: dto.status,
@@ -363,6 +393,81 @@ export class TimetableService {
         student: true,
       },
     });
+
+    await this.auditService.record({
+      action: 'review',
+      resource: 'homework_submission',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      after: {
+        status: updated.status,
+        score: dto.score ?? null,
+        homeworkId: updated.homeworkId,
+      },
+    });
+
+    return updated;
+  }
+
+  private resolveHomeworkAssignee(
+    dto: CreateHomeworkDto,
+    actorStaffId: string | null,
+    actor: AuthContext,
+  ) {
+    if (this.isScopedSubjectTeacher(actor)) {
+      if (!actorStaffId) {
+        throw new ForbiddenException('Subject teacher staff profile not found');
+      }
+
+      return actorStaffId;
+    }
+
+    return dto.assignedByStaffId ?? actorStaffId;
+  }
+
+  private async ensureSubjectTeacherHomeworkScope(
+    actor: AuthContext,
+    subjectId: string,
+    actorStaffId: string | null,
+  ) {
+    if (!this.isScopedSubjectTeacher(actor)) {
+      return;
+    }
+
+    if (!actorStaffId) {
+      throw new ForbiddenException('Subject teacher staff profile not found');
+    }
+
+    const assignment = await this.prisma.subjectTeacherAssignment.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        subjectId,
+        staffId: actorStaffId,
+      },
+    });
+
+    if (!assignment) {
+      throw new ForbiddenException('You are not assigned to this subject');
+    }
+  }
+
+  private async resolveActorStaffId(actor: AuthContext) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+      select: { id: true },
+    });
+
+    return staff?.id ?? null;
+  }
+
+  private isScopedSubjectTeacher(actor: AuthContext) {
+    return (
+      actor.roles.includes('subject_teacher') &&
+      !actor.roles.some((role) =>
+        ['super_admin', 'admin', 'principal'].includes(role),
+      )
+    );
   }
 
   private async ensureScheduleRefs(

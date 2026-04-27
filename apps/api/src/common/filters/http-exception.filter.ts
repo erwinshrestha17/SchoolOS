@@ -1,0 +1,61 @@
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
+import type { Request, Response } from 'express';
+
+type RequestWithId = Request & { requestId?: string };
+
+@Catch()
+export class HttpExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(HttpExceptionFilter.name);
+
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const request = ctx.getRequest<RequestWithId>();
+    const response = ctx.getResponse<Response>();
+    const status =
+      exception instanceof HttpException
+        ? exception.getStatus()
+        : HttpStatus.INTERNAL_SERVER_ERROR;
+    const exceptionResponse =
+      exception instanceof HttpException ? exception.getResponse() : null;
+
+    const message =
+      typeof exceptionResponse === 'object' &&
+      exceptionResponse !== null &&
+      'message' in exceptionResponse
+        ? (exceptionResponse as { message: string | string[] }).message
+        : exception instanceof Error
+          ? exception.message
+          : 'Internal server error';
+
+    const payload = {
+      statusCode: status,
+      error:
+        typeof exceptionResponse === 'object' &&
+        exceptionResponse !== null &&
+        'error' in exceptionResponse
+          ? (exceptionResponse as { error: string }).error
+          : HttpStatus[status] || 'Error',
+      message,
+      path: request.url,
+      method: request.method,
+      requestId: request.requestId,
+      timestamp: new Date().toISOString(),
+    };
+
+    this.logger.error(
+      JSON.stringify({
+        ...payload,
+        stack: exception instanceof Error ? exception.stack : undefined,
+      }),
+    );
+
+    response.status(status).json(payload);
+  }
+}

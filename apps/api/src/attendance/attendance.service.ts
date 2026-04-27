@@ -43,7 +43,8 @@ export class AttendanceService {
         class: true,
         section: true,
         records: {
-          where: Object.keys(studentScope).length > 0 ? studentScope : undefined,
+          where:
+            Object.keys(studentScope).length > 0 ? studentScope : undefined,
         },
       },
       orderBy: [{ attendanceDate: 'desc' }],
@@ -51,9 +52,10 @@ export class AttendanceService {
     });
 
     // For parents, filter out sessions that have no matching records
-    const filteredSessions = Object.keys(studentScope).length > 0
-      ? sessions.filter(s => s.records.length > 0)
-      : sessions;
+    const filteredSessions =
+      Object.keys(studentScope).length > 0
+        ? sessions.filter((s) => s.records.length > 0)
+        : sessions;
 
     return filteredSessions.map((session) => ({
       sessionId: session.id,
