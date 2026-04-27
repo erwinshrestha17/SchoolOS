@@ -9,6 +9,7 @@ import {
   NotificationChannel,
   NotificationStatus,
 } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
@@ -23,11 +24,32 @@ export class MessagingService {
     private readonly prisma: PrismaService,
     private readonly communicationsService: CommunicationsService,
     private readonly auditService: AuditService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async listConversations(actor: AuthContext) {
+    // Restrict parents/guardians to their own conversations
+    const isParentOnly =
+      actor.roles.includes('parent') &&
+      !actor.roles.includes('super_admin') &&
+      !actor.roles.includes('admin') &&
+      !actor.roles.includes('teacher') &&
+      !actor.roles.includes('principal');
+
+    let participantFilter = {};
+    if (isParentOnly) {
+      participantFilter = {
+        participants: {
+          some: { userId: actor.userId },
+        },
+      };
+    }
+
     return this.prisma.conversation.findMany({
-      where: { tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        ...participantFilter,
+      },
       include: {
         class: true,
         section: true,
@@ -173,7 +195,43 @@ export class MessagingService {
       data: { updatedAt: new Date() },
     });
 
+    this.eventEmitter.emit('message.sent', {
+      tenantId: actor.tenantId,
+      conversationId: conversation.id,
+      messageId: message.id,
+      body: message.body,
+      senderUserId: actor.userId,
+    });
+
     return message;
+  }
+
+  async getUnreadCount(actor: AuthContext) {
+    // Find all conversations where the user is a participant
+    const participations = await this.prisma.conversationParticipant.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+      },
+    });
+
+    let totalUnread = 0;
+
+    for (const participation of participations) {
+      const unreadCount = await this.prisma.message.count({
+        where: {
+          tenantId: actor.tenantId,
+          conversationId: participation.conversationId,
+          createdAt: {
+            gt: participation.lastReadAt ?? new Date(0),
+          },
+          senderUserId: { not: actor.userId },
+        },
+      });
+      totalUnread += unreadCount;
+    }
+
+    return { unreadCount: totalUnread };
   }
 
   async listReadReceipts(actor: AuthContext) {

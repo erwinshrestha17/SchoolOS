@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -45,6 +46,7 @@ export class TransportService {
         tenantId: actor.tenantId,
         name: dto.name,
         code: dto.code,
+        vehicleId: dto.vehicleId ?? null,
         isActive: dto.isActive ?? true,
         stops: {
           create: dto.stops.map((stop) => ({
@@ -153,11 +155,40 @@ export class TransportService {
     return assignment;
   }
 
-  listEnrollments(actor: AuthContext, routeId?: string) {
+  async listEnrollments(actor: AuthContext, routeId?: string) {
+    let allowedRouteIds: string[] | undefined = undefined;
+
+    if (actor.roles.includes('driver') && !actor.roles.includes('super_admin') && !actor.roles.includes('admin')) {
+      const staff = await this.prisma.staff.findFirst({
+        where: { tenantId: actor.tenantId, userId: actor.userId },
+      });
+
+      if (!staff) {
+        throw new ForbiddenException('Driver profile not found.');
+      }
+
+      const assignments = await this.prisma.transportDriverAssignment.findMany({
+        where: { tenantId: actor.tenantId, staffId: staff.id },
+      });
+
+      const vehicleIds = assignments.map(a => a.vehicleId);
+
+      const routes = await this.prisma.transportRoute.findMany({
+        where: { tenantId: actor.tenantId, vehicleId: { in: vehicleIds } },
+      });
+
+      allowedRouteIds = routes.map(r => r.id);
+
+      if (routeId && !allowedRouteIds.includes(routeId)) {
+        throw new ForbiddenException('You are not authorized to view the manifest for this route.');
+      }
+    }
+
     return this.prisma.transportEnrollment.findMany({
       where: {
         tenantId: actor.tenantId,
         ...(routeId ? { routeId } : {}),
+        ...(allowedRouteIds ? { routeId: { in: allowedRouteIds } } : {}),
       },
       include: { student: true, route: true, stop: true, feeAssignment: true },
       orderBy: [{ createdAt: 'desc' }],

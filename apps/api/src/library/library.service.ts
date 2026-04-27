@@ -23,12 +23,15 @@ import { CreateLibraryCopyDto } from './dto/create-library-copy.dto';
 import { IssueLibraryCopyDto } from './dto/issue-library-copy.dto';
 import { ReturnLibraryCopyDto } from './dto/return-library-copy.dto';
 
+import { ConfigService } from '@nestjs/config';
+
 @Injectable()
 export class LibraryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly communicationsService: CommunicationsService,
+    private readonly configService: ConfigService,
   ) {}
 
   listBooks(actor: AuthContext, query?: string) {
@@ -244,7 +247,17 @@ export class LibraryService {
       : dto.returnCondition?.toLowerCase().includes('damage')
         ? LibraryCopyStatus.DAMAGED
         : LibraryCopyStatus.AVAILABLE;
-    const fineAmount = new Prisma.Decimal(dto.fineAmount ?? 0);
+
+    // Automated fine calculation
+    let calculatedFine = 0;
+    const now = new Date();
+    if (now > issue.dueAt && !dto.markLost) {
+      const daysOverdue = Math.ceil((now.getTime() - issue.dueAt.getTime()) / (1000 * 60 * 60 * 24));
+      const finePerDay = this.configService.get<number>('LIBRARY_FINE_PER_DAY') ?? 10; // Default 10 currency units per day
+      calculatedFine = daysOverdue * finePerDay;
+    }
+
+    const fineAmount = new Prisma.Decimal(dto.fineAmount ?? calculatedFine);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const invoiceId =

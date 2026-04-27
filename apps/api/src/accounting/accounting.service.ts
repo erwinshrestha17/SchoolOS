@@ -3,8 +3,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import {
   AccountingPeriodStatus,
+  ChartAccountType,
   JournalLineSide,
   JournalSourceType,
   Prisma,
@@ -13,6 +15,7 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAccountingPeriodDto } from './dto/create-accounting-period.dto';
+import { CreateChartAccountDto } from './dto/create-chart-account.dto';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { CreateManualJournalDto } from './dto/create-manual-journal.dto';
 
@@ -54,6 +57,55 @@ export class AccountingService {
     return period;
   }
 
+  async listChartAccounts(actor: AuthContext) {
+    return this.prisma.chartAccount.findMany({
+      where: { tenantId: actor.tenantId },
+      include: { children: true },
+      orderBy: [{ code: 'asc' }],
+    });
+  }
+
+  async createChartAccount(dto: CreateChartAccountDto, actor: AuthContext) {
+    const existing = await this.prisma.chartAccount.findUnique({
+      where: { tenantId_code: { tenantId: actor.tenantId, code: dto.code } },
+    });
+
+    if (existing) {
+      throw new ConflictException('Chart account code already exists in this tenant');
+    }
+
+    if (dto.parentId) {
+      const parent = await this.prisma.chartAccount.findFirst({
+        where: { id: dto.parentId, tenantId: actor.tenantId },
+      });
+      if (!parent) {
+        throw new NotFoundException('Parent account not found in this tenant');
+      }
+    }
+
+    const account = await this.prisma.chartAccount.create({
+      data: {
+        tenantId: actor.tenantId,
+        code: dto.code,
+        name: dto.name,
+        type: dto.type,
+        parentId: dto.parentId ?? null,
+        isSystem: dto.isSystem ?? false,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'chart_account',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: account.id,
+      after: { code: account.code, name: account.name, type: account.type },
+    });
+
+    return account;
+  }
+
   async createManualJournal(dto: CreateManualJournalDto, actor: AuthContext) {
     const accountIds = dto.lines.map((line) => line.chartAccountId);
     const accounts = await this.prisma.chartAccount.findMany({
@@ -71,6 +123,23 @@ export class AccountingService {
 
     if (Math.abs(totals.debit - totals.credit) > 0.01) {
       throw new ConflictException('Manual journal must be balanced');
+    }
+
+    // Period guard: reject entries posted to a CLOSED period
+    const entryDate = new Date(dto.entryDate);
+    const closedPeriod = await this.prisma.accountingPeriod.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        status: AccountingPeriodStatus.CLOSED,
+        startsOn: { lte: entryDate },
+        endsOn: { gte: entryDate },
+      },
+    });
+
+    if (closedPeriod) {
+      throw new ConflictException(
+        `Cannot post journal entry to closed accounting period "${closedPeriod.name}"`,
+      );
     }
 
     const entry = await this.prisma.journalEntry.create({

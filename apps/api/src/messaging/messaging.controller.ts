@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Sse, UseGuards } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Observable, fromEvent, filter, map } from 'rxjs';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -12,7 +14,27 @@ import { MessagingService } from './messaging.service';
 @Controller('messaging')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class MessagingController {
-  constructor(private readonly messagingService: MessagingService) {}
+  constructor(
+    private readonly messagingService: MessagingService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  @Sse('stream')
+  @Permissions('messaging:read')
+  streamMessages(@CurrentAuth() auth: AuthContext): Observable<MessageEvent> {
+    return fromEvent(this.eventEmitter, 'message.sent').pipe(
+      filter((payload: any) => payload.tenantId === auth.tenantId),
+      map((payload) => ({
+        data: payload,
+      } as MessageEvent)),
+    );
+  }
+
+  @Get('unread-count')
+  @Permissions('messaging:read')
+  getUnreadCount(@CurrentAuth() auth: AuthContext) {
+    return this.messagingService.getUnreadCount(auth);
+  }
 
   @Get('conversations')
   @Permissions('messaging:read')

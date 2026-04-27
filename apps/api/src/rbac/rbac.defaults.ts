@@ -469,7 +469,6 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'students:read',
     'events:read',
     'transport:read',
-    'transport:manage',
   ],
 };
 

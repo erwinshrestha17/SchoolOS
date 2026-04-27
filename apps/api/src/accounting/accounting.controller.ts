@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { AccountingService } from './accounting.service';
 import { CreateAccountingPeriodDto } from './dto/create-accounting-period.dto';
+import { CreateChartAccountDto } from './dto/create-chart-account.dto';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { CreateManualJournalDto } from './dto/create-manual-journal.dto';
 
@@ -13,6 +14,21 @@ import { CreateManualJournalDto } from './dto/create-manual-journal.dto';
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class AccountingController {
   constructor(private readonly accountingService: AccountingService) {}
+
+  @Get('chart-accounts')
+  @Permissions('accounting:read')
+  listChartAccounts(@CurrentAuth() auth: AuthContext) {
+    return this.accountingService.listChartAccounts(auth);
+  }
+
+  @Post('chart-accounts')
+  @Permissions('accounting:close')
+  createChartAccount(
+    @Body() dto: CreateChartAccountDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.createChartAccount(dto, auth);
+  }
 
   @Get('periods')
   @Permissions('accounting:read')

@@ -2181,11 +2181,13 @@ model TransportRoute {
   tenantId  String
   name      String
   code      String
+  vehicleId String?
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   tenant      Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  vehicle     TransportVehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   stops       TransportStop[]
   enrollments TransportEnrollment[]
   logs        TransportLog[]
@@ -2227,6 +2229,7 @@ model TransportVehicle {
   tenant      Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   assignments TransportDriverAssignment[]
   logs        TransportLog[]
+  routes      TransportRoute[]
 
   @@unique([tenantId, registrationNumber])
   @@index([tenantId, status])
