@@ -234,6 +234,46 @@ export class UsersService {
     }
   }
 
+  async deactivateTenant(tenantId: string, actor: AuthContext) {
+    // Only super_admin can deactivate a tenant
+    if (!actor.roles.includes('super_admin')) {
+      throw new ConflictException('Only super admins can deactivate tenants');
+    }
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { isActive: false },
+    });
+
+    // Revoke all sessions for all users in this tenant
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        user: { tenantId },
+        revokedAt: null,
+      },
+      data: { revokedAt: new Date() },
+    });
+
+    await this.auditService.record({
+      action: 'deactivate',
+      resource: 'tenant',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: tenantId,
+      after: { isActive: false },
+    });
+
+    return { success: true, tenantId, isActive: false };
+  }
+
   private async revokeUserSessions(userId: string) {
     await this.prisma.refreshToken.updateMany({
       where: {

@@ -709,6 +709,110 @@ export class AdmissionsService {
       disabilityType: s.disabilityFlag,
     }));
   }
+
+  async deleteStudent(studentId: string, actor: AuthContext) {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, tenantId: actor.tenantId },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    // Fee balance guard — prevent deletion while outstanding invoices exist
+    const outstandingInvoices = await this.prisma.invoice.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        status: { notIn: ['PAID', 'VOID'] },
+      },
+    });
+
+    if (outstandingInvoices.length > 0) {
+      const totalOutstanding = outstandingInvoices.reduce(
+        (sum, inv) => sum + Number(inv.totalAmount),
+        0,
+      );
+      throw new ConflictException({
+        message: 'Cannot delete student with outstanding fee balances. Clear or waive all fees first.',
+        outstandingInvoiceCount: outstandingInvoices.length,
+        totalOutstandingAmount: totalOutstanding,
+        invoiceNumbers: outstandingInvoices.map(i => i.invoiceNumber),
+      });
+    }
+
+    // Proceed with soft-delete by marking all enrollments as WITHDRAWN
+    await this.prisma.enrollment.updateMany({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        status: EnrollmentStatus.ACTIVE,
+      },
+      data: { status: EnrollmentStatus.WITHDRAWN },
+    });
+
+    await this.auditService.record({
+      action: 'delete',
+      resource: 'student',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: student.id,
+      after: {
+        studentSystemId: student.studentSystemId,
+        fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`,
+      },
+    });
+
+    this.eventEmitter.emit('student.withdrawn', {
+      tenantId: actor.tenantId,
+      studentId: student.id,
+      actor,
+    });
+
+    return { success: true };
+  }
+
+  async archiveAlumni(studentId: string, actor: AuthContext) {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, tenantId: actor.tenantId },
+      include: {
+        enrollments: {
+          where: { status: EnrollmentStatus.ACTIVE },
+        },
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    if (student.enrollments.length > 0) {
+      throw new ConflictException(
+        'Cannot archive a student with active enrollments. Promote or transfer first.',
+      );
+    }
+
+    // Mark enrollments as PASSED_OUT
+    await this.prisma.enrollment.updateMany({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        status: { in: [EnrollmentStatus.PROMOTED] },
+      },
+      data: { status: 'PASSED_OUT' as any },
+    });
+
+    await this.auditService.record({
+      action: 'archive_alumni',
+      resource: 'student',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: student.id,
+      after: { status: 'alumni' },
+    });
+
+    return { success: true, status: 'archived_as_alumni' };
+  }
 }
 
 function buildBulkImportErrorCsv(

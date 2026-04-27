@@ -27,6 +27,7 @@ import { CreateSubjectDto } from './dto/create-subject.dto';
 import { EnterMarkDto } from './dto/enter-mark.dto';
 import { GenerateReportCardDto } from './dto/generate-report-card.dto';
 import { PromoteStudentDto } from './dto/promote-student.dto';
+import { BatchPromoteDto } from './dto/batch-promote.dto';
 import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 
@@ -1277,6 +1278,178 @@ export class AcademicsService {
     });
 
     return promotion;
+  async batchPromote(dto: BatchPromoteDto, actor: AuthContext) {
+    const [sourceYear, targetYear] = await Promise.all([
+      this.ensureAcademicYear(actor, dto.academicYearId),
+      this.ensureAcademicYear(actor, dto.targetAcademicYearId),
+    ]);
+
+    if (sourceYear.id === targetYear.id) {
+      throw new ConflictException('Target academic year must be different');
+    }
+
+    const results: Array<{
+      studentId: string;
+      studentName: string;
+      fromClassId: string;
+      toClassId: string;
+      status: 'promoted' | 'skipped' | 'failed';
+      reason?: string;
+    }> = [];
+
+    for (const mapping of dto.classMappings) {
+      const eligibleEnrollments = await this.prisma.enrollment.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          academicYearId: dto.academicYearId,
+          classId: mapping.fromClassId,
+          status: 'ACTIVE',
+        },
+        include: { student: true },
+      });
+
+      for (const enrollment of eligibleEnrollments) {
+        const student = enrollment.student;
+
+        // Check for locked report cards
+        const lockedReportCards = await this.prisma.reportCard.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            academicYearId: dto.academicYearId,
+            studentId: student.id,
+            status: GradeLockStatus.LOCKED,
+          },
+        });
+
+        if (lockedReportCards.length === 0) {
+          results.push({
+            studentId: student.id,
+            studentName: `${student.firstNameEn} ${student.lastNameEn}`,
+            fromClassId: mapping.fromClassId,
+            toClassId: mapping.toClassId,
+            status: 'skipped',
+            reason: 'No locked report card found',
+          });
+          continue;
+        }
+
+        const averagePercentage =
+          lockedReportCards.reduce((sum, card) => sum + Number(card.percentage), 0) /
+          lockedReportCards.length;
+
+        if (getPromotionStatus(averagePercentage) !== 'READY') {
+          results.push({
+            studentId: student.id,
+            studentName: `${student.firstNameEn} ${student.lastNameEn}`,
+            fromClassId: mapping.fromClassId,
+            toClassId: mapping.toClassId,
+            status: 'skipped',
+            reason: `Academic review required (avg: ${averagePercentage.toFixed(1)}%)`,
+          });
+          continue;
+        }
+
+        try {
+          await this.prisma.$transaction(async (tx) => {
+            await tx.enrollment.update({
+              where: { id: enrollment.id },
+              data: { status: 'PROMOTED' },
+            });
+
+            await tx.enrollment.upsert({
+              where: {
+                tenantId_studentId_academicYearId: {
+                  tenantId: actor.tenantId,
+                  studentId: student.id,
+                  academicYearId: dto.targetAcademicYearId,
+                },
+              },
+              update: {
+                classId: mapping.toClassId,
+                sectionId: mapping.toSectionId ?? null,
+                status: 'ACTIVE',
+              },
+              create: {
+                tenantId: actor.tenantId,
+                studentId: student.id,
+                academicYearId: dto.targetAcademicYearId,
+                classId: mapping.toClassId,
+                sectionId: mapping.toSectionId ?? null,
+                rollNumber: student.rollNumber,
+                admissionNumber: student.admissionNumber,
+                admissionDate: new Date(),
+                mediumOfInstruction: student.mediumOfInstruct,
+                status: 'ACTIVE',
+              },
+            });
+
+            await tx.student.update({
+              where: { id: student.id },
+              data: {
+                classId: mapping.toClassId,
+                sectionId: mapping.toSectionId ?? null,
+                section: null,
+              },
+            });
+
+            await tx.promotionRecord.create({
+              data: {
+                tenantId: actor.tenantId,
+                academicYearId: dto.academicYearId,
+                studentId: student.id,
+                fromClassId: mapping.fromClassId,
+                fromSectionId: enrollment.sectionId ?? null,
+                toClassId: mapping.toClassId,
+                toSectionId: mapping.toSectionId ?? null,
+                status: 'PROMOTED',
+                remarks: dto.remarks ?? null,
+              },
+            });
+          });
+
+          results.push({
+            studentId: student.id,
+            studentName: `${student.firstNameEn} ${student.lastNameEn}`,
+            fromClassId: mapping.fromClassId,
+            toClassId: mapping.toClassId,
+            status: 'promoted',
+          });
+        } catch (error) {
+          results.push({
+            studentId: student.id,
+            studentName: `${student.firstNameEn} ${student.lastNameEn}`,
+            fromClassId: mapping.fromClassId,
+            toClassId: mapping.toClassId,
+            status: 'failed',
+            reason: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      }
+    }
+
+    await this.auditService.record({
+      action: 'batch_promote',
+      resource: 'promotion',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        sourceYearId: dto.academicYearId,
+        targetYearId: dto.targetAcademicYearId,
+        promoted: results.filter(r => r.status === 'promoted').length,
+        skipped: results.filter(r => r.status === 'skipped').length,
+        failed: results.filter(r => r.status === 'failed').length,
+      },
+    });
+
+    return {
+      summary: {
+        total: results.length,
+        promoted: results.filter(r => r.status === 'promoted').length,
+        skipped: results.filter(r => r.status === 'skipped').length,
+        failed: results.filter(r => r.status === 'failed').length,
+      },
+      results,
+    };
   }
 
   private async ensureAcademicYear(actor: AuthContext, id: string) {

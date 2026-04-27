@@ -22,6 +22,7 @@ import { CreateExamTimetableSlotDto } from './dto/create-exam-timetable-slot.dto
 import { EnterMarkDto } from './dto/enter-mark.dto';
 import { GenerateReportCardDto } from './dto/generate-report-card.dto';
 import { PromoteStudentDto } from './dto/promote-student.dto';
+import { BatchPromoteDto } from './dto/batch-promote.dto';
 import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 
@@ -256,5 +257,14 @@ export class AcademicsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.academicsService.promoteStudent(dto, auth);
+  }
+
+  @Post('promotions/batch')
+  @Permissions('academics:manage')
+  batchPromote(
+    @Body() dto: BatchPromoteDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsService.batchPromote(dto, auth);
   }
 }

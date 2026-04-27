@@ -19,6 +19,7 @@ import { CreateActivityPostDto } from './dto/create-activity-post.dto';
 import { CreateActivityReactionDto } from './dto/create-activity-reaction.dto';
 import { CreateDevelopmentalMilestoneDto } from './dto/create-developmental-milestone.dto';
 import { CreateMoodLogDto } from './dto/create-mood-log.dto';
+import { isParentOnly, getParentStudentIds } from '../common/security/parent-scope';
 
 @Injectable()
 export class ActivityFeedService {
@@ -42,6 +43,20 @@ export class ActivityFeedService {
   ) {
     const monthRange = filters.month ? getMonthRange(filters.month) : null;
 
+    // Parent scoping: parents can only see posts tagged with their children
+    let studentTagFilter = filters.studentId
+      ? { studentTags: { some: { studentId: filters.studentId } } }
+      : {};
+
+    if (isParentOnly(actor)) {
+      const parentStudentIds = await getParentStudentIds(this.prisma, actor);
+      if (parentStudentIds !== null) {
+        studentTagFilter = {
+          studentTags: { some: { studentId: { in: parentStudentIds } } },
+        } as any;
+      }
+    }
+
     return this.prisma.activityPost.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -50,9 +65,7 @@ export class ActivityFeedService {
         ...(filters.category
           ? { category: filters.category as ActivityCategory }
           : {}),
-        ...(filters.studentId
-          ? { studentTags: { some: { studentId: filters.studentId } } }
-          : {}),
+        ...studentTagFilter,
         ...(monthRange
           ? {
               publishedAt: {

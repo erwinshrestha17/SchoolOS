@@ -86,6 +86,16 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Read student records inside a tenant',
   },
   {
+    resource: 'students',
+    action: 'delete',
+    description: 'Delete or withdraw student records',
+  },
+  {
+    resource: 'tenants',
+    action: 'manage',
+    description: 'Deactivate or manage tenants (super_admin only)',
+  },
+  {
     resource: 'guardians',
     action: 'create',
     description: 'Create guardian records inside a tenant',
@@ -395,7 +405,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     buildPermissionKey(resource, action),
   ).filter(
     (permission) =>
-      !['roles:manage_permissions', 'accounting:close'].includes(permission),
+      !['roles:manage_permissions', 'accounting:close', 'tenants:manage'].includes(permission),
   ),
   subject_teacher: [
     'roles:read',

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -56,6 +56,24 @@ export class AdmissionsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.admissionsService.transferStudent(studentId, dto, auth);
+  }
+
+  @Delete('students/:id')
+  @Permissions('students:delete')
+  deleteStudent(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.admissionsService.deleteStudent(studentId, auth);
+  }
+
+  @Post('students/:id/archive-alumni')
+  @Permissions('enrollments:create')
+  archiveAlumni(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.admissionsService.archiveAlumni(studentId, auth);
   }
 
   @Post('guardians/:id/invite')

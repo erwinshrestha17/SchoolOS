@@ -24,6 +24,7 @@ import { SubmitStaffAttendanceDto } from './dto/submit-staff-attendance.dto';
 import { SubmitAttendanceDto } from './dto/submit-attendance.dto';
 import { SyncAttendanceDto } from './dto/sync-attendance.dto';
 import { UpsertCalendarDayDto } from './dto/upsert-calendar-day.dto';
+import { buildStudentScopeFilter } from '../common/security/parent-scope';
 
 @Injectable()
 export class AttendanceService {
@@ -34,18 +35,27 @@ export class AttendanceService {
   ) {}
 
   async listAttendance(actor: AuthContext) {
+    const studentScope = await buildStudentScopeFilter(this.prisma, actor);
+
     const sessions = await this.prisma.attendanceSession.findMany({
       where: { tenantId: actor.tenantId },
       include: {
         class: true,
         section: true,
-        records: true,
+        records: {
+          where: Object.keys(studentScope).length > 0 ? studentScope : undefined,
+        },
       },
       orderBy: [{ attendanceDate: 'desc' }],
       take: 30,
     });
 
-    return sessions.map((session) => ({
+    // For parents, filter out sessions that have no matching records
+    const filteredSessions = Object.keys(studentScope).length > 0
+      ? sessions.filter(s => s.records.length > 0)
+      : sessions;
+
+    return filteredSessions.map((session) => ({
       sessionId: session.id,
       attendanceDate: session.attendanceDate,
       className: session.class.name,
