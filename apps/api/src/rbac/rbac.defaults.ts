@@ -286,6 +286,26 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Read parent-teacher conversations and message status',
   },
   {
+    resource: 'library',
+    action: 'read',
+    description: 'Read library catalog, circulation, and overdue records',
+  },
+  {
+    resource: 'library',
+    action: 'manage',
+    description: 'Manage books, copies, issue/return, fines, and lost items',
+  },
+  {
+    resource: 'transport',
+    action: 'read',
+    description: 'Read routes, vehicles, enrollments, and transport logs',
+  },
+  {
+    resource: 'transport',
+    action: 'manage',
+    description: 'Manage transport setup, enrollments, boarding, and delays',
+  },
+  {
     resource: 'consents',
     action: 'manage',
     description: 'Capture and revoke guardian consent records',
@@ -309,6 +329,18 @@ export const SYSTEM_ROLE_DEFINITIONS = [
   {
     name: 'teacher',
     description: 'System preset role for teacher',
+  },
+  {
+    name: 'principal',
+    description: 'System preset role for school principal',
+  },
+  {
+    name: 'subject_teacher',
+    description: 'System preset role for subject teachers',
+  },
+  {
+    name: 'support_staff',
+    description: 'System preset role for non-teaching support staff',
   },
   {
     name: 'student',
@@ -359,6 +391,39 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'notices:read',
     'events:read',
   ],
+  principal: PERMISSION_CATALOG.map(({ resource, action }) =>
+    buildPermissionKey(resource, action),
+  ).filter(
+    (permission) =>
+      !['roles:manage_permissions', 'accounting:close'].includes(permission),
+  ),
+  subject_teacher: [
+    'roles:read',
+    'classes:read',
+    'sections:read',
+    'students:read',
+    'academics:read',
+    'academics:enter_marks',
+    'timetable:read',
+    'homework:create',
+    'homework:read',
+    'homework:review',
+    'messaging:create',
+    'messaging:read',
+    'activity_feed:create',
+    'activity_feed:read',
+    'attendance:read',
+    'notices:read',
+    'events:read',
+  ],
+  support_staff: [
+    'roles:read',
+    'students:read',
+    'staff:read',
+    'notices:read',
+    'events:read',
+    'messaging:read',
+  ],
   student: [
     'notices:read',
     'events:read',
@@ -390,8 +455,22 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'payroll:read',
     'payroll:manage',
   ],
-  librarian: ['roles:read', 'classes:read', 'sections:read', 'students:read'],
-  driver: ['roles:read', 'students:read', 'events:read'],
+  librarian: [
+    'roles:read',
+    'classes:read',
+    'sections:read',
+    'students:read',
+    'library:read',
+    'library:manage',
+    'fees:manage',
+  ],
+  driver: [
+    'roles:read',
+    'students:read',
+    'events:read',
+    'transport:read',
+    'transport:manage',
+  ],
 };
 
 export function buildPermissionKey(resource: string, action: string) {

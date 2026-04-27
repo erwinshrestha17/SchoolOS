@@ -408,6 +408,26 @@ export type AttendanceSyncSubmission = {
   createdAt: string;
 };
 
+export type StaffLeaveRequestSummary = {
+  id: string;
+  staffId: string;
+  leaveType: string;
+  startsOn: string;
+  endsOn: string;
+  days: number;
+  reason: string;
+  status: string;
+  reviewedAt: string | null;
+};
+
+export type SchoolCalendarDaySummary = {
+  id: string;
+  calendarDate: string;
+  isWorkingDay: boolean;
+  label: string | null;
+  holidayType: string | null;
+};
+
 export type FeeHeadSummary = {
   id: string;
   code: string;
@@ -435,6 +455,28 @@ export type FeeBillingRun = {
   status: string;
   generatedAt: string;
   invoiceCount?: number;
+};
+
+export type FeeDueScheduleSummary = {
+  id: string;
+  academicYearId: string;
+  feePlanId: string | null;
+  name: string;
+  scheduleType: string;
+  dueDate: string;
+  reminderDays: number[];
+  stopOnPaid: boolean;
+  lastProcessedAt: string | null;
+};
+
+export type FeeCollectionReport = {
+  totalBilled: number;
+  totalCollected: number;
+  totalOutstanding: number;
+  totalWaived: number;
+  collectionTrend: Array<{ month: string; amount: number }>;
+  classWiseBreakdown: Array<{ className: string; amount: number }>;
+  feeHeadWiseBreakdown: Array<{ feeHeadName: string; amount: number }>;
 };
 
 export type DefaulterSummary = {
@@ -548,6 +590,16 @@ export type ActivityReaction = {
   createdAt: string;
 };
 
+export type ActivityReactionAnalytics = {
+  byReaction: Array<{ reaction: string; count: number }>;
+  topPosts: Array<{
+    postId: string;
+    title: string;
+    category: string;
+    reactionCount: number;
+  }>;
+};
+
 export type DevelopmentalMilestone = {
   id: string;
   classId: string;
@@ -651,6 +703,29 @@ export type ExamTermSummary = {
   weightPercent: number;
   isLocked: boolean;
   components?: AssessmentComponentSummary[];
+};
+
+export type ExamTimetableSlotSummary = {
+  id: string;
+  academicYearId: string;
+  examTermId: string;
+  subjectId: string;
+  classId: string;
+  sectionId: string | null;
+  startsAt: string;
+  endsAt: string;
+  room: string | null;
+  publishedAt: string | null;
+};
+
+export type MarkLockRequestSummary = {
+  id: string;
+  examTermId: string;
+  status: string;
+  reason: string;
+  reviewNote: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
 };
 
 export type AssessmentComponentSummary = {
@@ -872,6 +947,14 @@ export type AccountingReport = {
     expenses: number;
     netIncome: number;
   };
+  balanceSheet?: {
+    assets: number;
+    liabilities: number;
+    equity: number;
+  };
+  cashFlow?: {
+    netCashMovement: number;
+  };
   balanced: boolean;
 };
 
@@ -903,4 +986,83 @@ export type MessageReadReceiptSummary = {
   readerUserId: string | null;
   guardianId: string | null;
   readAt: string;
+};
+
+export type LibraryBookSummary = {
+  id: string;
+  title: string;
+  author: string;
+  isbn: string | null;
+  publisher: string | null;
+  subjectCategory: string | null;
+  classLevel: string | null;
+  copyCount?: number;
+};
+
+export type LibraryCopySummary = {
+  id: string;
+  bookId: string;
+  barcode: string;
+  qrCode: string | null;
+  status: string;
+  shelfLocation: string | null;
+  replacementCost: number | null;
+};
+
+export type LibraryIssueSummary = {
+  id: string;
+  copyId: string;
+  borrowerStudentId: string | null;
+  borrowerStaffId: string | null;
+  dueAt: string;
+  returnedAt: string | null;
+  status: string;
+  fineAmount: number;
+  invoiceId: string | null;
+};
+
+export type TransportRouteSummary = {
+  id: string;
+  name: string;
+  code: string;
+  isActive: boolean;
+  stops?: TransportStopSummary[];
+};
+
+export type TransportStopSummary = {
+  id: string;
+  routeId: string;
+  name: string;
+  sequence: number;
+  estimatedPickup: string | null;
+  estimatedDrop: string | null;
+};
+
+export type TransportVehicleSummary = {
+  id: string;
+  registrationNumber: string;
+  capacity: number;
+  status: string;
+  fitnessCertificateExp: string | null;
+};
+
+export type TransportEnrollmentSummary = {
+  id: string;
+  studentId: string;
+  routeId: string;
+  stopId: string;
+  feeAmount: number;
+  status: string;
+  feeAssignmentId: string | null;
+};
+
+export type TransportLogSummary = {
+  id: string;
+  routeId: string;
+  stopId: string | null;
+  vehicleId: string | null;
+  enrollmentId: string | null;
+  studentId: string | null;
+  status: string;
+  occurredAt: string;
 };

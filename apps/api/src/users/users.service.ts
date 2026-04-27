@@ -181,6 +181,32 @@ export class UsersService {
     return { success: true };
   }
 
+  async forceLogout(userId: string, actor: AuthContext) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        tenantId: actor.tenantId,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found in this tenant');
+    }
+
+    await this.revokeUserSessions(user.id);
+
+    await this.auditService.record({
+      action: 'force_logout',
+      resource: 'user',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: user.id,
+      after: { sessionsRevoked: true },
+    });
+
+    return { success: true };
+  }
+
   private get userInclude() {
     return {
       userRoles: {

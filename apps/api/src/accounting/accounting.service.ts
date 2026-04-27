@@ -1,9 +1,20 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { AccountingPeriodStatus, JournalLineSide } from '@prisma/client';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  AccountingPeriodStatus,
+  JournalLineSide,
+  JournalSourceType,
+  Prisma,
+} from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAccountingPeriodDto } from './dto/create-accounting-period.dto';
+import { CreateExpenseDto } from './dto/create-expense.dto';
+import { CreateManualJournalDto } from './dto/create-manual-journal.dto';
 
 @Injectable()
 export class AccountingService {
@@ -41,6 +52,92 @@ export class AccountingService {
     });
 
     return period;
+  }
+
+  async createManualJournal(dto: CreateManualJournalDto, actor: AuthContext) {
+    const accountIds = dto.lines.map((line) => line.chartAccountId);
+    const accounts = await this.prisma.chartAccount.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        id: { in: accountIds },
+      },
+    });
+
+    if (accounts.length !== new Set(accountIds).size) {
+      throw new NotFoundException('One or more chart accounts were not found');
+    }
+
+    const totals = sumJournalSides(dto.lines);
+
+    if (Math.abs(totals.debit - totals.credit) > 0.01) {
+      throw new ConflictException('Manual journal must be balanced');
+    }
+
+    const entry = await this.prisma.journalEntry.create({
+      data: {
+        tenantId: actor.tenantId,
+        entryNumber: await this.generateJournalEntryNumber(actor.tenantId),
+        entryDate: new Date(dto.entryDate),
+        narration: dto.narration,
+        sourceType: JournalSourceType.MANUAL,
+        sourceId: dto.sourceId ?? null,
+        createdById: actor.userId,
+        lines: {
+          create: dto.lines.map((line) => ({
+            tenantId: actor.tenantId,
+            chartAccountId: line.chartAccountId,
+            side: line.side,
+            amount: new Prisma.Decimal(line.amount),
+            description: line.description ?? dto.narration,
+          })),
+        },
+      },
+      include: {
+        lines: {
+          include: { chartAccount: true },
+        },
+      },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'manual_journal',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: entry.id,
+      after: {
+        entryNumber: entry.entryNumber,
+        debit: totals.debit,
+        credit: totals.credit,
+      },
+    });
+
+    return entry;
+  }
+
+  async createExpense(dto: CreateExpenseDto, actor: AuthContext) {
+    return this.createManualJournal(
+      {
+        entryDate: dto.expenseDate,
+        narration: dto.narration,
+        sourceId: dto.referenceNumber,
+        lines: [
+          {
+            chartAccountId: dto.expenseAccountId,
+            side: JournalLineSide.DEBIT,
+            amount: dto.amount,
+            description: dto.narration,
+          },
+          {
+            chartAccountId: dto.paymentAccountId,
+            side: JournalLineSide.CREDIT,
+            amount: dto.amount,
+            description: dto.referenceNumber ?? dto.narration,
+          },
+        ],
+      },
+      actor,
+    );
   }
 
   async buildReports(actor: AuthContext) {
@@ -97,6 +194,16 @@ export class AccountingService {
         expenses,
         netIncome: income - expenses,
       },
+      balanceSheet: {
+        assets: sumRows(trialBalance, 'ASSET'),
+        liabilities: sumRows(trialBalance, 'LIABILITY'),
+        equity: sumRows(trialBalance, 'EQUITY'),
+      },
+      cashFlow: {
+        netCashMovement: trialBalance
+          .filter((row) => row.type === 'ASSET' && /cash|bank/i.test(row.name))
+          .reduce((sum, row) => sum + row.balance, 0),
+      },
       balanced: Math.abs(totals.debit - totals.credit) < 0.01,
     };
   }
@@ -132,4 +239,33 @@ export class AccountingService {
 
     return closed;
   }
+
+  private async generateJournalEntryNumber(tenantId: string) {
+    const count = await this.prisma.journalEntry.count({
+      where: { tenantId },
+    });
+
+    return `JE-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, '0')}`;
+  }
+}
+
+function sumJournalSides(
+  lines: Array<{ side: JournalLineSide; amount: number }>,
+) {
+  return lines.reduce(
+    (totals, line) => ({
+      debit:
+        totals.debit + (line.side === JournalLineSide.DEBIT ? line.amount : 0),
+      credit:
+        totals.credit +
+        (line.side === JournalLineSide.CREDIT ? line.amount : 0),
+    }),
+    { debit: 0, credit: 0 },
+  );
+}
+
+function sumRows(rows: Array<{ type: string; balance: number }>, type: string) {
+  return rows
+    .filter((row) => row.type === type)
+    .reduce((sum, row) => sum + row.balance, 0);
 }

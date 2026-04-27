@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -7,8 +15,10 @@ import type { AuthContext } from '../auth/auth.types';
 import { CreateFeeHeadDto } from './dto/create-fee-head.dto';
 import { CreateFeePlanDto } from './dto/create-fee-plan.dto';
 import { CreateDiscountRuleDto } from './dto/create-discount-rule.dto';
+import { CreateFeeDueScheduleDto } from './dto/create-fee-due-schedule.dto';
 import { CreateFeeWaiverDto } from './dto/create-fee-waiver.dto';
 import { GenerateBillingRunDto } from './dto/generate-billing-run.dto';
+import { ProcessFeeDueScheduleDto } from './dto/process-fee-due-schedule.dto';
 import { SendDefaulterRemindersDto } from './dto/send-defaulter-reminders.dto';
 import { FinanceService } from './finance.service';
 
@@ -76,6 +86,43 @@ export class FeesController {
     @Query('feeHeadId') feeHeadId?: string,
   ) {
     return this.financeService.listDefaulters(auth, { classId, feeHeadId });
+  }
+
+  @Get('due-schedules')
+  @Permissions('fees:bill')
+  listDueSchedules(@CurrentAuth() auth: AuthContext) {
+    return this.financeService.listDueSchedules(auth);
+  }
+
+  @Post('due-schedules')
+  @Permissions('fees:bill')
+  createDueSchedule(
+    @Body() dto: CreateFeeDueScheduleDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.createDueSchedule(dto, auth);
+  }
+
+  @Post('due-schedules/:id/process')
+  @Permissions('fees:bill')
+  processDueSchedule(
+    @Param('id') scheduleId: string,
+    @Body() dto: ProcessFeeDueScheduleDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.processDueSchedule(scheduleId, dto, auth);
+  }
+
+  @Get('reports/collections')
+  @Permissions('fees:manage')
+  getCollectionReport(@CurrentAuth() auth: AuthContext) {
+    return this.financeService.getCollectionReport(auth);
+  }
+
+  @Post('discounts/recalculate')
+  @Permissions('fees:discount')
+  recalculateAutomaticDiscounts(@CurrentAuth() auth: AuthContext) {
+    return this.financeService.recalculateAutomaticDiscounts(auth);
   }
 
   @Post('defaulters/reminders')

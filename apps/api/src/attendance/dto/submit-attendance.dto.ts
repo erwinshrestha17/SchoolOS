@@ -10,7 +10,7 @@ import {
 import { AttendanceStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
 
-class AttendanceExceptionDto {
+export class AttendanceExceptionDto {
   @IsString()
   studentId!: string;
 

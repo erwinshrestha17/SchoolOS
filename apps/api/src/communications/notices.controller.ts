@@ -23,4 +23,10 @@ export class NoticesController {
   createNotice(@Body() dto: CreateNoticeDto, @CurrentAuth() auth: AuthContext) {
     return this.communicationsService.createNotice(dto, auth);
   }
+
+  @Post('scheduled/process')
+  @Permissions('notices:create')
+  processScheduled(@CurrentAuth() auth: AuthContext) {
+    return this.communicationsService.processScheduledNotices(auth);
+  }
 }

@@ -6,6 +6,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { AccountingService } from './accounting.service';
 import { CreateAccountingPeriodDto } from './dto/create-accounting-period.dto';
+import { CreateExpenseDto } from './dto/create-expense.dto';
+import { CreateManualJournalDto } from './dto/create-manual-journal.dto';
 
 @Controller('accounting')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -31,6 +33,24 @@ export class AccountingController {
   @Permissions('accounting:read')
   reports(@CurrentAuth() auth: AuthContext) {
     return this.accountingService.buildReports(auth);
+  }
+
+  @Post('journals')
+  @Permissions('accounting:close')
+  createManualJournal(
+    @Body() dto: CreateManualJournalDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.createManualJournal(dto, auth);
+  }
+
+  @Post('expenses')
+  @Permissions('accounting:close')
+  createExpense(
+    @Body() dto: CreateExpenseDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.createExpense(dto, auth);
   }
 
   @Post('closing/:id')

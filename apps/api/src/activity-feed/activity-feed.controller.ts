@@ -25,8 +25,27 @@ export class ActivityFeedController {
 
   @Get('posts')
   @Permissions('activity_feed:read')
-  listPosts(@CurrentAuth() auth: AuthContext) {
-    return this.activityFeedService.listPosts(auth);
+  listPosts(
+    @CurrentAuth() auth: AuthContext,
+    @Query('studentId') studentId?: string,
+    @Query('classId') classId?: string,
+    @Query('sectionId') sectionId?: string,
+    @Query('category') category?: string,
+    @Query('month') month?: string,
+  ) {
+    return this.activityFeedService.listPosts(auth, {
+      studentId,
+      classId,
+      sectionId,
+      category,
+      month,
+    });
+  }
+
+  @Get('reactions/analytics')
+  @Permissions('activity_feed:read')
+  getReactionAnalytics(@CurrentAuth() auth: AuthContext) {
+    return this.activityFeedService.getReactionAnalytics(auth);
   }
 
   @Post('posts')

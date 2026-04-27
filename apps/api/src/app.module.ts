@@ -31,6 +31,8 @@ import { CommunicationsModule } from './communications/communications.module';
 import { TimetableModule } from './timetable/timetable.module';
 import { PayrollModule } from './payroll/payroll.module';
 import { MessagingModule } from './messaging/messaging.module';
+import { LibraryModule } from './library/library.module';
+import { TransportModule } from './transport/transport.module';
 
 @Module({
   imports: [
@@ -64,6 +66,8 @@ import { MessagingModule } from './messaging/messaging.module';
     PayrollModule,
     AccountingModule,
     MessagingModule,
+    LibraryModule,
+    TransportModule,
     TenantsModule,
     RedisModule,
     NotificationsModule,

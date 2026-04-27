@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -49,6 +57,16 @@ export class PayrollController {
   @Permissions('payroll:read')
   listPayslips(@CurrentAuth() auth: AuthContext) {
     return this.payrollService.listPayslips(auth);
+  }
+
+  @Get('payslips/:payslipNumber.pdf')
+  @Header('Content-Type', 'application/pdf')
+  @Permissions('payroll:read')
+  getPayslipPdf(
+    @Param('payslipNumber') payslipNumber: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.getPayslipPdf(payslipNumber, auth);
   }
 
   @Get('statutory-deductions')

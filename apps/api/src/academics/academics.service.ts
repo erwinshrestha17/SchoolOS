@@ -3,23 +3,35 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { GradeLockStatus, Prisma } from '@prisma/client';
+import {
+  AudienceType,
+  ConsentType,
+  GradeLockStatus,
+  NotificationChannel,
+  Prisma,
+} from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
+import { CommunicationsService } from '../communications/communications.service';
+import { buildSimplePdf } from '../common/pdf/simple-pdf';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssignTeacherDto } from './dto/assign-teacher.dto';
 import { CreateAssessmentComponentDto } from './dto/create-assessment-component.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
 import { CreateExamTermDto } from './dto/create-exam-term.dto';
+import { CreateExamTimetableSlotDto } from './dto/create-exam-timetable-slot.dto';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { EnterMarkDto } from './dto/enter-mark.dto';
 import { GenerateReportCardDto } from './dto/generate-report-card.dto';
 import { PromoteStudentDto } from './dto/promote-student.dto';
+import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
+import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 
 @Injectable()
 export class AcademicsService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly communicationsService: CommunicationsService,
     private readonly auditService: AuditService,
   ) {}
 
@@ -240,6 +252,132 @@ export class AcademicsService {
     });
   }
 
+  async listExamTimetable(actor: AuthContext) {
+    return this.prisma.examTimetableSlot.findMany({
+      where: { tenantId: actor.tenantId },
+      include: {
+        academicYear: true,
+        examTerm: true,
+        subject: true,
+        class: true,
+        section: true,
+      },
+      orderBy: [{ startsAt: 'asc' }],
+    });
+  }
+
+  async createExamTimetableSlot(
+    dto: CreateExamTimetableSlotDto,
+    actor: AuthContext,
+  ) {
+    await Promise.all([
+      this.ensureAcademicYear(actor, dto.academicYearId),
+      this.ensureClass(actor, dto.classId),
+      this.ensureSubject(actor, dto.subjectId),
+    ]);
+
+    const term = await this.prisma.examTerm.findFirst({
+      where: {
+        id: dto.examTermId,
+        tenantId: actor.tenantId,
+        academicYearId: dto.academicYearId,
+      },
+    });
+
+    if (!term) {
+      throw new NotFoundException('Exam term not found in this tenant');
+    }
+
+    if (dto.sectionId) {
+      await this.ensureSection(actor, dto.sectionId, dto.classId);
+    }
+
+    const slot = await this.prisma.examTimetableSlot.create({
+      data: {
+        tenantId: actor.tenantId,
+        academicYearId: dto.academicYearId,
+        examTermId: dto.examTermId,
+        subjectId: dto.subjectId,
+        classId: dto.classId,
+        sectionId: dto.sectionId ?? null,
+        startsAt: new Date(dto.startsAt),
+        endsAt: new Date(dto.endsAt),
+        room: dto.room ?? null,
+      },
+      include: {
+        subject: true,
+        class: true,
+        section: true,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'exam_timetable_slot',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: slot.id,
+      after: {
+        examTermId: slot.examTermId,
+        subjectId: slot.subjectId,
+        startsAt: slot.startsAt,
+      },
+    });
+
+    return slot;
+  }
+
+  async publishExamTimetable(examTermId: string, actor: AuthContext) {
+    const slots = await this.prisma.examTimetableSlot.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        examTermId,
+      },
+      include: {
+        subject: true,
+        class: true,
+        section: true,
+      },
+    });
+
+    if (slots.length === 0) {
+      throw new NotFoundException('No exam timetable slots found to publish');
+    }
+
+    await this.prisma.examTimetableSlot.updateMany({
+      where: { tenantId: actor.tenantId, examTermId },
+      data: { publishedAt: new Date() },
+    });
+
+    for (const slot of slots) {
+      await this.communicationsService.recordDeliveryRecords({
+        actor,
+        sourceType: 'exam_timetable',
+        sourceId: slot.id,
+        audienceType: slot.sectionId
+          ? AudienceType.SECTION
+          : AudienceType.CLASS,
+        classId: slot.classId,
+        sectionId: slot.sectionId,
+        title: 'Exam timetable published',
+        body: `${slot.subject.name} exam starts at ${slot.startsAt.toISOString()}.`,
+        channels: [NotificationChannel.PUSH],
+        requiredConsentTypes: [ConsentType.MESSAGING],
+      });
+    }
+
+    await this.auditService.record({
+      action: 'publish',
+      resource: 'exam_timetable',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: examTermId,
+      after: { slotCount: slots.length },
+    });
+
+    return { examTermId, publishedSlots: slots.length };
+  }
+
   async listMarks(actor: AuthContext) {
     return this.prisma.markEntry.findMany({
       where: { tenantId: actor.tenantId },
@@ -333,6 +471,104 @@ export class AcademicsService {
     return mark;
   }
 
+  async listMarkLockRequests(actor: AuthContext) {
+    return this.prisma.markLockRequest.findMany({
+      where: { tenantId: actor.tenantId },
+      include: {
+        examTerm: true,
+        requestedBy: true,
+        reviewedBy: true,
+      },
+      orderBy: [{ createdAt: 'desc' }],
+    });
+  }
+
+  async requestMarkLock(dto: RequestMarkLockDto, actor: AuthContext) {
+    const term = await this.prisma.examTerm.findFirst({
+      where: { id: dto.examTermId, tenantId: actor.tenantId },
+    });
+
+    if (!term) {
+      throw new NotFoundException('Exam term not found in this tenant');
+    }
+
+    const request = await this.prisma.markLockRequest.create({
+      data: {
+        tenantId: actor.tenantId,
+        examTermId: term.id,
+        requestedById: actor.userId,
+        reason: dto.reason,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'request',
+      resource: 'mark_lock',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: request.id,
+      after: { examTermId: term.id },
+    });
+
+    return request;
+  }
+
+  async reviewMarkLockRequest(
+    requestId: string,
+    dto: ReviewMarkLockDto,
+    actor: AuthContext,
+  ) {
+    const request = await this.prisma.markLockRequest.findFirst({
+      where: { id: requestId, tenantId: actor.tenantId },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Mark lock request not found');
+    }
+
+    const reviewed = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.markLockRequest.update({
+        where: { id: request.id },
+        data: {
+          status: dto.status,
+          reviewNote: dto.reviewNote ?? null,
+          reviewedById: actor.userId,
+          reviewedAt: new Date(),
+        },
+      });
+
+      if (dto.status === 'APPROVED') {
+        await tx.examTerm.update({
+          where: { id: request.examTermId },
+          data: { isLocked: true },
+        });
+        await tx.markEntry.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            examTermId: request.examTermId,
+          },
+          data: { isLocked: true },
+        });
+      }
+
+      return updated;
+    });
+
+    await this.auditService.record({
+      action: 'review',
+      resource: 'mark_lock',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: reviewed.id,
+      after: {
+        status: reviewed.status,
+        examTermId: reviewed.examTermId,
+      },
+    });
+
+    return reviewed;
+  }
+
   async listCasRecords(actor: AuthContext) {
     return this.prisma.casRecord.findMany({
       where: { tenantId: actor.tenantId },
@@ -405,6 +641,52 @@ export class AcademicsService {
       orderBy: [{ updatedAt: 'desc' }],
       take: 100,
     });
+  }
+
+  async getReportCardPdf(reportCardId: string, actor: AuthContext) {
+    const reportCard = await this.prisma.reportCard.findFirst({
+      where: {
+        id: reportCardId,
+        tenantId: actor.tenantId,
+      },
+      include: {
+        student: true,
+        class: true,
+        section: true,
+        examTerm: true,
+      },
+    });
+
+    if (!reportCard) {
+      throw new NotFoundException('Report card not found in this tenant');
+    }
+
+    const unpaid = await this.prisma.invoice.count({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: reportCard.studentId,
+        reportCardBlocked: true,
+        status: { in: ['ISSUED', 'PARTIAL'] },
+      },
+    });
+
+    if (unpaid > 0) {
+      throw new ConflictException('Report card is blocked by unpaid fees');
+    }
+
+    return buildSimplePdf([
+      'SchoolOS Report Card',
+      `Exam: ${reportCard.examTerm.name}`,
+      `Student: ${reportCard.student.firstNameEn} ${reportCard.student.lastNameEn}`,
+      `Class: ${reportCard.class.name}`,
+      `Section: ${reportCard.section?.name ?? 'N/A'}`,
+      `Percentage: ${Number(reportCard.percentage).toFixed(2)}%`,
+      `Grade: ${reportCard.grade}`,
+      `GPA: ${Number(reportCard.gpa).toFixed(2)}`,
+      `Status: ${reportCard.status}`,
+      `Remarks: ${reportCard.remarks ?? 'N/A'}`,
+      'SEE-format metadata: tenant-scoped school record, marks locked before issue where applicable.',
+    ]);
   }
 
   async generateReportCard(dto: GenerateReportCardDto, actor: AuthContext) {
@@ -565,6 +847,36 @@ export class AcademicsService {
       grade: card.grade,
       status: getPromotionStatus(Number(card.percentage)),
       locked: card.status === GradeLockStatus.LOCKED,
+    }));
+  }
+
+  async listRemedialStudents(actor: AuthContext, academicYearId?: string) {
+    const cards = await this.prisma.reportCard.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        ...(academicYearId ? { academicYearId } : {}),
+        OR: [{ grade: 'NG' }, { percentage: { lt: new Prisma.Decimal(35) } }],
+      },
+      include: {
+        student: true,
+        class: true,
+        section: true,
+        examTerm: true,
+      },
+      orderBy: [{ percentage: 'asc' }],
+    });
+
+    return cards.map((card) => ({
+      reportCardId: card.id,
+      studentId: card.studentId,
+      studentName:
+        `${card.student.firstNameEn} ${card.student.lastNameEn}`.trim(),
+      className: card.class.name,
+      sectionName: card.section?.name ?? null,
+      examTerm: card.examTerm.name,
+      percentage: Number(card.percentage),
+      grade: card.grade,
+      reason: card.grade === 'NG' ? 'NG outcome' : 'Below 35%',
     }));
   }
 

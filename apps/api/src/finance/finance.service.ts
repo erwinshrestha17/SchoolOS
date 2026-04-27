@@ -20,10 +20,12 @@ import { CommunicationsService } from '../communications/communications.service'
 import { PrismaService } from '../prisma/prisma.service';
 import { CollectPaymentDto } from './dto/collect-payment.dto';
 import { CreateDiscountRuleDto } from './dto/create-discount-rule.dto';
+import { CreateFeeDueScheduleDto } from './dto/create-fee-due-schedule.dto';
 import { CreateFeeHeadDto } from './dto/create-fee-head.dto';
 import { CreateFeePlanDto } from './dto/create-fee-plan.dto';
 import { CreateFeeWaiverDto } from './dto/create-fee-waiver.dto';
 import { GenerateBillingRunDto } from './dto/generate-billing-run.dto';
+import { ProcessFeeDueScheduleDto } from './dto/process-fee-due-schedule.dto';
 import { SendDefaulterRemindersDto } from './dto/send-defaulter-reminders.dto';
 import { resolveCashAccountCode } from './finance.defaults';
 
@@ -262,6 +264,8 @@ export class FinanceService {
             academicYearId: dto.academicYearId,
             billingRunId: run.id,
             invoiceNumber,
+            fiscalYear: resolveFiscalYear(new Date(dto.dueDate)),
+            billNumber: invoiceNumber,
             dueDate: new Date(dto.dueDate),
             subtotal: calculated.subtotal,
             vatAmount: calculated.vatAmount,
@@ -431,6 +435,275 @@ export class FinanceService {
     });
 
     return waiver;
+  }
+
+  async listDueSchedules(actor: AuthContext) {
+    return this.prisma.feeDueSchedule.findMany({
+      where: { tenantId: actor.tenantId },
+      include: {
+        academicYear: true,
+        feePlan: true,
+      },
+      orderBy: [{ dueDate: 'asc' }],
+    });
+  }
+
+  async createDueSchedule(dto: CreateFeeDueScheduleDto, actor: AuthContext) {
+    const [academicYear, feePlan] = await Promise.all([
+      this.prisma.academicYear.findFirst({
+        where: { id: dto.academicYearId, tenantId: actor.tenantId },
+      }),
+      dto.feePlanId
+        ? this.prisma.feePlan.findFirst({
+            where: { id: dto.feePlanId, tenantId: actor.tenantId },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    if (!academicYear) {
+      throw new NotFoundException('Academic year not found in this tenant');
+    }
+
+    if (dto.feePlanId && !feePlan) {
+      throw new NotFoundException('Fee plan not found in this tenant');
+    }
+
+    const schedule = await this.prisma.feeDueSchedule.create({
+      data: {
+        tenantId: actor.tenantId,
+        academicYearId: dto.academicYearId,
+        feePlanId: dto.feePlanId ?? null,
+        name: dto.name,
+        scheduleType: dto.scheduleType,
+        runMonth: dto.runMonth ?? null,
+        runYear: dto.runYear ?? null,
+        dueDate: new Date(dto.dueDate),
+        reminderDays: dto.reminderDays ?? [7, 1, 0],
+        stopOnPaid: dto.stopOnPaid ?? true,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'fee_due_schedule',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: schedule.id,
+      after: {
+        academicYearId: schedule.academicYearId,
+        feePlanId: schedule.feePlanId,
+        dueDate: schedule.dueDate,
+      },
+    });
+
+    return schedule;
+  }
+
+  async processDueSchedule(
+    scheduleId: string,
+    dto: ProcessFeeDueScheduleDto,
+    actor: AuthContext,
+  ) {
+    const schedule = await this.prisma.feeDueSchedule.findFirst({
+      where: {
+        id: scheduleId,
+        tenantId: actor.tenantId,
+      },
+    });
+
+    if (!schedule) {
+      throw new NotFoundException('Fee due schedule not found in this tenant');
+    }
+
+    const today = new Date();
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        academicYearId: schedule.academicYearId,
+        ...(schedule.feePlanId
+          ? {
+              lines: {
+                some: {
+                  feeHead: {
+                    feePlanItems: {
+                      some: { feePlanId: schedule.feePlanId },
+                    },
+                  },
+                },
+              },
+            }
+          : {}),
+        dueDate: { lte: schedule.dueDate },
+        status: schedule.stopOnPaid
+          ? { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] }
+          : undefined,
+      },
+      include: {
+        payments: true,
+      },
+    });
+    const dueInvoiceIds = invoices
+      .filter((invoice) => {
+        const paidAmount = invoice.payments.reduce(
+          (sum, payment) => sum.add(payment.amount),
+          new Prisma.Decimal(0),
+        );
+
+        return invoice.totalAmount.sub(paidAmount).gt(0);
+      })
+      .map((invoice) => invoice.id);
+    const reminderResult =
+      dueInvoiceIds.length === 0
+        ? { reminded: 0, deliveryResults: [] }
+        : await this.sendDefaulterReminders(
+            {
+              invoiceIds: dueInvoiceIds,
+              message: dto.message,
+              channels: [
+                NotificationChannel.PUSH,
+                NotificationChannel.SMS,
+                NotificationChannel.EMAIL,
+              ],
+            },
+            actor,
+          );
+
+    await this.prisma.feeDueSchedule.update({
+      where: { id: schedule.id },
+      data: { lastProcessedAt: today },
+    });
+
+    await this.auditService.record({
+      action: 'process',
+      resource: 'fee_due_schedule',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: schedule.id,
+      after: {
+        dueInvoiceCount: dueInvoiceIds.length,
+        reminded: reminderResult.reminded,
+      },
+    });
+
+    return {
+      scheduleId: schedule.id,
+      dueInvoiceCount: dueInvoiceIds.length,
+      reminderResult,
+    };
+  }
+
+  async getCollectionReport(actor: AuthContext) {
+    const invoices = await this.prisma.invoice.findMany({
+      where: { tenantId: actor.tenantId },
+      include: {
+        payments: true,
+        lines: {
+          include: {
+            feeHead: true,
+          },
+        },
+        student: {
+          include: {
+            class: true,
+          },
+        },
+      },
+    });
+    const payments = await this.prisma.payment.findMany({
+      where: { tenantId: actor.tenantId },
+      orderBy: [{ paidAt: 'asc' }],
+    });
+    const totalBilled = invoices.reduce(
+      (sum, invoice) => sum + Number(invoice.totalAmount),
+      0,
+    );
+    const totalCollected = payments.reduce(
+      (sum, payment) => sum + Number(payment.amount),
+      0,
+    );
+    const totalWaived = (
+      await this.prisma.feeWaiver.aggregate({
+        where: { tenantId: actor.tenantId, status: 'APPROVED' },
+        _sum: { amount: true },
+      })
+    )._sum.amount;
+    const classWise = groupByAmount(
+      invoices,
+      (invoice) => invoice.student.class.name,
+    );
+    const feeHeadWise = new Map<string, number>();
+
+    for (const invoice of invoices) {
+      for (const line of invoice.lines) {
+        feeHeadWise.set(
+          line.feeHead.name,
+          (feeHeadWise.get(line.feeHead.name) ?? 0) + Number(line.totalAmount),
+        );
+      }
+    }
+
+    return {
+      totalBilled,
+      totalCollected,
+      totalOutstanding: Math.max(0, totalBilled - totalCollected),
+      totalWaived: Number(totalWaived ?? 0),
+      collectionTrend: groupPaymentsByMonth(payments),
+      classWiseBreakdown: Array.from(classWise.entries()).map(
+        ([className, amount]) => ({ className, amount }),
+      ),
+      feeHeadWiseBreakdown: Array.from(feeHeadWise.entries()).map(
+        ([feeHeadName, amount]) => ({ feeHeadName, amount }),
+      ),
+    };
+  }
+
+  async recalculateAutomaticDiscounts(actor: AuthContext) {
+    const [siblingRule, staffChildRule] = await Promise.all([
+      this.prisma.discountRule.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          type: 'SIBLING',
+          isActive: true,
+        },
+      }),
+      this.prisma.discountRule.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          type: 'STAFF_CHILD',
+          isActive: true,
+        },
+      }),
+    ]);
+    const siblingGroups = siblingRule
+      ? await this.prisma.siblingGroup.findMany({
+          where: { tenantId: actor.tenantId },
+          include: { members: true },
+        })
+      : [];
+    const affectedSiblingStudents = siblingGroups
+      .filter((group) => group.members.length > 1)
+      .flatMap((group) =>
+        group.members.slice(1).map((member) => member.studentId),
+      );
+
+    await this.auditService.record({
+      action: 'recalculate',
+      resource: 'automatic_discounts',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        siblingRuleId: siblingRule?.id ?? null,
+        staffChildRuleId: staffChildRule?.id ?? null,
+        affectedSiblingStudents,
+      },
+    });
+
+    return {
+      siblingRuleActive: Boolean(siblingRule),
+      staffChildRuleActive: Boolean(staffChildRule),
+      affectedSiblingStudents,
+      note: 'Automatic discounts are applied during invoice generation; this endpoint reports current recalculation scope.',
+    };
   }
 
   async listInvoices(actor: AuthContext) {
@@ -702,6 +975,8 @@ export class FinanceService {
         academicYearId: input.academicYearId,
         enrollmentId: input.enrollmentId,
         invoiceNumber,
+        fiscalYear: resolveFiscalYear(input.dueDate),
+        billNumber: invoiceNumber,
         dueDate: input.dueDate,
         subtotal,
         vatAmount,
@@ -763,6 +1038,12 @@ export class FinanceService {
     const journalEntryNumber = await this.generateJournalEntryNumber(
       actor.tenantId,
     );
+    const tenant = await this.prisma.tenant.findUniqueOrThrow({
+      where: { id: actor.tenantId },
+    });
+    const receiptVat = invoice.totalAmount.gt(0)
+      ? invoice.vatAmount.mul(paymentAmount).div(invoice.totalAmount)
+      : new Prisma.Decimal(0);
 
     const result = await this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.create({
@@ -774,12 +1055,25 @@ export class FinanceService {
           method: dto.method,
           referenceNumber: dto.referenceNumber ?? null,
           amount: paymentAmount,
+          isAdvance: dto.isAdvance ?? false,
+          recognizedAt: dto.recognizedAt ? new Date(dto.recognizedAt) : null,
+          metadata: {
+            remainingBeforePayment: Number(remaining),
+          },
           paidAt: new Date(),
           narration: dto.narration ?? null,
           receipt: {
             create: {
               tenantId: actor.tenantId,
               receiptNumber,
+              fiscalYear: resolveFiscalYear(new Date()),
+              schoolPan: tenant.panNumber,
+              vatAmount: receiptVat,
+              metadata: {
+                nonReusable: true,
+                invoiceFiscalYear: invoice.fiscalYear,
+                billNumber: invoice.billNumber ?? invoice.invoiceNumber,
+              },
               pdfUrl: `/api/v1/receipts/${receiptNumber}.pdf`,
             },
           },
@@ -895,6 +1189,7 @@ export class FinanceService {
       method: result.method,
       paidAt: result.paidAt,
       receiptNumber: result.receipt?.receiptNumber ?? null,
+      receiptPdfUrl: result.receipt?.pdfUrl ?? null,
     };
   }
 
@@ -1168,4 +1463,41 @@ function getAgingBucket(daysOverdue: number) {
   }
 
   return '90+';
+}
+
+function resolveFiscalYear(date: Date) {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth() + 1;
+
+  return month >= 7 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
+}
+
+function groupPaymentsByMonth(
+  payments: Array<{ paidAt: Date; amount: Prisma.Decimal }>,
+) {
+  const grouped = new Map<string, number>();
+
+  for (const payment of payments) {
+    const key = payment.paidAt.toISOString().slice(0, 7);
+    grouped.set(key, (grouped.get(key) ?? 0) + Number(payment.amount));
+  }
+
+  return Array.from(grouped.entries()).map(([month, amount]) => ({
+    month,
+    amount,
+  }));
+}
+
+function groupByAmount<T>(items: T[], getKey: (item: T) => string) {
+  const grouped = new Map<string, number>();
+
+  for (const item of items) {
+    const amount = Number(
+      (item as { totalAmount: Prisma.Decimal }).totalAmount,
+    );
+    const key = getKey(item);
+    grouped.set(key, (grouped.get(key) ?? 0) + amount);
+  }
+
+  return grouped;
 }

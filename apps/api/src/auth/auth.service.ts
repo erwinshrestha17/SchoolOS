@@ -40,6 +40,9 @@ import { RequestOtpLoginDto } from './dto/request-otp-login.dto';
 import { RequestPasswordRecoveryDto } from './dto/request-password-recovery.dto';
 import { VerifyOtpLoginDto } from './dto/verify-otp-login.dto';
 
+const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+const LOGIN_LOCK_MINUTES = 15;
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -72,6 +75,7 @@ export class AuthService {
     );
 
     if (!passwordMatches) {
+      await this.recordFailedPasswordLogin(user, requestMeta);
       throw new UnauthorizedException('Invalid tenant or credentials');
     }
 
@@ -507,7 +511,11 @@ export class AuthService {
   ) {
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { lastLoginAt: new Date() },
+      data: {
+        lastLoginAt: new Date(),
+        failedLoginCount: 0,
+        lockedUntil: null,
+      },
     });
 
     const authContext = this.buildAuthContext(user, tenant.slug);
@@ -578,10 +586,49 @@ export class AuthService {
     return { tenant, user };
   }
 
-  private assertUserIsActive(user: { status: UserStatus }) {
+  private assertUserIsActive(user: {
+    status: UserStatus;
+    lockedUntil?: Date | null;
+  }) {
     if (user.status !== UserStatus.ACTIVE) {
       throw new ForbiddenException('User is not active');
     }
+
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      throw new ForbiddenException('User is temporarily locked');
+    }
+  }
+
+  private async recordFailedPasswordLogin(
+    user: UserWithRoles,
+    requestMeta?: RequestMeta,
+  ) {
+    const failedLoginCount = user.failedLoginCount + 1;
+    const lockedUntil =
+      failedLoginCount >= MAX_FAILED_LOGIN_ATTEMPTS
+        ? new Date(Date.now() + LOGIN_LOCK_MINUTES * 60 * 1000)
+        : null;
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginCount,
+        lockedUntil,
+      },
+    });
+
+    await this.auditService.record({
+      action: lockedUntil ? 'login_locked' : 'login_failed',
+      resource: 'auth',
+      tenantId: user.tenantId,
+      userId: user.id,
+      after: {
+        failedLoginCount,
+        lockedUntil,
+      },
+      ipAddress: requestMeta?.ipAddress,
+      userAgent: requestMeta?.userAgent,
+    });
   }
 
   private async issueOtpChallenge(input: IssueOtpInput) {

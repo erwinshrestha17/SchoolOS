@@ -42,6 +42,15 @@ export class RolesPermissionsGuard implements CanActivate {
       throw new UnauthorizedException('Authentication required');
     }
 
+    if (auth.roles.includes('super_admin')) {
+      request.auth = {
+        ...auth,
+        roles: Array.from(new Set(auth.roles)),
+        permissions: Array.from(new Set(auth.permissions)),
+      };
+      return true;
+    }
+
     const memberships = await this.prisma.userRole.findMany({
       where: {
         userId: auth.userId,

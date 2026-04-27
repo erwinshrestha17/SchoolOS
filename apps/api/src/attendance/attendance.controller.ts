@@ -14,9 +14,14 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { AttendanceService } from './attendance.service';
+import { CreateStaffLeaveRequestDto } from './dto/create-staff-leave-request.dto';
+import { OverrideAttendanceSessionDto } from './dto/override-attendance-session.dto';
 import { ReviewAttendanceConflictDto } from './dto/review-attendance-conflict.dto';
+import { ReviewStaffLeaveRequestDto } from './dto/review-staff-leave-request.dto';
+import { SubmitStaffAttendanceDto } from './dto/submit-staff-attendance.dto';
 import { SubmitAttendanceDto } from './dto/submit-attendance.dto';
 import { SyncAttendanceDto } from './dto/sync-attendance.dto';
+import { UpsertCalendarDayDto } from './dto/upsert-calendar-day.dto';
 
 @Controller('attendance')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -59,6 +64,67 @@ export class AttendanceController {
     return this.attendanceService.listConflicts(auth);
   }
 
+  @Get('calendar')
+  @Permissions('attendance:read')
+  listCalendarDays(@CurrentAuth() auth: AuthContext) {
+    return this.attendanceService.listCalendarDays(auth);
+  }
+
+  @Post('calendar')
+  @Permissions('attendance:mark')
+  upsertCalendarDay(
+    @Body() dto: UpsertCalendarDayDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.upsertCalendarDay(dto, auth);
+  }
+
+  @Get('staff')
+  @Permissions('attendance:read')
+  listStaffAttendance(@CurrentAuth() auth: AuthContext) {
+    return this.attendanceService.listStaffAttendance(auth);
+  }
+
+  @Post('staff')
+  @Permissions('attendance:mark')
+  submitStaffAttendance(
+    @Body() dto: SubmitStaffAttendanceDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.submitStaffAttendance(dto, auth);
+  }
+
+  @Get('staff/leave-balances')
+  @Permissions('hr:read')
+  listLeaveBalances(@CurrentAuth() auth: AuthContext) {
+    return this.attendanceService.listLeaveBalances(auth);
+  }
+
+  @Get('staff/leave-requests')
+  @Permissions('hr:read')
+  listLeaveRequests(@CurrentAuth() auth: AuthContext) {
+    return this.attendanceService.listLeaveRequests(auth);
+  }
+
+  @Post('staff/leave-requests')
+  @Permissions('hr:manage')
+  createLeaveRequest(
+    @Body() dto: CreateStaffLeaveRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.createLeaveRequest(dto, auth);
+  }
+
+  @Patch('staff/leave-requests/:id/review')
+  @Permissions('hr:manage')
+  reviewLeaveRequest(
+    @Param('id') leaveRequestId: string,
+    @Body() dto: ReviewStaffLeaveRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.reviewLeaveRequest(leaveRequestId, dto, auth);
+  }
+
   @Post('sessions')
   @Permissions('attendance:mark')
   submitAttendance(
@@ -75,6 +141,16 @@ export class AttendanceController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.attendanceService.syncAttendance(dto, auth);
+  }
+
+  @Patch('sessions/:id/override')
+  @Permissions('attendance:review_conflicts')
+  overrideLockedSession(
+    @Param('id') sessionId: string,
+    @Body() dto: OverrideAttendanceSessionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.overrideLockedSession(sessionId, dto, auth);
   }
 
   @Patch('conflicts/:id/review')

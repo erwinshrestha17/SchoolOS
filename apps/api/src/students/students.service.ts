@@ -3,19 +3,29 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  AudienceType,
+  EnrollmentStatus,
+  NotificationChannel,
+  Prisma,
+} from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
+import { CommunicationsService } from '../communications/communications.service';
 import { buildSimplePdf } from '../common/pdf/simple-pdf';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
+import { ArchiveStudentDto } from './dto/archive-student.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
+import { InviteGuardianDto } from './dto/invite-guardian.dto';
+import { RequestStudentTransferDto } from './dto/request-student-transfer.dto';
 
 @Injectable()
 export class StudentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly usersService: UsersService,
+    private readonly communicationsService: CommunicationsService,
     private readonly auditService: AuditService,
   ) {}
 
@@ -136,7 +146,292 @@ export class StudentsService {
       rollNumber: student.rollNumber,
       email: student.user?.email ?? null,
       hasLogin: Boolean(student.userId),
+      lifecycleStatus: student.lifecycleStatus,
     }));
+  }
+
+  async getFeeClearance(studentId: string, actor: AuthContext) {
+    const student = await this.findTenantStudent(studentId, actor);
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        studentId,
+        status: { not: 'VOID' },
+      },
+      include: {
+        payments: true,
+      },
+      orderBy: [{ issuedAt: 'desc' }],
+    });
+
+    const invoiceSummaries = invoices.map((invoice) => {
+      const paidAmount = invoice.payments.reduce(
+        (sum, payment) => sum.add(payment.amount),
+        new Prisma.Decimal(0),
+      );
+      const outstandingAmount = invoice.totalAmount.sub(paidAmount);
+
+      return {
+        id: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        status: invoice.status,
+        totalAmount: Number(invoice.totalAmount),
+        paidAmount: Number(paidAmount),
+        outstandingAmount: Number(
+          outstandingAmount.gt(0) ? outstandingAmount : new Prisma.Decimal(0),
+        ),
+        dueDate: invoice.dueDate,
+      };
+    });
+    const outstandingAmount = invoiceSummaries.reduce(
+      (sum, invoice) => sum + invoice.outstandingAmount,
+      0,
+    );
+
+    return {
+      studentId: student.id,
+      studentSystemId: student.studentSystemId,
+      cleared: outstandingAmount <= 0 || Boolean(student.feeClearanceWaivedAt),
+      outstandingAmount,
+      waivedAt: student.feeClearanceWaivedAt,
+      invoices: invoiceSummaries,
+    };
+  }
+
+  async requestTransfer(
+    studentId: string,
+    dto: RequestStudentTransferDto,
+    actor: AuthContext,
+  ) {
+    const student = await this.findTenantStudent(studentId, actor);
+    const clearance = await this.getFeeClearance(studentId, actor);
+
+    if (!clearance.cleared && !dto.waiveFeeClearance) {
+      throw new BadRequestException({
+        message:
+          'Fee clearance is required before transfer or certificate issuance.',
+        clearance,
+      });
+    }
+
+    const exitedAt = dto.exitedAt ? new Date(dto.exitedAt) : new Date();
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.enrollment.updateMany({
+        where: {
+          tenantId: actor.tenantId,
+          studentId,
+          status: EnrollmentStatus.ACTIVE,
+        },
+        data: {
+          status: EnrollmentStatus.TRANSFERRED,
+        },
+      });
+
+      return tx.student.update({
+        where: { id: student.id },
+        data: {
+          lifecycleStatus: 'TRANSFERRED',
+          exitReason: dto.reason,
+          exitedAt,
+          destinationSchool: dto.destinationSchool ?? null,
+          conductRemark: dto.conductRemark ?? null,
+          ...(dto.waiveFeeClearance
+            ? {
+                feeClearanceWaivedAt: new Date(),
+                feeClearanceWaivedById: actor.userId,
+              }
+            : {}),
+        },
+      });
+    });
+
+    await this.auditService.record({
+      action: dto.waiveFeeClearance ? 'transfer_with_fee_waiver' : 'transfer',
+      resource: 'student',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: student.id,
+      after: {
+        lifecycleStatus: updated.lifecycleStatus,
+        destinationSchool: updated.destinationSchool,
+        exitedAt: updated.exitedAt,
+      },
+    });
+
+    return {
+      id: updated.id,
+      studentSystemId: updated.studentSystemId,
+      lifecycleStatus: updated.lifecycleStatus,
+      exitedAt: updated.exitedAt,
+      destinationSchool: updated.destinationSchool,
+      feeClearance: await this.getFeeClearance(studentId, actor),
+    };
+  }
+
+  async archiveStudent(
+    studentId: string,
+    dto: ArchiveStudentDto,
+    actor: AuthContext,
+  ) {
+    const student = await this.findTenantStudent(studentId, actor);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.enrollment.updateMany({
+        where: {
+          tenantId: actor.tenantId,
+          studentId,
+          status: EnrollmentStatus.ACTIVE,
+        },
+        data: {
+          status: EnrollmentStatus.EXITED,
+        },
+      });
+
+      return tx.student.update({
+        where: { id: student.id },
+        data: {
+          lifecycleStatus: 'ALUMNI',
+          exitReason: dto.reason,
+          exitedAt: dto.exitedAt ? new Date(dto.exitedAt) : new Date(),
+        },
+      });
+    });
+
+    await this.auditService.record({
+      action: 'archive',
+      resource: 'student',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: student.id,
+      after: {
+        lifecycleStatus: updated.lifecycleStatus,
+        exitedAt: updated.exitedAt,
+      },
+    });
+
+    return {
+      id: updated.id,
+      studentSystemId: updated.studentSystemId,
+      lifecycleStatus: updated.lifecycleStatus,
+      exitedAt: updated.exitedAt,
+    };
+  }
+
+  async inviteGuardians(
+    studentId: string,
+    dto: InviteGuardianDto,
+    actor: AuthContext,
+  ) {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, tenantId: actor.tenantId },
+      include: {
+        guardianLinks: {
+          where: dto.guardianId ? { guardianId: dto.guardianId } : undefined,
+          include: { guardian: true },
+        },
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    if (dto.guardianId && student.guardianLinks.length === 0) {
+      throw new NotFoundException('Guardian not linked to this student');
+    }
+
+    const title = 'SchoolOS guardian invitation';
+    const body =
+      dto.message ??
+      `You have been invited to connect with ${student.firstNameEn} ${student.lastNameEn} in SchoolOS.`;
+
+    const delivery = await this.communicationsService.recordDeliveryRecords({
+      actor,
+      sourceType: 'guardian_invitation',
+      sourceId: student.id,
+      audienceType: AudienceType.ALL,
+      studentIds: [student.id],
+      guardianIds: dto.guardianId ? [dto.guardianId] : undefined,
+      title,
+      body,
+      channels: [NotificationChannel.SMS],
+      requiredConsentTypes: [],
+    });
+
+    await this.auditService.record({
+      action: 'invite',
+      resource: 'guardian',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: student.id,
+      after: {
+        guardianId: dto.guardianId ?? null,
+        delivery,
+      },
+    });
+
+    return delivery;
+  }
+
+  async exportIemis(actor: AuthContext) {
+    const students = await this.prisma.student.findMany({
+      where: { tenantId: actor.tenantId },
+      include: {
+        class: true,
+        sectionRef: true,
+        guardianLinks: {
+          include: { guardian: true },
+        },
+        enrollments: {
+          include: {
+            academicYear: true,
+            section: true,
+          },
+          orderBy: [{ createdAt: 'desc' }],
+        },
+      },
+      orderBy: [{ studentSystemId: 'asc' }],
+    });
+
+    return {
+      exportedAt: new Date().toISOString(),
+      count: students.length,
+      students: students.map((student) => ({
+        studentSystemId: student.studentSystemId,
+        nationalStudentId: student.nationalStudentId,
+        firstNameEn: student.firstNameEn,
+        lastNameEn: student.lastNameEn,
+        firstNameNp: student.firstNameNp,
+        lastNameNp: student.lastNameNp,
+        dateOfBirth: student.dateOfBirth.toISOString().slice(0, 10),
+        gender: student.gender,
+        nationality: student.nationality,
+        motherTongue: student.motherTongue,
+        ethnicity: student.ethnicity,
+        disabilityFlag: student.disabilityFlag,
+        admissionDate: student.admissionDate.toISOString().slice(0, 10),
+        admissionNumber: student.admissionNumber,
+        lifecycleStatus: student.lifecycleStatus,
+        className: student.class.name,
+        sectionName: student.sectionRef?.name ?? student.section,
+        rollNumber: student.rollNumber,
+        guardians: student.guardianLinks.map((link) => ({
+          fullName: link.guardian.fullName,
+          relation: link.relation,
+          primaryPhone: link.guardian.primaryPhone,
+          email: link.guardian.email,
+          wardNumber: link.guardian.wardNumber,
+          isPrimary: link.isPrimary,
+        })),
+        latestEnrollment: student.enrollments[0]
+          ? {
+              academicYear: student.enrollments[0].academicYear.name,
+              classId: student.enrollments[0].classId,
+              sectionName: student.enrollments[0].section?.name ?? null,
+              status: student.enrollments[0].status,
+            }
+          : null,
+      })),
+    };
   }
 
   async generateStudentDocumentPdf(
@@ -173,6 +468,18 @@ export class StudentsService {
 
     if (!student) {
       throw new NotFoundException('Student not found in this tenant');
+    }
+
+    if (requiresFeeClearance(normalizedKind)) {
+      const clearance = await this.getFeeClearance(studentId, actor);
+
+      if (!clearance.cleared) {
+        throw new BadRequestException({
+          message:
+            'Fee clearance is required before this student document can be issued.',
+          clearance,
+        });
+      }
     }
 
     const lines = buildStudentDocumentLines(student, normalizedKind);
@@ -220,13 +527,29 @@ export class StudentsService {
 
     return `SCH-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
   }
+
+  private async findTenantStudent(studentId: string, actor: AuthContext) {
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: studentId,
+        tenantId: actor.tenantId,
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    return student;
+  }
 }
 
 type GeneratedStudentDocumentKind =
   | 'id-card'
   | 'transfer-certificate'
   | 'leaving-certificate'
-  | 'character-certificate';
+  | 'character-certificate'
+  | 'enrollment-confirmation';
 
 type StudentDocumentPayload = Prisma.StudentGetPayload<{
   include: {
@@ -256,13 +579,14 @@ function normalizeStudentDocumentKind(
     normalized === 'id-card' ||
     normalized === 'transfer-certificate' ||
     normalized === 'leaving-certificate' ||
-    normalized === 'character-certificate'
+    normalized === 'character-certificate' ||
+    normalized === 'enrollment-confirmation'
   ) {
     return normalized;
   }
 
   throw new BadRequestException(
-    'Document kind must be id-card, transfer-certificate, leaving-certificate, or character-certificate',
+    'Document kind must be id-card, transfer-certificate, leaving-certificate, character-certificate, or enrollment-confirmation',
   );
 }
 
@@ -276,7 +600,17 @@ function getStudentDocumentTitle(kind: GeneratedStudentDocumentKind) {
       return 'Leaving Certificate';
     case 'character-certificate':
       return 'Character Certificate';
+    case 'enrollment-confirmation':
+      return 'Enrollment Confirmation';
   }
+}
+
+function requiresFeeClearance(kind: GeneratedStudentDocumentKind) {
+  return (
+    kind === 'transfer-certificate' ||
+    kind === 'leaving-certificate' ||
+    kind === 'character-certificate'
+  );
 }
 
 function buildStudentDocumentLines(
@@ -328,6 +662,15 @@ function buildStudentDocumentLines(
       ...baseLines,
       `Admission Date: ${student.admissionDate.toISOString().slice(0, 10)}`,
       'This certifies that the student has completed the leaving process as recorded by the school.',
+    ];
+  }
+
+  if (kind === 'enrollment-confirmation') {
+    return [
+      ...baseLines,
+      `Admission Date: ${student.admissionDate.toISOString().slice(0, 10)}`,
+      `Academic Year: ${latestEnrollment?.academicYear.name ?? 'N/A'}`,
+      'This confirms that the student is enrolled as per school records.',
     ];
   }
 

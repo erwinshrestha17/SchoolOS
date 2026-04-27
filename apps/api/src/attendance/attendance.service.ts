@@ -17,8 +17,13 @@ import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReviewAttendanceConflictDto } from './dto/review-attendance-conflict.dto';
+import { CreateStaffLeaveRequestDto } from './dto/create-staff-leave-request.dto';
+import { OverrideAttendanceSessionDto } from './dto/override-attendance-session.dto';
+import { ReviewStaffLeaveRequestDto } from './dto/review-staff-leave-request.dto';
+import { SubmitStaffAttendanceDto } from './dto/submit-staff-attendance.dto';
 import { SubmitAttendanceDto } from './dto/submit-attendance.dto';
 import { SyncAttendanceDto } from './dto/sync-attendance.dto';
+import { UpsertCalendarDayDto } from './dto/upsert-calendar-day.dto';
 
 @Injectable()
 export class AttendanceService {
@@ -382,6 +387,382 @@ export class AttendanceService {
     return updated;
   }
 
+  async overrideLockedSession(
+    sessionId: string,
+    dto: OverrideAttendanceSessionDto,
+    actor: AuthContext,
+  ) {
+    const session = await this.prisma.attendanceSession.findFirst({
+      where: {
+        id: sessionId,
+        tenantId: actor.tenantId,
+      },
+      include: {
+        records: true,
+        class: true,
+        section: true,
+      },
+    });
+
+    if (!session) {
+      throw new NotFoundException('Attendance session not found');
+    }
+
+    const recordByStudent = new Map(
+      session.records.map((record) => [record.studentId, record]),
+    );
+
+    for (const exception of dto.exceptions) {
+      if (!recordByStudent.has(exception.studentId)) {
+        throw new NotFoundException(
+          `Student ${exception.studentId} is not part of this attendance session`,
+        );
+      }
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      for (const exception of dto.exceptions) {
+        await tx.attendanceRecord.update({
+          where: {
+            attendanceSessionId_studentId: {
+              attendanceSessionId: session.id,
+              studentId: exception.studentId,
+            },
+          },
+          data: {
+            status: exception.status,
+            remark: exception.remark ?? null,
+            lateAt: exception.lateAt ? new Date(exception.lateAt) : null,
+          },
+        });
+      }
+
+      await tx.attendanceConflict.create({
+        data: {
+          tenantId: actor.tenantId,
+          attendanceSessionId: session.id,
+          submittedById: actor.userId,
+          previousPayload: session.records.map((record) => ({
+            studentId: record.studentId,
+            status: record.status,
+            remark: record.remark,
+          })) as Prisma.InputJsonValue,
+          incomingPayload: {
+            override: dto.exceptions,
+            reason: dto.reason ?? null,
+          } as unknown as Prisma.InputJsonValue,
+          status: AttendanceConflictStatus.REVIEWED,
+          reviewedById: actor.userId,
+          reviewedAt: new Date(),
+          resolutionNote: dto.reason ?? 'Admin override',
+        },
+      });
+
+      return tx.attendanceSession.update({
+        where: { id: session.id },
+        data: {
+          conflictStatus: AttendanceConflictStatus.REVIEWED,
+        },
+        include: {
+          records: true,
+          class: true,
+          section: true,
+        },
+      });
+    });
+
+    await this.auditService.record({
+      action: 'override',
+      resource: 'attendance_session',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: session.id,
+      before: {
+        records: session.records.map((record) => ({
+          studentId: record.studentId,
+          status: record.status,
+          remark: record.remark,
+        })),
+      },
+      after: {
+        reason: dto.reason ?? null,
+        totals: summarizeAttendance(updated.records),
+      },
+    });
+
+    return {
+      sessionId: updated.id,
+      attendanceDate: updated.attendanceDate,
+      className: updated.class.name,
+      sectionName: updated.section?.name ?? null,
+      conflictStatus: updated.conflictStatus,
+      totals: summarizeAttendance(updated.records),
+    };
+  }
+
+  async listCalendarDays(actor: AuthContext) {
+    return this.prisma.schoolCalendarDay.findMany({
+      where: { tenantId: actor.tenantId },
+      orderBy: [{ calendarDate: 'asc' }],
+    });
+  }
+
+  async upsertCalendarDay(dto: UpsertCalendarDayDto, actor: AuthContext) {
+    const calendarDate = new Date(dto.calendarDate);
+    const day = await this.prisma.schoolCalendarDay.upsert({
+      where: {
+        tenantId_calendarDate: {
+          tenantId: actor.tenantId,
+          calendarDate,
+        },
+      },
+      update: {
+        isWorkingDay: dto.isWorkingDay,
+        label: dto.label ?? null,
+        holidayType: dto.holidayType ?? null,
+      },
+      create: {
+        tenantId: actor.tenantId,
+        calendarDate,
+        isWorkingDay: dto.isWorkingDay,
+        label: dto.label ?? null,
+        holidayType: dto.holidayType ?? null,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'upsert',
+      resource: 'school_calendar_day',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: day.id,
+      after: {
+        calendarDate: day.calendarDate,
+        isWorkingDay: day.isWorkingDay,
+        label: day.label,
+      },
+    });
+
+    return day;
+  }
+
+  async listStaffAttendance(actor: AuthContext) {
+    return this.prisma.staffAttendance.findMany({
+      where: { tenantId: actor.tenantId },
+      include: { staff: true, approvedBy: true },
+      orderBy: [{ attendanceDate: 'desc' }],
+      take: 100,
+    });
+  }
+
+  async submitStaffAttendance(
+    dto: SubmitStaffAttendanceDto,
+    actor: AuthContext,
+  ) {
+    const attendanceDate = new Date(dto.attendanceDate);
+    const staffIds = dto.records.map((record) => record.staffId);
+    const staffCount = await this.prisma.staff.count({
+      where: {
+        tenantId: actor.tenantId,
+        id: { in: staffIds },
+      },
+    });
+
+    if (staffCount !== staffIds.length) {
+      throw new NotFoundException('One or more staff records were not found');
+    }
+
+    const records = await this.prisma.$transaction(
+      dto.records.map((record) =>
+        this.prisma.staffAttendance.upsert({
+          where: {
+            tenantId_staffId_attendanceDate: {
+              tenantId: actor.tenantId,
+              staffId: record.staffId,
+              attendanceDate,
+            },
+          },
+          update: {
+            status: record.status,
+            leaveType: record.leaveType ?? null,
+            note: record.note ?? null,
+            checkInAt: record.checkInAt ? new Date(record.checkInAt) : null,
+            approvedById: actor.userId,
+          },
+          create: {
+            tenantId: actor.tenantId,
+            staffId: record.staffId,
+            attendanceDate,
+            status: record.status,
+            leaveType: record.leaveType ?? null,
+            note: record.note ?? null,
+            checkInAt: record.checkInAt ? new Date(record.checkInAt) : null,
+            approvedById: actor.userId,
+          },
+        }),
+      ),
+    );
+
+    await this.auditService.record({
+      action: 'submit',
+      resource: 'staff_attendance',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        attendanceDate,
+        count: records.length,
+      },
+    });
+
+    return {
+      attendanceDate,
+      count: records.length,
+      records,
+    };
+  }
+
+  async listLeaveBalances(actor: AuthContext) {
+    return this.prisma.staffLeaveBalance.findMany({
+      where: { tenantId: actor.tenantId },
+      include: { staff: true },
+      orderBy: [{ year: 'desc' }, { leaveType: 'asc' }],
+    });
+  }
+
+  async listLeaveRequests(actor: AuthContext) {
+    return this.prisma.staffLeaveRequest.findMany({
+      where: { tenantId: actor.tenantId },
+      include: { staff: true, reviewedBy: true },
+      orderBy: [{ createdAt: 'desc' }],
+      take: 100,
+    });
+  }
+
+  async createLeaveRequest(
+    dto: CreateStaffLeaveRequestDto,
+    actor: AuthContext,
+  ) {
+    const staff = await this.prisma.staff.findFirst({
+      where: {
+        id: dto.staffId,
+        tenantId: actor.tenantId,
+      },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff not found in this tenant');
+    }
+
+    const startsOn = new Date(dto.startsOn);
+    const endsOn = new Date(dto.endsOn);
+
+    if (endsOn < startsOn) {
+      throw new ForbiddenException(
+        'Leave end date cannot be before start date',
+      );
+    }
+
+    const leave = await this.prisma.staffLeaveRequest.create({
+      data: {
+        tenantId: actor.tenantId,
+        staffId: staff.id,
+        leaveType: dto.leaveType,
+        startsOn,
+        endsOn,
+        days: countInclusiveDays(startsOn, endsOn),
+        reason: dto.reason,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'staff_leave_request',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: leave.id,
+      after: {
+        staffId: staff.id,
+        leaveType: leave.leaveType,
+        startsOn: leave.startsOn,
+        endsOn: leave.endsOn,
+      },
+    });
+
+    return leave;
+  }
+
+  async reviewLeaveRequest(
+    leaveRequestId: string,
+    dto: ReviewStaffLeaveRequestDto,
+    actor: AuthContext,
+  ) {
+    const leave = await this.prisma.staffLeaveRequest.findFirst({
+      where: {
+        id: leaveRequestId,
+        tenantId: actor.tenantId,
+      },
+    });
+
+    if (!leave) {
+      throw new NotFoundException('Leave request not found in this tenant');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const reviewed = await tx.staffLeaveRequest.update({
+        where: { id: leave.id },
+        data: {
+          status: dto.status,
+          reviewedById: actor.userId,
+          reviewedAt: new Date(),
+          reviewNote: dto.reviewNote ?? null,
+        },
+      });
+
+      if (dto.status === 'APPROVED') {
+        const year = reviewed.startsOn.getFullYear();
+        await tx.staffLeaveBalance.upsert({
+          where: {
+            tenantId_staffId_leaveType_year: {
+              tenantId: actor.tenantId,
+              staffId: reviewed.staffId,
+              leaveType: reviewed.leaveType,
+              year,
+            },
+          },
+          update: {
+            used: {
+              increment: reviewed.days,
+            },
+          },
+          create: {
+            tenantId: actor.tenantId,
+            staffId: reviewed.staffId,
+            leaveType: reviewed.leaveType,
+            year,
+            allocated: new Prisma.Decimal(0),
+            used: reviewed.days,
+          },
+        });
+      }
+
+      return reviewed;
+    });
+
+    await this.auditService.record({
+      action: 'review',
+      resource: 'staff_leave_request',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      after: {
+        status: updated.status,
+        reviewNote: updated.reviewNote,
+      },
+    });
+
+    return updated;
+  }
+
   async getRoster(
     actor: AuthContext,
     academicYearId: string,
@@ -622,4 +1003,19 @@ function countConsecutiveAbsences(
   }
 
   return count;
+}
+
+function countInclusiveDays(startsOn: Date, endsOn: Date) {
+  const millisecondsPerDay = 24 * 60 * 60 * 1000;
+
+  return (
+    Math.floor(
+      (stripTime(endsOn).getTime() - stripTime(startsOn).getTime()) /
+        millisecondsPerDay,
+    ) + 1
+  );
+}
+
+function stripTime(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }

@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { AuditService } from '../../audit/audit.service';
 import { ConfigService } from '../../config/config.service';
 import { AuthenticatedRequest } from '../auth-request.interface';
 import { JwtAccessPayload } from '../auth.types';
@@ -14,6 +15,7 @@ export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly auditService: AuditService,
   ) {}
 
   async canActivate(context: ExecutionContext) {
@@ -35,9 +37,18 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid access token');
     }
 
+    const overrideTenantId = resolveHeader(
+      request.headers['x-schoolos-tenant-id'],
+    );
+    const canOverrideTenant =
+      Boolean(overrideTenantId) && payload.roles.includes('super_admin');
+    const effectiveTenantId = canOverrideTenant
+      ? overrideTenantId!
+      : payload.tenantId;
+
     request.auth = {
       userId: payload.sub,
-      tenantId: payload.tenantId,
+      tenantId: effectiveTenantId,
       tenantSlug: payload.tenantSlug,
       email: payload.email,
       authMethod: payload.authMethod,
@@ -45,6 +56,27 @@ export class JwtAuthGuard implements CanActivate {
       permissions: payload.permissions,
     };
 
+    if (canOverrideTenant) {
+      await this.auditService.record({
+        action: 'tenant_override',
+        resource: 'auth',
+        tenantId: payload.tenantId,
+        userId: payload.sub,
+        after: {
+          originalTenantId: payload.tenantId,
+          effectiveTenantId,
+        },
+      });
+    }
+
     return true;
   }
+}
+
+function resolveHeader(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+
+  return value;
 }

@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -8,9 +18,12 @@ import { AcademicsService } from './academics.service';
 import { CreateAssessmentComponentDto } from './dto/create-assessment-component.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
 import { CreateExamTermDto } from './dto/create-exam-term.dto';
+import { CreateExamTimetableSlotDto } from './dto/create-exam-timetable-slot.dto';
 import { EnterMarkDto } from './dto/enter-mark.dto';
 import { GenerateReportCardDto } from './dto/generate-report-card.dto';
 import { PromoteStudentDto } from './dto/promote-student.dto';
+import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
+import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 
 @Controller('academics')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -41,6 +54,30 @@ export class AcademicsController {
     return this.academicsService.createAssessmentComponent(dto, auth);
   }
 
+  @Get('exams/timetable')
+  @Permissions('academics:read')
+  listExamTimetable(@CurrentAuth() auth: AuthContext) {
+    return this.academicsService.listExamTimetable(auth);
+  }
+
+  @Post('exams/timetable')
+  @Permissions('academics:manage')
+  createExamTimetableSlot(
+    @Body() dto: CreateExamTimetableSlotDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsService.createExamTimetableSlot(dto, auth);
+  }
+
+  @Post('exams/:id/timetable/publish')
+  @Permissions('academics:manage')
+  publishExamTimetable(
+    @Param('id') examTermId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsService.publishExamTimetable(examTermId, auth);
+  }
+
   @Get('marks')
   @Permissions('academics:read')
   listMarks(@CurrentAuth() auth: AuthContext) {
@@ -51,6 +88,31 @@ export class AcademicsController {
   @Permissions('academics:enter_marks')
   enterMark(@Body() dto: EnterMarkDto, @CurrentAuth() auth: AuthContext) {
     return this.academicsService.enterMark(dto, auth);
+  }
+
+  @Get('marks/lock-requests')
+  @Permissions('academics:read')
+  listMarkLockRequests(@CurrentAuth() auth: AuthContext) {
+    return this.academicsService.listMarkLockRequests(auth);
+  }
+
+  @Post('marks/lock-requests')
+  @Permissions('academics:enter_marks')
+  requestMarkLock(
+    @Body() dto: RequestMarkLockDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsService.requestMarkLock(dto, auth);
+  }
+
+  @Patch('marks/lock-requests/:id/review')
+  @Permissions('academics:manage')
+  reviewMarkLockRequest(
+    @Param('id') requestId: string,
+    @Body() dto: ReviewMarkLockDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsService.reviewMarkLockRequest(requestId, dto, auth);
   }
 
   @Get('cas')
@@ -78,6 +140,25 @@ export class AcademicsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.academicsService.generateReportCard(dto, auth);
+  }
+
+  @Get('report-cards/:id.pdf')
+  @Header('Content-Type', 'application/pdf')
+  @Permissions('academics:read')
+  getReportCardPdf(
+    @Param('id') reportCardId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsService.getReportCardPdf(reportCardId, auth);
+  }
+
+  @Get('remedial')
+  @Permissions('academics:read')
+  listRemedialStudents(
+    @CurrentAuth() auth: AuthContext,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.academicsService.listRemedialStudents(auth, academicYearId);
   }
 
   @Get('promotions')

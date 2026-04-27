@@ -53,4 +53,10 @@ export class UsersController {
   ) {
     return this.usersService.resetPassword(userId, dto, auth);
   }
+
+  @Post(':id/force-logout')
+  @Permissions('users:reset_password')
+  forceLogout(@Param('id') userId: string, @CurrentAuth() auth: AuthContext) {
+    return this.usersService.forceLogout(userId, auth);
+  }
 }

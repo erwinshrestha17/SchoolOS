@@ -28,9 +28,38 @@ export class ActivityFeedService {
     private readonly auditService: AuditService,
   ) {}
 
-  async listPosts(actor: AuthContext) {
+  async listPosts(
+    actor: AuthContext,
+    filters: {
+      studentId?: string;
+      classId?: string;
+      sectionId?: string;
+      category?: string;
+      month?: string;
+    } = {},
+  ) {
+    const monthRange = filters.month ? getMonthRange(filters.month) : null;
+
     return this.prisma.activityPost.findMany({
-      where: { tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        ...(filters.classId ? { classId: filters.classId } : {}),
+        ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+        ...(filters.category
+          ? { category: filters.category as ActivityCategory }
+          : {}),
+        ...(filters.studentId
+          ? { studentTags: { some: { studentId: filters.studentId } } }
+          : {}),
+        ...(monthRange
+          ? {
+              publishedAt: {
+                gte: monthRange.start,
+                lt: monthRange.end,
+              },
+            }
+          : {}),
+      },
       include: {
         class: true,
         section: true,
@@ -47,6 +76,40 @@ export class ActivityFeedService {
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       take: 50,
     });
+  }
+
+  async getReactionAnalytics(actor: AuthContext) {
+    const reactions = await this.prisma.activityReaction.groupBy({
+      by: ['reaction'],
+      where: { tenantId: actor.tenantId },
+      _count: { reaction: true },
+    });
+    const postEngagement = await this.prisma.activityPost.findMany({
+      where: { tenantId: actor.tenantId },
+      include: {
+        _count: {
+          select: { reactions: true },
+        },
+      },
+      orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
+      take: 25,
+    });
+
+    return {
+      byReaction: reactions.map((reaction) => ({
+        reaction: reaction.reaction,
+        count: reaction._count.reaction,
+      })),
+      topPosts: postEngagement
+        .sort((a, b) => b._count.reactions - a._count.reactions)
+        .slice(0, 10)
+        .map((post) => ({
+          postId: post.id,
+          title: post.title,
+          category: post.category,
+          reactionCount: post._count.reactions,
+        })),
+    };
   }
 
   async createPost(dto: CreateActivityPostDto, actor: AuthContext) {

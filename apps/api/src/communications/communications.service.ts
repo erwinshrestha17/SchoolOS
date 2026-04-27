@@ -164,6 +164,95 @@ export class CommunicationsService {
     });
   }
 
+  async getDeliveryAnalytics(actor: AuthContext) {
+    const [byStatus, byChannel, emergencyCount] = await Promise.all([
+      this.prisma.notificationDelivery.groupBy({
+        by: ['status'],
+        where: { tenantId: actor.tenantId },
+        _count: { status: true },
+      }),
+      this.prisma.notificationDelivery.groupBy({
+        by: ['channel'],
+        where: { tenantId: actor.tenantId },
+        _count: { channel: true },
+      }),
+      this.prisma.notice.count({
+        where: {
+          tenantId: actor.tenantId,
+          priority: NoticePriority.EMERGENCY,
+        },
+      }),
+    ]);
+
+    return {
+      byStatus: byStatus.map((row) => ({
+        status: row.status,
+        count: row._count.status,
+      })),
+      byChannel: byChannel.map((row) => ({
+        channel: row.channel,
+        count: row._count.channel,
+      })),
+      emergencyNoticeCount: emergencyCount,
+    };
+  }
+
+  async processScheduledNotices(actor: AuthContext) {
+    const now = new Date();
+    const dueNotices = await this.prisma.notice.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        publishedAt: null,
+        scheduledFor: { lte: now },
+      },
+    });
+    const results: Array<{ noticeId: string; deliveryCount: number }> = [];
+
+    for (const notice of dueNotices) {
+      await this.prisma.notice.update({
+        where: { id: notice.id },
+        data: { publishedAt: now },
+      });
+
+      const delivery = await this.recordDeliveryRecords({
+        actor,
+        sourceType: 'notice',
+        sourceId: notice.id,
+        noticeId: notice.id,
+        audienceType: notice.audienceType,
+        classId: notice.classId,
+        sectionId: notice.sectionId,
+        title: notice.title,
+        body: notice.body,
+        channels:
+          notice.priority === NoticePriority.EMERGENCY
+            ? [NotificationChannel.PUSH, NotificationChannel.SMS]
+            : [NotificationChannel.PUSH],
+        requiredConsentTypes: [ConsentType.MESSAGING],
+      });
+
+      results.push({
+        noticeId: notice.id,
+        deliveryCount: delivery.count,
+      });
+    }
+
+    await this.auditService.record({
+      action: 'process',
+      resource: 'scheduled_notices',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        processed: results.length,
+      },
+    });
+
+    return {
+      processed: results.length,
+      results,
+    };
+  }
+
   async listConsents(actor: AuthContext) {
     return this.prisma.guardianConsent.findMany({
       where: { tenantId: actor.tenantId },
@@ -382,6 +471,9 @@ export class CommunicationsService {
       include: {
         user: true,
         guardianLinks: {
+          where: input.guardianIds?.length
+            ? { guardianId: { in: input.guardianIds } }
+            : undefined,
           include: {
             guardian: {
               include: {
@@ -508,6 +600,7 @@ type DeliveryRecordInput = {
   classId?: string | null;
   sectionId?: string | null;
   studentIds?: string[];
+  guardianIds?: string[];
   title: string;
   body: string;
   channels: NotificationChannel[];

@@ -3,7 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AudienceType, NotificationChannel, Prisma } from '@prisma/client';
+import {
+  AudienceType,
+  HomeworkStatus,
+  NotificationChannel,
+  Prisma,
+} from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
@@ -139,9 +144,19 @@ export class TimetableService {
     return slot;
   }
 
-  async listHomework(actor: AuthContext) {
+  async listHomework(
+    actor: AuthContext,
+    filters: { studentId?: string; classId?: string; sectionId?: string } = {},
+  ) {
     return this.prisma.homeworkAssignment.findMany({
-      where: { tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        ...(filters.classId ? { classId: filters.classId } : {}),
+        ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+        ...(filters.studentId
+          ? { submissions: { some: { studentId: filters.studentId } } }
+          : {}),
+      },
       include: {
         academicYear: true,
         class: true,
@@ -157,6 +172,77 @@ export class TimetableService {
       orderBy: [{ createdAt: 'desc' }],
       take: 100,
     });
+  }
+
+  async processHomeworkReminders(actor: AuthContext) {
+    const now = new Date();
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const assignments = await this.prisma.homeworkAssignment.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        dueAt: { lte: tomorrow },
+      },
+      include: {
+        submissions: true,
+      },
+    });
+    const results: Array<{ homeworkId: string; deliveryCount: number }> = [];
+
+    for (const assignment of assignments) {
+      const pendingSubmissions = assignment.submissions.filter(
+        (submission) =>
+          submission.status === HomeworkStatus.ASSIGNED ||
+          submission.status === HomeworkStatus.LATE,
+      );
+
+      if (pendingSubmissions.length === 0) {
+        continue;
+      }
+
+      if (assignment.dueAt < now) {
+        await this.prisma.homeworkSubmission.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            homeworkId: assignment.id,
+            status: HomeworkStatus.ASSIGNED,
+          },
+          data: { status: HomeworkStatus.LATE },
+        });
+      }
+
+      const delivery = await this.communicationsService.recordDeliveryRecords({
+        actor,
+        sourceType: 'homework_reminder',
+        sourceId: assignment.id,
+        audienceType: assignment.sectionId
+          ? AudienceType.SECTION
+          : AudienceType.CLASS,
+        classId: assignment.classId,
+        sectionId: assignment.sectionId,
+        studentIds: pendingSubmissions.map(
+          (submission) => submission.studentId,
+        ),
+        title:
+          assignment.dueAt < now ? 'Homework overdue' : 'Homework due tomorrow',
+        body: assignment.title,
+        channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
+      });
+
+      results.push({
+        homeworkId: assignment.id,
+        deliveryCount: delivery.count,
+      });
+    }
+
+    await this.auditService.record({
+      action: 'process',
+      resource: 'homework_reminders',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: { processed: results.length },
+    });
+
+    return { processed: results.length, results };
   }
 
   async createHomework(dto: CreateHomeworkDto, actor: AuthContext) {

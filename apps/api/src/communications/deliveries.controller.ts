@@ -16,4 +16,10 @@ export class DeliveriesController {
   listDeliveries(@CurrentAuth() auth: AuthContext) {
     return this.communicationsService.listDeliveries(auth);
   }
+
+  @Get('analytics')
+  @Permissions('communications:read_deliveries')
+  analytics(@CurrentAuth() auth: AuthContext) {
+    return this.communicationsService.getDeliveryAnalytics(auth);
+  }
 }

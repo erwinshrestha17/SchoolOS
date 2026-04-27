@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -15,8 +15,23 @@ export class HomeworkController {
 
   @Get()
   @Permissions('homework:read')
-  listHomework(@CurrentAuth() auth: AuthContext) {
-    return this.timetableService.listHomework(auth);
+  listHomework(
+    @CurrentAuth() auth: AuthContext,
+    @Query('studentId') studentId?: string,
+    @Query('classId') classId?: string,
+    @Query('sectionId') sectionId?: string,
+  ) {
+    return this.timetableService.listHomework(auth, {
+      studentId,
+      classId,
+      sectionId,
+    });
+  }
+
+  @Post('reminders/process')
+  @Permissions('homework:create')
+  processHomeworkReminders(@CurrentAuth() auth: AuthContext) {
+    return this.timetableService.processHomeworkReminders(auth);
   }
 
   @Post()
