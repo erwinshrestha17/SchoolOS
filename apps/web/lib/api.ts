@@ -1,25 +1,33 @@
 import type {
   AcademicYearSummary,
   AdmissionCreationResult,
+  AdmissionDuplicateCheckResult,
   AdmissionSummary,
   AccountingPeriodSummary,
   AccountingReport,
   ActivityPost,
+  ActivityReaction,
   AssessmentComponentSummary,
   AttendanceAnalytics,
+  AttendanceConflict,
   AttendanceRoster,
+  AttendanceSyncSubmission,
   AuthSession,
+  BulkAdmissionImportResult,
   CasRecordSummary,
   ClassSummary,
   ConsentRecord,
   ConversationSummary,
+  DefaulterReminderResult,
   DefaulterSummary,
   DiscountRule,
+  DevelopmentalMilestone,
   EventSummary,
   ExamTermSummary,
   FeeBillingRun,
   FeeHeadSummary,
   FeePlanSummary,
+  GuardianConsentStatus,
   HomeworkAssignmentSummary,
   HomeworkSubmissionSummary,
   InvoiceSummary,
@@ -189,8 +197,40 @@ export const api = {
   listAdmissions: () => request<AdmissionSummary[]>('/admissions'),
   createAdmission: (body: JsonBody) =>
     request<AdmissionCreationResult>('/admissions', { method: 'POST', json: body }),
+  checkAdmissionDuplicates: (body: JsonBody) =>
+    request<AdmissionDuplicateCheckResult>('/admissions/duplicates', {
+      method: 'POST',
+      json: body,
+    }),
+  bulkImportAdmissions: (body: JsonBody) =>
+    request<BulkAdmissionImportResult>('/admissions/bulk-import', {
+      method: 'POST',
+      json: body,
+    }),
   listStudentDocuments: (studentId: string) =>
     request(withQuery('/student-documents', { studentId })),
+  openStudentDocumentPdf: async (studentId: string, kind: string) => {
+    const accessToken = getAccessToken();
+    const response = await fetch(
+      `${API_BASE_URL}/students/${encodeURIComponent(studentId)}/documents/${encodeURIComponent(kind)}.pdf`,
+      {
+        credentials: 'include',
+        headers: accessToken
+          ? {
+              Authorization: `Bearer ${accessToken}`,
+            }
+          : undefined,
+      },
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `Request failed with status ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer');
+  },
   getAttendanceRoster: (params: {
     academicYearId: string;
     classId: string;
@@ -199,15 +239,33 @@ export const api = {
   }) => request<AttendanceRoster>(withQuery('/attendance/rosters', params)),
   listAttendanceAnalytics: () =>
     request<AttendanceAnalytics>('/attendance/analytics'),
+  listAttendanceConflicts: () =>
+    request<AttendanceConflict[]>('/attendance/conflicts'),
   submitAttendance: (body: JsonBody) =>
     request('/attendance/sessions', { method: 'POST', json: body }),
+  syncAttendance: (body: JsonBody) =>
+    request<AttendanceSyncSubmission>('/attendance/sync', {
+      method: 'POST',
+      json: body,
+    }),
+  reviewAttendanceConflict: (id: string, body: JsonBody) =>
+    request<AttendanceConflict>(`/attendance/conflicts/${id}/review`, {
+      method: 'PATCH',
+      json: body,
+    }),
   listFeeHeads: () => request<FeeHeadSummary[]>('/fees/heads'),
   listFeePlans: () => request<FeePlanSummary[]>('/fees/plans'),
   listInvoices: () => request<InvoiceSummary[]>('/fees/invoices'),
   listBillingRuns: () => request<FeeBillingRun[]>('/fees/billing-runs'),
   generateBillingRun: (body: JsonBody) =>
     request('/fees/billing-runs', { method: 'POST', json: body }),
-  listDefaulters: () => request<DefaulterSummary[]>('/fees/defaulters'),
+  listDefaulters: (params?: { classId?: string | null; feeHeadId?: string | null }) =>
+    request<DefaulterSummary[]>(withQuery('/fees/defaulters', params ?? {})),
+  sendDefaulterReminders: (body: JsonBody) =>
+    request<DefaulterReminderResult>('/fees/defaulters/reminders', {
+      method: 'POST',
+      json: body,
+    }),
   listDiscounts: () => request<DiscountRule[]>('/fees/discounts'),
   listWaivers: () => request<WaiverRecord[]>('/fees/waivers'),
   createDiscount: (body: JsonBody) =>
@@ -317,9 +375,26 @@ export const api = {
   listActivityPosts: () => request<ActivityPost[]>('/activity-feed/posts'),
   createActivityPost: (body: JsonBody) =>
     request('/activity-feed/posts', { method: 'POST', json: body }),
+  createActivityReaction: (postId: string, body: JsonBody) =>
+    request<ActivityReaction>(
+      `/activity-feed/posts/${encodeURIComponent(postId)}/reactions`,
+      { method: 'POST', json: body },
+    ),
   listMoodLogs: () => request<MoodLog[]>('/activity-feed/mood-logs'),
   createMoodLog: (body: JsonBody) =>
     request('/activity-feed/mood-logs', { method: 'POST', json: body }),
+  listDevelopmentalMilestones: (params?: {
+    studentId?: string | null;
+    month?: string | null;
+  }) =>
+    request<DevelopmentalMilestone[]>(
+      withQuery('/activity-feed/milestones', params ?? {}),
+    ),
+  createDevelopmentalMilestone: (body: JsonBody) =>
+    request<DevelopmentalMilestone>('/activity-feed/milestones', {
+      method: 'POST',
+      json: body,
+    }),
   listNotices: () => request<NoticeSummary[]>('/notices'),
   createNotice: (body: JsonBody) =>
     request<NoticeSummary>('/notices', { method: 'POST', json: body }),
@@ -329,4 +404,18 @@ export const api = {
   listNotificationDeliveries: () =>
     request<NotificationDelivery[]>('/communications/deliveries'),
   listConsents: () => request<ConsentRecord[]>('/consents'),
+  getGuardianConsentStatus: (guardianId: string) =>
+    request<GuardianConsentStatus[]>(
+      `/consents/guardians/${encodeURIComponent(guardianId)}/status`,
+    ),
+  captureGuardianConsent: (guardianId: string, body: JsonBody) =>
+    request<ConsentRecord>(
+      `/consents/guardians/${encodeURIComponent(guardianId)}/capture`,
+      { method: 'POST', json: body },
+    ),
+  revokeGuardianConsent: (guardianId: string, body: JsonBody) =>
+    request<ConsentRecord>(
+      `/consents/guardians/${encodeURIComponent(guardianId)}/revoke`,
+      { method: 'POST', json: body },
+    ),
 };

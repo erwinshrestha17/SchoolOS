@@ -50,6 +50,11 @@ export function FinanceForm() {
     amount: 500,
     reason: 'Manual approved waiver',
   });
+  const [defaulterFilters, setDefaulterFilters] = useState({
+    classId: '',
+    feeHeadId: '',
+  });
+  const [selectedReminderInvoiceIds, setSelectedReminderInvoiceIds] = useState<string[]>([]);
 
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years'],
@@ -80,8 +85,12 @@ export function FinanceForm() {
     queryFn: api.listLedgerEntries,
   });
   const defaultersQuery = useQuery({
-    queryKey: ['defaulters'],
-    queryFn: api.listDefaulters,
+    queryKey: ['defaulters', defaulterFilters],
+    queryFn: () =>
+      api.listDefaulters({
+        classId: defaulterFilters.classId || null,
+        feeHeadId: defaulterFilters.feeHeadId || null,
+      }),
   });
   const discountsQuery = useQuery({
     queryKey: ['discounts'],
@@ -191,6 +200,14 @@ export function FinanceForm() {
       void queryClient.invalidateQueries({ queryKey: ['defaulters'] });
     },
   });
+  const reminderMutation = useMutation({
+    mutationFn: api.sendDefaulterReminders,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['defaulters'] });
+      void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
+      setSelectedReminderInvoiceIds([]);
+    },
+  });
 
   const selectedInvoice = invoicesQuery.data?.find((invoice) => invoice.id === payment.invoiceId);
   const selectedWaiverInvoice = invoicesQuery.data?.find((invoice) => invoice.id === waiver.invoiceId);
@@ -203,6 +220,15 @@ export function FinanceForm() {
         Number(selectedWaiverInvoice.totalAmount) - Number(selectedWaiverInvoice.paidAmount ?? 0),
       )
     : 0;
+  const defaulters = defaultersQuery.data ?? [];
+
+  function toggleReminderInvoice(invoiceId: string) {
+    setSelectedReminderInvoiceIds((current) =>
+      current.includes(invoiceId)
+        ? current.filter((id) => id !== invoiceId)
+        : [...current, invoiceId],
+    );
+  }
 
   return (
     <div className="grid gap-6">
@@ -714,14 +740,107 @@ export function FinanceForm() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-3">
-        <SummaryList
-          title="Defaulters"
-          items={(defaultersQuery.data ?? []).slice(0, 5).map((defaulter) => ({
-            id: defaulter.invoiceId,
-            primary: defaulter.studentName,
-            secondary: `${defaulter.agingBucket} / Rs ${defaulter.outstanding}`,
-          }))}
-        />
+        <section className="shell-card rounded-[28px] p-6">
+          <p className="label mb-4">Defaulters</p>
+          <div className="mb-4 grid gap-3">
+            <select
+              value={defaulterFilters.classId}
+              onChange={(event) =>
+                setDefaulterFilters((current) => ({
+                  ...current,
+                  classId: event.target.value,
+                }))
+              }
+            >
+              <option value="">All classes</option>
+              {(classesQuery.data ?? []).map((classroom) => (
+                <option key={classroom.id} value={classroom.id}>
+                  {classroom.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={defaulterFilters.feeHeadId}
+              onChange={(event) =>
+                setDefaulterFilters((current) => ({
+                  ...current,
+                  feeHeadId: event.target.value,
+                }))
+              }
+            >
+              <option value="">All fee heads</option>
+              {(feeHeadsQuery.data ?? []).map((head) => (
+                <option key={head.id} value={head.id}>
+                  {head.code} / {head.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid gap-3">
+            {defaulters.slice(0, 6).map((defaulter) => (
+              <label
+                key={defaulter.invoiceId}
+                className="rounded-2xl border border-[var(--line)] bg-white/55 p-4"
+              >
+                <span className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedReminderInvoiceIds.includes(defaulter.invoiceId)}
+                    onChange={() => toggleReminderInvoice(defaulter.invoiceId)}
+                  />
+                  <span>
+                    <span className="block font-semibold">{defaulter.studentName}</span>
+                    <span className="block text-sm text-[var(--muted)]">
+                      {defaulter.agingBucket} / Rs {defaulter.outstanding}
+                      {defaulter.reportCardBlocked ? ' / report card blocked' : ''}
+                      {defaulter.hallTicketBlocked ? ' / hall ticket blocked' : ''}
+                    </span>
+                  </span>
+                </span>
+              </label>
+            ))}
+            {defaulters.length === 0 ? (
+              <p className="text-sm text-[var(--muted)]">No records yet.</p>
+            ) : null}
+          </div>
+          <div className="mt-4 grid gap-2">
+            <button
+              type="button"
+              className="rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold disabled:opacity-50"
+              disabled={defaulters.length === 0 || reminderMutation.isPending}
+              onClick={() =>
+                reminderMutation.mutate({
+                  classId: defaulterFilters.classId || null,
+                  feeHeadId: defaulterFilters.feeHeadId || null,
+                  channels: ['EMAIL', 'SMS', 'PUSH'],
+                  message: 'Fee payment reminder from SchoolOS.',
+                })
+              }
+            >
+              Remind all filtered
+            </button>
+            <button
+              type="button"
+              className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              disabled={selectedReminderInvoiceIds.length === 0 || reminderMutation.isPending}
+              onClick={() =>
+                reminderMutation.mutate({
+                  invoiceIds: selectedReminderInvoiceIds,
+                  channels: ['EMAIL', 'SMS', 'PUSH'],
+                  message: 'Fee payment reminder from SchoolOS.',
+                })
+              }
+            >
+              Remind selected
+            </button>
+          </div>
+          {reminderMutation.data ? (
+            <p className="mt-3 text-sm text-[var(--teal)]">
+              Reminded {reminderMutation.data.reminded} of {reminderMutation.data.requested}
+              invoices across {reminderMutation.data.channels.join(', ')}.
+            </p>
+          ) : null}
+        </section>
         <SummaryList
           title="Discounts"
           items={(discountsQuery.data ?? []).slice(0, 5).map((item) => ({
@@ -747,6 +866,7 @@ export function FinanceForm() {
         paymentMutation,
         discountMutation,
         waiverMutation,
+        reminderMutation,
       ].map((mutationState, index) =>
         mutationState.isError ? (
           <p key={index} className="text-sm text-[var(--accent-dark)]">

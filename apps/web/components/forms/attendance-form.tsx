@@ -41,6 +41,10 @@ export function AttendanceForm() {
     queryKey: ['attendance-analytics'],
     queryFn: api.listAttendanceAnalytics,
   });
+  const conflictsQuery = useQuery({
+    queryKey: ['attendance-conflicts'],
+    queryFn: api.listAttendanceConflicts,
+  });
 
   useEffect(() => {
     const currentAcademicYear = academicYearsQuery.data?.find((year) => year.isCurrent);
@@ -72,6 +76,25 @@ export function AttendanceForm() {
     mutationFn: api.submitAttendance,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['attendance-roster'] });
+      void queryClient.invalidateQueries({ queryKey: ['attendance-analytics'] });
+      void queryClient.invalidateQueries({ queryKey: ['attendance-conflicts'] });
+    },
+  });
+  const syncMutation = useMutation({
+    mutationFn: api.syncAttendance,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['attendance-roster'] });
+      void queryClient.invalidateQueries({ queryKey: ['attendance-analytics'] });
+      void queryClient.invalidateQueries({ queryKey: ['attendance-conflicts'] });
+    },
+  });
+  const reviewMutation = useMutation({
+    mutationFn: ({ id, resolutionNote }: { id: string; resolutionNote: string }) =>
+      api.reviewAttendanceConflict(id, { resolutionNote }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['attendance-conflicts'] });
+      void queryClient.invalidateQueries({ queryKey: ['attendance-analytics'] });
+      void queryClient.invalidateQueries({ queryKey: ['attendance-roster'] });
     },
   });
 
@@ -91,6 +114,16 @@ export function AttendanceForm() {
   }
 
   const roster = rosterQuery.data?.students ?? [];
+  const attendancePayload = {
+    academicYearId,
+    classId,
+    sectionId: sectionId || null,
+    attendanceDate: new Date(attendanceDate).toISOString(),
+    exceptions: Object.entries(exceptions).map(([studentId, status]) => ({
+      studentId,
+      status,
+    })),
+  };
   const rosterTotals = roster.reduce(
     (totals, student) => {
       const status = exceptions[student.id] ?? student.status ?? 'PRESENT';
@@ -224,20 +257,23 @@ export function AttendanceForm() {
         type="button"
         className="rounded-2xl bg-[var(--ink)] px-5 py-3 font-semibold text-white disabled:opacity-50"
         disabled={!academicYearId || !classId || roster.length === 0 || mutation.isPending}
+        onClick={() => mutation.mutate(attendancePayload)}
+      >
+        {mutation.isPending ? 'Submitting...' : 'Submit attendance'}
+      </button>
+      <button
+        type="button"
+        className="rounded-2xl border border-[var(--line)] bg-white/70 px-5 py-3 font-semibold text-[var(--ink)] disabled:opacity-50"
+        disabled={!academicYearId || !classId || roster.length === 0 || syncMutation.isPending}
         onClick={() =>
-          mutation.mutate({
-            academicYearId,
-            classId,
-            sectionId: sectionId || null,
-            attendanceDate: new Date(attendanceDate).toISOString(),
-            exceptions: Object.entries(exceptions).map(([studentId, status]) => ({
-              studentId,
-              status,
-            })),
+          syncMutation.mutate({
+            ...attendancePayload,
+            clientSubmissionId: `web-${Date.now()}`,
+            deviceTimestamp: new Date().toISOString(),
           })
         }
       >
-        {mutation.isPending ? 'Submitting...' : 'Submit attendance'}
+        {syncMutation.isPending ? 'Syncing draft...' : 'Sync offline draft'}
       </button>
 
       {rosterQuery.data?.existingSession ? (
@@ -258,6 +294,15 @@ export function AttendanceForm() {
       {mutation.isSuccess ? (
         <p className="text-sm text-[var(--teal)]">
           Attendance submitted. Absence delivery records are queued through the communications adapter.
+        </p>
+      ) : null}
+      {syncMutation.isError ? (
+        <p className="text-sm text-[var(--accent-dark)]">{syncMutation.error.message}</p>
+      ) : null}
+      {syncMutation.data ? (
+        <p className="text-sm text-[var(--teal)]">
+          Offline draft synced as {syncMutation.data.syncStatus}
+          {syncMutation.data.conflictId ? ` with conflict ${syncMutation.data.conflictId}` : ''}.
         </p>
       ) : null}
 
@@ -298,6 +343,82 @@ export function AttendanceForm() {
           </div>
         </div>
       </section>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="shell-card rounded-[28px] p-6">
+          <p className="label mb-4">Conflict Review</p>
+          <div className="grid gap-3">
+            {(conflictsQuery.data ?? []).slice(0, 5).map((conflict) => (
+              <div key={conflict.id} className="rounded-2xl border border-[var(--line)] bg-white/55 p-4">
+                <p className="font-semibold">
+                  {conflict.className ?? 'Attendance session'}
+                  {conflict.sectionName ? ` / ${conflict.sectionName}` : ''}
+                </p>
+                <p className="text-sm text-[var(--muted)]">
+                  {conflict.status} / submitted {new Date(conflict.submittedAt).toLocaleString()}
+                  {conflict.reviewedAt
+                    ? ` / reviewed ${new Date(conflict.reviewedAt).toLocaleString()}`
+                    : ''}
+                </p>
+                {!conflict.reviewedAt ? (
+                  <button
+                    type="button"
+                    className="mt-3 rounded-full bg-[var(--teal)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                    disabled={reviewMutation.isPending}
+                    onClick={() =>
+                      reviewMutation.mutate({
+                        id: conflict.id,
+                        resolutionNote: 'Reviewed from admin attendance screen.',
+                      })
+                    }
+                  >
+                    Mark reviewed
+                  </button>
+                ) : null}
+              </div>
+            ))}
+            {conflictsQuery.data?.length === 0 ? (
+              <p className="text-sm text-[var(--muted)]">No attendance conflicts waiting.</p>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="shell-card rounded-[28px] p-6">
+          <p className="label mb-4">Attendance Risk Alerts</p>
+          <div className="grid gap-4">
+            <div>
+              <p className="font-semibold">Below 80 percent</p>
+              <div className="mt-2 grid gap-2 text-sm text-[var(--muted)]">
+                {(analyticsQuery.data?.below80Warnings ?? []).slice(0, 5).map((item) => (
+                  <span key={item.studentId}>
+                    {item.fullNameEn} / {item.studentSystemId} / {item.attendancePercent}%
+                  </span>
+                ))}
+                {analyticsQuery.data?.below80Warnings?.length === 0 ? (
+                  <span>No below-80 warning yet.</span>
+                ) : null}
+              </div>
+            </div>
+            <div>
+              <p className="font-semibold">Consecutive absences</p>
+              <div className="mt-2 grid gap-2 text-sm text-[var(--muted)]">
+                {(analyticsQuery.data?.consecutiveAbsences ?? []).slice(0, 5).map((item) => (
+                  <span key={item.studentId}>
+                    {item.studentId}: {item.consecutiveAbsences} consecutive absences
+                  </span>
+                ))}
+                {analyticsQuery.data?.consecutiveAbsences?.length === 0 ? (
+                  <span>No consecutive absence pattern yet.</span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {reviewMutation.isError ? (
+        <p className="text-sm text-[var(--accent-dark)]">{reviewMutation.error.message}</p>
+      ) : null}
     </div>
   );
 }

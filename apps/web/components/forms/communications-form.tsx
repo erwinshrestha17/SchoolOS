@@ -25,6 +25,8 @@ export function CommunicationsForm() {
     startsAt: new Date().toISOString().slice(0, 16),
     location: 'Main hall',
   });
+  const [selectedGuardianId, setSelectedGuardianId] = useState('');
+  const [selectedConsentType, setSelectedConsentType] = useState('PHOTO_USAGE');
 
   const classesQuery = useQuery({
     queryKey: ['classes'],
@@ -46,6 +48,15 @@ export function CommunicationsForm() {
     queryKey: ['events'],
     queryFn: api.listEvents,
   });
+  const admissionsQuery = useQuery({
+    queryKey: ['admissions'],
+    queryFn: api.listAdmissions,
+  });
+  const guardianConsentStatusQuery = useQuery({
+    queryKey: ['guardian-consent-status', selectedGuardianId],
+    queryFn: () => api.getGuardianConsentStatus(selectedGuardianId),
+    enabled: Boolean(selectedGuardianId),
+  });
 
   useEffect(() => {
     const firstClass = classesQuery.data?.[0];
@@ -55,6 +66,22 @@ export function CommunicationsForm() {
       setEvent((current) => (current.classId ? current : { ...current, classId: firstClass.id }));
     }
   }, [classesQuery.data]);
+
+  const guardians = (admissionsQuery.data ?? []).flatMap((admission) =>
+    admission.guardians.map((guardian) => ({
+      ...guardian,
+      studentName: admission.fullNameEn,
+      studentSystemId: admission.studentSystemId,
+    })),
+  );
+
+  useEffect(() => {
+    const firstGuardian = guardians[0];
+
+    if (firstGuardian && !selectedGuardianId) {
+      setSelectedGuardianId(firstGuardian.id);
+    }
+  }, [guardians, selectedGuardianId]);
 
   const noticeSections = (sectionsQuery.data ?? []).filter((section) => {
     const sectionClassId = section.classId ?? section.class?.id;
@@ -78,6 +105,36 @@ export function CommunicationsForm() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
       void queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
+  });
+  const captureConsentMutation = useMutation({
+    mutationFn: () =>
+      api.captureGuardianConsent(selectedGuardianId, {
+        consentType: selectedConsentType,
+        version: 'v1-admin',
+        metadata: {
+          source: 'admin-web',
+        },
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['guardian-consent-status'] });
+      void queryClient.invalidateQueries({ queryKey: ['consents'] });
+      void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
+    },
+  });
+  const revokeConsentMutation = useMutation({
+    mutationFn: () =>
+      api.revokeGuardianConsent(selectedGuardianId, {
+        consentType: selectedConsentType,
+        version: 'v1-admin',
+        metadata: {
+          source: 'admin-web',
+        },
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['guardian-consent-status'] });
+      void queryClient.invalidateQueries({ queryKey: ['consents'] });
+      void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
     },
   });
 
@@ -347,7 +404,89 @@ export function CommunicationsForm() {
         </div>
       </section>
 
-      {[noticeMutation, eventMutation].map((mutationState, index) =>
+      <section className="shell-card rounded-[28px] p-6">
+        <p className="label mb-4">Guardian Consent Status</p>
+        <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+          <div className="grid gap-3">
+            <select
+              value={selectedGuardianId}
+              onChange={(inputEvent) => setSelectedGuardianId(inputEvent.target.value)}
+            >
+              <option value="">Select guardian</option>
+              {guardians.map((guardian) => (
+                <option key={`${guardian.id}-${guardian.studentSystemId}`} value={guardian.id}>
+                  {guardian.fullName} / {guardian.studentName}
+                </option>
+              ))}
+            </select>
+            <select
+              value={selectedConsentType}
+              onChange={(inputEvent) => setSelectedConsentType(inputEvent.target.value)}
+            >
+              <option value="PRIVACY">Privacy</option>
+              <option value="DATA_PROCESSING">Data processing</option>
+              <option value="MEDICAL">Medical</option>
+              <option value="PHOTO_USAGE">Photo usage</option>
+              <option value="MESSAGING">Messaging</option>
+            </select>
+            <div className="grid gap-2 md:grid-cols-2">
+              <button
+                type="button"
+                className="rounded-full bg-[var(--teal)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                disabled={!selectedGuardianId || captureConsentMutation.isPending}
+                onClick={() => captureConsentMutation.mutate()}
+              >
+                Capture consent
+              </button>
+              <button
+                type="button"
+                className="rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                disabled={!selectedGuardianId || revokeConsentMutation.isPending}
+                onClick={() => revokeConsentMutation.mutate()}
+              >
+                Revoke consent
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-3">
+            {(guardianConsentStatusQuery.data ?? []).map((status) => (
+              <div
+                key={status.consentType}
+                className="rounded-2xl border border-[var(--line)] bg-white/55 p-4"
+              >
+                <p className="font-semibold">
+                  {status.consentType} / {status.granted ? 'granted' : 'not granted'}
+                </p>
+                <p className="text-sm text-[var(--muted)]">
+                  {status.version ?? 'no version'}
+                  {status.capturedAt
+                    ? ` / captured ${new Date(status.capturedAt).toLocaleString()}`
+                    : ''}
+                  {status.revokedAt
+                    ? ` / revoked ${new Date(status.revokedAt).toLocaleString()}`
+                    : ''}
+                </p>
+              </div>
+            ))}
+            {selectedGuardianId && guardianConsentStatusQuery.data?.length === 0 ? (
+              <p className="text-sm text-[var(--muted)]">No consent records yet.</p>
+            ) : null}
+            {!selectedGuardianId ? (
+              <p className="text-sm text-[var(--muted)]">
+                Admit a student with guardian details first, then consent controls will appear here.
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      {[
+        noticeMutation,
+        eventMutation,
+        captureConsentMutation,
+        revokeConsentMutation,
+      ].map((mutationState, index) =>
         mutationState.isError ? (
           <p key={index} className="text-sm text-[var(--accent-dark)]">
             {mutationState.error.message}

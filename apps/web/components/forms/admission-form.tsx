@@ -15,6 +15,11 @@ export function AdmissionForm() {
   const queryClient = useQueryClient();
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [documentKind, setDocumentKind] = useState('BIRTH_CERTIFICATE');
+  const [duplicateWarning, setDuplicateWarning] =
+    useState<Awaited<ReturnType<typeof api.checkAdmissionDuplicates>> | null>(null);
+  const [bulkCsv, setBulkCsv] = useState('');
+  const [bulkConfirmDuplicates, setBulkConfirmDuplicates] = useState(false);
+  const [pdfError, setPdfError] = useState('');
 
   const admissionsQuery = useQuery({
     queryKey: ['admissions'],
@@ -31,6 +36,10 @@ export function AdmissionForm() {
   const sectionsQuery = useQuery({
     queryKey: ['sections'],
     queryFn: api.listSections,
+  });
+  const studentsQuery = useQuery({
+    queryKey: ['students'],
+    queryFn: api.listStudents,
   });
 
   const form = useForm<AdmissionFormInput>({
@@ -107,10 +116,34 @@ export function AdmissionForm() {
         ],
       });
       setDocumentFile(null);
+      setDuplicateWarning(null);
+      setPdfError('');
     },
   });
 
-  async function submitAdmission(values: AdmissionFormInput) {
+  const bulkMutation = useMutation({
+    mutationFn: api.bulkImportAdmissions,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admissions'] });
+      void queryClient.invalidateQueries({ queryKey: ['students'] });
+      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    },
+  });
+
+  async function submitAdmission(values: AdmissionFormInput, confirmDuplicate = false) {
+    if (!confirmDuplicate) {
+      const duplicates = await api.checkAdmissionDuplicates({
+        firstNameEn: values.firstNameEn,
+        lastNameEn: values.lastNameEn,
+        dateOfBirth: new Date(values.dateOfBirth).toISOString(),
+      });
+
+      if (duplicates.hasWarnings) {
+        setDuplicateWarning(duplicates);
+        return;
+      }
+    }
+
     const documentPayload = documentFile
       ? {
           ...(await fileToBase64Payload(documentFile)),
@@ -124,15 +157,28 @@ export function AdmissionForm() {
       sectionId: values.sectionId || null,
       admissionDate: new Date(values.admissionDate).toISOString(),
       dateOfBirth: new Date(values.dateOfBirth).toISOString(),
+      confirmDuplicate,
       documents: documentPayload ? [documentPayload] : [],
     });
   }
 
   const latestAdmission = mutation.data;
+  const sampleBulkCsv =
+    'firstNameEn,lastNameEn,dateOfBirth,gender,admissionDate,academicYearId,classId,sectionId,guardianFullName,guardianRelation,guardianPhone,rollNumber';
+
+  async function openStudentPdf(studentId: string, kind: string) {
+    setPdfError('');
+
+    try {
+      await api.openStudentDocumentPdf(studentId, kind);
+    } catch (error) {
+      setPdfError(error instanceof Error ? error.message : 'Unable to open generated PDF');
+    }
+  }
 
   return (
     <div className="grid gap-6">
-      <form className="grid gap-4 md:grid-cols-2" onSubmit={form.handleSubmit(submitAdmission)}>
+      <form className="grid gap-4 md:grid-cols-2" onSubmit={form.handleSubmit((values) => submitAdmission(values))}>
       {!hasAcademicYears || !hasClasses ? (
         <div className="md:col-span-2 rounded-[24px] border border-[var(--line)] bg-white/70 p-5">
           <p className="label mb-2">Setup Required</p>
@@ -301,6 +347,27 @@ export function AdmissionForm() {
           {mutation.error.message}
         </p>
       ) : null}
+      {duplicateWarning?.hasWarnings ? (
+        <div className="md:col-span-2 rounded-[24px] border border-[var(--accent)] bg-white/80 p-4">
+          <p className="label mb-2">Possible duplicate found</p>
+          <div className="grid gap-2 text-sm text-[var(--muted)]">
+            {duplicateWarning.matches.map((match) => (
+              <span key={match.studentId}>
+                {match.fullNameEn} / {match.studentSystemId} / DOB{' '}
+                {new Date(match.dateOfBirth).toLocaleDateString()}
+                {match.className ? ` / ${match.className}` : ''}
+              </span>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="mt-4 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white"
+            onClick={form.handleSubmit((values) => submitAdmission(values, true))}
+          >
+            Create anyway
+          </button>
+        </div>
+      ) : null}
       {mutation.isSuccess ? (
         <p className="md:col-span-2 text-sm text-[var(--teal)]">
           Admission created with guardian linkage, enrollment, optional document metadata, and fee side effects.
@@ -326,8 +393,91 @@ export function AdmissionForm() {
                 : 'No fee plan assigned yet'}
             </span>
           </div>
+          <GeneratedPdfActions
+            studentId={latestAdmission.student.id}
+            onOpen={(kind) => void openStudentPdf(latestAdmission.student.id, kind)}
+          />
+          {pdfError ? (
+            <p className="mt-3 text-sm text-[var(--accent-dark)]">{pdfError}</p>
+          ) : null}
         </section>
       ) : null}
+
+      <section className="rounded-[24px] border border-[var(--line)] bg-white/60 p-5">
+        <p className="label mb-3">Bulk CSV Admission Import</p>
+        <p className="mb-4 text-sm leading-6 text-[var(--muted)]">
+          Paste CSV rows for admin-side bulk admissions. The API validates each row,
+          creates the valid rows, and returns row-level errors for the rest.
+        </p>
+        <textarea
+          rows={5}
+          value={bulkCsv}
+          onChange={(event) => setBulkCsv(event.target.value)}
+          placeholder={`${sampleBulkCsv}\nAsha,Lama,2019-05-12,FEMALE,2026-04-27,...`}
+        />
+        <label className="mt-3 flex items-center gap-2 text-sm text-[var(--muted)]">
+          <input
+            type="checkbox"
+            checked={bulkConfirmDuplicates}
+            onChange={(event) => setBulkConfirmDuplicates(event.target.checked)}
+          />
+          Confirm possible duplicate rows
+        </label>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            type="button"
+            className="rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold"
+            onClick={() => setBulkCsv(sampleBulkCsv)}
+          >
+            Insert headers
+          </button>
+          <button
+            type="button"
+            className="rounded-full bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            disabled={!bulkCsv.trim() || bulkMutation.isPending}
+            onClick={() =>
+              bulkMutation.mutate({
+                csvContent: bulkCsv,
+                confirmDuplicates: bulkConfirmDuplicates,
+              })
+            }
+          >
+            {bulkMutation.isPending ? 'Importing...' : 'Import CSV'}
+          </button>
+        </div>
+        {bulkMutation.data ? (
+          <div className="mt-4 rounded-2xl border border-[var(--line)] bg-white/55 p-4 text-sm text-[var(--muted)]">
+            <p className="font-semibold text-[var(--ink)]">
+              Rows {bulkMutation.data.totalRows}, created {bulkMutation.data.created},
+              failed {bulkMutation.data.failed}
+            </p>
+            <div className="mt-3 grid gap-2">
+              {bulkMutation.data.results.slice(0, 6).map((result) => (
+                <span key={result.rowNumber}>
+                  Row {result.rowNumber}: {result.status}
+                  {result.studentSystemId ? ` / ${result.studentSystemId}` : ''}
+                  {result.errors?.length ? ` / ${result.errors.join(', ')}` : ''}
+                </span>
+              ))}
+            </div>
+            {bulkMutation.data.errorReportCsv ? (
+              <details className="mt-3">
+                <summary className="cursor-pointer font-semibold text-[var(--ink)]">
+                  Error report CSV
+                </summary>
+                <pre className="mt-2 overflow-auto whitespace-pre-wrap rounded-xl bg-white p-3 text-xs">
+                  {bulkMutation.data.errorReportCsv}
+                </pre>
+              </details>
+            ) : null}
+          </div>
+        ) : null}
+        {bulkMutation.isError ? (
+          <p className="mt-3 text-sm text-[var(--accent-dark)]">
+            {bulkMutation.error.message}
+          </p>
+        ) : null}
+      </section>
 
       <section className="rounded-[24px] border border-[var(--line)] bg-white/60 p-5">
         <p className="label mb-4">Recent Admissions</p>
@@ -361,6 +511,18 @@ export function AdmissionForm() {
                   ? `${admission.latestInvoice.invoiceNumber} / ${admission.latestInvoice.status} / Rs ${admission.latestInvoice.totalAmount}`
                   : 'not generated'}
               </p>
+              {(() => {
+                const studentId = studentsQuery.data?.find(
+                  (student) => student.studentSystemId === admission.studentSystemId,
+                )?.id;
+
+                return studentId ? (
+                  <GeneratedPdfActions
+                    studentId={studentId}
+                    onOpen={(kind) => void openStudentPdf(studentId, kind)}
+                  />
+                ) : null;
+              })()}
             </div>
           ))}
           {admissionsQuery.data?.length === 0 ? (
@@ -368,6 +530,36 @@ export function AdmissionForm() {
           ) : null}
         </div>
       </section>
+    </div>
+  );
+}
+
+function GeneratedPdfActions({
+  studentId,
+  onOpen,
+}: {
+  studentId: string;
+  onOpen: (kind: string) => void;
+}) {
+  const documents = [
+    ['id-card', 'ID card'],
+    ['transfer-certificate', 'Transfer certificate'],
+    ['leaving-certificate', 'Leaving certificate'],
+    ['character-certificate', 'Character certificate'],
+  ];
+
+  return (
+    <div className="mt-4 flex flex-wrap gap-2" data-student-id={studentId}>
+      {documents.map(([kind, label]) => (
+        <button
+          key={kind}
+          type="button"
+          className="rounded-full border border-[var(--line)] px-3 py-2 text-xs font-semibold"
+          onClick={() => onOpen(kind)}
+        >
+          Open {label}
+        </button>
+      ))}
     </div>
   );
 }
