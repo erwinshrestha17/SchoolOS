@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -8,6 +8,7 @@ import { AdmissionsService } from './admissions.service';
 import { BulkAdmissionImportDto } from './dto/bulk-admission-import.dto';
 import { CheckAdmissionDuplicateDto } from './dto/check-admission-duplicate.dto';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
+import { TransferStudentDto } from './dto/transfer-student.dto';
 
 @Controller('admissions')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -45,5 +46,30 @@ export class AdmissionsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.admissionsService.bulkImport(dto, auth);
+  }
+
+  @Post('students/:id/transfer')
+  @Permissions('enrollments:create')
+  transferStudent(
+    @Param('id') studentId: string,
+    @Body() dto: TransferStudentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.admissionsService.transferStudent(studentId, dto, auth);
+  }
+
+  @Post('guardians/:id/invite')
+  @Permissions('guardians:create')
+  inviteGuardian(
+    @Param('id') guardianId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.admissionsService.inviteGuardian(guardianId, auth);
+  }
+
+  @Get('iemis-export')
+  @Permissions('students:read')
+  exportIemis(@CurrentAuth() auth: AuthContext) {
+    return this.admissionsService.exportIemis(auth);
   }
 }

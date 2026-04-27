@@ -32,11 +32,11 @@ export class PrismaService
             const tenantId = cls?.get(TENANT_ID_KEY);
             if (tenantId) {
               if (['findUnique', 'findFirst', 'findMany', 'update', 'updateMany', 'delete', 'deleteMany', 'count'].includes(operation)) {
-                args.where = { ...args.where, tenantId };
+                (args as any).where = { ...(args as any).where, tenantId };
               } else if (['create', 'createMany'].includes(operation)) {
-                args.data = Array.isArray(args.data) 
-                  ? args.data.map(d => ({ ...d, tenantId }))
-                  : { ...args.data, tenantId };
+                (args as any).data = Array.isArray((args as any).data) 
+                  ? (args as any).data.map((d: any) => ({ ...d, tenantId }))
+                  : { ...(args as any).data, tenantId };
               }
             }
             return query(args);

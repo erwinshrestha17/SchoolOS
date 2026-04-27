@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AcademicYearsModule } from './academic-years/academic-years.module';
@@ -33,6 +34,7 @@ import { PayrollModule } from './payroll/payroll.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { LibraryModule } from './library/library.module';
 import { TransportModule } from './transport/transport.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -43,6 +45,13 @@ import { TransportModule } from './transport/transport.module';
         ttl: APP_RATE_TTL_MS,
       },
     ]),
+    ScheduleModule.forRoot(),
+    BullModule.forRoot({
+      connection: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379', 10),
+      },
+    }),
     PrismaModule,
     StorageModule,
     AuditModule,

@@ -29,9 +29,14 @@ type SendAuthCodeEmailInput = {
   resetUrl?: string;
 };
 
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
+
+  constructor(@InjectQueue('notifications') private notificationsQueue: Queue) {}
 
   async sendAuthCodeEmail(input: SendAuthCodeEmailInput) {
     const subject =
@@ -63,78 +68,24 @@ export class NotificationsService {
   }
 
   async sendEmail(input: SendEmailInput) {
-    const mode = process.env.EMAIL_DELIVERY_MODE ?? 'log';
-
-    if (mode === 'webhook') {
-      const webhookUrl = process.env.EMAIL_WEBHOOK_URL;
-
-      if (!webhookUrl) {
-        throw new Error(
-          'EMAIL_WEBHOOK_URL must be configured when EMAIL_DELIVERY_MODE=webhook',
-        );
-      }
-
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(process.env.EMAIL_WEBHOOK_TOKEN
-            ? {
-                Authorization: `Bearer ${process.env.EMAIL_WEBHOOK_TOKEN}`,
-              }
-            : {}),
-        },
-        body: JSON.stringify({
-          from: process.env.EMAIL_FROM_ADDRESS ?? 'no-reply@schoolos.local',
-          to: input.to,
-          subject: input.subject,
-          text: input.text,
-          html: input.html,
-          metadata: input.metadata ?? {},
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Email webhook failed with status ${response.status}`);
-      }
-
-      return;
-    }
-
-    this.logger.log(
-      JSON.stringify({
-        mode: 'log',
-        to: input.to,
-        subject: input.subject,
-        text: input.text,
-        metadata: input.metadata ?? {},
-      }),
-    );
+    await this.notificationsQueue.add('sendEmail', input, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 1000 },
+    });
   }
 
   async sendSms(input: SendSmsInput) {
-    this.logger.log(
-      JSON.stringify({
-        mode: 'log',
-        channel: 'sms',
-        to: input.to,
-        message: input.message,
-        metadata: input.metadata ?? {},
-      }),
-    );
+    await this.notificationsQueue.add('sendSms', input, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 1000 },
+    });
   }
 
   async sendPushNotification(input: SendPushNotificationInput) {
-    this.logger.log(
-      JSON.stringify({
-        mode: 'log',
-        channel: 'push',
-        title: input.title,
-        body: input.body,
-        audience: input.audience,
-        metadata: input.metadata ?? {},
-      }),
-    );
+    await this.notificationsQueue.add('sendPushNotification', input, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 1000 },
+    });
   }
 }
 

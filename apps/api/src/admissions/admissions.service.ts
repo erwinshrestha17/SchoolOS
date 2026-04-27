@@ -21,6 +21,8 @@ import {
 import { BulkAdmissionImportDto } from './dto/bulk-admission-import.dto';
 import { CheckAdmissionDuplicateDto } from './dto/check-admission-duplicate.dto';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
+import { TransferStudentDto } from './dto/transfer-student.dto';
+import { BadRequestException } from '@nestjs/common';
 
 @Injectable()
 export class AdmissionsService {
@@ -568,6 +570,127 @@ export class AdmissionsService {
         section: true,
       },
     });
+  }
+
+  async inviteGuardian(guardianId: string, actor: AuthContext) {
+    const guardian = await this.prisma.guardian.findFirst({
+      where: { id: guardianId, tenantId: actor.tenantId },
+    });
+
+    if (!guardian) {
+      throw new NotFoundException('Guardian not found');
+    }
+
+    if (!guardian.email) {
+      throw new BadRequestException('Guardian does not have an email address configured');
+    }
+
+    await this.notificationsService.sendEmail({
+      to: guardian.email,
+      subject: `${actor.tenantSlug}: admission invitation`,
+      text: `You have been invited to join the parent portal.`,
+      metadata: {
+        purpose: 'guardian_invite_resend',
+      },
+    });
+
+    await this.auditService.record({
+      action: 'invite',
+      resource: 'guardian',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: guardian.id,
+    });
+
+    return { success: true };
+  }
+
+  async transferStudent(studentId: string, dto: TransferStudentDto, actor: AuthContext) {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, tenantId: actor.tenantId },
+      include: {
+        enrollments: {
+          where: { status: EnrollmentStatus.ACTIVE },
+        },
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    if (student.enrollments.length === 0) {
+      throw new BadRequestException('Student has no active enrollments to transfer');
+    }
+
+    if (!dto.waiveFeeCheck) {
+      const outstandingInvoices = await this.prisma.invoice.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          studentId: student.id,
+          status: { notIn: ['PAID', 'VOID'] },
+        },
+      });
+
+      if (outstandingInvoices.length > 0) {
+        throw new ConflictException({
+          message: 'Cannot generate transfer certificate because the student has outstanding fee balances.',
+          outstandingInvoices: outstandingInvoices.map(i => i.invoiceNumber),
+        });
+      }
+    }
+
+    // Update the active enrollment status
+    await this.prisma.enrollment.update({
+      where: { id: student.enrollments[0].id },
+      data: {
+        status: EnrollmentStatus.TRANSFERRED,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'transfer',
+      resource: 'student',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: student.id,
+      after: {
+        reason: dto.reason,
+        transferDate: dto.transferDate,
+        destinationSchool: dto.destinationSchool,
+      },
+    });
+
+    return {
+      success: true,
+      transferCertificateRef: `TC-${new Date().getFullYear()}-${student.studentSystemId}`,
+    };
+  }
+
+  async exportIemis(actor: AuthContext) {
+    const students = await this.prisma.student.findMany({
+      where: { tenantId: actor.tenantId },
+      include: {
+        class: true,
+        sectionRef: true,
+        guardianLinks: {
+          include: { guardian: true }
+        }
+      }
+    });
+
+    // Mock implementation of iEMIS format export
+    return students.map(s => ({
+      systemId: s.studentSystemId,
+      fullName: `${s.firstNameEn} ${s.lastNameEn}`,
+      dob: s.dateOfBirth.toISOString().split('T')[0],
+      gender: s.gender,
+      class: s.class.name,
+      section: s.sectionRef?.name,
+      caste: s.nationality,
+      motherTongue: s.motherTongue,
+      disabilityType: s.disabilityFlag,
+    }));
   }
 }
 

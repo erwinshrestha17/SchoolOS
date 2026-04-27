@@ -8,15 +8,26 @@ import { LedgerController } from './ledger.controller';
 import { PaymentsController } from './payments.controller';
 import { ReceiptsController } from './receipts.controller';
 
+import { BullModule } from '@nestjs/bullmq';
+import { FinanceProcessor } from './finance.processor';
+import { FinanceCron } from './finance.cron';
+
 @Module({
-  imports: [AuthModule, AuditModule, CommunicationsModule],
+  imports: [
+    AuthModule, 
+    AuditModule, 
+    CommunicationsModule,
+    BullModule.registerQueue({
+      name: 'finance',
+    }),
+  ],
   controllers: [
     FeesController,
     PaymentsController,
     LedgerController,
     ReceiptsController,
   ],
-  providers: [FinanceService],
+  providers: [FinanceService, FinanceProcessor, FinanceCron],
   exports: [FinanceService],
 })
 export class FinanceModule {}
