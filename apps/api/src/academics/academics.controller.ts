@@ -134,12 +134,86 @@ export class AcademicsController {
   }
 
   @Post('report-cards')
-  @Permissions('academics:manage')
+  @Permissions('academics:manage_report_cards')
   generateReportCard(
     @Body() dto: GenerateReportCardDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.academicsService.generateReportCard(dto, auth);
+  }
+
+  @Get('subjects/:id/syllabus')
+  @Permissions('academics:read')
+  listSyllabusTopics(@Param('id') subjectId: string, @CurrentAuth() auth: AuthContext) {
+    return this.academicsService.listSyllabusTopics(subjectId, auth);
+  }
+
+  @Post('subjects/:id/syllabus')
+  @Permissions('academics:manage')
+  createSyllabusTopic(
+    @Param('id') subjectId: string,
+    @Body() dto: { title: string; description?: string; orderIndex?: number },
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsService.createSyllabusTopic(subjectId, dto, auth);
+  }
+
+  @Patch('syllabus/:id/complete')
+  @Permissions('academics:manage')
+  markTopicComplete(@Param('id') topicId: string, @CurrentAuth() auth: AuthContext) {
+    return this.academicsService.markTopicComplete(topicId, auth);
+  }
+
+  @Get('subjects/:id/syllabus/progress')
+  @Permissions('academics:read')
+  getSyllabusProgress(@Param('id') subjectId: string, @CurrentAuth() auth: AuthContext) {
+    return this.academicsService.getSyllabusProgress(subjectId, auth);
+  }
+
+  @Post('homework')
+  @Permissions('academics:manage')
+  createHomework(
+    @Body() dto: {
+      academicYearId: string;
+      classId: string;
+      sectionId?: string;
+      subjectId: string;
+      title: string;
+      instructions: string;
+      dueAt: string;
+      maxScore?: number;
+    },
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsService.createHomework(dto, auth);
+  }
+
+  @Get('homework')
+  @Permissions('academics:read')
+  listHomeworks(
+    @Query('classId') classId: string,
+    @Query('subjectId') subjectId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsService.listHomeworks(auth, classId, subjectId);
+  }
+
+  @Get('homework/:id/submissions')
+  @Permissions('academics:read')
+  listHomeworkSubmissions(@Param('id') homeworkId: string, @CurrentAuth() auth: AuthContext) {
+    return this.academicsService.listHomeworkSubmissions(homeworkId, auth);
+  }
+
+  @Patch('homework/submissions/:id/review')
+  @Permissions('academics:manage')
+  reviewHomeworkSubmission(
+    @Param('id') submissionId: string,
+    @Body() dto: { status: 'ASSIGNED' | 'SUBMITTED' | 'REVIEWED' | 'LATE'; score?: number; feedback?: string },
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    // Need to cast the string to HomeworkStatus inside the service or here.
+    // The service expects HomeworkStatus, so we can cast it if we import it, or just pass it since TS matches strings to string enums.
+    return this.academicsService.reviewHomeworkSubmission(submissionId, dto as any, auth);
   }
 
   @Get('report-cards/:id.pdf')

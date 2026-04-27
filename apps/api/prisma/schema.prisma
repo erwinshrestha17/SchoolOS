@@ -313,99 +313,100 @@ model Tenant {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  users                     User[]
-  roles                     Role[]
-  classes                   Class[]
-  students                  Student[]
-  subjects                  Subject[]
-  staff                     Staff[]
-  academicYears             AcademicYear[]
-  sections                  Section[]
-  guardians                 Guardian[]
-  studentGuardians          StudentGuardian[]
-  enrollments               Enrollment[]
-  attendanceSessions        AttendanceSession[]
-  attendanceRecords         AttendanceRecord[]
-  staffAttendance           StaffAttendance[]
-  feeHeads                  FeeHead[]
-  feePlans                  FeePlan[]
-  feePlanItems              FeePlanItem[]
-  studentFeeAssignments     StudentFeeAssignment[]
-  invoices                  Invoice[]
-  invoiceLines              InvoiceLine[]
-  payments                  Payment[]
-  receipts                  Receipt[]
-  chartAccounts             ChartAccount[]
-  journalEntries            JournalEntry[]
-  journalLines              JournalLine[]
-  notices                   Notice[]
-  events                    Event[]
-  studentDocuments          StudentDocument[]
-  siblingGroups             SiblingGroup[]
-  siblingGroupMembers       SiblingGroupMember[]
-  attendanceConflicts       AttendanceConflict[]
-  feeBillingRuns            FeeBillingRun[]
-  feeDueSchedules           FeeDueSchedule[]
-  discountRules             DiscountRule[]
-  feeWaivers                FeeWaiver[]
-  activityPosts             ActivityPost[]
-  activityAttachments       ActivityAttachment[]
-  activityPostStudents      ActivityPostStudent[]
-  activityReactions         ActivityReaction[]
-  developmentalMilestones   DevelopmentalMilestone[]
-  moodLogs                  MoodLog[]
-  notificationDeliveries    NotificationDelivery[]
-  guardianConsents          GuardianConsent[]
-  generatedStudentDocuments GeneratedStudentDocument[]
-  attendanceSyncSubmissions AttendanceSyncSubmission[]
-  teacherAssignments        SubjectTeacherAssignment[]
-  examTerms                 ExamTerm[]
-  examTimetableSlots        ExamTimetableSlot[]
-  markLockRequests          MarkLockRequest[]
-  assessmentComponents      AssessmentComponent[]
-  markEntries               MarkEntry[]
-  casRecords                CasRecord[]
-  reportCards               ReportCard[]
-  promotionRecords          PromotionRecord[]
-  timetableSlots            TimetableSlot[]
-  homeworkAssignments       HomeworkAssignment[]
-  homeworkSubmissions       HomeworkSubmission[]
-  staffContracts            StaffContract[]
-  payrollRuns               PayrollRun[]
-  payrollLines              PayrollLine[]
-  payslips                  Payslip[]
-  accountingPeriods         AccountingPeriod[]
-  conversations             Conversation[]
-  conversationParticipants  ConversationParticipant[]
-  messages                  Message[]
-  messageReadReceipts       MessageReadReceipt[]
-  libraryBooks              LibraryBook[]
-  libraryCopies             LibraryCopy[]
-  libraryIssues             LibraryIssue[]
-  transportRoutes           TransportRoute[]
-  transportStops            TransportStop[]
-  transportVehicles         TransportVehicle[]
+  users                      User[]
+  roles                      Role[]
+  classes                    Class[]
+  students                   Student[]
+  subjects                   Subject[]
+  staff                      Staff[]
+  academicYears              AcademicYear[]
+  sections                   Section[]
+  guardians                  Guardian[]
+  studentGuardians           StudentGuardian[]
+  enrollments                Enrollment[]
+  attendanceSessions         AttendanceSession[]
+  attendanceRecords          AttendanceRecord[]
+  staffAttendance            StaffAttendance[]
+  feeHeads                   FeeHead[]
+  feePlans                   FeePlan[]
+  feePlanItems               FeePlanItem[]
+  studentFeeAssignments      StudentFeeAssignment[]
+  invoices                   Invoice[]
+  invoiceLines               InvoiceLine[]
+  payments                   Payment[]
+  receipts                   Receipt[]
+  chartAccounts              ChartAccount[]
+  journalEntries             JournalEntry[]
+  journalLines               JournalLine[]
+  notices                    Notice[]
+  events                     Event[]
+  studentDocuments           StudentDocument[]
+  siblingGroups              SiblingGroup[]
+  siblingGroupMembers        SiblingGroupMember[]
+  attendanceConflicts        AttendanceConflict[]
+  feeBillingRuns             FeeBillingRun[]
+  feeDueSchedules            FeeDueSchedule[]
+  discountRules              DiscountRule[]
+  feeWaivers                 FeeWaiver[]
+  activityPosts              ActivityPost[]
+  activityAttachments        ActivityAttachment[]
+  activityPostStudents       ActivityPostStudent[]
+  activityReactions          ActivityReaction[]
+  developmentalMilestones    DevelopmentalMilestone[]
+  moodLogs                   MoodLog[]
+  notificationDeliveries     NotificationDelivery[]
+  guardianConsents           GuardianConsent[]
+  generatedStudentDocuments  GeneratedStudentDocument[]
+  attendanceSyncSubmissions  AttendanceSyncSubmission[]
+  teacherAssignments         SubjectTeacherAssignment[]
+  examTerms                  ExamTerm[]
+  examTimetableSlots         ExamTimetableSlot[]
+  markLockRequests           MarkLockRequest[]
+  assessmentComponents       AssessmentComponent[]
+  markEntries                MarkEntry[]
+  casRecords                 CasRecord[]
+  reportCards                ReportCard[]
+  promotionRecords           PromotionRecord[]
+  timetableSlots             TimetableSlot[]
+  homeworkAssignments        HomeworkAssignment[]
+  homeworkSubmissions        HomeworkSubmission[]
+  staffContracts             StaffContract[]
+  payrollRuns                PayrollRun[]
+  payrollLines               PayrollLine[]
+  payslips                   Payslip[]
+  accountingPeriods          AccountingPeriod[]
+  conversations              Conversation[]
+  conversationParticipants   ConversationParticipant[]
+  messages                   Message[]
+  messageReadReceipts        MessageReadReceipt[]
+  libraryBooks               LibraryBook[]
+  libraryCopies              LibraryCopy[]
+  libraryIssues              LibraryIssue[]
+  transportRoutes            TransportRoute[]
+  transportStops             TransportStop[]
+  transportVehicles          TransportVehicle[]
   transportDriverAssignments TransportDriverAssignment[]
-  transportEnrollments      TransportEnrollment[]
-  transportLogs             TransportLog[]
-  schoolCalendarDays        SchoolCalendarDay[]
-  staffLeaveBalances        StaffLeaveBalance[]
-  staffLeaveRequests        StaffLeaveRequest[]
+  transportEnrollments       TransportEnrollment[]
+  transportLogs              TransportLog[]
+  schoolCalendarDays         SchoolCalendarDay[]
+  staffLeaveBalances         StaffLeaveBalance[]
+  staffLeaveRequests         StaffLeaveRequest[]
+  syllabusTopics             SyllabusTopic[]
 }
 
 model User {
-  id           String     @id @default(uuid())
-  tenantId     String
-  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  email        String?
-  phone        String?
-  passwordHash String?
-  authMethod   AuthMethod @default(PASSWORD)
-  status       UserStatus @default(PENDING)
-  lastLoginAt  DateTime?
-  failedLoginCount Int    @default(0)
-  lockedUntil  DateTime?
-  createdAt    DateTime   @default(now())
+  id               String     @id @default(uuid())
+  tenantId         String
+  tenant           Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  email            String?
+  phone            String?
+  passwordHash     String?
+  authMethod       AuthMethod @default(PASSWORD)
+  status           UserStatus @default(PENDING)
+  lastLoginAt      DateTime?
+  failedLoginCount Int        @default(0)
+  lockedUntil      DateTime?
+  createdAt        DateTime   @default(now())
 
   userRoles                   UserRole[]
   refreshTokens               RefreshToken[]
@@ -637,6 +638,7 @@ model Subject {
   timetableSlots       TimetableSlot[]
   homeworkAssignments  HomeworkAssignment[]
   examTimetableSlots   ExamTimetableSlot[]
+  syllabusTopics       SyllabusTopic[]
 
   @@unique([tenantId, classId, code])
 }
@@ -826,21 +828,22 @@ model Staff {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
-  tenant                   Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  user                     User                       @relation("StaffUser", fields: [userId], references: [id], onDelete: Cascade)
-  attendanceRecords        StaffAttendance[]
-  teacherAssignments       SubjectTeacherAssignment[]
-  timetableSlots           TimetableSlot[]
-  homeworkAssignments      HomeworkAssignment[]
-  staffContracts           StaffContract[]
-  payrollLines             PayrollLine[]
-  payslips                 Payslip[]
-  conversationParticipants ConversationParticipant[]
-  messages                 Message[]
-  libraryIssues            LibraryIssue[]
+  tenant                     Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user                       User                        @relation("StaffUser", fields: [userId], references: [id], onDelete: Cascade)
+  attendanceRecords          StaffAttendance[]
+  teacherAssignments         SubjectTeacherAssignment[]
+  timetableSlots             TimetableSlot[]
+  homeworkAssignments        HomeworkAssignment[]
+  staffContracts             StaffContract[]
+  payrollLines               PayrollLine[]
+  payslips                   Payslip[]
+  conversationParticipants   ConversationParticipant[]
+  messages                   Message[]
+  libraryIssues              LibraryIssue[]
   transportDriverAssignments TransportDriverAssignment[]
-  leaveBalances            StaffLeaveBalance[]
-  leaveRequests            StaffLeaveRequest[]
+  leaveBalances              StaffLeaveBalance[]
+  leaveRequests              StaffLeaveRequest[]
+  syllabusTopics             SyllabusTopic[]
 }
 
 model AttendanceSession {
@@ -921,16 +924,16 @@ model SchoolCalendarDay {
 }
 
 model StaffLeaveBalance {
-  id         String   @id @default(uuid())
-  tenantId   String
-  staffId    String
-  leaveType  String
-  year       Int
-  allocated  Decimal  @default(0) @db.Decimal(8, 2)
-  used       Decimal  @default(0) @db.Decimal(8, 2)
-  carried    Decimal  @default(0) @db.Decimal(8, 2)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(uuid())
+  tenantId  String
+  staffId   String
+  leaveType String
+  year      Int
+  allocated Decimal  @default(0) @db.Decimal(8, 2)
+  used      Decimal  @default(0) @db.Decimal(8, 2)
+  carried   Decimal  @default(0) @db.Decimal(8, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
@@ -940,24 +943,24 @@ model StaffLeaveBalance {
 }
 
 model StaffLeaveRequest {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   tenantId     String
   staffId      String
   leaveType    String
   startsOn     DateTime
   endsOn       DateTime
-  days         Decimal  @db.Decimal(8, 2)
+  days         Decimal   @db.Decimal(8, 2)
   reason       String
-  status       String   @default("PENDING")
+  status       String    @default("PENDING")
   reviewedById String?
   reviewedAt   DateTime?
   reviewNote   String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  reviewedBy User? @relation("ReviewedStaffLeaveRequests", fields: [reviewedById], references: [id], onDelete: SetNull)
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff      Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  reviewedBy User?  @relation("ReviewedStaffLeaveRequests", fields: [reviewedById], references: [id], onDelete: SetNull)
 
   @@index([tenantId, staffId, status])
   @@index([tenantId, startsOn, endsOn])
@@ -1031,10 +1034,10 @@ model StudentFeeAssignment {
   assignedAt     DateTime @default(now())
   isActive       Boolean  @default(true)
 
-  tenant       Tenant       @relation(fields: [tenantId], references: [id])
-  student      Student      @relation(fields: [studentId], references: [id])
-  feePlan      FeePlan      @relation(fields: [feePlanId], references: [id])
-  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  tenant               Tenant                @relation(fields: [tenantId], references: [id])
+  student              Student               @relation(fields: [studentId], references: [id])
+  feePlan              FeePlan               @relation(fields: [feePlanId], references: [id])
+  academicYear         AcademicYear          @relation(fields: [academicYearId], references: [id])
   transportEnrollments TransportEnrollment[]
 
   @@unique([studentId, feePlanId, academicYearId])
@@ -1062,13 +1065,13 @@ model Invoice {
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
-  tenant       Tenant         @relation(fields: [tenantId], references: [id])
-  student      Student        @relation(fields: [studentId], references: [id])
-  academicYear AcademicYear   @relation(fields: [academicYearId], references: [id])
-  enrollment   Enrollment?    @relation(fields: [enrollmentId], references: [id])
-  billingRun   FeeBillingRun? @relation(fields: [billingRunId], references: [id])
-  lines        InvoiceLine[]
-  payments     Payment[]
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  student       Student        @relation(fields: [studentId], references: [id])
+  academicYear  AcademicYear   @relation(fields: [academicYearId], references: [id])
+  enrollment    Enrollment?    @relation(fields: [enrollmentId], references: [id])
+  billingRun    FeeBillingRun? @relation(fields: [billingRunId], references: [id])
+  lines         InvoiceLine[]
+  payments      Payment[]
   libraryIssues LibraryIssue[]
 
   @@unique([tenantId, invoiceNumber])
@@ -1135,21 +1138,21 @@ model Receipt {
 }
 
 model FeeDueSchedule {
-  id             String   @id @default(uuid())
-  tenantId       String
-  academicYearId String
-  feePlanId      String?
-  name           String
-  scheduleType   String
-  runMonth       Int?
-  runYear        Int?
-  dueDate        DateTime
-  reminderDays   Int[]
-  stopOnPaid     Boolean  @default(true)
-  isActive       Boolean  @default(true)
+  id              String    @id @default(uuid())
+  tenantId        String
+  academicYearId  String
+  feePlanId       String?
+  name            String
+  scheduleType    String
+  runMonth        Int?
+  runYear         Int?
+  dueDate         DateTime
+  reminderDays    Int[]
+  stopOnPaid      Boolean   @default(true)
+  isActive        Boolean   @default(true)
   lastProcessedAt DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
@@ -1637,12 +1640,12 @@ model ExamTerm {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  tenant       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  academicYear AcademicYear          @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
-  components   AssessmentComponent[]
-  markEntries  MarkEntry[]
-  reportCards  ReportCard[]
-  timetableSlots ExamTimetableSlot[]
+  tenant           Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear     AcademicYear          @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  components       AssessmentComponent[]
+  markEntries      MarkEntry[]
+  reportCards      ReportCard[]
+  timetableSlots   ExamTimetableSlot[]
   markLockRequests MarkLockRequest[]
 
   @@unique([tenantId, academicYearId, name])
@@ -1750,19 +1753,19 @@ model ReportCard {
 }
 
 model ExamTimetableSlot {
-  id          String   @id @default(uuid())
-  tenantId    String
+  id             String    @id @default(uuid())
+  tenantId       String
   academicYearId String
-  examTermId  String
-  subjectId   String
-  classId     String
-  sectionId   String?
-  startsAt    DateTime
-  endsAt      DateTime
-  room        String?
-  publishedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  examTermId     String
+  subjectId      String
+  classId        String
+  sectionId      String?
+  startsAt       DateTime
+  endsAt         DateTime
+  room           String?
+  publishedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
@@ -1775,16 +1778,16 @@ model ExamTimetableSlot {
 }
 
 model MarkLockRequest {
-  id          String   @id @default(uuid())
-  tenantId    String
-  examTermId  String
+  id            String    @id @default(uuid())
+  tenantId      String
+  examTermId    String
   requestedById String?
   reviewedById  String?
-  status      String   @default("PENDING")
-  reason      String
-  reviewNote  String?
-  createdAt   DateTime @default(now())
-  reviewedAt  DateTime?
+  status        String    @default("PENDING")
+  reason        String
+  reviewNote    String?
+  createdAt     DateTime  @default(now())
+  reviewedAt    DateTime?
 
   tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   examTerm    ExamTerm @relation(fields: [examTermId], references: [id], onDelete: Cascade)
@@ -1888,6 +1891,26 @@ model HomeworkSubmission {
 
   @@unique([tenantId, homeworkId, studentId])
   @@index([tenantId, studentId, status])
+}
+
+model SyllabusTopic {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  subjectId          String
+  title              String
+  description        String?
+  orderIndex         Int       @default(0)
+  isCompleted        Boolean   @default(false)
+  completedAt        DateTime?
+  completedByStaffId String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  tenant           Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  subject          Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  completedByStaff Staff?  @relation(fields: [completedByStaffId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, subjectId])
 }
 
 model StaffContract {
@@ -2115,7 +2138,7 @@ model LibraryCopy {
   replacementCost Decimal?          @db.Decimal(12, 2)
   purchasedAt     DateTime?
   createdAt       DateTime          @default(now())
-  updatedAt        DateTime         @updatedAt
+  updatedAt       DateTime          @updatedAt
 
   tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   book   LibraryBook    @relation(fields: [bookId], references: [id], onDelete: Cascade)
@@ -2255,18 +2278,18 @@ model TransportEnrollment {
 }
 
 model TransportLog {
-  id            String                  @id @default(uuid())
-  tenantId      String
-  routeId       String
-  stopId        String?
-  vehicleId     String?
-  enrollmentId  String?
-  studentId     String?
-  status        TransportBoardingStatus
-  occurredAt    DateTime                @default(now())
-  note          String?
-  createdById   String?
-  createdAt     DateTime                @default(now())
+  id           String                  @id @default(uuid())
+  tenantId     String
+  routeId      String
+  stopId       String?
+  vehicleId    String?
+  enrollmentId String?
+  studentId    String?
+  status       TransportBoardingStatus
+  occurredAt   DateTime                @default(now())
+  note         String?
+  createdById  String?
+  createdAt    DateTime                @default(now())
 
   tenant     Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   route      TransportRoute       @relation(fields: [routeId], references: [id], onDelete: Restrict)

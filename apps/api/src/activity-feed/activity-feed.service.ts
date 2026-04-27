@@ -9,6 +9,7 @@ import {
   ConsentType,
   NotificationChannel,
 } from '@prisma/client';
+import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
@@ -26,6 +27,7 @@ export class ActivityFeedService {
     private readonly storageService: StorageService,
     private readonly communicationsService: CommunicationsService,
     private readonly auditService: AuditService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async listPosts(
@@ -238,7 +240,68 @@ export class ActivityFeedService {
       },
     });
 
+    this.eventEmitter.emit('feed.post.created', post);
+
     return post;
+  }
+
+  @OnEvent('student.admitted')
+  async handleStudentAdmitted(event: { tenantId: string; classId: string; sectionId?: string; studentId: string; studentName: string; actor: AuthContext }) {
+    const post = await this.prisma.activityPost.create({
+      data: {
+        tenantId: event.tenantId,
+        classId: event.classId,
+        sectionId: event.sectionId ?? null,
+        createdById: event.actor.userId,
+        title: 'New Student Welcome',
+        caption: `Please welcome ${event.studentName} to the class!`,
+        category: ActivityCategory.GENERAL,
+        audienceType: event.sectionId ? AudienceType.SECTION : AudienceType.CLASS,
+        publishedAt: new Date(),
+        studentTags: {
+          create: [{ tenantId: event.tenantId, studentId: event.studentId }]
+        }
+      },
+      include: { attachments: true, studentTags: true },
+    });
+    this.eventEmitter.emit('feed.post.created', post);
+  }
+
+  @OnEvent('homework.assigned')
+  async handleHomeworkAssigned(event: { tenantId: string; classId: string; sectionId?: string; homeworkId: string; title: string; actor: AuthContext }) {
+    const post = await this.prisma.activityPost.create({
+      data: {
+        tenantId: event.tenantId,
+        classId: event.classId,
+        sectionId: event.sectionId ?? null,
+        createdById: event.actor.userId,
+        title: 'New Homework Assigned',
+        caption: `A new homework assignment "${event.title}" has been posted. Please check the academics portal.`,
+        category: ActivityCategory.LEARNING,
+        audienceType: event.sectionId ? AudienceType.SECTION : AudienceType.CLASS,
+        publishedAt: new Date(),
+      },
+      include: { attachments: true, studentTags: true },
+    });
+    this.eventEmitter.emit('feed.post.created', post);
+  }
+
+  @OnEvent('exam.published')
+  async handleExamPublished(event: { tenantId: string; classId: string; examTermId: string; actor: AuthContext }) {
+    const post = await this.prisma.activityPost.create({
+      data: {
+        tenantId: event.tenantId,
+        classId: event.classId,
+        createdById: event.actor.userId,
+        title: 'Exam Timetable Published',
+        caption: `The exam timetable for the upcoming term has been published.`,
+        category: ActivityCategory.LEARNING,
+        audienceType: AudienceType.CLASS,
+        publishedAt: new Date(),
+      },
+      include: { attachments: true, studentTags: true },
+    });
+    this.eventEmitter.emit('feed.post.created', post);
   }
 
   async createReaction(

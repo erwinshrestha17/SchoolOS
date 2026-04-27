@@ -5,8 +5,11 @@ import {
   Param,
   Post,
   Query,
+  Sse,
   UseGuards,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Observable, fromEvent, map, filter } from 'rxjs';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -21,7 +24,23 @@ import { CreateMoodLogDto } from './dto/create-mood-log.dto';
 @Controller('activity-feed')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class ActivityFeedController {
-  constructor(private readonly activityFeedService: ActivityFeedService) {}
+  constructor(
+    private readonly activityFeedService: ActivityFeedService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  @Sse('stream')
+  @Permissions('activity_feed:read')
+  streamFeed(@CurrentAuth() auth: AuthContext): Observable<MessageEvent> {
+    // Uses RxJS to observe the event emitter and map it to an SSE MessageEvent.
+    // Filters events to ensure the user only receives posts intended for their tenant.
+    return fromEvent(this.eventEmitter, 'feed.post.created').pipe(
+      filter((payload: any) => payload.tenantId === auth.tenantId),
+      map((payload) => ({
+        data: payload,
+      } as MessageEvent)),
+    );
+  }
 
   @Get('posts')
   @Permissions('activity_feed:read')

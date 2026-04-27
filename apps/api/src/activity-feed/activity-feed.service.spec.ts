@@ -61,6 +61,7 @@ describe('ActivityFeedService', () => {
       storageService,
       communicationsService,
       auditService,
+      { emit: jest.fn() } as any,
     );
   });
 

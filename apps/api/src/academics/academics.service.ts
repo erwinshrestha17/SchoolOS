@@ -1,12 +1,15 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   AudienceType,
   ConsentType,
   GradeLockStatus,
+  HomeworkStatus,
   NotificationChannel,
   Prisma,
 } from '@prisma/client';
@@ -33,6 +36,7 @@ export class AcademicsService {
     private readonly prisma: PrismaService,
     private readonly communicationsService: CommunicationsService,
     private readonly auditService: AuditService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async listSubjects(actor: AuthContext) {
@@ -373,6 +377,13 @@ export class AcademicsService {
       userId: actor.userId,
       resourceId: examTermId,
       after: { slotCount: slots.length },
+    });
+
+    this.eventEmitter.emit('exam.published', {
+      tenantId: actor.tenantId,
+      classId: slots[0].classId,
+      examTermId,
+      actor,
     });
 
     return { examTermId, publishedSlots: slots.length };
@@ -812,7 +823,252 @@ export class AcademicsService {
       });
     }
 
+    await this.auditService.record({
+      action: 'generate',
+      resource: 'report_card',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: reportCard.id,
+      after: {
+        percentage: Number(reportCard.percentage),
+        grade: reportCard.grade,
+        status: reportCard.status,
+      },
+    });
+
     return reportCard;
+  }
+
+  async createSyllabusTopic(
+    subjectId: string,
+    dto: { title: string; description?: string; orderIndex?: number },
+    actor: AuthContext,
+  ) {
+    const subject = await this.prisma.subject.findFirst({
+      where: { id: subjectId, tenantId: actor.tenantId },
+    });
+
+    if (!subject) {
+      throw new NotFoundException('Subject not found');
+    }
+
+    const topic = await this.prisma.syllabusTopic.create({
+      data: {
+        tenantId: actor.tenantId,
+        subjectId,
+        title: dto.title,
+        description: dto.description ?? null,
+        orderIndex: dto.orderIndex ?? 0,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'syllabus_topic',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: topic.id,
+      after: { title: topic.title, subjectId },
+    });
+
+    return topic;
+  }
+
+  async listSyllabusTopics(subjectId: string, actor: AuthContext) {
+    return this.prisma.syllabusTopic.findMany({
+      where: { tenantId: actor.tenantId, subjectId },
+      orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
+    });
+  }
+
+  async markTopicComplete(topicId: string, actor: AuthContext) {
+    const topic = await this.prisma.syllabusTopic.findFirst({
+      where: { id: topicId, tenantId: actor.tenantId },
+    });
+
+    if (!topic) {
+      throw new NotFoundException('Topic not found');
+    }
+
+    const updated = await this.prisma.syllabusTopic.update({
+      where: { id: topicId },
+      data: {
+        isCompleted: true,
+        completedAt: new Date(),
+        completedByStaffId: (await this.getStaffId(actor)) ?? null,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'complete',
+      resource: 'syllabus_topic',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: topic.id,
+    });
+
+    return updated;
+  }
+
+  async getSyllabusProgress(subjectId: string, actor: AuthContext) {
+    const topics = await this.prisma.syllabusTopic.findMany({
+      where: { tenantId: actor.tenantId, subjectId },
+    });
+
+    const total = topics.length;
+    if (total === 0) {
+      return { total: 0, completed: 0, percentage: 0 };
+    }
+
+    const completed = topics.filter((t) => t.isCompleted).length;
+    return {
+      total,
+      completed,
+      percentage: Math.round((completed / total) * 10000) / 100,
+    };
+  }
+
+  private async getStaffId(actor: AuthContext): Promise<string | null> {
+    const staff = await this.prisma.staff.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+    });
+    return staff?.id ?? null;
+  }
+
+  async createHomework(
+    dto: {
+      academicYearId: string;
+      classId: string;
+      sectionId?: string;
+      subjectId: string;
+      title: string;
+      instructions: string;
+      dueAt: string;
+      maxScore?: number;
+    },
+    actor: AuthContext,
+  ) {
+    const staffId = await this.getStaffId(actor);
+
+    // Subject-Teacher Scoping
+    if (actor.roles.includes('subject_teacher') && !actor.roles.includes('super_admin') && !actor.roles.includes('admin')) {
+      const assignment = await this.prisma.subjectTeacherAssignment.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          subjectId: dto.subjectId,
+          staffId: staffId!,
+        },
+      });
+      if (!assignment) {
+        throw new ForbiddenException('You are not assigned to this subject');
+      }
+    }
+
+    const homework = await this.prisma.homeworkAssignment.create({
+      data: {
+        tenantId: actor.tenantId,
+        academicYearId: dto.academicYearId,
+        classId: dto.classId,
+        sectionId: dto.sectionId ?? null,
+        subjectId: dto.subjectId,
+        assignedByStaffId: staffId,
+        title: dto.title,
+        instructions: dto.instructions,
+        dueAt: new Date(dto.dueAt),
+        maxScore: dto.maxScore ? new Prisma.Decimal(dto.maxScore) : null,
+      },
+    });
+
+    // Fire automated system post via ActivityFeedService listening to this event
+    this.eventEmitter.emit('homework.assigned', {
+      tenantId: actor.tenantId,
+      classId: homework.classId,
+      sectionId: homework.sectionId,
+      homeworkId: homework.id,
+      title: homework.title,
+      actor,
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'homework',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: homework.id,
+    });
+
+    return homework;
+  }
+
+  async listHomeworks(actor: AuthContext, classId?: string, subjectId?: string) {
+    return this.prisma.homeworkAssignment.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        ...(classId ? { classId } : {}),
+        ...(subjectId ? { subjectId } : {}),
+      },
+      include: {
+        subject: true,
+        assignedByStaff: true,
+      },
+      orderBy: [{ dueAt: 'desc' }],
+    });
+  }
+
+  async listHomeworkSubmissions(homeworkId: string, actor: AuthContext) {
+    return this.prisma.homeworkSubmission.findMany({
+      where: { tenantId: actor.tenantId, homeworkId },
+      include: { student: true },
+    });
+  }
+
+  async reviewHomeworkSubmission(
+    submissionId: string,
+    dto: { status: HomeworkStatus; score?: number; feedback?: string },
+    actor: AuthContext,
+  ) {
+    const submission = await this.prisma.homeworkSubmission.findFirst({
+      where: { id: submissionId, tenantId: actor.tenantId },
+      include: { homework: true },
+    });
+
+    if (!submission) {
+      throw new NotFoundException('Submission not found');
+    }
+
+    if (actor.roles.includes('subject_teacher') && !actor.roles.includes('super_admin') && !actor.roles.includes('admin')) {
+      const staffId = await this.getStaffId(actor);
+      const assignment = await this.prisma.subjectTeacherAssignment.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          subjectId: submission.homework.subjectId,
+          staffId: staffId!,
+        },
+      });
+      if (!assignment) {
+        throw new ForbiddenException('You are not assigned to this subject');
+      }
+    }
+
+    const updated = await this.prisma.homeworkSubmission.update({
+      where: { id: submissionId },
+      data: {
+        status: dto.status,
+        score: dto.score ? new Prisma.Decimal(dto.score) : null,
+        feedback: dto.feedback ?? null,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'review',
+      resource: 'homework_submission',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      after: { status: updated.status, score: dto.score },
+    });
+
+    return updated;
   }
 
   async listPromotionReadiness(

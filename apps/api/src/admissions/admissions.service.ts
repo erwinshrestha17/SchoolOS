@@ -1,8 +1,10 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EnrollmentStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -22,7 +24,6 @@ import { BulkAdmissionImportDto } from './dto/bulk-admission-import.dto';
 import { CheckAdmissionDuplicateDto } from './dto/check-admission-duplicate.dto';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
 import { TransferStudentDto } from './dto/transfer-student.dto';
-import { BadRequestException } from '@nestjs/common';
 
 @Injectable()
 export class AdmissionsService {
@@ -34,6 +35,7 @@ export class AdmissionsService {
     private readonly notificationsService: NotificationsService,
     private readonly auditService: AuditService,
     private readonly configService: ConfigService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async listAdmissions(actor: AuthContext) {
@@ -387,6 +389,15 @@ export class AdmissionsService {
       },
     });
 
+    this.eventEmitter.emit('student.admitted', {
+      tenantId: actor.tenantId,
+      classId: dto.classId,
+      sectionId: dto.sectionId,
+      studentId: student.id,
+      studentName: `${student.firstNameEn} ${student.lastNameEn}`,
+      actor,
+    });
+
     return {
       student: {
         id: student.id,
@@ -659,6 +670,12 @@ export class AdmissionsService {
         transferDate: dto.transferDate,
         destinationSchool: dto.destinationSchool,
       },
+    });
+
+    this.eventEmitter.emit('student.transferred', {
+      tenantId: actor.tenantId,
+      studentId: student.id,
+      actor,
     });
 
     return {
