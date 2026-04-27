@@ -1,20 +1,33 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { FinanceService } from '../finance/finance.service';
 import { AccountingService } from './accounting.service';
 import { CreateAccountingPeriodDto } from './dto/create-accounting-period.dto';
 import { CreateChartAccountDto } from './dto/create-chart-account.dto';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { CreateManualJournalDto } from './dto/create-manual-journal.dto';
+import { ReconciliationQueryDto } from './dto/reconciliation-query.dto';
 import { ReverseJournalEntryDto } from './dto/reverse-journal-entry.dto';
 
 @Controller('accounting')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class AccountingController {
-  constructor(private readonly accountingService: AccountingService) {}
+  constructor(
+    private readonly accountingService: AccountingService,
+    private readonly financeService: FinanceService,
+  ) {}
 
   @Get('chart-accounts')
   @Permissions('accounting:read')
@@ -50,6 +63,24 @@ export class AccountingController {
   @Permissions('accounting:read')
   reports(@CurrentAuth() auth: AuthContext) {
     return this.accountingService.buildReports(auth);
+  }
+
+  @Get('reports/reconciliation')
+  @Permissions('accounting:read')
+  reconciliationSummary(
+    @Query() query: ReconciliationQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.getReconciliationSummary(query, auth);
+  }
+
+  @Get('reports/reconciliation/export')
+  @Permissions('accounting:read')
+  reconciliationExport(
+    @Query() query: ReconciliationQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.exportReconciliation(query, auth);
   }
 
   @Post('journals')

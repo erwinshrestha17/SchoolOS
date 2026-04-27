@@ -91,6 +91,12 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Delete or withdraw student records',
   },
   {
+    resource: 'students',
+    action: 'manage_lifecycle',
+    description:
+      'Transfer, exit, archive, and manage student lifecycle transitions',
+  },
+  {
     resource: 'tenants',
     action: 'manage',
     description: 'Deactivate or manage tenants (super_admin only)',
@@ -239,6 +245,16 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     resource: 'payments',
     action: 'collect',
     description: 'Collect payments and issue receipts',
+  },
+  {
+    resource: 'payments',
+    action: 'refund',
+    description: 'Refund collected payments with immutable journal posting',
+  },
+  {
+    resource: 'payments',
+    action: 'close',
+    description: 'Preview and finalize cashier close snapshots',
   },
   {
     resource: 'receipts',
@@ -485,6 +501,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'fees:discount',
     'fees:adjust',
     'payments:collect',
+    'payments:refund',
+    'payments:close',
     'receipts:read',
     'ledger:read',
     'accounting:read',

@@ -57,7 +57,7 @@ export class AdmissionsController {
   }
 
   @Post('students/:id/transfer')
-  @Permissions('enrollments:create')
+  @Permissions('students:manage_lifecycle')
   transferStudent(
     @Param('id') studentId: string,
     @Body() dto: TransferStudentDto,
@@ -76,7 +76,7 @@ export class AdmissionsController {
   }
 
   @Post('students/:id/archive-alumni')
-  @Permissions('enrollments:create')
+  @Permissions('students:manage_lifecycle')
   archiveAlumni(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,

@@ -3,11 +3,14 @@ import {
   AuthMethod,
   FeeFrequency,
   InvoiceStatus,
+  JournalLineSide,
+  JournalSourceType,
+  PaymentMethod,
   Prisma,
 } from '@prisma/client';
 import {
-  resolveInvoiceStatusAfterAdjustment,
   FinanceService,
+  resolveInvoiceStatusAfterAdjustment,
 } from './finance.service';
 import { InvoiceAdjustmentDirection } from './dto/create-invoice-adjustment.dto';
 
@@ -18,10 +21,10 @@ const actor = {
   email: 'accountant@schoolos.test',
   authMethod: AuthMethod.PASSWORD,
   roles: ['accountant'],
-  permissions: ['fees:adjust'],
+  permissions: ['fees:adjust', 'payments:refund', 'payments:close'],
 };
 
-describe('finance invoice production controls', () => {
+describe('finance production controls', () => {
   it('voids unpaid invoices with an audit trail', async () => {
     const invoice = buildInvoice({ payments: [] });
     const { service, prisma, auditService } = buildService({
@@ -55,9 +58,9 @@ describe('finance invoice production controls', () => {
     );
   });
 
-  it('blocks voiding invoices with payments', async () => {
+  it('blocks voiding invoices with net payments still applied', async () => {
     const invoice = buildInvoice({
-      payments: [{ amount: new Prisma.Decimal(100) }],
+      payments: [buildInvoicePayment({ amount: new Prisma.Decimal(100) })],
     });
     const { service } = buildService({ invoice, feeHead: buildFeeHead() });
 
@@ -127,9 +130,9 @@ describe('finance invoice production controls', () => {
     );
   });
 
-  it('blocks adjustments that would reduce total below paid amount', async () => {
+  it('blocks adjustments that would reduce total below net paid amount', async () => {
     const invoice = buildInvoice({
-      payments: [{ amount: new Prisma.Decimal(950) }],
+      payments: [buildInvoicePayment({ amount: new Prisma.Decimal(950) })],
       status: InvoiceStatus.PARTIAL,
       totalAmount: new Prisma.Decimal(1000),
     });
@@ -150,12 +153,392 @@ describe('finance invoice production controls', () => {
     ).rejects.toThrow('Adjustment would make paid amount exceed invoice total');
   });
 
-  it('rejects missing invoices and fee heads', async () => {
+  it('creates a partial refund with a dedicated journal entry', async () => {
+    const payment = buildPayment({
+      amount: new Prisma.Decimal(500),
+      invoice: buildInvoice({
+        status: InvoiceStatus.PAID,
+        totalAmount: new Prisma.Decimal(500),
+        paidAt: new Date('2026-04-21T00:00:00.000Z'),
+        payments: [
+          buildInvoicePayment({
+            id: 'payment-1',
+            amount: new Prisma.Decimal(500),
+          }),
+        ],
+      }),
+    });
+    const sourceJournal = buildPaymentJournal({
+      amount: new Prisma.Decimal(500),
+    });
+    const createdRefund = {
+      id: 'refund-1',
+      refundNumber: 'RFD-2026-00001',
+      amount: new Prisma.Decimal(200),
+      refundDate: new Date('2026-04-27T00:00:00.000Z'),
+    };
+    const createdRefundJournal = {
+      id: 'journal-refund-1',
+      entryNumber: 'JE-2026-00005',
+    };
+    const updatedInvoice = {
+      ...payment.invoice,
+      status: InvoiceStatus.PARTIAL,
+      paidAt: null,
+    };
+    const { service, prisma, auditService } = buildService({
+      invoice: null,
+      feeHead: null,
+      payment,
+      sourceJournal,
+      createdRefund,
+      createdJournalEntry: createdRefundJournal,
+      updatedInvoice,
+      paymentRefundCount: 0,
+      journalCount: 4,
+    });
+
+    const result = await service.refundPayment(
+      payment.id,
+      {
+        amount: 200,
+        reason: 'Parent requested correction',
+        refundDate: '2026-04-27',
+      },
+      actor,
+    );
+
+    expect(result).toEqual({
+      refundId: createdRefund.id,
+      refundNumber: createdRefund.refundNumber,
+      paymentId: payment.id,
+      invoiceId: payment.invoiceId,
+      amount: 200,
+      refundDate: createdRefund.refundDate,
+      journalEntryNumber: createdRefundJournal.entryNumber,
+      remainingRefundableAmount: 300,
+      invoiceStatus: InvoiceStatus.PARTIAL,
+    });
+    expect(prisma.paymentRefund.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        paymentId: payment.id,
+        refundNumber: 'RFD-2026-00001',
+        amount: new Prisma.Decimal(200),
+        reason: 'Parent requested correction',
+      }),
+    });
+    expect(prisma.journalEntry.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        entryNumber: 'JE-2026-00005',
+        sourceType: JournalSourceType.PAYMENT_REFUND,
+        sourceId: createdRefund.id,
+        lines: {
+          create: [
+            expect.objectContaining({
+              chartAccountId: 'income',
+              side: JournalLineSide.DEBIT,
+              amount: new Prisma.Decimal(200),
+            }),
+            expect.objectContaining({
+              chartAccountId: 'cash',
+              side: JournalLineSide.CREDIT,
+              amount: new Prisma.Decimal(200),
+            }),
+          ],
+        },
+      }),
+    });
+    expect(prisma.invoice.update).toHaveBeenCalledWith({
+      where: { id: payment.invoiceId },
+      data: {
+        status: InvoiceStatus.PARTIAL,
+        paidAt: null,
+      },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'refund',
+        resource: 'payment_refund',
+        resourceId: createdRefund.id,
+      }),
+    );
+  });
+
+  it('blocks refunding more than the remaining refundable amount', async () => {
+    const payment = buildPayment({
+      amount: new Prisma.Decimal(300),
+      refunds: [{ amount: new Prisma.Decimal(200) }],
+      invoice: buildInvoice({
+        status: InvoiceStatus.PARTIAL,
+        totalAmount: new Prisma.Decimal(300),
+        payments: [
+          buildInvoicePayment({
+            id: 'payment-1',
+            amount: new Prisma.Decimal(300),
+            refunds: [{ amount: new Prisma.Decimal(200) }],
+          }),
+        ],
+      }),
+    });
+    const { service } = buildService({
+      invoice: null,
+      feeHead: null,
+      payment,
+      sourceJournal: buildPaymentJournal({ amount: new Prisma.Decimal(300) }),
+    });
+
+    await expect(
+      service.refundPayment(
+        payment.id,
+        { amount: 150, reason: 'Too much originally charged' },
+        actor,
+      ),
+    ).rejects.toThrow('Refund exceeds the remaining refundable amount');
+  });
+
+  it('blocks refunds in a closed accounting period', async () => {
+    const payment = buildPayment({
+      invoice: buildInvoice({
+        status: InvoiceStatus.PAID,
+        totalAmount: new Prisma.Decimal(500),
+        payments: [
+          buildInvoicePayment({
+            id: 'payment-1',
+            amount: new Prisma.Decimal(500),
+          }),
+        ],
+      }),
+    });
+    const { service } = buildService({
+      invoice: null,
+      feeHead: null,
+      payment,
+      sourceJournal: buildPaymentJournal({ amount: new Prisma.Decimal(500) }),
+      closedPeriod: { id: 'period-1', name: 'FY 2082 Closed' },
+    });
+
+    await expect(
+      service.refundPayment(
+        payment.id,
+        { amount: 100, reason: 'Correction', refundDate: '2026-04-27' },
+        actor,
+      ),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  it('previews and finalizes a cashier close with refund deductions', async () => {
+    const paymentRows = [
+      buildCashierPayment({
+        amount: new Prisma.Decimal(500),
+        receipt: { receiptNumber: 'REC-2026-00001' },
+      }),
+      buildCashierPayment({
+        id: 'payment-2',
+        amount: new Prisma.Decimal(300),
+        receipt: { receiptNumber: 'REC-2026-00002' },
+      }),
+    ];
+    const refundRows = [
+      {
+        id: 'refund-1',
+        amount: new Prisma.Decimal(100),
+        refundDate: new Date('2026-04-27T10:30:00.000Z'),
+        payment: {
+          receipt: { receiptNumber: 'REC-2026-00001' },
+        },
+      },
+    ];
+    const createdClose = {
+      id: 'close-1',
+      closeNumber: 'CLS-2026-00001',
+      openedAt: new Date('2026-04-27T09:00:00.000Z'),
+      closedAt: new Date('2026-04-27T17:00:00.000Z'),
+      grossCollected: new Prisma.Decimal(800),
+      totalRefunded: new Prisma.Decimal(100),
+      netCollected: new Prisma.Decimal(700),
+      paymentCount: 2,
+      refundCount: 1,
+      firstReceiptNumber: 'REC-2026-00001',
+      lastReceiptNumber: 'REC-2026-00002',
+      notes: 'Day close',
+      collectorUser: null,
+      closedBy: { id: actor.userId, email: actor.email },
+    };
+    const { service, prisma } = buildService({
+      invoice: null,
+      feeHead: null,
+      cashierPayments: paymentRows,
+      cashierRefunds: refundRows,
+      createdCashierClose: createdClose,
+      cashierCloseCount: 0,
+    });
+
+    const preview = await service.previewCashierClose(
+      {
+        openedAt: '2026-04-27T09:00:00.000Z',
+        closedAt: '2026-04-27T17:00:00.000Z',
+      },
+      actor,
+    );
+    const finalized = await service.finalizeCashierClose(
+      {
+        openedAt: '2026-04-27T09:00:00.000Z',
+        closedAt: '2026-04-27T17:00:00.000Z',
+        notes: 'Day close',
+      },
+      actor,
+    );
+
+    expect(preview).toEqual(
+      expect.objectContaining({
+        grossCollected: 800,
+        totalRefunded: 100,
+        netCollected: 700,
+        paymentCount: 2,
+        refundCount: 1,
+      }),
+    );
+    expect(prisma.cashierClose.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        closeNumber: 'CLS-2026-00001',
+        grossCollected: new Prisma.Decimal(800),
+        totalRefunded: new Prisma.Decimal(100),
+        netCollected: new Prisma.Decimal(700),
+      }),
+      include: {
+        collectorUser: true,
+        closedBy: true,
+      },
+    });
+    expect(finalized.closeNumber).toBe('CLS-2026-00001');
+  });
+
+  it('blocks duplicate cashier close windows', async () => {
+    const { service } = buildService({
+      invoice: null,
+      feeHead: null,
+      existingCashierClose: { id: 'close-1', closeNumber: 'CLS-2026-00001' },
+    });
+
+    await expect(
+      service.finalizeCashierClose(
+        {
+          openedAt: '2026-04-27T09:00:00.000Z',
+          closedAt: '2026-04-27T17:00:00.000Z',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('Cashier close CLS-2026-00001 already exists');
+  });
+
+  it('builds reconciliation rows and csv export from the same payments', async () => {
+    const paymentRows = [
+      {
+        id: 'payment-1',
+        paidAt: new Date('2026-04-27T09:15:00.000Z'),
+        amount: new Prisma.Decimal(500),
+        method: PaymentMethod.CASH,
+        invoiceId: 'invoice-1',
+        receipt: { receiptNumber: 'REC-2026-00001' },
+        collectedBy: { id: actor.userId, email: actor.email },
+        student: {
+          id: 'student-1',
+          firstNameEn: 'Erwin',
+          lastNameEn: 'Shrestha',
+          class: { name: 'Grade 1' },
+        },
+        invoice: { invoiceNumber: 'INV-2026-00001' },
+        refunds: [
+          {
+            id: 'refund-1',
+            refundNumber: 'RFD-2026-00001',
+            refundDate: new Date('2026-04-27T12:00:00.000Z'),
+            amount: new Prisma.Decimal(100),
+          },
+        ],
+      },
+    ];
+    const { service } = buildService({
+      invoice: null,
+      feeHead: null,
+      reconciliationPayments: paymentRows,
+      reconciliationPaymentEntries: [
+        { sourceId: 'payment-1', entryNumber: 'JE-2026-00010' },
+      ],
+      reconciliationRefundEntries: [
+        { sourceId: 'refund-1', entryNumber: 'JE-2026-00011' },
+      ],
+    });
+
+    const summary = await service.getReconciliationSummary(
+      {
+        openedAt: '2026-04-27T09:00:00.000Z',
+        closedAt: '2026-04-27T17:00:00.000Z',
+      },
+      actor,
+    );
+    const csv = await service.exportReconciliation(
+      {
+        openedAt: '2026-04-27T09:00:00.000Z',
+        closedAt: '2026-04-27T17:00:00.000Z',
+        format: 'csv' as never,
+      },
+      actor,
+    );
+
+    expect(summary.totalRows).toBe(1);
+    expect(summary.grossCollected).toBe(500);
+    expect(summary.totalRefunded).toBe(100);
+    expect(summary.netCollected).toBe(400);
+    expect(summary.rows[0]).toEqual(
+      expect.objectContaining({
+        receiptNumber: 'REC-2026-00001',
+        refundNumber: 'RFD-2026-00001',
+        journalEntryNumber: 'JE-2026-00010',
+        refundJournalEntryNumbers: ['JE-2026-00011'],
+      }),
+    );
+    expect(csv).toContain('REC-2026-00001');
+    expect(csv).toContain('RFD-2026-00001');
+  });
+
+  it('rejects missing invoices, fee heads, and source journals', async () => {
     const { service } = buildService({ invoice: null, feeHead: null });
 
     await expect(
       service.voidInvoice('missing', { reason: 'Missing' }, actor),
     ).rejects.toThrow(NotFoundException);
+
+    const payment = buildPayment({
+      invoice: buildInvoice({
+        status: InvoiceStatus.PAID,
+        totalAmount: new Prisma.Decimal(500),
+        payments: [
+          buildInvoicePayment({
+            id: 'payment-1',
+            amount: new Prisma.Decimal(500),
+          }),
+        ],
+      }),
+    });
+    const missingJournalService = buildService({
+      invoice: null,
+      feeHead: null,
+      payment,
+      sourceJournal: null,
+    }).service;
+
+    await expect(
+      missingJournalService.refundPayment(
+        payment.id,
+        { amount: 50, reason: 'Correction' },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Original payment journal entry was not found for this payment',
+    );
   });
 
   it('resolves invoice status after adjustments from paid amount', () => {
@@ -187,11 +570,83 @@ function buildInvoice(overrides: Record<string, unknown> = {}) {
   return {
     id: 'invoice-1',
     tenantId: actor.tenantId,
+    studentId: 'student-1',
     status: InvoiceStatus.ISSUED,
     subtotal: new Prisma.Decimal(1000),
     vatAmount: new Prisma.Decimal(117),
     totalAmount: new Prisma.Decimal(1117),
+    paidAt: null,
     payments: [],
+    ...overrides,
+  };
+}
+
+function buildInvoicePayment(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'payment-1',
+    amount: new Prisma.Decimal(0),
+    refunds: [],
+    ...overrides,
+  };
+}
+
+function buildPayment(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'payment-1',
+    tenantId: actor.tenantId,
+    studentId: 'student-1',
+    invoiceId: 'invoice-1',
+    amount: new Prisma.Decimal(500),
+    method: PaymentMethod.CASH,
+    refunds: [],
+    receipt: {
+      receiptNumber: 'REC-2026-00001',
+    },
+    invoice: buildInvoice({
+      id: 'invoice-1',
+      status: InvoiceStatus.PAID,
+      totalAmount: new Prisma.Decimal(500),
+      paidAt: new Date('2026-04-21T00:00:00.000Z'),
+      payments: [
+        buildInvoicePayment({
+          id: 'payment-1',
+          amount: new Prisma.Decimal(500),
+        }),
+      ],
+    }),
+    ...overrides,
+  };
+}
+
+function buildPaymentJournal(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'journal-payment-1',
+    entryNumber: 'JE-2026-00004',
+    sourceType: JournalSourceType.FEE_PAYMENT,
+    sourceId: 'payment-1',
+    lines: [
+      {
+        chartAccountId: 'cash',
+        side: JournalLineSide.DEBIT,
+        amount: new Prisma.Decimal(500),
+        description: 'Payment receipt REC-2026-00001',
+      },
+      {
+        chartAccountId: 'income',
+        side: JournalLineSide.CREDIT,
+        amount: new Prisma.Decimal(500),
+        description: 'Tuition',
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function buildCashierPayment(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'payment-1',
+    amount: new Prisma.Decimal(0),
+    receipt: null,
     ...overrides,
   };
 }
@@ -209,8 +664,24 @@ function buildFeeHead() {
 function buildService(options: {
   invoice: unknown;
   feeHead: unknown;
+  payment?: unknown;
+  sourceJournal?: unknown;
   createdLine?: unknown;
   updatedInvoice?: unknown;
+  createdRefund?: unknown;
+  createdJournalEntry?: unknown;
+  paymentRefundCount?: number;
+  journalCount?: number;
+  closedPeriod?: unknown;
+  cashierPayments?: unknown[];
+  cashierRefunds?: unknown[];
+  createdCashierClose?: unknown;
+  existingCashierClose?: unknown;
+  cashierCloseCount?: number;
+  cashierCloseList?: unknown[];
+  reconciliationPayments?: unknown[];
+  reconciliationPaymentEntries?: unknown[];
+  reconciliationRefundEntries?: unknown[];
 }) {
   const prisma = {
     invoice: {
@@ -220,8 +691,48 @@ function buildService(options: {
     feeHead: {
       findFirst: jest.fn().mockResolvedValue(options.feeHead),
     },
+    payment: {
+      findFirst: jest.fn().mockResolvedValue(options.payment ?? null),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(
+          options.cashierPayments ?? options.reconciliationPayments ?? [],
+        ),
+    },
+    paymentRefund: {
+      count: jest.fn().mockResolvedValue(options.paymentRefundCount ?? 0),
+      create: jest.fn().mockResolvedValue(options.createdRefund),
+      findMany: jest.fn().mockResolvedValue(options.cashierRefunds ?? []),
+    },
+    cashierClose: {
+      count: jest.fn().mockResolvedValue(options.cashierCloseCount ?? 0),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(options.existingCashierClose ?? null),
+      create: jest.fn().mockResolvedValue(options.createdCashierClose),
+      findMany: jest.fn().mockResolvedValue(options.cashierCloseList ?? []),
+    },
+    journalEntry: {
+      findFirst: jest.fn().mockResolvedValue(options.sourceJournal ?? null),
+      count: jest.fn().mockResolvedValue(options.journalCount ?? 0),
+      create: jest.fn().mockResolvedValue(options.createdJournalEntry),
+      findMany: jest
+        .fn()
+        .mockImplementation(
+          async (args?: { where?: { sourceType?: string } }) => {
+            if (args?.where?.sourceType === JournalSourceType.PAYMENT_REFUND) {
+              return options.reconciliationRefundEntries ?? [];
+            }
+
+            return options.reconciliationPaymentEntries ?? [];
+          },
+        ),
+    },
     invoiceLine: {
       create: jest.fn().mockResolvedValue(options.createdLine),
+    },
+    accountingPeriod: {
+      findFirst: jest.fn().mockResolvedValue(options.closedPeriod ?? null),
     },
     $transaction: jest.fn(async (callback) => callback(prisma)),
   };

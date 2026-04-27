@@ -1,13 +1,16 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import {
   AudienceType,
   EnrollmentStatus,
   NotificationChannel,
   Prisma,
+  StudentLifecycleStatus,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
@@ -17,8 +20,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { ArchiveStudentDto } from './dto/archive-student.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
+import { DeleteStudentDto } from './dto/delete-student.dto';
 import { InviteGuardianDto } from './dto/invite-guardian.dto';
 import { RequestStudentTransferDto } from './dto/request-student-transfer.dto';
+import { RevokeGeneratedStudentDocumentDto } from './dto/revoke-generated-student-document.dto';
 
 @Injectable()
 export class StudentsService {
@@ -159,16 +164,22 @@ export class StudentsService {
         status: { not: 'VOID' },
       },
       include: {
-        payments: true,
+        payments: {
+          include: { refunds: true },
+        },
       },
       orderBy: [{ issuedAt: 'desc' }],
     });
 
     const invoiceSummaries = invoices.map((invoice) => {
-      const paidAmount = invoice.payments.reduce(
-        (sum, payment) => sum.add(payment.amount),
-        new Prisma.Decimal(0),
-      );
+      const paidAmount = invoice.payments.reduce((sum, payment) => {
+        const refundedAmount = payment.refunds.reduce(
+          (refundSum, refund) => refundSum.add(refund.amount),
+          new Prisma.Decimal(0),
+        );
+
+        return sum.add(payment.amount).sub(refundedAmount);
+      }, new Prisma.Decimal(0));
       const outstandingAmount = invoice.totalAmount.sub(paidAmount);
 
       return {
@@ -204,6 +215,10 @@ export class StudentsService {
     actor: AuthContext,
   ) {
     const student = await this.findTenantStudent(studentId, actor);
+    ensureAllowedLifecycleTransition(
+      student.lifecycleStatus,
+      StudentLifecycleStatus.TRANSFERRED,
+    );
     const clearance = await this.getFeeClearance(studentId, actor);
 
     if (!clearance.cleared && !dto.waiveFeeClearance) {
@@ -230,7 +245,7 @@ export class StudentsService {
       return tx.student.update({
         where: { id: student.id },
         data: {
-          lifecycleStatus: 'TRANSFERRED',
+          lifecycleStatus: StudentLifecycleStatus.TRANSFERRED,
           exitReason: dto.reason,
           exitedAt,
           destinationSchool: dto.destinationSchool ?? null,
@@ -244,6 +259,19 @@ export class StudentsService {
         },
       });
     });
+    await this.recordLifecycleTransition(
+      student.id,
+      student.lifecycleStatus,
+      StudentLifecycleStatus.TRANSFERRED,
+      dto.reason,
+      actor,
+      {
+        destinationSchool: dto.destinationSchool ?? null,
+        conductRemark: dto.conductRemark ?? null,
+        exitedAt: exitedAt.toISOString(),
+      },
+      dto.waiveFeeClearance ?? false,
+    );
 
     await this.auditService.record({
       action: dto.waiveFeeClearance ? 'transfer_with_fee_waiver' : 'transfer',
@@ -274,6 +302,11 @@ export class StudentsService {
     actor: AuthContext,
   ) {
     const student = await this.findTenantStudent(studentId, actor);
+    ensureAllowedLifecycleTransition(
+      student.lifecycleStatus,
+      StudentLifecycleStatus.EXITED,
+    );
+    const exitedAt = dto.exitedAt ? new Date(dto.exitedAt) : new Date();
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.enrollment.updateMany({
         where: {
@@ -289,15 +322,150 @@ export class StudentsService {
       return tx.student.update({
         where: { id: student.id },
         data: {
-          lifecycleStatus: 'ALUMNI',
+          lifecycleStatus: StudentLifecycleStatus.EXITED,
           exitReason: dto.reason,
-          exitedAt: dto.exitedAt ? new Date(dto.exitedAt) : new Date(),
+          exitedAt,
+        },
+      });
+    });
+    await this.recordLifecycleTransition(
+      student.id,
+      student.lifecycleStatus,
+      StudentLifecycleStatus.EXITED,
+      dto.reason,
+      actor,
+      {
+        exitedAt: exitedAt.toISOString(),
+      },
+    );
+
+    await this.auditService.record({
+      action: 'exit',
+      resource: 'student',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: student.id,
+      after: {
+        lifecycleStatus: updated.lifecycleStatus,
+        exitedAt: updated.exitedAt,
+      },
+    });
+
+    return {
+      id: updated.id,
+      studentSystemId: updated.studentSystemId,
+      lifecycleStatus: updated.lifecycleStatus,
+      exitedAt: updated.exitedAt,
+    };
+  }
+
+  async archiveAlumni(
+    studentId: string,
+    dto: ArchiveStudentDto,
+    actor: AuthContext,
+  ) {
+    const student = await this.findTenantStudent(studentId, actor);
+    ensureAllowedLifecycleTransition(
+      student.lifecycleStatus,
+      StudentLifecycleStatus.ALUMNI,
+    );
+    const exitedAt = dto.exitedAt ? new Date(dto.exitedAt) : new Date();
+    const updated = await this.prisma.student.update({
+      where: { id: student.id },
+      data: {
+        lifecycleStatus: StudentLifecycleStatus.ALUMNI,
+        exitReason: dto.reason,
+        exitedAt,
+      },
+    });
+
+    await this.recordLifecycleTransition(
+      student.id,
+      student.lifecycleStatus,
+      StudentLifecycleStatus.ALUMNI,
+      dto.reason,
+      actor,
+      {
+        exitedAt: exitedAt.toISOString(),
+      },
+    );
+
+    await this.auditService.record({
+      action: 'archive_alumni',
+      resource: 'student',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: student.id,
+      after: {
+        lifecycleStatus: updated.lifecycleStatus,
+        exitedAt: updated.exitedAt,
+      },
+    });
+
+    return {
+      id: updated.id,
+      studentSystemId: updated.studentSystemId,
+      lifecycleStatus: updated.lifecycleStatus,
+      exitedAt: updated.exitedAt,
+    };
+  }
+
+  async deleteStudent(
+    studentId: string,
+    dto: DeleteStudentDto,
+    actor: AuthContext,
+  ) {
+    const student = await this.findTenantStudent(studentId, actor);
+    ensureAllowedLifecycleTransition(
+      student.lifecycleStatus,
+      StudentLifecycleStatus.DELETED,
+    );
+    const clearance = await this.getFeeClearance(studentId, actor);
+
+    if (!clearance.cleared) {
+      throw new BadRequestException({
+        message:
+          'Fee clearance is required before student deletion or withdrawal.',
+        clearance,
+      });
+    }
+
+    const deletedAt = dto.deletedAt ? new Date(dto.deletedAt) : new Date();
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.enrollment.updateMany({
+        where: {
+          tenantId: actor.tenantId,
+          studentId,
+          status: EnrollmentStatus.ACTIVE,
+        },
+        data: {
+          status: EnrollmentStatus.EXITED,
+        },
+      });
+
+      return tx.student.update({
+        where: { id: student.id },
+        data: {
+          lifecycleStatus: StudentLifecycleStatus.DELETED,
+          exitReason: dto.reason,
+          exitedAt: deletedAt,
         },
       });
     });
 
+    await this.recordLifecycleTransition(
+      student.id,
+      student.lifecycleStatus,
+      StudentLifecycleStatus.DELETED,
+      dto.reason,
+      actor,
+      {
+        deletedAt: deletedAt.toISOString(),
+      },
+    );
+
     await this.auditService.record({
-      action: 'archive',
+      action: 'delete',
       resource: 'student',
       tenantId: actor.tenantId,
       userId: actor.userId,
@@ -376,6 +544,7 @@ export class StudentsService {
     const students = await this.prisma.student.findMany({
       where: { tenantId: actor.tenantId },
       include: {
+        tenant: true,
         class: true,
         sectionRef: true,
         guardianLinks: {
@@ -392,45 +561,72 @@ export class StudentsService {
       orderBy: [{ studentSystemId: 'asc' }],
     });
 
+    const validationResults = students.map((student) => {
+      const issues = validateIemisStudent(student);
+
+      return {
+        student,
+        issues,
+      };
+    });
+
     return {
       exportedAt: new Date().toISOString(),
-      count: students.length,
-      students: students.map((student) => ({
-        studentSystemId: student.studentSystemId,
-        nationalStudentId: student.nationalStudentId,
-        firstNameEn: student.firstNameEn,
-        lastNameEn: student.lastNameEn,
-        firstNameNp: student.firstNameNp,
-        lastNameNp: student.lastNameNp,
-        dateOfBirth: student.dateOfBirth.toISOString().slice(0, 10),
-        gender: student.gender,
-        nationality: student.nationality,
-        motherTongue: student.motherTongue,
-        ethnicity: student.ethnicity,
-        disabilityFlag: student.disabilityFlag,
-        admissionDate: student.admissionDate.toISOString().slice(0, 10),
-        admissionNumber: student.admissionNumber,
-        lifecycleStatus: student.lifecycleStatus,
-        className: student.class.name,
-        sectionName: student.sectionRef?.name ?? student.section,
-        rollNumber: student.rollNumber,
-        guardians: student.guardianLinks.map((link) => ({
-          fullName: link.guardian.fullName,
-          relation: link.relation,
-          primaryPhone: link.guardian.primaryPhone,
-          email: link.guardian.email,
-          wardNumber: link.guardian.wardNumber,
-          isPrimary: link.isPrimary,
+      totalRecords: students.length,
+      validRecords: validationResults.filter(
+        (result) => result.issues.length === 0,
+      ).length,
+      invalidRecords: validationResults.filter(
+        (result) => result.issues.length > 0,
+      ).length,
+      issues: validationResults
+        .filter((result) => result.issues.length > 0)
+        .flatMap((result) =>
+          result.issues.map((issue) => ({
+            studentId: result.student.id,
+            studentSystemId: result.student.studentSystemId,
+            field: issue.field,
+            message: issue.message,
+          })),
+        ),
+      rows: validationResults
+        .filter((result) => result.issues.length === 0)
+        .map(({ student }) => ({
+          studentSystemId: student.studentSystemId,
+          nationalStudentId: student.nationalStudentId,
+          firstNameEn: student.firstNameEn,
+          lastNameEn: student.lastNameEn,
+          firstNameNp: student.firstNameNp,
+          lastNameNp: student.lastNameNp,
+          dateOfBirth: student.dateOfBirth.toISOString().slice(0, 10),
+          gender: student.gender,
+          nationality: student.nationality,
+          motherTongue: student.motherTongue,
+          ethnicity: student.ethnicity,
+          disabilityFlag: student.disabilityFlag,
+          admissionDate: student.admissionDate.toISOString().slice(0, 10),
+          admissionNumber: student.admissionNumber,
+          lifecycleStatus: student.lifecycleStatus,
+          className: student.class.name,
+          sectionName: student.sectionRef?.name ?? student.section,
+          rollNumber: student.rollNumber,
+          guardians: student.guardianLinks.map((link) => ({
+            fullName: link.guardian.fullName,
+            relation: link.relation,
+            primaryPhone: link.guardian.primaryPhone,
+            email: link.guardian.email,
+            wardNumber: link.guardian.wardNumber,
+            isPrimary: link.isPrimary,
+          })),
+          latestEnrollment: student.enrollments[0]
+            ? {
+                academicYear: student.enrollments[0].academicYear.name,
+                classId: student.enrollments[0].classId,
+                sectionName: student.enrollments[0].section?.name ?? null,
+                status: student.enrollments[0].status,
+              }
+            : null,
         })),
-        latestEnrollment: student.enrollments[0]
-          ? {
-              academicYear: student.enrollments[0].academicYear.name,
-              classId: student.enrollments[0].classId,
-              sectionName: student.enrollments[0].section?.name ?? null,
-              status: student.enrollments[0].status,
-            }
-          : null,
-      })),
     };
   }
 
@@ -486,23 +682,64 @@ export class StudentsService {
     const pdf = buildSimplePdf(lines);
     const fileName = `${student.studentSystemId}-${normalizedKind}.pdf`;
     const pdfUrl = `/api/v1/students/${student.id}/documents/${normalizedKind}.pdf`;
-
-    await this.prisma.generatedStudentDocument.create({
-      data: {
+    const checksumSha256 = createHash('sha256').update(pdf).digest('hex');
+    const storageObjectKey = `generated-student-documents/${student.id}/${fileName}`;
+    const signedAt = new Date();
+    const latestVersion = await this.prisma.generatedStudentDocument.findFirst({
+      where: {
         tenantId: actor.tenantId,
         studentId: student.id,
         kind: normalizedKind,
-        title: getStudentDocumentTitle(normalizedKind),
-        fileName,
-        sizeBytes: pdf.byteLength,
-        pdfUrl,
-        generatedById: actor.userId,
-        metadata: {
-          studentSystemId: student.studentSystemId,
-          className: student.class.name,
-          sectionName: student.sectionRef?.name ?? student.section ?? null,
-        } as Prisma.InputJsonValue,
       },
+      orderBy: [{ version: 'desc' }, { generatedAt: 'desc' }],
+    });
+    const version = (latestVersion?.version ?? 0) + 1;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.generatedStudentDocument.updateMany({
+        where: {
+          tenantId: actor.tenantId,
+          studentId: student.id,
+          kind: normalizedKind,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: signedAt,
+          revokedById: actor.userId,
+        },
+      });
+
+      await tx.generatedStudentDocument.create({
+        data: {
+          tenantId: actor.tenantId,
+          studentId: student.id,
+          kind: normalizedKind,
+          title: getStudentDocumentTitle(normalizedKind),
+          fileName,
+          sizeBytes: pdf.byteLength,
+          pdfUrl,
+          generatedById: actor.userId,
+          storageObjectKey,
+          checksumSha256,
+          signedAt,
+          signatureMetadata: {
+            issuerUserId: actor.userId,
+            tenantSlug: actor.tenantSlug,
+            generatedAt: signedAt.toISOString(),
+            mode: 'internal-issued',
+          } as Prisma.InputJsonValue,
+          version,
+          retentionUntil: resolveDocumentRetentionUntil(
+            normalizedKind,
+            signedAt,
+          ),
+          metadata: {
+            studentSystemId: student.studentSystemId,
+            className: student.class.name,
+            sectionName: student.sectionRef?.name ?? student.section ?? null,
+          } as Prisma.InputJsonValue,
+        },
+      });
     });
 
     await this.auditService.record({
@@ -518,6 +755,92 @@ export class StudentsService {
     });
 
     return pdf;
+  }
+
+  async revokeGeneratedStudentDocument(
+    studentId: string,
+    documentId: string,
+    dto: RevokeGeneratedStudentDocumentDto,
+    actor: AuthContext,
+  ) {
+    await this.findTenantStudent(studentId, actor);
+    const document = await this.prisma.generatedStudentDocument.findFirst({
+      where: {
+        id: documentId,
+        studentId,
+        tenantId: actor.tenantId,
+      },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Generated student document not found');
+    }
+
+    if (document.revokedAt) {
+      throw new ConflictException(
+        'Generated student document is already revoked',
+      );
+    }
+
+    if (document.retentionUntil && document.retentionUntil > new Date()) {
+      throw new ConflictException(
+        'Generated student document cannot be revoked before its retention period ends',
+      );
+    }
+
+    const revoked = await this.prisma.generatedStudentDocument.update({
+      where: { id: document.id },
+      data: {
+        revokedAt: new Date(),
+        revokedById: actor.userId,
+        metadata: {
+          ...(document.metadata as Record<string, unknown> | null),
+          revokeReason: dto.reason,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'revoke',
+      resource: 'generated_student_document',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: revoked.id,
+      after: {
+        kind: revoked.kind,
+        fileName: revoked.fileName,
+        revokeReason: dto.reason,
+      },
+    });
+
+    return {
+      id: revoked.id,
+      revokedAt: revoked.revokedAt,
+      revokedById: revoked.revokedById,
+    };
+  }
+
+  private async recordLifecycleTransition(
+    studentId: string,
+    fromStatus: StudentLifecycleStatus,
+    toStatus: StudentLifecycleStatus,
+    reason: string,
+    actor: AuthContext,
+    metadata: Record<string, unknown>,
+    feeClearanceWaived = false,
+  ) {
+    await this.prisma.studentLifecycleTransition.create({
+      data: {
+        tenantId: actor.tenantId,
+        studentId,
+        fromStatus,
+        toStatus,
+        reason,
+        changedById: actor.userId,
+        feeClearanceWaived,
+        metadata: metadata as Prisma.InputJsonValue,
+      },
+    });
   }
 
   private async generateStudentSystemId(actor: AuthContext) {
@@ -679,4 +1002,106 @@ function buildStudentDocumentLines(
     'This is to certify that the student has maintained good conduct as per available school records.',
     'Issued for official use by the school administration.',
   ];
+}
+
+function ensureAllowedLifecycleTransition(
+  currentStatus: StudentLifecycleStatus,
+  nextStatus: StudentLifecycleStatus,
+) {
+  const allowedTransitions: Record<
+    StudentLifecycleStatus,
+    StudentLifecycleStatus[]
+  > = {
+    [StudentLifecycleStatus.ACTIVE]: [
+      StudentLifecycleStatus.TRANSFERRED,
+      StudentLifecycleStatus.EXITED,
+      StudentLifecycleStatus.DELETED,
+    ],
+    [StudentLifecycleStatus.TRANSFERRED]: [StudentLifecycleStatus.ALUMNI],
+    [StudentLifecycleStatus.EXITED]: [StudentLifecycleStatus.ALUMNI],
+    [StudentLifecycleStatus.ALUMNI]: [],
+    [StudentLifecycleStatus.DELETED]: [],
+  };
+
+  if (!allowedTransitions[currentStatus].includes(nextStatus)) {
+    throw new ConflictException(
+      `Student lifecycle transition ${currentStatus} -> ${nextStatus} is not allowed`,
+    );
+  }
+}
+
+function resolveDocumentRetentionUntil(
+  kind: GeneratedStudentDocumentKind,
+  generatedAt: Date,
+) {
+  const retentionDays =
+    kind === 'id-card' ? 180 : kind === 'enrollment-confirmation' ? 365 : 3650;
+
+  return new Date(generatedAt.getTime() + retentionDays * 86_400_000);
+}
+
+function validateIemisStudent(student: StudentDocumentPayload) {
+  const issues: Array<{ field: string; message: string }> = [];
+  const hasGuardianContact = student.guardianLinks.some(
+    (link) =>
+      Boolean(link.guardian.primaryPhone) || Boolean(link.guardian.email),
+  );
+
+  if (!student.firstNameEn || !student.lastNameEn) {
+    issues.push({
+      field: 'fullNameEn',
+      message: 'English first and last name are required',
+    });
+  }
+
+  if (!student.firstNameNp || !student.lastNameNp) {
+    issues.push({
+      field: 'fullNameNp',
+      message: 'Nepali first and last name are required',
+    });
+  }
+
+  if (!student.dateOfBirth) {
+    issues.push({
+      field: 'dateOfBirth',
+      message: 'Date of birth is required',
+    });
+  }
+
+  if (!student.gender) {
+    issues.push({
+      field: 'gender',
+      message: 'Gender is required',
+    });
+  }
+
+  if (!student.classId) {
+    issues.push({
+      field: 'classId',
+      message: 'Class assignment is required',
+    });
+  }
+
+  if (!student.sectionRef?.name && !student.section) {
+    issues.push({
+      field: 'section',
+      message: 'Section assignment is required',
+    });
+  }
+
+  if (!hasGuardianContact) {
+    issues.push({
+      field: 'guardianContact',
+      message: 'At least one guardian phone or email contact is required',
+    });
+  }
+
+  if (student.lifecycleStatus === StudentLifecycleStatus.DELETED) {
+    issues.push({
+      field: 'lifecycleStatus',
+      message: 'Deleted students are not exportable to iEMIS',
+    });
+  }
+
+  return issues;
 }

@@ -1,9 +1,11 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AccountingPeriodStatus,
   AudienceType,
   ConsentType,
   InvoiceStatus,
@@ -15,14 +17,21 @@ import {
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
+import {
+  ReconciliationExportFormat,
+  ReconciliationQueryDto,
+} from '../accounting/dto/reconciliation-query.dto';
 import { buildSimplePdf } from '../common/pdf/simple-pdf';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CashierCloseWindowDto } from './dto/cashier-close-window.dto';
 import { CollectPaymentDto } from './dto/collect-payment.dto';
+import { CreateCashierCloseDto } from './dto/create-cashier-close.dto';
 import { CreateDiscountRuleDto } from './dto/create-discount-rule.dto';
 import { CreateFeeDueScheduleDto } from './dto/create-fee-due-schedule.dto';
 import { CreateFeeHeadDto } from './dto/create-fee-head.dto';
 import { CreateFeePlanDto } from './dto/create-fee-plan.dto';
+import { CreatePaymentRefundDto } from './dto/create-payment-refund.dto';
 import { CreateFeeWaiverDto } from './dto/create-fee-waiver.dto';
 import {
   CreateInvoiceAdjustmentDto,
@@ -31,6 +40,7 @@ import {
 import { GenerateBillingRunDto } from './dto/generate-billing-run.dto';
 import { ProcessFeeDueScheduleDto } from './dto/process-fee-due-schedule.dto';
 import { SendDefaulterRemindersDto } from './dto/send-defaulter-reminders.dto';
+import { ListCashierClosesDto } from './dto/list-cashier-closes.dto';
 import { VoidInvoiceDto } from './dto/void-invoice.dto';
 import { resolveCashAccountCode } from './finance.defaults';
 
@@ -377,7 +387,7 @@ export class FinanceService {
     const invoice = dto.invoiceId
       ? await this.prisma.invoice.findFirst({
           where: { id: dto.invoiceId, tenantId: actor.tenantId },
-          include: { payments: true },
+          include: { payments: { include: { refunds: true } } },
         })
       : null;
 
@@ -402,10 +412,7 @@ export class FinanceService {
       });
 
       if (invoice) {
-        const paidAmount = invoice.payments.reduce(
-          (sum, payment) => sum.add(payment.amount),
-          new Prisma.Decimal(0),
-        );
+        const paidAmount = sumNetPaidAmount(invoice.payments);
         const newTotal = invoice.totalAmount.sub(amount);
         const safeTotal = newTotal.gt(0) ? newTotal : new Prisma.Decimal(0);
 
@@ -544,15 +551,14 @@ export class FinanceService {
           : undefined,
       },
       include: {
-        payments: true,
+        payments: {
+          include: { refunds: true },
+        },
       },
     });
     const dueInvoiceIds = invoices
       .filter((invoice) => {
-        const paidAmount = invoice.payments.reduce(
-          (sum, payment) => sum.add(payment.amount),
-          new Prisma.Decimal(0),
-        );
+        const paidAmount = sumNetPaidAmount(invoice.payments);
 
         return invoice.totalAmount.sub(paidAmount).gt(0);
       })
@@ -601,7 +607,9 @@ export class FinanceService {
     const invoices = await this.prisma.invoice.findMany({
       where: { tenantId: actor.tenantId },
       include: {
-        payments: true,
+        payments: {
+          include: { refunds: true },
+        },
         lines: {
           include: {
             feeHead: true,
@@ -616,6 +624,7 @@ export class FinanceService {
     });
     const payments = await this.prisma.payment.findMany({
       where: { tenantId: actor.tenantId },
+      include: { refunds: true },
       orderBy: [{ paidAt: 'asc' }],
     });
     const totalBilled = invoices.reduce(
@@ -624,6 +633,10 @@ export class FinanceService {
     );
     const totalCollected = payments.reduce(
       (sum, payment) => sum + Number(payment.amount),
+      0,
+    );
+    const totalRefunded = payments.reduce(
+      (sum, payment) => sum + Number(sumRefundedAmount(payment.refunds)),
       0,
     );
     const totalWaived = (
@@ -650,9 +663,18 @@ export class FinanceService {
     return {
       totalBilled,
       totalCollected,
-      totalOutstanding: Math.max(0, totalBilled - totalCollected),
+      totalRefunded,
+      netCollected: totalCollected - totalRefunded,
+      totalOutstanding: Math.max(
+        0,
+        totalBilled -
+          Number(totalWaived ?? 0) -
+          (totalCollected - totalRefunded),
+      ),
       totalWaived: Number(totalWaived ?? 0),
       collectionTrend: groupPaymentsByMonth(payments),
+      refundTrend: groupRefundsByMonth(payments),
+      netCollectionTrend: groupNetCollectionsByMonth(payments),
       classWiseBreakdown: Array.from(classWise.entries()).map(
         ([className, amount]) => ({ className, amount }),
       ),
@@ -716,7 +738,9 @@ export class FinanceService {
       where: { tenantId: actor.tenantId },
       include: {
         student: true,
-        payments: true,
+        payments: {
+          include: { refunds: true },
+        },
       },
       orderBy: [{ issuedAt: 'desc' }],
     });
@@ -731,10 +755,7 @@ export class FinanceService {
         id: invoice.student.id,
         name: `${invoice.student.firstNameEn} ${invoice.student.lastNameEn}`.trim(),
       },
-      paidAmount: invoice.payments.reduce(
-        (sum, payment) => sum + Number(payment.amount),
-        0,
-      ),
+      paidAmount: Number(sumNetPaidAmount(invoice.payments)),
     }));
   }
 
@@ -745,7 +766,7 @@ export class FinanceService {
   ) {
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: invoiceId, tenantId: actor.tenantId },
-      include: { payments: true },
+      include: { payments: { include: { refunds: true } } },
     });
 
     if (!invoice) {
@@ -756,10 +777,7 @@ export class FinanceService {
       throw new ConflictException('Invoice is already void');
     }
 
-    const paidAmount = invoice.payments.reduce(
-      (sum, payment) => sum.add(payment.amount),
-      new Prisma.Decimal(0),
-    );
+    const paidAmount = sumNetPaidAmount(invoice.payments);
 
     if (paidAmount.gt(0)) {
       throw new ConflictException(
@@ -803,7 +821,7 @@ export class FinanceService {
   ) {
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: invoiceId, tenantId: actor.tenantId },
-      include: { payments: true },
+      include: { payments: { include: { refunds: true } } },
     });
 
     if (!invoice) {
@@ -828,10 +846,7 @@ export class FinanceService {
       throw new NotFoundException('Fee head not found in this tenant');
     }
 
-    const paidAmount = invoice.payments.reduce(
-      (sum, payment) => sum.add(payment.amount),
-      new Prisma.Decimal(0),
-    );
+    const paidAmount = sumNetPaidAmount(invoice.payments);
     const adjustmentAmount = new Prisma.Decimal(dto.amount);
     const adjustmentVat = new Prisma.Decimal(dto.vatAmount ?? 0);
     const signedSubtotal =
@@ -888,7 +903,9 @@ export class FinanceService {
         },
         include: {
           lines: true,
-          payments: true,
+          payments: {
+            include: { refunds: true },
+          },
         },
       });
 
@@ -956,16 +973,15 @@ export class FinanceService {
             sectionRef: true,
           },
         },
-        payments: true,
+        payments: {
+          include: { refunds: true },
+        },
       },
       orderBy: [{ dueDate: 'asc' }],
     });
 
     return invoices.map((invoice) => {
-      const paidAmount = invoice.payments.reduce(
-        (sum, payment) => sum + Number(payment.amount),
-        0,
-      );
+      const paidAmount = Number(sumNetPaidAmount(invoice.payments));
       const outstanding = Number(invoice.totalAmount) - paidAmount;
       const daysOverdue = Math.max(
         0,
@@ -1204,7 +1220,9 @@ export class FinanceService {
             feeHead: true,
           },
         },
-        payments: true,
+        payments: {
+          include: { refunds: true },
+        },
       },
     });
 
@@ -1212,10 +1230,7 @@ export class FinanceService {
       throw new NotFoundException('Invoice not found in this tenant');
     }
 
-    const paidSoFar = invoice.payments.reduce(
-      (sum, payment) => sum.add(payment.amount),
-      new Prisma.Decimal(0),
-    );
+    const paidSoFar = sumNetPaidAmount(invoice.payments);
     const paymentAmount = new Prisma.Decimal(dto.amount);
     const remaining = invoice.totalAmount.sub(paidSoFar);
 
@@ -1382,12 +1397,410 @@ export class FinanceService {
     };
   }
 
+  async refundPayment(
+    paymentId: string,
+    dto: CreatePaymentRefundDto,
+    actor: AuthContext,
+  ) {
+    const payment = await this.prisma.payment.findFirst({
+      where: { id: paymentId, tenantId: actor.tenantId },
+      include: {
+        receipt: true,
+        refunds: true,
+        invoice: {
+          include: {
+            payments: {
+              include: { refunds: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found in this tenant');
+    }
+
+    const sourceJournal = await this.prisma.journalEntry.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        sourceType: JournalSourceType.FEE_PAYMENT,
+        sourceId: payment.id,
+      },
+      include: {
+        lines: {
+          orderBy: [{ createdAt: 'asc' }],
+        },
+      },
+    });
+
+    if (!sourceJournal || sourceJournal.lines.length === 0) {
+      throw new ConflictException(
+        'Original payment journal entry was not found for this payment',
+      );
+    }
+
+    const refundedSoFar = sumRefundedAmount(payment.refunds);
+    const refundableAmount = payment.amount.sub(refundedSoFar);
+
+    if (refundableAmount.lte(0)) {
+      throw new ConflictException('Payment has already been fully refunded');
+    }
+
+    const refundAmount =
+      dto.amount === undefined
+        ? refundableAmount
+        : new Prisma.Decimal(dto.amount);
+
+    if (refundAmount.gt(refundableAmount)) {
+      throw new ConflictException(
+        'Refund exceeds the remaining refundable amount',
+      );
+    }
+
+    const refundDate = dto.refundDate ? new Date(dto.refundDate) : new Date();
+    await this.ensurePostingPeriodIsOpen(actor.tenantId, refundDate);
+
+    const refundNumber = await this.generateRefundNumber(actor.tenantId);
+    const journalEntryNumber = await this.generateJournalEntryNumber(
+      actor.tenantId,
+    );
+    const reversedDebitLines = allocateJournalLinesForRefund(
+      sourceJournal.lines.filter(
+        (line) => line.side === JournalLineSide.CREDIT,
+      ),
+      refundAmount,
+      payment.amount,
+      JournalLineSide.DEBIT,
+      actor.tenantId,
+    );
+    const reversedCreditLines = allocateJournalLinesForRefund(
+      sourceJournal.lines.filter((line) => line.side === JournalLineSide.DEBIT),
+      refundAmount,
+      payment.amount,
+      JournalLineSide.CREDIT,
+      actor.tenantId,
+    );
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const refund = await tx.paymentRefund.create({
+        data: {
+          tenantId: actor.tenantId,
+          paymentId: payment.id,
+          refundNumber,
+          amount: refundAmount,
+          refundDate,
+          reason: dto.reason,
+          referenceNumber: dto.referenceNumber ?? null,
+          narration: dto.narration ?? null,
+          createdById: actor.userId,
+        },
+      });
+
+      const journalEntry = await tx.journalEntry.create({
+        data: {
+          tenantId: actor.tenantId,
+          entryNumber: journalEntryNumber,
+          entryDate: refundDate,
+          narration:
+            dto.narration ??
+            `Refund ${refundNumber} for payment ${payment.receipt?.receiptNumber ?? payment.id}`,
+          sourceType: JournalSourceType.PAYMENT_REFUND,
+          sourceId: refund.id,
+          createdById: actor.userId,
+          lines: {
+            create: [...reversedDebitLines, ...reversedCreditLines],
+          },
+        },
+      });
+
+      const netPaidAmount = sumNetPaidAmount(
+        payment.invoice.payments.map((invoicePayment) =>
+          invoicePayment.id === payment.id
+            ? {
+                ...invoicePayment,
+                refunds: [...invoicePayment.refunds, { amount: refundAmount }],
+              }
+            : invoicePayment,
+        ),
+      );
+      const updatedInvoice = await tx.invoice.update({
+        where: { id: payment.invoiceId },
+        data: {
+          status: resolveInvoiceStatusAfterAdjustment(
+            payment.invoice.status,
+            netPaidAmount,
+            payment.invoice.totalAmount,
+          ),
+          paidAt:
+            netPaidAmount.gte(payment.invoice.totalAmount) &&
+            payment.invoice.totalAmount.gt(0)
+              ? (payment.invoice.paidAt ?? refundDate)
+              : null,
+        },
+      });
+
+      return { refund, journalEntry, updatedInvoice };
+    });
+
+    await this.auditService.record({
+      action: 'refund',
+      resource: 'payment_refund',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: result.refund.id,
+      before: {
+        paymentId: payment.id,
+        invoiceId: payment.invoiceId,
+        refundableAmount: Number(refundableAmount),
+      },
+      after: {
+        refundNumber: result.refund.refundNumber,
+        amount: Number(result.refund.amount),
+        journalEntryNumber: result.journalEntry.entryNumber,
+        invoiceStatus: result.updatedInvoice.status,
+      },
+    });
+
+    return {
+      refundId: result.refund.id,
+      refundNumber: result.refund.refundNumber,
+      paymentId: payment.id,
+      invoiceId: payment.invoiceId,
+      amount: Number(result.refund.amount),
+      refundDate: result.refund.refundDate,
+      journalEntryNumber: result.journalEntry.entryNumber,
+      remainingRefundableAmount: Number(refundableAmount.sub(refundAmount)),
+      invoiceStatus: result.updatedInvoice.status,
+    };
+  }
+
+  async previewCashierClose(query: CashierCloseWindowDto, actor: AuthContext) {
+    const window = resolveWindow(query.openedAt, query.closedAt);
+    const summary = await this.buildCashierCloseSummary(
+      {
+        openedAt: window.openedAt,
+        closedAt: window.closedAt,
+        collectorUserId: query.collectorUserId,
+        paymentMethod: query.paymentMethod,
+      },
+      actor,
+    );
+
+    await this.auditService.record({
+      action: 'preview',
+      resource: 'cashier_close',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        openedAt: window.openedAt,
+        closedAt: window.closedAt,
+        collectorUserId: query.collectorUserId ?? null,
+        paymentMethod: query.paymentMethod ?? null,
+        grossCollected: summary.grossCollected,
+        totalRefunded: summary.totalRefunded,
+        netCollected: summary.netCollected,
+      },
+    });
+
+    return summary;
+  }
+
+  async listCashierCloses(query: ListCashierClosesDto, actor: AuthContext) {
+    const closes = await this.prisma.cashierClose.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        ...(query.openedFrom
+          ? { openedAt: { gte: new Date(query.openedFrom) } }
+          : {}),
+        ...(query.closedTo
+          ? { closedAt: { lte: new Date(query.closedTo) } }
+          : {}),
+        ...(query.collectorUserId
+          ? { collectorUserId: query.collectorUserId }
+          : {}),
+        ...(query.paymentMethod ? { paymentMethod: query.paymentMethod } : {}),
+      },
+      include: {
+        collectorUser: true,
+        closedBy: true,
+      },
+      orderBy: [{ closedAt: 'desc' }, { createdAt: 'desc' }],
+    });
+
+    return closes.map((close) => ({
+      id: close.id,
+      closeNumber: close.closeNumber,
+      openedAt: close.openedAt,
+      closedAt: close.closedAt,
+      collectorUser: close.collectorUser
+        ? {
+            id: close.collectorUser.id,
+            email: close.collectorUser.email,
+          }
+        : null,
+      paymentMethod: close.paymentMethod,
+      grossCollected: Number(close.grossCollected),
+      totalRefunded: Number(close.totalRefunded),
+      netCollected: Number(close.netCollected),
+      paymentCount: close.paymentCount,
+      refundCount: close.refundCount,
+      firstReceiptNumber: close.firstReceiptNumber,
+      lastReceiptNumber: close.lastReceiptNumber,
+      notes: close.notes,
+      closedBy: close.closedBy
+        ? {
+            id: close.closedBy.id,
+            email: close.closedBy.email,
+          }
+        : null,
+      createdAt: close.createdAt,
+    }));
+  }
+
+  async finalizeCashierClose(dto: CreateCashierCloseDto, actor: AuthContext) {
+    const window = resolveWindow(dto.openedAt, dto.closedAt);
+    const existing = await this.prisma.cashierClose.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        openedAt: window.openedAt,
+        closedAt: window.closedAt,
+        collectorUserId: dto.collectorUserId ?? null,
+        paymentMethod: dto.paymentMethod ?? null,
+      },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        `Cashier close ${existing.closeNumber} already exists for the selected window`,
+      );
+    }
+
+    const summary = await this.buildCashierCloseSummary(
+      {
+        openedAt: window.openedAt,
+        closedAt: window.closedAt,
+        collectorUserId: dto.collectorUserId,
+        paymentMethod: dto.paymentMethod,
+      },
+      actor,
+    );
+    const closeNumber = await this.generateCashierCloseNumber(actor.tenantId);
+
+    const close = await this.prisma.cashierClose.create({
+      data: {
+        tenantId: actor.tenantId,
+        closeNumber,
+        openedAt: window.openedAt,
+        closedAt: window.closedAt,
+        collectorUserId: dto.collectorUserId ?? null,
+        paymentMethod: dto.paymentMethod ?? null,
+        grossCollected: new Prisma.Decimal(summary.grossCollected),
+        totalRefunded: new Prisma.Decimal(summary.totalRefunded),
+        netCollected: new Prisma.Decimal(summary.netCollected),
+        paymentCount: summary.paymentCount,
+        refundCount: summary.refundCount,
+        firstReceiptNumber: summary.firstReceiptNumber,
+        lastReceiptNumber: summary.lastReceiptNumber,
+        notes: dto.notes ?? null,
+        closedById: actor.userId,
+      },
+      include: {
+        collectorUser: true,
+        closedBy: true,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'finalize',
+      resource: 'cashier_close',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: close.id,
+      after: {
+        closeNumber: close.closeNumber,
+        openedAt: close.openedAt,
+        closedAt: close.closedAt,
+        collectorUserId: close.collectorUserId,
+        paymentMethod: close.paymentMethod,
+        grossCollected: Number(close.grossCollected),
+        totalRefunded: Number(close.totalRefunded),
+        netCollected: Number(close.netCollected),
+      },
+    });
+
+    return {
+      id: close.id,
+      closeNumber: close.closeNumber,
+      openedAt: close.openedAt,
+      closedAt: close.closedAt,
+      grossCollected: Number(close.grossCollected),
+      totalRefunded: Number(close.totalRefunded),
+      netCollected: Number(close.netCollected),
+      paymentCount: close.paymentCount,
+      refundCount: close.refundCount,
+      firstReceiptNumber: close.firstReceiptNumber,
+      lastReceiptNumber: close.lastReceiptNumber,
+      notes: close.notes,
+      collectorUser: close.collectorUser
+        ? {
+            id: close.collectorUser.id,
+            email: close.collectorUser.email,
+          }
+        : null,
+      closedBy: close.closedBy
+        ? {
+            id: close.closedBy.id,
+            email: close.closedBy.email,
+          }
+        : null,
+    };
+  }
+
+  async getReconciliationSummary(
+    query: ReconciliationQueryDto,
+    actor: AuthContext,
+  ) {
+    const rows = await this.buildReconciliationRows(query, actor);
+
+    return {
+      openedAt: query.openedAt,
+      closedAt: query.closedAt,
+      totalRows: rows.length,
+      grossCollected: rows.reduce((sum, row) => sum + row.grossAmount, 0),
+      totalRefunded: rows.reduce((sum, row) => sum + row.refundedAmount, 0),
+      netCollected: rows.reduce((sum, row) => sum + row.netAmount, 0),
+      rows,
+    };
+  }
+
+  async exportReconciliation(
+    query: ReconciliationQueryDto,
+    actor: AuthContext,
+  ) {
+    const rows = await this.buildReconciliationRows(query, actor);
+    const payload = {
+      generatedAt: new Date().toISOString(),
+      openedAt: query.openedAt,
+      closedAt: query.closedAt,
+      totalRows: rows.length,
+      rows,
+    };
+
+    if (query.format === ReconciliationExportFormat.JSON) {
+      return payload;
+    }
+
+    return buildReconciliationCsv(payload.rows);
+  }
+
   async listPayments(actor: AuthContext) {
     const payments = await this.prisma.payment.findMany({
       where: { tenantId: actor.tenantId },
       include: {
         student: true,
         receipt: true,
+        refunds: true,
       },
       orderBy: [{ paidAt: 'desc' }],
     });
@@ -1395,6 +1808,10 @@ export class FinanceService {
     return payments.map((payment) => ({
       id: payment.id,
       amount: Number(payment.amount),
+      refundedAmount: Number(sumRefundedAmount(payment.refunds)),
+      refundableAmount: Number(
+        payment.amount.sub(sumRefundedAmount(payment.refunds)),
+      ),
       method: payment.method,
       paidAt: payment.paidAt,
       student: {
@@ -1413,6 +1830,7 @@ export class FinanceService {
           include: {
             invoice: true,
             student: true,
+            refunds: true,
           },
         },
       },
@@ -1426,6 +1844,7 @@ export class FinanceService {
       pdfUrl: receipt.pdfUrl,
       paymentId: receipt.paymentId,
       amount: Number(receipt.payment.amount),
+      refundedAmount: Number(sumRefundedAmount(receipt.payment.refunds)),
       method: receipt.payment.method,
       invoiceNumber: receipt.payment.invoice.invoiceNumber,
       student: {
@@ -1446,6 +1865,7 @@ export class FinanceService {
           include: {
             invoice: true,
             student: true,
+            refunds: true,
           },
         },
       },
@@ -1487,6 +1907,225 @@ export class FinanceService {
     });
   }
 
+  private async buildCashierCloseSummary(
+    input: {
+      openedAt: Date;
+      closedAt: Date;
+      collectorUserId?: string;
+      paymentMethod?: PaymentMethod;
+    },
+    actor: AuthContext,
+  ) {
+    const payments = await this.prisma.payment.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        paidAt: {
+          gte: input.openedAt,
+          lte: input.closedAt,
+        },
+        invoice: {
+          status: { not: InvoiceStatus.VOID },
+        },
+        ...(input.collectorUserId
+          ? { collectedById: input.collectorUserId }
+          : {}),
+        ...(input.paymentMethod ? { method: input.paymentMethod } : {}),
+      },
+      include: {
+        receipt: true,
+      },
+      orderBy: [{ paidAt: 'asc' }, { createdAt: 'asc' }],
+    });
+    const refunds = await this.prisma.paymentRefund.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        refundDate: {
+          gte: input.openedAt,
+          lte: input.closedAt,
+        },
+        payment: {
+          invoice: {
+            status: { not: InvoiceStatus.VOID },
+          },
+          ...(input.collectorUserId
+            ? { collectedById: input.collectorUserId }
+            : {}),
+          ...(input.paymentMethod ? { method: input.paymentMethod } : {}),
+        },
+      },
+      include: {
+        payment: {
+          include: {
+            receipt: true,
+          },
+        },
+      },
+      orderBy: [{ refundDate: 'asc' }, { createdAt: 'asc' }],
+    });
+    const grossCollected = payments.reduce(
+      (sum, payment) => sum + Number(payment.amount),
+      0,
+    );
+    const totalRefunded = refunds.reduce(
+      (sum, refund) => sum + Number(refund.amount),
+      0,
+    );
+
+    return {
+      openedAt: input.openedAt,
+      closedAt: input.closedAt,
+      collectorUserId: input.collectorUserId ?? null,
+      paymentMethod: input.paymentMethod ?? null,
+      grossCollected,
+      totalRefunded,
+      netCollected: grossCollected - totalRefunded,
+      paymentCount: payments.length,
+      refundCount: refunds.length,
+      firstReceiptNumber: payments[0]?.receipt?.receiptNumber ?? null,
+      lastReceiptNumber: payments.at(-1)?.receipt?.receiptNumber ?? null,
+    };
+  }
+
+  private async buildReconciliationRows(
+    query: ReconciliationQueryDto,
+    actor: AuthContext,
+  ) {
+    const window = resolveWindow(query.openedAt, query.closedAt);
+    const payments = await this.prisma.payment.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        paidAt: {
+          gte: window.openedAt,
+          lte: window.closedAt,
+        },
+        invoice: {
+          status: { not: InvoiceStatus.VOID },
+          ...(query.studentId ? { studentId: query.studentId } : {}),
+          ...(query.classId
+            ? {
+                student: {
+                  classId: query.classId,
+                },
+              }
+            : {}),
+        },
+        ...(query.collectorUserId
+          ? { collectedById: query.collectorUserId }
+          : {}),
+        ...(query.paymentMethod ? { method: query.paymentMethod } : {}),
+      },
+      include: {
+        receipt: true,
+        collectedBy: true,
+        student: {
+          include: {
+            class: true,
+          },
+        },
+        invoice: true,
+        refunds: {
+          where: {
+            refundDate: {
+              gte: window.openedAt,
+              lte: window.closedAt,
+            },
+          },
+          orderBy: [{ refundDate: 'asc' }, { createdAt: 'asc' }],
+        },
+      },
+      orderBy: [{ paidAt: 'asc' }, { createdAt: 'asc' }],
+    });
+    const paymentEntryRecords = await this.prisma.journalEntry.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        sourceType: JournalSourceType.FEE_PAYMENT,
+        sourceId: {
+          in: payments.map((payment) => payment.id),
+        },
+      },
+      orderBy: [{ entryDate: 'asc' }, { createdAt: 'asc' }],
+    });
+    const refundIds = payments.flatMap((payment) =>
+      payment.refunds.map((refund) => refund.id),
+    );
+    const refundEntryRecords =
+      refundIds.length === 0
+        ? []
+        : await this.prisma.journalEntry.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              sourceType: JournalSourceType.PAYMENT_REFUND,
+              sourceId: {
+                in: refundIds,
+              },
+            },
+            orderBy: [{ entryDate: 'asc' }, { createdAt: 'asc' }],
+          });
+    const paymentEntryBySourceId = new Map(
+      paymentEntryRecords.map((entry) => [entry.sourceId, entry.entryNumber]),
+    );
+    const refundEntriesBySourceId = new Map<string, string[]>();
+
+    for (const entry of refundEntryRecords) {
+      if (!entry.sourceId) {
+        continue;
+      }
+
+      refundEntriesBySourceId.set(entry.sourceId, [
+        ...(refundEntriesBySourceId.get(entry.sourceId) ?? []),
+        entry.entryNumber,
+      ]);
+    }
+
+    return payments.map((payment) => {
+      const refundedAmount = Number(sumRefundedAmount(payment.refunds));
+      const refundNumbers = payment.refunds.map(
+        (refund) => refund.refundNumber,
+      );
+      const refundDates = payment.refunds.map((refund) =>
+        refund.refundDate.toISOString(),
+      );
+      const refundJournalEntryNumbers = payment.refunds.flatMap(
+        (refund) => refundEntriesBySourceId.get(refund.id) ?? [],
+      );
+      const statusMarkers =
+        refundedAmount <= 0
+          ? ['collected']
+          : refundedAmount >= Number(payment.amount)
+            ? ['fully_refunded']
+            : ['partially_refunded'];
+
+      return {
+        paymentId: payment.id,
+        paymentDate: payment.paidAt.toISOString(),
+        refundDate: refundDates.at(-1) ?? null,
+        receiptNumber: payment.receipt?.receiptNumber ?? null,
+        refundNumber:
+          refundNumbers.length > 0 ? refundNumbers.join(', ') : null,
+        invoiceId: payment.invoiceId,
+        invoiceNumber: payment.invoice.invoiceNumber,
+        student: {
+          id: payment.student.id,
+          name: `${payment.student.firstNameEn} ${payment.student.lastNameEn}`.trim(),
+          className: payment.student.class.name,
+        },
+        collector: payment.collectedBy
+          ? {
+              id: payment.collectedBy.id,
+              email: payment.collectedBy.email,
+            }
+          : null,
+        method: payment.method,
+        grossAmount: Number(payment.amount),
+        refundedAmount,
+        netAmount: Number(payment.amount) - refundedAmount,
+        journalEntryNumber: paymentEntryBySourceId.get(payment.id) ?? null,
+        refundJournalEntryNumbers,
+        statusMarkers,
+      };
+    });
+  }
+
   private async generateInvoiceNumber(tenantId: string) {
     const count = await this.prisma.invoice.count({
       where: { tenantId },
@@ -1503,12 +2142,45 @@ export class FinanceService {
     return `REC-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, '0')}`;
   }
 
+  private async generateCashierCloseNumber(tenantId: string) {
+    const count = await this.prisma.cashierClose.count({
+      where: { tenantId },
+    });
+
+    return `CLS-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, '0')}`;
+  }
+
+  private async generateRefundNumber(tenantId: string) {
+    const count = await this.prisma.paymentRefund.count({
+      where: { tenantId },
+    });
+
+    return `RFD-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, '0')}`;
+  }
+
   private async generateJournalEntryNumber(tenantId: string) {
     const count = await this.prisma.journalEntry.count({
       where: { tenantId },
     });
 
     return `JE-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, '0')}`;
+  }
+
+  private async ensurePostingPeriodIsOpen(tenantId: string, entryDate: Date) {
+    const closedPeriod = await this.prisma.accountingPeriod.findFirst({
+      where: {
+        tenantId,
+        status: AccountingPeriodStatus.CLOSED,
+        startsOn: { lte: entryDate },
+        endsOn: { gte: entryDate },
+      },
+    });
+
+    if (closedPeriod) {
+      throw new ConflictException(
+        `Cannot post refund to closed accounting period "${closedPeriod.name}"`,
+      );
+    }
   }
 
   private async calculateInvoiceLines(input: {
@@ -1610,6 +2282,57 @@ function resolveIncomeAccountCode(feeHeadCode: string) {
   }
 }
 
+function sumRefundedAmount(refunds: Array<{ amount: Prisma.Decimal }>) {
+  return refunds.reduce(
+    (sum, refund) => sum.add(refund.amount),
+    new Prisma.Decimal(0),
+  );
+}
+
+function sumNetPaidAmount(
+  payments: Array<{
+    amount: Prisma.Decimal;
+    refunds: Array<{ amount: Prisma.Decimal }>;
+  }>,
+) {
+  return payments.reduce(
+    (sum, payment) =>
+      sum.add(payment.amount).sub(sumRefundedAmount(payment.refunds)),
+    new Prisma.Decimal(0),
+  );
+}
+
+function allocateJournalLinesForRefund(
+  lines: Array<{
+    chartAccountId: string;
+    amount: Prisma.Decimal;
+    description: string | null;
+  }>,
+  refundAmount: Prisma.Decimal,
+  paymentAmount: Prisma.Decimal,
+  side: JournalLineSide,
+  tenantId: string,
+) {
+  let remaining = refundAmount;
+
+  return lines.map((line, index) => {
+    const amount =
+      index === lines.length - 1
+        ? remaining
+        : line.amount.mul(refundAmount).div(paymentAmount).toDecimalPlaces(2);
+
+    remaining = remaining.sub(amount);
+
+    return {
+      tenantId,
+      chartAccountId: line.chartAccountId,
+      side,
+      amount,
+      description: line.description,
+    };
+  });
+}
+
 function allocatePaymentAcrossLines(
   lines: Array<{
     id: string;
@@ -1675,6 +2398,147 @@ function groupPaymentsByMonth(
     month,
     amount,
   }));
+}
+
+function groupRefundsByMonth(
+  payments: Array<{
+    refunds: Array<{ refundDate: Date; amount: Prisma.Decimal }>;
+  }>,
+) {
+  const grouped = new Map<string, number>();
+
+  for (const payment of payments) {
+    for (const refund of payment.refunds) {
+      const key = refund.refundDate.toISOString().slice(0, 7);
+      grouped.set(key, (grouped.get(key) ?? 0) + Number(refund.amount));
+    }
+  }
+
+  return Array.from(grouped.entries()).map(([month, amount]) => ({
+    month,
+    amount,
+  }));
+}
+
+function groupNetCollectionsByMonth(
+  payments: Array<{
+    paidAt: Date;
+    amount: Prisma.Decimal;
+    refunds: Array<{ refundDate: Date; amount: Prisma.Decimal }>;
+  }>,
+) {
+  const grouped = new Map<string, number>();
+
+  for (const payment of payments) {
+    const paymentKey = payment.paidAt.toISOString().slice(0, 7);
+    grouped.set(
+      paymentKey,
+      (grouped.get(paymentKey) ?? 0) + Number(payment.amount),
+    );
+
+    for (const refund of payment.refunds) {
+      const refundKey = refund.refundDate.toISOString().slice(0, 7);
+      grouped.set(
+        refundKey,
+        (grouped.get(refundKey) ?? 0) - Number(refund.amount),
+      );
+    }
+  }
+
+  return Array.from(grouped.entries()).map(([month, amount]) => ({
+    month,
+    amount,
+  }));
+}
+
+function resolveWindow(openedAt: string, closedAt: string) {
+  const resolvedOpenedAt = new Date(openedAt);
+  const resolvedClosedAt = new Date(closedAt);
+
+  if (Number.isNaN(resolvedOpenedAt.getTime())) {
+    throw new BadRequestException('openedAt must be a valid ISO date');
+  }
+
+  if (Number.isNaN(resolvedClosedAt.getTime())) {
+    throw new BadRequestException('closedAt must be a valid ISO date');
+  }
+
+  if (resolvedOpenedAt >= resolvedClosedAt) {
+    throw new BadRequestException('openedAt must be earlier than closedAt');
+  }
+
+  return {
+    openedAt: resolvedOpenedAt,
+    closedAt: resolvedClosedAt,
+  };
+}
+
+function buildReconciliationCsv(
+  rows: Array<{
+    paymentDate: string;
+    refundDate: string | null;
+    receiptNumber: string | null;
+    refundNumber: string | null;
+    invoiceNumber: string;
+    student: { name: string; className: string };
+    collector: { email: string | null } | null;
+    method: string;
+    grossAmount: number;
+    refundedAmount: number;
+    netAmount: number;
+    journalEntryNumber: string | null;
+    refundJournalEntryNumbers: string[];
+    statusMarkers: string[];
+  }>,
+) {
+  const lines = [
+    [
+      'paymentDate',
+      'refundDate',
+      'receiptNumber',
+      'refundNumber',
+      'invoiceNumber',
+      'studentName',
+      'className',
+      'collectorEmail',
+      'method',
+      'grossAmount',
+      'refundedAmount',
+      'netAmount',
+      'journalEntryNumber',
+      'refundJournalEntryNumbers',
+      'statusMarkers',
+    ].join(','),
+    ...rows.map((row) =>
+      [
+        row.paymentDate,
+        row.refundDate ?? '',
+        row.receiptNumber ?? '',
+        row.refundNumber ?? '',
+        row.invoiceNumber,
+        escapeCsv(row.student.name),
+        escapeCsv(row.student.className),
+        escapeCsv(row.collector?.email ?? ''),
+        row.method,
+        row.grossAmount.toFixed(2),
+        row.refundedAmount.toFixed(2),
+        row.netAmount.toFixed(2),
+        row.journalEntryNumber ?? '',
+        escapeCsv(row.refundJournalEntryNumbers.join('; ')),
+        escapeCsv(row.statusMarkers.join('; ')),
+      ].join(','),
+    ),
+  ];
+
+  return lines.join('\n');
+}
+
+function escapeCsv(value: string) {
+  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+
+  return value;
 }
 
 export function resolveInvoiceStatusAfterAdjustment(

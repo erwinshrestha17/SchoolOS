@@ -173,6 +173,131 @@ export type PaymentReceipt = {
   paidAt: string;
 };
 
+export type PaymentRefundSummary = {
+  refundId: string;
+  refundNumber: string;
+  paymentId: string;
+  invoiceId: string;
+  amount: number;
+  refundDate: string;
+  journalEntryNumber: string;
+  remainingRefundableAmount: number;
+  invoiceStatus: string;
+};
+
+export type CashierClosePreview = {
+  openedAt: string | Date;
+  closedAt: string | Date;
+  collectorUserId: string | null;
+  paymentMethod: string | null;
+  grossCollected: number;
+  totalRefunded: number;
+  netCollected: number;
+  paymentCount: number;
+  refundCount: number;
+  firstReceiptNumber: string | null;
+  lastReceiptNumber: string | null;
+};
+
+export type CashierCloseSummary = {
+  id: string;
+  closeNumber: string;
+  openedAt: string | Date;
+  closedAt: string | Date;
+  grossCollected: number;
+  totalRefunded: number;
+  netCollected: number;
+  paymentCount: number;
+  refundCount: number;
+  firstReceiptNumber: string | null;
+  lastReceiptNumber: string | null;
+  notes?: string | null;
+};
+
+export type ReconciliationRow = {
+  paymentId: string;
+  paymentDate: string;
+  refundDate: string | null;
+  receiptNumber: string | null;
+  refundNumber: string | null;
+  invoiceId: string;
+  invoiceNumber: string;
+  student: {
+    id: string;
+    name: string;
+    className: string;
+  };
+  collector: {
+    id: string;
+    email: string | null;
+  } | null;
+  method: string;
+  grossAmount: number;
+  refundedAmount: number;
+  netAmount: number;
+  journalEntryNumber: string | null;
+  refundJournalEntryNumbers: string[];
+  statusMarkers: string[];
+};
+
+export type ReconciliationSummary = {
+  openedAt: string;
+  closedAt: string;
+  totalRows: number;
+  grossCollected: number;
+  totalRefunded: number;
+  netCollected: number;
+  rows: ReconciliationRow[];
+};
+
+export type StudentLifecycleStatus =
+  | 'ACTIVE'
+  | 'TRANSFERRED'
+  | 'EXITED'
+  | 'ALUMNI'
+  | 'DELETED';
+
+export type StudentLifecycleTransition = {
+  id: string;
+  studentId: string;
+  fromStatus: StudentLifecycleStatus;
+  toStatus: StudentLifecycleStatus;
+  reason: string;
+  changedAt: string;
+  feeClearanceWaived: boolean;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type GeneratedStudentDocumentMeta = {
+  id: string;
+  studentId: string;
+  kind: string;
+  fileName: string;
+  pdfUrl: string;
+  checksumSha256: string | null;
+  storageObjectKey: string | null;
+  signedAt: string | null;
+  version: number;
+  retentionUntil: string | null;
+  revokedAt: string | null;
+};
+
+export type IemisValidationIssue = {
+  studentId: string;
+  studentSystemId: string;
+  field: string;
+  message: string;
+};
+
+export type IemisExportResult = {
+  exportedAt: string;
+  totalRecords: number;
+  validRecords: number;
+  invalidRecords: number;
+  issues: IemisValidationIssue[];
+  rows: Array<Record<string, unknown>>;
+};
+
 export type JournalEntryView = {
   id: string;
   entryNumber: string;
@@ -351,6 +476,7 @@ export type AttendanceRoster = {
   class: ClassSummary;
   section: SectionSummary | null;
   attendanceDate: string;
+  calendarDay: AttendanceCalendarDayView;
   existingSession: {
     id: string;
     submittedAt: string | null;
@@ -362,11 +488,32 @@ export type AttendanceRoster = {
 
 export type AttendanceAnalytics = {
   sessionsReviewed: number;
+  todaySummary: {
+    date: string;
+    sessionCount: number;
+    totals: AttendanceSummary['totals'];
+  };
+  monthlyAttendance: {
+    month: number;
+    year: number;
+    attendancePercent: number;
+  };
+  annualAttendance: {
+    year: number;
+    attendancePercent: number;
+  };
   latestSessions: Array<
     AttendanceSummary & {
       conflictStatus: string;
+      calendarDay?: AttendanceCalendarDayView;
     }
   >;
+  classHeatmap: Array<{
+    attendanceDate: string;
+    className: string;
+    sectionName: string | null;
+    attendancePercent: number;
+  }>;
   absenceHotlist: Array<{
     studentId: string;
     absenceCount: number;
@@ -387,6 +534,7 @@ export type AttendanceConflict = {
   id: string;
   attendanceSessionId: string;
   status: string;
+  decision?: string | null;
   submittedById: string | null;
   reviewedById: string | null;
   submittedAt: string;
@@ -397,15 +545,35 @@ export type AttendanceConflict = {
   sectionName?: string | null;
 };
 
-export type AttendanceSyncSubmission = {
+export type AttendanceSyncResult = {
   id: string;
   clientSubmissionId: string;
   attendanceSessionId: string | null;
   conflictId: string | null;
   syncStatus: string;
   attendanceDate: string;
+  deviceId: string | null;
+  deviceLabel: string | null;
   deviceTimestamp: string | null;
+  sessionFingerprint: string | null;
+  syncAttemptCount: number;
+  serverReceivedAt: string;
+  replayed: boolean;
+  rejectionReason: string | null;
   createdAt: string;
+};
+
+export type AttendanceSyncSubmission = AttendanceSyncResult;
+
+export type AttendanceConflictReviewResult = {
+  id: string;
+  attendanceSessionId: string;
+  status: string;
+  decision: string;
+  resolutionNote: string | null;
+  reviewedById: string | null;
+  reviewedAt: string | null;
+  affectedSyncSubmissionCount: number;
 };
 
 export type StaffLeaveRequestSummary = {
@@ -420,12 +588,51 @@ export type StaffLeaveRequestSummary = {
   reviewedAt: string | null;
 };
 
+export type AttendanceCalendarDayView = {
+  calendarDate: string;
+  isWorkingDay: boolean;
+  label: string | null;
+  holidayType: string | null;
+  source: 'explicit' | 'weekday_fallback';
+};
+
 export type SchoolCalendarDaySummary = {
   id: string;
   calendarDate: string;
   isWorkingDay: boolean;
   label: string | null;
   holidayType: string | null;
+};
+
+export type AttendanceEscalationWarning = {
+  type: 'consecutive_absence' | 'below_threshold';
+  sourceType: string;
+  sourceId: string;
+  studentId: string;
+  studentSystemId: string;
+  fullNameEn: string;
+  className: string;
+  sectionName: string | null;
+  warningDate: string;
+  consecutiveAbsences?: number;
+  attendancePercent?: number;
+  deliveryCount: number;
+};
+
+export type StaffAttendanceMonthlySummary = {
+  month: number;
+  year: number;
+  items: Array<{
+    staffId: string;
+    employeeId: string;
+    fullName: string;
+    presentDays: number;
+    lateDays: number;
+    absentDays: number;
+    leaveDays: number;
+    approvedLeaveDays: number;
+    unresolvedOverlapAnomalies: number;
+  }>;
 };
 
 export type FeeHeadSummary = {
@@ -531,6 +738,7 @@ export type ReceiptView = {
   issuedAt: string;
   paymentId?: string;
   amount?: number;
+  refundedAmount?: number;
   method?: string;
   invoiceNumber?: string;
   student?: {

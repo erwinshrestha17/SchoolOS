@@ -15,6 +15,7 @@ import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { AttendanceService } from './attendance.service';
 import { CreateStaffLeaveRequestDto } from './dto/create-staff-leave-request.dto';
+import { ListStaffAttendanceSummaryDto } from './dto/list-staff-attendance-summary.dto';
 import { OverrideAttendanceSessionDto } from './dto/override-attendance-session.dto';
 import { ReviewAttendanceConflictDto } from './dto/review-attendance-conflict.dto';
 import { ReviewStaffLeaveRequestDto } from './dto/review-staff-leave-request.dto';
@@ -83,6 +84,15 @@ export class AttendanceController {
   @Permissions('attendance:read')
   listStaffAttendance(@CurrentAuth() auth: AuthContext) {
     return this.attendanceService.listStaffAttendance(auth);
+  }
+
+  @Get('staff/summary')
+  @Permissions('attendance:read', 'payroll:read')
+  listStaffAttendanceSummary(
+    @Query() query: ListStaffAttendanceSummaryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.listStaffAttendanceSummary(query, auth);
   }
 
   @Post('staff')
@@ -154,7 +164,7 @@ export class AttendanceController {
   }
 
   @Patch('conflicts/:id/review')
-  @Permissions('attendance:mark')
+  @Permissions('attendance:review_conflicts')
   reviewConflict(
     @Param('id') conflictId: string,
     @Body() dto: ReviewAttendanceConflictDto,

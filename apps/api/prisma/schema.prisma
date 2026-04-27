@@ -82,6 +82,7 @@ enum JournalSourceType {
   MANUAL
   INVOICE
   FEE_PAYMENT
+  PAYMENT_REFUND
   PAYROLL
   CLOSING
   ADJUSTMENT
@@ -139,6 +140,12 @@ enum AttendanceConflictStatus {
   NONE
   FLAGGED
   REVIEWED
+}
+
+enum AttendanceConflictDecision {
+  REVIEWED_WITHOUT_CHANGE
+  REVIEWED_AND_OVERRIDDEN
+  REJECTED_RESUBMISSION
 }
 
 enum BillingRunStatus {
@@ -204,6 +211,14 @@ enum AttendanceSyncStatus {
   REJECTED
 }
 
+enum AttendanceSyncRejectionReason {
+  LOCKED_SESSION
+  VALIDATION_ERROR
+  ROSTER_MISMATCH
+  REFERENCE_NOT_FOUND
+  UNKNOWN
+}
+
 enum ActivityReactionType {
   HEART
   CLAP
@@ -258,6 +273,14 @@ enum PayslipStatus {
 enum AccountingPeriodStatus {
   OPEN
   CLOSED
+}
+
+enum StudentLifecycleStatus {
+  ACTIVE
+  TRANSFERRED
+  EXITED
+  ALUMNI
+  DELETED
 }
 
 enum ConversationType {
@@ -335,6 +358,8 @@ model Tenant {
   invoices                   Invoice[]
   invoiceLines               InvoiceLine[]
   payments                   Payment[]
+  paymentRefunds             PaymentRefund[]
+  cashierCloses              CashierClose[]
   receipts                   Receipt[]
   chartAccounts              ChartAccount[]
   journalEntries             JournalEntry[]
@@ -358,6 +383,7 @@ model Tenant {
   notificationDeliveries     NotificationDelivery[]
   guardianConsents           GuardianConsent[]
   generatedStudentDocuments  GeneratedStudentDocument[]
+  lifecycleTransitions       StudentLifecycleTransition[]
   attendanceSyncSubmissions  AttendanceSyncSubmission[]
   teacherAssignments         SubjectTeacherAssignment[]
   examTerms                  ExamTerm[]
@@ -419,6 +445,9 @@ model User {
   submittedAttendanceSessions AttendanceSession[]    @relation("SubmittedAttendanceSessions")
   approvedStaffAttendance     StaffAttendance[]      @relation("ApprovedStaffAttendance")
   collectedPayments           Payment[]              @relation("CollectedPayments")
+  cashierCloseCollectorScopes CashierClose[]         @relation("CashierCloseCollector")
+  closedCashierCloses         CashierClose[]         @relation("ClosedCashierCloses")
+  createdPaymentRefunds       PaymentRefund[]        @relation("CreatedPaymentRefunds")
   journalEntries              JournalEntry[]         @relation("CreatedJournalEntries")
   createdNotices              Notice[]               @relation("CreatedNotices")
   createdEvents               Event[]                @relation("CreatedEvents")
@@ -668,7 +697,7 @@ model Student {
   admissionNumber           String?
   previousSchool            String?
   transferCertUrl           String?
-  lifecycleStatus           String    @default("ACTIVE")
+  lifecycleStatus           StudentLifecycleStatus @default(ACTIVE)
   exitReason                String?
   exitedAt                  DateTime?
   destinationSchool         String?
@@ -707,6 +736,7 @@ model Student {
   payments                 Payment[]
   documents                StudentDocument[]
   generatedDocuments       GeneratedStudentDocument[]
+  lifecycleTransitions     StudentLifecycleTransition[]
   siblingMemberships       SiblingGroupMember[]
   activityTags             ActivityPostStudent[]
   activityReactions        ActivityReaction[]
@@ -1116,8 +1146,59 @@ model Payment {
   invoice     Invoice  @relation(fields: [invoiceId], references: [id])
   collectedBy User?    @relation("CollectedPayments", fields: [collectedById], references: [id])
   receipt     Receipt?
+  refunds     PaymentRefund[]
 
   @@index([tenantId, paidAt])
+}
+
+model PaymentRefund {
+  id              String   @id @default(uuid())
+  tenantId        String
+  paymentId       String
+  refundNumber    String
+  amount          Decimal  @db.Decimal(12, 2)
+  refundDate      DateTime
+  reason          String
+  referenceNumber String?
+  narration       String?
+  createdById     String?
+  createdAt       DateTime @default(now())
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  payment   Payment  @relation(fields: [paymentId], references: [id])
+  createdBy User?    @relation("CreatedPaymentRefunds", fields: [createdById], references: [id])
+
+  @@unique([tenantId, refundNumber])
+  @@index([tenantId, refundDate])
+  @@index([paymentId])
+}
+
+model CashierClose {
+  id                 String        @id @default(uuid())
+  tenantId           String
+  closeNumber        String
+  openedAt           DateTime
+  closedAt           DateTime
+  collectorUserId    String?
+  paymentMethod      PaymentMethod?
+  grossCollected     Decimal       @db.Decimal(12, 2)
+  totalRefunded      Decimal       @db.Decimal(12, 2)
+  netCollected       Decimal       @db.Decimal(12, 2)
+  paymentCount       Int
+  refundCount        Int
+  firstReceiptNumber String?
+  lastReceiptNumber  String?
+  notes              String?
+  closedById         String?
+  createdAt          DateTime      @default(now())
+
+  tenant        Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  collectorUser User?  @relation("CashierCloseCollector", fields: [collectorUserId], references: [id], onDelete: SetNull)
+  closedBy      User?  @relation("ClosedCashierCloses", fields: [closedById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, closeNumber])
+  @@index([tenantId, openedAt, closedAt])
+  @@index([tenantId, collectorUserId, paymentMethod])
 }
 
 model Receipt {
@@ -1297,13 +1378,39 @@ model GeneratedStudentDocument {
   sizeBytes     Int
   pdfUrl        String
   generatedById String?
-  generatedAt   DateTime @default(now())
-  metadata      Json?
+  storageObjectKey String?
+  checksumSha256  String?
+  signedAt         DateTime?
+  signatureMetadata Json?
+  version          Int      @default(1)
+  retentionUntil   DateTime?
+  revokedAt        DateTime?
+  revokedById      String?
+  generatedAt      DateTime @default(now())
+  metadata         Json?
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, studentId, kind])
+}
+
+model StudentLifecycleTransition {
+  id                 String                @id @default(uuid())
+  tenantId           String
+  studentId          String
+  fromStatus         StudentLifecycleStatus
+  toStatus           StudentLifecycleStatus
+  reason             String
+  changedById        String?
+  changedAt          DateTime              @default(now())
+  feeClearanceWaived Boolean              @default(false)
+  metadata           Json?
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, studentId, changedAt])
 }
 
 model SiblingGroup {
@@ -1341,6 +1448,7 @@ model AttendanceConflict {
   attendanceSessionId String
   submittedById       String?
   status              AttendanceConflictStatus @default(FLAGGED)
+  decision            AttendanceConflictDecision?
   previousPayload     Json
   incomingPayload     Json
   resolutionNote      String?
@@ -1364,8 +1472,14 @@ model AttendanceSyncSubmission {
   classId             String
   sectionId           String?
   attendanceDate      DateTime
+  deviceId            String?
+  deviceLabel         String?
   deviceTimestamp     DateTime?
+  sessionFingerprint  String?
   syncStatus          AttendanceSyncStatus @default(ACCEPTED)
+  syncAttemptCount    Int                  @default(1)
+  serverReceivedAt    DateTime             @default(now())
+  rejectionReason     AttendanceSyncRejectionReason?
   submittedById       String?
   payload             Json
   createdAt           DateTime             @default(now())
@@ -1374,6 +1488,7 @@ model AttendanceSyncSubmission {
 
   @@unique([tenantId, clientSubmissionId])
   @@index([tenantId, syncStatus, attendanceDate])
+  @@index([tenantId, academicYearId, classId, sectionId, attendanceDate])
 }
 
 model FeeBillingRun {

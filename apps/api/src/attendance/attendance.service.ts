@@ -1,10 +1,13 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import {
+  AttendanceConflictDecision,
   AttendanceConflictStatus,
+  AttendanceSyncRejectionReason,
   AttendanceSyncStatus,
   AttendanceStatus,
   AudienceType,
@@ -18,7 +21,14 @@ import { CommunicationsService } from '../communications/communications.service'
 import { PrismaService } from '../prisma/prisma.service';
 import { ReviewAttendanceConflictDto } from './dto/review-attendance-conflict.dto';
 import { CreateStaffLeaveRequestDto } from './dto/create-staff-leave-request.dto';
-import { OverrideAttendanceSessionDto } from './dto/override-attendance-session.dto';
+import {
+  AttendanceConflictReviewDecision,
+} from './dto/review-attendance-conflict.dto';
+import {
+  AttendanceOverrideSource,
+  OverrideAttendanceSessionDto,
+} from './dto/override-attendance-session.dto';
+import { ListStaffAttendanceSummaryDto } from './dto/list-staff-attendance-summary.dto';
 import { ReviewStaffLeaveRequestDto } from './dto/review-staff-leave-request.dto';
 import { SubmitStaffAttendanceDto } from './dto/submit-staff-attendance.dto';
 import { SubmitAttendanceDto } from './dto/submit-attendance.dto';
@@ -57,6 +67,11 @@ export class AttendanceService {
         ? sessions.filter((s) => s.records.length > 0)
         : sessions;
 
+    const calendarByDate = await this.loadCalendarDayMap(
+      actor.tenantId,
+      filteredSessions.map((session) => session.attendanceDate),
+    );
+
     return filteredSessions.map((session) => ({
       sessionId: session.id,
       attendanceDate: session.attendanceDate,
@@ -64,11 +79,18 @@ export class AttendanceService {
       sectionName: session.section?.name ?? null,
       submittedAt: session.submittedAt,
       lockAt: session.lockAt,
+      calendarDay: calendarByDate.get(
+        getDateKey(stripTime(session.attendanceDate)),
+      ),
       totals: summarizeAttendance(session.records),
     }));
   }
 
-  async submitAttendance(dto: SubmitAttendanceDto, actor: AuthContext) {
+  async submitAttendance(
+    dto: SubmitAttendanceDto,
+    actor: AuthContext,
+    submissionContext?: AttendanceSubmissionContext,
+  ) {
     const [academicYear, classroom, section] = await Promise.all([
       this.prisma.academicYear.findFirst({
         where: { id: dto.academicYearId, tenantId: actor.tenantId },
@@ -95,7 +117,18 @@ export class AttendanceService {
       throw new NotFoundException('Section not found in this tenant');
     }
 
-    const attendanceDate = new Date(dto.attendanceDate);
+    const attendanceDate = stripTime(new Date(dto.attendanceDate));
+    const calendarDay = await this.resolveCalendarDay(
+      actor.tenantId,
+      attendanceDate,
+    );
+
+    if (!calendarDay.isWorkingDay) {
+      throw new ForbiddenException(
+        'Attendance can only be submitted for working days',
+      );
+    }
+
     const existingSession = await this.prisma.attendanceSession.findFirst({
       where: {
         tenantId: actor.tenantId,
@@ -138,13 +171,16 @@ export class AttendanceService {
             tenantId: actor.tenantId,
             attendanceSessionId: existingSession.id,
             submittedById: actor.userId,
+            decision: null,
             previousPayload: existingSession.records.map((record) => ({
               studentId: record.studentId,
               status: record.status,
               remark: record.remark,
             })) as Prisma.InputJsonValue,
-            incomingPayload: (dto.exceptions ??
-              []) as unknown as Prisma.InputJsonValue,
+            incomingPayload: buildAttendanceIncomingPayload(
+              dto,
+              submissionContext,
+            ) as Prisma.InputJsonValue,
           },
         });
       }
@@ -249,6 +285,7 @@ export class AttendanceService {
       submittedAt: session.submittedAt,
       lockAt: session.lockAt,
       conflictStatus: session.conflictStatus,
+      calendarDay,
       totals: summarizeAttendance(session.records),
     };
   }
@@ -264,11 +301,35 @@ export class AttendanceService {
     });
 
     if (existingSync) {
-      return existingSync;
+      const replay = await this.prisma.attendanceSyncSubmission.update({
+        where: { id: existingSync.id },
+        data: {
+          syncAttemptCount: {
+            increment: 1,
+          },
+        },
+      });
+
+      return mapAttendanceSyncResult(replay, true);
     }
 
+    const attendanceDate = stripTime(new Date(dto.attendanceDate));
+    const serverReceivedAt = new Date();
+    const trustMetadata = await this.buildSyncTrustMetadata(
+      dto,
+      actor,
+      attendanceDate,
+    );
+
     try {
-      const result = await this.submitAttendance(dto, actor);
+      const result = await this.submitAttendance(dto, actor, {
+        source: 'sync_submission',
+        clientSubmissionId: dto.clientSubmissionId,
+        deviceId: dto.deviceId ?? null,
+        deviceLabel: dto.deviceLabel ?? null,
+        sessionFingerprint: dto.sessionFingerprint ?? null,
+        trustMetadata,
+      });
       const conflict =
         result.conflictStatus === AttendanceConflictStatus.FLAGGED
           ? await this.prisma.attendanceConflict.findFirst({
@@ -280,7 +341,7 @@ export class AttendanceService {
             })
           : null;
 
-      return this.prisma.attendanceSyncSubmission.create({
+      const created = await this.prisma.attendanceSyncSubmission.create({
         data: {
           tenantId: actor.tenantId,
           clientSubmissionId: dto.clientSubmissionId,
@@ -289,31 +350,62 @@ export class AttendanceService {
           academicYearId: dto.academicYearId,
           classId: dto.classId,
           sectionId: dto.sectionId ?? null,
-          attendanceDate: new Date(dto.attendanceDate),
+          attendanceDate,
+          deviceId: dto.deviceId ?? null,
+          deviceLabel: dto.deviceLabel ?? null,
           deviceTimestamp: new Date(dto.deviceTimestamp),
+          sessionFingerprint: dto.sessionFingerprint ?? null,
           syncStatus: conflict
             ? AttendanceSyncStatus.CONFLICTED
             : AttendanceSyncStatus.ACCEPTED,
+          syncAttemptCount: 1,
+          serverReceivedAt,
+          rejectionReason: null,
           submittedById: actor.userId,
-          payload: dto as unknown as Prisma.InputJsonValue,
+          payload: {
+            dto,
+            result,
+            trustMetadata,
+          } as Prisma.InputJsonValue,
         },
       });
+
+      return mapAttendanceSyncResult(created, false);
     } catch (error) {
-      await this.prisma.attendanceSyncSubmission.create({
+      const created = await this.prisma.attendanceSyncSubmission.create({
         data: {
           tenantId: actor.tenantId,
           clientSubmissionId: dto.clientSubmissionId,
           academicYearId: dto.academicYearId,
           classId: dto.classId,
           sectionId: dto.sectionId ?? null,
-          attendanceDate: new Date(dto.attendanceDate),
+          attendanceDate,
+          deviceId: dto.deviceId ?? null,
+          deviceLabel: dto.deviceLabel ?? null,
           deviceTimestamp: new Date(dto.deviceTimestamp),
+          sessionFingerprint: dto.sessionFingerprint ?? null,
           syncStatus: AttendanceSyncStatus.REJECTED,
+          syncAttemptCount: 1,
+          serverReceivedAt,
+          rejectionReason: classifyAttendanceSyncRejection(error),
           submittedById: actor.userId,
           payload: {
             dto,
             error: error instanceof Error ? error.message : 'Unknown error',
+            trustMetadata,
           } as unknown as Prisma.InputJsonValue,
+        },
+      });
+
+      await this.auditService.record({
+        action: 'reject',
+        resource: 'attendance_sync_submission',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: created.id,
+        after: {
+          clientSubmissionId: dto.clientSubmissionId,
+          rejectionReason: created.rejectionReason,
         },
       });
 
@@ -343,6 +435,7 @@ export class AttendanceService {
       id: conflict.id,
       attendanceSessionId: conflict.attendanceSessionId,
       status: conflict.status,
+      decision: conflict.decision,
       submittedById: conflict.submittedById,
       reviewedById: conflict.reviewedById,
       submittedAt: conflict.createdAt,
@@ -359,6 +452,8 @@ export class AttendanceService {
     dto: ReviewAttendanceConflictDto,
     actor: AuthContext,
   ) {
+    this.ensureAttendanceReviewAuthority(actor);
+
     const conflict = await this.prisma.attendanceConflict.findFirst({
       where: {
         id: conflictId,
@@ -370,15 +465,45 @@ export class AttendanceService {
       throw new NotFoundException('Attendance conflict not found');
     }
 
+    const decision =
+      dto.decision ?? AttendanceConflictReviewDecision.REVIEWED_WITHOUT_CHANGE;
+
     const updated = await this.prisma.attendanceConflict.update({
       where: { id: conflict.id },
       data: {
         status: AttendanceConflictStatus.REVIEWED,
+        decision:
+          decision === AttendanceConflictReviewDecision.REJECTED_RESUBMISSION
+            ? AttendanceConflictDecision.REJECTED_RESUBMISSION
+            : AttendanceConflictDecision.REVIEWED_WITHOUT_CHANGE,
         resolutionNote: dto.resolutionNote ?? null,
         reviewedById: actor.userId,
         reviewedAt: new Date(),
       },
     });
+
+    const syncUpdate =
+      decision === AttendanceConflictReviewDecision.REJECTED_RESUBMISSION
+        ? await this.prisma.attendanceSyncSubmission.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              conflictId: conflict.id,
+            },
+            data: {
+              syncStatus: AttendanceSyncStatus.REJECTED,
+              rejectionReason: AttendanceSyncRejectionReason.ROSTER_MISMATCH,
+            },
+          })
+        : await this.prisma.attendanceSyncSubmission.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              conflictId: conflict.id,
+            },
+            data: {
+              syncStatus: AttendanceSyncStatus.ACCEPTED,
+              rejectionReason: null,
+            },
+          });
 
     await this.prisma.attendanceSession.update({
       where: { id: conflict.attendanceSessionId },
@@ -392,11 +517,22 @@ export class AttendanceService {
       userId: actor.userId,
       resourceId: conflict.id,
       after: {
+        decision,
         resolutionNote: dto.resolutionNote ?? null,
+        affectedSyncSubmissionCount: syncUpdate.count,
       },
     });
 
-    return updated;
+    return {
+      id: updated.id,
+      attendanceSessionId: updated.attendanceSessionId,
+      status: updated.status,
+      decision: updated.decision,
+      resolutionNote: updated.resolutionNote,
+      reviewedById: updated.reviewedById,
+      reviewedAt: updated.reviewedAt,
+      affectedSyncSubmissionCount: syncUpdate.count,
+    };
   }
 
   async overrideLockedSession(
@@ -404,6 +540,8 @@ export class AttendanceService {
     dto: OverrideAttendanceSessionDto,
     actor: AuthContext,
   ) {
+    this.ensureAttendanceReviewAuthority(actor);
+
     const session = await this.prisma.attendanceSession.findFirst({
       where: {
         id: sessionId,
@@ -432,6 +570,18 @@ export class AttendanceService {
       }
     }
 
+    const changedRows = dto.exceptions.map((exception) => {
+      const original = recordByStudent.get(exception.studentId)!;
+
+      return {
+        studentId: exception.studentId,
+        fromStatus: original.status,
+        toStatus: exception.status,
+        fromRemark: original.remark ?? null,
+        toRemark: exception.remark ?? null,
+      };
+    });
+
     const updated = await this.prisma.$transaction(async (tx) => {
       for (const exception of dto.exceptions) {
         await tx.attendanceRecord.update({
@@ -454,6 +604,7 @@ export class AttendanceService {
           tenantId: actor.tenantId,
           attendanceSessionId: session.id,
           submittedById: actor.userId,
+          decision: AttendanceConflictDecision.REVIEWED_AND_OVERRIDDEN,
           previousPayload: session.records.map((record) => ({
             studentId: record.studentId,
             status: record.status,
@@ -462,6 +613,9 @@ export class AttendanceService {
           incomingPayload: {
             override: dto.exceptions,
             reason: dto.reason ?? null,
+            source: dto.source ?? AttendanceOverrideSource.MANUAL_OVERRIDE,
+            changedRows,
+            originalLockAt: session.lockAt.toISOString(),
           } as unknown as Prisma.InputJsonValue,
           status: AttendanceConflictStatus.REVIEWED,
           reviewedById: actor.userId,
@@ -483,6 +637,21 @@ export class AttendanceService {
       });
     });
 
+    const syncUpdate =
+      dto.source === AttendanceOverrideSource.SYNC_CONFLICT_RESOLUTION
+        ? await this.prisma.attendanceSyncSubmission.updateMany({
+            where: {
+              tenantId: actor.tenantId,
+              attendanceSessionId: session.id,
+              syncStatus: AttendanceSyncStatus.CONFLICTED,
+            },
+            data: {
+              syncStatus: AttendanceSyncStatus.ACCEPTED,
+              rejectionReason: null,
+            },
+          })
+        : { count: 0 };
+
     await this.auditService.record({
       action: 'override',
       resource: 'attendance_session',
@@ -498,6 +667,10 @@ export class AttendanceService {
       },
       after: {
         reason: dto.reason ?? null,
+        source: dto.source ?? AttendanceOverrideSource.MANUAL_OVERRIDE,
+        originalLockAt: session.lockAt,
+        changedRows,
+        affectedSyncSubmissionCount: syncUpdate.count,
         totals: summarizeAttendance(updated.records),
       },
     });
@@ -508,6 +681,7 @@ export class AttendanceService {
       className: updated.class.name,
       sectionName: updated.section?.name ?? null,
       conflictStatus: updated.conflictStatus,
+      affectedSyncSubmissionCount: syncUpdate.count,
       totals: summarizeAttendance(updated.records),
     };
   }
@@ -567,11 +741,146 @@ export class AttendanceService {
     });
   }
 
+  async listStaffAttendanceSummary(
+    query: ListStaffAttendanceSummaryDto,
+    actor: AuthContext,
+  ) {
+    const now = new Date();
+    const month = query.month ?? now.getMonth() + 1;
+    const year = query.year ?? now.getFullYear();
+    const startsOn = new Date(year, month - 1, 1);
+    const endsOn = new Date(year, month, 1);
+
+    const [records, approvedLeaveRequests] = await Promise.all([
+      this.prisma.staffAttendance.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          attendanceDate: {
+            gte: startsOn,
+            lt: endsOn,
+          },
+        },
+        include: {
+          staff: true,
+        },
+      }),
+      this.prisma.staffLeaveRequest.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          status: 'APPROVED',
+          startsOn: { lt: endsOn },
+          endsOn: { gte: startsOn },
+        },
+        include: {
+          staff: true,
+        },
+      }),
+    ]);
+
+    const summaryByStaff = new Map<
+      string,
+      {
+        staffId: string;
+        employeeId: string;
+        fullName: string;
+        presentDays: number;
+        lateDays: number;
+        absentDays: number;
+        leaveDays: number;
+        approvedLeaveDays: number;
+        unresolvedOverlapAnomalies: number;
+      }
+    >();
+    const recordStatusByStaffAndDate = new Map<string, AttendanceStatus>();
+
+    for (const record of records) {
+      const fullName = `${record.staff.firstName} ${record.staff.lastName}`.trim();
+      const current = summaryByStaff.get(record.staffId) ?? {
+        staffId: record.staffId,
+        employeeId: record.staff.employeeId,
+        fullName,
+        presentDays: 0,
+        lateDays: 0,
+        absentDays: 0,
+        leaveDays: 0,
+        approvedLeaveDays: 0,
+        unresolvedOverlapAnomalies: 0,
+      };
+
+      if (record.status === AttendanceStatus.PRESENT) {
+        current.presentDays += 1;
+      } else if (record.status === AttendanceStatus.LATE) {
+        current.lateDays += 1;
+      } else if (record.status === AttendanceStatus.ABSENT) {
+        current.absentDays += 1;
+      } else if (record.status === AttendanceStatus.LEAVE) {
+        current.leaveDays += 1;
+      }
+
+      recordStatusByStaffAndDate.set(
+        buildStaffDateKey(record.staffId, stripTime(record.attendanceDate)),
+        record.status,
+      );
+      summaryByStaff.set(record.staffId, current);
+    }
+
+    for (const leave of approvedLeaveRequests) {
+      const fullName = `${leave.staff.firstName} ${leave.staff.lastName}`.trim();
+      const current = summaryByStaff.get(leave.staffId) ?? {
+        staffId: leave.staffId,
+        employeeId: leave.staff.employeeId,
+        fullName,
+        presentDays: 0,
+        lateDays: 0,
+        absentDays: 0,
+        leaveDays: 0,
+        approvedLeaveDays: 0,
+        unresolvedOverlapAnomalies: 0,
+      };
+
+      for (const leaveDate of eachDateInclusive(leave.startsOn, leave.endsOn)) {
+        if (leaveDate < startsOn || leaveDate >= endsOn) {
+          continue;
+        }
+
+        current.approvedLeaveDays += 1;
+        const existingStatus = recordStatusByStaffAndDate.get(
+          buildStaffDateKey(leave.staffId, leaveDate),
+        );
+
+        if (existingStatus && existingStatus !== AttendanceStatus.LEAVE) {
+          current.unresolvedOverlapAnomalies += 1;
+        }
+      }
+
+      summaryByStaff.set(leave.staffId, current);
+    }
+
+    return {
+      month,
+      year,
+      items: Array.from(summaryByStaff.values()).sort((a, b) =>
+        a.fullName.localeCompare(b.fullName),
+      ),
+    };
+  }
+
   async submitStaffAttendance(
     dto: SubmitStaffAttendanceDto,
     actor: AuthContext,
   ) {
-    const attendanceDate = new Date(dto.attendanceDate);
+    const attendanceDate = stripTime(new Date(dto.attendanceDate));
+    const calendarDay = await this.resolveCalendarDay(
+      actor.tenantId,
+      attendanceDate,
+    );
+
+    if (!calendarDay.isWorkingDay) {
+      throw new ForbiddenException(
+        'Staff attendance can only be submitted for working days',
+      );
+    }
+
     const staffIds = dto.records.map((record) => record.staffId);
     const staffCount = await this.prisma.staff.count({
       where: {
@@ -629,6 +938,7 @@ export class AttendanceService {
     return {
       attendanceDate,
       count: records.length,
+      calendarDay,
       records,
     };
   }
@@ -719,6 +1029,10 @@ export class AttendanceService {
       throw new NotFoundException('Leave request not found in this tenant');
     }
 
+    if (leave.status !== 'PENDING') {
+      throw new ConflictException('Only pending leave requests can be reviewed');
+    }
+
     const updated = await this.prisma.$transaction(async (tx) => {
       const reviewed = await tx.staffLeaveRequest.update({
         where: { id: leave.id },
@@ -730,8 +1044,35 @@ export class AttendanceService {
         },
       });
 
+      const overlapAnomalies: Array<{
+        date: string;
+        existingStatus: AttendanceStatus;
+      }> = [];
+
       if (dto.status === 'APPROVED') {
         const year = reviewed.startsOn.getFullYear();
+        const existingBalance = await tx.staffLeaveBalance.findUnique({
+          where: {
+            tenantId_staffId_leaveType_year: {
+              tenantId: actor.tenantId,
+              staffId: reviewed.staffId,
+              leaveType: reviewed.leaveType,
+              year,
+            },
+          },
+        });
+        const availableDays = Number(
+          (existingBalance?.allocated ?? new Prisma.Decimal(0))
+            .add(existingBalance?.carried ?? new Prisma.Decimal(0))
+            .sub(existingBalance?.used ?? new Prisma.Decimal(0)),
+        );
+
+        if (availableDays < Number(reviewed.days)) {
+          throw new ForbiddenException(
+            'Approving this leave request would result in a negative leave balance',
+          );
+        }
+
         await tx.staffLeaveBalance.upsert({
           where: {
             tenantId_staffId_leaveType_year: {
@@ -755,9 +1096,66 @@ export class AttendanceService {
             used: reviewed.days,
           },
         });
+
+        for (const leaveDate of eachDateInclusive(
+          reviewed.startsOn,
+          reviewed.endsOn,
+        )) {
+          const attendanceDay = stripTime(leaveDate);
+          const existingAttendance = await tx.staffAttendance.findUnique({
+            where: {
+              tenantId_staffId_attendanceDate: {
+                tenantId: actor.tenantId,
+                staffId: reviewed.staffId,
+                attendanceDate: attendanceDay,
+              },
+            },
+          });
+
+          if (!existingAttendance) {
+            await tx.staffAttendance.create({
+              data: {
+                tenantId: actor.tenantId,
+                staffId: reviewed.staffId,
+                attendanceDate: attendanceDay,
+                status: AttendanceStatus.LEAVE,
+                leaveType: reviewed.leaveType,
+                note: `Approved leave request ${reviewed.id}`,
+                approvedById: actor.userId,
+              },
+            });
+            continue;
+          }
+
+          if (existingAttendance.status === AttendanceStatus.LEAVE) {
+            await tx.staffAttendance.update({
+              where: {
+                tenantId_staffId_attendanceDate: {
+                  tenantId: actor.tenantId,
+                  staffId: reviewed.staffId,
+                  attendanceDate: attendanceDay,
+                },
+              },
+              data: {
+                leaveType: reviewed.leaveType,
+                note: `Approved leave request ${reviewed.id}`,
+                approvedById: actor.userId,
+              },
+            });
+            continue;
+          }
+
+          overlapAnomalies.push({
+            date: attendanceDay.toISOString(),
+            existingStatus: existingAttendance.status,
+          });
+        }
       }
 
-      return reviewed;
+      return {
+        reviewed,
+        overlapAnomalies,
+      };
     });
 
     await this.auditService.record({
@@ -765,14 +1163,18 @@ export class AttendanceService {
       resource: 'staff_leave_request',
       tenantId: actor.tenantId,
       userId: actor.userId,
-      resourceId: updated.id,
+      resourceId: updated.reviewed.id,
       after: {
-        status: updated.status,
-        reviewNote: updated.reviewNote,
+        status: updated.reviewed.status,
+        reviewNote: updated.reviewed.reviewNote,
+        overlapAnomalies: updated.overlapAnomalies,
       },
     });
 
-    return updated;
+    return {
+      ...updated.reviewed,
+      overlapAnomalies: updated.overlapAnomalies,
+    };
   }
 
   async getRoster(
@@ -808,9 +1210,13 @@ export class AttendanceService {
       throw new NotFoundException('Section not found in this tenant');
     }
 
-    const parsedAttendanceDate = attendanceDate
-      ? new Date(attendanceDate)
-      : new Date();
+    const parsedAttendanceDate = stripTime(
+      attendanceDate ? new Date(attendanceDate) : new Date(),
+    );
+    const calendarDay = await this.resolveCalendarDay(
+      actor.tenantId,
+      parsedAttendanceDate,
+    );
 
     const [students, existingSession] = await Promise.all([
       this.prisma.student.findMany({
@@ -852,6 +1258,7 @@ export class AttendanceService {
       class: classroom,
       section,
       attendanceDate: parsedAttendanceDate,
+      calendarDay,
       existingSession: existingSession
         ? {
             id: existingSession.id,
@@ -899,6 +1306,39 @@ export class AttendanceService {
       orderBy: [{ attendanceDate: 'desc' }],
       take: 60,
     });
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const nextYearStart = new Date(now.getFullYear() + 1, 0, 1);
+    const calendarByDate = await this.loadCalendarDayMap(
+      actor.tenantId,
+      sessions.map((session) => session.attendanceDate),
+    );
+    const [monthlyRecords, annualRecords] = await Promise.all([
+      this.prisma.attendanceRecord.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          attendanceSession: {
+            attendanceDate: {
+              gte: monthStart,
+              lt: nextMonthStart,
+            },
+          },
+        },
+      }),
+      this.prisma.attendanceRecord.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          attendanceSession: {
+            attendanceDate: {
+              gte: yearStart,
+              lt: nextYearStart,
+            },
+          },
+        },
+      }),
+    ]);
 
     const studentAbsenceCounts = new Map<string, number>();
     const studentTotals = new Map<
@@ -945,15 +1385,46 @@ export class AttendanceService {
       }
     }
 
+    const todayKey = getDateKey(stripTime(now));
+    const todaySessions = sessions.filter(
+      (session) => getDateKey(stripTime(session.attendanceDate)) === todayKey,
+    );
+    const todayTotals = summarizeAttendance(
+      todaySessions.flatMap((session) => session.records),
+    );
+
     return {
       sessionsReviewed: sessions.length,
+      todaySummary: {
+        date: stripTime(now).toISOString(),
+        sessionCount: todaySessions.length,
+        totals: todayTotals,
+      },
+      monthlyAttendance: {
+        month: now.getMonth() + 1,
+        year: now.getFullYear(),
+        attendancePercent: calculateAttendancePercent(monthlyRecords),
+      },
+      annualAttendance: {
+        year: now.getFullYear(),
+        attendancePercent: calculateAttendancePercent(annualRecords),
+      },
       latestSessions: sessions.map((session) => ({
         sessionId: session.id,
         attendanceDate: session.attendanceDate,
         className: session.class.name,
         sectionName: session.section?.name ?? null,
         conflictStatus: session.conflictStatus,
+        calendarDay: calendarByDate.get(
+          getDateKey(stripTime(session.attendanceDate)),
+        ),
         totals: summarizeAttendance(session.records),
+      })),
+      classHeatmap: sessions.map((session) => ({
+        attendanceDate: session.attendanceDate.toISOString(),
+        className: session.class.name,
+        sectionName: session.section?.name ?? null,
+        attendancePercent: calculateAttendancePercent(session.records),
       })),
       absenceHotlist: Array.from(studentAbsenceCounts.entries())
         .map(([studentId, absenceCount]) => ({ studentId, absenceCount }))
@@ -980,6 +1451,381 @@ export class AttendanceService {
         .sort((a, b) => a.attendancePercent - b.attendancePercent),
     };
   }
+
+  async processDailyEscalationWarnings(
+    actor: AuthContext,
+    runDate = new Date(),
+  ) {
+    const warningDate = stripTime(runDate);
+    const warningDateKey = getDateKey(warningDate);
+    const windowStart = new Date(warningDate);
+    windowStart.setDate(windowStart.getDate() - 59);
+    const monthStart = new Date(
+      warningDate.getFullYear(),
+      warningDate.getMonth(),
+      1,
+    );
+    const nextDay = new Date(warningDate);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    const sessions = await this.prisma.attendanceSession.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        attendanceDate: {
+          gte: windowStart,
+          lt: nextDay,
+        },
+      },
+      include: {
+        class: true,
+        section: true,
+        records: {
+          include: {
+            student: true,
+          },
+        },
+      },
+      orderBy: [{ attendanceDate: 'desc' }],
+    });
+
+    const recordsByStudent = new Map<
+      string,
+      Array<{
+        attendanceDate: Date;
+        status: AttendanceStatus;
+        studentSystemId: string;
+        fullNameEn: string;
+        className: string;
+        sectionName: string | null;
+      }>
+    >();
+    const monthlyTotals = new Map<
+      string,
+      {
+        present: number;
+        total: number;
+        studentSystemId: string;
+        fullNameEn: string;
+        className: string;
+        sectionName: string | null;
+      }
+    >();
+
+    for (const session of sessions) {
+      for (const record of session.records) {
+        const fullNameEn =
+          `${record.student.firstNameEn} ${record.student.lastNameEn}`.trim();
+        const className = session.class.name;
+        const sectionName = session.section?.name ?? null;
+
+        recordsByStudent.set(record.studentId, [
+          ...(recordsByStudent.get(record.studentId) ?? []),
+          {
+            attendanceDate: session.attendanceDate,
+            status: record.status,
+            studentSystemId: record.student.studentSystemId,
+            fullNameEn,
+            className,
+            sectionName,
+          },
+        ]);
+
+        if (
+          session.attendanceDate >= monthStart &&
+          session.attendanceDate < nextDay
+        ) {
+          const monthly = monthlyTotals.get(record.studentId) ?? {
+            present: 0,
+            total: 0,
+            studentSystemId: record.student.studentSystemId,
+            fullNameEn,
+            className,
+            sectionName,
+          };
+          monthly.total += 1;
+          if (
+            record.status === AttendanceStatus.PRESENT ||
+            record.status === AttendanceStatus.LATE
+          ) {
+            monthly.present += 1;
+          }
+          monthlyTotals.set(record.studentId, monthly);
+        }
+      }
+    }
+
+    const warnings: Array<{
+      type: 'consecutive_absence' | 'below_threshold';
+      sourceType: string;
+      sourceId: string;
+      studentId: string;
+      studentSystemId: string;
+      fullNameEn: string;
+      className: string;
+      sectionName: string | null;
+      warningDate: string;
+      consecutiveAbsences?: number;
+      attendancePercent?: number;
+      deliveryCount: number;
+    }> = [];
+
+    for (const [studentId, records] of recordsByStudent.entries()) {
+      const consecutiveAbsences = countConsecutiveAbsences(records);
+      const latest = records[0];
+
+      if (consecutiveAbsences >= 2 && latest) {
+        const sourceType = 'attendance_consecutive_absence_warning';
+        const sourceId = `${studentId}:${warningDateKey}`;
+        const alreadySent = await this.prisma.notificationDelivery.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            sourceType,
+            sourceId,
+          },
+        });
+
+        if (!alreadySent) {
+          const delivery = await this.communicationsService.recordDeliveryRecords(
+            {
+              actor,
+              sourceType,
+              sourceId,
+              audienceType: AudienceType.ALL,
+              studentIds: [studentId],
+              title: 'Attendance warning',
+              body: `${latest.fullNameEn} has been absent for ${consecutiveAbsences} consecutive attendance days.`,
+              channels: [
+                NotificationChannel.PUSH,
+                NotificationChannel.SMS,
+              ],
+              requiredConsentTypes: [ConsentType.MESSAGING],
+            },
+          );
+
+          warnings.push({
+            type: 'consecutive_absence',
+            sourceType,
+            sourceId,
+            studentId,
+            studentSystemId: latest.studentSystemId,
+            fullNameEn: latest.fullNameEn,
+            className: latest.className,
+            sectionName: latest.sectionName,
+            warningDate: warningDate.toISOString(),
+            consecutiveAbsences,
+            deliveryCount: delivery.count,
+          });
+        }
+      }
+    }
+
+    for (const [studentId, totals] of monthlyTotals.entries()) {
+      const attendancePercent =
+        totals.total === 0
+          ? 100
+          : Math.round((totals.present / totals.total) * 10000) / 100;
+
+      if (attendancePercent >= 80) {
+        continue;
+      }
+
+      const sourceType = 'attendance_below_threshold_warning';
+      const sourceId = `${studentId}:${warningDateKey}`;
+      const alreadySent = await this.prisma.notificationDelivery.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          sourceType,
+          sourceId,
+        },
+      });
+
+      if (alreadySent) {
+        continue;
+      }
+
+      const delivery = await this.communicationsService.recordDeliveryRecords({
+        actor,
+        sourceType,
+        sourceId,
+        audienceType: AudienceType.ALL,
+        studentIds: [studentId],
+        title: 'Attendance threshold warning',
+        body: `${totals.fullNameEn} is below the 80% monthly attendance threshold.`,
+        channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
+        requiredConsentTypes: [ConsentType.MESSAGING],
+      });
+
+      warnings.push({
+        type: 'below_threshold',
+        sourceType,
+        sourceId,
+        studentId,
+        studentSystemId: totals.studentSystemId,
+        fullNameEn: totals.fullNameEn,
+        className: totals.className,
+        sectionName: totals.sectionName,
+        warningDate: warningDate.toISOString(),
+        attendancePercent,
+        deliveryCount: delivery.count,
+      });
+    }
+
+    await this.auditService.record({
+      action: 'process',
+      resource: 'attendance_escalation_warning',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        warningDate: warningDate.toISOString(),
+        warningCount: warnings.length,
+      },
+    });
+
+    return {
+      warningDate: warningDate.toISOString(),
+      warningCount: warnings.length,
+      warnings,
+    };
+  }
+
+  private async buildSyncTrustMetadata(
+    dto: SyncAttendanceDto,
+    actor: AuthContext,
+    attendanceDate: Date,
+  ) {
+    const priorSubmission = await this.prisma.attendanceSyncSubmission.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        academicYearId: dto.academicYearId,
+        classId: dto.classId,
+        sectionId: dto.sectionId ?? null,
+        attendanceDate,
+        clientSubmissionId: {
+          not: dto.clientSubmissionId,
+        },
+        syncStatus: {
+          in: [
+            AttendanceSyncStatus.ACCEPTED,
+            AttendanceSyncStatus.CONFLICTED,
+          ],
+        },
+      },
+      orderBy: [{ serverReceivedAt: 'desc' }],
+    });
+
+    if (!priorSubmission) {
+      return {
+        firstSeen: true,
+        flagged: false,
+        flagReason: null,
+        priorSubmissionId: null,
+      };
+    }
+
+    const fingerprintMismatch =
+      Boolean(dto.sessionFingerprint) &&
+      Boolean(priorSubmission.sessionFingerprint) &&
+      dto.sessionFingerprint !== priorSubmission.sessionFingerprint;
+    const deviceMismatch =
+      Boolean(dto.deviceId) &&
+      Boolean(priorSubmission.deviceId) &&
+      dto.deviceId !== priorSubmission.deviceId;
+
+    return {
+      firstSeen: false,
+      flagged: fingerprintMismatch || deviceMismatch,
+      flagReason: fingerprintMismatch
+        ? 'device_fingerprint_mismatch'
+        : deviceMismatch
+          ? 'device_id_mismatch'
+          : null,
+      priorSubmissionId: priorSubmission.id,
+      priorDeviceId: priorSubmission.deviceId,
+      priorSessionFingerprint: priorSubmission.sessionFingerprint,
+    };
+  }
+
+  private ensureAttendanceReviewAuthority(actor: AuthContext) {
+    const allowedRoles = new Set(['super_admin', 'admin', 'principal']);
+
+    if (!actor.roles.some((role) => allowedRoles.has(role))) {
+      throw new ForbiddenException(
+        'Only principal, admin, or super_admin may review attendance conflicts or override locked sessions',
+      );
+    }
+  }
+
+  private async resolveCalendarDay(tenantId: string, date: Date) {
+    const normalizedDate = stripTime(date);
+    const explicitDay = await this.prisma.schoolCalendarDay.findFirst({
+      where: {
+        tenantId,
+        calendarDate: normalizedDate,
+      },
+    });
+
+    if (explicitDay) {
+      return {
+        calendarDate: explicitDay.calendarDate.toISOString(),
+        isWorkingDay: explicitDay.isWorkingDay,
+        label: explicitDay.label,
+        holidayType: explicitDay.holidayType,
+        source: 'explicit' as const,
+      };
+    }
+
+    return {
+      calendarDate: normalizedDate.toISOString(),
+      isWorkingDay: isWeekdayWorkingDay(normalizedDate),
+      label: null,
+      holidayType: null,
+      source: 'weekday_fallback' as const,
+    };
+  }
+
+  private async loadCalendarDayMap(tenantId: string, dates: Date[]) {
+    const normalizedDates = Array.from(
+      new Set(dates.map((date) => stripTime(date).getTime())),
+    ).map((time) => new Date(time));
+
+    const explicitDays = await this.prisma.schoolCalendarDay.findMany({
+      where: {
+        tenantId,
+        calendarDate: {
+          in: normalizedDates,
+        },
+      },
+    });
+    const explicitByKey = new Map(
+      explicitDays.map((day) => [getDateKey(day.calendarDate), day]),
+    );
+
+    return new Map(
+      normalizedDates.map((date) => {
+        const key = getDateKey(date);
+        const explicitDay = explicitByKey.get(key);
+
+        return [
+          key,
+          explicitDay
+            ? {
+                calendarDate: explicitDay.calendarDate.toISOString(),
+                isWorkingDay: explicitDay.isWorkingDay,
+                label: explicitDay.label,
+                holidayType: explicitDay.holidayType,
+                source: 'explicit' as const,
+              }
+            : {
+                calendarDate: date.toISOString(),
+                isWorkingDay: isWeekdayWorkingDay(date),
+                label: null,
+                holidayType: null,
+                source: 'weekday_fallback' as const,
+              },
+        ];
+      }),
+    );
+  }
 }
 
 function summarizeAttendance(records: Array<{ status: AttendanceStatus }>) {
@@ -995,6 +1841,25 @@ function summarizeAttendance(records: Array<{ status: AttendanceStatus }>) {
       .length,
     leave: records.filter((record) => record.status === AttendanceStatus.LEAVE)
       .length,
+  };
+}
+
+type AttendanceSubmissionContext = {
+  source: 'sync_submission';
+  clientSubmissionId: string;
+  deviceId: string | null;
+  deviceLabel: string | null;
+  sessionFingerprint: string | null;
+  trustMetadata: Record<string, unknown>;
+};
+
+function buildAttendanceIncomingPayload(
+  dto: SubmitAttendanceDto,
+  submissionContext?: AttendanceSubmissionContext,
+) {
+  return {
+    exceptions: dto.exceptions ?? [],
+    submissionContext: submissionContext ?? null,
   };
 }
 
@@ -1030,4 +1895,108 @@ function countInclusiveDays(startsOn: Date, endsOn: Date) {
 
 function stripTime(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function getDateKey(date: Date) {
+  return stripTime(date).toISOString().slice(0, 10);
+}
+
+function isWeekdayWorkingDay(date: Date) {
+  const dayOfWeek = date.getDay();
+  return dayOfWeek >= 1 && dayOfWeek <= 5;
+}
+
+function classifyAttendanceSyncRejection(error: unknown) {
+  if (error instanceof NotFoundException) {
+    return AttendanceSyncRejectionReason.REFERENCE_NOT_FOUND;
+  }
+
+  if (error instanceof ForbiddenException) {
+    const message = String(error.message ?? '');
+
+    if (message.includes('locked')) {
+      return AttendanceSyncRejectionReason.LOCKED_SESSION;
+    }
+
+    if (message.includes('working days')) {
+      return AttendanceSyncRejectionReason.VALIDATION_ERROR;
+    }
+  }
+
+  if (error instanceof ConflictException) {
+    return AttendanceSyncRejectionReason.ROSTER_MISMATCH;
+  }
+
+  return AttendanceSyncRejectionReason.UNKNOWN;
+}
+
+function mapAttendanceSyncResult(
+  submission: {
+    id: string;
+    clientSubmissionId: string;
+    attendanceSessionId: string | null;
+    conflictId: string | null;
+    syncStatus: AttendanceSyncStatus;
+    attendanceDate: Date;
+    deviceId: string | null;
+    deviceLabel: string | null;
+    deviceTimestamp: Date | null;
+    sessionFingerprint: string | null;
+    syncAttemptCount: number;
+    serverReceivedAt: Date;
+    rejectionReason: AttendanceSyncRejectionReason | null;
+    createdAt: Date;
+  },
+  replayed: boolean,
+) {
+  return {
+    id: submission.id,
+    clientSubmissionId: submission.clientSubmissionId,
+    attendanceSessionId: submission.attendanceSessionId,
+    conflictId: submission.conflictId,
+    syncStatus: submission.syncStatus,
+    attendanceDate: submission.attendanceDate.toISOString(),
+    deviceId: submission.deviceId,
+    deviceLabel: submission.deviceLabel,
+    deviceTimestamp: submission.deviceTimestamp?.toISOString() ?? null,
+    sessionFingerprint: submission.sessionFingerprint,
+    syncAttemptCount: submission.syncAttemptCount,
+    serverReceivedAt: submission.serverReceivedAt.toISOString(),
+    replayed,
+    rejectionReason: submission.rejectionReason,
+    createdAt: submission.createdAt.toISOString(),
+  };
+}
+
+function calculateAttendancePercent(
+  records: Array<{ status: AttendanceStatus }>,
+) {
+  if (records.length === 0) {
+    return 100;
+  }
+
+  const presentCount = records.filter(
+    (record) =>
+      record.status === AttendanceStatus.PRESENT ||
+      record.status === AttendanceStatus.LATE,
+  ).length;
+
+  return Math.round((presentCount / records.length) * 10000) / 100;
+}
+
+function eachDateInclusive(startsOn: Date, endsOn: Date) {
+  const dates: Date[] = [];
+  const cursor = stripTime(startsOn);
+  const last = stripTime(endsOn);
+
+  while (cursor <= last) {
+    dates.push(new Date(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return dates;
+}
+
+function buildStaffDateKey(staffId: string, date: Date) {
+  return `${staffId}:${getDateKey(date)}`;
 }

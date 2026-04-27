@@ -14,6 +14,10 @@ import { FinanceService } from '../finance/finance.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StudentRecordsService } from '../student-records/student-records.service';
+import { ArchiveStudentDto } from '../students/dto/archive-student.dto';
+import { DeleteStudentDto } from '../students/dto/delete-student.dto';
+import { RequestStudentTransferDto } from '../students/dto/request-student-transfer.dto';
+import { StudentsService } from '../students/students.service';
 import { UsersService } from '../users/users.service';
 import {
   buildAdmissionDtoFromCsvRow,
@@ -36,6 +40,7 @@ export class AdmissionsService {
     private readonly auditService: AuditService,
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly studentsService: StudentsService,
   ) {}
 
   async listAdmissions(actor: AuthContext) {
@@ -623,205 +628,40 @@ export class AdmissionsService {
     dto: TransferStudentDto,
     actor: AuthContext,
   ) {
-    const student = await this.prisma.student.findFirst({
-      where: { id: studentId, tenantId: actor.tenantId },
-      include: {
-        enrollments: {
-          where: { status: EnrollmentStatus.ACTIVE },
-        },
-      },
-    });
-
-    if (!student) {
-      throw new NotFoundException('Student not found');
-    }
-
-    if (student.enrollments.length === 0) {
-      throw new BadRequestException(
-        'Student has no active enrollments to transfer',
-      );
-    }
-
-    if (!dto.waiveFeeCheck) {
-      const outstandingInvoices = await this.prisma.invoice.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          studentId: student.id,
-          status: { notIn: ['PAID', 'VOID'] },
-        },
-      });
-
-      if (outstandingInvoices.length > 0) {
-        throw new ConflictException({
-          message:
-            'Cannot generate transfer certificate because the student has outstanding fee balances.',
-          outstandingInvoices: outstandingInvoices.map((i) => i.invoiceNumber),
-        });
-      }
-    }
-
-    // Update the active enrollment status
-    await this.prisma.enrollment.update({
-      where: { id: student.enrollments[0].id },
-      data: {
-        status: EnrollmentStatus.TRANSFERRED,
-      },
-    });
-
-    await this.auditService.record({
-      action: 'transfer',
-      resource: 'student',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: student.id,
-      after: {
+    return this.studentsService.requestTransfer(
+      studentId,
+      {
         reason: dto.reason,
-        transferDate: dto.transferDate,
         destinationSchool: dto.destinationSchool,
-      },
-    });
-
-    this.eventEmitter.emit('student.transferred', {
-      tenantId: actor.tenantId,
-      studentId: student.id,
+        exitedAt: dto.transferDate,
+        waiveFeeClearance: dto.waiveFeeCheck,
+      } as RequestStudentTransferDto,
       actor,
-    });
-
-    return {
-      success: true,
-      transferCertificateRef: `TC-${new Date().getFullYear()}-${student.studentSystemId}`,
-    };
+    );
   }
 
   async exportIemis(actor: AuthContext) {
-    const students = await this.prisma.student.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        class: true,
-        sectionRef: true,
-        guardianLinks: {
-          include: { guardian: true },
-        },
-      },
-    });
-
-    // Mock implementation of iEMIS format export
-    return students.map((s) => ({
-      systemId: s.studentSystemId,
-      fullName: `${s.firstNameEn} ${s.lastNameEn}`,
-      dob: s.dateOfBirth.toISOString().split('T')[0],
-      gender: s.gender,
-      class: s.class.name,
-      section: s.sectionRef?.name,
-      caste: s.nationality,
-      motherTongue: s.motherTongue,
-      disabilityType: s.disabilityFlag,
-    }));
+    return this.studentsService.exportIemis(actor);
   }
 
   async deleteStudent(studentId: string, actor: AuthContext) {
-    const student = await this.prisma.student.findFirst({
-      where: { id: studentId, tenantId: actor.tenantId },
-    });
-
-    if (!student) {
-      throw new NotFoundException('Student not found in this tenant');
-    }
-
-    // Fee balance guard — prevent deletion while outstanding invoices exist
-    const outstandingInvoices = await this.prisma.invoice.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        studentId: student.id,
-        status: { notIn: ['PAID', 'VOID'] },
-      },
-    });
-
-    if (outstandingInvoices.length > 0) {
-      const totalOutstanding = outstandingInvoices.reduce(
-        (sum, inv) => sum + Number(inv.totalAmount),
-        0,
-      );
-      throw new ConflictException({
-        message:
-          'Cannot delete student with outstanding fee balances. Clear or waive all fees first.',
-        outstandingInvoiceCount: outstandingInvoices.length,
-        totalOutstandingAmount: totalOutstanding,
-        invoiceNumbers: outstandingInvoices.map((i) => i.invoiceNumber),
-      });
-    }
-
-    // Proceed with soft-delete by marking all enrollments as exited.
-    await this.prisma.enrollment.updateMany({
-      where: {
-        tenantId: actor.tenantId,
-        studentId: student.id,
-        status: EnrollmentStatus.ACTIVE,
-      },
-      data: { status: EnrollmentStatus.EXITED },
-    });
-
-    await this.auditService.record({
-      action: 'delete',
-      resource: 'student',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: student.id,
-      after: {
-        studentSystemId: student.studentSystemId,
-        fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`,
-      },
-    });
-
-    this.eventEmitter.emit('student.withdrawn', {
-      tenantId: actor.tenantId,
-      studentId: student.id,
+    return this.studentsService.deleteStudent(
+      studentId,
+      {
+        reason: 'Deleted via admissions compatibility route',
+      } as DeleteStudentDto,
       actor,
-    });
-
-    return { success: true };
+    );
   }
 
   async archiveAlumni(studentId: string, actor: AuthContext) {
-    const student = await this.prisma.student.findFirst({
-      where: { id: studentId, tenantId: actor.tenantId },
-      include: {
-        enrollments: {
-          where: { status: EnrollmentStatus.ACTIVE },
-        },
-      },
-    });
-
-    if (!student) {
-      throw new NotFoundException('Student not found in this tenant');
-    }
-
-    if (student.enrollments.length > 0) {
-      throw new ConflictException(
-        'Cannot archive a student with active enrollments. Promote or transfer first.',
-      );
-    }
-
-    // Archive completed promotion records through the existing exit lifecycle.
-    await this.prisma.enrollment.updateMany({
-      where: {
-        tenantId: actor.tenantId,
-        studentId: student.id,
-        status: { in: [EnrollmentStatus.PROMOTED] },
-      },
-      data: { status: EnrollmentStatus.EXITED },
-    });
-
-    await this.auditService.record({
-      action: 'archive_alumni',
-      resource: 'student',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: student.id,
-      after: { status: 'alumni' },
-    });
-
-    return { success: true, status: 'archived_as_alumni' };
+    return this.studentsService.archiveAlumni(
+      studentId,
+      {
+        reason: 'Archived via admissions compatibility route',
+      } as ArchiveStudentDto,
+      actor,
+    );
   }
 }
 

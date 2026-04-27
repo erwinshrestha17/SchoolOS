@@ -1,6 +1,7 @@
 import {
   ArrayMinSize,
   ArrayUnique,
+  IsEnum,
   IsArray,
   IsOptional,
   IsString,
@@ -8,6 +9,11 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { AttendanceExceptionDto } from './submit-attendance.dto';
+
+export enum AttendanceOverrideSource {
+  MANUAL_OVERRIDE = 'manual_override',
+  SYNC_CONFLICT_RESOLUTION = 'sync_conflict_resolution',
+}
 
 export class OverrideAttendanceSessionDto {
   @IsArray()
@@ -20,4 +26,8 @@ export class OverrideAttendanceSessionDto {
   @IsOptional()
   @IsString()
   reason?: string;
+
+  @IsOptional()
+  @IsEnum(AttendanceOverrideSource)
+  source?: AttendanceOverrideSource;
 }

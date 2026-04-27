@@ -14,8 +14,10 @@ import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { ArchiveStudentDto } from './dto/archive-student.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
+import { DeleteStudentDto } from './dto/delete-student.dto';
 import { InviteGuardianDto } from './dto/invite-guardian.dto';
 import { RequestStudentTransferDto } from './dto/request-student-transfer.dto';
+import { RevokeGeneratedStudentDocumentDto } from './dto/revoke-generated-student-document.dto';
 import { StudentsService } from './students.service';
 
 @Controller('students')
@@ -54,7 +56,7 @@ export class StudentsController {
   }
 
   @Post(':id/transfer')
-  @Permissions('enrollments:create')
+  @Permissions('students:manage_lifecycle')
   requestTransfer(
     @Param('id') studentId: string,
     @Body() dto: RequestStudentTransferDto,
@@ -64,13 +66,33 @@ export class StudentsController {
   }
 
   @Post(':id/archive')
-  @Permissions('enrollments:create')
+  @Permissions('students:manage_lifecycle')
   archiveStudent(
     @Param('id') studentId: string,
     @Body() dto: ArchiveStudentDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.studentsService.archiveStudent(studentId, dto, auth);
+  }
+
+  @Post(':id/archive-alumni')
+  @Permissions('students:manage_lifecycle')
+  archiveAlumni(
+    @Param('id') studentId: string,
+    @Body() dto: ArchiveStudentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.archiveAlumni(studentId, dto, auth);
+  }
+
+  @Post(':id/delete')
+  @Permissions('students:delete')
+  deleteStudent(
+    @Param('id') studentId: string,
+    @Body() dto: DeleteStudentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.deleteStudent(studentId, dto, auth);
   }
 
   @Post(':id/guardian-invitations')
@@ -94,6 +116,22 @@ export class StudentsController {
     return this.studentsService.generateStudentDocumentPdf(
       studentId,
       kind,
+      auth,
+    );
+  }
+
+  @Post(':id/generated-documents/:documentId/revoke')
+  @Permissions('student_documents:manage')
+  revokeGeneratedDocument(
+    @Param('id') studentId: string,
+    @Param('documentId') documentId: string,
+    @Body() dto: RevokeGeneratedStudentDocumentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.revokeGeneratedStudentDocument(
+      studentId,
+      documentId,
+      dto,
       auth,
     );
   }

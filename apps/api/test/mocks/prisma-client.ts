@@ -120,6 +120,12 @@ export const AttendanceConflictStatus = {
   REVIEWED: 'REVIEWED',
 } as const;
 
+export const AttendanceConflictDecision = {
+  REVIEWED_WITHOUT_CHANGE: 'REVIEWED_WITHOUT_CHANGE',
+  REVIEWED_AND_OVERRIDDEN: 'REVIEWED_AND_OVERRIDDEN',
+  REJECTED_RESUBMISSION: 'REJECTED_RESUBMISSION',
+} as const;
+
 export const FeeFrequency = {
   ONE_TIME: 'ONE_TIME',
   MONTHLY: 'MONTHLY',
@@ -162,10 +168,19 @@ export const PaymentMethod = {
   MOBILE: 'MOBILE',
 } as const;
 
+export const StudentLifecycleStatus = {
+  ACTIVE: 'ACTIVE',
+  TRANSFERRED: 'TRANSFERRED',
+  EXITED: 'EXITED',
+  ALUMNI: 'ALUMNI',
+  DELETED: 'DELETED',
+} as const;
+
 export const JournalSourceType = {
   MANUAL: 'MANUAL',
   INVOICE: 'INVOICE',
   FEE_PAYMENT: 'FEE_PAYMENT',
+  PAYMENT_REFUND: 'PAYMENT_REFUND',
   PAYROLL: 'PAYROLL',
   CLOSING: 'CLOSING',
   ADJUSTMENT: 'ADJUSTMENT',
@@ -261,6 +276,14 @@ export const AttendanceSyncStatus = {
   ACCEPTED: 'ACCEPTED',
   CONFLICTED: 'CONFLICTED',
   REJECTED: 'REJECTED',
+} as const;
+
+export const AttendanceSyncRejectionReason = {
+  LOCKED_SESSION: 'LOCKED_SESSION',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  ROSTER_MISMATCH: 'ROSTER_MISMATCH',
+  REFERENCE_NOT_FOUND: 'REFERENCE_NOT_FOUND',
+  UNKNOWN: 'UNKNOWN',
 } as const;
 
 export const ActivityReactionType = {
