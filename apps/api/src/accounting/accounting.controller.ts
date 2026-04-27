@@ -9,6 +9,7 @@ import { CreateAccountingPeriodDto } from './dto/create-accounting-period.dto';
 import { CreateChartAccountDto } from './dto/create-chart-account.dto';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { CreateManualJournalDto } from './dto/create-manual-journal.dto';
+import { ReverseJournalEntryDto } from './dto/reverse-journal-entry.dto';
 
 @Controller('accounting')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -58,6 +59,16 @@ export class AccountingController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.accountingService.createManualJournal(dto, auth);
+  }
+
+  @Post('journals/:id/reverse')
+  @Permissions('accounting:reverse')
+  reverseJournalEntry(
+    @Param('id') id: string,
+    @Body() dto: ReverseJournalEntryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.reverseJournalEntry(id, dto, auth);
   }
 
   @Post('expenses')

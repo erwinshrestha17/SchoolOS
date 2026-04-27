@@ -30,6 +30,14 @@ class Decimal {
     return this.numericValue >= decimalToNumber(value);
   }
 
+  lt(value: number | string | Decimal) {
+    return this.numericValue < decimalToNumber(value);
+  }
+
+  lte(value: number | string | Decimal) {
+    return this.numericValue <= decimalToNumber(value);
+  }
+
   toDecimalPlaces(places: number) {
     return new Decimal(Number(this.numericValue.toFixed(places)));
   }
@@ -161,6 +169,7 @@ export const JournalSourceType = {
   PAYROLL: 'PAYROLL',
   CLOSING: 'CLOSING',
   ADJUSTMENT: 'ADJUSTMENT',
+  REVERSAL: 'REVERSAL',
 } as const;
 
 export const JournalLineSide = {

@@ -18,6 +18,7 @@ import { CreateAccountingPeriodDto } from './dto/create-accounting-period.dto';
 import { CreateChartAccountDto } from './dto/create-chart-account.dto';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { CreateManualJournalDto } from './dto/create-manual-journal.dto';
+import { ReverseJournalEntryDto } from './dto/reverse-journal-entry.dto';
 
 @Injectable()
 export class AccountingService {
@@ -127,22 +128,8 @@ export class AccountingService {
       throw new ConflictException('Manual journal must be balanced');
     }
 
-    // Period guard: reject entries posted to a CLOSED period
     const entryDate = new Date(dto.entryDate);
-    const closedPeriod = await this.prisma.accountingPeriod.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        status: AccountingPeriodStatus.CLOSED,
-        startsOn: { lte: entryDate },
-        endsOn: { gte: entryDate },
-      },
-    });
-
-    if (closedPeriod) {
-      throw new ConflictException(
-        `Cannot post journal entry to closed accounting period "${closedPeriod.name}"`,
-      );
-    }
+    await this.ensurePostingPeriodIsOpen(actor.tenantId, entryDate);
 
     const entry = await this.prisma.journalEntry.create({
       data: {
@@ -184,6 +171,99 @@ export class AccountingService {
     });
 
     return entry;
+  }
+
+  async reverseJournalEntry(
+    journalEntryId: string,
+    dto: ReverseJournalEntryDto,
+    actor: AuthContext,
+  ) {
+    const original = await this.prisma.journalEntry.findFirst({
+      where: { id: journalEntryId, tenantId: actor.tenantId },
+      include: {
+        lines: {
+          include: { chartAccount: true },
+          orderBy: [{ createdAt: 'asc' }],
+        },
+      },
+    });
+
+    if (!original) {
+      throw new NotFoundException('Journal entry not found in this tenant');
+    }
+
+    if (original.sourceType === JournalSourceType.REVERSAL) {
+      throw new ConflictException(
+        'Reversal entries cannot be reversed directly',
+      );
+    }
+
+    const existingReversal = await this.prisma.journalEntry.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        reversalOfId: original.id,
+      },
+    });
+
+    if (existingReversal) {
+      throw new ConflictException(
+        `Journal entry already reversed by ${existingReversal.entryNumber}`,
+      );
+    }
+
+    const reversalDate = dto.reversalDate
+      ? new Date(dto.reversalDate)
+      : new Date();
+    await this.ensurePostingPeriodIsOpen(actor.tenantId, reversalDate);
+
+    const reversal = await this.prisma.journalEntry.create({
+      data: {
+        tenantId: actor.tenantId,
+        entryNumber: await this.generateJournalEntryNumber(actor.tenantId),
+        entryDate: reversalDate,
+        narration:
+          dto.narration ?? `Reversal of journal entry ${original.entryNumber}`,
+        sourceType: JournalSourceType.REVERSAL,
+        sourceId: original.id,
+        reversalOfId: original.id,
+        createdById: actor.userId,
+        lines: {
+          create: original.lines.map((line) => ({
+            tenantId: actor.tenantId,
+            chartAccountId: line.chartAccountId,
+            side: reverseJournalSide(line.side),
+            amount: line.amount,
+            description:
+              line.description ??
+              `Reversal of ${original.entryNumber} line ${line.id}`,
+          })),
+        },
+      },
+      include: {
+        reversalOf: true,
+        lines: {
+          include: { chartAccount: true },
+        },
+      },
+    });
+
+    await this.auditService.record({
+      action: 'reverse',
+      resource: 'journal_entry',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: reversal.id,
+      before: {
+        originalEntryId: original.id,
+        originalEntryNumber: original.entryNumber,
+      },
+      after: {
+        reversalEntryNumber: reversal.entryNumber,
+        reversalOfId: reversal.reversalOfId,
+      },
+    });
+
+    return reversal;
   }
 
   async createExpense(dto: CreateExpenseDto, actor: AuthContext) {
@@ -318,6 +398,23 @@ export class AccountingService {
 
     return `JE-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, '0')}`;
   }
+
+  private async ensurePostingPeriodIsOpen(tenantId: string, entryDate: Date) {
+    const closedPeriod = await this.prisma.accountingPeriod.findFirst({
+      where: {
+        tenantId,
+        status: AccountingPeriodStatus.CLOSED,
+        startsOn: { lte: entryDate },
+        endsOn: { gte: entryDate },
+      },
+    });
+
+    if (closedPeriod) {
+      throw new ConflictException(
+        `Cannot post journal entry to closed accounting period "${closedPeriod.name}"`,
+      );
+    }
+  }
 }
 
 function sumJournalSides(
@@ -339,4 +436,10 @@ function sumRows(rows: Array<{ type: string; balance: number }>, type: string) {
   return rows
     .filter((row) => row.type === type)
     .reduce((sum, row) => sum + row.balance, 0);
+}
+
+export function reverseJournalSide(side: JournalLineSide) {
+  return side === JournalLineSide.DEBIT
+    ? JournalLineSide.CREDIT
+    : JournalLineSide.DEBIT;
 }

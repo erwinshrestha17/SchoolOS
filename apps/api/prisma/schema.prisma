@@ -85,6 +85,7 @@ enum JournalSourceType {
   PAYROLL
   CLOSING
   ADJUSTMENT
+  REVERSAL
 }
 
 enum JournalLineSide {
@@ -1181,21 +1182,25 @@ model ChartAccount {
 }
 
 model JournalEntry {
-  id          String            @id @default(uuid())
-  tenantId    String
-  entryNumber String
-  entryDate   DateTime
-  narration   String
-  sourceType  JournalSourceType
-  sourceId    String?
-  createdById String?
-  createdAt   DateTime          @default(now())
+  id           String            @id @default(uuid())
+  tenantId     String
+  entryNumber  String
+  entryDate    DateTime
+  narration    String
+  sourceType   JournalSourceType
+  sourceId     String?
+  reversalOfId String?
+  createdById  String?
+  createdAt    DateTime          @default(now())
 
-  tenant    Tenant        @relation(fields: [tenantId], references: [id])
-  createdBy User?         @relation("CreatedJournalEntries", fields: [createdById], references: [id])
-  lines     JournalLine[]
+  tenant     Tenant         @relation(fields: [tenantId], references: [id])
+  createdBy  User?          @relation("CreatedJournalEntries", fields: [createdById], references: [id])
+  reversalOf JournalEntry?  @relation("JournalEntryReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversals  JournalEntry[] @relation("JournalEntryReversal")
+  lines      JournalLine[]
 
   @@unique([tenantId, entryNumber])
+  @@index([tenantId, reversalOfId])
 }
 
 model JournalLine {

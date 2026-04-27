@@ -17,9 +17,11 @@ import { CreateFeePlanDto } from './dto/create-fee-plan.dto';
 import { CreateDiscountRuleDto } from './dto/create-discount-rule.dto';
 import { CreateFeeDueScheduleDto } from './dto/create-fee-due-schedule.dto';
 import { CreateFeeWaiverDto } from './dto/create-fee-waiver.dto';
+import { CreateInvoiceAdjustmentDto } from './dto/create-invoice-adjustment.dto';
 import { GenerateBillingRunDto } from './dto/generate-billing-run.dto';
 import { ProcessFeeDueScheduleDto } from './dto/process-fee-due-schedule.dto';
 import { SendDefaulterRemindersDto } from './dto/send-defaulter-reminders.dto';
+import { VoidInvoiceDto } from './dto/void-invoice.dto';
 import { FinanceService } from './finance.service';
 
 @Controller('fees')
@@ -61,6 +63,26 @@ export class FeesController {
   @Permissions('fees:manage')
   listInvoices(@CurrentAuth() auth: AuthContext) {
     return this.financeService.listInvoices(auth);
+  }
+
+  @Post('invoices/:id/void')
+  @Permissions('fees:adjust')
+  voidInvoice(
+    @Param('id') invoiceId: string,
+    @Body() dto: VoidInvoiceDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.voidInvoice(invoiceId, dto, auth);
+  }
+
+  @Post('invoices/:id/adjustments')
+  @Permissions('fees:adjust')
+  createInvoiceAdjustment(
+    @Param('id') invoiceId: string,
+    @Body() dto: CreateInvoiceAdjustmentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.createInvoiceAdjustment(invoiceId, dto, auth);
   }
 
   @Get('billing-runs')

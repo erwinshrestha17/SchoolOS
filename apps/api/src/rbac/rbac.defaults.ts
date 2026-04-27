@@ -231,6 +231,11 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Manage discounts and waivers',
   },
   {
+    resource: 'fees',
+    action: 'adjust',
+    description: 'Void invoices and post audited fee invoice adjustments',
+  },
+  {
     resource: 'payments',
     action: 'collect',
     description: 'Collect payments and issue receipts',
@@ -254,6 +259,12 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     resource: 'accounting',
     action: 'close',
     description: 'Close accounting periods with audit visibility',
+  },
+  {
+    resource: 'accounting',
+    action: 'reverse',
+    description:
+      'Create reversing journal entries for posted accounting records',
   },
   {
     resource: 'activity_feed',
@@ -418,6 +429,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
       ![
         'roles:manage_permissions',
         'accounting:close',
+        'accounting:reverse',
         'tenants:manage',
       ].includes(permission),
   ),
@@ -471,11 +483,13 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'fees:manage',
     'fees:bill',
     'fees:discount',
+    'fees:adjust',
     'payments:collect',
     'receipts:read',
     'ledger:read',
     'accounting:read',
     'accounting:close',
+    'accounting:reverse',
     'payroll:read',
     'payroll:manage',
   ],

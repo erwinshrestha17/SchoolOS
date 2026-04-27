@@ -24,9 +24,14 @@ import { CreateFeeDueScheduleDto } from './dto/create-fee-due-schedule.dto';
 import { CreateFeeHeadDto } from './dto/create-fee-head.dto';
 import { CreateFeePlanDto } from './dto/create-fee-plan.dto';
 import { CreateFeeWaiverDto } from './dto/create-fee-waiver.dto';
+import {
+  CreateInvoiceAdjustmentDto,
+  InvoiceAdjustmentDirection,
+} from './dto/create-invoice-adjustment.dto';
 import { GenerateBillingRunDto } from './dto/generate-billing-run.dto';
 import { ProcessFeeDueScheduleDto } from './dto/process-fee-due-schedule.dto';
 import { SendDefaulterRemindersDto } from './dto/send-defaulter-reminders.dto';
+import { VoidInvoiceDto } from './dto/void-invoice.dto';
 import { resolveCashAccountCode } from './finance.defaults';
 
 @Injectable()
@@ -731,6 +736,190 @@ export class FinanceService {
         0,
       ),
     }));
+  }
+
+  async voidInvoice(
+    invoiceId: string,
+    dto: VoidInvoiceDto,
+    actor: AuthContext,
+  ) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, tenantId: actor.tenantId },
+      include: { payments: true },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found in this tenant');
+    }
+
+    if (invoice.status === InvoiceStatus.VOID) {
+      throw new ConflictException('Invoice is already void');
+    }
+
+    const paidAmount = invoice.payments.reduce(
+      (sum, payment) => sum.add(payment.amount),
+      new Prisma.Decimal(0),
+    );
+
+    if (paidAmount.gt(0)) {
+      throw new ConflictException(
+        'Paid invoices must be refunded or reversed before voiding',
+      );
+    }
+
+    const voided = await this.prisma.invoice.update({
+      where: { id: invoice.id },
+      data: {
+        status: InvoiceStatus.VOID,
+        reportCardBlocked: false,
+        hallTicketBlocked: false,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'void',
+      resource: 'invoice',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: invoice.id,
+      before: {
+        status: invoice.status,
+        totalAmount: Number(invoice.totalAmount),
+      },
+      after: {
+        status: voided.status,
+        reason: dto.reason,
+        approvedBy: dto.approvedBy ?? actor.userId,
+      },
+    });
+
+    return voided;
+  }
+
+  async createInvoiceAdjustment(
+    invoiceId: string,
+    dto: CreateInvoiceAdjustmentDto,
+    actor: AuthContext,
+  ) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, tenantId: actor.tenantId },
+      include: { payments: true },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found in this tenant');
+    }
+
+    if (invoice.status === InvoiceStatus.VOID) {
+      throw new ConflictException('Void invoices cannot be adjusted');
+    }
+
+    if (invoice.status === InvoiceStatus.PAID) {
+      throw new ConflictException(
+        'Paid invoices require a refund or reversal workflow before adjustment',
+      );
+    }
+
+    const feeHead = await this.prisma.feeHead.findFirst({
+      where: { id: dto.feeHeadId, tenantId: actor.tenantId },
+    });
+
+    if (!feeHead) {
+      throw new NotFoundException('Fee head not found in this tenant');
+    }
+
+    const paidAmount = invoice.payments.reduce(
+      (sum, payment) => sum.add(payment.amount),
+      new Prisma.Decimal(0),
+    );
+    const adjustmentAmount = new Prisma.Decimal(dto.amount);
+    const adjustmentVat = new Prisma.Decimal(dto.vatAmount ?? 0);
+    const signedSubtotal =
+      dto.direction === InvoiceAdjustmentDirection.INCREASE
+        ? adjustmentAmount
+        : adjustmentAmount.mul(-1);
+    const signedVat =
+      dto.direction === InvoiceAdjustmentDirection.INCREASE
+        ? adjustmentVat
+        : adjustmentVat.mul(-1);
+    const newSubtotal = invoice.subtotal.add(signedSubtotal);
+    const newVatAmount = invoice.vatAmount.add(signedVat);
+    const newTotal = invoice.totalAmount.add(signedSubtotal).add(signedVat);
+
+    if (newSubtotal.lt(0) || newVatAmount.lt(0) || newTotal.lt(0)) {
+      throw new ConflictException(
+        'Adjustment cannot make invoice totals negative',
+      );
+    }
+
+    if (paidAmount.gt(newTotal)) {
+      throw new ConflictException(
+        'Adjustment would make paid amount exceed invoice total',
+      );
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const line = await tx.invoiceLine.create({
+        data: {
+          tenantId: actor.tenantId,
+          invoiceId: invoice.id,
+          feeHeadId: feeHead.id,
+          description: `Adjustment: ${dto.reason}`,
+          quantity: 1,
+          unitAmount: signedSubtotal,
+          vatAmount: signedVat,
+          totalAmount: signedSubtotal.add(signedVat),
+        },
+      });
+
+      const updated = await tx.invoice.update({
+        where: { id: invoice.id },
+        data: {
+          subtotal: newSubtotal,
+          vatAmount: newVatAmount,
+          totalAmount: newTotal,
+          status: resolveInvoiceStatusAfterAdjustment(
+            invoice.status,
+            paidAmount,
+            newTotal,
+          ),
+          paidAt:
+            paidAmount.gte(newTotal) && newTotal.gt(0) ? new Date() : null,
+        },
+        include: {
+          lines: true,
+          payments: true,
+        },
+      });
+
+      return { line, invoice: updated };
+    });
+
+    await this.auditService.record({
+      action: 'adjust',
+      resource: 'invoice',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: invoice.id,
+      before: {
+        subtotal: Number(invoice.subtotal),
+        vatAmount: Number(invoice.vatAmount),
+        totalAmount: Number(invoice.totalAmount),
+        status: invoice.status,
+      },
+      after: {
+        adjustmentLineId: result.line.id,
+        direction: dto.direction,
+        amount: dto.amount,
+        vatAmount: dto.vatAmount ?? 0,
+        reason: dto.reason,
+        subtotal: Number(result.invoice.subtotal),
+        totalAmount: Number(result.invoice.totalAmount),
+        status: result.invoice.status,
+      },
+    });
+
+    return result;
   }
 
   async listDefaulters(
@@ -1486,6 +1675,30 @@ function groupPaymentsByMonth(
     month,
     amount,
   }));
+}
+
+export function resolveInvoiceStatusAfterAdjustment(
+  currentStatus: InvoiceStatus,
+  paidAmount: Prisma.Decimal,
+  totalAmount: Prisma.Decimal,
+) {
+  if (currentStatus === InvoiceStatus.DRAFT) {
+    return InvoiceStatus.DRAFT;
+  }
+
+  if (totalAmount.lte(0)) {
+    return InvoiceStatus.PAID;
+  }
+
+  if (paidAmount.gte(totalAmount)) {
+    return InvoiceStatus.PAID;
+  }
+
+  if (paidAmount.gt(0)) {
+    return InvoiceStatus.PARTIAL;
+  }
+
+  return InvoiceStatus.ISSUED;
 }
 
 function groupByAmount<T>(items: T[], getKey: (item: T) => string) {
