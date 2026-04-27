@@ -53,6 +53,9 @@ enum AttendanceStatus {
   ABSENT
   LATE
   LEAVE
+  SICK_LEAVE
+  EXCUSED_LEAVE
+  UNEXCUSED_LEAVE
 }
 
 enum FeeFrequency {
@@ -692,6 +695,7 @@ model Student {
   disabilityFlag            String?
   nationalStudentId         String?
   birthCertNumber           String?
+  citizenshipNo             String?
   photoUrl                  String?
   admissionDate             DateTime
   admissionNumber           String?

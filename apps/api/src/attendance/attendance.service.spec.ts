@@ -344,8 +344,19 @@ describe('attendance production hardening', () => {
         },
       ],
     });
+    const sessionC = buildAttendanceSession({
+      id: 'session-c',
+      attendanceDate: new Date('2026-04-26T00:00:00.000Z'),
+      records: [
+        {
+          studentId: 'student-1',
+          status: AttendanceStatus.ABSENT,
+          student: buildStudent(),
+        },
+      ],
+    });
     const { service, prisma, communicationsService } = buildService({
-      attendanceSessions: [sessionA, sessionB],
+      attendanceSessions: [sessionA, sessionB, sessionC],
       notificationDeliveryFindFirstQueue: [
         { id: 'existing-consecutive' },
         null,
@@ -486,6 +497,7 @@ function buildService(options: {
     attendanceSession: {
       findFirst: jest.fn().mockResolvedValue(options.attendanceSession ?? null),
       findMany: jest.fn().mockResolvedValue(options.attendanceSessions ?? []),
+      update: jest.fn().mockResolvedValue(options.attendanceSession ?? {}),
     },
     student: {
       findMany: jest.fn().mockResolvedValue(options.students ?? []),
@@ -538,7 +550,7 @@ function buildService(options: {
         return Promise.all(input);
       }
 
-      return (input as (tx: typeof tx) => unknown)(tx);
+      return (input as (tx: any) => unknown)(tx);
     }),
   };
   const communicationsService = {
@@ -547,12 +559,16 @@ function buildService(options: {
   const auditService = {
     record: jest.fn(),
   };
+  const eventEmitter = {
+    emit: jest.fn(),
+  };
 
   return {
     service: new AttendanceService(
       prisma as never,
       communicationsService as never,
       auditService as never,
+      eventEmitter as never,
     ),
     prisma,
     tx,

@@ -35,6 +35,7 @@ import { SubmitAttendanceDto } from './dto/submit-attendance.dto';
 import { SyncAttendanceDto } from './dto/sync-attendance.dto';
 import { UpsertCalendarDayDto } from './dto/upsert-calendar-day.dto';
 import { buildStudentScopeFilter } from '../common/security/parent-scope';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class AttendanceService {
@@ -42,6 +43,7 @@ export class AttendanceService {
     private readonly prisma: PrismaService,
     private readonly communicationsService: CommunicationsService,
     private readonly auditService: AuditService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async listAttendance(actor: AuthContext) {
@@ -176,11 +178,11 @@ export class AttendanceService {
               studentId: record.studentId,
               status: record.status,
               remark: record.remark,
-            })) as Prisma.InputJsonValue,
+            })) as unknown as Prisma.InputJsonValue,
             incomingPayload: buildAttendanceIncomingPayload(
               dto,
               submissionContext,
-            ) as Prisma.InputJsonValue,
+            ) as unknown as Prisma.InputJsonValue,
           },
         });
       }
@@ -255,26 +257,48 @@ export class AttendanceService {
       },
     });
 
-    const absentRecords = session.records.filter(
-      (record) => record.status === AttendanceStatus.ABSENT,
+    const notifyRecords = session.records.filter(
+      (record) =>
+        record.status === AttendanceStatus.ABSENT ||
+        record.status === AttendanceStatus.LATE ||
+        record.status === AttendanceStatus.SICK_LEAVE ||
+        record.status === AttendanceStatus.EXCUSED_LEAVE ||
+        record.status === AttendanceStatus.UNEXCUSED_LEAVE,
     );
 
-    if (absentRecords.length > 0) {
-      await this.communicationsService.recordDeliveryRecords({
-        actor,
-        sourceType: 'attendance_absence',
-        sourceId: session.id,
-        audienceType: session.sectionId
-          ? AudienceType.SECTION
-          : AudienceType.CLASS,
-        classId: session.classId,
-        sectionId: session.sectionId,
-        studentIds: absentRecords.map((record) => record.studentId),
-        title: 'Attendance alert',
-        body: 'A student was marked absent today.',
-        channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
-        requiredConsentTypes: [ConsentType.MESSAGING],
-      });
+    if (notifyRecords.length > 0) {
+      for (const record of notifyRecords) {
+        let title = 'Attendance alert';
+        let body = '';
+        let channels: NotificationChannel[] = [NotificationChannel.PUSH];
+
+        if (record.status === AttendanceStatus.ABSENT) {
+          body = 'A student was marked absent today.';
+          channels = [NotificationChannel.PUSH, NotificationChannel.SMS];
+        } else if (record.status === AttendanceStatus.LATE) {
+          body = `A student was marked late today at ${record.lateAt ? record.lateAt.toISOString() : new Date().toISOString()}.`;
+        } else if (record.status === AttendanceStatus.SICK_LEAVE || record.status === AttendanceStatus.EXCUSED_LEAVE) {
+          body = `Excused/Sick leave confirmed for a student today.`;
+        } else if (record.status === AttendanceStatus.UNEXCUSED_LEAVE) {
+          body = `Unexcused leave recorded. Please contact the school immediately.`;
+        }
+
+        await this.communicationsService.recordDeliveryRecords({
+          actor,
+          sourceType: 'attendance_alert',
+          sourceId: session.id,
+          audienceType: session.sectionId
+            ? AudienceType.SECTION
+            : AudienceType.CLASS,
+          classId: session.classId,
+          sectionId: session.sectionId,
+          studentIds: [record.studentId],
+          title,
+          body,
+          channels,
+          requiredConsentTypes: [ConsentType.MESSAGING],
+        });
+      }
     }
 
     return {
@@ -362,11 +386,11 @@ export class AttendanceService {
           serverReceivedAt,
           rejectionReason: null,
           submittedById: actor.userId,
-          payload: {
+          payload: JSON.parse(JSON.stringify({
             dto,
             result,
             trustMetadata,
-          } as Prisma.InputJsonValue,
+          })) as Prisma.InputJsonValue,
         },
       });
 
@@ -1171,6 +1195,16 @@ export class AttendanceService {
       },
     });
 
+    if (updated.reviewed.status === 'APPROVED') {
+      this.eventEmitter.emit('staff.leave.approved', {
+        tenantId: actor.tenantId,
+        leaveRequestId: updated.reviewed.id,
+        staffId: updated.reviewed.staffId,
+        startsOn: updated.reviewed.startsOn,
+        endsOn: updated.reviewed.endsOn,
+      });
+    }
+
     return {
       ...updated.reviewed,
       overlapAnomalies: updated.overlapAnomalies,
@@ -1573,7 +1607,7 @@ export class AttendanceService {
       const consecutiveAbsences = countConsecutiveAbsences(records);
       const latest = records[0];
 
-      if (consecutiveAbsences >= 2 && latest) {
+      if (consecutiveAbsences >= 3 && latest) {
         const sourceType = 'attendance_consecutive_absence_warning';
         const sourceId = `${studentId}:${warningDateKey}`;
         const alreadySent = await this.prisma.notificationDelivery.findFirst({
@@ -1590,8 +1624,9 @@ export class AttendanceService {
               actor,
               sourceType,
               sourceId,
-              audienceType: AudienceType.ALL,
-              studentIds: [studentId],
+              audienceType: AudienceType.ROLE,
+              roleNames: ['admin', 'teacher'],
+              studentIds: [],
               title: 'Attendance warning',
               body: `${latest.fullNameEn} has been absent for ${consecutiveAbsences} consecutive attendance days.`,
               channels: [

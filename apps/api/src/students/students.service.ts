@@ -420,6 +420,20 @@ export class StudentsService {
       student.lifecycleStatus,
       StudentLifecycleStatus.DELETED,
     );
+
+    if (student.lifecycleStatus === StudentLifecycleStatus.ALUMNI) {
+      if (!student.exitedAt) {
+        throw new BadRequestException('Alumni record must have an exitedAt date');
+      }
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      if (student.exitedAt > twelveMonthsAgo) {
+        throw new BadRequestException(
+          'Alumni must be retained for at least 12 months after graduation/exit before deletion.',
+        );
+      }
+    }
+
     const clearance = await this.getFeeClearance(studentId, actor);
 
     if (!clearance.cleared) {

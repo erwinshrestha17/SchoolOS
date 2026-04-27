@@ -176,6 +176,12 @@ export class AdmissionsService {
       }
     }
 
+    if (!dto.disabilityFlag && !dto.confirmNoDisability) {
+      throw new BadRequestException(
+        'You must explicitly confirm "No known disability" (iEMIS requirement) if no disability is specified.',
+      );
+    }
+
     let linkedUserId: string | null = null;
 
     if (dto.createLogin) {
@@ -224,7 +230,11 @@ export class AdmissionsService {
         rollNumber: dto.rollNumber ?? null,
         nationality: dto.nationality ?? 'Nepali',
         motherTongue: dto.motherTongue ?? null,
-        disabilityFlag: dto.disabilityFlag ?? null,
+        disabilityFlag: dto.disabilityFlag || 'No known disability',
+        bloodGroup: dto.bloodGroup ?? null,
+        religion: dto.religion ?? null,
+        ethnicity: dto.ethnicity ?? null,
+        citizenshipNo: dto.citizenshipNo ?? null,
         mediumOfInstruct: dto.mediumOfInstruction ?? 'English',
         emergencyName: dto.emergencyName ?? null,
         emergencyPhone: dto.emergencyPhone ?? null,
@@ -263,6 +273,43 @@ export class AdmissionsService {
             : null,
       },
     });
+
+    if (dto.siblingStudentSystemId) {
+      const sibling = await this.prisma.student.findFirst({
+        where: { tenantId: actor.tenantId, studentSystemId: dto.siblingStudentSystemId },
+        include: { siblingMemberships: { include: { siblingGroup: true } } },
+      });
+
+      if (sibling) {
+        let siblingGroupId: string;
+        if (sibling.siblingMemberships.length > 0) {
+          siblingGroupId = sibling.siblingMemberships[0].siblingGroupId;
+        } else {
+          const newGroup = await this.prisma.siblingGroup.create({
+            data: {
+              tenantId: actor.tenantId,
+              name: `Sibling-${sibling.studentSystemId}`,
+            },
+          });
+          siblingGroupId = newGroup.id;
+          await this.prisma.siblingGroupMember.create({
+            data: {
+              tenantId: actor.tenantId,
+              studentId: sibling.id,
+              siblingGroupId,
+            },
+          });
+        }
+
+        await this.prisma.siblingGroupMember.create({
+          data: {
+            tenantId: actor.tenantId,
+            studentId: student.id,
+            siblingGroupId,
+          },
+        });
+      }
+    }
 
     const guardianLinks: Array<{
       relation: string;
@@ -321,11 +368,10 @@ export class AdmissionsService {
         }),
       );
 
-      if (guardian.email) {
-        await this.notificationsService.sendEmail({
-          to: guardian.email,
-          subject: `${actor.tenantSlug}: admission invitation`,
-          text: `${student.firstNameEn} ${student.lastNameEn} has been enrolled in ${classroom.name}.`,
+      if (guardian.primaryPhone) {
+        await this.notificationsService.sendSms({
+          to: guardian.primaryPhone,
+          message: `${student.firstNameEn} ${student.lastNameEn} has been enrolled in ${classroom.name}. Download the SchoolOS app to access the parent portal.`,
           metadata: {
             purpose: 'guardian_invite',
             studentId: student.id,
@@ -362,6 +408,16 @@ export class AdmissionsService {
       enrollmentId: enrollment.id,
       dueDate: new Date(dto.admissionDate),
     });
+
+    try {
+      await this.studentsService.generateStudentDocumentPdf(
+        student.id,
+        'ID_CARD',
+        actor,
+      );
+    } catch (e) {
+      // Best effort generation during admission to avoid blocking enrollment
+    }
 
     const documents: Array<
       Awaited<ReturnType<StudentRecordsService['uploadDocument']>>

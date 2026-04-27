@@ -110,11 +110,35 @@ export class CreateAdmissionDto {
 
   @IsOptional()
   @IsString()
+  bloodGroup?: string;
+
+  @IsOptional()
+  @IsString()
+  religion?: string;
+
+  @IsOptional()
+  @IsString()
+  ethnicity?: string;
+
+  @IsOptional()
+  @IsString()
+  citizenshipNo?: string;
+
+  @IsOptional()
+  @IsString()
+  siblingStudentSystemId?: string;
+
+  @IsOptional()
+  @IsString()
   motherTongue?: string;
 
   @IsOptional()
   @IsString()
   disabilityFlag?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  confirmNoDisability?: boolean;
 
   @IsOptional()
   @IsString()
