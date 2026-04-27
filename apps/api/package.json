@@ -11,30 +11,23 @@
     "prisma:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
-
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "lint:check": "eslint \"{src,apps,libs,test}/**/*.ts\"",
-
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "type:check": "pnpm run typecheck",
-
     "check": "pnpm run format:check && pnpm run lint:check && pnpm run typecheck",
-    "fix":   "pnpm run format && pnpm run lint",
-
+    "fix": "pnpm run format && pnpm run lint",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-
     "ci": "pnpm run check && pnpm run test"
   },
   "prisma": {
@@ -58,6 +51,7 @@
     "class-validator": "^0.15.1",
     "dotenv": "^17.4.2",
     "ioredis": "^5.10.1",
+    "nestjs-cls": "^6.2.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
@@ -100,7 +94,11 @@
     "vitest": "^4.1.5"
   },
   "jest": {
-    "moduleFileExtensions": ["js", "json", "ts"],
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
     "rootDir": ".",
     "moduleNameMapper": {
       "^@prisma/client$": "<rootDir>/test/mocks/prisma-client.ts"
@@ -109,7 +107,9 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
-    "collectCoverageFrom": ["**/*.(t|j)s"],
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
     "coverageDirectory": "./coverage",
     "testEnvironment": "node"
   }

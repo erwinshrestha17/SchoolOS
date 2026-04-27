@@ -1,0 +1,2017 @@
+SchoolOS
+Complete Module Deep-Dive Documentation
+Including Authentication, Authorization, Security & RBAC
+  
+Nepal  |  Montessori to Class 10  |  Version 3.0  |  2026–2028
+  
+Detail
+Value
+Document Type
+Engineering Deep-Dive — Product, Engineering & Implementation
+Modules Covered
+M1 through M10 + Auth/Security Layer
+Target Audience
+Product Managers, Backend Engineers, QA, DevOps
+Architecture
+NestJS Monorepo · TypeScript · Prisma · PostgreSQL · Redis
+Compliance
+Nepal MoEST · Nepal IRD VAT · Privacy Act 2075 · Labour Act 2074
+Version
+3.0 — April 2026
+
+1. System Architecture & Overview
+SchoolOS is a multi-tenant SaaS platform built on a NestJS monorepo architecture. Each school is an isolated tenant. All 10 modules share a single PostgreSQL database scoped by school_id. The platform is deployed as a single API with modular activation per subscription tier.
+ 
+1.1 Technology Stack
+Layer
+Technology
+Rationale
+Runtime
+Node.js 20 LTS
+Stable, massive ecosystem, best PostgreSQL support
+Framework
+NestJS 10
+Enforced structure, native monorepo CLI, DI container, decorators
+Language
+TypeScript 5
+End-to-end type safety — DTOs, services, Prisma models all typed
+Build Orchestration
+Turborepo
+Caches builds, parallel task execution, monorepo-native
+ORM
+Prisma
+Type-safe queries, auto-generated types from schema, best PG support
+Authentication
+Custom JWT (passport-jwt)
+Full control — no magic, token rotation built in
+Cache + Queue
+Redis + BullMQ
+Refresh token store, rate limiting, OTP delivery jobs
+Validation
+class-validator + class-transformer
+Integrates natively with NestJS ValidationPipe
+Password Hashing
+bcrypt (cost 12)
+Industry standard — balances security vs login latency
+File Storage
+Cloudflare R2
+Signed URLs with 1-hour expiry, no public access
+SMS Gateway
+Configurable (Sparrow/Prabhu)
+Nepal-local SMS for OTP and notifications
+Push Notifications
+Firebase FCM
+Cross-platform push — iOS, Android, web
+API Docs
+@nestjs/swagger
+Auto-generated from decorators — zero extra work
+ 
+1.2 Module Overview Matrix
+#
+Module
+Phase
+Plan Tier
+Levels
+M1
+Admissions & Student Profiles
+Phase 1
+Basic+
+All levels
+M2
+Attendance (Student + Staff)
+Phase 1
+Basic+
+All levels
+M3
+Fee Management
+Phase 1
+Basic+
+All levels
+M4
+Academics: Exams, CAS & Grading
+Phase 1–2
+Standard+
+Class 1–10
+M5
+Activity Feed & Milestones
+Phase 1
+Basic+
+Montessori–Class 5
+M6
+Homework & Timetable
+Phase 2
+Standard+
+Class 1–10
+M7
+Staff Management, HR & Payroll
+Phase 2
+Standard+
+All levels
+M8A
+Library Management
+Phase 2
+Standard+
+All levels
+M8B
+Transport Management
+Phase 2–3
+Standard+
+All levels
+M9
+Accounting & Financial Management
+Phase 2
+Standard+ / Add-on
+All levels
+M10
+Notices, Events & Messaging
+Phase 1
+Basic+
+All levels
+ 
+1.3 Module Dependency Hierarchy
+ARCH
+Module 1 (Admissions) is the ROOT of the entire system. Every other module queries the student record. Data quality in M1 determines data quality across all modules.
+ 
+Layer
+Module(s)
+Depends On
+Provides To
+Foundation
+M1 — Admissions
+None (root)
+All modules — student identity, class, guardian contacts
+Core Ops
+M2 — Attendance
+M1 (student list)
+M4 (promotion), M7 (payroll), M9 (accounting)
+Core Ops
+M3 — Fee Management
+M1 (student+guardian), M8B (transport)
+M9 (journal entries), M10 (receipts)
+Core Ops
+M10 — Notices & Messaging
+M1 (guardian contacts)
+All modules (notification layer)
+Academic
+M4 — Exams, CAS & Grading
+M1 (roster), M2 (attendance %)
+M1 (report cards), M10 (results)
+Academic
+M5 — Activity Feed
+M1 (student+guardian)
+M10 (push notifications)
+Academic
+M6 — Homework & Timetable
+M1 (class/section), M7 (teachers)
+M4 (completion), M10 (alerts)
+HR & Finance
+M7 — Staff HR & Payroll
+M1 (staff), M2 (attendance)
+M9 (salary entries), M6 (timetable)
+Finance
+M9 — Accounting
+M3 (fee income), M7 (salary)
+IRD exports, financial reports
+Auxiliary
+M8A — Library
+M1 (borrower)
+M3 (fines), M9 (assets)
+Auxiliary
+M8B — Transport
+M1 (enrollment)
+M3 (transport fee), M10 (boarding)
+
+2. Module 1 — Admissions & Student Profile Management
+ARCH
+M1 is the root of the entire SchoolOS data model. Every other module — attendance, fees, marks, activity feed — queries the student record. Data quality here determines data quality everywhere.
+ 
+2.1 Purpose & Scope
+The Admissions module manages the complete lifecycle of a student's relationship with the school — from initial enrollment, through annual class promotions, to graduation or transfer exit. It serves as the single source of truth for all student identity, placement, and guardian data used by all other modules.
+ 
+2.2 Core Data Model
+Student Record — Key Entities
+Entity Group
+Key Fields
+Encryption
+iEMIS Required
+Personal Info
+Full name (Nepali + English), DOB, gender, blood group, nationality, religion, ethnicity, mother tongue, photo
+Photo in Cloudflare R2 (signed URL)
+Yes — name, DOB, gender, mother tongue, disability flag
+Academic Placement
+Class, section, roll number, student ID (SCH-YYYY-NNNN), admission date, academic year, medium of instruction
+No
+Yes — student ID links to MoEST Student Registry
+Guardian Contacts (×3)
+Full name, relation type, primary/secondary phone, email, occupation, address, is-primary flag, app login link
+No
+Yes — at least one guardian with phone
+Health & Medical
+Known conditions, allergy flags, medication schedule, SEN requirements, emergency contact, doctor info
+AES-256 at rest
+Disability flag only
+Documents
+Birth certificate, transfer certificate, passport photos
+Cloudflare R2 signed URLs
+Birth cert number
+National IDs
+National Student ID (MoEST), birth cert number, citizenship (for 16+)
+National ID encrypted at rest
+National Student ID (nullable UUID)
+ 
+2.3 Enrollment Workflow
+Step
+Action
+Actor
+System Output
+1
+Admin fills enrollment form: personal, academic, guardian, health fields
+Admin
+Form validation — required fields enforced
+2
+Upload documents: birth cert, transfer cert, photo
+Admin
+Files stored in Cloudflare R2; signed URL stored in student record
+3
+Assign class, section, roll number for current academic year
+Admin
+Roll number auto-generated if not manually set
+4
+Fee structure auto-applied based on class assignment
+System
+Outstanding fee record created in Module 3
+5
+Guardian receives app invitation SMS with login link
+System
+SMS via gateway; app account created with temp PIN
+6
+Student ID card generated as downloadable PDF
+System
+PDF with photo, name, class, section, school logo, QR code
+7
+First month's fee invoice auto-created in fee module
+System
+Invoice with due date; parent notified via push + SMS
+ 
+2.4 Key Business Rules
+	•	Student ID format is SCH-YYYY-NNNN. YYYY = academic year start. NNNN = sequential per school, zero-padded. Once assigned, immutable.
+	•	Sibling linking: admin manually links 2+ students from same family. Module 3 reads this link to apply sibling discounts automatically.
+	•	Duplicate detection: system checks same name + same DOB before final enrollment. Admin must confirm intentional duplicate.
+	•	A student record cannot be deleted while they have an outstanding fee balance — must be cleared or waived first.
+	•	Disability flag is a required iEMIS field — system prompts admin to confirm 'No known disability' rather than leaving blank.
+	•	Privacy Act 2075: guardian consent timestamp recorded on first app login. No marketing communications until consent recorded.
+	•	Alumni archiving: passed-out students moved to alumni status. Records retained 12 months, then eligible for deletion on request.
+ 
+2.5 Documents Generated
+Document
+Trigger
+Key Contents
+Student ID Card
+On enrollment completion
+Photo, name, class, section, school logo, primary color, optional QR code
+Enrollment Confirmation
+On admission
+School-branded letter: class, section, fee structure, academic year, first day date
+Transfer Certificate
+When student transfers out
+Enrollment/leaving dates, class completed, conduct remark, fee clearance status, principal signature
+Leaving Certificate
+On permanent exit
+Final class, last attendance date, reason for leaving, fee clearance confirmation
+Character Certificate
+On request
+Conduct record, years enrolled, activities, signed by principal
+ 
+2.6 Module Interactions from M1
+Event in M1
+Target Module
+Automated Action
+New student enrolled — class assigned
+M3 Fee Management
+Fee structure auto-applied; first invoice auto-generated
+New student enrolled — guardian contacts created
+M10 Messaging
+App invitation SMS sent; guardian account created
+Sibling link created
+M3 Fee Management
+Sibling discount automatically applied on next invoice
+Student assigned to class/section
+M2 Attendance
+Student appears in attendance roster for that class
+Health allergy flag set
+M2 Attendance
+Red badge appears on teacher attendance screen
+Year-end promotion run
+M2, M3, M4, M6
+New rosters, fee structures, academic records, timetables
+Transfer certificate issued
+M3 Fee Management
+Outstanding balance must be zero or waived before cert issued
+ 
+2.7 Edge Cases & Validation Rules
+	•	Roll number conflicts: if manually set roll number already exists in that class-section-year, system blocks and shows conflict.
+	•	Transfer students: previous school records stored but not validated. Admin manually confirms class placement.
+	•	Bulk CSV import: each row validated individually. Invalid rows rejected with specific error messages in downloadable error report.
+	•	Photo storage: images compressed on upload to max 800px wide, 80% quality. Signed URLs expire in 1 hour.
+
+3. Module 2 — Attendance Management
+CRITICAL
+THE 3-TAP RULE: Open class → tap absent students (all pre-marked present) → submit. If attendance takes more than 30 seconds, teachers stop using it within 2 weeks. This is the #1 UX constraint for the entire module.
+ 
+3.1 Purpose & Scope
+The Attendance module handles daily marking of student and staff attendance, generates analytics for promotion eligibility and defaulter management, feeds leave data into payroll, and triggers real-time parent notifications. The module must function fully offline with sync-on-reconnect.
+ 
+3.2 Student Attendance Status Codes
+Status
+Code
+Default?
+Parent Notification
+Present
+P
+Yes — all students pre-marked present
+None
+Absent
+A
+No — teacher taps to mark
+Push notification immediately on submission + SMS fallback
+Late
+L
+No — teacher taps + timestamp auto-captured
+Push: 'Your child arrived late at HH:MM'
+Leave — Sick
+LS
+No
+Push: 'Sick leave recorded for today'
+Leave — Excused
+LE
+No
+Push: 'Excused leave recorded'
+Leave — Unexcused
+LU
+No
+Push: 'Unexcused absence marked — please contact school'
+ 
+3.3 Offline Operation Architecture
+	•	Attendance data saved to device SQLite database on submission.
+	•	Network check runs every 30 seconds. On reconnection, unsynced records queued and uploaded in order.
+	•	Submission timestamp = device time at the moment teacher tapped Submit — not the server receipt time.
+	•	Conflict resolution: if the same class-date attendance is submitted twice (two devices), system uses the most recent submission timestamp and flags conflict for admin review.
+	•	Submission lock: attendance locked 6 hours after submission. Admin override required to modify after lock.
+ 
+3.4 Attendance Analytics & Alert Thresholds
+Metric
+Calculation
+Alert Trigger
+Recipient
+Monthly attendance %
+(Present days / working days) × 100
+Below 80% — red flag on dashboard
+Teacher + Admin
+Consecutive absences
+Count of consecutive absent days
+3+ consecutive days — alert triggered
+Admin + Class Teacher
+Annual attendance %
+Sum present days / total working days × 100
+Used for promotion eligibility check at year-end
+Admin
+Class daily rate
+Class present count / class total × 100
+Class-wise heatmap — month-view grid
+Admin
+ 
+3.5 Staff Attendance & Leave Management
+Leave Type
+Annual Balance
+Carryover
+Pay Impact
+Nepal Law
+Sick leave
+12 days
+No
+Full pay
+Labour Act 2074
+Casual leave
+10 days
+No
+Full pay
+Labour Act 2074
+Earned/annual leave
+18 days
+Yes (max 30 days)
+Full pay
+Labour Act 2074
+Maternity leave
+98 days
+No
+Full pay
+Labour Act 2074 + Social Security Act 2075
+Paternity leave
+15 days
+No
+Full pay
+Labour Act 2074
+Unpaid leave
+No limit (admin discretion)
+No
+Zero pay for duration
+School policy
+ 
+3.6 Module Interactions from M2
+Event in M2
+Target Module
+Automated Action
+Teacher submits student attendance
+M10 Messaging
+Push to parents of absent students within seconds of submission
+3+ consecutive absences flagged
+M10 Messaging
+Alert to admin and class teacher; optional parent notification
+Student attendance below 80%
+M4 Academics
+Flag on promotion eligibility check; report card attendance % populated
+Staff leave approved
+M7 HR & Payroll
+Leave balance deducted; payroll deduction calculated for excess leave
+Staff leave approved
+M6 Timetable
+Substitution trigger: admin prompted to assign substitute teacher
+Working days calendar set
+M3 Fee Management
+Fee proration uses working days count for partial month billing
+Public holiday auto-skipped
+All modules
+No attendance required; fee proration excludes holiday
+
+4. Module 3 — Fee Management
+INTEGRATION
+Every payment collected in M3 auto-posts a double-entry journal entry in M9 (Accounting). The fee module handles the school-facing collection workflow; the accounting module handles the back-end financial record. They share data but are administered by different staff roles.
+ 
+4.1 Fee Structure Configuration
+Fee Head
+Type
+Applies To
+VAT (Nepal)
+Auto-Generated
+Tuition fee
+Monthly recurring
+All students by class
+13% applicable
+Yes — 1st of every month
+Admission fee
+One-time
+New enrollments only
+13% applicable
+Yes — on enrollment confirmation
+Exam fee
+Per-term
+All students
+13% applicable
+Yes — on exam creation
+Transport fee
+Monthly recurring
+Transport-enrolled students only
+13% applicable
+Yes — 1st of every month
+Lab fee
+Annual or per-term
+Science + computer students
+13% applicable
+Yes — at term start
+Sports fee
+Annual
+All students
+13% applicable
+Yes — at academic year start
+Library fine
+On return
+Per student as incurred
+No VAT
+Yes — on late return event
+Miscellaneous
+One-time
+As needed
+Case by case
+Manual
+ 
+4.2 Discount & Concession Engine
+Discount Type
+How Applied
+Source Data
+Stacking Rule
+Sibling discount
+Fixed amount or % off 2nd/3rd child's tuition
+Sibling link from M1 — auto-reads family group
+Applied before other discounts
+Scholarship discount
+% or fixed reduction per student — named scholarship
+Admin applies per student
+Stacks with sibling discount
+Staff child discount
+Configurable % off tuition
+Staff profile link from M7
+Stacks with scholarship
+Late fee addition
+Fixed amount or % added after due date
+Due date from fee structure; auto-triggered at midnight
+Added on top of all discounts
+Waiver
+Full or partial waiver of any fee head
+Admin action with documented reason
+Overrides all — audit trail recorded
+ 
+4.3 Collection Workflow & Nepal VAT Compliance
+Step
+Detail
+System Action
+1. Auto-generation
+Monthly dues created on 1st of each month per student based on their fee structure
+Batch job runs at 00:01 on 1st. Creates fee records for all active students.
+2. Parent notification
+Push + SMS sent 5 days before due, on due date, 3 days after — stops when paid
+Notification scheduler reads due dates. Stops queue when payment_status = 'paid'.
+3. Counter collection
+Accountant searches student by name or ID, views all outstanding balances
+Real-time balance query. Shows all heads with amounts, discounts, and totals.
+4. Payment processing
+Cash, cheque, bank transfer, eSewa, Khalti (Phase 2: payment gateway webhooks)
+Payment gateway webhooks in Phase 2. Cash/cheque manually entered by accountant.
+5. VAT receipt
+Nepal IRD-compliant: bill number, school PAN, student name, fee breakdown, VAT 13%, cashier
+PDF generated. Bill number sequential, non-reusable, per fiscal year.
+6. Auto accounting entry
+Dr Cash/Bank → Cr Fee Income — posted automatically on payment confirmation
+Journal entry created with payment ID as narration. No manual input needed.
+7. Parent notification
+Receipt PDF sent to parent app and email on confirmation
+Push with PDF attachment. Email with PDF if email on record.
+ 
+4.4 Defaulter Management
+	•	Defaulters list filterable by class, fee head, and aging buckets: 1–30 days, 31–60 days, 61–90 days, 90+ days overdue.
+	•	Bulk reminder: send push + SMS to all overdue parents in one action. Log of bulk send stored with timestamp.
+	•	Admin toggle: block report card or exam hall ticket issuance for fee-defaulting students. Toggle is per fee head.
+	•	Collection trend report: monthly collected vs outstanding vs waived — class-wise and fee-head-wise breakdown.
+ 
+4.5 Module Interactions from M3
+Event in M3
+Target Module
+Automated Action
+New student enrolled (from M1)
+M3
+Fee structure auto-applied; first invoice auto-generated
+Fee payment confirmed
+M9 Accounting
+Journal entry auto-posted: Dr Cash/Bank, Cr Fee Income
+Fee payment confirmed
+M10 Messaging
+Receipt PDF pushed to parent app and email
+Library fine incurred (from M8A)
+M3
+Fine amount added to student's outstanding fee balance
+Transport student enrolled (from M8B)
+M3
+Monthly transport fee added to student's recurring dues
+Sibling linked (from M1)
+M3
+Sibling discount auto-recalculated on next invoice generation
+Student defaulter blocked
+M4 Academics
+Report card / hall ticket generation blocked until fee cleared
+
+5. Module 4 — Academic Management: Exams, CAS & Grading
+5.1 Nepal MoEST Grading System — Hardcoded Server-Side
+CRITICAL
+The Nepal MoEST grading table is hardcoded as a server-side utility function and CANNOT be overridden by schools. All marks entry auto-computes GPA and Letter Grade on save.
+ 
+Achievement %
+GPA
+Letter Grade
+Description
+System Action
+90% and above
+4.0
+A+
+Outstanding
+Auto honor mention flag on report card
+80% – 89%
+3.6
+A
+Excellent
+None
+70% – 79%
+3.2
+B+
+Very Good
+None
+60% – 69%
+2.8
+B
+Good
+None
+50% – 59%
+2.4
+C+
+Satisfactory
+None
+40% – 49%
+2.0
+C
+Acceptable
+None
+35% – 39%
+1.6
+D
+Basic
+Flag for CAS support; teacher alert
+Below 35%
+—
+NG
+Not Graded
+Added to Liberal Promotion Policy remedial list
+ 
+5.2 Exam Management Workflow
+Step
+Action
+Actor
+Notes
+1. Create exam
+Name, type, academic year, term, date range
+Admin
+Types: terminal, CAS, unit test, pre-board
+2. Configure subjects
+Max marks, pass mark, theory/practical split
+Admin
+Theory + practical tracked separately (e.g., 75+25 for Science)
+3. Publish timetable
+Exam schedule sent as notice to parents and students
+Admin
+Triggers M10 notification to all targeted parents
+4. Marks entry
+Subject teacher enters marks per student
+Subject Teacher
+Class average shown in real time during entry
+5. Absent/withheld flag
+Mark student as absent or withheld per subject
+Subject Teacher
+Absent = 0 marks, not averaged. Withheld = pending review.
+6. Admin review
+Admin reviews all marks entries before locking
+Admin
+Can see entry vs final submission status per teacher
+7. Marks lock
+Admin locks marks — no further edits without unlock request
+Admin
+Audit trail: who entered, who locked, timestamp
+8. Report card generation
+System compiles marks, computes GPA, rank, generates PDF
+System
+Rank computed within class-section per exam
+ 
+5.3 Continuous Assessment System (CAS)
+Nepal MoEST is shifting toward CAS. SchoolOS supports both terminal exams and CAS simultaneously. Admin selects mode per class level. Modes can be combined (e.g., 60% terminal + 40% CAS).
+ 
+CAS Component
+Default Weight
+Entry Actor
+System Output
+Parent Visibility
+Participation
+20%
+Class Teacher
+Running score per student per subject
+Visible as % complete
+Project / Portfolio
+20%
+Class Teacher
+Project grade with optional file attachment
+Grade + teacher remark visible
+Observation / Behavior
+10%
+Class Teacher
+Behavioral observation with remark
+Remark visible; no raw score shown
+Unit Test
+50%
+Subject Teacher
+Test score per assessment event
+Score visible after admin approval
+ 
+5.4 Report Card Types
+Report Type
+Used For
+Key Elements
+Standard report card
+All classes — terminal exam
+Subject marks, letter grade, GPA, rank, attendance %, conduct grade, teacher remark, principal signature
+CAS report card
+CAS mode classes
+Each CAS component separately displayed, weighted aggregate, qualitative remarks, portfolio reference
+Progress card (mid-term)
+All classes — mid-term update
+Current subject standing, homework completion %, attendance, teacher note — parent views in app
+SEE-format mark sheet
+Class 9–10 only
+National Board format: theory + practical split, all subjects, GPA, letter grade, school stamp, principal signature
+ 
+5.5 Module Interactions from M4
+Event in M4
+Target Module
+Automated Action
+Exam timetable published
+M10 Messaging
+Exam schedule pushed as notice to parents and students
+Student marks below 35% (NG)
+M4 (internal)
+Added to Liberal Promotion Policy remedial list
+Report card generated
+M10 Messaging
+Push to parent: 'Your child's report card is ready'
+Fee defaulter block toggle on (M3)
+M4
+Hall ticket or report card PDF blocked until fee cleared
+Attendance % pulled
+M2 Attendance
+Monthly attendance % for each student populated in report card
+Year-end marks locked
+M1 Admissions
+Promotion eligibility check uses final marks + attendance % to confirm batch promotion
+
+6. Module 5 — Activity Feed & Developmental Milestone Tracking
+PRODUCT
+The activity feed is the #1 retention feature in SchoolOS. Parents open the app daily because of teacher photo posts. After 2–3 weeks of daily use, parents become emotionally invested — the school cannot discontinue SchoolOS without parent resistance. This is the product moat.
+ 
+6.1 Activity Feed Core Features
+Feature
+Detail
+Phase
+Photo upload
+1–5 photos per post from device camera or gallery
+Phase 1
+Caption
+Written by teacher. Phase 4: AI-generated via GPT-4o Vision
+Phase 1 / Phase 4
+Tag scope
+Whole class (all parents) or specific child (only that child's parents)
+Phase 1
+Category tags
+Learning activity, outdoor play, art and craft, celebration, sports, general
+Phase 1
+Daily mood/behavior log
+Per class: calm, engaged, excited, unsettled, tired — shown in parent app
+Phase 1
+Video clips
+Up to 30 seconds per clip
+Phase 2
+Push notification
+To tagged parents within 30 seconds of post
+Phase 1
+Parent reactions
+Emoji reactions (heart, clap, star) — teacher sees engagement rate
+Phase 1
+Feed archive
+Searchable by child and by month
+Phase 1
+Storage
+Cloudflare R2, signed URLs expiring in 1 hour. Images compressed: max 800px, 80% quality
+Phase 1
+ 
+6.2 Developmental Milestone Tracking (Montessori & ECE Only)
+Domain
+Sample Milestones
+Age Range
+Entry Method
+Physical
+Gross motor: runs, jumps, climbs. Fine motor: holds pencil correctly, cuts with scissors
+2–6 years
+Observation note + status + optional photo
+Cognitive
+Recognizes shapes, colors, numbers 1–10. Sorts by size. Simple cause-effect reasoning
+2–6 years
+Observation note + status + optional photo
+Language
+Uses 2–3 word sentences, recognizes own name in writing, follows 2-step instructions
+2–6 years
+Observation note + status
+Social-Emotional
+Takes turns, plays cooperatively, separates from parent calmly, shows empathy
+2–6 years
+Observation note + status
+ 
+6.3 Milestone Status Logic
+Status
+Meaning
+Visual in Parent App
+System Alert
+Achieved
+Child consistently demonstrates milestone
+Green ring segment fills
+None
+In-progress
+Child demonstrates sometimes but not consistently
+Yellow ring segment partial fill
+None
+Not yet
+Child has not demonstrated milestone yet
+Grey ring segment
+Age-delay flag if significantly delayed for recorded age
+ 
+7. Module 6 — Homework & Timetable Management
+7.1 Homework Management
+Feature
+Detail
+Actor
+Risk Alert
+Assignment creation
+Subject, class/section, description, due date, optional file attachment
+Teacher
+—
+Individual assignment
+Target a specific student for remedial or additional homework
+Teacher
+—
+Recurring homework
+Daily reading, weekly worksheet — set frequency without re-entering
+Teacher
+—
+Parent notification
+Push on creation; reminder push 1 day before due if not submitted
+System
+—
+Student submission (Cl. 6+)
+Student marks own work complete via student portal
+Student
+—
+Teacher submission mark
+Per student: submitted / late / not submitted
+Teacher
+—
+Overdue flag
+Auto-set at midnight on due date for any not-submitted entries
+System
+—
+Risk flag
+3+ consecutive non-submissions triggers alert to teacher and admin
+System
+Alert sent to teacher + admin
+ 
+7.2 Timetable Management
+Feature
+Detail
+Conflict Detection
+Master timetable build
+Admin builds weekly schedule: period slots × days × subject × teacher
+Same teacher cannot be in two classes at the same time — blocked at entry
+Effective-from date
+Schedule changes planned in advance and auto-activate on a specific date
+Overlap check with active schedule
+Substitution management
+Replace a teacher for a single day without modifying master timetable
+Substitute teacher conflict check for that day only
+Holiday override
+Mark date as holiday — all periods auto-cancelled
+No manual editing required
+Teacher view
+Teacher sees own weekly schedule: class, subject, room
+—
+Parent view
+Child's class timetable. Today's periods highlighted. Exam dates integrated.
+—
+Student view (Cl. 6+)
+Own timetable, today's classes, pending homework per subject
+—
+
+8. Module 7 — Staff Management, HR & Payroll
+8.1 Staff Profile Data Model
+Field Group
+Key Fields
+Encryption
+Compliance Use
+Personal
+Full name, photo, DOB, gender, address, emergency contact
+No
+iEMIS staff registry
+Role & Assignment
+Role type, subject assignments, class assignments, joining date, contract type
+No
+Timetable module integration
+Identity
+Citizenship number, Nepal Teacher Registry ID
+Citizenship encrypted at rest
+iEMIS required — Teacher Registry ID mandatory for teaching roles
+Financial
+Bank account number, bank name, PAN number, salary structure ID
+Bank account + PAN encrypted at rest
+PAN required for TDS; bank account for salary disbursement
+Qualification
+Academic qualifications, teaching experience records
+No
+iEMIS staff record
+ 
+8.2 Monthly Payroll Processing Workflow
+Step
+Action
+Source Data
+System Output
+1. Attendance pull
+System reads staff present days for the month
+M2 Staff attendance
+Days present count per staff member
+2. Leave consumption
+Approved leaves deducted from balance; excess leaves create deduction
+M2 Leave records
+Net payable days, excess leave deduction amount
+3. Gross calculation
+Basic + all allowances based on days present
+Salary structure
+Gross salary per employee
+4. PF calculation
+10% employee + 10% employer on basic salary
+Salary structure (basic only)
+Employee PF deduction; employer PF expense
+5. TDS calculation
+Annual taxable income projection → monthly TDS deduction (threshold: Rs. 5 lakh)
+PAN, gross salary, allowance exemptions
+Monthly TDS deduction per employee
+6. Advance recovery
+Active salary advances recovered at configured EMI
+Advance records
+Deduction amount per advance
+7. Net payable
+Gross – PF employee – TDS – advance recovery – excess leave
+Steps 3–6
+Net salary payable per employee
+8. Admin approval
+Admin reviews payroll register; approves or sends back for correction
+Payroll register
+Approved payroll locks — cannot reprocess without admin override
+9. Auto accounting
+On approval: Dr Salary Expense + Dr PF Employer → Cr Salary Payable + Cr PF Payable
+Approved payroll
+Journal entries auto-posted to M9
+10. Salary slip
+PDF salary slip per employee with full breakdown
+Approved payroll
+Downloadable by staff from their portal
+11. Disbursement
+Bank transfer batch or manual cheque per employee
+Net salary payable
+Dr Salary Payable → Cr Bank Account — auto-posted to M9
+ 
+8.3 Nepal Statutory Deductions
+Obligation
+Rate
+Threshold
+Remittance
+System Export
+PF — Employee contribution
+10% of basic salary
+All employees
+CIPS / CIT — monthly
+PF statement per employee
+PF — Employer contribution
+10% of basic salary
+All employees
+CIPS / CIT — monthly
+PF statement per employee
+TDS on salary
+Per Nepal Income Tax Act slab rates
+Annual income above Rs. 5 lakh
+IRD — monthly TDS return
+TDS return per employee
+TDS on service payments
+10%
+Service payments above Rs. 10,000 to vendor
+IRD — monthly
+TDS return per vendor
+ 
+8.4 Module Interactions from M7
+Event in M7
+Target Module
+Automated Action
+Payroll approved
+M9 Accounting
+Auto-post: Dr Salary Expense + Dr PF Employer Contribution, Cr Salary Payable + Cr PF Payable
+Salary disbursed
+M9 Accounting
+Auto-post: Dr Salary Payable, Cr Bank Account
+TDS withheld
+M9 Accounting
+TDS Payable account credited; shown in IRD TDS return
+Staff leave approved
+M2 Attendance
+Leave balance deducted; payroll deduction flag set
+Staff leave approved
+M6 Timetable
+Admin prompted to assign substitute for affected teaching periods
+Staff child linked (M1)
+M3 Fee Management
+Staff child discount auto-applied on next invoice for that student
+Contract termination
+M1 Admissions
+Teacher removed from class assignments; timetable gaps flagged
+
+9. Module 8A — Library Management
+9.1 Book Catalog & Issue Management
+Feature
+Detail
+Integration
+Book catalog
+Title, author, ISBN, publisher, year, subject category, class level suitability
+None
+Copy tracking
+Multiple copies per book; individual barcode/QR per copy; status: available/issued/lost/damaged/reserved
+None
+Book issue
+Linked to student or staff profile; due date auto-set by category (7/14/30 days)
+M1 — borrower profile required
+Return processing
+Condition note recorded: good / damaged / pages torn
+None
+Overdue notification
+Push to student and parent when due date passes
+M10 Messaging
+Fine calculation
+Rs. X per day overdue (configurable). Auto-calculated on return.
+M3 — fine added to student fee account
+Lost book processing
+Admin marks as lost; replacement cost charged to student's fee account
+M3 — replacement charge added
+Book purchase
+Addition auto-posts accounting entry: Dr Library Assets, Cr Cash/Bank
+M9 Accounting
+ 
+10. Module 8B — Transport Management
+10.1 Route & Vehicle Setup
+Entity
+Key Fields
+Business Rule
+Route
+Route name, stop names, stop sequence, estimated pick-up times
+Stop sequence determines notification order — first stop notified first
+Vehicle
+Registration number, capacity, current driver assignment, fitness certificate expiry
+Alert to admin 30 days before fitness certificate expires
+Driver profile
+Name, license number, license expiry, phone
+Alert to admin 30 days before license expires
+Student enrollment
+Student linked to specific stop on specific route
+Transport fee auto-added to student's monthly dues on enrollment
+ 
+10.2 Daily Operations (Phase 3)
+Feature
+Actor
+Parent Notification
+Student boarding mark per stop
+Driver app (simplified Flutter view)
+Push: 'Your child boarded the vehicle at [stop name] at [time]'
+Student drop-off confirmation
+Driver app
+Push: 'Your child was dropped at [stop name] at [time]'
+Route delay notification
+Driver broadcasts via app
+Push to all parents on route: 'Route delayed by approximately X minutes'
+Monthly transport attendance report
+System auto-generated
+Not a notification — admin download only
+ 
+11. Module 9 — Accounting & Financial Management System
+VALUE
+Most Nepal school software has basic fee collection OR basic accounting — never both properly integrated. SchoolOS integrates them fully: every rupee collected from fees, every salary paid, and every expense recorded flows automatically through a double-entry general ledger.
+ 
+11.1 Chart of Accounts — Nepal School Standard
+Account Group
+Sub-Accounts
+Type
+Auto-Posted From
+Income
+Tuition fees, Admission fees, Exam fees, Transport fees, Library fines, Other income
+Revenue
+M3 Fee module — every payment
+Staff Expenses
+Teacher salary, Admin salary, Support staff salary, PF employer contribution, Staff allowances
+Expense
+M7 Payroll — every approved payroll run
+Operating Expenses
+Stationery, Utilities, Rent, Maintenance, Fuel, Cleaning, Security
+Expense
+Manual entry with approval workflow
+Academic Expenses
+Lab materials, Library additions, Sports equipment, Exam materials, Educational software
+Expense
+Manual entry; library additions auto-post on purchase
+Assets
+Cash in hand (petty cash), Bank accounts, Furniture, Equipment, Library books, Land/building
+Asset
+Auto (cash/bank from payments); manual (fixed assets)
+Liabilities
+Bank loan, Outstanding salary payable, Advance fees received, Tax payable (VAT/TDS/PF)
+Liability
+Auto (salary payable from payroll); manual (loans)
+Tax Accounts
+VAT payable (13%), TDS payable, PF payable, Income tax provision
+Liability
+Auto-calculated from fee collections and payroll
+ 
+11.2 Complete Auto-Posting Journal Entry Map
+Business Event
+Debit Account
+Credit Account
+Trigger
+Fee payment — cash
+Cash in hand
+Tuition / other fee income
+M3 payment confirmed
+Fee payment — bank transfer
+Bank account (specified)
+Tuition / other fee income
+M3 payment confirmed
+Fee payment — eSewa/Khalti
+Bank account (gateway settlement)
+Tuition / other fee income
+M3 gateway webhook confirmed
+Monthly payroll approved
+Salary expense + PF employer expense
+Salary payable + PF payable
+M7 payroll approval
+TDS deducted from salary
+Salary expense (gross amount)
+TDS payable + Net salary payable
+M7 payroll approval
+Salary disbursed
+Salary payable
+Bank account
+M7 disbursement confirmation
+PF remitted to CIPS/CIT
+PF payable
+Bank account
+Manual confirmation of bank transfer
+TDS remitted to IRD
+TDS payable
+Bank account
+Manual confirmation
+Operating expense — cash
+Operating expense (by head)
+Cash in hand
+M9 manual expense entry
+Library fine collected
+Cash in hand
+Library fine income
+M3 collection (from M8A)
+Advance fee received
+Cash / Bank
+Advance fee liability
+M3 advance payment
+Advance fee recognized as income
+Advance fee liability
+Fee income
+M3 — on applicable billing period
+Book purchased for library
+Library asset
+Cash / Bank
+M8A book addition confirmed
+ 
+11.3 Financial Reports
+Report
+Description
+Frequency
+Primary User
+Income & Expenditure (I&E)
+Total income by head vs total expenses by head. Surplus or deficit. Year-on-year comparison.
+Monthly / Annual
+Principal, School Management Committee
+Balance Sheet
+Assets vs liabilities at any date. Net worth. Fixed assets, current assets, receivables, payables.
+Quarterly / Annual
+Principal, Auditor
+Trial Balance
+All account balances in debit and credit columns. Must balance to zero difference.
+Monthly
+Accountant, Auditor
+Fee Collection Summary
+Total collected vs outstanding per month. By head and by class. Defaulter aging analysis.
+Monthly
+Accountant, Principal
+Cash Flow Statement
+Monthly inflow (fees) vs outflow (salary, expenses). Opening and closing cash balance.
+Monthly
+Principal, Accountant
+Payroll Register
+All staff: gross salary, each deduction, net payable. Must be approved before disbursement.
+Monthly
+Admin, Principal
+Budget vs Actual
+Each expense head: budget, spent-to-date, remaining, % used. Over-budget flags.
+Monthly
+Principal, School Management
+Bank Reconciliation
+System balance vs bank statement balance. Unreconciled items listed for review.
+Monthly
+Accountant
+ 
+12. Module 10 — Notices, Events, Messaging & Consent
+Module 10 is the notification delivery layer for the entire SchoolOS platform. It does not generate its own events — it receives triggers from every other module and delivers them to the right audiences through the right channels.
+ 
+12.1 Notification Delivery — Complete Trigger Map
+Trigger Module
+Event
+Channel
+Audience
+M1 Admissions
+New student enrolled
+SMS
+Guardian — app invitation with login link
+M2 Attendance
+Student marked absent
+Push + SMS fallback
+Primary guardian
+M2 Attendance
+3+ consecutive absences
+Push + SMS
+Primary guardian + admin + class teacher
+M3 Fee Management
+Fee due in 5 days / due today / overdue 3 days
+Push + SMS
+Primary guardian
+M3 Fee Management
+Payment confirmed
+Push (with receipt PDF)
+Primary guardian
+M4 Academics
+Exam timetable published
+Push
+All parents + students (Cl. 6+)
+M4 Academics
+Report card ready
+Push
+Primary guardian
+M5 Activity Feed
+Photo post created
+Push (within 30 seconds)
+Tagged parent(s)
+M6 Homework
+Homework assigned
+Push
+Parent of class/student
+M6 Homework
+Homework due tomorrow — not submitted
+Push
+Parent + student (Cl. 6+)
+M7 HR & Payroll
+Leave approved
+Push
+Staff member
+M8B Transport
+Child boarded vehicle
+Push
+Primary guardian
+M8B Transport
+Child dropped at stop
+Push
+Primary guardian
+M8B Transport
+Route delay
+Push
+All parents on affected route
+M10 Notices
+Emergency notice published
+Push + forced SMS
+All targeted accounts
+ 
+12.2 Digital Consent Management (Privacy Act 2075)
+Consent Type
+Method
+Stored Data
+Revocable?
+Data processing consent
+Mandatory on first parent login. Plain Nepali + English. Cannot be skipped.
+Timestamp, Privacy Act 2075 version number, guardian ID
+No — required for continued app access
+Photo usage consent
+Parent can opt out of child appearing in class-wide activity posts
+Opt-out flag per student per guardian
+Yes — changes take effect on next post
+School trip consent
+Digital form replaces physical slip. Parent taps approve in app.
+Timestamp, event ID, guardian ID
+Yes — until trip departure
+Medical treatment consent
+Emergency medical authorization stored in student profile
+Authorization text, timestamp, guardian ID
+Yes — replacement consent required
+Marketing SMS opt-out
+Individual toggle in parent app settings
+Preference flag per guardian
+Yes — immediate effect
+
+13. Authentication, Authorization & Security Architecture
+ARCH
+SchoolOS uses a plug-and-play NestJS auth library (@corp/auth) built on custom JWT + passport-jwt with full RBAC, audit logging, and multi-tenancy. Zero auth code needed in individual modules — all protection is applied globally via AuthModule.forRoot().
+ 
+13.1 Authentication Overview
+Authentication in SchoolOS is handled by the @corp/auth library imported by the school-os NestJS app. The library provides complete JWT-based stateless authentication with refresh token rotation stored in Redis, bcrypt password hashing (cost 12), OTP delivery via SMS, and brute-force rate limiting.
+ 
+13.2 User Roles
+Role
+Who
+Scope
+Key Permissions
+Super Admin
+SchoolOS Pvt. Ltd. staff
+Platform-wide — all schools
+Tenant management, global settings, support access
+Principal
+School head / director
+One school (own tenant)
+Approve/reject all major actions, view all data, cannot delete financial records
+Accountant
+School accountant
+One school — financial modules only
+Fee collection, expense entry, payroll processing, accounting module full access
+Class Teacher
+Homeroom teacher
+Own class/section only
+Attendance marking, activity posts, CAS entry, homework, messaging
+Subject Teacher
+Subject-specific teacher
+Own subjects only
+Marks entry for assigned subjects, homework assignment
+Support Staff
+Admin, librarian, coordinator, driver
+Role-specific modules only
+Limited to their function — librarian: M8A only; driver: M8B only
+Parent
+Guardian of enrolled student
+Own child(ren) only
+View-only: attendance, fees, marks, activity feed, messaging
+Student
+Class 6+ students
+Own data only
+View-only: timetable, homework, own marks; can submit homework (Cl. 6+)
+ 
+13.3 Role-Based Access Control (RBAC) Matrix
+Permissions are enforced server-side via guards. Client UI adapts to the role, but all enforcement happens at the API layer. The table below defines Read (R), Write (W), and Approve (A) access per module per role.
+ 
+Module
+Super Admin
+Principal
+Accountant
+Class Teacher
+Parent
+Student
+M1 — Admissions
+R/W/A
+R/W
+R
+R
+R (own child)
+—
+M2 — Attendance
+R/W/A
+R/A
+R
+R/W
+R (own child)
+—
+M3 — Fee Management
+R/W/A
+R/A
+R/W
+—
+R (own child)
+—
+M4 — Academics
+R/W/A
+R/A
+—
+R/W
+R (own child)
+R (own)
+M5 — Activity Feed
+R/W/A
+R/W
+—
+R/W
+R (own child)
+—
+M6 — Homework
+R/W/A
+R
+—
+R/W
+R (own child)
+R/W (own)
+M7 — HR & Payroll
+R/W/A
+R/A
+R/W
+R (own data)
+—
+—
+M8A — Library
+R/W/A
+R
+R
+R/W
+—
+R (own)
+M8B — Transport
+R/W/A
+R
+R
+—
+R (own child)
+—
+M9 — Accounting
+R/W/A
+R/A
+R/W
+—
+—
+—
+M10 — Notices
+R/W/A
+R/W/A
+—
+R/W
+R
+R
+ 
+13.4 JWT Token Strategy
+Access Token
+	•	Algorithm: HS256 (HMAC SHA-256)
+	•	Expiry: 24 hours for admin/teacher web app — short enough to limit exposure if stolen
+	•	Payload: { sub: userId, tenantId: schoolId, role: 'accountant', permissions: [...], iat, exp }
+	•	Storage: Stored in memory (React state) or httpOnly cookie — never localStorage
+ 
+Refresh Token
+	•	Expiry: 30 days for parent mobile app — longer to reduce friction for daily use
+	•	Storage: Stored in Redis with key pattern refresh:{userId}:{tokenFamily}
+	•	Rotation: Every refresh call issues a new refresh token and invalidates the old one (token family pattern)
+	•	Revocation: Admin can invalidate all sessions for a user by deleting their Redis keys
+ 
+13.5 Registration Flow
+Admin / Staff Registration (School-Initiated)
+Staff accounts are not self-registered. They are created by the Super Admin or Principal through the Admin panel.
+Step
+Action
+Actor
+System Output
+1
+Admin creates staff profile in M7 (Staff Management) with all fields
+Super Admin / Principal
+Staff record created with role assigned
+2
+System generates a temporary PIN (6 digits) and sends SMS to staff's registered phone
+System (BullMQ SMS job)
+SMS delivered: 'Your SchoolOS login PIN is XXXXXX — change on first login'
+3
+Staff opens web app, enters phone number + temp PIN
+Staff member
+Successful auth → forced password change screen
+4
+Staff sets new password (min 8 chars, 1 uppercase, 1 number, 1 special)
+Staff member
+Password hashed with bcrypt cost 12 and stored; temp PIN invalidated
+5
+Staff receives access token (24h) + refresh token (30d)
+System
+Session established — dashboard loaded based on role
+ 
+Parent Registration (App-Initiated)
+Step
+Action
+Actor
+System Output
+1
+Admin enrolls student in M1 and creates guardian contact with phone number
+Admin
+Guardian record created; phone number stored as credential identifier
+2
+System sends SMS with app download link + 6-digit OTP
+System (BullMQ SMS job)
+SMS: 'Welcome to SchoolOS. Download the app and enter OTP: XXXXXX'
+3
+Parent downloads app, enters phone number + OTP
+Parent
+OTP verified against Redis-stored value (5-minute expiry)
+4
+Parent sets a 4-digit app PIN for future logins (biometric fallback available)
+Parent
+PIN stored as bcrypt hash; app session established
+5
+Data processing consent screen shown (Privacy Act 2075) — cannot skip
+Parent
+Consent timestamp + version stored. Marketing preference defaults shown.
+6
+Parent sees dashboard with own child's data only
+System
+Parent role enforced — scoped to linked student_id(s)
+ 
+13.6 Login Flow
+Web App Login (Admin / Staff / Teacher)
+Step
+Detail
+Security Control
+1. Submit credentials
+Phone/email + password submitted via HTTPS POST /auth/login
+HTTPS-only. Rate limited: 5 attempts per 15 min per IP (Redis counter).
+2. Validate user
+Lookup user by identifier. Check if account active and not locked.
+If 5 consecutive failures: account locked for 15 min. Admin can unlock manually.
+3. Verify password
+bcrypt.compare(inputPassword, storedHash) — constant-time comparison
+bcrypt cost 12 — resistant to brute force. Timing attack safe.
+4. Check tenant scope
+Confirm user belongs to the requesting school's tenantId
+Multi-tenant isolation enforced at auth layer — school A cannot log into school B.
+5. Issue tokens
+Sign access token (24h) + refresh token (30d). Store refresh in Redis.
+Refresh token family pattern — old refresh invalidated on each rotation.
+6. Return response
+{ accessToken, refreshToken, user: { id, role, name, tenantId } }
+HttpOnly cookie option available for web. Never send to third parties.
+ 
+Mobile App Login (Parent)
+Step
+Detail
+Security Control
+1. Enter phone number
+Parent enters registered phone number
+Phone number is the primary identifier — must match guardian record in M1
+2. Request OTP
+POST /auth/otp/request — OTP generated and queued for SMS delivery
+6-digit OTP. Expires in 5 minutes. Max 3 OTP requests per phone per hour (Redis).
+3. Enter OTP
+Parent enters OTP received via SMS — POST /auth/otp/verify
+OTP verified against Redis. Invalidated immediately on use. Brute force: 3 attempts max.
+4. Enter app PIN
+4-digit PIN entered (or biometric if set up)
+PIN checked against bcrypt hash. 3 failures = PIN reset via new OTP.
+5. Issue tokens
+Access token (24h) + refresh token (30d) issued
+Same token strategy as web — refresh token family rotation in Redis.
+6. Return response
+Parent dashboard scoped to their child(ren) only
+Tenant + student scoping enforced server-side on every API call.
+ 
+13.7 Logout Flow
+Scenario
+Action
+Server-Side Effect
+User clicks Logout (web)
+DELETE /auth/logout called with access token
+Refresh token deleted from Redis. Access token added to short-lived blocklist in Redis (TTL = remaining access token lifetime).
+User logs out from mobile
+DELETE /auth/logout called with refresh token
+Refresh token family deleted from Redis. All active sessions for that device invalidated.
+Admin force-logout a user
+Admin triggers invalidation from user management panel
+All Redis refresh tokens for that userId deleted. User must re-authenticate on next API call.
+Access token expiry
+Client receives 401 Unauthorized
+Client uses refresh token to silently obtain new access token via POST /auth/refresh.
+Refresh token expiry (30d)
+POST /auth/refresh returns 401
+User must go through full login flow again — SMS OTP for parent, password for staff.
+School subscription cancelled
+Super Admin deactivates tenant
+All users in that tenantId receive 401 on next API call. Redis keys purged.
+ 
+13.8 Guard & Decorator Patterns (NestJS)
+Guard Execution Order
+On every protected request: JwtAuthGuard → RolesGuard → PermissionsGuard. A request must pass all three guards before reaching the controller handler.
+ 
+Guard / Decorator
+Purpose
+Usage Example
+JwtAuthGuard
+Validates JWT access token on every request. Attaches decoded user to request object.
+@UseGuards(JwtAuthGuard) on controllers or set globally
+RolesGuard
+Checks if the authenticated user's role matches the @Roles() decorator on the handler.
+@Roles('principal', 'accountant') on a controller method
+PermissionsGuard
+Granular permission check beyond roles — checks specific action strings.
+@Permissions('fees:collect', 'fees:waive') on a handler
+@Public()
+Decorator that bypasses JwtAuthGuard for public endpoints.
+@Public() on POST /auth/login, POST /auth/otp/request
+@CurrentUser()
+Injects the authenticated user object into handler parameters.
+handler(@CurrentUser() user: User) { ... }
+AuditInterceptor
+Logs every write operation: actor, action, entity, old value, new value, IP, timestamp.
+Applied globally — every POST/PATCH/DELETE is audited automatically
+ 
+13.9 Multi-Tenancy Isolation
+SECURITY
+Multi-tenant isolation is enforced at the database query layer. All queries are automatically scoped by tenantId (school_id). Cross-school data access is architecturally impossible — not just policy, but enforced in the ORM.
+ 
+	•	Every Prisma query includes an implicit WHERE school_id = :tenantId condition injected by a Prisma middleware.
+	•	tenantId is extracted from the verified JWT payload — it cannot be spoofed by the client.
+	•	Super Admin has a special bypass mechanism that requires an explicit tenant override header — logged in the audit trail.
+	•	No direct database access for any frontend role — all data access goes through the NestJS API layer.
+ 
+13.10 Security Controls Summary
+Security Control
+Implementation
+Purpose
+Password hashing
+bcrypt cost 12
+Resistant to brute force — approx 300ms per hash on server
+JWT signing
+HS256 with 256-bit secret rotated quarterly
+Token tampering detection
+Refresh token rotation
+Token family pattern in Redis
+Prevents refresh token reuse after logout or theft
+Rate limiting
+Redis counter — 5 attempts / 15 min / IP
+Brute force protection on login and OTP endpoints
+OTP expiry
+5 minutes, single-use, max 3 requests/hour/phone
+Prevents OTP enumeration and replay attacks
+Session invalidation
+Redis key deletion on logout
+Ensures tokens are dead after logout — no expiry wait
+Account lockout
+After 5 failures: 15-min lockout
+Prevents automated credential stuffing
+Audit logging
+Global NestJS interceptor — append-only table
+Full trail of who did what, when, and from where
+Data encryption at rest
+AES-256 for health data, PAN, citizenship, bank accounts
+Sensitive PII protected even if database is compromised
+Signed URLs for files
+Cloudflare R2 — 1-hour expiry
+No permanent public access to student photos or documents
+HTTPS enforcement
+TLS 1.3 — HTTP redirected to HTTPS
+In-transit encryption for all API and file transfers
+Financial transaction PIN
+Accountant re-enters PIN for fee collection and payroll
+Second factor for high-value financial operations
+CORS policy
+Origin whitelist — only school app domains allowed
+Prevents cross-site API calls from unauthorized origins
+Input validation
+class-validator + ValidationPipe — global
+Blocks injection attacks at DTO level before business logic
+
+14. Complete Cross-Module Interaction Matrix
+The table below is the authoritative map of all automated data flows between modules. Solid arrows indicate real-time auto-posting. Events marked 'Batch' run as scheduled jobs.
+ 
+Source Event
+Source Module
+Target Module
+Auto Action
+Type
+Student enrolled
+M1
+M3 Fee Management
+Fee structure auto-applied, first invoice created
+Real-time
+Student enrolled
+M1
+M10 Messaging
+SMS app invitation to guardian
+Real-time
+Student assigned to class
+M1
+M2 Attendance
+Student appears in attendance roster
+Real-time
+Sibling link created
+M1
+M3 Fee Management
+Sibling discount auto-applied on next invoice
+Real-time
+Year-end promotion run
+M1
+M2, M3, M4, M6
+New rosters, fee structures, timetables applied
+Batch
+Transfer certificate issued
+M1
+M3 Fee Management
+Outstanding balance checked — must be zero before cert
+Real-time
+Allergy flag set
+M1
+M2 Attendance
+Red badge on teacher's attendance screen
+Real-time
+Teacher marks student absent
+M2
+M10 Messaging
+Push + SMS to primary guardian within seconds
+Real-time
+3+ consecutive absences
+M2
+M10 Messaging
+Alert to admin and class teacher
+Real-time
+Attendance below 80%
+M2
+M4 Academics
+Flag on promotion eligibility check
+Batch
+Staff leave approved
+M2
+M7 HR & Payroll
+Leave balance deducted; payroll deduction flag set
+Real-time
+Staff leave approved
+M2
+M6 Timetable
+Admin prompted to assign substitute teacher
+Real-time
+Working days calendar set
+M2
+M3 Fee Management
+Fee proration uses working days count
+Real-time
+Fee payment confirmed
+M3
+M9 Accounting
+Dr Cash/Bank → Cr Fee Income — journal posted instantly
+Real-time
+Fee payment confirmed
+M3
+M10 Messaging
+Receipt PDF pushed to parent app + email
+Real-time
+Library fine incurred
+M8A → M3
+M3 Fee Management
+Fine added to student outstanding fee balance
+Real-time
+Transport student enrolled
+M8B → M3
+M3 Fee Management
+Monthly transport fee added to student's recurring dues
+Real-time
+Exam timetable published
+M4
+M10 Messaging
+Exam schedule pushed to parents and students
+Real-time
+Report card generated
+M4
+M10 Messaging
+Push to parent: 'Your child's report card is ready'
+Real-time
+Fee defaulter blocked
+M3 → M4
+M4 Academics
+Hall ticket or report card PDF blocked
+Real-time
+Year-end marks locked
+M4
+M1 Admissions
+Promotion eligibility check using final marks + attendance
+Batch
+Activity photo posted
+M5
+M10 Messaging
+Push to tagged parents within 30 seconds
+Real-time
+Homework assigned
+M6
+M10 Messaging
+Push to parents of targeted class or student
+Real-time
+Homework due tomorrow (not submitted)
+M6
+M10 Messaging
+Automated reminder push to parent + student
+Scheduled
+3+ consecutive non-submissions
+M6
+M10 Messaging
+Alert to teacher and admin
+Real-time
+Timetable built (teacher assignments)
+M6
+M7 HR & Payroll
+Teaching hours per teacher tracked for workload reporting
+Real-time
+Payroll approved
+M7
+M9 Accounting
+Dr Salary Expense + Dr PF Employer → Cr Salary Payable + Cr PF Payable
+Real-time
+Salary disbursed
+M7
+M9 Accounting
+Dr Salary Payable → Cr Bank Account
+Real-time
+Staff child linked
+M7 → M1
+M3 Fee Management
+Staff child discount auto-applied on next invoice
+Real-time
+Contract termination
+M7
+M1 Admissions
+Teacher removed from class assignments; timetable gaps flagged
+Real-time
+Book purchased for library
+M8A
+M9 Accounting
+Dr Library Asset → Cr Cash/Bank
+Real-time
+Book returned late
+M8A
+M3 Fee Management
+Fine added to student's outstanding fees
+Real-time
+Child boards vehicle
+M8B
+M10 Messaging
+Push notification to primary guardian
+Real-time
+Child dropped at stop
+M8B
+M10 Messaging
+Push notification to primary guardian
+Real-time
+Route delay
+M8B
+M10 Messaging
+Broadcast push to all parents on affected route
+Real-time
+
+15. Audit Trail, Compliance & Academic Year Rollover
+15.1 Audit Trail Requirements
+Module
+What is Audited
+Retention Period
+M3 Fee Management
+Every payment, waiver, discount change — who, when, old value, new value
+7 years (Nepal financial records)
+M9 Accounting
+Every journal entry, edit, approval, and deletion — IP address, timestamp, actor
+7 years (Nepal financial records)
+M7 Payroll
+Every payroll run: submitted by, approved by, timestamps, changes after approval
+7 years
+M1 Admissions
+All field edits to student profiles — health data changes especially
+Active enrollment + 5 years after exit
+M10 Messaging
+All parent-teacher message threads
+12 months per Privacy Act 2075
+M10 Consent
+Every consent action: timestamp, version, guardian ID, action (granted/revoked)
+Active + 5 years
+Auth Layer
+All login attempts (success and failure), IP address, device, timestamp
+3 years (security incident investigation)
+ 
+15.2 Academic Year Rollover — End-to-End Process
+Step
+Module(s)
+Action
+1. Freeze current year
+All modules
+Admin triggers year-end close. No new transactions accepted for current year after this point.
+2. Final marks lock
+M4 Academics
+All exam marks locked. Report cards finalized.
+3. Accounting close
+M9 Accounting
+Month-end and year-end closing. Retained surplus/deficit carried forward to balance sheet.
+4. Define new academic year
+M1 Admissions
+New academic year created. New fee structures configured for next year's class levels.
+5. Batch class promotion
+M1 Admissions
+All students promoted to next class. Exceptions (retained, transferred, passed-out) handled individually.
+6. New rosters generated
+M2 Attendance
+New class-section rosters for new academic year. Previous year's attendance archived.
+7. New fee structures applied
+M3 Fee Management
+New year's fee invoices generated based on new class assignments and updated fee structures.
+8. New timetable built
+M6 Homework & Timetable
+Admin builds new year's timetable. Previous year's timetable archived.
+9. Opening balance carried forward
+M9 Accounting
+Asset and liability accounts carry forward. Income and expense accounts reset to zero.
+ 
+15.3 Data Storage Architecture
+Data Type
+Storage
+Access Control
+Retention
+Student photos, activity photos
+Cloudflare R2
+Signed URLs, 1-hour expiry, no public access
+Active + Privacy Act duration
+Documents (birth cert, transfer cert)
+Cloudflare R2
+Admin-only signed URLs
+Active enrollment + 5 years
+Health & medical data
+PostgreSQL — AES-256 encrypted at rest
+Admin + Class Teacher only
+Active + 5 years
+Financial records
+PostgreSQL — not encrypted (read-only for auditors)
+Accountant + Admin + Auditor role
+7 years
+JWT refresh tokens
+Redis — key: refresh:{userId}:{tokenFamily}
+Server-side only — never exposed to clients
+30 days or until logout
+OTP codes
+Redis — key: otp:{phone} — TTL 5 minutes
+Server-side only
+5 minutes
+Message threads
+PostgreSQL
+Thread parties + Admin (read-only)
+12 months
+Audit logs
+Append-only PostgreSQL audit table
+Admin + Super Admin read-only
+As per financial / legal requirement
+ 
+15.4 Subscription Plan — Module Availability
+Module
+Basic Plan
+Standard Plan
+Add-on
+M1 Admissions
+✓
+✓
+—
+M2 Attendance
+✓
+✓
+—
+M3 Fee Management
+✓
+✓
+—
+M5 Activity Feed
+✓
+✓
+—
+M10 Notices & Messaging
+✓
+✓
+—
+M4 Academics
+—
+✓
+—
+M6 Homework + Timetable
+—
+✓
+—
+M7 HR + Payroll
+—
+✓
+—
+M8A Library
+—
+✓
+—
+M8B Transport
+—
+✓
+—
+M9 Accounting
+—
+✓
+Also available as standalone Add-on
+
+16. Implementation Phases
+Phase
+Modules Included
+Timeline
+Deliverable
+Phase 1 — Core
+M1 Admissions, M2 Attendance, M3 Fee Management, M5 Activity Feed, M10 Notices & Messaging
+Months 1–4
+Live school: enroll students, mark attendance, collect fees, post photos, send notices
+Phase 2 — Academic + HR
+M4 Academics (Exams + CAS), M6 Homework + Timetable, M7 HR + Payroll, M9 Accounting, M10 Phase 2 (Messaging)
+Months 5–10
+Full academic cycle: exams, report cards, timetables, payroll with auto-accounting. Parent-teacher messaging live.
+Phase 3 — Auxiliary
+M8A Library, M8B Transport (driver app, live boarding notifications)
+Months 9–14
+Library circulation with fee integration. Transport live-tracking and boarding notifications.
+Phase 4 — AI Features
+M5 AI captions (GPT-4o Vision), M5 AI developmental narratives, M10 smart message templates
+Months 14–20
+AI-powered activity captions, milestone developmental narratives, and intelligent messaging.
+ 
+SALES
+HIGHEST-VALUE DEMO SCRIPT — Accounting Module: Collect a fee payment at the counter screen. Show the principal the journal entry that auto-posted to the ledger in real time. No one in Nepal has seen this before. That 10-second demo closes the sale.
