@@ -102,6 +102,11 @@ passphrase, before admitting students with medical data.
 Production API startup validates required secrets, CORS origins, Redis, database,
 cookie, encryption, and provider settings before listening.
 
+The Next.js dashboard authenticates browser API calls with `httpOnly` access and
+refresh cookies. The backend still returns access tokens in JSON for direct
+API/mobile compatibility, but the dashboard persists only non-sensitive session
+metadata in browser storage.
+
 ## Default Login Credentials
 
 After running `pnpm db:seed`, the following local demo accounts are available:

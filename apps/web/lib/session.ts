@@ -3,9 +3,18 @@ import type { AuthSession, PermissionKey } from '@schoolos/core';
 const SESSION_STORAGE_KEY = 'schoolos.auth-session';
 export const SESSION_CLEARED_EVENT = 'schoolos:session-cleared';
 
-// Pilot note: access tokens are still held client-side for the current Next.js
-// dashboard. Keep all browser storage access in this file until the planned
-// httpOnly-cookie/BFF migration removes client-readable access tokens entirely.
+// Pilot note: browser-persisted session state is metadata-only. API auth is
+// backed by httpOnly cookies; future BFF work should also remove access tokens
+// from browser-visible login/refresh response bodies.
+export type BrowserSession = Omit<AuthSession, 'accessToken'>;
+
+export function toBrowserSession(session: AuthSession): BrowserSession {
+  return {
+    accessTokenExpiresAt: session.accessTokenExpiresAt,
+    user: session.user,
+    tenant: session.tenant,
+  };
+}
 
 export function readStoredSession() {
   if (typeof window === 'undefined') {
@@ -19,7 +28,14 @@ export function readStoredSession() {
   }
 
   try {
-    return JSON.parse(rawSession) as AuthSession;
+    const parsed = JSON.parse(rawSession) as Partial<AuthSession>;
+
+    if ('accessToken' in parsed) {
+      window.localStorage.removeItem(SESSION_STORAGE_KEY);
+      return null;
+    }
+
+    return parsed as BrowserSession;
   } catch {
     window.localStorage.removeItem(SESSION_STORAGE_KEY);
     return null;
@@ -27,7 +43,7 @@ export function readStoredSession() {
 }
 
 export function storeSession(
-  session: AuthSession | null,
+  session: BrowserSession | AuthSession | null,
   options: { notify?: boolean } = {},
 ) {
   if (typeof window === 'undefined') {
@@ -44,7 +60,13 @@ export function storeSession(
     return;
   }
 
-  window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  const browserSession =
+    'accessToken' in session ? toBrowserSession(session) : session;
+
+  window.localStorage.setItem(
+    SESSION_STORAGE_KEY,
+    JSON.stringify(browserSession),
+  );
 }
 
 export function clearStoredSession() {
@@ -52,14 +74,14 @@ export function clearStoredSession() {
 }
 
 export function hasPermission(
-  session: AuthSession | null,
+  session: BrowserSession | null,
   permission: PermissionKey,
 ) {
   return session?.user.permissions.includes(permission) ?? false;
 }
 
 export function hasAllPermissions(
-  session: AuthSession | null,
+  session: BrowserSession | null,
   permissions: PermissionKey[],
 ) {
   return permissions.every((permission) => hasPermission(session, permission));

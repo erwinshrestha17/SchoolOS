@@ -140,4 +140,24 @@ describe('SchoolOS web production contracts', () => {
       assert.doesNotMatch(read(file), /localStorage|sessionStorage/, `${file} touches browser storage directly`);
     }
   });
+
+  it('stores only metadata in browser session state', () => {
+    const sessionModule = read('lib/session.ts');
+
+    assert.match(sessionModule, /Omit<AuthSession, 'accessToken'>/);
+    assert.match(sessionModule, /toBrowserSession/);
+    assert.doesNotMatch(
+      sessionModule,
+      /JSON\.stringify\(session\)/,
+      'raw AuthSession must not be persisted',
+    );
+  });
+
+  it('uses cookie credentials instead of bearer tokens for browser API calls', () => {
+    const apiClient = read('lib/api.ts');
+
+    assert.match(apiClient, /credentials:\s*'include'/);
+    assert.doesNotMatch(apiClient, /Authorization:\s*`Bearer/);
+    assert.doesNotMatch(apiClient, /getAccessToken/);
+  });
 });

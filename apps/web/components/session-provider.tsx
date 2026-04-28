@@ -10,20 +10,22 @@ import {
 } from 'react';
 import { api } from '../lib/api';
 import {
+  type BrowserSession,
   clearStoredSession,
   hasAllPermissions,
   readStoredSession,
   SESSION_CLEARED_EVENT,
   storeSession,
+  toBrowserSession,
 } from '../lib/session';
 
 type SessionStatus = 'loading' | 'authenticated' | 'anonymous';
 
 type SessionContextValue = {
-  session: AuthSession | null;
+  session: BrowserSession | null;
   status: SessionStatus;
   setAuthenticatedSession: (session: AuthSession) => void;
-  refreshSession: () => Promise<AuthSession | null>;
+  refreshSession: () => Promise<BrowserSession | null>;
   logout: () => Promise<void>;
   hasPermissions: (permissions: PermissionKey[]) => boolean;
 };
@@ -31,7 +33,7 @@ type SessionContextValue = {
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 export function SessionProvider({ children }: PropsWithChildren) {
-  const [session, setSession] = useState<AuthSession | null>(null);
+  const [session, setSession] = useState<BrowserSession | null>(null);
   const [status, setStatus] = useState<SessionStatus>('loading');
 
   useEffect(() => {
@@ -59,8 +61,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
           return;
         }
 
-        storeSession(refreshedSession);
-        setSession(refreshedSession);
+        const browserSession = toBrowserSession(refreshedSession);
+        storeSession(browserSession);
+        setSession(browserSession);
         setStatus('authenticated');
       } catch {
         if (cancelled) {
@@ -84,10 +87,11 @@ export function SessionProvider({ children }: PropsWithChildren) {
   async function refreshSession() {
     try {
       const refreshedSession = await api.refreshSession();
-      storeSession(refreshedSession);
-      setSession(refreshedSession);
+      const browserSession = toBrowserSession(refreshedSession);
+      storeSession(browserSession);
+      setSession(browserSession);
       setStatus('authenticated');
-      return refreshedSession;
+      return browserSession;
     } catch {
       clearStoredSession();
       setSession(null);
@@ -107,8 +111,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }
 
   function setAuthenticatedSession(nextSession: AuthSession) {
-    storeSession(nextSession);
-    setSession(nextSession);
+    const browserSession = toBrowserSession(nextSession);
+    storeSession(browserSession);
+    setSession(browserSession);
     setStatus('authenticated');
   }
 

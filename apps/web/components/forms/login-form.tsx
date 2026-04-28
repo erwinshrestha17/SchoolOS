@@ -89,8 +89,8 @@ export function LoginForm() {
       ) : null}
       {mutation.isSuccess && !challengeMessage ? (
         <p className="text-sm text-[var(--teal)]">
-          Login request completed. Refresh cookie flow is active and the
-          dashboard session has been stored in the browser.
+          Login request completed. Secure cookie flow is active and only
+          non-sensitive dashboard session metadata is stored in the browser.
         </p>
       ) : null}
     </form>

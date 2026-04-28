@@ -41,10 +41,29 @@ REDIS_PORT=6379
 FRONTEND_ORIGIN=http://localhost:3000
 EMAIL_DELIVERY_MODE=log
 STORAGE_PROVIDER=local
+ACCESS_COOKIE_NAME=school_os_access_token
+REFRESH_COOKIE_NAME=school_os_refresh_token
+COOKIE_SAME_SITE=lax
 ```
 
 Production must replace local JWT/encryption secrets with stable values of at
 least 32 characters. Do not run production with the example secrets.
+
+## Browser Auth Flow
+
+The current Next.js dashboard authenticates browser API calls with `httpOnly`
+cookies issued by the Nest API:
+
+- Login sets a short-lived `ACCESS_COOKIE_NAME` cookie and rotating
+  `REFRESH_COOKIE_NAME` cookie.
+- Protected API requests use `credentials: include`; browser JavaScript does not
+  attach bearer tokens.
+- The web app stores only non-sensitive session metadata such as user, tenant,
+  roles, and permissions.
+- API `401` responses clear local metadata and the API client attempts one
+  refresh-cookie rotation before failing a protected request.
+- Production deployments must use HTTPS. Set `COOKIE_SAME_SITE=none` only for
+  cross-site HTTPS deployments behind a trusted proxy.
 
 ## 4. Prepare Database
 
@@ -132,10 +151,10 @@ Use the seeded admin or register a fresh tenant, then verify:
 
 ## 9. Known Pilot Limitations
 
-- The temporary Next.js dashboard still stores the short-lived access token in
-  centralized browser storage. The backend refresh token is httpOnly, and API
-  `401` responses now clear client state, but the longer-term production target
-  is a cookie/BFF session model with no client-readable access token.
+- The temporary Next.js dashboard no longer persists client-readable tokens, but
+  login/refresh JSON responses still include access tokens for direct API and
+  future mobile compatibility. A future BFF route layer can remove token-bearing
+  JSON from browser-visible responses entirely.
 - Real SMS, FCM, email webhook, R2, payment gateway, and AI providers remain
   adapter-ready but not enabled for the pilot baseline.
 - The current automated e2e harness is mocked for speed and isolation. Before a

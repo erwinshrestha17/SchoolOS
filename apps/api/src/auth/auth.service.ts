@@ -381,6 +381,7 @@ export class AuthService {
     );
     const session = await this.issueSession(authContext);
     this.attachRefreshCookie(response, session.refreshToken);
+    this.attachAccessCookie(response, session.accessToken);
 
     await this.auditService.record({
       action: 'refresh',
@@ -415,6 +416,7 @@ export class AuthService {
     }
 
     this.clearRefreshCookie(response);
+    this.clearAccessCookie(response);
 
     const session = rawToken
       ? await this.prisma.refreshToken.findUnique({
@@ -521,6 +523,7 @@ export class AuthService {
     const authContext = this.buildAuthContext(user, tenant.slug);
     const session = await this.issueSession(authContext);
     this.attachRefreshCookie(response, session.refreshToken);
+    this.attachAccessCookie(response, session.accessToken);
 
     await this.auditService.record({
       action: audit?.action ?? 'login',
@@ -920,8 +923,29 @@ export class AuthService {
     });
   }
 
+  private attachAccessCookie(response: Response, accessToken: string) {
+    response.cookie(this.configService.accessCookieName, accessToken, {
+      httpOnly: true,
+      sameSite: this.configService.cookieSameSite,
+      secure: this.configService.isProduction,
+      path: '/',
+      domain: this.configService.cookieDomain,
+      maxAge: resolveAccessTokenMaxAge(this.configService.accessTokenTtl),
+    });
+  }
+
   private clearRefreshCookie(response: Response) {
     response.clearCookie(this.configService.refreshCookieName, {
+      httpOnly: true,
+      sameSite: this.configService.cookieSameSite,
+      secure: this.configService.isProduction,
+      path: '/',
+      domain: this.configService.cookieDomain,
+    });
+  }
+
+  private clearAccessCookie(response: Response) {
+    response.clearCookie(this.configService.accessCookieName, {
       httpOnly: true,
       sameSite: this.configService.cookieSameSite,
       secure: this.configService.isProduction,
@@ -935,6 +959,27 @@ export class AuthService {
     expiry.setDate(expiry.getDate() + this.configService.refreshTokenTtlDays);
     return expiry;
   }
+}
+
+function resolveAccessTokenMaxAge(ttl: string) {
+  const match = /^(\d+)([smhd])$/.exec(ttl.trim());
+
+  if (!match) {
+    return undefined;
+  }
+
+  const value = Number(match[1]);
+  const unit = match[2];
+  const multiplier =
+    unit === 's'
+      ? 1000
+      : unit === 'm'
+        ? 60 * 1000
+        : unit === 'h'
+          ? 60 * 60 * 1000
+          : 24 * 60 * 60 * 1000;
+
+  return value * multiplier;
 }
 
 type RequestMeta = {

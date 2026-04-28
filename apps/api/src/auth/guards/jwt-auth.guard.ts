@@ -12,6 +12,7 @@ import { ConfigService } from '../../config/config.service';
 import { PrismaService, TENANT_ID_KEY } from '../../prisma/prisma.service';
 import { AuthenticatedRequest } from '../auth-request.interface';
 import { JwtAccessPayload } from '../auth.types';
+import { parseCookie } from '../auth.utils';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -25,13 +26,8 @@ export class JwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const header = request.headers.authorization;
+    const token = this.resolveAccessToken(request);
 
-    if (!header?.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Missing bearer token');
-    }
-
-    const token = header.slice(7);
     let payload: JwtAccessPayload;
 
     try {
@@ -80,6 +76,25 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     return true;
+  }
+
+  private resolveAccessToken(request: AuthenticatedRequest) {
+    const header = request.headers.authorization;
+
+    if (header?.startsWith('Bearer ')) {
+      return header.slice(7);
+    }
+
+    const cookieToken = parseCookie(
+      resolveHeader(request.headers.cookie),
+      this.configService.accessCookieName,
+    );
+
+    if (cookieToken) {
+      return cookieToken;
+    }
+
+    throw new UnauthorizedException('Missing access token');
   }
 
   private async resolveOverrideTenantId(tenantId: string) {

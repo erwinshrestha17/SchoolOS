@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   ACCESS_TOKEN_TTL,
+  ACCESS_COOKIE_NAME,
   AUTH_COOKIE_NAME,
   CHALLENGE_TOKEN_TTL,
   OTP_ISSUE_LIMIT,
@@ -54,6 +55,10 @@ export class ConfigService {
 
   get refreshCookieName() {
     return process.env.REFRESH_COOKIE_NAME ?? AUTH_COOKIE_NAME;
+  }
+
+  get accessCookieName() {
+    return process.env.ACCESS_COOKIE_NAME ?? ACCESS_COOKIE_NAME;
   }
 
   get cookieDomain() {

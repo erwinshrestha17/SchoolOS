@@ -56,7 +56,7 @@ import type {
   TimetableSlotSummary,
   WaiverRecord,
 } from '@schoolos/core';
-import { clearStoredSession, readStoredSession } from './session';
+import { clearStoredSession } from './session';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
@@ -73,30 +73,30 @@ export type AuthChallengeResponse = {
 type RequestOptions = RequestInit & {
   auth?: boolean;
   json?: JsonBody;
+  retryOnUnauthorized?: boolean;
 };
 
-function getAccessToken() {
-  return readStoredSession()?.accessToken;
-}
-
 async function request<T>(path: string, init?: RequestOptions) {
-  const accessToken = init?.auth === false ? null : getAccessToken();
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(accessToken
-        ? {
-            Authorization: `Bearer ${accessToken}`,
-          }
-        : {}),
       ...(init?.headers ?? {}),
     },
     body: init?.json ? JSON.stringify(init.json) : init?.body,
   });
 
   if (!response.ok) {
+    if (
+      response.status === 401 &&
+      init?.auth !== false &&
+      init?.retryOnUnauthorized !== false &&
+      (await refreshAccessCookie())
+    ) {
+      return request<T>(path, { ...init, retryOnUnauthorized: false });
+    }
+
     const text = await response.text();
 
     if (response.status === 401 && init?.auth !== false) {
@@ -107,6 +107,19 @@ async function request<T>(path: string, init?: RequestOptions) {
   }
 
   return (await response.json()) as T;
+}
+
+async function refreshAccessCookie() {
+  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  });
+
+  return response.ok;
 }
 
 function withQuery(path: string, params: Record<string, string | undefined | null>) {
@@ -216,16 +229,10 @@ export const api = {
   listStudentDocuments: (studentId: string) =>
     request(withQuery('/student-documents', { studentId })),
   openStudentDocumentPdf: async (studentId: string, kind: string) => {
-    const accessToken = getAccessToken();
     const response = await fetch(
       `${API_BASE_URL}/students/${encodeURIComponent(studentId)}/documents/${encodeURIComponent(kind)}.pdf`,
       {
         credentials: 'include',
-        headers: accessToken
-          ? {
-              Authorization: `Bearer ${accessToken}`,
-            }
-          : undefined,
       },
     );
 
@@ -302,16 +309,10 @@ export const api = {
     request('/payments', { method: 'POST', json: body }),
   listReceipts: () => request<ReceiptView[]>('/receipts'),
   openReceiptPdf: async (receiptNumber: string) => {
-    const accessToken = getAccessToken();
     const response = await fetch(
       `${API_BASE_URL}/receipts/${encodeURIComponent(receiptNumber)}.pdf`,
       {
         credentials: 'include',
-        headers: accessToken
-          ? {
-              Authorization: `Bearer ${accessToken}`,
-            }
-          : undefined,
       },
     );
 

@@ -79,6 +79,7 @@ describe('AuthService', () => {
       challengeTokenTtl: '10m',
       refreshTokenTtlDays: 7,
       refreshCookieName: 'refresh_token',
+      accessCookieName: 'access_token',
       cookieSameSite: 'lax',
       cookieDomain: undefined,
       isProduction: false,
@@ -134,7 +135,27 @@ describe('AuthService', () => {
 
     expect(result.accessToken).toBe('access-token');
     expect(result.user.authMethod).toBe(AuthMethod.PASSWORD);
-    expect(response.cookie).toHaveBeenCalled();
+    expect(response.cookie).toHaveBeenCalledWith(
+      'refresh_token',
+      expect.any(String),
+      expect.objectContaining({
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax',
+        path: '/',
+      }),
+    );
+    expect(response.cookie).toHaveBeenCalledWith(
+      'access_token',
+      'access-token',
+      expect.objectContaining({
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 15 * 60 * 1000,
+      }),
+    );
   });
 
   it('returns an MFA challenge for BOTH auth mode', async () => {
@@ -293,7 +314,16 @@ describe('AuthService', () => {
     });
     expect(prisma.refreshToken.create).toHaveBeenCalled();
     expect(result.accessToken).toBe('access-token');
-    expect(response.cookie).toHaveBeenCalled();
+    expect(response.cookie).toHaveBeenCalledWith(
+      'refresh_token',
+      expect.any(String),
+      expect.objectContaining({ httpOnly: true }),
+    );
+    expect(response.cookie).toHaveBeenCalledWith(
+      'access_token',
+      'access-token',
+      expect.objectContaining({ httpOnly: true }),
+    );
   });
 
   it('revokes refresh tokens on logout', async () => {
@@ -316,7 +346,14 @@ describe('AuthService', () => {
       },
       data: { revokedAt: expect.any(Date) },
     });
-    expect(response.clearCookie).toHaveBeenCalled();
+    expect(response.clearCookie).toHaveBeenCalledWith(
+      'refresh_token',
+      expect.objectContaining({ httpOnly: true }),
+    );
+    expect(response.clearCookie).toHaveBeenCalledWith(
+      'access_token',
+      expect.objectContaining({ httpOnly: true }),
+    );
   });
 });
 

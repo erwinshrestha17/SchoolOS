@@ -1,4 +1,5 @@
 export const AUTH_COOKIE_NAME = 'school_os_refresh_token';
+export const ACCESS_COOKIE_NAME = 'school_os_access_token';
 export const ACCESS_TOKEN_TTL = '15m';
 export const REFRESH_TOKEN_TTL_DAYS = 7;
 export const APP_RATE_LIMIT = 60;

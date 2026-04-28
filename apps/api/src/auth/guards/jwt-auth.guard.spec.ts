@@ -47,7 +47,10 @@ describe('JwtAuthGuard', () => {
 
     guard = new JwtAuthGuard(
       jwtService as unknown as JwtService,
-      { jwtSecret: 'test-secret' } as ConfigService,
+      {
+        jwtSecret: 'test-secret',
+        accessCookieName: 'access_token',
+      } as ConfigService,
       auditService as unknown as AuditService,
       prisma as unknown as PrismaService,
       cls as unknown as ClsService,
@@ -70,6 +73,23 @@ describe('JwtAuthGuard', () => {
     });
     expect(cls.set).toHaveBeenCalledWith(TENANT_ID_KEY, 'tenant-1');
     expect(prisma.tenant.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('hydrates auth context from the httpOnly access cookie when no bearer token is present', async () => {
+    const { context, request } = createContext(
+      {
+        cookie: 'access_token=access-cookie-token; other=value',
+      },
+      false,
+    );
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+
+    expect(jwtService.verifyAsync).toHaveBeenCalledWith('access-cookie-token', {
+      secret: 'test-secret',
+    });
+    expect(request.auth?.tenantId).toBe('tenant-1');
+    expect(cls.set).toHaveBeenCalledWith(TENANT_ID_KEY, 'tenant-1');
   });
 
   it('rejects invalid access tokens before tenant context is created', async () => {
@@ -155,13 +175,16 @@ describe('JwtAuthGuard', () => {
   });
 });
 
-function createContext(extraHeaders: Record<string, string> = {}) {
+function createContext(
+  extraHeaders: Record<string, string> = {},
+  includeAuthorization = true,
+) {
   const request: {
     headers: Record<string, string>;
     auth?: AuthContext;
   } = {
     headers: {
-      authorization: 'Bearer access-token',
+      ...(includeAuthorization ? { authorization: 'Bearer access-token' } : {}),
       ...extraHeaders,
     },
   };

@@ -83,7 +83,10 @@ pnpm exec jest --config ./test/jest-e2e.json --runInBand
 
 ## Frontend domain and cookie policy
 
-The refresh token is stored in an `httpOnly` cookie. Configure these values to match the frontend you will deploy:
+The browser dashboard uses `httpOnly` cookies for both the short-lived access
+token and the rotating refresh token. Direct API/mobile clients can still use
+the access token returned in the JSON response. Configure these values to match
+the frontend you will deploy:
 
 - `FRONTEND_ORIGIN`
   - primary frontend origin, for example `https://app.schoolos.com`
@@ -91,6 +94,10 @@ The refresh token is stored in an `httpOnly` cookie. Configure these values to m
   - comma-separated extra origins if you have multiple frontends
 - `COOKIE_DOMAIN`
   - set this when frontend and backend share a parent domain
+- `ACCESS_COOKIE_NAME`
+  - defaults to `school_os_access_token`
+- `REFRESH_COOKIE_NAME`
+  - defaults to `school_os_refresh_token`
 - `COOKIE_SAME_SITE`
   - use `none` for cross-site cookie delivery over HTTPS
   - use `lax` for same-site or local development
@@ -105,6 +112,8 @@ FRONTEND_ORIGIN=https://app.schoolos.com
 COOKIE_DOMAIN=.schoolos.com
 COOKIE_SAME_SITE=none
 TRUST_PROXY=true
+ACCESS_COOKIE_NAME=school_os_access_token
+REFRESH_COOKIE_NAME=school_os_refresh_token
 ```
 
 ## Email delivery

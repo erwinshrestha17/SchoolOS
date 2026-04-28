@@ -17,6 +17,8 @@ Set these variables for the API container:
 - `FRONTEND_ORIGIN=https://your-schoolos-domain`
 - `TRUST_PROXY=true` when behind Nginx, Caddy, Traefik, or a load balancer
 - `COOKIE_SAME_SITE=lax` for same-site deployments, or `none` only when cross-site HTTPS cookies are required
+- `ACCESS_COOKIE_NAME=school_os_access_token`
+- `REFRESH_COOKIE_NAME=school_os_refresh_token`
 - `LOCAL_STORAGE_ROOT=/var/lib/schoolos/storage` for local storage mode
 
 Provider-specific variables are required only when enabled:
@@ -37,6 +39,14 @@ The readiness endpoint checks both Postgres and Redis. Keep it wired into contai
 For the local Docker pilot baseline, `pnpm smoke:phase1` validates Postgres,
 Redis, and API readiness. Use `SMOKE_LOGIN=true pnpm smoke:phase1` after seeding
 to include the default admin login in the smoke pass.
+
+## Browser Session Policy
+
+The admin dashboard sends API requests with `credentials: include`. The API sets
+httpOnly access and refresh cookies and still returns access tokens in JSON for
+direct API/mobile compatibility. Browser-persisted state must remain metadata
+only; do not store raw access or refresh tokens in `localStorage` or
+`sessionStorage`.
 
 ## Deployment Order
 

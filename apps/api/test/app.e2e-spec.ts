@@ -495,13 +495,16 @@ describe('School OS Auth + RBAC integration', () => {
     const refreshed = await authController.refresh(
       {},
       refreshResponse as any,
-      buildCookieHeader(adminResponse.cookieCalls.at(-1)),
+      buildCookieHeader(adminResponse.cookieCalls, 'school_os_refresh_token'),
       createRequestMock() as any,
     );
 
     expect(refreshed.accessToken).toBeTruthy();
 
-    const rotatedCookie = buildCookieHeader(refreshResponse.cookieCalls.at(-1));
+    const rotatedCookie = buildCookieHeader(
+      refreshResponse.cookieCalls,
+      'school_os_refresh_token',
+    );
     expect(rotatedCookie).toContain('school_os_refresh_token=');
 
     const logoutResponse = createResponseMock();
@@ -628,7 +631,12 @@ function createResponseMock() {
   };
 }
 
-function buildCookieHeader(cookie?: { name: string; value: string }) {
+function buildCookieHeader(
+  cookies: Array<{ name: string; value: string }>,
+  name: string,
+) {
+  const cookie = cookies.find((item) => item.name === name);
+
   return cookie ? `${cookie.name}=${cookie.value}` : undefined;
 }
 
