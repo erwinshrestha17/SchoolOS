@@ -19,3 +19,4 @@
     "verify:production": "pnpm verify:tracked-artifacts && pnpm db:generate && pnpm db:validate && pnpm verify:openapi && pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build"
   }
 }
+
