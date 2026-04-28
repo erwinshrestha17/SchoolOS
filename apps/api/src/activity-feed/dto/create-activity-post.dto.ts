@@ -14,9 +14,11 @@ import { Type } from 'class-transformer';
 
 class ActivityAttachmentInputDto {
   @IsString()
+  @MinLength(2)
   fileName!: string;
 
   @IsString()
+  @MinLength(3)
   contentType!: string;
 
   @IsString()
@@ -26,6 +28,7 @@ class ActivityAttachmentInputDto {
 
 export class CreateActivityPostDto {
   @IsString()
+  @MinLength(1)
   classId!: string;
 
   @IsOptional()
@@ -33,9 +36,11 @@ export class CreateActivityPostDto {
   sectionId?: string;
 
   @IsString()
+  @MinLength(2)
   title!: string;
 
   @IsString()
+  @MinLength(2)
   caption!: string;
 
   @IsOptional()

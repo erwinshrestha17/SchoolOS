@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -22,8 +23,12 @@ import { CreateDevelopmentalMilestoneDto } from './dto/create-developmental-mile
 import { CreateMoodLogDto } from './dto/create-mood-log.dto';
 import {
   isParentOnly,
+  isStudentOnly,
   getParentStudentIds,
+  getStudentOwnId,
 } from '../common/security/parent-scope';
+
+const MAX_ACTIVITY_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 @Injectable()
 export class ActivityFeedService {
@@ -46,19 +51,17 @@ export class ActivityFeedService {
     } = {},
   ) {
     const monthRange = filters.month ? getMonthRange(filters.month) : null;
+    const visibilityFilter = await this.buildActorPostVisibilityFilter(
+      actor,
+      filters.studentId,
+    );
 
-    // Parent scoping: parents can only see posts tagged with their children
-    let studentTagFilter: Prisma.ActivityPostWhereInput = filters.studentId
-      ? { studentTags: { some: { studentId: filters.studentId } } }
-      : {};
-
-    if (isParentOnly(actor)) {
-      const parentStudentIds = await getParentStudentIds(this.prisma, actor);
-      if (parentStudentIds !== null) {
-        studentTagFilter = {
-          studentTags: { some: { studentId: { in: parentStudentIds } } },
-        };
-      }
+    if (filters.classId) {
+      await this.ensureClassSectionAndWriteAccess(actor, {
+        classId: filters.classId,
+        sectionId: filters.sectionId,
+        requireWritable: false,
+      });
     }
 
     return this.prisma.activityPost.findMany({
@@ -69,7 +72,7 @@ export class ActivityFeedService {
         ...(filters.category
           ? { category: filters.category as ActivityCategory }
           : {}),
-        ...studentTagFilter,
+        ...visibilityFilter,
         ...(monthRange
           ? {
               publishedAt: {
@@ -132,24 +135,11 @@ export class ActivityFeedService {
   }
 
   async createPost(dto: CreateActivityPostDto, actor: AuthContext) {
-    const [classroom, section] = await Promise.all([
-      this.prisma.class.findFirst({
-        where: { id: dto.classId, tenantId: actor.tenantId },
-      }),
-      dto.sectionId
-        ? this.prisma.section.findFirst({
-            where: { id: dto.sectionId, tenantId: actor.tenantId },
-          })
-        : Promise.resolve(null),
-    ]);
-
-    if (!classroom) {
-      throw new NotFoundException('Class not found in this tenant');
-    }
-
-    if (dto.sectionId && !section) {
-      throw new NotFoundException('Section not found in this tenant');
-    }
+    await this.ensureClassSectionAndWriteAccess(actor, {
+      classId: dto.classId,
+      sectionId: dto.sectionId,
+      requireWritable: true,
+    });
 
     if (dto.studentIds?.length) {
       const students = await this.prisma.student.findMany({
@@ -168,6 +158,10 @@ export class ActivityFeedService {
       }
     }
 
+    for (const attachment of dto.attachments) {
+      this.validateActivityAttachment(attachment);
+    }
+
     const storedAttachments = await Promise.all(
       dto.attachments.map((attachment, index) =>
         this.storageService
@@ -181,6 +175,7 @@ export class ActivityFeedService {
           .then((stored) => ({
             ...attachment,
             ...stored,
+            publicUrl: null,
             sortOrder: index,
           })),
       ),
@@ -188,7 +183,11 @@ export class ActivityFeedService {
 
     const audienceType =
       dto.audienceType ??
-      (dto.studentIds?.length ? AudienceType.SECTION : AudienceType.CLASS);
+      (dto.studentIds?.length
+        ? AudienceType.ALL
+        : dto.sectionId
+          ? AudienceType.SECTION
+          : AudienceType.CLASS);
 
     const post = await this.prisma.activityPost.create({
       data: {
@@ -363,6 +362,8 @@ export class ActivityFeedService {
       throw new NotFoundException('Activity post not found in this tenant');
     }
 
+    await this.ensurePostVisibleToActor(actor, post.id);
+
     const [guardian, student] = await Promise.all([
       dto.guardianId
         ? this.prisma.guardian.findFirst({
@@ -382,6 +383,28 @@ export class ActivityFeedService {
 
     if (dto.studentId && !student) {
       throw new NotFoundException('Student not found in this tenant');
+    }
+
+    if (isParentOnly(actor)) {
+      if (!dto.guardianId) {
+        throw new ForbiddenException('Guardian context is required');
+      }
+
+      if (guardian?.userId !== actor.userId) {
+        throw new ForbiddenException(
+          'Parent can only react as their own guardian profile',
+        );
+      }
+    }
+
+    if (isStudentOnly(actor)) {
+      const studentOwnId = await getStudentOwnId(this.prisma, actor);
+
+      if (dto.studentId !== studentOwnId) {
+        throw new ForbiddenException(
+          'Student can only react as their own profile',
+        );
+      }
     }
 
     const existing = await this.prisma.activityReaction.findFirst({
@@ -425,8 +448,13 @@ export class ActivityFeedService {
   }
 
   async listMoodLogs(actor: AuthContext) {
+    const studentScope = await this.buildActorStudentIdScope(actor);
+
     return this.prisma.moodLog.findMany({
-      where: { tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        ...(studentScope ? { studentId: studentScope } : {}),
+      },
       include: {
         class: true,
         section: true,
@@ -438,32 +466,27 @@ export class ActivityFeedService {
   }
 
   async createMoodLog(dto: CreateMoodLogDto, actor: AuthContext) {
-    const [classroom, section, student] = await Promise.all([
-      this.prisma.class.findFirst({
-        where: { id: dto.classId, tenantId: actor.tenantId },
-      }),
-      dto.sectionId
-        ? this.prisma.section.findFirst({
-            where: { id: dto.sectionId, tenantId: actor.tenantId },
-          })
-        : Promise.resolve(null),
-      dto.studentId
-        ? this.prisma.student.findFirst({
-            where: { id: dto.studentId, tenantId: actor.tenantId },
-          })
-        : Promise.resolve(null),
-    ]);
+    await this.ensureClassSectionAndWriteAccess(actor, {
+      classId: dto.classId,
+      sectionId: dto.sectionId,
+      requireWritable: true,
+    });
 
-    if (!classroom) {
-      throw new NotFoundException('Class not found in this tenant');
-    }
-
-    if (dto.sectionId && !section) {
-      throw new NotFoundException('Section not found in this tenant');
-    }
+    const student = dto.studentId
+      ? await this.prisma.student.findFirst({
+          where: {
+            id: dto.studentId,
+            tenantId: actor.tenantId,
+            classId: dto.classId,
+            ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
+          },
+        })
+      : null;
 
     if (dto.studentId && !student) {
-      throw new NotFoundException('Student not found in this tenant');
+      throw new NotFoundException(
+        'Student not found in this class/section tenant scope',
+      );
     }
 
     const moodLog = await this.prisma.moodLog.create({
@@ -500,11 +523,19 @@ export class ActivityFeedService {
     filters: { studentId?: string; month?: string } = {},
   ) {
     const monthRange = filters.month ? getMonthRange(filters.month) : null;
+    const studentScope = await this.buildActorStudentIdScope(
+      actor,
+      filters.studentId,
+    );
 
     return this.prisma.developmentalMilestone.findMany({
       where: {
         tenantId: actor.tenantId,
-        ...(filters.studentId ? { studentId: filters.studentId } : {}),
+        ...(studentScope
+          ? { studentId: studentScope }
+          : filters.studentId
+            ? { studentId: filters.studentId }
+            : {}),
         ...(monthRange
           ? {
               observedAt: {
@@ -528,32 +559,20 @@ export class ActivityFeedService {
     dto: CreateDevelopmentalMilestoneDto,
     actor: AuthContext,
   ) {
-    const [classroom, section, student] = await Promise.all([
-      this.prisma.class.findFirst({
-        where: { id: dto.classId, tenantId: actor.tenantId },
-      }),
-      dto.sectionId
-        ? this.prisma.section.findFirst({
-            where: { id: dto.sectionId, tenantId: actor.tenantId },
-          })
-        : Promise.resolve(null),
-      this.prisma.student.findFirst({
-        where: {
-          id: dto.studentId,
-          tenantId: actor.tenantId,
-          classId: dto.classId,
-          ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
-        },
-      }),
-    ]);
+    await this.ensureClassSectionAndWriteAccess(actor, {
+      classId: dto.classId,
+      sectionId: dto.sectionId,
+      requireWritable: true,
+    });
 
-    if (!classroom) {
-      throw new NotFoundException('Class not found in this tenant');
-    }
-
-    if (dto.sectionId && !section) {
-      throw new NotFoundException('Section not found in this tenant');
-    }
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: dto.studentId,
+        tenantId: actor.tenantId,
+        classId: dto.classId,
+        ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
+      },
+    });
 
     if (!student) {
       throw new NotFoundException(
@@ -571,8 +590,8 @@ export class ActivityFeedService {
         milestone: dto.milestone,
         status: dto.status,
         observationNote: dto.observationNote ?? null,
-        photoObjectKey: dto.photoObjectKey ?? null,
-        photoUrl: dto.photoUrl ?? null,
+        photoObjectKey: dto.photoObjectKey ?? dto.photoUrl ?? null,
+        photoUrl: null,
         observedAt: new Date(dto.observedAt),
         createdById: actor.userId,
       },
@@ -593,6 +612,192 @@ export class ActivityFeedService {
 
     return milestone;
   }
+
+  private async ensureClassSectionAndWriteAccess(
+    actor: AuthContext,
+    input: {
+      classId: string;
+      sectionId?: string | null;
+      requireWritable: boolean;
+    },
+  ) {
+    const [classroom, section] = await Promise.all([
+      this.prisma.class.findFirst({
+        where: { id: input.classId, tenantId: actor.tenantId },
+      }),
+      input.sectionId
+        ? this.prisma.section.findFirst({
+            where: { id: input.sectionId, tenantId: actor.tenantId },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    if (!classroom) {
+      throw new NotFoundException('Class not found in this tenant');
+    }
+
+    if (input.sectionId && !section) {
+      throw new NotFoundException('Section not found in this tenant');
+    }
+
+    if (section && section.classId !== input.classId) {
+      throw new NotFoundException('Section not found in selected class');
+    }
+
+    if (!input.requireWritable || canManageAllActivity(actor)) {
+      return;
+    }
+
+    const staffAssignment = await this.prisma.staff.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        teacherAssignments: {
+          some: {
+            classId: input.classId,
+            ...(input.sectionId ? { sectionId: input.sectionId } : {}),
+          },
+        },
+      },
+      select: { id: true },
+    });
+
+    if (!staffAssignment) {
+      throw new ForbiddenException(
+        'Teacher is not assigned to this class/section',
+      );
+    }
+  }
+
+  private validateActivityAttachment(attachment: {
+    fileName: string;
+    contentType: string;
+    base64Content: string;
+  }) {
+    if (!attachment.contentType.startsWith('image/')) {
+      throw new BadRequestException('Activity attachments must be images');
+    }
+
+    const sizeBytes = Buffer.byteLength(attachment.base64Content, 'base64');
+
+    if (sizeBytes > MAX_ACTIVITY_ATTACHMENT_BYTES) {
+      throw new BadRequestException(
+        'Activity attachment exceeds the 10MB size limit',
+      );
+    }
+  }
+
+  private async buildActorPostVisibilityFilter(
+    actor: AuthContext,
+    requestedStudentId?: string,
+  ): Promise<Prisma.ActivityPostWhereInput> {
+    const studentIds = await this.resolveVisibleStudentIds(
+      actor,
+      requestedStudentId,
+    );
+
+    if (studentIds === null) {
+      return requestedStudentId
+        ? { studentTags: { some: { studentId: requestedStudentId } } }
+        : {};
+    }
+
+    if (studentIds.length === 0) {
+      return { id: '__no_visible_activity_posts__' };
+    }
+
+    const students = await this.prisma.student.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        id: { in: studentIds },
+      },
+      select: {
+        id: true,
+        classId: true,
+        sectionId: true,
+      },
+    });
+
+    return {
+      OR: [
+        { studentTags: { some: { studentId: { in: studentIds } } } },
+        ...students.map((student) => ({
+          studentTags: { none: {} },
+          classId: student.classId,
+          ...(student.sectionId ? { sectionId: student.sectionId } : {}),
+        })),
+      ],
+    };
+  }
+
+  private async buildActorStudentIdScope(
+    actor: AuthContext,
+    requestedStudentId?: string,
+  ): Promise<Prisma.StringFilter | string | undefined> {
+    const studentIds = await this.resolveVisibleStudentIds(
+      actor,
+      requestedStudentId,
+    );
+
+    if (studentIds === null) {
+      return requestedStudentId;
+    }
+
+    if (studentIds.length === 0) {
+      return { in: ['__no_visible_students__'] };
+    }
+
+    return { in: studentIds };
+  }
+
+  private async resolveVisibleStudentIds(
+    actor: AuthContext,
+    requestedStudentId?: string,
+  ) {
+    let studentIds: string[] | null = null;
+
+    if (isParentOnly(actor)) {
+      studentIds = (await getParentStudentIds(this.prisma, actor)) ?? [];
+    } else if (isStudentOnly(actor)) {
+      const studentOwnId = await getStudentOwnId(this.prisma, actor);
+      studentIds = studentOwnId ? [studentOwnId] : [];
+    }
+
+    if (studentIds === null) {
+      return null;
+    }
+
+    if (requestedStudentId) {
+      if (!studentIds.includes(requestedStudentId)) {
+        throw new ForbiddenException('Student is outside your activity scope');
+      }
+
+      return [requestedStudentId];
+    }
+
+    return studentIds;
+  }
+
+  private async ensurePostVisibleToActor(actor: AuthContext, postId: string) {
+    const visibilityFilter = await this.buildActorPostVisibilityFilter(actor);
+
+    if (Object.keys(visibilityFilter).length === 0) {
+      return;
+    }
+
+    const visiblePost = await this.prisma.activityPost.findFirst({
+      where: {
+        id: postId,
+        tenantId: actor.tenantId,
+        ...visibilityFilter,
+      },
+      select: { id: true },
+    });
+
+    if (!visiblePost) {
+      throw new ForbiddenException('Activity post is outside your scope');
+    }
+  }
 }
 
 function getMonthRange(month: string) {
@@ -612,4 +817,10 @@ function getMonthRange(month: string) {
     start: new Date(Date.UTC(year, monthIndex, 1)),
     end: new Date(Date.UTC(year, monthIndex + 1, 1)),
   };
+}
+
+function canManageAllActivity(actor: AuthContext) {
+  return actor.roles.some((role) =>
+    ['super_admin', 'admin', 'principal'].includes(role),
+  );
 }
