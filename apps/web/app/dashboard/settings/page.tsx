@@ -1,22 +1,24 @@
-import { AppShell } from '../../../components/app-shell';
+'use client';
+
 import { SetupForm } from '../../../components/forms/setup-form';
 
 export default function SettingsPage() {
   return (
-    <AppShell
-      eyebrow="Settings"
-      title="School setup and rollout posture"
-      requiredPermissions={[
-        'academic_years:create',
-        'classes:create',
-        'sections:create',
-      ]}
-    >
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+          Settings
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          School setup and rollout posture.
+        </p>
+      </div>
+
       <SetupForm />
 
-      <section className="shell-card rounded-[32px] p-8">
+      <section className="shell-card p-6">
         <p className="label mb-3">Phase 1 Guardrails</p>
-        <div className="grid gap-3 text-sm leading-6 text-[var(--muted)]">
+        <div className="grid gap-3 text-sm leading-6 text-gray-500">
           <p>Primary deployment model is multi-tenant SaaS.</p>
           <p>
             Web admin/staff is v1. Parent and teacher mobile apps stay deferred
@@ -28,6 +30,6 @@ export default function SettingsPage() {
           </p>
         </div>
       </section>
-    </AppShell>
+    </div>
   );
 }

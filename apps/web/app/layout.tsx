@@ -4,7 +4,8 @@ import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: 'SchoolOS Admin',
-  description: 'SchoolOS web admin for admissions, attendance, finance, and communications.',
+  description:
+    'SchoolOS — Multi-tenant School Management SaaS for Nepal. Admissions, attendance, finance, academics, and communications.',
 };
 
 export default function RootLayout({
@@ -14,7 +15,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
+      <body className="font-sans antialiased">
         <Providers>{children}</Providers>
       </body>
     </html>

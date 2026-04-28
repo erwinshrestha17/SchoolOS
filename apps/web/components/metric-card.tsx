@@ -8,12 +8,14 @@ export function MetricCard({
   accent: string;
 }) {
   return (
-    <div className="shell-card rounded-[28px] p-6">
-      <p className="label mb-4">{label}</p>
+    <div className="shell-card p-5 hover:shadow-md transition-shadow duration-200">
+      <p className="label mb-3">{label}</p>
       <div className="flex items-end justify-between gap-4">
-        <p className="text-4xl font-black tracking-tight">{value}</p>
+        <p className="text-3xl font-bold tracking-tight text-gray-900">
+          {value}
+        </p>
         <span
-          className="h-12 w-12 rounded-2xl"
+          className="h-10 w-10 rounded-xl shrink-0"
           style={{ background: accent }}
         />
       </div>
