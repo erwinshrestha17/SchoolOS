@@ -37,6 +37,7 @@ export function FinanceForm() {
   });
   const [discount, setDiscount] = useState({
     name: 'Sibling discount',
+    reason: 'Approved sibling discount policy',
     type: 'SIBLING',
     feeHeadId: '',
     classId: '',
@@ -496,6 +497,13 @@ export function FinanceForm() {
                 }
                 placeholder="Discount name"
               />
+              <input
+                value={discount.reason}
+                onChange={(event) =>
+                  setDiscount((current) => ({ ...current, reason: event.target.value }))
+                }
+                placeholder="Approval reason"
+              />
               <select
                 value={discount.type}
                 onChange={(event) =>
@@ -579,12 +587,14 @@ export function FinanceForm() {
               className="rounded-2xl bg-[var(--accent)] px-5 py-3 font-semibold text-white disabled:opacity-50"
               disabled={
                 !discount.name ||
+                !discount.reason ||
                 (!discount.feeHeadId && !discount.classId && !discount.feePlanId) ||
                 discountMutation.isPending
               }
               onClick={() =>
                 discountMutation.mutate({
                   name: discount.name,
+                  reason: discount.reason,
                   type: discount.type,
                   feeHeadId: discount.feeHeadId || null,
                   classId: discount.classId || null,

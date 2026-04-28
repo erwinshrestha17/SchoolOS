@@ -180,6 +180,7 @@ export const reconciliationQuerySchema = cashierCloseWindowSchema.extend({
 
 export const discountRuleFormSchema = z.object({
   name: z.string().min(2),
+  reason: z.string().min(2),
   type: z.enum(['SIBLING', 'SCHOLARSHIP', 'STAFF_CHILD', 'MANUAL']),
   feeHeadId: z.string().optional().nullable(),
   classId: z.string().optional().nullable(),

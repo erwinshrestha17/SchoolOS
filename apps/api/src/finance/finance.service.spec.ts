@@ -25,6 +25,198 @@ const actor = {
 };
 
 describe('finance production controls', () => {
+  it('requires discount reason and tenant-owned target references', async () => {
+    const feeHead = buildFeeHead();
+    const classroom = { id: 'class-1', tenantId: actor.tenantId };
+    const feePlan = {
+      id: 'plan-1',
+      tenantId: actor.tenantId,
+      classId: 'class-1',
+    };
+    const createdDiscount = {
+      id: 'discount-1',
+      name: 'Sibling discount',
+      type: 'SIBLING',
+    };
+    const { service, prisma, auditService } = buildService({
+      invoice: null,
+      feeHead,
+      classroom,
+      feePlan,
+      createdDiscount,
+    });
+
+    const result = await service.createDiscountRule(
+      {
+        name: 'Sibling discount',
+        reason: 'Approved sibling policy',
+        type: 'SIBLING',
+        feeHeadId: feeHead.id,
+        classId: classroom.id,
+        feePlanId: feePlan.id,
+        percentOff: 10,
+      },
+      actor,
+    );
+
+    expect(result).toBe(createdDiscount);
+    expect(prisma.feeHead.findFirst).toHaveBeenCalledWith({
+      where: { id: feeHead.id, tenantId: actor.tenantId },
+    });
+    expect(prisma.class.findFirst).toHaveBeenCalledWith({
+      where: { id: classroom.id, tenantId: actor.tenantId },
+    });
+    expect(prisma.feePlan.findFirst).toHaveBeenCalledWith({
+      where: { id: feePlan.id, tenantId: actor.tenantId },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'create',
+        resource: 'discount_rule',
+        after: expect.objectContaining({
+          reason: 'Approved sibling policy',
+        }),
+      }),
+    );
+  });
+
+  it('blocks discounts without an auditable reason', async () => {
+    const { service } = buildService({
+      invoice: null,
+      feeHead: buildFeeHead(),
+    });
+
+    await expect(
+      service.createDiscountRule(
+        {
+          name: 'Manual discount',
+          reason: '',
+          type: 'MANUAL',
+          feeHeadId: 'fee-head-1',
+          amountOff: 100,
+        },
+        actor,
+      ),
+    ).rejects.toThrow('Discount reason is required');
+  });
+
+  it('blocks waivers when invoice and student do not match', async () => {
+    const invoice = buildInvoice({ studentId: 'student-2' });
+    const { service } = buildService({
+      invoice,
+      feeHead: buildFeeHead(),
+      student: { id: 'student-1', tenantId: actor.tenantId },
+    });
+
+    await expect(
+      service.createWaiver(
+        {
+          studentId: 'student-1',
+          invoiceId: invoice.id,
+          amount: 100,
+          reason: 'Hardship waiver',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('Invoice does not belong to the selected student');
+  });
+
+  it('blocks duplicate referenced payments for the same invoice', async () => {
+    const invoice = buildInvoice({
+      payments: [],
+      lines: [
+        {
+          id: 'line-1',
+          totalAmount: new Prisma.Decimal(1117),
+          feeHead: { code: 'TUITION' },
+          description: 'Tuition',
+        },
+      ],
+      student: { id: 'student-1' },
+    });
+    const { service } = buildService({
+      invoice,
+      feeHead: buildFeeHead(),
+      duplicatePayment: { id: 'payment-duplicate' },
+    });
+
+    await expect(
+      service.collectPayment(
+        {
+          invoiceId: invoice.id,
+          amount: 100,
+          method: PaymentMethod.BANK,
+          referenceNumber: 'BANK-REF-001',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Payment reference was already recorded for this invoice',
+    );
+  });
+
+  it('emits a finance domain event after confirmed payment collection', async () => {
+    const invoice = buildInvoice({
+      payments: [],
+      invoiceNumber: 'INV-2025-2026-00001',
+      fiscalYear: '2025/2026',
+      billNumber: 'INV-2025-2026-00001',
+      lines: [
+        {
+          id: 'line-1',
+          totalAmount: new Prisma.Decimal(1117),
+          feeHead: { code: 'TUITION' },
+          description: 'Tuition',
+        },
+      ],
+      student: { id: 'student-1' },
+    });
+    const createdPayment = {
+      id: 'payment-1',
+      invoiceId: invoice.id,
+      amount: new Prisma.Decimal(100),
+      method: PaymentMethod.CASH,
+      paidAt: new Date('2026-04-27T10:00:00.000Z'),
+      receipt: {
+        receiptNumber: 'REC-2025-2026-00001',
+        pdfUrl: '/api/v1/receipts/REC-2025-2026-00001.pdf',
+      },
+    };
+    const { service, eventEmitter } = buildService({
+      invoice,
+      feeHead: buildFeeHead(),
+      duplicatePayment: null,
+      tenant: { id: actor.tenantId, panNumber: 'PAN-123' },
+      receiptCount: 0,
+      journalCount: 0,
+      cashAccount: { id: 'cash' },
+      incomeAccount: { id: 'income' },
+      createdPayment,
+    });
+
+    const result = await service.collectPayment(
+      {
+        invoiceId: invoice.id,
+        amount: 100,
+        method: PaymentMethod.CASH,
+        referenceNumber: 'COUNTER-001',
+      },
+      actor,
+    );
+
+    expect(result.receiptNumber).toBe('REC-2025-2026-00001');
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'fees.payment.confirmed',
+      expect.objectContaining({
+        tenantId: actor.tenantId,
+        paymentId: createdPayment.id,
+        invoiceId: invoice.id,
+        studentId: invoice.studentId,
+        amount: 100,
+      }),
+    );
+  });
+
   it('voids unpaid invoices with an audit trail', async () => {
     const invoice = buildInvoice({ payments: [] });
     const { service, prisma, auditService } = buildService({
@@ -664,7 +856,19 @@ function buildFeeHead() {
 function buildService(options: {
   invoice: unknown;
   feeHead: unknown;
+  student?: unknown;
+  classroom?: unknown;
+  feePlan?: unknown;
+  createdDiscount?: unknown;
+  createdWaiver?: unknown;
+  invoiceContainsFeeHead?: boolean;
   payment?: unknown;
+  duplicatePayment?: unknown;
+  createdPayment?: unknown;
+  tenant?: unknown;
+  receiptCount?: number;
+  cashAccount?: unknown;
+  incomeAccount?: unknown;
   sourceJournal?: unknown;
   createdLine?: unknown;
   updatedInvoice?: unknown;
@@ -684,15 +888,39 @@ function buildService(options: {
   reconciliationRefundEntries?: unknown[];
 }) {
   const prisma = {
+    student: {
+      findFirst: jest.fn().mockResolvedValue(options.student ?? null),
+    },
+    tenant: {
+      findUniqueOrThrow: jest
+        .fn()
+        .mockResolvedValue(options.tenant ?? { id: actor.tenantId }),
+    },
     invoice: {
       findFirst: jest.fn().mockResolvedValue(options.invoice),
       update: jest.fn().mockResolvedValue(options.updatedInvoice),
     },
+    discountRule: {
+      create: jest.fn().mockResolvedValue(options.createdDiscount),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    feeWaiver: {
+      create: jest.fn().mockResolvedValue(options.createdWaiver),
+    },
     feeHead: {
       findFirst: jest.fn().mockResolvedValue(options.feeHead),
     },
+    feePlan: {
+      findFirst: jest.fn().mockResolvedValue(options.feePlan ?? null),
+    },
+    class: {
+      findFirst: jest.fn().mockResolvedValue(options.classroom ?? null),
+    },
     payment: {
-      findFirst: jest.fn().mockResolvedValue(options.payment ?? null),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(options.duplicatePayment ?? options.payment ?? null),
+      create: jest.fn().mockResolvedValue(options.createdPayment),
       findMany: jest
         .fn()
         .mockResolvedValue(
@@ -729,7 +957,32 @@ function buildService(options: {
         ),
     },
     invoiceLine: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(
+          options.invoiceContainsFeeHead === false
+            ? null
+            : { id: 'line-fee-head' },
+        ),
       create: jest.fn().mockResolvedValue(options.createdLine),
+    },
+    receipt: {
+      count: jest.fn().mockResolvedValue(options.receiptCount ?? 0),
+    },
+    chartAccount: {
+      findUniqueOrThrow: jest
+        .fn()
+        .mockImplementation(
+          async (args?: { where?: { tenantId_code?: { code?: string } } }) => {
+            const code = args?.where?.tenantId_code?.code;
+
+            if (code === '1000' || code === '1010' || code === '1020') {
+              return options.cashAccount ?? { id: 'cash' };
+            }
+
+            return options.incomeAccount ?? { id: 'income' };
+          },
+        ),
     },
     accountingPeriod: {
       findFirst: jest.fn().mockResolvedValue(options.closedPeriod ?? null),
@@ -740,14 +993,19 @@ function buildService(options: {
     record: jest.fn(),
   };
   const communicationsService = {};
+  const eventEmitter = {
+    emit: jest.fn(),
+  };
 
   return {
     service: new FinanceService(
       prisma as never,
       auditService as never,
       communicationsService as never,
+      eventEmitter as never,
     ),
     prisma,
     auditService,
+    eventEmitter,
   };
 }

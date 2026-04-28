@@ -5,6 +5,9 @@ export class CreateDiscountRuleDto {
   @IsString()
   name!: string;
 
+  @IsString()
+  reason!: string;
+
   @IsEnum(DiscountType)
   type!: DiscountType;
 

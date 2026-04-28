@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   AccountingPeriodStatus,
   AudienceType,
@@ -50,6 +51,7 @@ export class FinanceService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly communicationsService: CommunicationsService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async listFeeHeads(actor: AuthContext) {
@@ -246,73 +248,86 @@ export class FinanceService {
       );
     }
 
-    const run = await this.prisma.feeBillingRun.create({
-      data: {
-        tenantId: actor.tenantId,
-        academicYearId: dto.academicYearId,
-        feePlanId: dto.feePlanId ?? null,
-        runMonth: dto.runMonth,
-        runYear: dto.runYear,
-        generatedById: actor.userId,
-        notes: dto.notes ?? null,
-      },
-    });
-
-    const invoices: Array<
-      Awaited<ReturnType<typeof this.prisma.invoice.create>>
-    > = [];
-
-    for (const assignment of assignments) {
-      const invoiceNumber = await this.generateInvoiceNumber(actor.tenantId);
-      const calculated = await this.calculateInvoiceLines({
-        tenantId: actor.tenantId,
-        classId: assignment.student.classId,
-        feePlanId: assignment.feePlanId,
-        items: assignment.feePlan.items,
+    const dueDate = new Date(dto.dueDate);
+    const fiscalYear = resolveFiscalYear(dueDate);
+    const result = await this.prisma.$transaction(async (tx) => {
+      const run = await tx.feeBillingRun.create({
+        data: {
+          tenantId: actor.tenantId,
+          academicYearId: dto.academicYearId,
+          feePlanId: dto.feePlanId ?? null,
+          runMonth: dto.runMonth,
+          runYear: dto.runYear,
+          generatedById: actor.userId,
+          notes: dto.notes ?? null,
+        },
       });
 
-      invoices.push(
-        await this.prisma.invoice.create({
-          data: {
+      const invoices: Array<
+        Awaited<ReturnType<typeof this.prisma.invoice.create>>
+      > = [];
+
+      for (const assignment of assignments) {
+        const invoiceNumber = await this.generateInvoiceNumber(
+          actor.tenantId,
+          fiscalYear,
+          tx,
+        );
+        const calculated = await this.calculateInvoiceLines(
+          {
             tenantId: actor.tenantId,
-            studentId: assignment.studentId,
-            academicYearId: dto.academicYearId,
-            billingRunId: run.id,
-            invoiceNumber,
-            fiscalYear: resolveFiscalYear(new Date(dto.dueDate)),
-            billNumber: invoiceNumber,
-            dueDate: new Date(dto.dueDate),
-            subtotal: calculated.subtotal,
-            vatAmount: calculated.vatAmount,
-            totalAmount: calculated.totalAmount,
-            lines: {
-              create: calculated.lines,
+            classId: assignment.student.classId,
+            feePlanId: assignment.feePlanId,
+            items: assignment.feePlan.items,
+          },
+          tx,
+        );
+
+        invoices.push(
+          await tx.invoice.create({
+            data: {
+              tenantId: actor.tenantId,
+              studentId: assignment.studentId,
+              academicYearId: dto.academicYearId,
+              billingRunId: run.id,
+              invoiceNumber,
+              fiscalYear,
+              billNumber: invoiceNumber,
+              dueDate,
+              subtotal: calculated.subtotal,
+              vatAmount: calculated.vatAmount,
+              totalAmount: calculated.totalAmount,
+              lines: {
+                create: calculated.lines,
+              },
             },
-          },
-          include: {
-            student: true,
-            lines: true,
-          },
-        }),
-      );
-    }
+            include: {
+              student: true,
+              lines: true,
+            },
+          }),
+        );
+      }
+
+      return { run, invoices };
+    });
 
     await this.auditService.record({
       action: 'generate',
       resource: 'fee_billing_run',
       tenantId: actor.tenantId,
       userId: actor.userId,
-      resourceId: run.id,
+      resourceId: result.run.id,
       after: {
         academicYearId: dto.academicYearId,
         feePlanId: dto.feePlanId ?? null,
-        invoiceCount: invoices.length,
+        invoiceCount: result.invoices.length,
       },
     });
 
     return {
-      ...run,
-      invoices,
+      ...result.run,
+      invoices: result.invoices,
     };
   }
 
@@ -329,6 +344,12 @@ export class FinanceService {
   }
 
   async createDiscountRule(dto: CreateDiscountRuleDto, actor: AuthContext) {
+    if (!dto.reason?.trim()) {
+      throw new BadRequestException('Discount reason is required');
+    }
+
+    await this.ensureDiscountReferencesBelongToTenant(dto, actor.tenantId);
+
     const discount = await this.prisma.discountRule.create({
       data: {
         tenantId: actor.tenantId,
@@ -357,6 +378,7 @@ export class FinanceService {
       after: {
         name: discount.name,
         type: discount.type,
+        reason: dto.reason,
       },
     });
 
@@ -393,6 +415,31 @@ export class FinanceService {
 
     if (dto.invoiceId && !invoice) {
       throw new NotFoundException('Invoice not found in this tenant');
+    }
+
+    if (dto.invoiceId && invoice?.studentId !== student.id) {
+      throw new ConflictException(
+        'Invoice does not belong to the selected student',
+      );
+    }
+
+    if (dto.feeHeadId) {
+      const feeHead = await this.prisma.feeHead.findFirst({
+        where: { id: dto.feeHeadId, tenantId: actor.tenantId },
+      });
+
+      if (!feeHead) {
+        throw new NotFoundException('Fee head not found in this tenant');
+      }
+
+      if (
+        invoice &&
+        !(await this.invoiceContainsFeeHead(invoice.id, dto.feeHeadId))
+      ) {
+        throw new ConflictException(
+          'Fee head is not present on the selected invoice',
+        );
+      }
     }
 
     const amount = new Prisma.Decimal(dto.amount);
@@ -1159,8 +1206,10 @@ export class FinanceService {
       return null;
     }
 
+    const fiscalYear = resolveFiscalYear(input.dueDate);
     const invoiceNumber = await this.generateInvoiceNumber(
       input.actor.tenantId,
+      fiscalYear,
     );
     let subtotal = new Prisma.Decimal(0);
     let vatAmount = new Prisma.Decimal(0);
@@ -1180,7 +1229,7 @@ export class FinanceService {
         academicYearId: input.academicYearId,
         enrollmentId: input.enrollmentId,
         invoiceNumber,
-        fiscalYear: resolveFiscalYear(input.dueDate),
+        fiscalYear,
         billNumber: invoiceNumber,
         dueDate: input.dueDate,
         subtotal,
@@ -1238,7 +1287,28 @@ export class FinanceService {
       throw new ConflictException('Payment exceeds the remaining balance');
     }
 
-    const receiptNumber = await this.generateReceiptNumber(actor.tenantId);
+    if (dto.referenceNumber) {
+      const duplicatePayment = await this.prisma.payment.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          invoiceId: invoice.id,
+          method: dto.method,
+          referenceNumber: dto.referenceNumber,
+        },
+      });
+
+      if (duplicatePayment) {
+        throw new ConflictException(
+          'Payment reference was already recorded for this invoice',
+        );
+      }
+    }
+
+    const fiscalYear = resolveFiscalYear(new Date());
+    const receiptNumber = await this.generateReceiptNumber(
+      actor.tenantId,
+      fiscalYear,
+    );
     const journalEntryNumber = await this.generateJournalEntryNumber(
       actor.tenantId,
     );
@@ -1270,7 +1340,7 @@ export class FinanceService {
             create: {
               tenantId: actor.tenantId,
               receiptNumber,
-              fiscalYear: resolveFiscalYear(new Date()),
+              fiscalYear,
               schoolPan: tenant.panNumber,
               vatAmount: receiptVat,
               metadata: {
@@ -1384,6 +1454,16 @@ export class FinanceService {
         method: dto.method,
         receiptNumber: result.receipt?.receiptNumber ?? null,
       },
+    });
+
+    this.eventEmitter.emit('fees.payment.confirmed', {
+      tenantId: actor.tenantId,
+      paymentId: result.id,
+      invoiceId: dto.invoiceId,
+      studentId: invoice.studentId,
+      amount: Number(result.amount),
+      method: result.method,
+      receiptNumber: result.receipt?.receiptNumber ?? null,
     });
 
     return {
@@ -2126,20 +2206,32 @@ export class FinanceService {
     });
   }
 
-  private async generateInvoiceNumber(tenantId: string) {
-    const count = await this.prisma.invoice.count({
-      where: { tenantId },
+  private async generateInvoiceNumber(
+    tenantId: string,
+    fiscalYear = resolveFiscalYear(new Date()),
+    client: Pick<Prisma.TransactionClient, 'invoice'> = this.prisma,
+  ) {
+    const count = await client.invoice.count({
+      where: { tenantId, fiscalYear },
     });
 
-    return `INV-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, '0')}`;
+    return `INV-${formatFiscalYearForNumber(fiscalYear)}-${String(
+      count + 1,
+    ).padStart(5, '0')}`;
   }
 
-  private async generateReceiptNumber(tenantId: string) {
-    const count = await this.prisma.receipt.count({
-      where: { tenantId },
+  private async generateReceiptNumber(
+    tenantId: string,
+    fiscalYear = resolveFiscalYear(new Date()),
+    client: Pick<Prisma.TransactionClient, 'receipt'> = this.prisma,
+  ) {
+    const count = await client.receipt.count({
+      where: { tenantId, fiscalYear },
     });
 
-    return `REC-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, '0')}`;
+    return `REC-${formatFiscalYearForNumber(fiscalYear)}-${String(
+      count + 1,
+    ).padStart(5, '0')}`;
   }
 
   private async generateCashierCloseNumber(tenantId: string) {
@@ -2183,22 +2275,25 @@ export class FinanceService {
     }
   }
 
-  private async calculateInvoiceLines(input: {
-    tenantId: string;
-    classId: string;
-    feePlanId: string;
-    items: Array<{
-      feeHeadId: string;
-      amount: Prisma.Decimal;
-      feeHead: {
-        id: string;
-        code: string;
-        name: string;
-        vatApplicable: boolean;
-      };
-    }>;
-  }) {
-    const discounts = await this.prisma.discountRule.findMany({
+  private async calculateInvoiceLines(
+    input: {
+      tenantId: string;
+      classId: string;
+      feePlanId: string;
+      items: Array<{
+        feeHeadId: string;
+        amount: Prisma.Decimal;
+        feeHead: {
+          id: string;
+          code: string;
+          name: string;
+          vatApplicable: boolean;
+        };
+      }>;
+    },
+    client: Pick<Prisma.TransactionClient, 'discountRule'> = this.prisma,
+  ) {
+    const discounts = await client.discountRule.findMany({
       where: {
         tenantId: input.tenantId,
         isActive: true,
@@ -2264,6 +2359,68 @@ export class FinanceService {
       vatAmount,
       totalAmount: subtotal.add(vatAmount),
     };
+  }
+
+  private async ensureDiscountReferencesBelongToTenant(
+    dto: CreateDiscountRuleDto,
+    tenantId: string,
+  ) {
+    if (!dto.feeHeadId && !dto.classId && !dto.feePlanId) {
+      throw new BadRequestException(
+        'Discount must target at least one fee head, class, or fee plan',
+      );
+    }
+
+    if (!dto.percentOff && !dto.amountOff) {
+      throw new BadRequestException(
+        'Discount must include a percentage or fixed amount',
+      );
+    }
+
+    const [feeHead, classroom, feePlan] = await Promise.all([
+      dto.feeHeadId
+        ? this.prisma.feeHead.findFirst({
+            where: { id: dto.feeHeadId, tenantId },
+          })
+        : Promise.resolve(null),
+      dto.classId
+        ? this.prisma.class.findFirst({
+            where: { id: dto.classId, tenantId },
+          })
+        : Promise.resolve(null),
+      dto.feePlanId
+        ? this.prisma.feePlan.findFirst({
+            where: { id: dto.feePlanId, tenantId },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    if (dto.feeHeadId && !feeHead) {
+      throw new NotFoundException('Fee head not found in this tenant');
+    }
+
+    if (dto.classId && !classroom) {
+      throw new NotFoundException('Class not found in this tenant');
+    }
+
+    if (dto.feePlanId && !feePlan) {
+      throw new NotFoundException('Fee plan not found in this tenant');
+    }
+
+    if (feePlan?.classId && dto.classId && feePlan.classId !== dto.classId) {
+      throw new ConflictException(
+        'Discount class does not match the selected fee plan',
+      );
+    }
+  }
+
+  private async invoiceContainsFeeHead(invoiceId: string, feeHeadId: string) {
+    const line = await this.prisma.invoiceLine.findFirst({
+      where: { invoiceId, feeHeadId },
+      select: { id: true },
+    });
+
+    return Boolean(line);
   }
 }
 
@@ -2382,6 +2539,10 @@ function resolveFiscalYear(date: Date) {
   const month = date.getUTCMonth() + 1;
 
   return month >= 7 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
+}
+
+function formatFiscalYearForNumber(fiscalYear: string) {
+  return fiscalYear.replace(/[^0-9]+/g, '-');
 }
 
 function groupPaymentsByMonth(
