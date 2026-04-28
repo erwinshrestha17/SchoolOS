@@ -12,6 +12,7 @@ import {
   AttendanceStatus,
   AudienceType,
   ConsentType,
+  EnrollmentStatus,
   NotificationChannel,
   Prisma,
 } from '@prisma/client';
@@ -22,6 +23,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ReviewAttendanceConflictDto } from './dto/review-attendance-conflict.dto';
 import { CreateStaffLeaveRequestDto } from './dto/create-staff-leave-request.dto';
 import { AttendanceConflictReviewDecision } from './dto/review-attendance-conflict.dto';
+import { ListAttendanceSummaryDto } from './dto/list-attendance-summary.dto';
 import {
   AttendanceOverrideSource,
   OverrideAttendanceSessionDto,
@@ -91,32 +93,11 @@ export class AttendanceService {
     actor: AuthContext,
     submissionContext?: AttendanceSubmissionContext,
   ) {
-    const [academicYear, classroom, section] = await Promise.all([
-      this.prisma.academicYear.findFirst({
-        where: { id: dto.academicYearId, tenantId: actor.tenantId },
-      }),
-      this.prisma.class.findFirst({
-        where: { id: dto.classId, tenantId: actor.tenantId },
-      }),
-      dto.sectionId
-        ? this.prisma.section.findFirst({
-            where: { id: dto.sectionId, tenantId: actor.tenantId },
-          })
-        : Promise.resolve(null),
-    ]);
-
-    if (!academicYear) {
-      throw new NotFoundException('Academic year not found in this tenant');
-    }
-
-    if (!classroom) {
-      throw new NotFoundException('Class not found in this tenant');
-    }
-
-    if (dto.sectionId && !section) {
-      throw new NotFoundException('Section not found in this tenant');
-    }
-
+    await this.validateAttendanceScope(actor, {
+      academicYearId: dto.academicYearId,
+      classId: dto.classId,
+      sectionId: dto.sectionId,
+    });
     const attendanceDate = stripTime(new Date(dto.attendanceDate));
     const calendarDay = await this.resolveCalendarDay(
       actor.tenantId,
@@ -150,6 +131,15 @@ export class AttendanceService {
         tenantId: actor.tenantId,
         classId: dto.classId,
         ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
+        enrollments: {
+          some: {
+            tenantId: actor.tenantId,
+            academicYearId: dto.academicYearId,
+            classId: dto.classId,
+            sectionId: dto.sectionId ?? null,
+            status: EnrollmentStatus.ACTIVE,
+          },
+        },
       },
       orderBy: [{ rollNumber: 'asc' }, { firstNameEn: 'asc' }],
     });
@@ -163,6 +153,18 @@ export class AttendanceService {
     const exceptionMap = new Map(
       (dto.exceptions ?? []).map((item) => [item.studentId, item]),
     );
+    const rosterStudentIds = new Set(students.map((student) => student.id));
+    const invalidExceptionIds = Array.from(exceptionMap.keys()).filter(
+      (studentId) => !rosterStudentIds.has(studentId),
+    );
+
+    if (invalidExceptionIds.length > 0) {
+      throw new ConflictException({
+        message:
+          'One or more attendance exceptions are outside the selected roster',
+        studentIds: invalidExceptionIds,
+      });
+    }
 
     const session = await this.prisma.$transaction(async (tx) => {
       if (existingSession?.submittedAt) {
@@ -269,6 +271,12 @@ export class AttendanceService {
         let title = 'Attendance alert';
         let body = '';
         let channels: NotificationChannel[] = [NotificationChannel.PUSH];
+        const eventType =
+          record.status === AttendanceStatus.ABSENT
+            ? 'attendance.student.absent'
+            : record.status === AttendanceStatus.LATE
+              ? 'attendance.student.late'
+              : 'attendance.student.leave';
 
         if (record.status === AttendanceStatus.ABSENT) {
           body = 'A student was marked absent today.';
@@ -282,6 +290,37 @@ export class AttendanceService {
           body = `Excused/Sick leave confirmed for a student today.`;
         } else if (record.status === AttendanceStatus.UNEXCUSED_LEAVE) {
           body = `Unexcused leave recorded. Please contact the school immediately.`;
+        }
+
+        this.eventEmitter.emit(eventType, {
+          tenantId: actor.tenantId,
+          attendanceSessionId: session.id,
+          attendanceDate: session.attendanceDate,
+          classId: session.classId,
+          sectionId: session.sectionId,
+          studentId: record.studentId,
+          status: record.status,
+        });
+
+        if (record.status === AttendanceStatus.ABSENT) {
+          const consecutiveAbsences =
+            await this.countConsecutiveAbsencesForStudent(
+              actor.tenantId,
+              record.studentId,
+              session.attendanceDate,
+            );
+
+          if (consecutiveAbsences >= 3) {
+            this.eventEmitter.emit('attendance.student.consecutive_absence', {
+              tenantId: actor.tenantId,
+              attendanceSessionId: session.id,
+              attendanceDate: session.attendanceDate,
+              classId: session.classId,
+              sectionId: session.sectionId,
+              studentId: record.studentId,
+              consecutiveAbsences,
+            });
+          }
         }
 
         await this.communicationsService.recordDeliveryRecords({
@@ -1225,32 +1264,12 @@ export class AttendanceService {
     sectionId?: string,
     attendanceDate?: string,
   ) {
-    const [academicYear, classroom, section] = await Promise.all([
-      this.prisma.academicYear.findFirst({
-        where: { id: academicYearId, tenantId: actor.tenantId },
-      }),
-      this.prisma.class.findFirst({
-        where: { id: classId, tenantId: actor.tenantId },
-      }),
-      sectionId
-        ? this.prisma.section.findFirst({
-            where: { id: sectionId, tenantId: actor.tenantId },
-          })
-        : Promise.resolve(null),
-    ]);
-
-    if (!academicYear) {
-      throw new NotFoundException('Academic year not found in this tenant');
-    }
-
-    if (!classroom) {
-      throw new NotFoundException('Class not found in this tenant');
-    }
-
-    if (sectionId && !section) {
-      throw new NotFoundException('Section not found in this tenant');
-    }
-
+    const { academicYear, classroom, section } =
+      await this.validateAttendanceScope(actor, {
+        academicYearId,
+        classId,
+        sectionId,
+      });
     const parsedAttendanceDate = stripTime(
       attendanceDate ? new Date(attendanceDate) : new Date(),
     );
@@ -1265,6 +1284,15 @@ export class AttendanceService {
           tenantId: actor.tenantId,
           classId,
           ...(sectionId ? { sectionId } : {}),
+          enrollments: {
+            some: {
+              tenantId: actor.tenantId,
+              academicYearId,
+              classId,
+              sectionId: sectionId ?? null,
+              status: EnrollmentStatus.ACTIVE,
+            },
+          },
         },
         include: {
           guardianLinks: {
@@ -1490,6 +1518,87 @@ export class AttendanceService {
         }))
         .filter((item) => item.attendancePercent < 80)
         .sort((a, b) => a.attendancePercent - b.attendancePercent),
+    };
+  }
+
+  async getSummary(query: ListAttendanceSummaryDto, actor: AuthContext) {
+    await this.validateAttendanceScope(actor, {
+      academicYearId: query.academicYearId,
+      classId: query.classId,
+      sectionId: query.sectionId,
+    });
+
+    if (query.studentId) {
+      await this.ensureStudentInAttendanceScope(query.studentId, actor, {
+        academicYearId: query.academicYearId,
+        classId: query.classId,
+        sectionId: query.sectionId,
+      });
+    }
+
+    const attendanceDate = stripTime(
+      query.attendanceDate ? new Date(query.attendanceDate) : new Date(),
+    );
+    const month = query.month ?? attendanceDate.getMonth() + 1;
+    const year = query.year ?? attendanceDate.getFullYear();
+    const monthStart = new Date(year, month - 1, 1);
+    const nextMonthStart = new Date(year, month, 1);
+
+    const [dailySession, monthlyRecords] = await Promise.all([
+      this.prisma.attendanceSession.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          academicYearId: query.academicYearId,
+          classId: query.classId,
+          sectionId: query.sectionId ?? null,
+          attendanceDate,
+        },
+        include: {
+          records: true,
+        },
+      }),
+      query.studentId
+        ? this.prisma.attendanceRecord.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              studentId: query.studentId,
+              attendanceSession: {
+                tenantId: actor.tenantId,
+                academicYearId: query.academicYearId,
+                classId: query.classId,
+                sectionId: query.sectionId ?? null,
+                attendanceDate: {
+                  gte: monthStart,
+                  lt: nextMonthStart,
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    return {
+      classDaily: {
+        attendanceDate: attendanceDate.toISOString(),
+        academicYearId: query.academicYearId,
+        classId: query.classId,
+        sectionId: query.sectionId ?? null,
+        submittedAt: dailySession?.submittedAt ?? null,
+        totals: summarizeAttendance(dailySession?.records ?? []),
+      },
+      studentMonthly: query.studentId
+        ? {
+            studentId: query.studentId,
+            month,
+            year,
+            attendancePercent: calculateAttendancePercent(monthlyRecords),
+            consecutiveAbsences: await this.countConsecutiveAbsencesForStudent(
+              actor.tenantId,
+              query.studentId,
+              attendanceDate,
+            ),
+          }
+        : null,
     };
   }
 
@@ -1726,6 +1835,123 @@ export class AttendanceService {
     };
   }
 
+  private async validateAttendanceScope(
+    actor: AuthContext,
+    scope: {
+      academicYearId: string;
+      classId: string;
+      sectionId?: string | null;
+    },
+  ) {
+    const [academicYear, classroom, section] = await Promise.all([
+      this.prisma.academicYear.findFirst({
+        where: { id: scope.academicYearId, tenantId: actor.tenantId },
+      }),
+      this.prisma.class.findFirst({
+        where: { id: scope.classId, tenantId: actor.tenantId },
+      }),
+      scope.sectionId
+        ? this.prisma.section.findFirst({
+            where: { id: scope.sectionId, tenantId: actor.tenantId },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    if (!academicYear) {
+      throw new NotFoundException('Academic year not found in this tenant');
+    }
+
+    if (!classroom) {
+      throw new NotFoundException('Class not found in this tenant');
+    }
+
+    if (scope.sectionId && !section) {
+      throw new NotFoundException('Section not found in this tenant');
+    }
+
+    if (section && section.classId !== scope.classId) {
+      throw new ConflictException(
+        'Section must belong to the selected class in this tenant',
+      );
+    }
+
+    return { academicYear, classroom, section };
+  }
+
+  private async ensureStudentInAttendanceScope(
+    studentId: string,
+    actor: AuthContext,
+    scope: {
+      academicYearId: string;
+      classId: string;
+      sectionId?: string | null;
+    },
+  ) {
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: studentId,
+        tenantId: actor.tenantId,
+        classId: scope.classId,
+        ...(scope.sectionId ? { sectionId: scope.sectionId } : {}),
+        enrollments: {
+          some: {
+            tenantId: actor.tenantId,
+            academicYearId: scope.academicYearId,
+            classId: scope.classId,
+            sectionId: scope.sectionId ?? null,
+            status: EnrollmentStatus.ACTIVE,
+          },
+        },
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this attendance scope');
+    }
+  }
+
+  private async countConsecutiveAbsencesForStudent(
+    tenantId: string,
+    studentId: string,
+    throughDate: Date,
+  ) {
+    const nextDay = new Date(stripTime(throughDate));
+    nextDay.setDate(nextDay.getDate() + 1);
+    const sessions = await this.prisma.attendanceSession.findMany({
+      where: {
+        tenantId,
+        attendanceDate: {
+          lt: nextDay,
+        },
+        records: {
+          some: {
+            tenantId,
+            studentId,
+          },
+        },
+      },
+      include: {
+        records: {
+          where: {
+            tenantId,
+            studentId,
+          },
+        },
+      },
+      orderBy: [{ attendanceDate: 'desc' }],
+      take: 30,
+    });
+
+    return countConsecutiveAbsences(
+      sessions.flatMap((session) =>
+        session.records.map((record) => ({
+          attendanceDate: session.attendanceDate,
+          status: record.status,
+        })),
+      ),
+    );
+  }
+
   private async buildSyncTrustMetadata(
     dto: SyncAttendanceDto,
     actor: AuthContext,
@@ -1880,6 +2106,15 @@ function summarizeAttendance(records: Array<{ status: AttendanceStatus }>) {
       .length,
     leave: records.filter((record) => record.status === AttendanceStatus.LEAVE)
       .length,
+    sickLeave: records.filter(
+      (record) => record.status === AttendanceStatus.SICK_LEAVE,
+    ).length,
+    excusedLeave: records.filter(
+      (record) => record.status === AttendanceStatus.EXCUSED_LEAVE,
+    ).length,
+    unexcusedLeave: records.filter(
+      (record) => record.status === AttendanceStatus.UNEXCUSED_LEAVE,
+    ).length,
   };
 }
 

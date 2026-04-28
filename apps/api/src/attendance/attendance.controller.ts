@@ -15,6 +15,7 @@ import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { AttendanceService } from './attendance.service';
 import { CreateStaffLeaveRequestDto } from './dto/create-staff-leave-request.dto';
+import { ListAttendanceSummaryDto } from './dto/list-attendance-summary.dto';
 import { ListStaffAttendanceSummaryDto } from './dto/list-staff-attendance-summary.dto';
 import { OverrideAttendanceSessionDto } from './dto/override-attendance-session.dto';
 import { ReviewAttendanceConflictDto } from './dto/review-attendance-conflict.dto';
@@ -57,6 +58,15 @@ export class AttendanceController {
   @Permissions('attendance:read')
   getAnalytics(@CurrentAuth() auth: AuthContext) {
     return this.attendanceService.getAnalytics(auth);
+  }
+
+  @Get('summary')
+  @Permissions('attendance:read')
+  getSummary(
+    @Query() query: ListAttendanceSummaryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.getSummary(query, auth);
   }
 
   @Get('conflicts')

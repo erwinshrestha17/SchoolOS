@@ -8,12 +8,26 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { AttendanceStatus } from '@prisma/client';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+
+const ATTENDANCE_STATUS_CODES: Record<string, AttendanceStatus> = {
+  P: AttendanceStatus.PRESENT,
+  A: AttendanceStatus.ABSENT,
+  L: AttendanceStatus.LATE,
+  LS: AttendanceStatus.SICK_LEAVE,
+  LE: AttendanceStatus.EXCUSED_LEAVE,
+  LU: AttendanceStatus.UNEXCUSED_LEAVE,
+};
 
 export class AttendanceExceptionDto {
   @IsString()
   studentId!: string;
 
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string'
+      ? (ATTENDANCE_STATUS_CODES[value.toUpperCase()] ?? value)
+      : value,
+  )
   @IsEnum(AttendanceStatus)
   status!: AttendanceStatus;
 

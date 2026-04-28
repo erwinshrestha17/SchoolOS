@@ -86,7 +86,21 @@ export const sectionFormSchema = z.object({
 
 export const attendanceExceptionSchema = z.object({
   studentId: z.string().min(1),
-  status: z.enum(['ABSENT', 'LATE', 'LEAVE']),
+  status: z.enum([
+    'P',
+    'A',
+    'L',
+    'LS',
+    'LE',
+    'LU',
+    'PRESENT',
+    'ABSENT',
+    'LATE',
+    'LEAVE',
+    'SICK_LEAVE',
+    'EXCUSED_LEAVE',
+    'UNEXCUSED_LEAVE'
+  ]),
   remark: z.string().optional().nullable(),
   lateAt: z.string().optional().nullable()
 });

@@ -10,6 +10,7 @@ import type {
   AssessmentComponentSummary,
   AttendanceAnalytics,
   AttendanceConflict,
+  AttendanceOperationalSummary,
   AttendanceRoster,
   AttendanceSyncSubmission,
   AuthSession,
@@ -239,6 +240,22 @@ export const api = {
   }) => request<AttendanceRoster>(withQuery('/attendance/rosters', params)),
   listAttendanceAnalytics: () =>
     request<AttendanceAnalytics>('/attendance/analytics'),
+  getAttendanceSummary: (params: {
+    academicYearId: string;
+    classId: string;
+    sectionId?: string | null;
+    attendanceDate?: string | null;
+    studentId?: string | null;
+    month?: number | null;
+    year?: number | null;
+  }) =>
+    request<AttendanceOperationalSummary>(
+      withQuery('/attendance/summary', {
+        ...params,
+        month: params.month ? String(params.month) : null,
+        year: params.year ? String(params.year) : null,
+      }),
+    ),
   listAttendanceConflicts: () =>
     request<AttendanceConflict[]>('/attendance/conflicts'),
   submitAttendance: (body: JsonBody) =>

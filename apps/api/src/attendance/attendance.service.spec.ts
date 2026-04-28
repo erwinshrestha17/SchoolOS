@@ -10,6 +10,7 @@ import {
   AttendanceSyncStatus,
   AttendanceStatus,
   AuthMethod,
+  EnrollmentStatus,
   NotificationChannel,
   Prisma,
 } from '@prisma/client';
@@ -36,6 +37,223 @@ const teacherActor = {
 };
 
 describe('attendance production hardening', () => {
+  it('loads roster from active tenant enrollment scope and defaults students present', async () => {
+    const student = buildStudent({
+      rollNumber: 3,
+      guardianLinks: [],
+      severeAllergies: null,
+      medicalConditions: null,
+      specialNeeds: null,
+    });
+    const { service, prisma } = buildService({
+      academicYear: { id: 'ay-1' },
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      section: { id: 'section-1', name: 'A', classId: 'class-1' },
+      students: [student],
+    });
+
+    const roster = await service.getRoster(
+      adminActor,
+      'ay-1',
+      'class-1',
+      'section-1',
+      '2026-04-28',
+    );
+
+    expect(prisma.student.findMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: adminActor.tenantId,
+        classId: 'class-1',
+        sectionId: 'section-1',
+        enrollments: {
+          some: {
+            tenantId: adminActor.tenantId,
+            academicYearId: 'ay-1',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            status: EnrollmentStatus.ACTIVE,
+          },
+        },
+      },
+      include: {
+        guardianLinks: {
+          include: {
+            guardian: true,
+          },
+        },
+      },
+      orderBy: [{ rollNumber: 'asc' }, { firstNameEn: 'asc' }],
+    });
+    expect(roster.students[0]).toEqual(
+      expect.objectContaining({
+        id: 'student-1',
+        status: AttendanceStatus.PRESENT,
+      }),
+    );
+  });
+
+  it('rejects section and class mismatches before attendance writes', async () => {
+    const { service, prisma } = buildService({
+      academicYear: { id: 'ay-1' },
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      section: { id: 'section-1', name: 'A', classId: 'other-class' },
+    });
+
+    await expect(
+      service.submitAttendance(
+        {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [],
+        },
+        adminActor,
+      ),
+    ).rejects.toThrow(ConflictException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects exception students outside the selected tenant roster', async () => {
+    const { service, prisma } = buildService({
+      academicYear: { id: 'ay-1' },
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      section: { id: 'section-1', name: 'A', classId: 'class-1' },
+      students: [buildStudent({ id: 'student-1' })],
+    });
+
+    await expect(
+      service.submitAttendance(
+        {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [
+            {
+              studentId: 'student-other',
+              status: AttendanceStatus.ABSENT,
+            },
+          ],
+        },
+        adminActor,
+      ),
+    ).rejects.toThrow(ConflictException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('emits attendance domain events for M10 notification workflows', async () => {
+    const finalSession = buildAttendanceSession({
+      records: [
+        {
+          studentId: 'student-1',
+          status: AttendanceStatus.ABSENT,
+          remark: null,
+          lateAt: null,
+        },
+      ],
+    });
+    const { service, eventEmitter } = buildService({
+      academicYear: { id: 'ay-1' },
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      section: { id: 'section-1', name: 'A', classId: 'class-1' },
+      students: [buildStudent({ id: 'student-1' })],
+      finalSession,
+    });
+
+    await service.submitAttendance(
+      {
+        academicYearId: 'ay-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        attendanceDate: '2026-04-28',
+        exceptions: [
+          {
+            studentId: 'student-1',
+            status: AttendanceStatus.ABSENT,
+          },
+        ],
+      },
+      adminActor,
+    );
+
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'attendance.student.absent',
+      expect.objectContaining({
+        tenantId: adminActor.tenantId,
+        studentId: 'student-1',
+        status: AttendanceStatus.ABSENT,
+      }),
+    );
+  });
+
+  it('returns class daily and student monthly attendance summary', async () => {
+    const dailySession = buildAttendanceSession({
+      records: [
+        { status: AttendanceStatus.PRESENT },
+        { status: AttendanceStatus.ABSENT },
+        { status: AttendanceStatus.LATE },
+      ],
+    });
+    const { service, prisma } = buildService({
+      academicYear: { id: 'ay-1' },
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      section: { id: 'section-1', name: 'A', classId: 'class-1' },
+      studentFindFirst: buildStudent({ id: 'student-1' }),
+      attendanceSession: dailySession,
+      attendanceRecords: [
+        { status: AttendanceStatus.PRESENT },
+        { status: AttendanceStatus.ABSENT },
+        { status: AttendanceStatus.LATE },
+      ],
+    });
+
+    const summary = await service.getSummary(
+      {
+        academicYearId: 'ay-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        attendanceDate: '2026-04-28',
+        studentId: 'student-1',
+        month: 4,
+        year: 2026,
+      },
+      adminActor,
+    );
+
+    expect(prisma.student.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'student-1',
+        tenantId: adminActor.tenantId,
+        classId: 'class-1',
+        sectionId: 'section-1',
+        enrollments: {
+          some: {
+            tenantId: adminActor.tenantId,
+            academicYearId: 'ay-1',
+            classId: 'class-1',
+            sectionId: 'section-1',
+            status: EnrollmentStatus.ACTIVE,
+          },
+        },
+      },
+    });
+    expect(summary.classDaily.totals).toEqual(
+      expect.objectContaining({
+        totalStudents: 3,
+        present: 1,
+        absent: 1,
+        late: 1,
+      }),
+    );
+    expect(summary.studentMonthly).toEqual(
+      expect.objectContaining({
+        studentId: 'student-1',
+        attendancePercent: 66.67,
+      }),
+    );
+  });
+
   it('replays duplicate sync submissions with a stable envelope and incremented attempts', async () => {
     const existingSync = buildSyncSubmission({
       syncAttemptCount: 1,
@@ -435,6 +653,7 @@ function buildService(options: {
   calendarDay?: unknown;
   students?: unknown[];
   attendanceSession?: unknown;
+  attendanceRecords?: unknown[];
   finalSession?: unknown;
   attendanceSessions?: unknown[];
   priorSyncSubmission?: unknown;
@@ -451,6 +670,7 @@ function buildService(options: {
   notificationDeliveryFindFirstQueue?: unknown[];
   staffAttendanceRows?: unknown[];
   approvedLeaveRequests?: unknown[];
+  studentFindFirst?: unknown;
 }) {
   const tx = {
     attendanceConflict: {
@@ -509,6 +729,7 @@ function buildService(options: {
     },
     student: {
       findMany: jest.fn().mockResolvedValue(options.students ?? []),
+      findFirst: jest.fn().mockResolvedValue(options.studentFindFirst ?? null),
     },
     attendanceSyncSubmission: {
       findUnique: jest
@@ -537,7 +758,7 @@ function buildService(options: {
       update: jest.fn().mockResolvedValue(options.updatedConflict ?? null),
     },
     attendanceRecord: {
-      findMany: jest.fn().mockResolvedValue([]),
+      findMany: jest.fn().mockResolvedValue(options.attendanceRecords ?? []),
     },
     notificationDelivery: {
       findFirst: jest.fn().mockImplementation(async () => {
@@ -590,6 +811,7 @@ function buildService(options: {
     tx,
     communicationsService,
     auditService,
+    eventEmitter,
   };
 }
 

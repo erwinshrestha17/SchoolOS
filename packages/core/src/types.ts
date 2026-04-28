@@ -147,6 +147,9 @@ export type AttendanceSummary = {
     absent: number;
     late: number;
     leave: number;
+    sickLeave: number;
+    excusedLeave: number;
+    unexcusedLeave: number;
   };
 };
 
@@ -613,6 +616,24 @@ export type AttendanceAnalytics = {
     fullNameEn: string;
     attendancePercent: number;
   }>;
+};
+
+export type AttendanceOperationalSummary = {
+  classDaily: {
+    attendanceDate: string;
+    academicYearId: string;
+    classId: string;
+    sectionId: string | null;
+    submittedAt: string | null;
+    totals: AttendanceSummary["totals"];
+  };
+  studentMonthly: {
+    studentId: string;
+    month: number;
+    year: number;
+    attendancePercent: number;
+    consecutiveAbsences: number;
+  } | null;
 };
 
 export type AttendanceConflict = {
