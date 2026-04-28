@@ -6,6 +6,7 @@ import {
   NotificationChannel,
   StorageProvider,
 } from '@prisma/client';
+import { ForbiddenException } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
 import { ActivityFeedService } from './activity-feed.service';
 
@@ -227,7 +228,7 @@ describe('ActivityFeedService', () => {
     expect(storageService.saveBase64Object).not.toHaveBeenCalled();
   });
 
-  it('scopes parent feed reads to own child tagged and class-wide posts', async () => {
+  it('scopes parent feed reads to own child tagged, section, and whole-class posts', async () => {
     const parentActor: AuthContext = {
       ...actor,
       userId: 'guardian-user-1',
@@ -254,12 +255,35 @@ describe('ActivityFeedService', () => {
             {
               studentTags: { none: {} },
               classId: 'class-1',
+              sectionId: null,
+            },
+            {
+              studentTags: { none: {} },
+              classId: 'class-1',
               sectionId: 'section-1',
             },
           ],
         }),
       }),
     );
+  });
+
+  it('blocks parent feed reads for another child', async () => {
+    const parentActor: AuthContext = {
+      ...actor,
+      userId: 'guardian-user-1',
+      roles: ['parent'],
+      permissions: ['activity_feed:read'],
+    };
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+
+    await expect(
+      service.listPosts(parentActor, { studentId: 'student-2' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.activityPost.findMany).not.toHaveBeenCalled();
   });
 
   it('stores milestone photo references as private object metadata', async () => {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +8,32 @@ const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 function read(relativePath) {
   return readFileSync(join(webRoot, relativePath), 'utf8');
+}
+
+function sourceFiles(relativeDir) {
+  const root = join(webRoot, relativeDir);
+  const entries = readdirSync(root);
+  const files = [];
+
+  for (const entry of entries) {
+    const absolute = join(root, entry);
+    const relative = join(relativeDir, entry);
+
+    if (entry === '.next' || entry === 'node_modules') {
+      continue;
+    }
+
+    if (statSync(absolute).isDirectory()) {
+      files.push(...sourceFiles(relative));
+      continue;
+    }
+
+    if (/\.(tsx?|mjs)$/.test(entry)) {
+      files.push(relative);
+    }
+  }
+
+  return files;
 }
 
 describe('SchoolOS web production contracts', () => {
@@ -100,6 +126,18 @@ describe('SchoolOS web production contracts', () => {
 
     for (const formFile of formFiles) {
       assert.doesNotMatch(read(formFile), /replace-me/i, `${formFile} has a raw replacement ID`);
+    }
+  });
+
+  it('centralizes browser session storage access in lib/session', () => {
+    const files = sourceFiles('.');
+
+    for (const file of files) {
+      if (file === 'lib/session.ts' || file.startsWith('test/')) {
+        continue;
+      }
+
+      assert.doesNotMatch(read(file), /localStorage|sessionStorage/, `${file} touches browser storage directly`);
     }
   });
 });

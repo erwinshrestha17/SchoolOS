@@ -16,7 +16,7 @@
     "db:seed": "pnpm --filter @schoolos/api db:seed",
     "verify:tracked-artifacts": "node scripts/check-tracked-artifacts.mjs",
     "verify:openapi": "node scripts/check-openapi-gate.mjs",
-    "verify:production": "pnpm verify:tracked-artifacts && pnpm db:generate && pnpm db:validate && pnpm verify:openapi && pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build"
+    "verify:production": "pnpm verify:tracked-artifacts && pnpm db:generate && pnpm db:validate && pnpm verify:openapi && pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build",
+    "smoke:phase1": "node scripts/smoke-phase1-local.mjs"
   }
 }
-

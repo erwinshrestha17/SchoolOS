@@ -34,6 +34,10 @@ The API now fails fast during startup if required production secrets or provider
 
 The readiness endpoint checks both Postgres and Redis. Keep it wired into container health checks or reverse-proxy upstream checks before exposing traffic.
 
+For the local Docker pilot baseline, `pnpm smoke:phase1` validates Postgres,
+Redis, and API readiness. Use `SMOKE_LOGIN=true pnpm smoke:phase1` after seeding
+to include the default admin login in the smoke pass.
+
 ## Deployment Order
 
 1. Build images from a clean commit.

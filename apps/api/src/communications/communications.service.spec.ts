@@ -276,4 +276,136 @@ describe('CommunicationsService', () => {
       }),
     );
   });
+
+  it('converts admission domain events into consent-aware guardian invitation deliveries', async () => {
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+    prisma.student.findMany.mockResolvedValue([
+      {
+        id: 'student-1',
+        userId: null,
+        user: null,
+        guardianLinks: [
+          {
+            isPrimary: true,
+            guardian: {
+              id: 'guardian-1',
+              userId: 'guardian-user-1',
+              email: 'guardian@school.test',
+              primaryPhone: '+9779800000000',
+              receivesAlerts: true,
+              user: { email: 'guardian-user@school.test' },
+            },
+          },
+        ],
+      },
+    ]);
+    prisma.guardianConsent.findMany.mockResolvedValue([
+      {
+        id: 'consent-1',
+        guardianId: 'guardian-1',
+        consentType: ConsentType.MESSAGING,
+        granted: true,
+        revokedAt: null,
+        capturedAt: new Date('2026-04-01T00:00:00.000Z'),
+      },
+    ]);
+
+    await service.handleStudentAdmitted({
+      tenantId: actor.tenantId,
+      actor,
+      classId: 'class-1',
+      sectionId: 'section-1',
+      studentId: 'student-1',
+      studentName: 'Aarav Sharma',
+    });
+
+    expect(prisma.student.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: actor.tenantId,
+          sectionId: 'section-1',
+          id: { in: ['student-1'] },
+        }),
+      }),
+    );
+    expect(prisma.notificationDelivery.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        sourceType: 'student_admitted',
+        sourceId: 'student:student-1:admitted',
+        guardianId: 'guardian-1',
+        studentId: 'student-1',
+        status: NotificationStatus.QUEUED,
+      }),
+    });
+    expect(notificationsService.sendSms).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: '+9779800000000',
+        message: expect.stringContaining('Guardian access is ready'),
+      }),
+    );
+  });
+
+  it('marks provider dispatch failures without breaking delivery creation', async () => {
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+    prisma.student.findMany.mockResolvedValue([
+      {
+        id: 'student-1',
+        userId: null,
+        user: null,
+        guardianLinks: [
+          {
+            isPrimary: true,
+            guardian: {
+              id: 'guardian-1',
+              userId: 'guardian-user-1',
+              email: 'guardian@school.test',
+              primaryPhone: '+9779800000000',
+              receivesAlerts: true,
+              user: { email: 'guardian-user@school.test' },
+            },
+          },
+        ],
+      },
+    ]);
+    prisma.guardianConsent.findMany.mockResolvedValue([
+      {
+        id: 'consent-1',
+        guardianId: 'guardian-1',
+        consentType: ConsentType.MESSAGING,
+        granted: true,
+        revokedAt: null,
+        capturedAt: new Date('2026-04-01T00:00:00.000Z'),
+      },
+    ]);
+    notificationsService.sendPushNotification.mockRejectedValueOnce(
+      new Error('Queue unavailable'),
+    );
+
+    const result = await service.recordDeliveryRecords({
+      actor,
+      sourceType: 'attendance_absent',
+      sourceId: 'attendance:session-1:student-1:absent',
+      audienceType: AudienceType.ALL,
+      studentIds: ['student-1'],
+      title: 'Attendance alert',
+      body: 'Your child was marked absent today.',
+      channels: [NotificationChannel.PUSH],
+      requiredConsentTypes: [ConsentType.MESSAGING],
+    });
+
+    expect(result.count).toBe(1);
+    expect(prisma.notificationDelivery.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        status: NotificationStatus.QUEUED,
+      }),
+    });
+    expect(prisma.notificationDelivery.update).toHaveBeenCalledWith({
+      where: { id: 'delivery-1' },
+      data: {
+        status: NotificationStatus.FAILED,
+        errorMessage: 'Queue unavailable',
+      },
+    });
+  });
 });

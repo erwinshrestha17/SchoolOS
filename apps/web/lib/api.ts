@@ -56,7 +56,7 @@ import type {
   TimetableSlotSummary,
   WaiverRecord,
 } from '@schoolos/core';
-import { readStoredSession } from './session';
+import { clearStoredSession, readStoredSession } from './session';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
@@ -98,6 +98,11 @@ async function request<T>(path: string, init?: RequestOptions) {
 
   if (!response.ok) {
     const text = await response.text();
+
+    if (response.status === 401 && init?.auth !== false) {
+      clearStoredSession();
+    }
+
     throw new Error(text || `Request failed with status ${response.status}`);
   }
 

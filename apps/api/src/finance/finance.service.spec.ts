@@ -155,6 +155,44 @@ describe('finance production controls', () => {
     );
   });
 
+  it('rejects overpayment against the remaining invoice balance', async () => {
+    const invoice = buildInvoice({
+      totalAmount: new Prisma.Decimal(100),
+      payments: [
+        buildInvoicePayment({
+          amount: new Prisma.Decimal(90),
+          refunds: [],
+        }),
+      ],
+      lines: [
+        {
+          id: 'line-1',
+          totalAmount: new Prisma.Decimal(100),
+          feeHead: { code: 'TUITION' },
+          description: 'Tuition',
+        },
+      ],
+      student: { id: 'student-1' },
+    });
+    const { service, prisma } = buildService({
+      invoice,
+      feeHead: buildFeeHead(),
+      duplicatePayment: null,
+    });
+
+    await expect(
+      service.collectPayment(
+        {
+          invoiceId: invoice.id,
+          amount: 20,
+          method: PaymentMethod.CASH,
+        },
+        actor,
+      ),
+    ).rejects.toThrow('Payment exceeds the remaining balance');
+    expect(prisma.payment.create).not.toHaveBeenCalled();
+  });
+
   it('emits a finance domain event after confirmed payment collection', async () => {
     const invoice = buildInvoice({
       payments: [],

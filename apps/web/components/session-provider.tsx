@@ -13,6 +13,7 @@ import {
   clearStoredSession,
   hasAllPermissions,
   readStoredSession,
+  SESSION_CLEARED_EVENT,
   storeSession,
 } from '../lib/session';
 
@@ -34,6 +35,13 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<SessionStatus>('loading');
 
   useEffect(() => {
+    function handleSessionCleared() {
+      setSession(null);
+      setStatus('anonymous');
+    }
+
+    window.addEventListener(SESSION_CLEARED_EVENT, handleSessionCleared);
+
     const existingSession = readStoredSession();
 
     if (existingSession) {
@@ -69,6 +77,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
     return () => {
       cancelled = true;
+      window.removeEventListener(SESSION_CLEARED_EVENT, handleSessionCleared);
     };
   }, []);
 

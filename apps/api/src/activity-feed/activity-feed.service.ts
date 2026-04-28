@@ -721,11 +721,26 @@ export class ActivityFeedService {
     return {
       OR: [
         { studentTags: { some: { studentId: { in: studentIds } } } },
-        ...students.map((student) => ({
-          studentTags: { none: {} },
-          classId: student.classId,
-          ...(student.sectionId ? { sectionId: student.sectionId } : {}),
-        })),
+        ...students.flatMap((student) => {
+          const classWidePost = {
+            studentTags: { none: {} },
+            classId: student.classId,
+            sectionId: null,
+          };
+
+          if (!student.sectionId) {
+            return [classWidePost];
+          }
+
+          return [
+            classWidePost,
+            {
+              studentTags: { none: {} },
+              classId: student.classId,
+              sectionId: student.sectionId,
+            },
+          ];
+        }),
       ],
     };
   }

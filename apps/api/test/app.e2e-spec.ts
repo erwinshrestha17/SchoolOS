@@ -461,6 +461,29 @@ describe('School OS Auth + RBAC integration', () => {
     );
 
     await expect(
+      studentsController.createStudent(
+        {
+          firstNameEn: 'Cross',
+          lastNameEn: 'Tenant',
+          dateOfBirth: '2013-01-01',
+          gender: 'MALE',
+          admissionDate: '2024-04-01',
+          classId: createdClass.id,
+          createLogin: false,
+        },
+        secondTenantRequest.auth,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    await expect(
+      classesController.listClasses(secondTenantRequest.auth),
+    ).resolves.toHaveLength(0);
+
+    await expect(
+      studentsController.listStudents(secondTenantRequest.auth),
+    ).resolves.toHaveLength(0);
+
+    await expect(
       usersController.updateStatus(
         teacherUser!.id,
         { status: 'ACTIVE' },
@@ -569,10 +592,18 @@ async function authenticateRequest(
     getClass: () => controllerClass,
   } as any;
 
-  await jwtAuthGuard.canActivate(context);
-  await rolesGuard.canActivate(context);
+  const cls = (
+    jwtAuthGuard as unknown as {
+      cls: { run: <T>(callback: () => T | Promise<T>) => Promise<T> };
+    }
+  ).cls;
 
-  return request;
+  return cls.run(async () => {
+    await jwtAuthGuard.canActivate(context);
+    await rolesGuard.canActivate(context);
+
+    return request;
+  });
 }
 
 function createRequestMock() {

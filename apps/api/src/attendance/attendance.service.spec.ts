@@ -340,7 +340,7 @@ describe('attendance production hardening', () => {
     const existingSession = {
       id: 'session-1',
       submittedAt: new Date('2026-04-28T08:00:00.000Z'),
-      lockAt: new Date('2026-04-28T16:00:00.000Z'),
+      lockAt: new Date('2099-04-28T16:00:00.000Z'),
       records: [
         {
           studentId: 'student-1',

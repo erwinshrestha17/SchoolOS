@@ -35,15 +35,25 @@ pnpm install
 cp apps/api/.env.example apps/api/.env
 ```
 
-3. Generate the Prisma client and apply migrations.
+3. Start local Postgres and Redis.
+
+```bash
+docker compose up -d postgres redis
+```
+
+The default API env file targets Docker Postgres on `localhost:5433` and Redis
+on `localhost:6379`.
+
+4. Generate the Prisma client and apply migrations.
 
 ```bash
 pnpm db:generate
+pnpm db:validate
 pnpm db:migrate
 pnpm db:seed
 ```
 
-4. Start the API and web app together.
+5. Start the API and web app together.
 
 ```bash
 pnpm dev
@@ -77,12 +87,16 @@ passphrase, before admitting students with medical data.
 - `pnpm typecheck`
 - `pnpm test`
 - `pnpm db:generate`
+- `pnpm db:validate`
 - `pnpm db:migrate`
 - `pnpm db:seed`
+- `pnpm smoke:phase1`
+- `pnpm verify:production`
 
 ## Production Operations
 
 - Docker VPS baseline: [docs/production/docker-vps-runbook.md](/Users/erwin/Desktop/SchoolOS/docs/production/docker-vps-runbook.md)
+- Phase 1 pilot readiness: [docs/production/phase1-pilot-readiness.md](/Users/erwin/Desktop/SchoolOS/docs/production/phase1-pilot-readiness.md)
 - Backup and restore baseline: [docs/production/backup-restore-runbook.md](/Users/erwin/Desktop/SchoolOS/docs/production/backup-restore-runbook.md)
 
 Production API startup validates required secrets, CORS origins, Redis, database,
