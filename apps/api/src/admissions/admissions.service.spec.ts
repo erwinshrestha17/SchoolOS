@@ -110,12 +110,7 @@ describe('AdmissionsService production hardening', () => {
       enrollmentId: 'enrollment-1',
       dueDate: new Date('2026-04-15'),
     });
-    expect(notificationsService.sendSms).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: '9800000000',
-        metadata: { purpose: 'guardian_invite', studentId: 'student-1' },
-      }),
-    );
+    expect(notificationsService.sendSms).not.toHaveBeenCalled();
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'student.admitted',
       expect.objectContaining({

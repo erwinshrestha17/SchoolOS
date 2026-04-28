@@ -268,9 +268,6 @@ export class AttendanceService {
 
     if (notifyRecords.length > 0) {
       for (const record of notifyRecords) {
-        let title = 'Attendance alert';
-        let body = '';
-        let channels: NotificationChannel[] = [NotificationChannel.PUSH];
         const eventType =
           record.status === AttendanceStatus.ABSENT
             ? 'attendance.student.absent'
@@ -278,22 +275,9 @@ export class AttendanceService {
               ? 'attendance.student.late'
               : 'attendance.student.leave';
 
-        if (record.status === AttendanceStatus.ABSENT) {
-          body = 'A student was marked absent today.';
-          channels = [NotificationChannel.PUSH, NotificationChannel.SMS];
-        } else if (record.status === AttendanceStatus.LATE) {
-          body = `A student was marked late today at ${record.lateAt ? record.lateAt.toISOString() : new Date().toISOString()}.`;
-        } else if (
-          record.status === AttendanceStatus.SICK_LEAVE ||
-          record.status === AttendanceStatus.EXCUSED_LEAVE
-        ) {
-          body = `Excused/Sick leave confirmed for a student today.`;
-        } else if (record.status === AttendanceStatus.UNEXCUSED_LEAVE) {
-          body = `Unexcused leave recorded. Please contact the school immediately.`;
-        }
-
         this.eventEmitter.emit(eventType, {
           tenantId: actor.tenantId,
+          actor,
           attendanceSessionId: session.id,
           attendanceDate: session.attendanceDate,
           classId: session.classId,
@@ -313,6 +297,7 @@ export class AttendanceService {
           if (consecutiveAbsences >= 3) {
             this.eventEmitter.emit('attendance.student.consecutive_absence', {
               tenantId: actor.tenantId,
+              actor,
               attendanceSessionId: session.id,
               attendanceDate: session.attendanceDate,
               classId: session.classId,
@@ -322,22 +307,6 @@ export class AttendanceService {
             });
           }
         }
-
-        await this.communicationsService.recordDeliveryRecords({
-          actor,
-          sourceType: 'attendance_alert',
-          sourceId: session.id,
-          audienceType: session.sectionId
-            ? AudienceType.SECTION
-            : AudienceType.CLASS,
-          classId: session.classId,
-          sectionId: session.sectionId,
-          studentIds: [record.studentId],
-          title,
-          body,
-          channels,
-          requiredConsentTypes: [ConsentType.MESSAGING],
-        });
       }
     }
 

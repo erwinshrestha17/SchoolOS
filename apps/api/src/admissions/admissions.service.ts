@@ -410,17 +410,6 @@ export class AdmissionsService {
       );
     }
 
-    for (const link of core.guardians) {
-      await this.notificationsService.sendSms({
-        to: link.guardian.primaryPhone,
-        message: `${core.student.firstNameEn} ${core.student.lastNameEn} has been enrolled in ${context.classroom.name}. Download the SchoolOS app to access the parent portal.`,
-        metadata: {
-          purpose: 'guardian_invite',
-          studentId: core.student.id,
-        },
-      });
-    }
-
     await this.auditService.record({
       action: 'admission_side_effects',
       resource: 'admission',

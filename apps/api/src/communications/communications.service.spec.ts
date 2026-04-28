@@ -36,7 +36,16 @@ describe('CommunicationsService', () => {
         findMany: jest.fn(),
       },
       notificationDelivery: {
-        createMany: jest.fn(),
+        create: jest.fn((args) =>
+          Promise.resolve({
+            id: `delivery-${prisma.notificationDelivery.create.mock.calls.length}`,
+            createdAt: new Date('2026-04-27T00:00:00.000Z'),
+            sentAt: null,
+            errorMessage: null,
+            ...args.data,
+          }),
+        ),
+        update: jest.fn(),
         findMany: jest.fn(),
       },
       guardian: {
@@ -50,6 +59,8 @@ describe('CommunicationsService', () => {
     };
     notificationsService = {
       sendPushNotification: jest.fn(),
+      sendSms: jest.fn(),
+      sendEmail: jest.fn(),
     };
     auditService = {
       record: jest.fn(),
@@ -73,7 +84,10 @@ describe('CommunicationsService', () => {
 
   it('creates event delivery records for the resolved class or section audience', async () => {
     prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
-    prisma.section.findFirst.mockResolvedValue({ id: 'section-1' });
+    prisma.section.findFirst.mockResolvedValue({
+      id: 'section-1',
+      classId: 'class-1',
+    });
     prisma.event.create.mockResolvedValue({
       id: 'event-1',
       title: 'Parent meeting',
@@ -103,7 +117,7 @@ describe('CommunicationsService', () => {
         ],
       },
     ]);
-    prisma.notificationDelivery.createMany.mockResolvedValue({ count: 1 });
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
     prisma.guardianConsent.findMany.mockResolvedValue([
       {
         id: 'consent-1',
@@ -137,27 +151,128 @@ describe('CommunicationsService', () => {
         }),
       }),
     );
-    expect(prisma.notificationDelivery.createMany).toHaveBeenCalledWith({
-      data: [
-        expect.objectContaining({
-          tenantId: 'tenant-1',
-          channel: NotificationChannel.PUSH,
-          status: NotificationStatus.SENT,
+    expect(prisma.notificationDelivery.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: 'tenant-1',
+        channel: NotificationChannel.PUSH,
+        status: NotificationStatus.QUEUED,
+        sourceType: 'event',
+        sourceId: 'event-1',
+        eventId: 'event-1',
+        audienceType: AudienceType.SECTION,
+        guardianId: 'guardian-1',
+        studentId: 'student-1',
+        destination: 'guardian-user-1',
+      }),
+    });
+    expect(notificationsService.sendPushNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Parent meeting',
+        body: 'Monthly guardian conversation.',
+        audience: 'guardian-user-1',
+        metadata: expect.objectContaining({
+          notificationDeliveryId: 'delivery-1',
           sourceType: 'event',
           sourceId: 'event-1',
-          eventId: 'event-1',
-          audienceType: AudienceType.SECTION,
-          guardianId: 'guardian-1',
-          studentId: 'student-1',
-          destination: 'guardian-user-1',
         }),
-      ],
-    });
+      }),
+    );
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'record',
         resource: 'notification_delivery',
         tenantId: 'tenant-1',
+      }),
+    );
+  });
+
+  it('replays existing delivery records for the same source event without duplicate queues', async () => {
+    prisma.notificationDelivery.findMany.mockResolvedValue([
+      { id: 'delivery-1', status: NotificationStatus.QUEUED },
+    ]);
+
+    const result = await service.recordDeliveryRecords({
+      actor,
+      sourceType: 'attendance_absent',
+      sourceId: 'attendance:session-1:student-1:absent',
+      audienceType: AudienceType.ALL,
+      studentIds: ['student-1'],
+      title: 'Attendance alert',
+      body: 'Your child was marked absent today.',
+      channels: [NotificationChannel.PUSH],
+      requiredConsentTypes: [ConsentType.MESSAGING],
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        count: 1,
+        queuedCount: 1,
+        replayed: true,
+      }),
+    );
+    expect(prisma.student.findMany).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.create).not.toHaveBeenCalled();
+    expect(notificationsService.sendPushNotification).not.toHaveBeenCalled();
+  });
+
+  it('converts fee payment domain events into guardian receipt notifications', async () => {
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+    prisma.student.findMany.mockResolvedValue([
+      {
+        id: 'student-1',
+        userId: null,
+        user: null,
+        guardianLinks: [
+          {
+            isPrimary: true,
+            guardian: {
+              id: 'guardian-1',
+              userId: 'guardian-user-1',
+              email: 'guardian@school.test',
+              primaryPhone: '+9779800000000',
+              receivesAlerts: true,
+              user: { email: 'guardian-user@school.test' },
+            },
+          },
+        ],
+      },
+    ]);
+    prisma.guardianConsent.findMany.mockResolvedValue([
+      {
+        id: 'consent-1',
+        guardianId: 'guardian-1',
+        consentType: ConsentType.MESSAGING,
+        granted: true,
+        revokedAt: null,
+        capturedAt: new Date('2026-04-01T00:00:00.000Z'),
+      },
+    ]);
+
+    await service.handleFeePaymentConfirmed({
+      tenantId: actor.tenantId,
+      actor,
+      paymentId: 'payment-1',
+      invoiceId: 'invoice-1',
+      studentId: 'student-1',
+      amount: 1200,
+      method: 'CASH',
+      receiptNumber: 'REC-2025-2026-00001',
+    });
+
+    expect(prisma.notificationDelivery.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        sourceType: 'fee_payment_confirmed',
+        sourceId: 'fee-payment:payment-1:confirmed',
+        studentId: 'student-1',
+        guardianId: 'guardian-1',
+        status: NotificationStatus.QUEUED,
+      }),
+    });
+    expect(notificationsService.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'guardian@school.test',
+        subject: 'Fee receipt ready',
       }),
     );
   });

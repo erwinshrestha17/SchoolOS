@@ -1458,6 +1458,7 @@ export class FinanceService {
 
     this.eventEmitter.emit('fees.payment.confirmed', {
       tenantId: actor.tenantId,
+      actor,
       paymentId: result.id,
       invoiceId: dto.invoiceId,
       studentId: invoice.studentId,

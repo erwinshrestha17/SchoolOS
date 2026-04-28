@@ -1,6 +1,8 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
+import { NotificationStatus } from '@prisma/client';
 import { Job } from 'bullmq';
+import { PrismaService } from '../prisma/prisma.service';
 
 type EmailJobData = {
   to: string;
@@ -29,17 +31,56 @@ type NotificationJobData = EmailJobData | SmsJobData | PushJobData;
 export class NotificationsProcessor extends WorkerHost {
   private readonly logger = new Logger(NotificationsProcessor.name);
 
+  constructor(private readonly prisma: PrismaService) {
+    super();
+  }
+
   async process(job: Job<NotificationJobData, void, string>): Promise<void> {
-    switch (job.name) {
-      case 'sendEmail':
-        return this.handleSendEmail(job.data as EmailJobData);
-      case 'sendSms':
-        return this.handleSendSms(job.data as SmsJobData);
-      case 'sendPushNotification':
-        return this.handleSendPush(job.data as PushJobData);
-      default:
-        this.logger.warn(`Unknown job name: ${job.name}`);
+    try {
+      switch (job.name) {
+        case 'sendEmail':
+          await this.handleSendEmail(job.data as EmailJobData);
+          break;
+        case 'sendSms':
+          await this.handleSendSms(job.data as SmsJobData);
+          break;
+        case 'sendPushNotification':
+          await this.handleSendPush(job.data as PushJobData);
+          break;
+        default:
+          this.logger.warn(`Unknown job name: ${job.name}`);
+      }
+
+      await this.markDelivery(job.data, NotificationStatus.SENT);
+    } catch (error) {
+      await this.markDelivery(
+        job.data,
+        NotificationStatus.FAILED,
+        error instanceof Error ? error.message : 'Notification job failed',
+      );
+      throw error;
     }
+  }
+
+  private async markDelivery(
+    input: NotificationJobData,
+    status: NotificationStatus,
+    errorMessage?: string,
+  ) {
+    const deliveryId = input.metadata?.notificationDeliveryId;
+
+    if (typeof deliveryId !== 'string') {
+      return;
+    }
+
+    await this.prisma.notificationDelivery.update({
+      where: { id: deliveryId },
+      data: {
+        status,
+        sentAt: status === NotificationStatus.SENT ? new Date() : undefined,
+        errorMessage: errorMessage ?? null,
+      },
+    });
   }
 
   private async handleSendEmail(input: EmailJobData) {

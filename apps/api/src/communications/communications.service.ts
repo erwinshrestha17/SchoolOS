@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import {
   AudienceType,
+  AuthMethod,
   ConsentType,
   EventType,
   NotificationChannel,
@@ -18,6 +20,8 @@ import { CaptureConsentDto } from './dto/capture-consent.dto';
 
 @Injectable()
 export class CommunicationsService {
+  private readonly logger = new Logger(CommunicationsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
@@ -52,16 +56,6 @@ export class CommunicationsService {
     });
 
     if (publishedAt) {
-      await this.notificationsService.sendPushNotification({
-        title: notice.title,
-        body: notice.body,
-        audience: notice.audienceType.toLowerCase(),
-        metadata: {
-          tenantId: actor.tenantId,
-          noticeId: notice.id,
-        },
-      });
-
       await this.recordDeliveryRecords({
         actor,
         sourceType: 'notice',
@@ -347,6 +341,22 @@ export class CommunicationsService {
   }
 
   async recordDeliveryRecords(input: DeliveryRecordInput) {
+    const existingDeliveries = await this.prisma.notificationDelivery.findMany({
+      where: {
+        tenantId: input.actor.tenantId,
+        sourceType: input.sourceType,
+        sourceId: input.sourceId,
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    if (existingDeliveries.length > 0) {
+      return summarizeExistingDeliveries(existingDeliveries);
+    }
+
     const recipients = await this.resolveAudienceRecipients(input);
     const { allowedRecipients, skippedRecipients } =
       await this.partitionRecipientsByConsent(input, recipients);
@@ -355,53 +365,21 @@ export class CommunicationsService {
       return { count: 0 };
     }
 
-    await this.prisma.notificationDelivery.createMany({
-      data: [
-        ...allowedRecipients.flatMap((recipient) =>
-          input.channels.map((channel) => ({
-            tenantId: input.actor.tenantId,
-            channel,
-            status: NotificationStatus.SENT,
-            sourceType: input.sourceType,
-            sourceId: input.sourceId,
-            audienceType: input.audienceType,
-            recipientUserId: recipient.userId,
-            guardianId: recipient.guardianId,
-            studentId: recipient.studentId,
-            noticeId: input.noticeId ?? null,
-            eventId: input.eventId ?? null,
-            activityPostId: input.activityPostId ?? null,
-            destination: resolveDestination(recipient, channel),
-            title: input.title,
-            body: input.body,
-            sentAt: new Date(),
-          })),
-        ),
-        ...skippedRecipients.flatMap((recipient) =>
-          input.channels.map((channel) => ({
-            tenantId: input.actor.tenantId,
-            channel,
-            status: NotificationStatus.SKIPPED,
-            sourceType: input.sourceType,
-            sourceId: input.sourceId,
-            audienceType: input.audienceType,
-            recipientUserId: recipient.userId,
-            guardianId: recipient.guardianId,
-            studentId: recipient.studentId,
-            noticeId: input.noticeId ?? null,
-            eventId: input.eventId ?? null,
-            activityPostId: input.activityPostId ?? null,
-            destination: resolveDestination(recipient, channel),
-            title: input.title,
-            body: input.body,
-            errorMessage: `Missing required consent: ${input.requiredConsentTypes?.join(
-              ', ',
-            )}`,
-            sentAt: null,
-          })),
-        ),
-      ],
-    });
+    const queuedDeliveries = await this.createDeliveryRows(
+      input,
+      allowedRecipients,
+      NotificationStatus.QUEUED,
+    );
+    const skippedDeliveries = await this.createDeliveryRows(
+      input,
+      skippedRecipients,
+      NotificationStatus.SKIPPED,
+      `Missing required consent: ${input.requiredConsentTypes?.join(', ')}`,
+    );
+
+    for (const delivery of queuedDeliveries) {
+      await this.dispatchDelivery(delivery);
+    }
 
     await this.auditService.record({
       action: 'record',
@@ -425,7 +403,223 @@ export class CommunicationsService {
         input.channels.length,
       sentCount: allowedRecipients.length * input.channels.length,
       skippedCount: skippedRecipients.length * input.channels.length,
+      queuedCount: queuedDeliveries.length,
+      failedCount: 0,
+      deliveryIds: [...queuedDeliveries, ...skippedDeliveries].map(
+        (delivery) => delivery.id,
+      ),
     };
+  }
+
+  @OnEvent('student.admitted')
+  async handleStudentAdmitted(event: StudentAdmittedEvent) {
+    await this.safeRecordDomainDelivery('student.admitted', event, {
+      actor: toNotificationActor(event),
+      sourceType: 'student_admitted',
+      sourceId: `student:${event.studentId}:admitted`,
+      audienceType: event.sectionId ? AudienceType.SECTION : AudienceType.CLASS,
+      classId: event.classId,
+      sectionId: event.sectionId ?? null,
+      studentIds: [event.studentId],
+      title: 'Student admitted',
+      body: `${event.studentName} has been enrolled. Guardian access is ready in SchoolOS.`,
+      channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
+      requiredConsentTypes: [ConsentType.MESSAGING],
+    });
+  }
+
+  @OnEvent('attendance.student.absent')
+  async handleAttendanceAbsent(event: AttendanceNotificationEvent) {
+    await this.safeRecordDomainDelivery('attendance.student.absent', event, {
+      actor: toNotificationActor(event),
+      sourceType: 'attendance_absent',
+      sourceId: `attendance:${event.attendanceSessionId}:${event.studentId}:absent`,
+      audienceType: event.sectionId ? AudienceType.SECTION : AudienceType.CLASS,
+      classId: event.classId,
+      sectionId: event.sectionId ?? null,
+      studentIds: [event.studentId],
+      title: 'Attendance alert',
+      body: 'Your child was marked absent today.',
+      channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
+      requiredConsentTypes: [ConsentType.MESSAGING],
+    });
+  }
+
+  @OnEvent('attendance.student.late')
+  async handleAttendanceLate(event: AttendanceNotificationEvent) {
+    await this.safeRecordDomainDelivery('attendance.student.late', event, {
+      actor: toNotificationActor(event),
+      sourceType: 'attendance_late',
+      sourceId: `attendance:${event.attendanceSessionId}:${event.studentId}:late`,
+      audienceType: event.sectionId ? AudienceType.SECTION : AudienceType.CLASS,
+      classId: event.classId,
+      sectionId: event.sectionId ?? null,
+      studentIds: [event.studentId],
+      title: 'Late arrival recorded',
+      body: 'Your child was marked late today.',
+      channels: [NotificationChannel.PUSH],
+      requiredConsentTypes: [ConsentType.MESSAGING],
+    });
+  }
+
+  @OnEvent('attendance.student.leave')
+  async handleAttendanceLeave(event: AttendanceNotificationEvent) {
+    await this.safeRecordDomainDelivery('attendance.student.leave', event, {
+      actor: toNotificationActor(event),
+      sourceType: 'attendance_leave',
+      sourceId: `attendance:${event.attendanceSessionId}:${event.studentId}:${event.status.toLowerCase()}`,
+      audienceType: event.sectionId ? AudienceType.SECTION : AudienceType.CLASS,
+      classId: event.classId,
+      sectionId: event.sectionId ?? null,
+      studentIds: [event.studentId],
+      title: 'Leave attendance recorded',
+      body: 'A leave attendance status was recorded for your child today.',
+      channels: [NotificationChannel.PUSH],
+      requiredConsentTypes: [ConsentType.MESSAGING],
+    });
+  }
+
+  @OnEvent('attendance.student.consecutive_absence')
+  async handleConsecutiveAbsence(event: ConsecutiveAbsenceEvent) {
+    await this.safeRecordDomainDelivery(
+      'attendance.student.consecutive_absence',
+      event,
+      {
+        actor: toNotificationActor(event),
+        sourceType: 'attendance_consecutive_absence',
+        sourceId: `attendance:${event.attendanceSessionId}:${event.studentId}:consecutive:${event.consecutiveAbsences}`,
+        audienceType: event.sectionId
+          ? AudienceType.SECTION
+          : AudienceType.CLASS,
+        classId: event.classId,
+        sectionId: event.sectionId ?? null,
+        studentIds: [event.studentId],
+        title: 'Consecutive absence warning',
+        body: `Your child has ${event.consecutiveAbsences} consecutive absences. Please contact the school.`,
+        channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
+        requiredConsentTypes: [ConsentType.MESSAGING],
+      },
+    );
+  }
+
+  @OnEvent('fees.payment.confirmed')
+  async handleFeePaymentConfirmed(event: FeePaymentConfirmedEvent) {
+    await this.safeRecordDomainDelivery('fees.payment.confirmed', event, {
+      actor: toNotificationActor(event),
+      sourceType: 'fee_payment_confirmed',
+      sourceId: `fee-payment:${event.paymentId}:confirmed`,
+      audienceType: AudienceType.ALL,
+      studentIds: [event.studentId],
+      title: 'Fee receipt ready',
+      body: `Payment of Rs ${event.amount.toFixed(2)} was received. Receipt ${event.receiptNumber ?? 'is ready'}.`,
+      channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
+      requiredConsentTypes: [ConsentType.MESSAGING],
+    });
+  }
+
+  private async safeRecordDomainDelivery(
+    eventName: string,
+    event: TenantDomainEvent,
+    input: DeliveryRecordInput,
+  ) {
+    try {
+      await this.recordDeliveryRecords(input);
+    } catch (error) {
+      this.logger.error(
+        `Notification event ${eventName} failed for tenant ${event.tenantId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  private async createDeliveryRows(
+    input: DeliveryRecordInput,
+    recipients: DeliveryRecipient[],
+    status: NotificationStatus,
+    errorMessage?: string,
+  ) {
+    const deliveries: DeliveryRow[] = [];
+
+    for (const recipient of recipients) {
+      for (const channel of input.channels) {
+        const delivery = await this.prisma.notificationDelivery.create({
+          data: {
+            tenantId: input.actor.tenantId,
+            channel,
+            status,
+            sourceType: input.sourceType,
+            sourceId: input.sourceId,
+            audienceType: input.audienceType,
+            recipientUserId: recipient.userId,
+            guardianId: recipient.guardianId,
+            studentId: recipient.studentId,
+            noticeId: input.noticeId ?? null,
+            eventId: input.eventId ?? null,
+            activityPostId: input.activityPostId ?? null,
+            destination: resolveDestination(recipient, channel),
+            title: input.title,
+            body: input.body,
+            errorMessage: errorMessage ?? null,
+            sentAt: null,
+          },
+        });
+
+        deliveries.push(delivery);
+      }
+    }
+
+    return deliveries;
+  }
+
+  private async dispatchDelivery(delivery: DeliveryRow) {
+    try {
+      if (!delivery.destination) {
+        throw new Error(`No destination resolved for ${delivery.channel}`);
+      }
+
+      const metadata = {
+        tenantId: delivery.tenantId,
+        notificationDeliveryId: delivery.id,
+        sourceType: delivery.sourceType,
+        sourceId: delivery.sourceId,
+      };
+
+      if (delivery.channel === NotificationChannel.EMAIL) {
+        await this.notificationsService.sendEmail({
+          to: delivery.destination,
+          subject: delivery.title,
+          text: delivery.body,
+          metadata,
+        });
+        return;
+      }
+
+      if (delivery.channel === NotificationChannel.SMS) {
+        await this.notificationsService.sendSms({
+          to: delivery.destination,
+          message: delivery.body,
+          metadata,
+        });
+        return;
+      }
+
+      await this.notificationsService.sendPushNotification({
+        title: delivery.title,
+        body: delivery.body,
+        audience: delivery.destination,
+        metadata,
+      });
+    } catch (error) {
+      await this.prisma.notificationDelivery.update({
+        where: { id: delivery.id },
+        data: {
+          status: NotificationStatus.FAILED,
+          errorMessage:
+            error instanceof Error ? error.message : 'Notification failed',
+        },
+      });
+    }
   }
 
   private async ensureAudienceRefs(
@@ -450,6 +644,10 @@ export class CommunicationsService {
 
       if (!section) {
         throw new NotFoundException('Section not found in this tenant');
+      }
+
+      if (classId && section.classId !== classId) {
+        throw new NotFoundException('Section not found in selected class');
       }
     }
   }
@@ -642,6 +840,62 @@ type DeliveryRecipient = {
   phone: string | null;
 };
 
+type DeliveryRow = {
+  id: string;
+  tenantId: string;
+  channel: NotificationChannel;
+  status: NotificationStatus;
+  sourceType: string;
+  sourceId: string;
+  audienceType: AudienceType;
+  recipientUserId: string | null;
+  guardianId: string | null;
+  studentId: string | null;
+  noticeId: string | null;
+  eventId: string | null;
+  activityPostId: string | null;
+  destination: string | null;
+  title: string;
+  body: string;
+  errorMessage: string | null;
+  sentAt: Date | null;
+  createdAt: Date;
+};
+
+type TenantDomainEvent = {
+  tenantId: string;
+  actor?: AuthContext;
+};
+
+type StudentAdmittedEvent = TenantDomainEvent & {
+  classId: string;
+  sectionId?: string | null;
+  studentId: string;
+  studentName: string;
+};
+
+type AttendanceNotificationEvent = TenantDomainEvent & {
+  attendanceSessionId: string;
+  attendanceDate: Date;
+  classId: string;
+  sectionId?: string | null;
+  studentId: string;
+  status: string;
+};
+
+type ConsecutiveAbsenceEvent = AttendanceNotificationEvent & {
+  consecutiveAbsences: number;
+};
+
+type FeePaymentConfirmedEvent = TenantDomainEvent & {
+  paymentId: string;
+  invoiceId: string;
+  studentId: string;
+  amount: number;
+  method: string;
+  receiptNumber?: string | null;
+};
+
 function resolveDestination(
   recipient: DeliveryRecipient,
   channel: NotificationChannel,
@@ -655,4 +909,40 @@ function resolveDestination(
   }
 
   return recipient.userId ?? recipient.phone ?? recipient.email;
+}
+
+function toNotificationActor(event: TenantDomainEvent): AuthContext {
+  return (
+    event.actor ?? {
+      userId: 'system',
+      tenantId: event.tenantId,
+      tenantSlug: event.tenantId,
+      email: null,
+      authMethod: AuthMethod.PASSWORD,
+      roles: ['system'],
+      permissions: [],
+    }
+  );
+}
+
+function summarizeExistingDeliveries(
+  deliveries: Array<{ id: string; status: NotificationStatus }>,
+) {
+  return {
+    count: deliveries.length,
+    sentCount: deliveries.filter(
+      (delivery) => delivery.status === NotificationStatus.SENT,
+    ).length,
+    skippedCount: deliveries.filter(
+      (delivery) => delivery.status === NotificationStatus.SKIPPED,
+    ).length,
+    queuedCount: deliveries.filter(
+      (delivery) => delivery.status === NotificationStatus.QUEUED,
+    ).length,
+    failedCount: deliveries.filter(
+      (delivery) => delivery.status === NotificationStatus.FAILED,
+    ).length,
+    deliveryIds: deliveries.map((delivery) => delivery.id),
+    replayed: true,
+  };
 }
