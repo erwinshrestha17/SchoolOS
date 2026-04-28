@@ -276,7 +276,10 @@ export class AdmissionsService {
 
     if (dto.siblingStudentSystemId) {
       const sibling = await this.prisma.student.findFirst({
-        where: { tenantId: actor.tenantId, studentSystemId: dto.siblingStudentSystemId },
+        where: {
+          tenantId: actor.tenantId,
+          studentSystemId: dto.siblingStudentSystemId,
+        },
         include: { siblingMemberships: { include: { siblingGroup: true } } },
       });
 

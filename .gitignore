@@ -6,6 +6,7 @@ coverage
 build
 .turbo
 .cache
+*.tsbuildinfo
 
 .DS_Store
 

@@ -23,7 +23,11 @@ const adminActor = {
   email: 'admin@schoolos.test',
   authMethod: AuthMethod.PASSWORD,
   roles: ['admin'],
-  permissions: ['attendance:mark', 'attendance:read', 'attendance:review_conflicts'],
+  permissions: [
+    'attendance:mark',
+    'attendance:read',
+    'attendance:review_conflicts',
+  ],
 };
 
 const teacherActor = {
@@ -374,7 +378,9 @@ describe('attendance production hardening', () => {
         type: 'below_threshold',
       }),
     );
-    expect(communicationsService.recordDeliveryRecords).toHaveBeenCalledTimes(1);
+    expect(communicationsService.recordDeliveryRecords).toHaveBeenCalledTimes(
+      1,
+    );
     expect(prisma.notificationDelivery.findFirst).toHaveBeenCalledTimes(2);
   });
 
@@ -453,7 +459,9 @@ function buildService(options: {
     attendanceSession: {
       update: jest.fn().mockResolvedValue(options.finalSession ?? null),
       create: jest.fn().mockResolvedValue(options.finalSession ?? null),
-      findUniqueOrThrow: jest.fn().mockResolvedValue(options.finalSession ?? null),
+      findUniqueOrThrow: jest
+        .fn()
+        .mockResolvedValue(options.finalSession ?? null),
     },
     attendanceRecord: {
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -490,9 +498,9 @@ function buildService(options: {
     },
     schoolCalendarDay: {
       findFirst: jest.fn().mockResolvedValue(options.calendarDay ?? null),
-      findMany: jest.fn().mockResolvedValue(
-        options.calendarDay ? [options.calendarDay] : [],
-      ),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.calendarDay ? [options.calendarDay] : []),
     },
     attendanceSession: {
       findFirst: jest.fn().mockResolvedValue(options.attendanceSession ?? null),
@@ -509,8 +517,12 @@ function buildService(options: {
       findFirst: jest
         .fn()
         .mockResolvedValue(options.priorSyncSubmission ?? null),
-      update: jest.fn().mockResolvedValue(options.attendanceSyncUpdated ?? null),
-      create: jest.fn().mockResolvedValue(options.attendanceSyncCreated ?? null),
+      update: jest
+        .fn()
+        .mockResolvedValue(options.attendanceSyncUpdated ?? null),
+      create: jest
+        .fn()
+        .mockResolvedValue(options.attendanceSyncCreated ?? null),
       updateMany: jest
         .fn()
         .mockResolvedValue({ count: options.updatedSyncCount ?? 0 }),
@@ -518,7 +530,9 @@ function buildService(options: {
     attendanceConflict: {
       findFirst: jest
         .fn()
-        .mockResolvedValue(options.conflictRecord ?? options.attendanceConflict ?? null),
+        .mockResolvedValue(
+          options.conflictRecord ?? options.attendanceConflict ?? null,
+        ),
       findMany: jest.fn().mockResolvedValue([]),
       update: jest.fn().mockResolvedValue(options.updatedConflict ?? null),
     },
@@ -543,7 +557,9 @@ function buildService(options: {
     },
     staffLeaveRequest: {
       findFirst: jest.fn().mockResolvedValue(options.leaveRequest ?? null),
-      findMany: jest.fn().mockResolvedValue(options.approvedLeaveRequests ?? []),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.approvedLeaveRequests ?? []),
     },
     $transaction: jest.fn().mockImplementation(async (input: unknown) => {
       if (Array.isArray(input)) {

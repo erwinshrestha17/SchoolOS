@@ -147,6 +147,10 @@ export class ConfigService {
     return process.env.LOCAL_STORAGE_PUBLIC_BASE_URL ?? '/storage';
   }
 
+  get libraryFinePerDay() {
+    return Number(process.env.LIBRARY_FINE_PER_DAY ?? 10);
+  }
+
   get medicalEncryptionKey() {
     if (process.env.MEDICAL_ENCRYPTION_KEY) {
       return process.env.MEDICAL_ENCRYPTION_KEY;
@@ -201,6 +205,7 @@ export class ConfigService {
       ['OTP_LENGTH', this.otpLength],
       ['OTP_ISSUE_LIMIT', this.otpIssueLimit],
       ['OTP_ISSUE_WINDOW_MINUTES', this.otpIssueWindowMinutes],
+      ['LIBRARY_FINE_PER_DAY', this.libraryFinePerDay],
     ];
 
     for (const [name, value] of numericFields) {

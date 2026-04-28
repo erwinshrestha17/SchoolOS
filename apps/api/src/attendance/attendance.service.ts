@@ -21,9 +21,7 @@ import { CommunicationsService } from '../communications/communications.service'
 import { PrismaService } from '../prisma/prisma.service';
 import { ReviewAttendanceConflictDto } from './dto/review-attendance-conflict.dto';
 import { CreateStaffLeaveRequestDto } from './dto/create-staff-leave-request.dto';
-import {
-  AttendanceConflictReviewDecision,
-} from './dto/review-attendance-conflict.dto';
+import { AttendanceConflictReviewDecision } from './dto/review-attendance-conflict.dto';
 import {
   AttendanceOverrideSource,
   OverrideAttendanceSessionDto,
@@ -277,7 +275,10 @@ export class AttendanceService {
           channels = [NotificationChannel.PUSH, NotificationChannel.SMS];
         } else if (record.status === AttendanceStatus.LATE) {
           body = `A student was marked late today at ${record.lateAt ? record.lateAt.toISOString() : new Date().toISOString()}.`;
-        } else if (record.status === AttendanceStatus.SICK_LEAVE || record.status === AttendanceStatus.EXCUSED_LEAVE) {
+        } else if (
+          record.status === AttendanceStatus.SICK_LEAVE ||
+          record.status === AttendanceStatus.EXCUSED_LEAVE
+        ) {
           body = `Excused/Sick leave confirmed for a student today.`;
         } else if (record.status === AttendanceStatus.UNEXCUSED_LEAVE) {
           body = `Unexcused leave recorded. Please contact the school immediately.`;
@@ -386,11 +387,13 @@ export class AttendanceService {
           serverReceivedAt,
           rejectionReason: null,
           submittedById: actor.userId,
-          payload: JSON.parse(JSON.stringify({
-            dto,
-            result,
-            trustMetadata,
-          })) as Prisma.InputJsonValue,
+          payload: JSON.parse(
+            JSON.stringify({
+              dto,
+              result,
+              trustMetadata,
+            }),
+          ) as Prisma.InputJsonValue,
         },
       });
 
@@ -818,7 +821,8 @@ export class AttendanceService {
     const recordStatusByStaffAndDate = new Map<string, AttendanceStatus>();
 
     for (const record of records) {
-      const fullName = `${record.staff.firstName} ${record.staff.lastName}`.trim();
+      const fullName =
+        `${record.staff.firstName} ${record.staff.lastName}`.trim();
       const current = summaryByStaff.get(record.staffId) ?? {
         staffId: record.staffId,
         employeeId: record.staff.employeeId,
@@ -849,7 +853,8 @@ export class AttendanceService {
     }
 
     for (const leave of approvedLeaveRequests) {
-      const fullName = `${leave.staff.firstName} ${leave.staff.lastName}`.trim();
+      const fullName =
+        `${leave.staff.firstName} ${leave.staff.lastName}`.trim();
       const current = summaryByStaff.get(leave.staffId) ?? {
         staffId: leave.staffId,
         employeeId: leave.staff.employeeId,
@@ -1054,7 +1059,9 @@ export class AttendanceService {
     }
 
     if (leave.status !== 'PENDING') {
-      throw new ConflictException('Only pending leave requests can be reviewed');
+      throw new ConflictException(
+        'Only pending leave requests can be reviewed',
+      );
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -1619,8 +1626,8 @@ export class AttendanceService {
         });
 
         if (!alreadySent) {
-          const delivery = await this.communicationsService.recordDeliveryRecords(
-            {
+          const delivery =
+            await this.communicationsService.recordDeliveryRecords({
               actor,
               sourceType,
               sourceId,
@@ -1629,13 +1636,9 @@ export class AttendanceService {
               studentIds: [],
               title: 'Attendance warning',
               body: `${latest.fullNameEn} has been absent for ${consecutiveAbsences} consecutive attendance days.`,
-              channels: [
-                NotificationChannel.PUSH,
-                NotificationChannel.SMS,
-              ],
+              channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
               requiredConsentTypes: [ConsentType.MESSAGING],
-            },
-          );
+            });
 
           warnings.push({
             type: 'consecutive_absence',
@@ -1728,25 +1731,26 @@ export class AttendanceService {
     actor: AuthContext,
     attendanceDate: Date,
   ) {
-    const priorSubmission = await this.prisma.attendanceSyncSubmission.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        academicYearId: dto.academicYearId,
-        classId: dto.classId,
-        sectionId: dto.sectionId ?? null,
-        attendanceDate,
-        clientSubmissionId: {
-          not: dto.clientSubmissionId,
+    const priorSubmission =
+      await this.prisma.attendanceSyncSubmission.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          academicYearId: dto.academicYearId,
+          classId: dto.classId,
+          sectionId: dto.sectionId ?? null,
+          attendanceDate,
+          clientSubmissionId: {
+            not: dto.clientSubmissionId,
+          },
+          syncStatus: {
+            in: [
+              AttendanceSyncStatus.ACCEPTED,
+              AttendanceSyncStatus.CONFLICTED,
+            ],
+          },
         },
-        syncStatus: {
-          in: [
-            AttendanceSyncStatus.ACCEPTED,
-            AttendanceSyncStatus.CONFLICTED,
-          ],
-        },
-      },
-      orderBy: [{ serverReceivedAt: 'desc' }],
-    });
+        orderBy: [{ serverReceivedAt: 'desc' }],
+      });
 
     if (!priorSubmission) {
       return {

@@ -23,7 +23,7 @@ import { CreateLibraryCopyDto } from './dto/create-library-copy.dto';
 import { IssueLibraryCopyDto } from './dto/issue-library-copy.dto';
 import { ReturnLibraryCopyDto } from './dto/return-library-copy.dto';
 
-import { ConfigService } from '@nestjs/config';
+import { ConfigService } from '../config/config.service';
 
 @Injectable()
 export class LibraryService {
@@ -255,9 +255,7 @@ export class LibraryService {
       const daysOverdue = Math.ceil(
         (now.getTime() - issue.dueAt.getTime()) / (1000 * 60 * 60 * 24),
       );
-      const finePerDay =
-        this.configService.get<number>('LIBRARY_FINE_PER_DAY') ?? 10; // Default 10 currency units per day
-      calculatedFine = daysOverdue * finePerDay;
+      calculatedFine = daysOverdue * this.configService.libraryFinePerDay;
     }
 
     const fineAmount = new Prisma.Decimal(dto.fineAmount ?? calculatedFine);

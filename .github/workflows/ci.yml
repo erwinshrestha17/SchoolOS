@@ -9,6 +9,16 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout
@@ -28,11 +38,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check tracked generated artifacts
+        run: pnpm verify:tracked-artifacts
+
       - name: Generate Prisma client
         run: pnpm db:generate
 
       - name: Validate Prisma schema
-        run: pnpm --filter @schoolos/api exec prisma validate --schema prisma/schema.prisma
+        run: pnpm db:validate
+
+      - name: Check OpenAPI gate
+        run: pnpm verify:openapi
 
       - name: Lint
         run: pnpm lint
@@ -42,6 +58,9 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: API e2e
+        run: pnpm test:e2e
 
       - name: Build
         run: pnpm build

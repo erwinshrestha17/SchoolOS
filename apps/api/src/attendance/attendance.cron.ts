@@ -38,8 +38,8 @@ export class AttendanceCron {
       }
 
       try {
-        const result = await this.attendanceService.processDailyEscalationWarnings(
-          {
+        const result =
+          await this.attendanceService.processDailyEscalationWarnings({
             userId: actorUser.id,
             tenantId: tenant.id,
             tenantSlug: tenant.slug,
@@ -47,8 +47,7 @@ export class AttendanceCron {
             authMethod: actorUser.authMethod,
             roles: ['super_admin'],
             permissions: [],
-          },
-        );
+          });
 
         this.logger.log(
           `Attendance escalations processed for tenant ${tenant.slug}: ${result.warningCount} warnings`,

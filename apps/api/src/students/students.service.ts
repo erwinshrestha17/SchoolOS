@@ -423,7 +423,9 @@ export class StudentsService {
 
     if (student.lifecycleStatus === StudentLifecycleStatus.ALUMNI) {
       if (!student.exitedAt) {
-        throw new BadRequestException('Alumni record must have an exitedAt date');
+        throw new BadRequestException(
+          'Alumni record must have an exitedAt date',
+        );
       }
       const twelveMonthsAgo = new Date();
       twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);

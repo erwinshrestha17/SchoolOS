@@ -77,11 +77,41 @@ export class StaffService {
     const currentYear = new Date().getFullYear();
     await this.prisma.staffLeaveBalance.createMany({
       data: [
-        { tenantId: actor.tenantId, staffId: staff.id, leaveType: 'Sick', year: currentYear, allocated: 12 },
-        { tenantId: actor.tenantId, staffId: staff.id, leaveType: 'Casual', year: currentYear, allocated: 10 },
-        { tenantId: actor.tenantId, staffId: staff.id, leaveType: 'Earned', year: currentYear, allocated: 18 },
-        { tenantId: actor.tenantId, staffId: staff.id, leaveType: 'Maternity', year: currentYear, allocated: 98 },
-        { tenantId: actor.tenantId, staffId: staff.id, leaveType: 'Paternity', year: currentYear, allocated: 15 },
+        {
+          tenantId: actor.tenantId,
+          staffId: staff.id,
+          leaveType: 'Sick',
+          year: currentYear,
+          allocated: 12,
+        },
+        {
+          tenantId: actor.tenantId,
+          staffId: staff.id,
+          leaveType: 'Casual',
+          year: currentYear,
+          allocated: 10,
+        },
+        {
+          tenantId: actor.tenantId,
+          staffId: staff.id,
+          leaveType: 'Earned',
+          year: currentYear,
+          allocated: 18,
+        },
+        {
+          tenantId: actor.tenantId,
+          staffId: staff.id,
+          leaveType: 'Maternity',
+          year: currentYear,
+          allocated: 98,
+        },
+        {
+          tenantId: actor.tenantId,
+          staffId: staff.id,
+          leaveType: 'Paternity',
+          year: currentYear,
+          allocated: 15,
+        },
       ],
     });
 

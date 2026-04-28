@@ -352,3 +352,35 @@ export const MessageStatus = {
   SENT: 'SENT',
   READ: 'READ',
 } as const;
+
+export const LibraryCopyStatus = {
+  AVAILABLE: 'AVAILABLE',
+  ISSUED: 'ISSUED',
+  LOST: 'LOST',
+  DAMAGED: 'DAMAGED',
+} as const;
+
+export const LibraryIssueStatus = {
+  ISSUED: 'ISSUED',
+  RETURNED: 'RETURNED',
+  OVERDUE: 'OVERDUE',
+  LOST: 'LOST',
+} as const;
+
+export const TransportVehicleStatus = {
+  ACTIVE: 'ACTIVE',
+  MAINTENANCE: 'MAINTENANCE',
+  RETIRED: 'RETIRED',
+} as const;
+
+export const TransportEnrollmentStatus = {
+  ACTIVE: 'ACTIVE',
+  PAUSED: 'PAUSED',
+  ENDED: 'ENDED',
+} as const;
+
+export const TransportBoardingStatus = {
+  BOARDED: 'BOARDED',
+  DROPPED: 'DROPPED',
+  MISSED: 'MISSED',
+} as const;
