@@ -9,6 +9,7 @@ import {
   Users,
   CalendarCheck,
   Wallet,
+  Images,
   GraduationCap,
   UserCog,
   Calculator,
@@ -18,6 +19,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  Lock,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -25,76 +27,100 @@ export type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
-  permission: PermissionKey;
+  permissions?: PermissionKey[];
   badge?: number;
+  phase: 'phase1' | 'future';
+  disabled?: boolean;
 };
 
-const navItems: NavItem[] = [
+export const dashboardNavItems: NavItem[] = [
   {
     href: '/dashboard',
     label: 'Dashboard',
     icon: LayoutDashboard,
-    permission: 'tenants:read',
+    phase: 'phase1',
   },
   {
     href: '/dashboard/admissions',
-    label: 'Students',
+    label: 'Students / Admissions',
     icon: Users,
-    permission: 'students:create',
+    permissions: ['students:read', 'students:create'],
+    phase: 'phase1',
   },
   {
     href: '/dashboard/attendance',
     label: 'Attendance',
     icon: CalendarCheck,
-    permission: 'attendance:mark',
+    permissions: ['attendance:read', 'attendance:mark'],
+    phase: 'phase1',
   },
   {
     href: '/dashboard/finance',
     label: 'Fee Collection',
     icon: Wallet,
-    permission: 'fees:manage',
-  },
-  {
-    href: '/dashboard/academics',
-    label: 'Academics',
-    icon: GraduationCap,
-    permission: 'academics:manage',
-  },
-  {
-    href: '/dashboard/payroll',
-    label: 'Staff & HR',
-    icon: UserCog,
-    permission: 'payroll:manage',
-  },
-  {
-    href: '/dashboard/accounting',
-    label: 'Accounting',
-    icon: Calculator,
-    permission: 'accounting:read',
-  },
-  {
-    href: '/dashboard/timetable',
-    label: 'Library',
-    icon: BookOpen,
-    permission: 'timetable:manage',
+    permissions: ['fees:manage', 'fees:bill', 'payments:collect', 'receipts:read'],
+    phase: 'phase1',
   },
   {
     href: '/dashboard/activity',
-    label: 'Transport',
-    icon: Bus,
-    permission: 'activity_feed:create',
+    label: 'Activity Feed',
+    icon: Images,
+    permissions: ['activity_feed:read', 'activity_feed:create'],
+    phase: 'phase1',
   },
   {
     href: '/dashboard/notices',
     label: 'Notices',
     icon: Megaphone,
-    permission: 'notices:create',
+    permissions: ['notices:read', 'notices:create', 'events:read', 'events:create'],
+    phase: 'phase1',
   },
   {
     href: '/dashboard/settings',
     label: 'Settings',
     icon: Settings,
-    permission: 'roles:read',
+    permissions: ['roles:read', 'classes:read', 'academic_years:read'],
+    phase: 'phase1',
+  },
+  {
+    href: '/dashboard/academics',
+    label: 'Academics',
+    icon: GraduationCap,
+    permissions: ['academics:read', 'academics:manage'],
+    phase: 'future',
+    disabled: true,
+  },
+  {
+    href: '/dashboard/payroll',
+    label: 'Staff & HR',
+    icon: UserCog,
+    permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
+    phase: 'future',
+    disabled: true,
+  },
+  {
+    href: '/dashboard/accounting',
+    label: 'Accounting',
+    icon: Calculator,
+    permissions: ['accounting:read'],
+    phase: 'future',
+    disabled: true,
+  },
+  {
+    href: '#library-coming-soon',
+    label: 'Library',
+    icon: BookOpen,
+    permissions: ['library:read', 'library:manage'],
+    phase: 'future',
+    disabled: true,
+  },
+  {
+    href: '#transport-coming-soon',
+    label: 'Transport',
+    icon: Bus,
+    permissions: ['transport:read', 'transport:manage', 'transport:operate'],
+    phase: 'future',
+    disabled: true,
   },
 ];
 
@@ -112,103 +138,22 @@ export function Sidebar({
   onMobileClose,
 }: SidebarProps) {
   const pathname = usePathname();
-  const { hasPermissions } = useSession();
+  const { session } = useSession();
+
+  const visiblePrimaryItems = dashboardNavItems.filter(
+    (item) => item.phase === 'phase1' && canSeeNavItem(item, session),
+  );
+  const futureItems = dashboardNavItems.filter((item) => item.phase === 'future');
 
   const sidebarContent = (
-    <div
-      className={`flex h-full flex-col bg-sidebar-900 text-white sidebar-transition ${
-        collapsed ? 'w-[72px]' : 'w-[260px]'
-      }`}
-    >
-      {/* Logo area */}
-      <div className="flex h-16 items-center gap-3 px-4 border-b border-white/[0.06]">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-600 font-bold text-sm">
-          S
-        </div>
-        <div
-          className={`sidebar-label ${collapsed ? 'opacity-0 w-0' : 'opacity-100'}`}
-        >
-          <span className="font-semibold text-sm text-white truncate">
-            SchoolOS
-          </span>
-        </div>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-        {navItems.map((item) => {
-          const enabled = hasPermissions([item.permission]);
-          const isExactDashboard =
-            item.href === '/dashboard' && pathname === '/dashboard';
-          const isSubRoute =
-            item.href !== '/dashboard' && pathname?.startsWith(item.href);
-          const active = isExactDashboard || isSubRoute;
-
-          if (!enabled) return null;
-
-          const Icon = item.icon;
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => onMobileClose()}
-              className={`group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
-                active
-                  ? 'bg-primary-600/15 text-primary-50'
-                  : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'
-              } ${!enabled ? 'pointer-events-none opacity-30' : ''}`}
-            >
-              {/* Active left border */}
-              {active && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-[3px] rounded-r-full bg-primary-500" />
-              )}
-
-              <Icon
-                size={20}
-                className={`shrink-0 ${active ? 'text-primary-400' : 'text-slate-500 group-hover:text-slate-300'}`}
-              />
-
-              <span
-                className={`sidebar-label ${collapsed ? 'opacity-0 w-0' : 'opacity-100'}`}
-              >
-                {item.label}
-              </span>
-
-              {item.badge && !collapsed && (
-                <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-danger-500 px-1.5 text-[0.6875rem] font-semibold text-white">
-                  {item.badge}
-                </span>
-              )}
-
-              {/* Tooltip for collapsed state */}
-              {collapsed && (
-                <span className="pointer-events-none absolute left-full ml-2 rounded-md bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 z-50 whitespace-nowrap">
-                  {item.label}
-                </span>
-              )}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Collapse toggle (desktop) */}
-      <div className="hidden lg:block border-t border-white/[0.06] px-3 py-3">
-        <button
-          onClick={onToggle}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-500 hover:bg-white/[0.06] hover:text-slate-300 transition-colors"
-        >
-          {collapsed ? (
-            <ChevronRight size={20} className="shrink-0" />
-          ) : (
-            <>
-              <ChevronLeft size={20} className="shrink-0" />
-              <span className="sidebar-label">Collapse</span>
-            </>
-          )}
-        </button>
-      </div>
-    </div>
+    <SidebarContent
+      collapsed={collapsed}
+      futureItems={futureItems}
+      pathname={pathname}
+      primaryItems={visiblePrimaryItems}
+      onMobileClose={onMobileClose}
+      onToggle={onToggle}
+    />
   );
 
   return (
@@ -218,6 +163,14 @@ export function Sidebar({
         <div
           className="sidebar-overlay lg:hidden"
           onClick={onMobileClose}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              onMobileClose();
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          aria-label="Close navigation menu"
         />
       )}
 
@@ -227,59 +180,13 @@ export function Sidebar({
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Force expanded on mobile */}
-        <div className="flex h-full flex-col bg-sidebar-900 text-white w-[260px]">
-          {/* Logo area */}
-          <div className="flex h-16 items-center gap-3 px-4 border-b border-white/[0.06]">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-600 font-bold text-sm">
-              S
-            </div>
-            <span className="font-semibold text-sm text-white">SchoolOS</span>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-            {navItems.map((item) => {
-              const enabled = hasPermissions([item.permission]);
-              const isExactDashboard =
-                item.href === '/dashboard' && pathname === '/dashboard';
-              const isSubRoute =
-                item.href !== '/dashboard' && pathname?.startsWith(item.href);
-              const active = isExactDashboard || isSubRoute;
-
-              if (!enabled) return null;
-
-              const Icon = item.icon;
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => onMobileClose()}
-                  className={`group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
-                    active
-                      ? 'bg-primary-600/15 text-primary-50'
-                      : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'
-                  } ${!enabled ? 'pointer-events-none opacity-30' : ''}`}
-                >
-                  {active && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-[3px] rounded-r-full bg-primary-500" />
-                  )}
-                  <Icon
-                    size={20}
-                    className={`shrink-0 ${active ? 'text-primary-400' : 'text-slate-500 group-hover:text-slate-300'}`}
-                  />
-                  <span>{item.label}</span>
-                  {item.badge && (
-                    <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-danger-500 px-1.5 text-[0.6875rem] font-semibold text-white">
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
+        <SidebarContent
+          collapsed={false}
+          futureItems={futureItems}
+          pathname={pathname}
+          primaryItems={visiblePrimaryItems}
+          onMobileClose={onMobileClose}
+        />
       </aside>
 
       {/* Desktop sidebar */}
@@ -288,4 +195,219 @@ export function Sidebar({
       </aside>
     </>
   );
+}
+
+function SidebarContent({
+  collapsed,
+  futureItems,
+  pathname,
+  primaryItems,
+  onMobileClose,
+  onToggle,
+}: {
+  collapsed: boolean;
+  futureItems: NavItem[];
+  pathname: string | null;
+  primaryItems: NavItem[];
+  onMobileClose: () => void;
+  onToggle?: () => void;
+}) {
+  return (
+    <div
+      className={`flex h-full flex-col bg-sidebar-900 text-white sidebar-transition ${
+        collapsed ? 'w-[72px]' : 'w-[280px]'
+      }`}
+    >
+      <div className="flex h-16 items-center gap-3 border-b border-white/[0.06] px-4">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-sm font-bold">
+          S
+        </div>
+        <div
+          className={`sidebar-label ${collapsed ? 'w-0 opacity-0' : 'opacity-100'}`}
+        >
+          <span className="block truncate text-sm font-semibold text-white">
+            SchoolOS
+          </span>
+          <span className="block truncate text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-slate-500">
+            Pilot workspace
+          </span>
+        </div>
+      </div>
+
+      <nav
+        className="flex-1 overflow-y-auto px-3 py-4"
+        aria-label="Dashboard navigation"
+      >
+        <NavSection
+          collapsed={collapsed}
+          items={primaryItems}
+          label="Phase 1 Core"
+          pathname={pathname}
+          onMobileClose={onMobileClose}
+        />
+
+        <NavSection
+          collapsed={collapsed}
+          items={futureItems}
+          label="Later Modules"
+          pathname={pathname}
+          onMobileClose={onMobileClose}
+        />
+      </nav>
+
+      {onToggle && (
+        <div className="hidden border-t border-white/[0.06] px-3 py-3 lg:block">
+          <button
+            type="button"
+            onClick={onToggle}
+            className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-500 transition-colors hover:bg-white/[0.06] hover:text-slate-300"
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {collapsed ? (
+              <ChevronRight size={20} className="shrink-0" />
+            ) : (
+              <>
+                <ChevronLeft size={20} className="shrink-0" />
+                <span className="sidebar-label">Collapse</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NavSection({
+  collapsed,
+  items,
+  label,
+  pathname,
+  onMobileClose,
+}: {
+  collapsed: boolean;
+  items: NavItem[];
+  label: string;
+  pathname: string | null;
+  onMobileClose: () => void;
+}) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mb-5 space-y-1">
+      {!collapsed && (
+        <p className="px-3 pb-2 text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-slate-500">
+          {label}
+        </p>
+      )}
+
+      {items.map((item) => (
+        <NavEntry
+          key={item.href}
+          collapsed={collapsed}
+          item={item}
+          pathname={pathname}
+          onMobileClose={onMobileClose}
+        />
+      ))}
+    </div>
+  );
+}
+
+function NavEntry({
+  collapsed,
+  item,
+  pathname,
+  onMobileClose,
+}: {
+  collapsed: boolean;
+  item: NavItem;
+  pathname: string | null;
+  onMobileClose: () => void;
+}) {
+  const Icon = item.icon;
+  const active =
+    (item.href === '/dashboard' && pathname === '/dashboard') ||
+    (item.href !== '/dashboard' && pathname?.startsWith(item.href));
+  const content = (
+    <>
+      {active && !item.disabled && (
+        <span className="absolute left-0 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-r-full bg-primary-500" />
+      )}
+
+      <Icon
+        size={20}
+        className={`shrink-0 ${
+          active && !item.disabled
+            ? 'text-primary-300'
+            : 'text-slate-500 group-hover:text-slate-300'
+        }`}
+      />
+
+      <span
+        className={`sidebar-label ${collapsed ? 'w-0 opacity-0' : 'opacity-100'}`}
+      >
+        {item.label}
+      </span>
+
+      {item.disabled && !collapsed && (
+        <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-white/[0.08] px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-500">
+          <Lock size={10} />
+          Later
+        </span>
+      )}
+
+      {item.badge && !collapsed && (
+        <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-danger-500 px-1.5 text-[0.6875rem] font-semibold text-white">
+          {item.badge}
+        </span>
+      )}
+
+      {collapsed && (
+        <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-md bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+          {item.label}
+          {item.disabled ? ' · Later' : ''}
+        </span>
+      )}
+    </>
+  );
+
+  const className = `group relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
+    active && !item.disabled
+      ? 'bg-primary-600/15 text-primary-50'
+      : 'text-slate-400 hover:bg-white/[0.06] hover:text-white'
+  } ${item.disabled ? 'cursor-not-allowed opacity-55 hover:bg-transparent hover:text-slate-400' : ''}`;
+
+  if (item.disabled) {
+    return (
+      <button
+        type="button"
+        className={className}
+        disabled
+        aria-disabled="true"
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <Link href={item.href} onClick={onMobileClose} className={className}>
+      {content}
+    </Link>
+  );
+}
+
+function canSeeNavItem(
+  item: NavItem,
+  session: ReturnType<typeof useSession>['session'],
+) {
+  if (!item.permissions?.length) {
+    return true;
+  }
+
+  const permissionSet = new Set(session?.user.permissions ?? []);
+  return item.permissions.some((permission) => permissionSet.has(permission));
 }

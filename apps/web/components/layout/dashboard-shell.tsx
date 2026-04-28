@@ -9,24 +9,28 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  function closeMobileNavigation() {
+    setMobileOpen(false);
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
-      {/* Sidebar */}
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         mobileOpen={mobileOpen}
-        onMobileClose={() => setMobileOpen(false)}
+        onMobileClose={closeMobileNavigation}
       />
 
-      {/* Main content area */}
-      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
-        {/* Header */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Header onMobileMenuToggle={() => setMobileOpen(!mobileOpen)} />
 
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-7xl px-4 py-6 lg:px-8">
+        <main
+          id="dashboard-main"
+          className="flex-1 overflow-y-auto bg-gray-50"
+          tabIndex={-1}
+        >
+          <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:py-6 lg:px-8">
             <Breadcrumbs />
             <div className="animate-fade-in">{children}</div>
           </div>

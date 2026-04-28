@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useSession } from '../../components/session-provider';
 import { DashboardShell } from '../../components/layout/dashboard-shell';
-import { Loader2 } from 'lucide-react';
 
 export default function DashboardLayout({
   children,
@@ -24,18 +23,23 @@ export default function DashboardLayout({
     }
   }, [pathname, router, status]);
 
-  // Loading state
   if (status === 'loading') {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-center animate-fade-in">
-          <div className="inline-flex items-center justify-center h-12 w-12 rounded-xl bg-primary-100 mb-4">
-            <Loader2 size={24} className="text-primary-600 animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="h-12 w-12 animate-pulse rounded-2xl bg-primary-100" />
+            <div className="space-y-2">
+              <div className="h-4 w-40 animate-pulse rounded-full bg-gray-200" />
+              <div className="h-3 w-28 animate-pulse rounded-full bg-gray-100" />
+            </div>
           </div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-1">
-            Restoring your workspace
-          </h2>
-          <p className="text-sm text-gray-500 max-w-xs">
+          <div className="space-y-3">
+            <div className="h-3 w-full animate-pulse rounded-full bg-gray-100" />
+            <div className="h-3 w-5/6 animate-pulse rounded-full bg-gray-100" />
+            <div className="h-10 w-full animate-pulse rounded-xl bg-gray-50" />
+          </div>
+          <p className="mt-5 text-sm text-gray-500">
             Validating your SchoolOS session and loading permissions...
           </p>
         </div>
@@ -43,18 +47,14 @@ export default function DashboardLayout({
     );
   }
 
-  // Redirect state (no session)
   if (!session) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="text-center animate-fade-in">
-          <div className="inline-flex items-center justify-center h-12 w-12 rounded-xl bg-amber-100 mb-4">
-            <Loader2 size={24} className="text-amber-600 animate-spin" />
-          </div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-1">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-md rounded-2xl border border-amber-100 bg-white p-6 text-center shadow-sm">
+          <h2 className="mb-1 text-lg font-semibold text-gray-900">
             Redirecting to sign in
           </h2>
-          <p className="text-sm text-gray-500 max-w-xs">
+          <p className="text-sm text-gray-500">
             Protected pages require an active SchoolOS session.
           </p>
         </div>

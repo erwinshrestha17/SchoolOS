@@ -160,4 +160,48 @@ describe('SchoolOS web production contracts', () => {
     assert.doesNotMatch(apiClient, /Authorization:\s*`Bearer/);
     assert.doesNotMatch(apiClient, /getAccessToken/);
   });
+
+  it('keeps Phase 1 pilot navigation permission-gated and prominent', () => {
+    const sidebar = read('components/layout/sidebar.tsx');
+    const requiredPhaseOneLabels = [
+      'Students / Admissions',
+      'Attendance',
+      'Fee Collection',
+      'Activity Feed',
+      'Notices',
+      'Settings',
+    ];
+
+    assert.match(sidebar, /export const dashboardNavItems/);
+    assert.match(sidebar, /visiblePrimaryItems = dashboardNavItems\.filter/);
+    assert.match(sidebar, /canSeeNavItem\(item, session\)/);
+
+    for (const label of requiredPhaseOneLabels) {
+      assert.match(sidebar, new RegExp(label.replace('/', '\\/')));
+    }
+
+    assert.match(sidebar, /href: '\/dashboard\/activity'/);
+    assert.doesNotMatch(
+      sidebar,
+      /label: 'Transport'[\s\S]*href: '\/dashboard\/activity'/,
+      'Transport must not point at the Activity Feed route',
+    );
+    assert.doesNotMatch(
+      sidebar,
+      /label: 'Library'[\s\S]*href: '\/dashboard\/timetable'/,
+      'Library must not point at the Timetable route',
+    );
+  });
+
+  it('uses authenticated session metadata and real shell APIs in the header', () => {
+    const header = read('components/layout/header.tsx');
+
+    assert.match(header, /const \{ hasPermissions, session, logout \} = useSession\(\)/);
+    assert.match(header, /session\?\.tenant\.name/);
+    assert.match(header, /api\.listAcademicYears/);
+    assert.match(header, /api\.listNotificationDeliveries/);
+    assert.match(header, /void logout\(\)/);
+    assert.doesNotMatch(header, /const unreadCount = 3/);
+    assert.doesNotMatch(header, /2081-82|2080-81|2079-80/);
+  });
 });
