@@ -17,6 +17,10 @@ BEGIN
   END IF;
 END $$;
 
+-- Add column first if it doesn't exist (as TEXT, before type conversion)
+ALTER TABLE "Student"
+  ADD COLUMN IF NOT EXISTS "lifecycleStatus" TEXT NOT NULL DEFAULT 'ACTIVE';
+
 ALTER TABLE "Student"
   ALTER COLUMN "lifecycleStatus" DROP DEFAULT;
 

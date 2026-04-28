@@ -2,6 +2,9 @@
   "$schema": "https://json.schemastore.org/nest-cli",
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
+    "watchOptions": {
+    "killDelay": 1000
+  },
   "compilerOptions": {
     "deleteOutDir": true
   }

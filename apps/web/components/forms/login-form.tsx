@@ -75,7 +75,8 @@ export function LoginForm() {
           </p>
         ) : null}
       </div>
-      <button className="rounded-2xl bg-[var(--ink)] px-5 py-3 font-semibold text-white">
+      <button className="rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-600 px-5 py-3 font-semibold text-white shadow-md shadow-indigo-200 transition-all hover:from-indigo-600 hover:to-violet-700 hover:shadow-lg hover:shadow-indigo-300 active:scale-[0.98]">
+
         {mutation.isPending ? 'Signing in...' : 'Sign in'}
       </button>
       {mutation.isError ? (
