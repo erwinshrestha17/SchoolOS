@@ -1,4 +1,4 @@
-import type { PermissionKey } from './permissions';
+import type { PermissionKey } from "./permissions";
 
 export type AuthSessionUser = {
   id: string;
@@ -251,11 +251,11 @@ export type ReconciliationSummary = {
 };
 
 export type StudentLifecycleStatus =
-  | 'ACTIVE'
-  | 'TRANSFERRED'
-  | 'EXITED'
-  | 'ALUMNI'
-  | 'DELETED';
+  | "ACTIVE"
+  | "TRANSFERRED"
+  | "EXITED"
+  | "ALUMNI"
+  | "DELETED";
 
 export type StudentLifecycleTransition = {
   id: string;
@@ -266,6 +266,38 @@ export type StudentLifecycleTransition = {
   changedAt: string;
   feeClearanceWaived: boolean;
   metadata?: Record<string, unknown> | null;
+};
+
+export type DuplicateStudentMergeCounts = {
+  guardianLinks: number;
+  documents: number;
+  generatedDocuments: number;
+  invoices: number;
+  payments: number;
+  feeWaivers: number;
+  notificationDeliveries: number;
+  developmentalMilestones: number;
+  moodLogs: number;
+  libraryIssues: number;
+  transportEnrollments: number;
+  transportLogs: number;
+  conversations: number;
+  conversationParticipants: number;
+};
+
+export type DuplicateStudentMergeResult = {
+  sourceStudent: {
+    id: string;
+    studentSystemId: string;
+    lifecycleStatus: StudentLifecycleStatus;
+  };
+  targetStudent: {
+    id: string;
+    studentSystemId: string;
+    lifecycleStatus: StudentLifecycleStatus;
+  };
+  mergedAt: string;
+  mergeCounts: DuplicateStudentMergeCounts;
 };
 
 export type GeneratedStudentDocumentMeta = {
@@ -282,6 +314,28 @@ export type GeneratedStudentDocumentMeta = {
   revokedAt: string | null;
 };
 
+export type GuardianIdentityVerificationStatus =
+  | "PENDING"
+  | "VERIFIED"
+  | "REJECTED"
+  | "REVOKED";
+
+export type GuardianIdentityVerification = {
+  id: string;
+  guardianId: string;
+  status: GuardianIdentityVerificationStatus;
+  documentType: string;
+  documentNumber: string | null;
+  evidenceDocumentId: string | null;
+  notes: string | null;
+  submittedById: string | null;
+  reviewedById: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type IemisValidationIssue = {
   studentId: string;
   studentSystemId: string;
@@ -289,13 +343,44 @@ export type IemisValidationIssue = {
   message: string;
 };
 
+export type IemisExportRow = {
+  studentSystemId: string;
+  nationalStudentId: string;
+  firstNameEn: string;
+  lastNameEn: string;
+  firstNameNp: string;
+  lastNameNp: string;
+  dateOfBirth: string;
+  gender: string;
+  nationality: string;
+  motherTongue: string;
+  ethnicity: string;
+  disabilityFlag: string;
+  admissionDate: string;
+  admissionNumber: string;
+  lifecycleStatus: StudentLifecycleStatus;
+  academicYear: string;
+  className: string;
+  sectionName: string;
+  rollNumber: string | number;
+  primaryGuardianName: string;
+  primaryGuardianRelation: string;
+  primaryGuardianPhone: string;
+  primaryGuardianEmail: string;
+  wardNumber: string;
+  guardianCount: number;
+};
+
 export type IemisExportResult = {
+  formatVersion: "SCHOLOS-IEMIS-1.0";
   exportedAt: string;
   totalRecords: number;
   validRecords: number;
   invalidRecords: number;
   issues: IemisValidationIssue[];
-  rows: Array<Record<string, unknown>>;
+  headers: Array<keyof IemisExportRow>;
+  rows: IemisExportRow[];
+  csv: string;
 };
 
 export type JournalEntryView = {
@@ -442,7 +527,7 @@ export type BulkAdmissionImportResult = {
   failed: number;
   results: Array<{
     rowNumber: number;
-    status: 'created' | 'validated' | 'failed';
+    status: "created" | "validated" | "failed";
     studentId?: string;
     studentSystemId?: string;
     errors?: string[];
@@ -491,7 +576,7 @@ export type AttendanceAnalytics = {
   todaySummary: {
     date: string;
     sessionCount: number;
-    totals: AttendanceSummary['totals'];
+    totals: AttendanceSummary["totals"];
   };
   monthlyAttendance: {
     month: number;
@@ -593,7 +678,7 @@ export type AttendanceCalendarDayView = {
   isWorkingDay: boolean;
   label: string | null;
   holidayType: string | null;
-  source: 'explicit' | 'weekday_fallback';
+  source: "explicit" | "weekday_fallback";
 };
 
 export type SchoolCalendarDaySummary = {
@@ -605,7 +690,7 @@ export type SchoolCalendarDaySummary = {
 };
 
 export type AttendanceEscalationWarning = {
-  type: 'consecutive_absence' | 'below_threshold';
+  type: "consecutive_absence" | "below_threshold";
   sourceType: string;
   sourceId: string;
   studentId: string;
@@ -794,7 +879,7 @@ export type ActivityReaction = {
   activityPostId: string;
   guardianId: string | null;
   studentId: string | null;
-  reaction: 'HEART' | 'CLAP' | 'STAR';
+  reaction: "HEART" | "CLAP" | "STAR";
   createdAt: string;
 };
 
@@ -815,7 +900,7 @@ export type DevelopmentalMilestone = {
   studentId: string;
   domain: string;
   milestone: string;
-  status: 'EMERGING' | 'PROGRESSING' | 'ACHIEVED' | 'NEEDS_SUPPORT';
+  status: "EMERGING" | "PROGRESSING" | "ACHIEVED" | "NEEDS_SUPPORT";
   observationNote: string | null;
   photoObjectKey: string | null;
   photoUrl: string | null;

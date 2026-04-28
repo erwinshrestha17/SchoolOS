@@ -2,13 +2,21 @@ import { Module } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { CommunicationsModule } from '../communications/communications.module';
+import { StorageModule } from '../storage/storage.module';
 import { UsersModule } from '../users/users.module';
+import { StudentDocumentRetentionCron } from './student-document-retention.cron';
 import { StudentsService } from './students.service';
 import { StudentsController } from './students.controller';
 
 @Module({
-  imports: [AuthModule, UsersModule, CommunicationsModule, AuditModule],
-  providers: [StudentsService],
+  imports: [
+    AuthModule,
+    UsersModule,
+    CommunicationsModule,
+    AuditModule,
+    StorageModule,
+  ],
+  providers: [StudentsService, StudentDocumentRetentionCron],
   controllers: [StudentsController],
   exports: [StudentsService],
 })

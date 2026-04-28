@@ -15,15 +15,19 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
-import { buildSimplePdf } from '../common/pdf/simple-pdf';
+import { buildCertificatePdf } from '../common/pdf/simple-pdf';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { UsersService } from '../users/users.service';
 import { ArchiveStudentDto } from './dto/archive-student.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
 import { InviteGuardianDto } from './dto/invite-guardian.dto';
+import { MergeDuplicateStudentDto } from './dto/merge-duplicate-student.dto';
+import { CreateGuardianIdentityVerificationDto } from './dto/create-guardian-identity-verification.dto';
 import { RequestStudentTransferDto } from './dto/request-student-transfer.dto';
 import { RevokeGeneratedStudentDocumentDto } from './dto/revoke-generated-student-document.dto';
+import { ReviewGuardianIdentityVerificationDto } from './dto/review-guardian-identity-verification.dto';
 
 @Injectable()
 export class StudentsService {
@@ -32,6 +36,7 @@ export class StudentsService {
     private readonly usersService: UsersService,
     private readonly communicationsService: CommunicationsService,
     private readonly auditService: AuditService,
+    private readonly storageService: StorageService,
   ) {}
 
   async createStudent(dto: CreateStudentDto, actor: AuthContext) {
@@ -500,6 +505,269 @@ export class StudentsService {
     };
   }
 
+  async mergeDuplicateStudent(
+    dto: MergeDuplicateStudentDto,
+    actor: AuthContext,
+  ) {
+    if (dto.sourceStudentId === dto.targetStudentId) {
+      throw new BadRequestException(
+        'Source and target students must be different records',
+      );
+    }
+
+    const [sourceStudent, targetStudent] = await Promise.all([
+      this.findTenantStudentForDuplicateMerge(dto.sourceStudentId, actor),
+      this.findTenantStudentForDuplicateMerge(dto.targetStudentId, actor),
+    ]);
+
+    if (sourceStudent.lifecycleStatus !== StudentLifecycleStatus.ACTIVE) {
+      throw new ConflictException(
+        'Only active duplicate source records can be merged safely',
+      );
+    }
+
+    if (targetStudent.lifecycleStatus !== StudentLifecycleStatus.ACTIVE) {
+      throw new ConflictException(
+        'Duplicate records can only be merged into an active canonical student',
+      );
+    }
+
+    if (!isProbableDuplicateStudent(sourceStudent, targetStudent)) {
+      throw new BadRequestException(
+        'The selected student records do not match duplicate identity checks',
+      );
+    }
+
+    ensureAllowedLifecycleTransition(
+      sourceStudent.lifecycleStatus,
+      StudentLifecycleStatus.DELETED,
+    );
+
+    const mergedAt = new Date();
+    const missingGuardianLinks = sourceStudent.guardianLinks
+      .filter(
+        (sourceLink) =>
+          !targetStudent.guardianLinks.some(
+            (targetLink) => targetLink.guardianId === sourceLink.guardianId,
+          ),
+      )
+      .map((sourceLink) => ({
+        tenantId: actor.tenantId,
+        studentId: targetStudent.id,
+        guardianId: sourceLink.guardianId,
+        relation: sourceLink.relation,
+        isPrimary:
+          !targetStudent.guardianLinks.some((link) => link.isPrimary) &&
+          sourceLink.isPrimary,
+        appLoginLinked: sourceLink.appLoginLinked,
+      }));
+
+    const mergeCounts = await this.prisma.$transaction(async (tx) => {
+      const [
+        guardianLinks,
+        documents,
+        generatedDocuments,
+        invoices,
+        payments,
+        feeWaivers,
+        notificationDeliveries,
+        developmentalMilestones,
+        moodLogs,
+        libraryIssues,
+        transportEnrollments,
+        transportLogs,
+        conversations,
+        conversationParticipants,
+      ] = await Promise.all([
+        missingGuardianLinks.length > 0
+          ? tx.studentGuardian.createMany({
+              data: missingGuardianLinks,
+              skipDuplicates: true,
+            })
+          : Promise.resolve({ count: 0 }),
+        tx.studentDocument.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          data: { studentId: targetStudent.id },
+        }),
+        tx.generatedStudentDocument.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          data: { studentId: targetStudent.id },
+        }),
+        tx.invoice.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          data: { studentId: targetStudent.id },
+        }),
+        tx.payment.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          data: { studentId: targetStudent.id },
+        }),
+        tx.feeWaiver.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          data: { studentId: targetStudent.id },
+        }),
+        tx.notificationDelivery.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          data: { studentId: targetStudent.id },
+        }),
+        tx.developmentalMilestone.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          data: { studentId: targetStudent.id },
+        }),
+        tx.moodLog.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          data: { studentId: targetStudent.id },
+        }),
+        tx.libraryIssue.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            borrowerStudentId: sourceStudent.id,
+          },
+          data: { borrowerStudentId: targetStudent.id },
+        }),
+        tx.transportEnrollment.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          data: { studentId: targetStudent.id },
+        }),
+        tx.transportLog.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          data: { studentId: targetStudent.id },
+        }),
+        tx.conversation.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          data: { studentId: targetStudent.id },
+        }),
+        tx.conversationParticipant.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          data: { studentId: targetStudent.id },
+        }),
+      ]);
+
+      await tx.enrollment.updateMany({
+        where: {
+          tenantId: actor.tenantId,
+          studentId: sourceStudent.id,
+          status: EnrollmentStatus.ACTIVE,
+        },
+        data: {
+          status: EnrollmentStatus.EXITED,
+        },
+      });
+
+      await tx.student.update({
+        where: { id: sourceStudent.id },
+        data: {
+          lifecycleStatus: StudentLifecycleStatus.DELETED,
+          exitReason: dto.reason,
+          exitedAt: mergedAt,
+        },
+      });
+
+      await tx.studentLifecycleTransition.create({
+        data: {
+          tenantId: actor.tenantId,
+          studentId: sourceStudent.id,
+          fromStatus: sourceStudent.lifecycleStatus,
+          toStatus: StudentLifecycleStatus.DELETED,
+          reason: dto.reason,
+          changedById: actor.userId,
+          feeClearanceWaived: false,
+          metadata: {
+            mergeType: 'duplicate_student_merge',
+            mergedIntoStudentId: targetStudent.id,
+            mergedIntoStudentSystemId: targetStudent.studentSystemId,
+            mergedAt: mergedAt.toISOString(),
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      return {
+        guardianLinks: guardianLinks.count,
+        documents: documents.count,
+        generatedDocuments: generatedDocuments.count,
+        invoices: invoices.count,
+        payments: payments.count,
+        feeWaivers: feeWaivers.count,
+        notificationDeliveries: notificationDeliveries.count,
+        developmentalMilestones: developmentalMilestones.count,
+        moodLogs: moodLogs.count,
+        libraryIssues: libraryIssues.count,
+        transportEnrollments: transportEnrollments.count,
+        transportLogs: transportLogs.count,
+        conversations: conversations.count,
+        conversationParticipants: conversationParticipants.count,
+      };
+    });
+
+    await this.auditService.record({
+      action: 'merge_duplicate',
+      resource: 'student',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: sourceStudent.id,
+      before: {
+        sourceStudentId: sourceStudent.id,
+        sourceStudentSystemId: sourceStudent.studentSystemId,
+        targetStudentId: targetStudent.id,
+        targetStudentSystemId: targetStudent.studentSystemId,
+      },
+      after: {
+        lifecycleStatus: StudentLifecycleStatus.DELETED,
+        mergeCounts,
+      },
+    });
+
+    return {
+      sourceStudent: {
+        id: sourceStudent.id,
+        studentSystemId: sourceStudent.studentSystemId,
+        lifecycleStatus: StudentLifecycleStatus.DELETED,
+      },
+      targetStudent: {
+        id: targetStudent.id,
+        studentSystemId: targetStudent.studentSystemId,
+        lifecycleStatus: targetStudent.lifecycleStatus,
+      },
+      mergedAt: mergedAt.toISOString(),
+      mergeCounts,
+    };
+  }
+
   async inviteGuardians(
     studentId: string,
     dto: InviteGuardianDto,
@@ -556,6 +824,144 @@ export class StudentsService {
     return delivery;
   }
 
+  async listGuardianIdentityVerifications(
+    guardianId: string,
+    actor: AuthContext,
+  ) {
+    await this.findTenantGuardian(guardianId, actor);
+
+    return this.prisma.guardianIdentityVerification.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        guardianId,
+      },
+      orderBy: [{ createdAt: 'desc' }],
+    });
+  }
+
+  async createGuardianIdentityVerification(
+    guardianId: string,
+    dto: CreateGuardianIdentityVerificationDto,
+    actor: AuthContext,
+  ) {
+    await this.findTenantGuardian(guardianId, actor);
+    await this.ensureGuardianEvidenceDocument(dto.evidenceDocumentId, actor);
+
+    if (!dto.documentNumber && !dto.evidenceDocumentId) {
+      throw new BadRequestException(
+        'Guardian identity verification requires a document number or evidence document',
+      );
+    }
+
+    const verification = await this.prisma.guardianIdentityVerification.create({
+      data: {
+        tenantId: actor.tenantId,
+        guardianId,
+        status: 'PENDING',
+        documentType: dto.documentType,
+        documentNumber: dto.documentNumber ?? null,
+        evidenceDocumentId: dto.evidenceDocumentId ?? null,
+        notes: dto.notes ?? null,
+        submittedById: actor.userId,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'guardian_identity_verification',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: verification.id,
+      after: {
+        guardianId,
+        status: verification.status,
+        documentType: verification.documentType,
+        evidenceDocumentId: verification.evidenceDocumentId,
+      },
+    });
+
+    return verification;
+  }
+
+  async reviewGuardianIdentityVerification(
+    guardianId: string,
+    verificationId: string,
+    dto: ReviewGuardianIdentityVerificationDto,
+    actor: AuthContext,
+  ) {
+    await this.findTenantGuardian(guardianId, actor);
+    const verification =
+      await this.prisma.guardianIdentityVerification.findFirst({
+        where: {
+          id: verificationId,
+          tenantId: actor.tenantId,
+          guardianId,
+        },
+      });
+
+    if (!verification) {
+      throw new NotFoundException(
+        'Guardian identity verification not found in this tenant',
+      );
+    }
+
+    if (verification.status !== 'PENDING') {
+      throw new ConflictException(
+        'Only pending guardian identity verifications can be reviewed',
+      );
+    }
+
+    const reviewedAt = new Date();
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (dto.status === 'VERIFIED') {
+        await tx.guardianIdentityVerification.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            guardianId,
+            status: 'VERIFIED',
+            id: { not: verification.id },
+          },
+          data: {
+            status: 'REVOKED',
+            reviewedById: actor.userId,
+            reviewedAt,
+            reviewNote:
+              'Automatically revoked because a newer verification was approved.',
+          },
+        });
+      }
+
+      return tx.guardianIdentityVerification.update({
+        where: { id: verification.id },
+        data: {
+          status: dto.status,
+          reviewedById: actor.userId,
+          reviewedAt,
+          reviewNote: dto.reviewNote ?? null,
+        },
+      });
+    });
+
+    await this.auditService.record({
+      action: 'review',
+      resource: 'guardian_identity_verification',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      before: {
+        status: verification.status,
+      },
+      after: {
+        guardianId,
+        status: updated.status,
+        reviewedAt: updated.reviewedAt,
+        reviewNote: updated.reviewNote,
+      },
+    });
+
+    return updated;
+  }
+
   async exportIemis(actor: AuthContext) {
     const students = await this.prisma.student.findMany({
       where: { tenantId: actor.tenantId },
@@ -586,7 +992,13 @@ export class StudentsService {
       };
     });
 
+    const headers = buildIemisHeaders();
+    const rows = validationResults
+      .filter((result) => result.issues.length === 0)
+      .map(({ student }) => buildIemisRow(student));
+
     return {
+      formatVersion: 'SCHOLOS-IEMIS-1.0',
       exportedAt: new Date().toISOString(),
       totalRecords: students.length,
       validRecords: validationResults.filter(
@@ -605,44 +1017,9 @@ export class StudentsService {
             message: issue.message,
           })),
         ),
-      rows: validationResults
-        .filter((result) => result.issues.length === 0)
-        .map(({ student }) => ({
-          studentSystemId: student.studentSystemId,
-          nationalStudentId: student.nationalStudentId,
-          firstNameEn: student.firstNameEn,
-          lastNameEn: student.lastNameEn,
-          firstNameNp: student.firstNameNp,
-          lastNameNp: student.lastNameNp,
-          dateOfBirth: student.dateOfBirth.toISOString().slice(0, 10),
-          gender: student.gender,
-          nationality: student.nationality,
-          motherTongue: student.motherTongue,
-          ethnicity: student.ethnicity,
-          disabilityFlag: student.disabilityFlag,
-          admissionDate: student.admissionDate.toISOString().slice(0, 10),
-          admissionNumber: student.admissionNumber,
-          lifecycleStatus: student.lifecycleStatus,
-          className: student.class.name,
-          sectionName: student.sectionRef?.name ?? student.section,
-          rollNumber: student.rollNumber,
-          guardians: student.guardianLinks.map((link) => ({
-            fullName: link.guardian.fullName,
-            relation: link.relation,
-            primaryPhone: link.guardian.primaryPhone,
-            email: link.guardian.email,
-            wardNumber: link.guardian.wardNumber,
-            isPrimary: link.isPrimary,
-          })),
-          latestEnrollment: student.enrollments[0]
-            ? {
-                academicYear: student.enrollments[0].academicYear.name,
-                classId: student.enrollments[0].classId,
-                sectionName: student.enrollments[0].section?.name ?? null,
-                status: student.enrollments[0].status,
-              }
-            : null,
-        })),
+      headers,
+      rows,
+      csv: buildCsv(headers, rows),
     };
   }
 
@@ -694,12 +1071,7 @@ export class StudentsService {
       }
     }
 
-    const lines = buildStudentDocumentLines(student, normalizedKind);
-    const pdf = buildSimplePdf(lines);
     const fileName = `${student.studentSystemId}-${normalizedKind}.pdf`;
-    const pdfUrl = `/api/v1/students/${student.id}/documents/${normalizedKind}.pdf`;
-    const checksumSha256 = createHash('sha256').update(pdf).digest('hex');
-    const storageObjectKey = `generated-student-documents/${student.id}/${fileName}`;
     const signedAt = new Date();
     const latestVersion = await this.prisma.generatedStudentDocument.findFirst({
       where: {
@@ -710,6 +1082,24 @@ export class StudentsService {
       orderBy: [{ version: 'desc' }, { generatedAt: 'desc' }],
     });
     const version = (latestVersion?.version ?? 0) + 1;
+    const pdf = buildStudentDocumentPdf({
+      student,
+      kind: normalizedKind,
+      actor,
+      issuedAt: signedAt,
+      version,
+    });
+    const checksumSha256 = createHash('sha256').update(pdf).digest('hex');
+    const stored = await this.storageService.saveBufferObject({
+      tenantId: actor.tenantId,
+      prefix: `students/${student.id}/generated-documents/${normalizedKind}`,
+      fileName,
+      contentType: 'application/pdf',
+      content: pdf,
+    });
+    const pdfUrl =
+      stored.publicUrl ??
+      `/api/v1/students/${student.id}/documents/${normalizedKind}.pdf`;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.generatedStudentDocument.updateMany({
@@ -732,10 +1122,10 @@ export class StudentsService {
           kind: normalizedKind,
           title: getStudentDocumentTitle(normalizedKind),
           fileName,
-          sizeBytes: pdf.byteLength,
+          sizeBytes: stored.sizeBytes,
           pdfUrl,
           generatedById: actor.userId,
-          storageObjectKey,
+          storageObjectKey: stored.objectKey,
           checksumSha256,
           signedAt,
           signatureMetadata: {
@@ -743,6 +1133,11 @@ export class StudentsService {
             tenantSlug: actor.tenantSlug,
             generatedAt: signedAt.toISOString(),
             mode: 'internal-issued',
+            storageProvider: stored.provider,
+            storageObjectKey: stored.objectKey,
+            signerName: actor.email ?? actor.userId,
+            signerRole: actor.roles[0] ?? 'school_official',
+            layoutVersion: 'certificate-v2',
           } as Prisma.InputJsonValue,
           version,
           retentionUntil: resolveDocumentRetentionUntil(
@@ -753,6 +1148,8 @@ export class StudentsService {
             studentSystemId: student.studentSystemId,
             className: student.class.name,
             sectionName: student.sectionRef?.name ?? student.section ?? null,
+            storageProvider: stored.provider,
+            layoutVersion: 'certificate-v2',
           } as Prisma.InputJsonValue,
         },
       });
@@ -836,6 +1233,66 @@ export class StudentsService {
     };
   }
 
+  async processGeneratedDocumentRetention(now = new Date()) {
+    const candidates = await this.prisma.generatedStudentDocument.findMany({
+      where: {
+        revokedAt: { not: null },
+        retentionUntil: { lte: now },
+      },
+      orderBy: [{ retentionUntil: 'asc' }],
+      take: 500,
+    });
+    const eligibleDocuments = candidates.filter(
+      (document) =>
+        !(
+          document.metadata &&
+          typeof document.metadata === 'object' &&
+          !Array.isArray(document.metadata) &&
+          document.metadata['retentionStatus'] === 'eligible_for_purge'
+        ),
+    );
+
+    for (const document of eligibleDocuments) {
+      const metadata =
+        document.metadata &&
+        typeof document.metadata === 'object' &&
+        !Array.isArray(document.metadata)
+          ? document.metadata
+          : {};
+
+      await this.prisma.generatedStudentDocument.update({
+        where: { id: document.id },
+        data: {
+          metadata: {
+            ...metadata,
+            retentionStatus: 'eligible_for_purge',
+            retentionReviewedAt: now.toISOString(),
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      await this.auditService.record({
+        action: 'retention_mark_eligible',
+        resource: 'generated_student_document',
+        tenantId: document.tenantId,
+        userId: null,
+        resourceId: document.id,
+        after: {
+          studentId: document.studentId,
+          kind: document.kind,
+          retentionUntil: document.retentionUntil,
+          retentionReviewedAt: now,
+        },
+      });
+    }
+
+    return {
+      reviewedAt: now.toISOString(),
+      eligibleDocuments: candidates.length,
+      markedDocuments: eligibleDocuments.length,
+    };
+  }
+
   private async recordLifecycleTransition(
     studentId: string,
     fromStatus: StudentLifecycleStatus,
@@ -880,6 +1337,66 @@ export class StudentsService {
     }
 
     return student;
+  }
+
+  private async findTenantStudentForDuplicateMerge(
+    studentId: string,
+    actor: AuthContext,
+  ) {
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: studentId,
+        tenantId: actor.tenantId,
+      },
+      include: {
+        guardianLinks: true,
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    return student;
+  }
+
+  private async findTenantGuardian(guardianId: string, actor: AuthContext) {
+    const guardian = await this.prisma.guardian.findFirst({
+      where: {
+        id: guardianId,
+        tenantId: actor.tenantId,
+      },
+    });
+
+    if (!guardian) {
+      throw new NotFoundException('Guardian not found in this tenant');
+    }
+
+    return guardian;
+  }
+
+  private async ensureGuardianEvidenceDocument(
+    evidenceDocumentId: string | undefined,
+    actor: AuthContext,
+  ) {
+    if (!evidenceDocumentId) {
+      return null;
+    }
+
+    const document = await this.prisma.studentDocument.findFirst({
+      where: {
+        id: evidenceDocumentId,
+        tenantId: actor.tenantId,
+      },
+    });
+
+    if (!document) {
+      throw new NotFoundException(
+        'Evidence document was not found in this tenant',
+      );
+    }
+
+    return document;
   }
 }
 
@@ -952,10 +1469,14 @@ function requiresFeeClearance(kind: GeneratedStudentDocumentKind) {
   );
 }
 
-function buildStudentDocumentLines(
-  student: StudentDocumentPayload,
-  kind: GeneratedStudentDocumentKind,
-) {
+function buildStudentDocumentPdf(input: {
+  student: StudentDocumentPayload;
+  kind: GeneratedStudentDocumentKind;
+  actor: AuthContext;
+  issuedAt: Date;
+  version: number;
+}) {
+  const { student, kind, actor, issuedAt, version } = input;
   const latestEnrollment = student.enrollments[0];
   const primaryGuardian =
     student.guardianLinks.find((link) => link.isPrimary)?.guardian ??
@@ -966,58 +1487,218 @@ function buildStudentDocumentLines(
     latestEnrollment?.section?.name ??
     student.sectionRef?.name ??
     student.section;
-  const baseLines = [
-    student.tenant.name,
-    getStudentDocumentTitle(kind),
-    `Generated: ${new Date().toISOString().slice(0, 10)}`,
-    `Student ID: ${student.studentSystemId}`,
-    `Name: ${fullName}`,
-    `Date of Birth: ${student.dateOfBirth.toISOString().slice(0, 10)}`,
-    `Class: ${student.class.name}`,
-    `Section: ${sectionName ?? 'N/A'}`,
-    `Roll No: ${student.rollNumber ?? latestEnrollment?.rollNumber ?? 'N/A'}`,
-    `Guardian: ${primaryGuardian?.fullName ?? 'N/A'}`,
-    `Guardian Phone: ${primaryGuardian?.primaryPhone ?? 'N/A'}`,
+  const title = getStudentDocumentTitle(kind);
+  const referenceNumber = `${student.studentSystemId}-${kind}-v${version}`;
+  const fields = [
+    { label: 'Student ID', value: student.studentSystemId },
+    { label: 'Student Name', value: fullName },
+    {
+      label: 'Date of Birth',
+      value: student.dateOfBirth.toISOString().slice(0, 10),
+    },
+    { label: 'Class', value: student.class.name },
+    { label: 'Section', value: sectionName ?? 'N/A' },
+    {
+      label: 'Roll Number',
+      value: student.rollNumber ?? latestEnrollment?.rollNumber ?? 'N/A',
+    },
+    { label: 'Guardian', value: primaryGuardian?.fullName ?? 'N/A' },
+    { label: 'Guardian Phone', value: primaryGuardian?.primaryPhone ?? 'N/A' },
   ];
 
   if (kind === 'id-card') {
-    return [
-      ...baseLines,
-      'This card identifies the student as currently enrolled in the school.',
-    ];
+    return buildCertificatePdf({
+      schoolName: student.tenant.name,
+      title,
+      subtitle: 'Operational student identity document',
+      referenceNumber,
+      issuedAt,
+      fields,
+      body: [
+        'This card identifies the student as currently enrolled in the school.',
+      ],
+      footer: [
+        'This document is valid only when verified against the current SchoolOS student record.',
+      ],
+      signature: buildSignatureBlock(actor),
+    });
   }
 
   if (kind === 'transfer-certificate') {
-    return [
-      ...baseLines,
-      `Admission Date: ${student.admissionDate.toISOString().slice(0, 10)}`,
-      'The student has been issued this transfer certificate on school request.',
-      'Fee and library clearance should be verified before final handover.',
-    ];
+    return buildCertificatePdf({
+      schoolName: student.tenant.name,
+      title,
+      subtitle: 'Issued for official school transfer processing',
+      referenceNumber,
+      issuedAt,
+      fields,
+      body: [
+        `Admission Date: ${student.admissionDate.toISOString().slice(0, 10)}`,
+        'The student has been issued this transfer certificate on school request.',
+        'Fee and library clearance should be verified before final handover.',
+      ],
+      footer: [
+        'This certificate is internally signed by SchoolOS and retained under the school document retention policy.',
+      ],
+      signature: buildSignatureBlock(actor),
+    });
   }
 
   if (kind === 'leaving-certificate') {
-    return [
-      ...baseLines,
-      `Admission Date: ${student.admissionDate.toISOString().slice(0, 10)}`,
-      'This certifies that the student has completed the leaving process as recorded by the school.',
-    ];
+    return buildCertificatePdf({
+      schoolName: student.tenant.name,
+      title,
+      subtitle: 'Issued for official student leaving records',
+      referenceNumber,
+      issuedAt,
+      fields,
+      body: [
+        `Admission Date: ${student.admissionDate.toISOString().slice(0, 10)}`,
+        'This certifies that the student has completed the leaving process as recorded by the school.',
+      ],
+      footer: [
+        'This certificate is internally signed by SchoolOS and retained under the school document retention policy.',
+      ],
+      signature: buildSignatureBlock(actor),
+    });
   }
 
   if (kind === 'enrollment-confirmation') {
-    return [
-      ...baseLines,
-      `Admission Date: ${student.admissionDate.toISOString().slice(0, 10)}`,
-      `Academic Year: ${latestEnrollment?.academicYear.name ?? 'N/A'}`,
-      'This confirms that the student is enrolled as per school records.',
-    ];
+    return buildCertificatePdf({
+      schoolName: student.tenant.name,
+      title,
+      subtitle: 'Current enrollment confirmation',
+      referenceNumber,
+      issuedAt,
+      fields,
+      body: [
+        `Admission Date: ${student.admissionDate.toISOString().slice(0, 10)}`,
+        `Academic Year: ${latestEnrollment?.academicYear.name ?? 'N/A'}`,
+        'This confirms that the student is enrolled as per school records.',
+      ],
+      footer: [
+        'Enrollment validity depends on current lifecycle, fee, and attendance records in SchoolOS.',
+      ],
+      signature: buildSignatureBlock(actor),
+    });
   }
 
+  return buildCertificatePdf({
+    schoolName: student.tenant.name,
+    title,
+    subtitle: 'Conduct and character certificate',
+    referenceNumber,
+    issuedAt,
+    fields,
+    body: [
+      'This is to certify that the student has maintained good conduct as per available school records.',
+      'Issued for official use by the school administration.',
+    ],
+    footer: [
+      'This certificate is internally signed by SchoolOS and retained under the school document retention policy.',
+    ],
+    signature: buildSignatureBlock(actor),
+  });
+}
+
+function buildSignatureBlock(actor: AuthContext) {
+  return {
+    signerName: actor.email ?? actor.userId,
+    signerRole: actor.roles[0] ?? 'school_official',
+    verificationText:
+      'Digitally issued in SchoolOS. Verify using the stored checksum and generated document metadata.',
+  };
+}
+
+function buildIemisHeaders() {
   return [
-    ...baseLines,
-    'This is to certify that the student has maintained good conduct as per available school records.',
-    'Issued for official use by the school administration.',
+    'studentSystemId',
+    'nationalStudentId',
+    'firstNameEn',
+    'lastNameEn',
+    'firstNameNp',
+    'lastNameNp',
+    'dateOfBirth',
+    'gender',
+    'nationality',
+    'motherTongue',
+    'ethnicity',
+    'disabilityFlag',
+    'admissionDate',
+    'admissionNumber',
+    'lifecycleStatus',
+    'academicYear',
+    'className',
+    'sectionName',
+    'rollNumber',
+    'primaryGuardianName',
+    'primaryGuardianRelation',
+    'primaryGuardianPhone',
+    'primaryGuardianEmail',
+    'wardNumber',
+    'guardianCount',
   ];
+}
+
+function buildIemisRow(student: StudentDocumentPayload) {
+  const latestEnrollment = student.enrollments[0] ?? null;
+  const primaryGuardianLink =
+    student.guardianLinks.find((link) => link.isPrimary) ??
+    student.guardianLinks[0] ??
+    null;
+  const primaryGuardian = primaryGuardianLink?.guardian ?? null;
+
+  return {
+    studentSystemId: student.studentSystemId,
+    nationalStudentId: student.nationalStudentId ?? '',
+    firstNameEn: student.firstNameEn,
+    lastNameEn: student.lastNameEn,
+    firstNameNp: student.firstNameNp ?? '',
+    lastNameNp: student.lastNameNp ?? '',
+    dateOfBirth: student.dateOfBirth.toISOString().slice(0, 10),
+    gender: student.gender,
+    nationality: student.nationality ?? '',
+    motherTongue: student.motherTongue ?? '',
+    ethnicity: student.ethnicity ?? '',
+    disabilityFlag: student.disabilityFlag ?? '',
+    admissionDate: student.admissionDate.toISOString().slice(0, 10),
+    admissionNumber: student.admissionNumber ?? '',
+    lifecycleStatus: student.lifecycleStatus,
+    academicYear: latestEnrollment?.academicYear.name ?? '',
+    className: student.class.name,
+    sectionName:
+      latestEnrollment?.section?.name ??
+      student.sectionRef?.name ??
+      student.section ??
+      '',
+    rollNumber: student.rollNumber ?? '',
+    primaryGuardianName: primaryGuardian?.fullName ?? '',
+    primaryGuardianRelation: primaryGuardianLink?.relation ?? '',
+    primaryGuardianPhone: primaryGuardian?.primaryPhone ?? '',
+    primaryGuardianEmail: primaryGuardian?.email ?? '',
+    wardNumber: primaryGuardian?.wardNumber ?? '',
+    guardianCount: student.guardianLinks.length,
+  };
+}
+
+function buildCsv(headers: string[], rows: Array<Record<string, unknown>>) {
+  return [
+    headers.join(','),
+    ...rows.map((row) =>
+      headers.map((header) => escapeCsvValue(row[header])).join(','),
+    ),
+  ].join('\n');
+}
+
+function escapeCsvValue(value: unknown) {
+  const text =
+    value === null || typeof value === 'undefined' ? '' : String(value);
+
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+
+  return text;
 }
 
 function ensureAllowedLifecycleTransition(
@@ -1046,6 +1727,32 @@ function ensureAllowedLifecycleTransition(
   }
 }
 
+function isProbableDuplicateStudent(
+  sourceStudent: {
+    firstNameEn: string;
+    lastNameEn: string;
+    dateOfBirth: Date;
+  },
+  targetStudent: {
+    firstNameEn: string;
+    lastNameEn: string;
+    dateOfBirth: Date;
+  },
+) {
+  return (
+    normalizeStudentIdentityName(sourceStudent.firstNameEn) ===
+      normalizeStudentIdentityName(targetStudent.firstNameEn) &&
+    normalizeStudentIdentityName(sourceStudent.lastNameEn) ===
+      normalizeStudentIdentityName(targetStudent.lastNameEn) &&
+    sourceStudent.dateOfBirth.toISOString().slice(0, 10) ===
+      targetStudent.dateOfBirth.toISOString().slice(0, 10)
+  );
+}
+
+function normalizeStudentIdentityName(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
 function resolveDocumentRetentionUntil(
   kind: GeneratedStudentDocumentKind,
   generatedAt: Date,
@@ -1058,10 +1765,18 @@ function resolveDocumentRetentionUntil(
 
 function validateIemisStudent(student: StudentDocumentPayload) {
   const issues: Array<{ field: string; message: string }> = [];
+  const latestEnrollment = student.enrollments[0] ?? null;
   const hasGuardianContact = student.guardianLinks.some(
     (link) =>
       Boolean(link.guardian.primaryPhone) || Boolean(link.guardian.email),
   );
+
+  if (!student.studentSystemId) {
+    issues.push({
+      field: 'studentSystemId',
+      message: 'School student ID is required',
+    });
+  }
 
   if (!student.firstNameEn || !student.lastNameEn) {
     issues.push({
@@ -1082,12 +1797,31 @@ function validateIemisStudent(student: StudentDocumentPayload) {
       field: 'dateOfBirth',
       message: 'Date of birth is required',
     });
+  } else if (student.dateOfBirth > new Date()) {
+    issues.push({
+      field: 'dateOfBirth',
+      message: 'Date of birth cannot be in the future',
+    });
   }
 
   if (!student.gender) {
     issues.push({
       field: 'gender',
       message: 'Gender is required',
+    });
+  }
+
+  if (!student.nationality) {
+    issues.push({
+      field: 'nationality',
+      message: 'Nationality is required',
+    });
+  }
+
+  if (!student.admissionDate) {
+    issues.push({
+      field: 'admissionDate',
+      message: 'Admission date is required',
     });
   }
 
@@ -1105,6 +1839,13 @@ function validateIemisStudent(student: StudentDocumentPayload) {
     });
   }
 
+  if (!latestEnrollment?.academicYear?.name) {
+    issues.push({
+      field: 'academicYear',
+      message: 'Latest academic year enrollment is required',
+    });
+  }
+
   if (!hasGuardianContact) {
     issues.push({
       field: 'guardianContact',
@@ -1112,10 +1853,10 @@ function validateIemisStudent(student: StudentDocumentPayload) {
     });
   }
 
-  if (student.lifecycleStatus === StudentLifecycleStatus.DELETED) {
+  if (student.lifecycleStatus !== StudentLifecycleStatus.ACTIVE) {
     issues.push({
       field: 'lifecycleStatus',
-      message: 'Deleted students are not exportable to iEMIS',
+      message: 'Only active students are exportable to iEMIS',
     });
   }
 

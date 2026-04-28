@@ -23,6 +23,7 @@ const actor = {
     'students:manage_lifecycle',
     'students:delete',
     'student_documents:manage',
+    'guardians:verify',
   ],
 };
 
@@ -146,6 +147,128 @@ describe('students lifecycle hardening', () => {
     expect(result.lifecycleStatus).toBe(StudentLifecycleStatus.DELETED);
   });
 
+  it('merges an active duplicate into a canonical student and soft-deletes the source', async () => {
+    const sourceStudent = buildStudent({
+      id: 'student-source',
+      studentSystemId: 'SCH-2026-0002',
+      guardianLinks: [
+        {
+          guardianId: 'guardian-source',
+          guardian: {
+            fullName: 'Maya Shrestha',
+            primaryPhone: '9800000000',
+            email: 'maya@example.com',
+            wardNumber: '5',
+          },
+          relation: 'mother',
+          isPrimary: true,
+          appLoginLinked: false,
+        },
+      ],
+    });
+    const targetStudent = buildStudent({
+      id: 'student-target',
+      studentSystemId: 'SCH-2026-0001',
+      guardianLinks: [],
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [sourceStudent, targetStudent],
+    });
+    const { service, auditService } = buildService(prisma);
+
+    const result = await service.mergeDuplicateStudent(
+      {
+        sourceStudentId: sourceStudent.id,
+        targetStudentId: targetStudent.id,
+        reason: 'Duplicate record confirmed by registrar',
+      },
+      actor,
+    );
+
+    expect(prisma.transaction.studentGuardian.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          tenantId: actor.tenantId,
+          studentId: targetStudent.id,
+          guardianId: 'guardian-source',
+          relation: 'mother',
+          isPrimary: true,
+          appLoginLinked: false,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    expect(prisma.transaction.invoice.updateMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: sourceStudent.id,
+      },
+      data: { studentId: targetStudent.id },
+    });
+    expect(prisma.transaction.student.update).toHaveBeenCalledWith({
+      where: { id: sourceStudent.id },
+      data: {
+        lifecycleStatus: StudentLifecycleStatus.DELETED,
+        exitReason: 'Duplicate record confirmed by registrar',
+        exitedAt: expect.any(Date),
+      },
+    });
+    expect(
+      prisma.transaction.studentLifecycleTransition.create,
+    ).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        studentId: sourceStudent.id,
+        fromStatus: StudentLifecycleStatus.ACTIVE,
+        toStatus: StudentLifecycleStatus.DELETED,
+        reason: 'Duplicate record confirmed by registrar',
+        changedById: actor.userId,
+        metadata: expect.objectContaining({
+          mergeType: 'duplicate_student_merge',
+          mergedIntoStudentId: targetStudent.id,
+        }),
+      }),
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'merge_duplicate',
+        resource: 'student',
+        resourceId: sourceStudent.id,
+      }),
+    );
+    expect(result.sourceStudent.lifecycleStatus).toBe(
+      StudentLifecycleStatus.DELETED,
+    );
+  });
+
+  it('rejects duplicate merge when identity evidence does not match', async () => {
+    const sourceStudent = buildStudent({
+      id: 'student-source',
+      firstNameEn: 'Erwin',
+    });
+    const targetStudent = buildStudent({
+      id: 'student-target',
+      firstNameEn: 'Sita',
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [sourceStudent, targetStudent],
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.mergeDuplicateStudent(
+        {
+          sourceStudentId: sourceStudent.id,
+          targetStudentId: targetStudent.id,
+          reason: 'Mistaken duplicate',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it('returns validation-first iEMIS export results', async () => {
     const validStudent = buildStudent({
       id: 'student-valid',
@@ -192,9 +315,12 @@ describe('students lifecycle hardening', () => {
 
     const result = await service.exportIemis(actor);
 
+    expect(result.formatVersion).toBe('SCHOLOS-IEMIS-1.0');
     expect(result.totalRecords).toBe(2);
     expect(result.validRecords).toBe(1);
     expect(result.invalidRecords).toBe(1);
+    expect(result.headers).toContain('studentSystemId');
+    expect(result.csv).toContain('SCH-2026-0001');
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0].studentSystemId).toBe('SCH-2026-0001');
     expect(result.issues).toEqual(
@@ -243,7 +369,7 @@ describe('students lifecycle hardening', () => {
       studentFindFirstQueue: [student],
       generatedStudentDocumentFindFirstQueue: [latestVersion],
     });
-    const { service } = buildService(prisma);
+    const { service, storageService } = buildService(prisma);
 
     const pdf = await service.generateStudentDocumentPdf(
       student.id,
@@ -252,6 +378,13 @@ describe('students lifecycle hardening', () => {
     );
 
     expect(Buffer.isBuffer(pdf)).toBe(true);
+    expect(storageService.saveBufferObject).toHaveBeenCalledWith({
+      tenantId: actor.tenantId,
+      prefix: `students/${student.id}/generated-documents/enrollment-confirmation`,
+      fileName: `${student.studentSystemId}-enrollment-confirmation.pdf`,
+      contentType: 'application/pdf',
+      content: expect.any(Buffer),
+    });
     expect(
       prisma.transaction.generatedStudentDocument.updateMany,
     ).toHaveBeenCalledWith({
@@ -274,15 +407,15 @@ describe('students lifecycle hardening', () => {
         studentId: student.id,
         kind: 'enrollment-confirmation',
         generatedById: actor.userId,
-        storageObjectKey: expect.stringContaining(
-          `generated-student-documents/${student.id}/`,
-        ),
+        pdfUrl: '/storage/generated-doc.pdf',
+        storageObjectKey: `tenant-1/students/${student.id}/generated-documents/enrollment-confirmation/generated-doc.pdf`,
         checksumSha256: expect.any(String),
         signedAt: expect.any(Date),
         signatureMetadata: expect.objectContaining({
           issuerUserId: actor.userId,
           tenantSlug: actor.tenantSlug,
           mode: 'internal-issued',
+          storageProvider: 'LOCAL',
         }),
         version: 3,
         retentionUntil: expect.any(Date),
@@ -317,6 +450,149 @@ describe('students lifecycle hardening', () => {
         actor,
       ),
     ).rejects.toThrow(ConflictException);
+  });
+
+  it('marks expired revoked generated documents as purge-eligible without deleting them', async () => {
+    const expiredDocument = {
+      id: 'doc-expired',
+      tenantId: actor.tenantId,
+      studentId: 'student-1',
+      kind: 'id-card',
+      metadata: { previous: true },
+      revokedAt: new Date('2026-01-01T00:00:00.000Z'),
+      retentionUntil: new Date('2026-02-01T00:00:00.000Z'),
+    };
+    const alreadyMarkedDocument = {
+      ...expiredDocument,
+      id: 'doc-marked',
+      metadata: { retentionStatus: 'eligible_for_purge' },
+    };
+    const prisma = buildPrisma({
+      generatedStudentDocumentFindManyResult: [
+        expiredDocument,
+        alreadyMarkedDocument,
+      ],
+    });
+    const { service, auditService } = buildService(prisma);
+
+    const result = await service.processGeneratedDocumentRetention(
+      new Date('2026-03-01T00:00:00.000Z'),
+    );
+
+    expect(result).toEqual({
+      reviewedAt: '2026-03-01T00:00:00.000Z',
+      eligibleDocuments: 2,
+      markedDocuments: 1,
+    });
+    expect(prisma.generatedStudentDocument.update).toHaveBeenCalledWith({
+      where: { id: expiredDocument.id },
+      data: {
+        metadata: {
+          previous: true,
+          retentionStatus: 'eligible_for_purge',
+          retentionReviewedAt: '2026-03-01T00:00:00.000Z',
+        },
+      },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'retention_mark_eligible',
+        resource: 'generated_student_document',
+        userId: null,
+        resourceId: expiredDocument.id,
+      }),
+    );
+  });
+
+  it('creates and approves guardian identity verification records with audit history', async () => {
+    const guardian = {
+      id: 'guardian-1',
+      tenantId: actor.tenantId,
+      fullName: 'Maya Shrestha',
+    };
+    const evidenceDocument = {
+      id: 'document-1',
+      tenantId: actor.tenantId,
+    };
+    const createdVerification = {
+      id: 'verification-1',
+      tenantId: actor.tenantId,
+      guardianId: guardian.id,
+      status: 'PENDING',
+      documentType: 'citizenship',
+      documentNumber: '12-34-56',
+      evidenceDocumentId: evidenceDocument.id,
+    };
+    const reviewedVerification = {
+      ...createdVerification,
+      status: 'VERIFIED',
+      reviewedById: actor.userId,
+      reviewedAt: new Date('2026-04-28T00:00:00.000Z'),
+      reviewNote: 'Document matches guardian profile',
+    };
+    const prisma = buildPrisma({
+      guardianFindFirstQueue: [guardian, guardian],
+      studentDocumentFindFirstQueue: [evidenceDocument],
+      guardianIdentityVerificationCreateResult: createdVerification,
+      guardianIdentityVerificationFindFirstQueue: [createdVerification],
+      transactionGuardianIdentityVerificationUpdateResult: reviewedVerification,
+    });
+    const { service, auditService } = buildService(prisma);
+
+    const created = await service.createGuardianIdentityVerification(
+      guardian.id,
+      {
+        documentType: 'citizenship',
+        documentNumber: '12-34-56',
+        evidenceDocumentId: evidenceDocument.id,
+      },
+      actor,
+    );
+    const reviewed = await service.reviewGuardianIdentityVerification(
+      guardian.id,
+      createdVerification.id,
+      {
+        status: 'VERIFIED',
+        reviewNote: 'Document matches guardian profile',
+      },
+      actor,
+    );
+
+    expect(created.status).toBe('PENDING');
+    expect(prisma.guardianIdentityVerification.create).toHaveBeenCalledWith({
+      data: {
+        tenantId: actor.tenantId,
+        guardianId: guardian.id,
+        status: 'PENDING',
+        documentType: 'citizenship',
+        documentNumber: '12-34-56',
+        evidenceDocumentId: evidenceDocument.id,
+        notes: null,
+        submittedById: actor.userId,
+      },
+    });
+    expect(
+      prisma.transaction.guardianIdentityVerification.updateMany,
+    ).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        guardianId: guardian.id,
+        status: 'VERIFIED',
+        id: { not: createdVerification.id },
+      },
+      data: expect.objectContaining({
+        status: 'REVOKED',
+        reviewedById: actor.userId,
+      }),
+    });
+    expect(reviewed.status).toBe('VERIFIED');
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'review',
+        resource: 'guardian_identity_verification',
+        resourceId: reviewedVerification.id,
+      }),
+    );
   });
 
   it('requires fee clearance before transfer when no waiver is provided', async () => {
@@ -381,6 +657,7 @@ function buildStudent(
     sectionRef: { id: string; name: string } | null;
     rollNumber: number | null;
     guardianLinks: Array<{
+      guardianId?: string;
       guardian: {
         fullName: string;
         primaryPhone: string | null;
@@ -389,6 +666,7 @@ function buildStudent(
       };
       relation: string;
       isPrimary: boolean;
+      appLoginLinked?: boolean;
     }>;
     enrollments: Array<{
       academicYear: { name: string };
@@ -446,6 +724,14 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
   const auditService = {
     record: jest.fn(),
   };
+  const storageService = {
+    saveBufferObject: jest.fn(async (input: { prefix: string }) => ({
+      provider: 'LOCAL',
+      objectKey: `tenant-1/${input.prefix}/generated-doc.pdf`,
+      publicUrl: '/storage/generated-doc.pdf',
+      sizeBytes: 512,
+    })),
+  };
 
   return {
     service: new StudentsService(
@@ -453,17 +739,25 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
       usersService as never,
       communicationsService as never,
       auditService as never,
+      storageService as never,
     ),
     prisma,
     auditService,
+    storageService,
   };
 }
 
 function buildPrisma(options: {
   studentFindFirstQueue?: unknown[];
   studentFindManyResult?: unknown[];
+  guardianFindFirstQueue?: unknown[];
+  studentDocumentFindFirstQueue?: unknown[];
   invoiceFindManyQueue?: unknown[];
   generatedStudentDocumentFindFirstQueue?: unknown[];
+  generatedStudentDocumentFindManyResult?: unknown[];
+  guardianIdentityVerificationCreateResult?: unknown;
+  guardianIdentityVerificationFindFirstQueue?: unknown[];
+  transactionGuardianIdentityVerificationUpdateResult?: unknown;
   transactionStudentUpdateResult?: unknown;
 }) {
   const transaction = {
@@ -475,9 +769,59 @@ function buildPrisma(options: {
         .fn()
         .mockResolvedValue(options.transactionStudentUpdateResult ?? null),
     },
+    studentGuardian: {
+      createMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    studentDocument: {
+      updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+    },
     generatedStudentDocument: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       create: jest.fn().mockResolvedValue({ id: 'doc-created' }),
+    },
+    invoice: {
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    payment: {
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    feeWaiver: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    notificationDelivery: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    developmentalMilestone: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    moodLog: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    libraryIssue: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    transportEnrollment: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    transportLog: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    conversation: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    conversationParticipant: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    studentLifecycleTransition: {
+      create: jest.fn().mockResolvedValue({ id: 'transition-merge' }),
+    },
+    guardianIdentityVerification: {
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      update: jest
+        .fn()
+        .mockResolvedValue(
+          options.transactionGuardianIdentityVerificationUpdateResult ?? null,
+        ),
     },
   };
 
@@ -500,6 +844,36 @@ function buildPrisma(options: {
         .fn()
         .mockResolvedValue(options.studentFindManyResult ?? []),
     },
+    guardian: {
+      findFirst: jest.fn().mockImplementation(async () => {
+        const queue = options.guardianFindFirstQueue ?? [];
+
+        if (queue.length === 0) {
+          return null;
+        }
+
+        if (queue.length === 1) {
+          return queue[0];
+        }
+
+        return queue.shift();
+      }),
+    },
+    studentDocument: {
+      findFirst: jest.fn().mockImplementation(async () => {
+        const queue = options.studentDocumentFindFirstQueue ?? [];
+
+        if (queue.length === 0) {
+          return null;
+        }
+
+        if (queue.length === 1) {
+          return queue[0];
+        }
+
+        return queue.shift();
+      }),
+    },
     invoice: {
       findMany: jest
         .fn()
@@ -514,7 +888,31 @@ function buildPrisma(options: {
           async () =>
             options.generatedStudentDocumentFindFirstQueue?.shift() ?? null,
         ),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(
+          options.generatedStudentDocumentFindManyResult ?? [],
+        ),
       update: jest.fn(),
+    },
+    guardianIdentityVerification: {
+      create: jest
+        .fn()
+        .mockResolvedValue(options.guardianIdentityVerificationCreateResult),
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockImplementation(async () => {
+        const queue = options.guardianIdentityVerificationFindFirstQueue ?? [];
+
+        if (queue.length === 0) {
+          return null;
+        }
+
+        if (queue.length === 1) {
+          return queue[0];
+        }
+
+        return queue.shift();
+      }),
     },
     studentLifecycleTransition: {
       create: jest.fn().mockResolvedValue({ id: 'transition-1' }),

@@ -3,6 +3,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { getQueueToken } from '@nestjs/bullmq';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
 import { AppModule } from '../src/app.module';
@@ -10,8 +11,12 @@ import { AuthController } from '../src/auth/auth.controller';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../src/auth/guards/roles-permissions.guard';
 import { ClassesController } from '../src/classes/classes.controller';
+import { FinanceProcessor } from '../src/finance/finance.processor';
 import { NotificationsService } from '../src/notifications/notifications.service';
+import { NotificationsProcessor } from '../src/notifications/notifications.processor';
+import { PayrollProcessor } from '../src/payroll/payroll.processor';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { RedisService } from '../src/redis/redis.service';
 import { RolesController } from '../src/roles/roles.controller';
 import { StaffController } from '../src/staff/staff.controller';
 import { StudentsController } from '../src/students/students.controller';
@@ -51,6 +56,23 @@ describe('School OS Auth + RBAC integration', () => {
     })
       .overrideProvider(PrismaService)
       .useValue(prisma)
+      .overrideProvider(RedisService)
+      .useValue({
+        ping: jest.fn(async () => 'PONG'),
+        onModuleDestroy: jest.fn(async () => undefined),
+      })
+      .overrideProvider(getQueueToken('finance'))
+      .useValue(createQueueMock())
+      .overrideProvider(getQueueToken('notifications'))
+      .useValue(createQueueMock())
+      .overrideProvider(getQueueToken('payroll'))
+      .useValue(createQueueMock())
+      .overrideProvider(FinanceProcessor)
+      .useValue({ process: jest.fn() })
+      .overrideProvider(NotificationsProcessor)
+      .useValue({ process: jest.fn() })
+      .overrideProvider(PayrollProcessor)
+      .useValue({ process: jest.fn() })
       .overrideProvider(NotificationsService)
       .useValue({
         sendAuthCodeEmail: jest.fn(async (payload) => {
@@ -73,6 +95,10 @@ describe('School OS Auth + RBAC integration', () => {
     rolesController = moduleRef.get(RolesController);
     jwtAuthGuard = moduleRef.get(JwtAuthGuard);
     rolesGuard = moduleRef.get(RolesPermissionsGuard);
+  });
+
+  afterEach(async () => {
+    await moduleRef?.close();
   });
 
   it('supports secure multi-tenant school onboarding, recovery, and MFA flows', async () => {
@@ -575,6 +601,37 @@ function buildCookieHeader(cookie?: { name: string; value: string }) {
   return cookie ? `${cookie.name}=${cookie.value}` : undefined;
 }
 
+function createQueueMock() {
+  return {
+    add: jest.fn(async () => ({ id: 'job-1' })),
+    close: jest.fn(async () => undefined),
+    disconnect: jest.fn(async () => undefined),
+    on: jest.fn(),
+    once: jest.fn(),
+    off: jest.fn(),
+    removeAllListeners: jest.fn(),
+  };
+}
+
+function applyMockUpdate(
+  target: Record<string, any>,
+  update: Record<string, any>,
+) {
+  for (const [key, value] of Object.entries(update)) {
+    if (
+      value &&
+      typeof value === 'object' &&
+      'increment' in value &&
+      typeof value.increment !== 'undefined'
+    ) {
+      target[key] = Number(target[key] ?? 0) + Number(value.increment);
+      continue;
+    }
+
+    target[key] = value;
+  }
+}
+
 async function createPrismaMock() {
   const adminPasswordHash = await bcrypt.hash('admin12345', 4);
   const state = {
@@ -600,6 +657,7 @@ async function createPrismaMock() {
     classes: [] as any[],
     students: [] as any[],
     staff: [] as any[],
+    staffLeaveBalances: [] as any[],
     academicYears: [] as any[],
     chartAccounts: [] as any[],
     feeHeads: [] as any[],
@@ -1185,6 +1243,90 @@ async function createPrismaMock() {
         return state.staff.filter(
           (member) => !where.tenantId || member.tenantId === where.tenantId,
         ).length;
+      }),
+    },
+    staffLeaveBalance: {
+      createMany: jest.fn(async ({ data }: any) => {
+        const rows = Array.isArray(data) ? data : [data];
+
+        for (const item of rows) {
+          state.staffLeaveBalances.push({
+            id: nextId('leave-balance'),
+            used: 0,
+            carried: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            ...item,
+          });
+        }
+
+        return { count: rows.length };
+      }),
+      findMany: jest.fn(async ({ where }: any = {}) => {
+        return state.staffLeaveBalances
+          .filter(
+            (balance) =>
+              (!where?.tenantId || balance.tenantId === where.tenantId) &&
+              (!where?.staffId || balance.staffId === where.staffId) &&
+              (!where?.year || balance.year === where.year),
+          )
+          .map((balance) => ({
+            ...balance,
+            staff:
+              state.staff.find((member) => member.id === balance.staffId) ??
+              null,
+          }));
+      }),
+      findUnique: jest.fn(async ({ where }: any) => {
+        if (where?.tenantId_staffId_leaveType_year) {
+          const key = where.tenantId_staffId_leaveType_year;
+          return (
+            state.staffLeaveBalances.find(
+              (balance) =>
+                balance.tenantId === key.tenantId &&
+                balance.staffId === key.staffId &&
+                balance.leaveType === key.leaveType &&
+                balance.year === key.year,
+            ) ?? null
+          );
+        }
+
+        if (where?.id) {
+          return (
+            state.staffLeaveBalances.find(
+              (balance) => balance.id === where.id,
+            ) ?? null
+          );
+        }
+
+        return null;
+      }),
+      upsert: jest.fn(async ({ where, update, create }: any) => {
+        const key = where.tenantId_staffId_leaveType_year;
+        const existing = state.staffLeaveBalances.find(
+          (balance) =>
+            balance.tenantId === key.tenantId &&
+            balance.staffId === key.staffId &&
+            balance.leaveType === key.leaveType &&
+            balance.year === key.year,
+        );
+
+        if (existing) {
+          applyMockUpdate(existing, update);
+          existing.updatedAt = new Date();
+          return existing;
+        }
+
+        const balance = {
+          id: nextId('leave-balance'),
+          used: 0,
+          carried: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          ...create,
+        };
+        state.staffLeaveBalances.push(balance);
+        return balance;
       }),
     },
     refreshToken: {

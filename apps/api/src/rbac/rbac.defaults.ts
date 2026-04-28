@@ -112,6 +112,11 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Read guardian records inside a tenant',
   },
   {
+    resource: 'guardians',
+    action: 'verify',
+    description: 'Review and approve guardian identity verification records',
+  },
+  {
     resource: 'student_documents',
     action: 'manage',
     description: 'Upload and manage student documents inside a tenant',

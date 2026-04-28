@@ -16,8 +16,11 @@ import { ArchiveStudentDto } from './dto/archive-student.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
 import { InviteGuardianDto } from './dto/invite-guardian.dto';
+import { MergeDuplicateStudentDto } from './dto/merge-duplicate-student.dto';
+import { CreateGuardianIdentityVerificationDto } from './dto/create-guardian-identity-verification.dto';
 import { RequestStudentTransferDto } from './dto/request-student-transfer.dto';
 import { RevokeGeneratedStudentDocumentDto } from './dto/revoke-generated-student-document.dto';
+import { ReviewGuardianIdentityVerificationDto } from './dto/review-guardian-identity-verification.dto';
 import { StudentsService } from './students.service';
 
 @Controller('students')
@@ -44,6 +47,15 @@ export class StudentsController {
   @Permissions('students:read')
   exportIemis(@CurrentAuth() auth: AuthContext) {
     return this.studentsService.exportIemis(auth);
+  }
+
+  @Post('duplicates/merge')
+  @Permissions('students:manage_lifecycle')
+  mergeDuplicateStudent(
+    @Body() dto: MergeDuplicateStudentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.mergeDuplicateStudent(dto, auth);
   }
 
   @Get(':id/fee-clearance')
@@ -103,6 +115,48 @@ export class StudentsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.studentsService.inviteGuardians(studentId, dto, auth);
+  }
+
+  @Get('guardians/:guardianId/identity-verifications')
+  @Permissions('guardians:read')
+  listGuardianIdentityVerifications(
+    @Param('guardianId') guardianId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.listGuardianIdentityVerifications(
+      guardianId,
+      auth,
+    );
+  }
+
+  @Post('guardians/:guardianId/identity-verifications')
+  @Permissions('guardians:verify')
+  createGuardianIdentityVerification(
+    @Param('guardianId') guardianId: string,
+    @Body() dto: CreateGuardianIdentityVerificationDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.createGuardianIdentityVerification(
+      guardianId,
+      dto,
+      auth,
+    );
+  }
+
+  @Post('guardians/:guardianId/identity-verifications/:verificationId/review')
+  @Permissions('guardians:verify')
+  reviewGuardianIdentityVerification(
+    @Param('guardianId') guardianId: string,
+    @Param('verificationId') verificationId: string,
+    @Body() dto: ReviewGuardianIdentityVerificationDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.reviewGuardianIdentityVerification(
+      guardianId,
+      verificationId,
+      dto,
+      auth,
+    );
   }
 
   @Get(':id/documents/:kind.pdf')

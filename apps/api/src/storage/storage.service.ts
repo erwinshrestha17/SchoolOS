@@ -16,13 +16,28 @@ export class StorageService {
     contentType: string;
     base64Content: string;
   }) {
+    return this.saveBufferObject({
+      tenantId: input.tenantId,
+      prefix: input.prefix,
+      fileName: input.fileName,
+      contentType: input.contentType,
+      content: Buffer.from(input.base64Content, 'base64'),
+    });
+  }
+
+  async saveBufferObject(input: {
+    tenantId: string;
+    prefix: string;
+    fileName: string;
+    contentType: string;
+    content: Buffer;
+  }) {
     const extension = getExtension(input.fileName);
     const objectKey = posix.join(
       sanitizeSegment(input.tenantId),
       sanitizeSegment(input.prefix),
       `${randomUUID()}${extension}`,
     );
-    const bytes = Buffer.from(input.base64Content, 'base64');
 
     if (this.configService.storageProvider === 'r2') {
       return {
@@ -31,20 +46,20 @@ export class StorageService {
         publicUrl: this.configService.r2PublicBaseUrl
           ? `${this.configService.r2PublicBaseUrl.replace(/\/$/, '')}/${objectKey}`
           : null,
-        sizeBytes: bytes.byteLength,
+        sizeBytes: input.content.byteLength,
       };
     }
 
     const localRoot = this.configService.localStorageRoot;
     const absolutePath = join(process.cwd(), localRoot, objectKey);
     await mkdir(dirname(absolutePath), { recursive: true });
-    await writeFile(absolutePath, bytes);
+    await writeFile(absolutePath, input.content);
 
     return {
       provider: StorageProvider.LOCAL,
       objectKey,
       publicUrl: `${this.configService.localStoragePublicBaseUrl.replace(/\/$/, '')}/${objectKey}`,
-      sizeBytes: bytes.byteLength,
+      sizeBytes: input.content.byteLength,
     };
   }
 }

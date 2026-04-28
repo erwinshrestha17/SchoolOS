@@ -286,6 +286,13 @@ enum StudentLifecycleStatus {
   DELETED
 }
 
+enum GuardianIdentityVerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  REVOKED
+}
+
 enum ConversationType {
   DIRECT
   CLASS
@@ -340,88 +347,89 @@ model Tenant {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  users                      User[]
-  roles                      Role[]
-  classes                    Class[]
-  students                   Student[]
-  subjects                   Subject[]
-  staff                      Staff[]
-  academicYears              AcademicYear[]
-  sections                   Section[]
-  guardians                  Guardian[]
-  studentGuardians           StudentGuardian[]
-  enrollments                Enrollment[]
-  attendanceSessions         AttendanceSession[]
-  attendanceRecords          AttendanceRecord[]
-  staffAttendance            StaffAttendance[]
-  feeHeads                   FeeHead[]
-  feePlans                   FeePlan[]
-  feePlanItems               FeePlanItem[]
-  studentFeeAssignments      StudentFeeAssignment[]
-  invoices                   Invoice[]
-  invoiceLines               InvoiceLine[]
-  payments                   Payment[]
-  paymentRefunds             PaymentRefund[]
-  cashierCloses              CashierClose[]
-  receipts                   Receipt[]
-  chartAccounts              ChartAccount[]
-  journalEntries             JournalEntry[]
-  journalLines               JournalLine[]
-  notices                    Notice[]
-  events                     Event[]
-  studentDocuments           StudentDocument[]
-  siblingGroups              SiblingGroup[]
-  siblingGroupMembers        SiblingGroupMember[]
-  attendanceConflicts        AttendanceConflict[]
-  feeBillingRuns             FeeBillingRun[]
-  feeDueSchedules            FeeDueSchedule[]
-  discountRules              DiscountRule[]
-  feeWaivers                 FeeWaiver[]
-  activityPosts              ActivityPost[]
-  activityAttachments        ActivityAttachment[]
-  activityPostStudents       ActivityPostStudent[]
-  activityReactions          ActivityReaction[]
-  developmentalMilestones    DevelopmentalMilestone[]
-  moodLogs                   MoodLog[]
-  notificationDeliveries     NotificationDelivery[]
-  guardianConsents           GuardianConsent[]
-  generatedStudentDocuments  GeneratedStudentDocument[]
-  lifecycleTransitions       StudentLifecycleTransition[]
-  attendanceSyncSubmissions  AttendanceSyncSubmission[]
-  teacherAssignments         SubjectTeacherAssignment[]
-  examTerms                  ExamTerm[]
-  examTimetableSlots         ExamTimetableSlot[]
-  markLockRequests           MarkLockRequest[]
-  assessmentComponents       AssessmentComponent[]
-  markEntries                MarkEntry[]
-  casRecords                 CasRecord[]
-  reportCards                ReportCard[]
-  promotionRecords           PromotionRecord[]
-  timetableSlots             TimetableSlot[]
-  homeworkAssignments        HomeworkAssignment[]
-  homeworkSubmissions        HomeworkSubmission[]
-  staffContracts             StaffContract[]
-  payrollRuns                PayrollRun[]
-  payrollLines               PayrollLine[]
-  payslips                   Payslip[]
-  accountingPeriods          AccountingPeriod[]
-  conversations              Conversation[]
-  conversationParticipants   ConversationParticipant[]
-  messages                   Message[]
-  messageReadReceipts        MessageReadReceipt[]
-  libraryBooks               LibraryBook[]
-  libraryCopies              LibraryCopy[]
-  libraryIssues              LibraryIssue[]
-  transportRoutes            TransportRoute[]
-  transportStops             TransportStop[]
-  transportVehicles          TransportVehicle[]
-  transportDriverAssignments TransportDriverAssignment[]
-  transportEnrollments       TransportEnrollment[]
-  transportLogs              TransportLog[]
-  schoolCalendarDays         SchoolCalendarDay[]
-  staffLeaveBalances         StaffLeaveBalance[]
-  staffLeaveRequests         StaffLeaveRequest[]
-  syllabusTopics             SyllabusTopic[]
+  users                         User[]
+  roles                         Role[]
+  classes                       Class[]
+  students                      Student[]
+  subjects                      Subject[]
+  staff                         Staff[]
+  academicYears                 AcademicYear[]
+  sections                      Section[]
+  guardians                     Guardian[]
+  studentGuardians              StudentGuardian[]
+  enrollments                   Enrollment[]
+  attendanceSessions            AttendanceSession[]
+  attendanceRecords             AttendanceRecord[]
+  staffAttendance               StaffAttendance[]
+  feeHeads                      FeeHead[]
+  feePlans                      FeePlan[]
+  feePlanItems                  FeePlanItem[]
+  studentFeeAssignments         StudentFeeAssignment[]
+  invoices                      Invoice[]
+  invoiceLines                  InvoiceLine[]
+  payments                      Payment[]
+  paymentRefunds                PaymentRefund[]
+  cashierCloses                 CashierClose[]
+  receipts                      Receipt[]
+  chartAccounts                 ChartAccount[]
+  journalEntries                JournalEntry[]
+  journalLines                  JournalLine[]
+  notices                       Notice[]
+  events                        Event[]
+  studentDocuments              StudentDocument[]
+  siblingGroups                 SiblingGroup[]
+  siblingGroupMembers           SiblingGroupMember[]
+  attendanceConflicts           AttendanceConflict[]
+  feeBillingRuns                FeeBillingRun[]
+  feeDueSchedules               FeeDueSchedule[]
+  discountRules                 DiscountRule[]
+  feeWaivers                    FeeWaiver[]
+  activityPosts                 ActivityPost[]
+  activityAttachments           ActivityAttachment[]
+  activityPostStudents          ActivityPostStudent[]
+  activityReactions             ActivityReaction[]
+  developmentalMilestones       DevelopmentalMilestone[]
+  moodLogs                      MoodLog[]
+  notificationDeliveries        NotificationDelivery[]
+  guardianConsents              GuardianConsent[]
+  guardianIdentityVerifications GuardianIdentityVerification[]
+  generatedStudentDocuments     GeneratedStudentDocument[]
+  lifecycleTransitions          StudentLifecycleTransition[]
+  attendanceSyncSubmissions     AttendanceSyncSubmission[]
+  teacherAssignments            SubjectTeacherAssignment[]
+  examTerms                     ExamTerm[]
+  examTimetableSlots            ExamTimetableSlot[]
+  markLockRequests              MarkLockRequest[]
+  assessmentComponents          AssessmentComponent[]
+  markEntries                   MarkEntry[]
+  casRecords                    CasRecord[]
+  reportCards                   ReportCard[]
+  promotionRecords              PromotionRecord[]
+  timetableSlots                TimetableSlot[]
+  homeworkAssignments           HomeworkAssignment[]
+  homeworkSubmissions           HomeworkSubmission[]
+  staffContracts                StaffContract[]
+  payrollRuns                   PayrollRun[]
+  payrollLines                  PayrollLine[]
+  payslips                      Payslip[]
+  accountingPeriods             AccountingPeriod[]
+  conversations                 Conversation[]
+  conversationParticipants      ConversationParticipant[]
+  messages                      Message[]
+  messageReadReceipts           MessageReadReceipt[]
+  libraryBooks                  LibraryBook[]
+  libraryCopies                 LibraryCopy[]
+  libraryIssues                 LibraryIssue[]
+  transportRoutes               TransportRoute[]
+  transportStops                TransportStop[]
+  transportVehicles             TransportVehicle[]
+  transportDriverAssignments    TransportDriverAssignment[]
+  transportEnrollments          TransportEnrollment[]
+  transportLogs                 TransportLog[]
+  schoolCalendarDays            SchoolCalendarDay[]
+  staffLeaveBalances            StaffLeaveBalance[]
+  staffLeaveRequests            StaffLeaveRequest[]
+  syllabusTopics                SyllabusTopic[]
 }
 
 model User {
@@ -677,9 +685,9 @@ model Subject {
 }
 
 model Student {
-  id                        String    @id @default(uuid())
+  id                        String                 @id @default(uuid())
   tenantId                  String
-  userId                    String?   @unique
+  userId                    String?                @unique
   studentSystemId           String
   firstNameEn               String
   lastNameEn                String
@@ -688,7 +696,7 @@ model Student {
   dateOfBirth               DateTime
   gender                    Gender
   bloodGroup                String?
-  nationality               String    @default("Nepali")
+  nationality               String                 @default("Nepali")
   religion                  String?
   ethnicity                 String?
   motherTongue              String?
@@ -708,7 +716,7 @@ model Student {
   conductRemark             String?
   feeClearanceWaivedAt      DateTime?
   feeClearanceWaivedById    String?
-  mediumOfInstruct          String    @default("English")
+  mediumOfInstruct          String                 @default("English")
   classId                   String
   sectionId                 String?
   section                   String?
@@ -725,13 +733,13 @@ model Student {
   dataProcessingConsentedAt DateTime?
   medicalConsentAt          DateTime?
   photoUsageConsentAt       DateTime?
-  createdAt                 DateTime  @default(now())
-  updatedAt                 DateTime  @updatedAt
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
 
-  tenant                   Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  user                     User?                      @relation("StudentUser", fields: [userId], references: [id], onDelete: SetNull)
-  class                    Class                      @relation(fields: [classId], references: [id], onDelete: Restrict)
-  sectionRef               Section?                   @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  tenant                   Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user                     User?                        @relation("StudentUser", fields: [userId], references: [id], onDelete: SetNull)
+  class                    Class                        @relation(fields: [classId], references: [id], onDelete: Restrict)
+  sectionRef               Section?                     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   guardianLinks            StudentGuardian[]
   enrollments              Enrollment[]
   attendanceRecords        AttendanceRecord[]
@@ -780,8 +788,8 @@ model Guardian {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  tenant                   Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  user                     User?                     @relation("GuardianUser", fields: [userId], references: [id], onDelete: SetNull)
+  tenant                   Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user                     User?                          @relation("GuardianUser", fields: [userId], references: [id], onDelete: SetNull)
   studentLinks             StudentGuardian[]
   consents                 GuardianConsent[]
   notificationDeliveries   NotificationDelivery[]
@@ -790,8 +798,32 @@ model Guardian {
   conversationParticipants ConversationParticipant[]
   messages                 Message[]
   messageReadReceipts      MessageReadReceipt[]
+  identityVerifications    GuardianIdentityVerification[]
 
   @@unique([tenantId, primaryPhone])
+}
+
+model GuardianIdentityVerification {
+  id                 String                             @id @default(uuid())
+  tenantId           String
+  guardianId         String
+  status             GuardianIdentityVerificationStatus @default(PENDING)
+  documentType       String
+  documentNumber     String?
+  evidenceDocumentId String?
+  notes              String?
+  submittedById      String?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  reviewNote         String?
+  createdAt          DateTime                           @default(now())
+  updatedAt          DateTime                           @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  guardian Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, guardianId, status])
+  @@index([tenantId, status, createdAt])
 }
 
 model StudentGuardian {
@@ -1145,10 +1177,10 @@ model Payment {
   narration       String?
   createdAt       DateTime      @default(now())
 
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  student     Student  @relation(fields: [studentId], references: [id])
-  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
-  collectedBy User?    @relation("CollectedPayments", fields: [collectedById], references: [id])
+  tenant      Tenant          @relation(fields: [tenantId], references: [id])
+  student     Student         @relation(fields: [studentId], references: [id])
+  invoice     Invoice         @relation(fields: [invoiceId], references: [id])
+  collectedBy User?           @relation("CollectedPayments", fields: [collectedById], references: [id])
   receipt     Receipt?
   refunds     PaymentRefund[]
 
@@ -1168,9 +1200,9 @@ model PaymentRefund {
   createdById     String?
   createdAt       DateTime @default(now())
 
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  payment   Payment  @relation(fields: [paymentId], references: [id])
-  createdBy User?    @relation("CreatedPaymentRefunds", fields: [createdById], references: [id])
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+  payment   Payment @relation(fields: [paymentId], references: [id])
+  createdBy User?   @relation("CreatedPaymentRefunds", fields: [createdById], references: [id])
 
   @@unique([tenantId, refundNumber])
   @@index([tenantId, refundDate])
@@ -1178,23 +1210,23 @@ model PaymentRefund {
 }
 
 model CashierClose {
-  id                 String        @id @default(uuid())
+  id                 String         @id @default(uuid())
   tenantId           String
   closeNumber        String
   openedAt           DateTime
   closedAt           DateTime
   collectorUserId    String?
   paymentMethod      PaymentMethod?
-  grossCollected     Decimal       @db.Decimal(12, 2)
-  totalRefunded      Decimal       @db.Decimal(12, 2)
-  netCollected       Decimal       @db.Decimal(12, 2)
+  grossCollected     Decimal        @db.Decimal(12, 2)
+  totalRefunded      Decimal        @db.Decimal(12, 2)
+  netCollected       Decimal        @db.Decimal(12, 2)
   paymentCount       Int
   refundCount        Int
   firstReceiptNumber String?
   lastReceiptNumber  String?
   notes              String?
   closedById         String?
-  createdAt          DateTime      @default(now())
+  createdAt          DateTime       @default(now())
 
   tenant        Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   collectorUser User?  @relation("CashierCloseCollector", fields: [collectorUserId], references: [id], onDelete: SetNull)
@@ -1372,26 +1404,26 @@ model StudentDocument {
 }
 
 model GeneratedStudentDocument {
-  id            String   @id @default(uuid())
-  tenantId      String
-  studentId     String
-  kind          String
-  title         String
-  fileName      String
-  contentType   String   @default("application/pdf")
-  sizeBytes     Int
-  pdfUrl        String
-  generatedById String?
-  storageObjectKey String?
-  checksumSha256  String?
-  signedAt         DateTime?
+  id                String    @id @default(uuid())
+  tenantId          String
+  studentId         String
+  kind              String
+  title             String
+  fileName          String
+  contentType       String    @default("application/pdf")
+  sizeBytes         Int
+  pdfUrl            String
+  generatedById     String?
+  storageObjectKey  String?
+  checksumSha256    String?
+  signedAt          DateTime?
   signatureMetadata Json?
-  version          Int      @default(1)
-  retentionUntil   DateTime?
-  revokedAt        DateTime?
-  revokedById      String?
-  generatedAt      DateTime @default(now())
-  metadata         Json?
+  version           Int       @default(1)
+  retentionUntil    DateTime?
+  revokedAt         DateTime?
+  revokedById       String?
+  generatedAt       DateTime  @default(now())
+  metadata          Json?
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -1400,15 +1432,15 @@ model GeneratedStudentDocument {
 }
 
 model StudentLifecycleTransition {
-  id                 String                @id @default(uuid())
+  id                 String                 @id @default(uuid())
   tenantId           String
   studentId          String
   fromStatus         StudentLifecycleStatus
   toStatus           StudentLifecycleStatus
   reason             String
   changedById        String?
-  changedAt          DateTime              @default(now())
-  feeClearanceWaived Boolean              @default(false)
+  changedAt          DateTime               @default(now())
+  feeClearanceWaived Boolean                @default(false)
   metadata           Json?
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
@@ -1447,18 +1479,18 @@ model SiblingGroupMember {
 }
 
 model AttendanceConflict {
-  id                  String                   @id @default(uuid())
+  id                  String                      @id @default(uuid())
   tenantId            String
   attendanceSessionId String
   submittedById       String?
-  status              AttendanceConflictStatus @default(FLAGGED)
+  status              AttendanceConflictStatus    @default(FLAGGED)
   decision            AttendanceConflictDecision?
   previousPayload     Json
   incomingPayload     Json
   resolutionNote      String?
   reviewedById        String?
   reviewedAt          DateTime?
-  createdAt           DateTime                 @default(now())
+  createdAt           DateTime                    @default(now())
 
   tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   attendanceSession AttendanceSession @relation(fields: [attendanceSessionId], references: [id], onDelete: Cascade)
@@ -1467,7 +1499,7 @@ model AttendanceConflict {
 }
 
 model AttendanceSyncSubmission {
-  id                  String               @id @default(uuid())
+  id                  String                         @id @default(uuid())
   tenantId            String
   clientSubmissionId  String
   attendanceSessionId String?
@@ -1480,13 +1512,13 @@ model AttendanceSyncSubmission {
   deviceLabel         String?
   deviceTimestamp     DateTime?
   sessionFingerprint  String?
-  syncStatus          AttendanceSyncStatus @default(ACCEPTED)
-  syncAttemptCount    Int                  @default(1)
-  serverReceivedAt    DateTime             @default(now())
+  syncStatus          AttendanceSyncStatus           @default(ACCEPTED)
+  syncAttemptCount    Int                            @default(1)
+  serverReceivedAt    DateTime                       @default(now())
   rejectionReason     AttendanceSyncRejectionReason?
   submittedById       String?
   payload             Json
-  createdAt           DateTime             @default(now())
+  createdAt           DateTime                       @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
