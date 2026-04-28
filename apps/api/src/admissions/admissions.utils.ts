@@ -98,6 +98,7 @@ export function buildAdmissionDtoFromCsvRow(
       nationality: raw.nationality || undefined,
       motherTongue: raw.motherTongue || undefined,
       disabilityFlag: raw.disabilityFlag || undefined,
+      confirmNoDisability: parseCsvBoolean(raw.confirmNoDisability),
       mediumOfInstruction: raw.mediumOfInstruction || undefined,
       emergencyName: raw.emergencyName || undefined,
       emergencyPhone: raw.emergencyPhone || undefined,
@@ -154,4 +155,12 @@ function parseCsvLine(line: string) {
 
   values.push(current);
   return values;
+}
+
+function parseCsvBoolean(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  return ['true', '1', 'yes', 'y'].includes(value.trim().toLowerCase());
 }

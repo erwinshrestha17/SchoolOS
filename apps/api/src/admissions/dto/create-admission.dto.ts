@@ -7,8 +7,10 @@ import {
   IsEmail,
   IsEnum,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   Min,
   MinLength,
   ValidateIf,
@@ -19,12 +21,18 @@ import { UploadStudentDocumentDto } from '../../student-records/dto/upload-stude
 
 class GuardianInputDto {
   @IsString()
+  @IsNotEmpty()
   fullName!: string;
 
   @IsString()
+  @IsNotEmpty()
   relation!: string;
 
   @IsString()
+  @IsNotEmpty()
+  @Matches(/^\+?[0-9][0-9\s-]{6,19}$/, {
+    message: 'primaryPhone must be a valid phone number',
+  })
   primaryPhone!: string;
 
   @IsOptional()

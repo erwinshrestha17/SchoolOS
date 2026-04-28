@@ -44,6 +44,7 @@ async function bootstrap() {
       'Authorization',
       'X-Requested-With',
       'X-Request-Id',
+      'X-SchoolOS-Tenant-Id',
     ],
   });
 

@@ -37,10 +37,15 @@ import { LibraryModule } from './library/library.module';
 import { TransportModule } from './transport/transport.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from './config/config.service';
+import { ClsModule } from 'nestjs-cls';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ClsModule.forRoot({
+      global: true,
+      middleware: { mount: true },
+    }),
     ThrottlerModule.forRoot([
       {
         limit: APP_RATE_LIMIT,

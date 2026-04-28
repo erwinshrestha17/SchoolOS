@@ -213,4 +213,14 @@ describe('production data integrity contracts', () => {
       ),
     ).toEqual({ where: { slug: 'default-school' } });
   });
+
+  it('seeds request tenant context at the authentication boundary', () => {
+    const guardSource = readFileSync(
+      join(sourceRoot, 'auth/guards/jwt-auth.guard.ts'),
+      'utf8',
+    );
+
+    expect(guardSource).toContain('TENANT_ID_KEY');
+    expect(guardSource).toContain('this.cls.set(TENANT_ID_KEY');
+  });
 });

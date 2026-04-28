@@ -1,12 +1,15 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ClsService } from 'nestjs-cls';
 import { AuditService } from '../../audit/audit.service';
 import { ConfigService } from '../../config/config.service';
+import { PrismaService, TENANT_ID_KEY } from '../../prisma/prisma.service';
 import { AuthenticatedRequest } from '../auth-request.interface';
 import { JwtAccessPayload } from '../auth.types';
 
@@ -16,6 +19,8 @@ export class JwtAuthGuard implements CanActivate {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
+    private readonly prisma: PrismaService,
+    private readonly cls: ClsService,
   ) {}
 
   async canActivate(context: ExecutionContext) {
@@ -40,10 +45,14 @@ export class JwtAuthGuard implements CanActivate {
     const overrideTenantId = resolveHeader(
       request.headers['x-schoolos-tenant-id'],
     );
-    const canOverrideTenant =
-      Boolean(overrideTenantId) && payload.roles.includes('super_admin');
-    const effectiveTenantId = canOverrideTenant
-      ? overrideTenantId!
+    const canOverrideTenant = payload.roles.includes('super_admin');
+
+    if (overrideTenantId && !canOverrideTenant) {
+      throw new ForbiddenException('Tenant override requires super admin');
+    }
+
+    const effectiveTenantId = overrideTenantId
+      ? await this.resolveOverrideTenantId(overrideTenantId)
       : payload.tenantId;
 
     request.auth = {
@@ -55,8 +64,9 @@ export class JwtAuthGuard implements CanActivate {
       roles: payload.roles,
       permissions: payload.permissions,
     };
+    this.cls.set(TENANT_ID_KEY, effectiveTenantId);
 
-    if (canOverrideTenant) {
+    if (overrideTenantId) {
       await this.auditService.record({
         action: 'tenant_override',
         resource: 'auth',
@@ -70,6 +80,19 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     return true;
+  }
+
+  private async resolveOverrideTenantId(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true, isActive: true },
+    });
+
+    if (!tenant?.isActive) {
+      throw new ForbiddenException('Tenant override is not allowed');
+    }
+
+    return tenant.id;
   }
 }
 

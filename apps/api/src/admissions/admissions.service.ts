@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -28,6 +29,15 @@ import { BulkAdmissionImportDto } from './dto/bulk-admission-import.dto';
 import { CheckAdmissionDuplicateDto } from './dto/check-admission-duplicate.dto';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
 import { TransferStudentDto } from './dto/transfer-student.dto';
+
+type AdmissionReferenceContext = {
+  academicYear: { id: string; startsOn: Date };
+  classroom: { id: string; name: string };
+  section: { id: string; name: string; classId: string } | null;
+};
+
+type AdmissionGuardianInput = CreateAdmissionDto['guardians'][number];
+type AdmissionPersistenceClient = Prisma.TransactionClient | PrismaService;
 
 @Injectable()
 export class AdmissionsService {
@@ -112,75 +122,7 @@ export class AdmissionsService {
   }
 
   async createAdmission(dto: CreateAdmissionDto, actor: AuthContext) {
-    const [academicYear, classroom, section] = await Promise.all([
-      this.prisma.academicYear.findFirst({
-        where: { id: dto.academicYearId, tenantId: actor.tenantId },
-      }),
-      this.prisma.class.findFirst({
-        where: { id: dto.classId, tenantId: actor.tenantId },
-      }),
-      dto.sectionId
-        ? this.prisma.section.findFirst({
-            where: { id: dto.sectionId, tenantId: actor.tenantId },
-          })
-        : Promise.resolve(null),
-    ]);
-
-    if (!academicYear) {
-      throw new NotFoundException('Academic year not found in this tenant');
-    }
-
-    if (!classroom) {
-      throw new NotFoundException('Class not found in this tenant');
-    }
-
-    if (dto.sectionId && !section) {
-      throw new NotFoundException('Section not found in this tenant');
-    }
-
-    const duplicateWarnings = await this.checkDuplicateAdmissions(
-      {
-        firstNameEn: dto.firstNameEn,
-        lastNameEn: dto.lastNameEn,
-        dateOfBirth: dto.dateOfBirth,
-      },
-      actor,
-    );
-
-    if (duplicateWarnings.matches.length > 0 && !dto.confirmDuplicate) {
-      throw new ConflictException({
-        message:
-          'Possible duplicate admission found. Resubmit with confirmDuplicate=true to continue.',
-        duplicates: duplicateWarnings.matches,
-      });
-    }
-
-    if (dto.rollNumber) {
-      const rollConflict = await this.findRollNumberConflict(dto, actor);
-
-      if (rollConflict) {
-        throw new ConflictException({
-          message:
-            'Roll number is already assigned in this academic year, class, and section.',
-          conflict: {
-            enrollmentId: rollConflict.id,
-            studentId: rollConflict.studentId,
-            studentSystemId: rollConflict.student.studentSystemId,
-            fullNameEn:
-              `${rollConflict.student.firstNameEn} ${rollConflict.student.lastNameEn}`.trim(),
-            className: rollConflict.class.name,
-            sectionName: rollConflict.section?.name ?? null,
-            rollNumber: rollConflict.rollNumber,
-          },
-        });
-      }
-    }
-
-    if (!dto.disabilityFlag && !dto.confirmNoDisability) {
-      throw new BadRequestException(
-        'You must explicitly confirm "No known disability" (iEMIS requirement) if no disability is specified.',
-      );
-    }
+    const context = await this.validateAdmissionForCreate(dto, actor);
 
     let linkedUserId: string | null = null;
 
@@ -209,212 +151,242 @@ export class AdmissionsService {
       linkedUserId = managedUser.id;
     }
 
-    const student = await this.prisma.student.create({
-      data: {
-        tenantId: actor.tenantId,
-        userId: linkedUserId,
-        studentSystemId:
+    const core = await this.prisma.$transaction(
+      async (tx) => {
+        const studentSystemId =
           dto.studentSystemId ??
-          (await this.generateStudentSystemId(actor, academicYear.startsOn)),
-        firstNameEn: dto.firstNameEn,
-        lastNameEn: dto.lastNameEn,
-        firstNameNp: dto.firstNameNp ?? null,
-        lastNameNp: dto.lastNameNp ?? null,
-        dateOfBirth: new Date(dto.dateOfBirth),
-        gender: dto.gender,
-        admissionDate: new Date(dto.admissionDate),
-        admissionNumber: dto.admissionNumber ?? null,
-        classId: dto.classId,
-        sectionId: dto.sectionId ?? null,
-        section: section?.name ?? null,
-        rollNumber: dto.rollNumber ?? null,
-        nationality: dto.nationality ?? 'Nepali',
-        motherTongue: dto.motherTongue ?? null,
-        disabilityFlag: dto.disabilityFlag || 'No known disability',
-        bloodGroup: dto.bloodGroup ?? null,
-        religion: dto.religion ?? null,
-        ethnicity: dto.ethnicity ?? null,
-        citizenshipNo: dto.citizenshipNo ?? null,
-        mediumOfInstruct: dto.mediumOfInstruction ?? 'English',
-        emergencyName: dto.emergencyName ?? null,
-        emergencyPhone: dto.emergencyPhone ?? null,
-        medicalConditions: encryptSensitiveField(
-          dto.medicalConditions,
-          this.configService.medicalEncryptionKey,
-        ),
-        severeAllergies: encryptSensitiveField(
-          dto.severeAllergies,
-          this.configService.medicalEncryptionKey,
-        ),
-        medications: encryptSensitiveField(
-          dto.medications,
-          this.configService.medicalEncryptionKey,
-        ),
-        specialNeeds: encryptSensitiveField(
-          dto.specialNeeds,
-          this.configService.medicalEncryptionKey,
-        ),
-        doctorName: encryptSensitiveField(
-          dto.doctorName,
-          this.configService.medicalEncryptionKey,
-        ),
-        doctorPhone: encryptSensitiveField(
-          dto.doctorPhone,
-          this.configService.medicalEncryptionKey,
-        ),
-        privacyConsentAt: new Date(),
-        dataProcessingConsentedAt: new Date(),
-        medicalConsentAt:
-          dto.medicalConditions ||
-          dto.severeAllergies ||
-          dto.medications ||
-          dto.specialNeeds
-            ? new Date()
-            : null,
-      },
-    });
+          (await this.generateStudentSystemId(
+            actor,
+            context.academicYear.startsOn,
+            tx,
+          ));
 
-    if (dto.siblingStudentSystemId) {
-      const sibling = await this.prisma.student.findFirst({
-        where: {
-          tenantId: actor.tenantId,
-          studentSystemId: dto.siblingStudentSystemId,
-        },
-        include: { siblingMemberships: { include: { siblingGroup: true } } },
-      });
+        const student = await tx.student.create({
+          data: {
+            tenantId: actor.tenantId,
+            userId: linkedUserId,
+            studentSystemId,
+            firstNameEn: dto.firstNameEn,
+            lastNameEn: dto.lastNameEn,
+            firstNameNp: dto.firstNameNp ?? null,
+            lastNameNp: dto.lastNameNp ?? null,
+            dateOfBirth: new Date(dto.dateOfBirth),
+            gender: dto.gender,
+            admissionDate: new Date(dto.admissionDate),
+            admissionNumber: dto.admissionNumber ?? null,
+            classId: dto.classId,
+            sectionId: dto.sectionId ?? null,
+            section: context.section?.name ?? null,
+            rollNumber: dto.rollNumber ?? null,
+            nationality: dto.nationality ?? 'Nepali',
+            motherTongue: dto.motherTongue ?? null,
+            disabilityFlag: dto.disabilityFlag || 'No known disability',
+            bloodGroup: dto.bloodGroup ?? null,
+            religion: dto.religion ?? null,
+            ethnicity: dto.ethnicity ?? null,
+            citizenshipNo: dto.citizenshipNo ?? null,
+            mediumOfInstruct: dto.mediumOfInstruction ?? 'English',
+            emergencyName: dto.emergencyName ?? null,
+            emergencyPhone: dto.emergencyPhone ?? null,
+            medicalConditions: encryptSensitiveField(
+              dto.medicalConditions,
+              this.configService.medicalEncryptionKey,
+            ),
+            severeAllergies: encryptSensitiveField(
+              dto.severeAllergies,
+              this.configService.medicalEncryptionKey,
+            ),
+            medications: encryptSensitiveField(
+              dto.medications,
+              this.configService.medicalEncryptionKey,
+            ),
+            specialNeeds: encryptSensitiveField(
+              dto.specialNeeds,
+              this.configService.medicalEncryptionKey,
+            ),
+            doctorName: encryptSensitiveField(
+              dto.doctorName,
+              this.configService.medicalEncryptionKey,
+            ),
+            doctorPhone: encryptSensitiveField(
+              dto.doctorPhone,
+              this.configService.medicalEncryptionKey,
+            ),
+            privacyConsentAt: new Date(),
+            dataProcessingConsentedAt: new Date(),
+            medicalConsentAt:
+              dto.medicalConditions ||
+              dto.severeAllergies ||
+              dto.medications ||
+              dto.specialNeeds
+                ? new Date()
+                : null,
+          },
+        });
 
-      if (sibling) {
-        let siblingGroupId: string;
-        if (sibling.siblingMemberships.length > 0) {
-          siblingGroupId = sibling.siblingMemberships[0].siblingGroupId;
-        } else {
-          const newGroup = await this.prisma.siblingGroup.create({
-            data: {
+        if (dto.siblingStudentSystemId) {
+          const sibling = await tx.student.findFirst({
+            where: {
               tenantId: actor.tenantId,
-              name: `Sibling-${sibling.studentSystemId}`,
+              studentSystemId: dto.siblingStudentSystemId,
+            },
+            include: {
+              siblingMemberships: { include: { siblingGroup: true } },
             },
           });
-          siblingGroupId = newGroup.id;
-          await this.prisma.siblingGroupMember.create({
-            data: {
-              tenantId: actor.tenantId,
-              studentId: sibling.id,
-              siblingGroupId,
-            },
-          });
+
+          if (sibling) {
+            let siblingGroupId: string;
+            if (sibling.siblingMemberships.length > 0) {
+              siblingGroupId = sibling.siblingMemberships[0].siblingGroupId;
+            } else {
+              const newGroup = await tx.siblingGroup.create({
+                data: {
+                  tenantId: actor.tenantId,
+                  name: `Sibling-${sibling.studentSystemId}`,
+                },
+              });
+              siblingGroupId = newGroup.id;
+              await tx.siblingGroupMember.create({
+                data: {
+                  tenantId: actor.tenantId,
+                  studentId: sibling.id,
+                  siblingGroupId,
+                },
+              });
+            }
+
+            await tx.siblingGroupMember.create({
+              data: {
+                tenantId: actor.tenantId,
+                studentId: student.id,
+                siblingGroupId,
+              },
+            });
+          }
         }
 
-        await this.prisma.siblingGroupMember.create({
+        const guardianLinks: Array<{
+          relation: string;
+          guardian: {
+            id: string;
+            fullName: string;
+            primaryPhone: string;
+          };
+        }> = [];
+
+        for (const guardianInput of dto.guardians) {
+          const guardianPhone = normalizeGuardianPhone(
+            guardianInput.primaryPhone,
+          );
+          const guardian = await tx.guardian.upsert({
+            where: {
+              tenantId_primaryPhone: {
+                tenantId: actor.tenantId,
+                primaryPhone: guardianPhone,
+              },
+            },
+            update: {
+              fullName: guardianInput.fullName.trim(),
+              relation: guardianInput.relation.trim(),
+              secondaryPhone: guardianInput.secondaryPhone ?? null,
+              email: guardianInput.email ?? null,
+              occupation: guardianInput.occupation ?? null,
+              homeAddress: guardianInput.homeAddress ?? null,
+              wardNumber: guardianInput.wardNumber ?? null,
+              receivesAlerts: guardianInput.receivesAlerts ?? false,
+              privacyConsentAt: new Date(),
+            },
+            create: {
+              tenantId: actor.tenantId,
+              fullName: guardianInput.fullName.trim(),
+              relation: guardianInput.relation.trim(),
+              primaryPhone: guardianPhone,
+              secondaryPhone: guardianInput.secondaryPhone ?? null,
+              email: guardianInput.email ?? null,
+              occupation: guardianInput.occupation ?? null,
+              homeAddress: guardianInput.homeAddress ?? null,
+              wardNumber: guardianInput.wardNumber ?? null,
+              receivesAlerts: guardianInput.receivesAlerts ?? false,
+              privacyConsentAt: new Date(),
+            },
+          });
+
+          guardianLinks.push(
+            await tx.studentGuardian.create({
+              data: {
+                tenantId: actor.tenantId,
+                studentId: student.id,
+                guardianId: guardian.id,
+                relation: guardianInput.relation.trim(),
+                isPrimary: guardianInput.isPrimary ?? false,
+              },
+              include: {
+                guardian: true,
+              },
+            }),
+          );
+        }
+
+        const enrollment = await tx.enrollment.create({
           data: {
             tenantId: actor.tenantId,
             studentId: student.id,
-            siblingGroupId,
+            academicYearId: dto.academicYearId,
+            classId: dto.classId,
+            sectionId: dto.sectionId ?? null,
+            rollNumber: dto.rollNumber ?? null,
+            admissionNumber: dto.admissionNumber ?? null,
+            admissionDate: new Date(dto.admissionDate),
+            mediumOfInstruction: dto.mediumOfInstruction ?? 'English',
           },
         });
-      }
-    }
 
-    const guardianLinks: Array<{
-      relation: string;
-      guardian: {
-        id: string;
-        fullName: string;
-      };
-    }> = [];
-
-    for (const guardianInput of dto.guardians) {
-      const guardian = await this.prisma.guardian.upsert({
-        where: {
-          tenantId_primaryPhone: {
-            tenantId: actor.tenantId,
-            primaryPhone: guardianInput.primaryPhone,
-          },
-        },
-        update: {
-          fullName: guardianInput.fullName,
-          relation: guardianInput.relation,
-          secondaryPhone: guardianInput.secondaryPhone ?? null,
-          email: guardianInput.email ?? null,
-          occupation: guardianInput.occupation ?? null,
-          homeAddress: guardianInput.homeAddress ?? null,
-          wardNumber: guardianInput.wardNumber ?? null,
-          receivesAlerts: guardianInput.receivesAlerts ?? false,
-          privacyConsentAt: new Date(),
-        },
-        create: {
-          tenantId: actor.tenantId,
-          fullName: guardianInput.fullName,
-          relation: guardianInput.relation,
-          primaryPhone: guardianInput.primaryPhone,
-          secondaryPhone: guardianInput.secondaryPhone ?? null,
-          email: guardianInput.email ?? null,
-          occupation: guardianInput.occupation ?? null,
-          homeAddress: guardianInput.homeAddress ?? null,
-          wardNumber: guardianInput.wardNumber ?? null,
-          receivesAlerts: guardianInput.receivesAlerts ?? false,
-          privacyConsentAt: new Date(),
-        },
-      });
-
-      guardianLinks.push(
-        await this.prisma.studentGuardian.create({
+        await tx.auditLog.create({
           data: {
+            action: 'create',
+            resource: 'admission',
             tenantId: actor.tenantId,
-            studentId: student.id,
-            guardianId: guardian.id,
-            relation: guardianInput.relation,
-            isPrimary: guardianInput.isPrimary ?? false,
-          },
-          include: {
-            guardian: true,
-          },
-        }),
-      );
-
-      if (guardian.primaryPhone) {
-        await this.notificationsService.sendSms({
-          to: guardian.primaryPhone,
-          message: `${student.firstNameEn} ${student.lastNameEn} has been enrolled in ${classroom.name}. Download the SchoolOS app to access the parent portal.`,
-          metadata: {
-            purpose: 'guardian_invite',
-            studentId: student.id,
+            userId: actor.userId,
+            resourceId: enrollment.id,
+            after: {
+              studentId: student.id,
+              studentSystemId: student.studentSystemId,
+              academicYearId: dto.academicYearId,
+              classId: dto.classId,
+              sectionId: dto.sectionId ?? null,
+              guardianCount: guardianLinks.length,
+            } as Prisma.InputJsonValue,
           },
         });
-      }
-    }
 
-    const enrollment = await this.prisma.enrollment.create({
-      data: {
-        tenantId: actor.tenantId,
-        studentId: student.id,
-        academicYearId: dto.academicYearId,
-        classId: dto.classId,
-        sectionId: dto.sectionId ?? null,
-        rollNumber: dto.rollNumber ?? null,
-        admissionNumber: dto.admissionNumber ?? null,
-        admissionDate: new Date(dto.admissionDate),
-        mediumOfInstruction: dto.mediumOfInstruction ?? 'English',
+        return {
+          student,
+          enrollment,
+          guardians: guardianLinks,
+        };
       },
-    });
+      { isolationLevel: 'Serializable' },
+    );
 
     await this.financeService.assignFeePlansForEnrollment({
       tenantId: actor.tenantId,
-      studentId: student.id,
+      studentId: core.student.id,
       academicYearId: dto.academicYearId,
       classId: dto.classId,
     });
 
     const initialInvoice = await this.financeService.createInitialInvoice({
       actor,
-      studentId: student.id,
+      studentId: core.student.id,
       academicYearId: dto.academicYearId,
-      enrollmentId: enrollment.id,
+      enrollmentId: core.enrollment.id,
       dueDate: new Date(dto.admissionDate),
     });
 
     try {
       await this.studentsService.generateStudentDocumentPdf(
-        student.id,
+        core.student.id,
         'ID_CARD',
         actor,
       );
@@ -431,25 +403,35 @@ export class AdmissionsService {
         await this.studentRecordsService.uploadDocument(
           {
             ...documentInput,
-            studentId: student.id,
+            studentId: core.student.id,
           },
           actor,
         ),
       );
     }
 
+    for (const link of core.guardians) {
+      await this.notificationsService.sendSms({
+        to: link.guardian.primaryPhone,
+        message: `${core.student.firstNameEn} ${core.student.lastNameEn} has been enrolled in ${context.classroom.name}. Download the SchoolOS app to access the parent portal.`,
+        metadata: {
+          purpose: 'guardian_invite',
+          studentId: core.student.id,
+        },
+      });
+    }
+
     await this.auditService.record({
-      action: 'create',
+      action: 'admission_side_effects',
       resource: 'admission',
       tenantId: actor.tenantId,
       userId: actor.userId,
-      resourceId: enrollment.id,
+      resourceId: core.enrollment.id,
       after: {
-        studentId: student.id,
-        academicYearId: dto.academicYearId,
-        classId: dto.classId,
-        guardianCount: guardianLinks.length,
+        studentId: core.student.id,
         invoiceId: initialInvoice?.id ?? null,
+        documentCount: documents.length,
+        guardianInviteCount: core.guardians.length,
       },
     });
 
@@ -457,25 +439,26 @@ export class AdmissionsService {
       tenantId: actor.tenantId,
       classId: dto.classId,
       sectionId: dto.sectionId,
-      studentId: student.id,
-      studentName: `${student.firstNameEn} ${student.lastNameEn}`,
+      studentId: core.student.id,
+      studentName: `${core.student.firstNameEn} ${core.student.lastNameEn}`,
       actor,
     });
 
     return {
       student: {
-        id: student.id,
-        studentSystemId: student.studentSystemId,
-        fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+        id: core.student.id,
+        studentSystemId: core.student.studentSystemId,
+        fullNameEn:
+          `${core.student.firstNameEn} ${core.student.lastNameEn}`.trim(),
       },
       enrollment: {
-        id: enrollment.id,
-        academicYearId: enrollment.academicYearId,
-        classId: enrollment.classId,
-        sectionId: enrollment.sectionId,
-        rollNumber: enrollment.rollNumber,
+        id: core.enrollment.id,
+        academicYearId: core.enrollment.academicYearId,
+        classId: core.enrollment.classId,
+        sectionId: core.enrollment.sectionId,
+        rollNumber: core.enrollment.rollNumber,
       },
-      guardians: guardianLinks.map((link) => ({
+      guardians: core.guardians.map((link) => ({
         id: link.guardian.id,
         fullName: link.guardian.fullName,
         relation: link.relation,
@@ -559,23 +542,13 @@ export class AdmissionsService {
       }
 
       if (dto.dryRun) {
-        const duplicateWarnings = await this.checkDuplicateAdmissions(
-          {
-            firstNameEn: parsed.dto.firstNameEn,
-            lastNameEn: parsed.dto.lastNameEn,
-            dateOfBirth: parsed.dto.dateOfBirth,
-          },
-          actor,
-        );
-        const rollConflict = parsed.dto.rollNumber
-          ? await this.findRollNumberConflict(parsed.dto, actor)
-          : null;
-        const errors = [
-          ...(duplicateWarnings.matches.length > 0
-            ? ['possible duplicate admission']
-            : []),
-          ...(rollConflict ? ['roll number conflict'] : []),
-        ];
+        const errors: string[] = [];
+
+        try {
+          await this.validateAdmissionForCreate(parsed.dto, actor);
+        } catch (error) {
+          errors.push(formatImportError(error));
+        }
 
         results.push({
           rowNumber: row.rowNumber,
@@ -597,12 +570,25 @@ export class AdmissionsService {
         results.push({
           rowNumber: row.rowNumber,
           status: 'failed',
-          errors: [
-            error instanceof Error ? error.message : 'Unknown import error',
-          ],
+          errors: [formatImportError(error)],
         });
       }
     }
+
+    await this.auditService.record({
+      action: dto.dryRun ? 'bulk_import_validate' : 'bulk_import',
+      resource: 'admission',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        totalRows: rows.length,
+        dryRun: dto.dryRun ?? false,
+        created: results.filter((result) => result.status === 'created').length,
+        validated: results.filter((result) => result.status === 'validated')
+          .length,
+        failed: results.filter((result) => result.status === 'failed').length,
+      },
+    });
 
     return {
       totalRows: rows.length,
@@ -615,12 +601,147 @@ export class AdmissionsService {
     };
   }
 
-  private async generateStudentSystemId(actor: AuthContext, startsOn: Date) {
-    const count = await this.prisma.student.count({
-      where: { tenantId: actor.tenantId },
+  private async validateAdmissionForCreate(
+    dto: CreateAdmissionDto,
+    actor: AuthContext,
+  ): Promise<AdmissionReferenceContext> {
+    this.assertGuardianPhoneRequirement(dto.guardians);
+
+    const [academicYear, classroom, section] = await Promise.all([
+      this.prisma.academicYear.findFirst({
+        where: { id: dto.academicYearId, tenantId: actor.tenantId },
+        select: { id: true, startsOn: true },
+      }),
+      this.prisma.class.findFirst({
+        where: { id: dto.classId, tenantId: actor.tenantId },
+        select: { id: true, name: true },
+      }),
+      dto.sectionId
+        ? this.prisma.section.findFirst({
+            where: { id: dto.sectionId, tenantId: actor.tenantId },
+            select: { id: true, name: true, classId: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    if (!academicYear) {
+      throw new NotFoundException('Academic year not found in this tenant');
+    }
+
+    if (!classroom) {
+      throw new NotFoundException('Class not found in this tenant');
+    }
+
+    if (dto.sectionId && !section) {
+      throw new NotFoundException('Section not found in this tenant');
+    }
+
+    if (section && section.classId !== dto.classId) {
+      throw new BadRequestException(
+        'Section must belong to the selected class in this tenant',
+      );
+    }
+
+    if (dto.studentSystemId) {
+      await this.assertStudentSystemIdAvailable(dto.studentSystemId, actor);
+    }
+
+    const duplicateWarnings = await this.checkDuplicateAdmissions(
+      {
+        firstNameEn: dto.firstNameEn,
+        lastNameEn: dto.lastNameEn,
+        dateOfBirth: dto.dateOfBirth,
+      },
+      actor,
+    );
+
+    if (duplicateWarnings.matches.length > 0 && !dto.confirmDuplicate) {
+      throw new ConflictException({
+        message:
+          'Possible duplicate admission found. Resubmit with confirmDuplicate=true to continue.',
+        duplicates: duplicateWarnings.matches,
+      });
+    }
+
+    if (dto.rollNumber) {
+      const rollConflict = await this.findRollNumberConflict(dto, actor);
+
+      if (rollConflict) {
+        throw new ConflictException({
+          message:
+            'Roll number is already assigned in this academic year, class, and section.',
+          conflict: {
+            enrollmentId: rollConflict.id,
+            studentId: rollConflict.studentId,
+            studentSystemId: rollConflict.student.studentSystemId,
+            fullNameEn:
+              `${rollConflict.student.firstNameEn} ${rollConflict.student.lastNameEn}`.trim(),
+            className: rollConflict.class.name,
+            sectionName: rollConflict.section?.name ?? null,
+            rollNumber: rollConflict.rollNumber,
+          },
+        });
+      }
+    }
+
+    if (!dto.disabilityFlag && !dto.confirmNoDisability) {
+      throw new BadRequestException(
+        'You must explicitly confirm "No known disability" (iEMIS requirement) if no disability is specified.',
+      );
+    }
+
+    return { academicYear, classroom, section };
+  }
+
+  private assertGuardianPhoneRequirement(guardians: AdmissionGuardianInput[]) {
+    const hasValidPrimaryPhone = guardians.some((guardian) =>
+      isValidGuardianPhone(guardian.primaryPhone),
+    );
+
+    if (!hasValidPrimaryPhone) {
+      throw new BadRequestException(
+        'At least one guardian with a valid primary phone number is required',
+      );
+    }
+  }
+
+  private async assertStudentSystemIdAvailable(
+    studentSystemId: string,
+    actor: AuthContext,
+  ) {
+    if (!/^SCH-\d{4}-\d{4}$/.test(studentSystemId)) {
+      throw new BadRequestException(
+        'studentSystemId must use the SCH-YYYY-NNNN format',
+      );
+    }
+
+    const existing = await this.prisma.student.findFirst({
+      where: { tenantId: actor.tenantId, studentSystemId },
     });
 
-    return `SCH-${startsOn.getUTCFullYear()}-${String(count + 1).padStart(4, '0')}`;
+    if (existing) {
+      throw new ConflictException(
+        'Student system ID already exists in this tenant',
+      );
+    }
+  }
+
+  private async generateStudentSystemId(
+    actor: AuthContext,
+    startsOn: Date,
+    client: AdmissionPersistenceClient = this.prisma,
+  ) {
+    const prefix = `SCH-${startsOn.getUTCFullYear()}-`;
+    const count = await client.student.count({
+      where: {
+        tenantId: actor.tenantId,
+        studentSystemId: {
+          startsWith: prefix,
+        },
+      },
+    });
+
+    return `${prefix}${String(count + 1).padStart(4, '0')}`;
   }
 
   private async findRollNumberConflict(
@@ -740,4 +861,45 @@ function buildBulkImportErrorCsv(
   ];
 
   return lines.join('\n');
+}
+
+function normalizeGuardianPhone(phone: string) {
+  return phone.trim().replace(/\s+/g, ' ');
+}
+
+function isValidGuardianPhone(phone: string | undefined) {
+  if (!phone) {
+    return false;
+  }
+
+  return /^\+?[0-9][0-9\s-]{6,19}$/.test(normalizeGuardianPhone(phone));
+}
+
+function formatImportError(error: unknown) {
+  if (error instanceof HttpException) {
+    const response = error.getResponse();
+
+    if (typeof response === 'string') {
+      return response;
+    }
+
+    if (isErrorResponse(response)) {
+      return Array.isArray(response.message)
+        ? response.message.join('; ')
+        : response.message;
+    }
+  }
+
+  return error instanceof Error ? error.message : 'Unknown import error';
+}
+
+function isErrorResponse(
+  response: unknown,
+): response is { message: string | string[] } {
+  return (
+    typeof response === 'object' &&
+    response !== null &&
+    'message' in response &&
+    (typeof response.message === 'string' || Array.isArray(response.message))
+  );
 }
