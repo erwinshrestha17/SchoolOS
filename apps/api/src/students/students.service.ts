@@ -860,6 +860,15 @@ export class StudentsService {
       student.lifecycleStatus,
       StudentLifecycleStatus.EXITED,
     );
+    const clearance = await this.getFeeClearance(studentId, actor);
+
+    if (!clearance.cleared) {
+      throw new BadRequestException({
+        message: 'Fee clearance is required before student exit or archive.',
+        clearance,
+      });
+    }
+
     const exitedAt = dto.exitedAt ? new Date(dto.exitedAt) : new Date();
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.enrollment.updateMany({

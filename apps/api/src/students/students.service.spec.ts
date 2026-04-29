@@ -1065,6 +1065,35 @@ describe('students lifecycle hardening', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('requires fee clearance before exiting or archiving an active student', async () => {
+    const student = buildStudent({
+      lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+    });
+    const invoice = {
+      id: 'invoice-1',
+      invoiceNumber: 'INV-1',
+      status: 'ISSUED',
+      totalAmount: new Prisma.Decimal(1000),
+      dueDate: new Date('2026-05-01T00:00:00.000Z'),
+      payments: [],
+    };
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      invoiceFindManyQueue: [[invoice]],
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.archiveStudent(
+        student.id,
+        { reason: 'Withdrawal requested by guardian' },
+        actor,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it('rejects missing students in tenant-scoped operations', async () => {
     const prisma = buildPrisma({
       studentFindFirstQueue: [null],

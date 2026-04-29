@@ -5,9 +5,13 @@ import type {
   GeneratedStudentDocumentMeta,
   GuardianProfile,
   StudentDocument,
+  StudentFeeClearance,
+  StudentArchivePayload,
+  StudentDeletePayload,
   StudentProfileAttendanceRecord,
   StudentProfileDetail,
   StudentProfileInvoice,
+  StudentTransferPayload,
   UpdateStudentGuardianPayload,
   UpdateStudentProfilePayload,
 } from '@schoolos/core';
@@ -39,15 +43,30 @@ const generatedDocumentActions = [
   ['character-certificate', 'Character certificate'],
 ] as const;
 
+type LifecycleAction = 'transfer' | 'archive' | 'alumni' | 'delete';
+type LifecycleRequest =
+  | { action: 'transfer'; body: StudentTransferPayload }
+  | { action: 'archive'; body: StudentArchivePayload }
+  | { action: 'alumni'; body: StudentArchivePayload }
+  | { action: 'delete'; body: StudentDeletePayload };
+
 export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('Overview');
   const [pdfError, setPdfError] = useState('');
   const [isEditingStudent, setIsEditingStudent] = useState(false);
   const [editingGuardianId, setEditingGuardianId] = useState<string | null>(null);
+  const [lifecycleAction, setLifecycleAction] =
+    useState<LifecycleAction | null>(null);
+  const [lifecycleMessage, setLifecycleMessage] = useState('');
   const queryClient = useQueryClient();
   const profileQuery = useQuery({
     queryKey: ['student-profile', studentId],
     queryFn: () => api.getStudentProfile(studentId),
+    enabled: Boolean(studentId),
+  });
+  const feeClearanceQuery = useQuery({
+    queryKey: ['student-fee-clearance', studentId],
+    queryFn: () => api.getStudentFeeClearance(studentId),
     enabled: Boolean(studentId),
   });
   const studentUpdateMutation = useMutation({
@@ -69,6 +88,35 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
     onSuccess: (profile) => {
       queryClient.setQueryData(['student-profile', studentId], profile);
       setEditingGuardianId(null);
+    },
+  });
+  const lifecycleMutation = useMutation({
+    mutationFn: ({ action, body }: LifecycleRequest) => {
+      if (action === 'transfer') {
+        return api.transferStudent(studentId, body);
+      }
+
+      if (action === 'archive') {
+        return api.archiveStudent(studentId, body);
+      }
+
+      if (action === 'alumni') {
+        return api.archiveStudentAsAlumni(studentId, body);
+      }
+
+      return api.softDeleteStudent(studentId, body);
+    },
+    onSuccess: async (result) => {
+      setLifecycleAction(null);
+      setLifecycleMessage(
+        `Student status updated to ${result.lifecycleStatus}.`,
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] }),
+        queryClient.invalidateQueries({
+          queryKey: ['student-fee-clearance', studentId],
+        }),
+      ]);
     },
   });
 
@@ -198,6 +246,31 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
           onSave={(body) => studentUpdateMutation.mutate(body)}
         />
       ) : null}
+
+      <LifecycleActionsPanel
+        action={lifecycleAction}
+        clearance={feeClearanceQuery.data ?? null}
+        clearanceError={feeClearanceQuery.error}
+        isCheckingClearance={feeClearanceQuery.isFetching}
+        isSaving={lifecycleMutation.isPending}
+        message={lifecycleMessage}
+        mutationError={lifecycleMutation.error}
+        profile={profile}
+        onCancelAction={() => {
+          lifecycleMutation.reset();
+          setLifecycleAction(null);
+        }}
+        onCheckClearance={() => void feeClearanceQuery.refetch()}
+        onOpenCertificate={(kind) => void openStudentPdf(kind)}
+        onSelectAction={(action) => {
+          setLifecycleMessage('');
+          lifecycleMutation.reset();
+          setLifecycleAction(action);
+        }}
+        onSubmitAction={(action, body) =>
+          lifecycleMutation.mutate({ action, body } as LifecycleRequest)
+        }
+      />
 
       <section className="rounded-3xl border border-gray-200 bg-white p-2 shadow-sm">
         <div
@@ -458,6 +531,324 @@ function StudentEditCard({
         </button>
       </div>
     </SectionCard>
+  );
+}
+
+function LifecycleActionsPanel({
+  action,
+  clearance,
+  clearanceError,
+  isCheckingClearance,
+  isSaving,
+  message,
+  mutationError,
+  onCancelAction,
+  onCheckClearance,
+  onOpenCertificate,
+  onSelectAction,
+  onSubmitAction,
+  profile,
+}: {
+  action: LifecycleAction | null;
+  clearance: StudentFeeClearance | null;
+  clearanceError: unknown;
+  isCheckingClearance: boolean;
+  isSaving: boolean;
+  message: string;
+  mutationError: unknown;
+  onCancelAction: () => void;
+  onCheckClearance: () => void;
+  onOpenCertificate: (kind: string) => void;
+  onSelectAction: (action: LifecycleAction) => void;
+  onSubmitAction: (action: LifecycleAction, body: Record<string, unknown>) => void;
+  profile: StudentProfileDetail;
+}) {
+  const status = profile.student.lifecycleStatus ?? 'ACTIVE';
+  const active = status === 'ACTIVE';
+  const exited = status === 'EXITED' || status === 'TRANSFERRED';
+  const outstanding = clearance?.outstandingAmount ?? 0;
+  const hasOutstanding = clearance ? !clearance.cleared : false;
+
+  return (
+    <SectionCard title="Lifecycle / Actions">
+      <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+          <p className="label mb-2">Current status</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge>{status}</Badge>
+            {clearance ? (
+              <Badge>
+                {clearance.cleared
+                  ? 'Fee cleared'
+                  : `Outstanding Rs. ${formatMoney(outstanding)}`}
+              </Badge>
+            ) : (
+              <Badge>Fee clearance not checked</Badge>
+            )}
+          </div>
+          <p className="mt-3 text-sm leading-6 text-gray-600">
+            Lifecycle changes are tenant-scoped, RBAC-protected, audited, and
+            never hard-delete financial, attendance, or document history.
+          </p>
+          {clearanceError ? (
+            <InlineError message={errorMessage(clearanceError)} />
+          ) : null}
+          {message ? (
+            <p className="mt-4 rounded-2xl border border-success-200 bg-success-50 p-3 text-sm text-success-700">
+              {message}
+            </p>
+          ) : null}
+          {hasOutstanding ? (
+            <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              Outstanding fees must be cleared before transfer, archive, or
+              soft-delete actions. Use Fee Collection before continuing.
+            </p>
+          ) : null}
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 disabled:opacity-60"
+              disabled={isCheckingClearance}
+              onClick={onCheckClearance}
+            >
+              {isCheckingClearance ? 'Checking...' : 'Check Fee Clearance'}
+            </button>
+            <button
+              type="button"
+              className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700"
+              onClick={() => onOpenCertificate('transfer-certificate')}
+            >
+              Open Transfer Certificate
+            </button>
+            <button
+              type="button"
+              className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700"
+              onClick={() => onOpenCertificate('leaving-certificate')}
+            >
+              Open Leaving Certificate
+            </button>
+          </div>
+
+          <div className="mt-4 grid gap-2 md:grid-cols-2">
+            <LifecycleButton
+              disabled={!active}
+              label="Transfer Student"
+              onClick={() => onSelectAction('transfer')}
+            />
+            <LifecycleButton
+              disabled={!active}
+              label="Archive / Inactive"
+              onClick={() => onSelectAction('archive')}
+            />
+            <LifecycleButton
+              disabled={!exited}
+              label="Archive as Alumni"
+              onClick={() => onSelectAction('alumni')}
+            />
+            <LifecycleButton
+              danger
+              disabled={!active}
+              label="Request Soft Delete"
+              onClick={() => onSelectAction('delete')}
+            />
+          </div>
+
+          {action ? (
+            <LifecycleActionForm
+              action={action}
+              clearance={clearance}
+              isSaving={isSaving}
+              mutationError={mutationError}
+              onCancel={onCancelAction}
+              onSubmit={(body) => onSubmitAction(action, body)}
+            />
+          ) : null}
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
+function LifecycleButton({
+  danger,
+  disabled,
+  label,
+  onClick,
+}: {
+  danger?: boolean;
+  disabled: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
+        danger
+          ? 'border border-danger-200 bg-danger-50 text-danger-700'
+          : 'border border-gray-200 bg-gray-50 text-gray-700'
+      }`}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  );
+}
+
+function LifecycleActionForm({
+  action,
+  clearance,
+  isSaving,
+  mutationError,
+  onCancel,
+  onSubmit,
+}: {
+  action: LifecycleAction;
+  clearance: StudentFeeClearance | null;
+  isSaving: boolean;
+  mutationError: unknown;
+  onCancel: () => void;
+  onSubmit: (body: Record<string, unknown>) => void;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [reason, setReason] = useState('');
+  const [actionDate, setActionDate] = useState(today);
+  const [destinationSchool, setDestinationSchool] = useState('');
+  const [conductRemark, setConductRemark] = useState('');
+  const [confirmation, setConfirmation] = useState('');
+  const [validationError, setValidationError] = useState('');
+  const needsClearance =
+    action === 'transfer' || action === 'archive' || action === 'delete';
+  const outstanding = clearance?.outstandingAmount ?? 0;
+  const blockedByFees = needsClearance && clearance ? !clearance.cleared : false;
+
+  function submit() {
+    setValidationError('');
+
+    if (!reason.trim()) {
+      setValidationError('Reason is required for lifecycle changes.');
+      return;
+    }
+
+    if (!actionDate) {
+      setValidationError('Transfer/leaving date is required.');
+      return;
+    }
+
+    if (blockedByFees) {
+      setValidationError(
+        `Outstanding fees of Rs. ${formatMoney(outstanding)} must be cleared first.`,
+      );
+      return;
+    }
+
+    if (action === 'delete' && confirmation !== 'SOFT DELETE') {
+      setValidationError('Type SOFT DELETE to confirm this audited action.');
+      return;
+    }
+
+    if (action === 'transfer') {
+      onSubmit({
+        reason: reason.trim(),
+        exitedAt: actionDate,
+        destinationSchool: destinationSchool.trim() || null,
+        conductRemark: conductRemark.trim() || null,
+      });
+      return;
+    }
+
+    if (action === 'delete') {
+      onSubmit({
+        reason: reason.trim(),
+        deletedAt: actionDate,
+      });
+      return;
+    }
+
+    onSubmit({
+      reason: reason.trim(),
+      exitedAt: actionDate,
+    });
+  }
+
+  return (
+    <div className="mt-4 rounded-2xl border border-primary-100 bg-primary-50/40 p-4">
+      <p className="label mb-3">{lifecycleActionTitle(action)}</p>
+      {blockedByFees ? (
+        <p className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          This action is blocked until fee clearance is complete.
+        </p>
+      ) : null}
+      <div className="grid gap-3 md:grid-cols-2">
+        <Field label="Reason">
+          <input
+            className="input"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </Field>
+        <Field label="Transfer / leaving date">
+          <input
+            className="input"
+            type="date"
+            value={actionDate}
+            onChange={(event) => setActionDate(event.target.value)}
+          />
+        </Field>
+        {action === 'transfer' ? (
+          <>
+            <Field label="Destination school">
+              <input
+                className="input"
+                value={destinationSchool}
+                onChange={(event) => setDestinationSchool(event.target.value)}
+              />
+            </Field>
+            <Field label="Conduct remark">
+              <input
+                className="input"
+                value={conductRemark}
+                onChange={(event) => setConductRemark(event.target.value)}
+              />
+            </Field>
+          </>
+        ) : null}
+        {action === 'delete' ? (
+          <Field label='Confirmation text: type "SOFT DELETE"'>
+            <input
+              className="input"
+              value={confirmation}
+              onChange={(event) => setConfirmation(event.target.value)}
+            />
+          </Field>
+        ) : null}
+      </div>
+
+      {validationError ? <InlineError message={validationError} /> : null}
+      {mutationError ? <InlineError message={errorMessage(mutationError)} /> : null}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="inline-flex min-h-11 items-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white disabled:opacity-60"
+          disabled={isSaving}
+          onClick={submit}
+        >
+          {isSaving ? 'Saving...' : lifecycleActionSubmitLabel(action)}
+        </button>
+        <button
+          type="button"
+          className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700"
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1152,4 +1543,36 @@ function splitNepaliName(fullNameNp?: string | null) {
     firstNameNp,
     lastNameNp: rest.join(' '),
   };
+}
+
+function lifecycleActionTitle(action: LifecycleAction) {
+  if (action === 'transfer') {
+    return 'Transfer student';
+  }
+
+  if (action === 'archive') {
+    return 'Archive / inactive student';
+  }
+
+  if (action === 'alumni') {
+    return 'Archive as alumni';
+  }
+
+  return 'Request soft delete';
+}
+
+function lifecycleActionSubmitLabel(action: LifecycleAction) {
+  if (action === 'transfer') {
+    return 'Confirm Transfer';
+  }
+
+  if (action === 'archive') {
+    return 'Confirm Archive';
+  }
+
+  if (action === 'alumni') {
+    return 'Confirm Alumni Archive';
+  }
+
+  return 'Confirm Soft Delete';
 }

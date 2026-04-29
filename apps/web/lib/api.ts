@@ -49,8 +49,14 @@ import type {
   SectionSummary,
   StaffSummary,
   StaffContractSummary,
+  RevokeGeneratedStudentDocumentPayload,
   StudentProfileDetail,
+  StudentArchivePayload,
+  StudentDeletePayload,
+  StudentFeeClearance,
+  StudentLifecycleActionResult,
   StudentProfile,
+  StudentTransferPayload,
   SubjectSummary,
   TeacherAssignmentSummary,
   TeacherWorkloadSummary,
@@ -243,6 +249,54 @@ export const api = {
       `/students/${encodeURIComponent(studentId)}/guardians/${encodeURIComponent(guardianId)}`,
       {
         method: 'PATCH',
+        json: body as JsonBody,
+      },
+    ),
+  getStudentFeeClearance: (studentId: string) =>
+    request<StudentFeeClearance>(
+      `/students/${encodeURIComponent(studentId)}/fee-clearance`,
+    ),
+  transferStudent: (studentId: string, body: StudentTransferPayload) =>
+    request<StudentLifecycleActionResult>(
+      `/students/${encodeURIComponent(studentId)}/transfer`,
+      {
+        method: 'POST',
+        json: body as JsonBody,
+      },
+    ),
+  archiveStudent: (studentId: string, body: StudentArchivePayload) =>
+    request<StudentLifecycleActionResult>(
+      `/students/${encodeURIComponent(studentId)}/archive`,
+      {
+        method: 'POST',
+        json: body as JsonBody,
+      },
+    ),
+  archiveStudentAsAlumni: (studentId: string, body: StudentArchivePayload) =>
+    request<StudentLifecycleActionResult>(
+      `/students/${encodeURIComponent(studentId)}/archive-alumni`,
+      {
+        method: 'POST',
+        json: body as JsonBody,
+      },
+    ),
+  softDeleteStudent: (studentId: string, body: StudentDeletePayload) =>
+    request<StudentLifecycleActionResult>(
+      `/students/${encodeURIComponent(studentId)}/delete`,
+      {
+        method: 'POST',
+        json: body as JsonBody,
+      },
+    ),
+  revokeGeneratedStudentDocument: (
+    studentId: string,
+    documentId: string,
+    body: RevokeGeneratedStudentDocumentPayload,
+  ) =>
+    request(
+      `/students/${encodeURIComponent(studentId)}/generated-documents/${encodeURIComponent(documentId)}/revoke`,
+      {
+        method: 'POST',
         json: body as JsonBody,
       },
     ),

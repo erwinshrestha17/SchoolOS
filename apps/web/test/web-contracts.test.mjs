@@ -412,6 +412,34 @@ describe('SchoolOS web production contracts', () => {
     assert.doesNotMatch(detailPage, /demo-guardian|student-123|guardian-123/i);
   });
 
+  it('adds lifecycle and transfer actions to the student detail page', () => {
+    const detailPage = read('components/students/student-detail-page.tsx');
+    const apiClient = read('lib/api.ts');
+
+    for (const helper of [
+      'getStudentFeeClearance',
+      'transferStudent',
+      'archiveStudent',
+      'archiveStudentAsAlumni',
+      'softDeleteStudent',
+      'revokeGeneratedStudentDocument',
+    ]) {
+      assert.match(apiClient, new RegExp(`${helper}:`));
+    }
+
+    assert.match(detailPage, /Lifecycle \/ Actions/);
+    assert.match(detailPage, /Check Fee Clearance/);
+    assert.match(detailPage, /Transfer Student/);
+    assert.match(detailPage, /Archive \/ Inactive/);
+    assert.match(detailPage, /Archive as Alumni/);
+    assert.match(detailPage, /Request Soft Delete/);
+    assert.match(detailPage, /Open Transfer Certificate/);
+    assert.match(detailPage, /Open Leaving Certificate/);
+    assert.match(detailPage, /Outstanding fees must be cleared/);
+    assert.match(detailPage, /SOFT DELETE/);
+    assert.doesNotMatch(detailPage, /hard delete|demo-lifecycle|student-123/i);
+  });
+
   it('validates PDF responses before opening blob tabs', () => {
     const apiClient = read('lib/api.ts');
 

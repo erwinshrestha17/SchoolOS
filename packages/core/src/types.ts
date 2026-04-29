@@ -361,6 +361,54 @@ export type StudentLifecycleTransition = {
   metadata?: Record<string, unknown> | null;
 };
 
+export type StudentFeeClearance = {
+  studentId: string;
+  studentSystemId: string;
+  cleared: boolean;
+  outstandingAmount: number;
+  waivedAt: string | Date | null;
+  invoices: Array<{
+    id: string;
+    invoiceNumber: string;
+    status: string;
+    totalAmount: number;
+    paidAmount: number;
+    outstandingAmount: number;
+    dueDate: string | Date;
+  }>;
+};
+
+export type StudentLifecycleActionResult = {
+  id: string;
+  studentSystemId: string;
+  lifecycleStatus: StudentLifecycleStatus;
+  exitedAt: string | Date | null;
+  destinationSchool?: string | null;
+  feeClearance?: StudentFeeClearance;
+};
+
+export type StudentTransferPayload = {
+  reason: string;
+  destinationSchool?: string | null;
+  conductRemark?: string | null;
+  exitedAt?: string;
+  waiveFeeClearance?: boolean;
+};
+
+export type StudentArchivePayload = {
+  reason: string;
+  exitedAt?: string;
+};
+
+export type StudentDeletePayload = {
+  reason: string;
+  deletedAt?: string;
+};
+
+export type RevokeGeneratedStudentDocumentPayload = {
+  reason: string;
+};
+
 export type DuplicateStudentMergeCounts = {
   guardianLinks: number;
   documents: number;
