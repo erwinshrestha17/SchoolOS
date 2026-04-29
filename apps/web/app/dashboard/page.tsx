@@ -300,7 +300,7 @@ export default function DashboardPage() {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             {quickActions.map((action) => (
               <Link
-                key={action.href}
+              key={`${action.href}-${action.label}`}
                 href={action.href}
                 className="flex min-h-11 items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-800 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700"
               >
@@ -849,9 +849,14 @@ function allLoading(values: boolean[]) {
 
 const quickActions = [
   {
-    href: '/dashboard/admissions',
+    href: '/dashboard/admissions/create',
     label: 'Admit Student',
     icon: UserPlus,
+  },
+  {
+    href: '/dashboard/admissions',
+    label: 'View Students',
+    icon: Users,
   },
   {
     href: '/dashboard/attendance',
@@ -859,33 +864,28 @@ const quickActions = [
     icon: CalendarCheck,
   },
   {
-    href: '/dashboard/finance',
+    href: '/dashboard/finance/collect',
     label: 'Collect Fee',
     icon: Wallet,
   },
   {
-    href: '/dashboard/activity',
+    href: '/dashboard/activity/create',
     label: 'Create Activity Post',
     icon: Images,
   },
   {
-    href: '/dashboard/notices',
+    href: '/dashboard/notices/create',
     label: 'Create Notice',
     icon: Megaphone,
+  },
+  {
+    href: '/dashboard/notices/deliveries',
+    label: 'Review Deliveries',
+    icon: Bell,
   },
   {
     href: '/dashboard/settings',
     label: 'Open Settings',
     icon: Settings,
-  },
-  {
-    href: '/dashboard/notices',
-    label: 'Review Deliveries',
-    icon: Bell,
-  },
-  {
-    href: '/dashboard/admissions',
-    label: 'View Students',
-    icon: Users,
   },
 ];
