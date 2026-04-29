@@ -380,10 +380,10 @@ export function FinanceForm() {
             <button
               key={section}
               type="button"
-              className={`min-h-11 whitespace-nowrap rounded-full px-4 text-sm font-semibold transition ${
+              className={`min-h-11 whitespace-nowrap rounded-full border px-4 text-sm font-semibold transition ${
                 activeSection === section
-                  ? 'bg-[var(--ink)] text-white shadow-sm'
-                  : 'border border-[var(--line)] bg-white text-[var(--muted)] hover:text-[var(--ink)]'
+                  ? 'border-gray-900 bg-gray-900 text-white shadow-sm'
+                  : 'border-[var(--line)] bg-white text-gray-700 hover:border-gray-900 hover:text-gray-950'
               }`}
               onClick={() => setActiveSection(section)}
             >
