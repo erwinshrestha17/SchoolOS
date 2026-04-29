@@ -255,6 +255,49 @@ describe('finance production controls', () => {
     );
   });
 
+  it('returns a valid PDF payload for tenant-scoped receipts', async () => {
+    const payment = buildPayment({
+      paidAt: new Date('2026-04-27T10:00:00.000Z'),
+      student: {
+        id: 'student-1',
+        firstNameEn: 'Erwin',
+        lastNameEn: 'Shrestha',
+      },
+      invoice: buildInvoice({
+        invoiceNumber: 'INV-2026-00001',
+      }),
+    });
+    const receipt = {
+      receiptNumber: 'REC-2026-00001',
+      pdfUrl: '/api/v1/receipts/REC-2026-00001.pdf',
+      payment,
+    };
+    const { service, prisma } = buildService({
+      invoice: null,
+      feeHead: null,
+      receipt,
+    });
+
+    const pdf = await service.getReceiptPdf(receipt.receiptNumber, actor);
+
+    expect(prisma.receipt.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        receiptNumber: receipt.receiptNumber,
+      },
+      include: {
+        payment: {
+          include: {
+            invoice: true,
+            student: true,
+            refunds: true,
+          },
+        },
+      },
+    });
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+  });
+
   it('voids unpaid invoices with an audit trail', async () => {
     const invoice = buildInvoice({ payments: [] });
     const { service, prisma, auditService } = buildService({
@@ -921,6 +964,7 @@ function buildService(options: {
   existingCashierClose?: unknown;
   cashierCloseCount?: number;
   cashierCloseList?: unknown[];
+  receipt?: unknown;
   reconciliationPayments?: unknown[];
   reconciliationPaymentEntries?: unknown[];
   reconciliationRefundEntries?: unknown[];
@@ -1006,6 +1050,7 @@ function buildService(options: {
     },
     receipt: {
       count: jest.fn().mockResolvedValue(options.receiptCount ?? 0),
+      findFirst: jest.fn().mockResolvedValue(options.receipt ?? null),
     },
     chartAccount: {
       findUniqueOrThrow: jest

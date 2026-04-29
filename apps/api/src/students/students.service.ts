@@ -160,6 +160,257 @@ export class StudentsService {
     }));
   }
 
+  async getStudentProfile(studentId: string, actor: AuthContext) {
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: studentId,
+        tenantId: actor.tenantId,
+      },
+      include: {
+        class: true,
+        sectionRef: true,
+        guardianLinks: {
+          include: {
+            guardian: true,
+          },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+        },
+        documents: {
+          orderBy: [{ createdAt: 'desc' }],
+        },
+        generatedDocuments: {
+          orderBy: [{ generatedAt: 'desc' }],
+        },
+        enrollments: {
+          include: {
+            academicYear: true,
+            class: true,
+            section: true,
+          },
+          orderBy: [{ createdAt: 'desc' }],
+        },
+        invoices: {
+          include: {
+            lines: {
+              include: {
+                feeHead: true,
+              },
+            },
+            payments: {
+              include: {
+                refunds: true,
+                receipt: true,
+              },
+            },
+          },
+          orderBy: [{ issuedAt: 'desc' }],
+          take: 12,
+        },
+        attendanceRecords: {
+          include: {
+            attendanceSession: true,
+          },
+          orderBy: [{ attendanceSession: { attendanceDate: 'desc' } }],
+          take: 30,
+        },
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    const activityPosts = await this.prisma.activityPost.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        OR: [
+          {
+            studentTags: {
+              some: {
+                studentId: student.id,
+              },
+            },
+          },
+          {
+            audienceType: AudienceType.CLASS,
+            classId: student.classId,
+          },
+          {
+            audienceType: AudienceType.SECTION,
+            classId: student.classId,
+            sectionId: student.sectionId,
+          },
+        ],
+      },
+      include: {
+        attachments: {
+          orderBy: [{ sortOrder: 'asc' }],
+        },
+        studentTags: {
+          include: {
+            student: true,
+          },
+        },
+        reactions: true,
+      },
+      orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
+      take: 12,
+    });
+    const latestEnrollment = student.enrollments[0] ?? null;
+    const guardians = student.guardianLinks.map((link) => ({
+      id: link.guardian.id,
+      fullName: link.guardian.fullName,
+      relation: link.relation || link.guardian.relation,
+      primaryPhone: link.guardian.primaryPhone,
+      email: link.guardian.email,
+      isPrimary: link.isPrimary,
+    }));
+
+    return {
+      student: {
+        id: student.id,
+        studentSystemId: student.studentSystemId,
+        firstNameEn: student.firstNameEn,
+        lastNameEn: student.lastNameEn,
+        fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+        fullNameNp:
+          [student.firstNameNp, student.lastNameNp].filter(Boolean).join(' ') ||
+          null,
+        gender: student.gender,
+        dateOfBirth: student.dateOfBirth.toISOString(),
+        motherTongue: student.motherTongue,
+        disabilityFlag: student.disabilityFlag,
+        nationalStudentId: student.nationalStudentId,
+        className: student.class.name,
+        sectionName: student.sectionRef?.name ?? student.section,
+        class: {
+          id: student.class.id,
+          name: student.class.name,
+        },
+        section: student.sectionRef?.name ?? student.section,
+        rollNumber: student.rollNumber ?? latestEnrollment?.rollNumber ?? null,
+        guardians,
+        lifecycleStatus: student.lifecycleStatus,
+      },
+      guardians,
+      enrollments: student.enrollments.map((enrollment) => ({
+        id: enrollment.id,
+        academicYearId: enrollment.academicYearId,
+        academicYear: enrollment.academicYear.name,
+        classId: enrollment.classId,
+        className: enrollment.class.name,
+        sectionId: enrollment.sectionId,
+        sectionName: enrollment.section?.name ?? null,
+        rollNumber: enrollment.rollNumber,
+        status: enrollment.status,
+        admissionDate: enrollment.admissionDate.toISOString(),
+      })),
+      documents: student.documents.map((document) => ({
+        id: document.id,
+        studentId: document.studentId,
+        kind: document.kind,
+        title: document.title,
+        fileName: document.fileName,
+        contentType: document.contentType,
+        sizeBytes: document.sizeBytes,
+        provider: document.provider,
+        objectKey: document.objectKey,
+        publicUrl: document.publicUrl,
+        uploadedAt: document.createdAt.toISOString(),
+      })),
+      generatedDocuments: student.generatedDocuments.map((document) => ({
+        id: document.id,
+        studentId: document.studentId,
+        kind: document.kind,
+        fileName: document.fileName,
+        pdfUrl: document.pdfUrl,
+        checksumSha256: document.checksumSha256,
+        storageObjectKey: document.storageObjectKey,
+        signedAt: document.signedAt?.toISOString() ?? null,
+        version: document.version,
+        retentionUntil: document.retentionUntil?.toISOString() ?? null,
+        revokedAt: document.revokedAt?.toISOString() ?? null,
+      })),
+      invoices: student.invoices.map((invoice) => {
+        const paidAmount = sumStudentProfileNetPaidAmount(invoice.payments);
+
+        return {
+          id: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          status: invoice.status,
+          dueDate: invoice.dueDate.toISOString(),
+          totalAmount: Number(invoice.totalAmount),
+          paidAmount: Number(paidAmount),
+          outstandingAmount: Number(
+            invoice.totalAmount.sub(paidAmount).gt(0)
+              ? invoice.totalAmount.sub(paidAmount)
+              : new Prisma.Decimal(0),
+          ),
+          issuedAt: invoice.issuedAt.toISOString(),
+          lines: invoice.lines.map((line) => ({
+            id: line.id,
+            feeHeadId: line.feeHeadId,
+            feeHeadName: line.feeHead.name,
+            description: line.description,
+            quantity: line.quantity,
+            unitAmount: Number(line.unitAmount),
+            vatAmount: Number(line.vatAmount),
+            totalAmount: Number(line.totalAmount),
+          })),
+        };
+      }),
+      attendanceRecords: student.attendanceRecords.map((record) => ({
+        id: record.id,
+        attendanceDate: record.attendanceSession.attendanceDate
+          .toISOString()
+          .slice(0, 10),
+        status: record.status,
+        remark: record.remark,
+        lateAt: record.lateAt?.toISOString() ?? null,
+        submittedAt:
+          record.attendanceSession.submittedAt?.toISOString() ?? null,
+      })),
+      activityPosts: activityPosts.map((post) => ({
+        id: post.id,
+        title: post.title,
+        caption: post.caption,
+        category: post.category,
+        audienceType: post.audienceType,
+        classId: post.classId,
+        sectionId: post.sectionId,
+        publishedAt: post.publishedAt?.toISOString() ?? null,
+        attachments: post.attachments.map((attachment) => ({
+          id: attachment.id,
+          fileName: attachment.fileName,
+          contentType: attachment.contentType,
+          sizeBytes: attachment.sizeBytes,
+          provider: attachment.provider,
+          objectKey: attachment.objectKey,
+          publicUrl: attachment.publicUrl,
+        })),
+        studentTags: post.studentTags.map((tag) => ({
+          studentId: tag.studentId,
+          student: tag.student
+            ? {
+                id: tag.student.id,
+                studentSystemId: tag.student.studentSystemId,
+                firstNameEn: tag.student.firstNameEn,
+                lastNameEn: tag.student.lastNameEn,
+              }
+            : undefined,
+        })),
+        reactions: post.reactions.map((reaction) => ({
+          id: reaction.id,
+          activityPostId: reaction.activityPostId,
+          guardianId: reaction.guardianId,
+          studentId: reaction.studentId,
+          reaction: reaction.reaction,
+          createdAt: reaction.createdAt.toISOString(),
+        })),
+      })),
+    };
+  }
+
   async getFeeClearance(studentId: string, actor: AuthContext) {
     const student = await this.findTenantStudent(studentId, actor);
     const invoices = await this.prisma.invoice.findMany({
@@ -1608,6 +1859,22 @@ function buildSignatureBlock(actor: AuthContext) {
     verificationText:
       'Digitally issued in SchoolOS. Verify using the stored checksum and generated document metadata.',
   };
+}
+
+function sumStudentProfileNetPaidAmount(
+  payments: Array<{
+    amount: Prisma.Decimal;
+    refunds: Array<{ amount: Prisma.Decimal }>;
+  }>,
+) {
+  return payments.reduce((sum, payment) => {
+    const refunded = payment.refunds.reduce(
+      (refundSum, refund) => refundSum.add(refund.amount),
+      new Prisma.Decimal(0),
+    );
+
+    return sum.add(payment.amount).sub(refunded);
+  }, new Prisma.Decimal(0));
 }
 
 function buildIemisHeaders() {

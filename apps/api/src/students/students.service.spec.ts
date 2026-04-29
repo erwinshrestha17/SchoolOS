@@ -378,6 +378,7 @@ describe('students lifecycle hardening', () => {
     );
 
     expect(Buffer.isBuffer(pdf)).toBe(true);
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
     expect(storageService.saveBufferObject).toHaveBeenCalledWith({
       tenantId: actor.tenantId,
       prefix: `students/${student.id}/generated-documents/enrollment-confirmation`,
@@ -421,6 +422,165 @@ describe('students lifecycle hardening', () => {
         retentionUntil: expect.any(Date),
       }),
     });
+  });
+
+  it('generates a valid PDF header for student ID cards', async () => {
+    const student = buildStudent({
+      guardianLinks: [
+        {
+          guardian: {
+            fullName: 'Maya Shrestha',
+            primaryPhone: '9800000000',
+            email: 'maya@example.com',
+            wardNumber: '5',
+          },
+          relation: 'mother',
+          isPrimary: true,
+        },
+      ],
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      generatedStudentDocumentFindFirstQueue: [null],
+    });
+    const { service } = buildService(prisma);
+
+    const pdf = await service.generateStudentDocumentPdf(
+      student.id,
+      'id-card',
+      actor,
+    );
+
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+  });
+
+  it('returns a clean validation error for unsupported student document kinds', async () => {
+    const prisma = buildPrisma({});
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.generateStudentDocumentPdf('student-1', 'unsupported', actor),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('returns a tenant-scoped student profile detail payload', async () => {
+    const student = buildStudent({
+      guardianLinks: [
+        {
+          guardian: {
+            id: 'guardian-1',
+            fullName: 'Maya Shrestha',
+            relation: 'mother',
+            primaryPhone: '9800000000',
+            email: 'maya@example.com',
+            wardNumber: null,
+          },
+          relation: 'mother',
+          isPrimary: true,
+        },
+      ],
+      documents: [
+        {
+          id: 'document-1',
+          studentId: 'student-1',
+          kind: 'BIRTH_CERTIFICATE',
+          title: 'Birth certificate',
+          fileName: 'birth.pdf',
+          contentType: 'application/pdf',
+          sizeBytes: 128,
+          provider: 'LOCAL',
+          objectKey: 'tenant-1/students/student-1/birth.pdf',
+          publicUrl: null,
+          createdAt: new Date('2026-04-27T00:00:00.000Z'),
+        },
+      ],
+      generatedDocuments: [
+        {
+          id: 'generated-1',
+          studentId: 'student-1',
+          kind: 'id-card',
+          fileName: 'SCH-2026-0001-id-card.pdf',
+          pdfUrl: '/api/v1/students/student-1/documents/id-card.pdf',
+          checksumSha256: 'checksum',
+          storageObjectKey: 'tenant-1/students/student-1/generated.pdf',
+          signedAt: new Date('2026-04-27T00:00:00.000Z'),
+          version: 1,
+          retentionUntil: new Date('2026-10-27T00:00:00.000Z'),
+          revokedAt: null,
+        },
+      ],
+      enrollments: [
+        {
+          id: 'enrollment-1',
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          rollNumber: 7,
+          status: EnrollmentStatus.ACTIVE,
+          admissionDate: new Date('2026-04-01T00:00:00.000Z'),
+          academicYear: { name: '2083' },
+          class: { name: 'Grade 1' },
+          section: { name: 'A' },
+        },
+      ],
+      invoices: [
+        {
+          id: 'invoice-1',
+          invoiceNumber: 'INV-2026-00001',
+          status: 'ISSUED',
+          dueDate: new Date('2026-05-01T00:00:00.000Z'),
+          totalAmount: new Prisma.Decimal(1000),
+          issuedAt: new Date('2026-04-27T00:00:00.000Z'),
+          lines: [
+            {
+              id: 'line-1',
+              feeHeadId: 'fee-head-1',
+              feeHead: { name: 'Tuition' },
+              description: 'Tuition',
+              quantity: 1,
+              unitAmount: new Prisma.Decimal(1000),
+              vatAmount: new Prisma.Decimal(0),
+              totalAmount: new Prisma.Decimal(1000),
+            },
+          ],
+          payments: [],
+        },
+      ],
+      attendanceRecords: [
+        {
+          id: 'attendance-record-1',
+          status: 'PRESENT',
+          remark: null,
+          lateAt: null,
+          attendanceSession: {
+            attendanceDate: new Date('2026-04-27T00:00:00.000Z'),
+            submittedAt: new Date('2026-04-27T08:00:00.000Z'),
+          },
+        },
+      ],
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      activityPostFindManyResult: [],
+    });
+    const { service } = buildService(prisma);
+
+    const profile = await service.getStudentProfile(student.id, actor);
+
+    expect(prisma.student.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: student.id,
+          tenantId: actor.tenantId,
+        },
+      }),
+    );
+    expect(profile.student.studentSystemId).toBe(student.studentSystemId);
+    expect(profile.guardians[0].primaryPhone).toBe('9800000000');
+    expect(profile.documents[0].fileName).toBe('birth.pdf');
+    expect(profile.generatedDocuments[0].kind).toBe('id-card');
+    expect(profile.invoices[0].outstandingAmount).toBe(1000);
+    expect(profile.attendanceRecords[0].attendanceDate).toBe('2026-04-27');
   });
 
   it('blocks revoking generated documents before retention expiry', async () => {
@@ -659,7 +819,9 @@ function buildStudent(
     guardianLinks: Array<{
       guardianId?: string;
       guardian: {
+        id?: string;
         fullName: string;
+        relation?: string;
         primaryPhone: string | null;
         email: string | null;
         wardNumber: string | null;
@@ -669,12 +831,22 @@ function buildStudent(
       appLoginLinked?: boolean;
     }>;
     enrollments: Array<{
+      id?: string;
+      academicYearId?: string;
       academicYear: { name: string };
       classId: string;
+      sectionId?: string | null;
+      rollNumber?: number | null;
+      admissionDate?: Date;
+      class?: { name: string };
       section: { name: string } | null;
       status: EnrollmentStatus;
     }>;
     tenant: { name: string };
+    documents: unknown[];
+    generatedDocuments: unknown[];
+    invoices: unknown[];
+    attendanceRecords: unknown[];
   }> = {},
 ) {
   return {
@@ -710,6 +882,10 @@ function buildStudent(
     feeClearanceWaivedAt: null,
     guardianLinks: overrides.guardianLinks ?? [],
     enrollments: overrides.enrollments ?? [],
+    documents: overrides.documents ?? [],
+    generatedDocuments: overrides.generatedDocuments ?? [],
+    invoices: overrides.invoices ?? [],
+    attendanceRecords: overrides.attendanceRecords ?? [],
     tenant: overrides.tenant ?? { name: 'Everest Academy' },
   };
 }
@@ -757,6 +933,7 @@ function buildPrisma(options: {
   generatedStudentDocumentFindManyResult?: unknown[];
   guardianIdentityVerificationCreateResult?: unknown;
   guardianIdentityVerificationFindFirstQueue?: unknown[];
+  activityPostFindManyResult?: unknown[];
   transactionGuardianIdentityVerificationUpdateResult?: unknown;
   transactionStudentUpdateResult?: unknown;
 }) {
@@ -913,6 +1090,11 @@ function buildPrisma(options: {
 
         return queue.shift();
       }),
+    },
+    activityPost: {
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.activityPostFindManyResult ?? []),
     },
     studentLifecycleTransition: {
       create: jest.fn().mockResolvedValue({ id: 'transition-1' }),

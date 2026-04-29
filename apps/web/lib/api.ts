@@ -49,6 +49,7 @@ import type {
   SectionSummary,
   StaffSummary,
   StaffContractSummary,
+  StudentProfileDetail,
   StudentProfile,
   SubjectSummary,
   TeacherAssignmentSummary,
@@ -129,6 +130,37 @@ function parseApiErrorMessage(text: string) {
   }
 }
 
+async function openPdfBlob(response: Response) {
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(parseApiErrorMessage(text) || `Request failed with status ${response.status}`);
+  }
+
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+
+  if (!contentType.includes('application/pdf')) {
+    const text = await response.text();
+    throw new Error(
+      parseApiErrorMessage(text) ||
+        'The server did not return a PDF document. Please try again or contact support.',
+    );
+  }
+
+  const blob = await response.blob();
+
+  if (blob.size === 0) {
+    throw new Error('The server returned an empty PDF document.');
+  }
+
+  const header = await blob.slice(0, 5).text();
+
+  if (header !== '%PDF-') {
+    throw new Error('The server returned an invalid PDF document.');
+  }
+
+  window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer');
+}
+
 async function refreshAccessCookie() {
   const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
     method: 'POST',
@@ -193,6 +225,8 @@ export const api = {
   createSection: (body: JsonBody) =>
     request<SectionSummary>('/sections', { method: 'POST', json: body }),
   listStudents: () => request<StudentProfile[]>('/students'),
+  getStudentProfile: (studentId: string) =>
+    request<StudentProfileDetail>(`/students/${encodeURIComponent(studentId)}`),
   listStaff: () => request<StaffSummary[]>('/staff'),
   createStaff: (body: JsonBody) =>
     request<StaffSummary>('/staff', { method: 'POST', json: body }),
@@ -256,13 +290,7 @@ export const api = {
       },
     );
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(parseApiErrorMessage(text) || `Request failed with status ${response.status}`);
-    }
-
-    const blob = await response.blob();
-    window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer');
+    await openPdfBlob(response);
   },
   getAttendanceRoster: (params: {
     academicYearId: string;
@@ -336,13 +364,7 @@ export const api = {
       },
     );
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(parseApiErrorMessage(text) || `Request failed with status ${response.status}`);
-    }
-
-    const blob = await response.blob();
-    window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer');
+    await openPdfBlob(response);
   },
   listLedgerEntries: () => request<JournalEntryView[]>('/ledger/entries'),
   listTimetable: () => request<TimetableSlotSummary[]>('/timetable'),

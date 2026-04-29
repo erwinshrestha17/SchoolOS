@@ -2,9 +2,9 @@ import {
   Body,
   Controller,
   Get,
-  Header,
   Param,
   Post,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
@@ -32,6 +32,15 @@ export class StudentsController {
   @Permissions('students:read')
   listStudents(@CurrentAuth() auth: AuthContext) {
     return this.studentsService.listStudents(auth);
+  }
+
+  @Get(':id')
+  @Permissions('students:read')
+  getStudentProfile(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.getStudentProfile(studentId, auth);
   }
 
   @Post()
@@ -160,18 +169,22 @@ export class StudentsController {
   }
 
   @Get(':id/documents/:kind.pdf')
-  @Header('Content-Type', 'application/pdf')
   @Permissions('student_documents:manage')
-  getGeneratedDocument(
+  async getGeneratedDocument(
     @Param('id') studentId: string,
     @Param('kind') kind: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.studentsService.generateStudentDocumentPdf(
+    const pdf = await this.studentsService.generateStudentDocumentPdf(
       studentId,
       kind,
       auth,
     );
+
+    return new StreamableFile(pdf, {
+      type: 'application/pdf',
+      disposition: `inline; filename="${safePdfFileName(`${studentId}-${kind}.pdf`)}"`,
+    });
   }
 
   @Post(':id/generated-documents/:documentId/revoke')
@@ -189,4 +202,8 @@ export class StudentsController {
       auth,
     );
   }
+}
+
+function safePdfFileName(value: string) {
+  return value.replace(/[^a-zA-Z0-9._-]/g, '-');
 }

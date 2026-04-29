@@ -1,4 +1,10 @@
-import { Controller, Get, Header, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  StreamableFile,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -18,12 +24,20 @@ export class ReceiptsController {
   }
 
   @Get(':receiptNumber.pdf')
-  @Header('Content-Type', 'application/pdf')
   @Permissions('receipts:read')
-  getReceiptPdf(
+  async getReceiptPdf(
     @Param('receiptNumber') receiptNumber: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.financeService.getReceiptPdf(receiptNumber, auth);
+    const pdf = await this.financeService.getReceiptPdf(receiptNumber, auth);
+
+    return new StreamableFile(pdf, {
+      type: 'application/pdf',
+      disposition: `inline; filename="${safePdfFileName(`${receiptNumber}.pdf`)}"`,
+    });
   }
+}
+
+function safePdfFileName(value: string) {
+  return value.replace(/[^a-zA-Z0-9._-]/g, '-');
 }

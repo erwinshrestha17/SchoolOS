@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { api } from '../../lib/api';
 import { fileToBase64Payload } from '../../lib/files';
+import { StudentDirectory } from './student-directory';
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -27,8 +28,19 @@ const documentKinds = [
   ['OTHER', 'Other'],
 ] as const;
 
+const workspaceTabs = [
+  ['directory', 'Student Directory'],
+  ['enrollment', 'New Enrollment'],
+  ['bulk', 'Bulk Import'],
+  ['recent', 'Recent Admissions'],
+] as const;
+
+type WorkspaceTab = (typeof workspaceTabs)[number][0];
+
 export function AdmissionForm() {
   const queryClient = useQueryClient();
+  const [activeWorkspaceTab, setActiveWorkspaceTab] =
+    useState<WorkspaceTab>('directory');
   const [activeStep, setActiveStep] = useState(0);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [documentKind, setDocumentKind] = useState('BIRTH_CERTIFICATE');
@@ -273,26 +285,73 @@ export function AdmissionForm() {
 
   return (
     <div className="grid gap-6">
-      <form
-        className="grid gap-5"
-        onSubmit={form.handleSubmit((values) => submitAdmission(values))}
+      <div
+        className="grid gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-2 md:grid-cols-4"
+        aria-label="Students workspace sections"
       >
-        <Stepper activeStep={activeStep} completed={Boolean(latestAdmission)} />
-
-        {setupIsLoading ? <SetupSkeleton /> : null}
-        {!setupIsLoading && setupIsMissing ? (
-          <SetupRequiredCard
-            hasAcademicYears={hasAcademicYears}
-            hasClasses={hasClasses}
-          />
-        ) : null}
-
-        {activeStep === 0 ? (
-          <StepCard
-            eyebrow="Step 1"
-            title="Personal Info"
-            description="Capture the student's core identity exactly as it should appear on school records."
+        {workspaceTabs.map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            className={`min-h-11 rounded-xl px-4 text-sm font-semibold transition-colors ${
+              activeWorkspaceTab === value
+                ? 'bg-gray-900 text-white shadow-sm'
+                : 'bg-white text-gray-600 hover:bg-gray-100'
+            }`}
+            onClick={() => setActiveWorkspaceTab(value)}
           >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeWorkspaceTab === 'directory' ? (
+        <StudentDirectory
+          academicYears={academicYearsQuery.data ?? []}
+          admissions={admissionsQuery.data ?? []}
+          classes={classesQuery.data ?? []}
+          isError={
+            academicYearsQuery.isError ||
+            classesQuery.isError ||
+            sectionsQuery.isError ||
+            studentsQuery.isError ||
+            admissionsQuery.isError
+          }
+          isLoading={
+            academicYearsQuery.isLoading ||
+            classesQuery.isLoading ||
+            sectionsQuery.isLoading ||
+            studentsQuery.isLoading ||
+            admissionsQuery.isLoading
+          }
+          pdfError={pdfError}
+          sections={sectionsQuery.data ?? []}
+          students={studentsQuery.data ?? []}
+          onOpenPdf={(studentId, kind) => void openStudentPdf(studentId, kind)}
+        />
+      ) : null}
+
+      {activeWorkspaceTab === 'enrollment' ? (
+        <form
+          className="grid gap-5"
+          onSubmit={form.handleSubmit((values) => submitAdmission(values))}
+        >
+          <Stepper activeStep={activeStep} completed={Boolean(latestAdmission)} />
+
+          {setupIsLoading ? <SetupSkeleton /> : null}
+          {!setupIsLoading && setupIsMissing ? (
+            <SetupRequiredCard
+              hasAcademicYears={hasAcademicYears}
+              hasClasses={hasClasses}
+            />
+          ) : null}
+
+          {activeStep === 0 ? (
+            <StepCard
+              eyebrow="Step 1"
+              title="Personal Info"
+              description="Capture the student's core identity exactly as it should appear on school records."
+            >
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="First name (EN)" error={fieldError(form.formState.errors.firstNameEn)}>
                 <input {...form.register('firstNameEn')} autoComplete="given-name" />
@@ -396,15 +455,15 @@ export function AdmissionForm() {
                 </p>
               ) : null}
             </fieldset>
-          </StepCard>
-        ) : null}
+            </StepCard>
+          ) : null}
 
-        {activeStep === 1 ? (
-          <StepCard
-            eyebrow="Step 2"
-            title="Academic Placement"
-            description="Place the student into the correct academic year, class, section, and roll number."
-          >
+          {activeStep === 1 ? (
+            <StepCard
+              eyebrow="Step 2"
+              title="Academic Placement"
+              description="Place the student into the correct academic year, class, section, and roll number."
+            >
             <div className="grid gap-4 md:grid-cols-2">
               <Field
                 label="Academic year"
@@ -486,32 +545,32 @@ export function AdmissionForm() {
                 <input {...form.register('mediumOfInstruction')} />
               </Field>
             </div>
-          </StepCard>
-        ) : null}
+            </StepCard>
+          ) : null}
 
-        {activeStep === 2 ? (
-          <StepCard
-            eyebrow="Step 3"
-            title="Guardian Contacts"
-            description="At least one guardian with a valid phone number is required for emergency contact and future app invites."
-            action={
-              <button
-                type="button"
-                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-200 px-4 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={guardians.fields.length >= 3}
-                onClick={() =>
-                  guardians.append({
-                    fullName: '',
-                    relation: 'guardian',
-                    primaryPhone: '',
-                    isPrimary: false,
-                  })
-                }
-              >
-                Add guardian
-              </button>
-            }
-          >
+          {activeStep === 2 ? (
+            <StepCard
+              eyebrow="Step 3"
+              title="Guardian Contacts"
+              description="At least one guardian with a valid phone number is required for emergency contact and future app invites."
+              action={
+                <button
+                  type="button"
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-200 px-4 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={guardians.fields.length >= 3}
+                  onClick={() =>
+                    guardians.append({
+                      fullName: '',
+                      relation: 'guardian',
+                      primaryPhone: '',
+                      isPrimary: false,
+                    })
+                  }
+                >
+                  Add guardian
+                </button>
+              }
+            >
             <div className="grid gap-4">
               {guardians.fields.map((field, index) => (
                 <div
@@ -591,15 +650,15 @@ export function AdmissionForm() {
                 </div>
               ))}
             </div>
-          </StepCard>
-        ) : null}
+            </StepCard>
+          ) : null}
 
-        {activeStep === 3 ? (
-          <StepCard
-            eyebrow="Step 4"
-            title="Documents & Review"
-            description="Attach an admission document, review the placement, and submit the enrollment."
-          >
+          {activeStep === 3 ? (
+            <StepCard
+              eyebrow="Step 4"
+              title="Documents & Review"
+              description="Attach an admission document, review the placement, and submit the enrollment."
+            >
             <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
               <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                 <p className="label mb-4">Admission Document</p>
@@ -659,65 +718,70 @@ export function AdmissionForm() {
                 {mutation.error.message}
               </p>
             ) : null}
-          </StepCard>
-        ) : null}
+            </StepCard>
+          ) : null}
 
-        {activeStep === 4 && latestAdmission ? (
-          <SuccessPanel
-            latestAdmission={latestAdmission}
-            pdfError={pdfError}
-            onAddAnother={addAnotherStudent}
-            onOpenPdf={(kind) => void openStudentPdf(latestAdmission.student.id, kind)}
-          />
-        ) : null}
+          {activeStep === 4 && latestAdmission ? (
+            <SuccessPanel
+              latestAdmission={latestAdmission}
+              pdfError={pdfError}
+              onAddAnother={addAnotherStudent}
+              onOpenPdf={(kind) => void openStudentPdf(latestAdmission.student.id, kind)}
+            />
+          ) : null}
 
-        {activeStep < 4 ? (
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <button
-              type="button"
-              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-200 px-4 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={activeStep === 0}
-              onClick={() => setActiveStep((step) => Math.max(0, step - 1))}
-            >
-              Back
-            </button>
-            {activeStep < 3 ? (
+          {activeStep < 4 ? (
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
               <button
                 type="button"
-                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-gray-900 px-5 text-sm font-semibold text-white"
-                onClick={() => void goToNextStep()}
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-200 px-4 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={activeStep === 0}
+                onClick={() => setActiveStep((step) => Math.max(0, step - 1))}
               >
-                Continue
+                Back
               </button>
-            ) : (
-              <button
-                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-primary-600 px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={mutation.isPending || setupIsMissing}
-              >
-                {mutation.isPending ? 'Creating admission...' : 'Create admission'}
-              </button>
-            )}
-          </div>
-        ) : null}
-      </form>
+              {activeStep < 3 ? (
+                <button
+                  type="button"
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-gray-900 px-5 text-sm font-semibold text-white"
+                  onClick={() => void goToNextStep()}
+                >
+                  Continue
+                </button>
+              ) : (
+                <button
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-primary-600 px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={mutation.isPending || setupIsMissing}
+                >
+                  {mutation.isPending ? 'Creating admission...' : 'Create admission'}
+                </button>
+              )}
+            </div>
+          ) : null}
+        </form>
+      ) : null}
 
-      <BulkImportPanel
-        bulkConfirmDuplicates={bulkConfirmDuplicates}
-        bulkCsv={bulkCsv}
-        bulkMutation={bulkMutation}
-        sampleBulkCsv={sampleBulkCsv}
-        setBulkConfirmDuplicates={setBulkConfirmDuplicates}
-        setBulkCsv={setBulkCsv}
-      />
+      {activeWorkspaceTab === 'bulk' ? (
+        <BulkImportPanel
+          bulkConfirmDuplicates={bulkConfirmDuplicates}
+          bulkCsv={bulkCsv}
+          bulkMutation={bulkMutation}
+          sampleBulkCsv={sampleBulkCsv}
+          setBulkConfirmDuplicates={setBulkConfirmDuplicates}
+          setBulkCsv={setBulkCsv}
+        />
+      ) : null}
 
-      <RecentAdmissions
-        admissions={admissionsQuery.data ?? []}
-        isError={admissionsQuery.isError}
-        isLoading={admissionsQuery.isLoading}
-        pdfError={pdfError}
-        students={studentsQuery.data ?? []}
-        onOpenPdf={(studentId, kind) => void openStudentPdf(studentId, kind)}
-      />
+      {activeWorkspaceTab === 'recent' ? (
+        <RecentAdmissions
+          admissions={admissionsQuery.data ?? []}
+          isError={admissionsQuery.isError}
+          isLoading={admissionsQuery.isLoading}
+          pdfError={pdfError}
+          students={studentsQuery.data ?? []}
+          onOpenPdf={(studentId, kind) => void openStudentPdf(studentId, kind)}
+        />
+      ) : null}
     </div>
   );
 }

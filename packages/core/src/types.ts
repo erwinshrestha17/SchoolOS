@@ -79,6 +79,64 @@ export type StudentProfile = {
   guardians?: GuardianProfile[];
 };
 
+export type StudentProfileEnrollment = {
+  id: string;
+  academicYearId: string;
+  academicYear: string;
+  classId: string;
+  className: string;
+  sectionId: string | null;
+  sectionName: string | null;
+  rollNumber: number | null;
+  status: string;
+  admissionDate: string;
+};
+
+export type StudentProfileInvoiceLine = {
+  id: string;
+  feeHeadId: string;
+  feeHeadName: string;
+  description: string;
+  quantity: number;
+  unitAmount: number;
+  vatAmount: number;
+  totalAmount: number;
+};
+
+export type StudentProfileInvoice = {
+  id: string;
+  invoiceNumber: string;
+  status: string;
+  dueDate: string;
+  totalAmount: number;
+  paidAmount: number;
+  outstandingAmount: number;
+  issuedAt: string;
+  lines: StudentProfileInvoiceLine[];
+};
+
+export type StudentProfileAttendanceRecord = {
+  id: string;
+  attendanceDate: string;
+  status: string;
+  remark: string | null;
+  lateAt: string | null;
+  submittedAt: string | null;
+};
+
+export type StudentProfileDetail = {
+  student: StudentProfile & {
+    lifecycleStatus?: string;
+  };
+  guardians: GuardianProfile[];
+  enrollments: StudentProfileEnrollment[];
+  documents: StudentDocument[];
+  generatedDocuments: GeneratedStudentDocumentMeta[];
+  invoices: StudentProfileInvoice[];
+  attendanceRecords: StudentProfileAttendanceRecord[];
+  activityPosts: ActivityPost[];
+};
+
 export type AdmissionSummary = {
   id: string;
   studentSystemId: string;

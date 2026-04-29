@@ -80,6 +80,7 @@ describe('SchoolOS web production contracts', () => {
       'checkAdmissionDuplicates',
       'bulkImportAdmissions',
       'openStudentDocumentPdf',
+      'getStudentProfile',
       'getAttendanceRoster',
       'syncAttendance',
       'reviewAttendanceConflict',
@@ -327,6 +328,56 @@ describe('SchoolOS web production contracts', () => {
     assert.match(admissionForm, /Collect First Fee/);
     assert.match(admissionForm, /Download ID Card/);
     assert.match(admissionForm, /Add Another Student/);
+  });
+
+  it('adds a student directory workspace without removing admissions flows', () => {
+    const admissionForm = read('components/forms/admission-form.tsx');
+    const directory = read('components/forms/student-directory.tsx');
+
+    assert.match(admissionForm, /Student Directory/);
+    assert.match(admissionForm, /New Enrollment/);
+    assert.match(admissionForm, /Bulk Import/);
+    assert.match(admissionForm, /Recent Admissions/);
+    assert.match(admissionForm, /activeWorkspaceTab.*directory/s);
+    assert.match(admissionForm, /<StudentDirectory/);
+    assert.match(directory, /Academic year/);
+    assert.match(directory, /Class/);
+    assert.match(directory, /Section/);
+    assert.match(directory, /Search by name or SCH-YYYY-NNNN/);
+  });
+
+  it('keeps student profile and directory actions wired to real helpers', () => {
+    const directory = read('components/forms/student-directory.tsx');
+    const profile = read('components/forms/student-profile-panel.tsx');
+    const admissionForm = read('components/forms/admission-form.tsx');
+
+    assert.match(directory, /api\.getStudentProfile/);
+    assert.match(directory, /View Profile/);
+    assert.match(directory, /Collect Fee/);
+    assert.match(directory, /Open ID Card/);
+    assert.match(directory, /api\.listInvoices/);
+    assert.match(directory, /api\.listActivityPosts/);
+    assert.match(directory, /api\.getAttendanceSummary/);
+    assert.match(admissionForm, /api\.openStudentDocumentPdf/);
+    assert.match(profile, /Guardians/);
+    assert.match(profile, /Documents & Certificates/);
+    assert.match(profile, /Recent Invoices/);
+    assert.match(profile, /Attendance Summary/);
+    assert.match(profile, /Recent Activity/);
+  });
+
+  it('validates PDF responses before opening blob tabs', () => {
+    const apiClient = read('lib/api.ts');
+
+    assert.match(apiClient, /async function openPdfBlob/);
+    assert.match(apiClient, /response\.ok/);
+    assert.match(apiClient, /content-type/);
+    assert.match(apiClient, /application\/pdf/);
+    assert.match(apiClient, /blob\.size === 0/);
+    assert.match(apiClient, /header !== '%PDF-'/);
+    assert.match(apiClient, /parseApiErrorMessage/);
+    assert.match(apiClient, /openStudentDocumentPdf[\s\S]*openPdfBlob/);
+    assert.match(apiClient, /openReceiptPdf[\s\S]*openPdfBlob/);
   });
 
   it('keeps attendance screen wired to real roster, submit, sync, analytics, and conflict APIs', () => {
