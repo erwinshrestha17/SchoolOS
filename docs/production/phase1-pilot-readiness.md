@@ -160,3 +160,60 @@ Use the seeded admin or register a fresh tenant, then verify:
 - The current automated e2e harness is mocked for speed and isolation. Before a
   live school, run the browser smoke checklist against Docker Postgres/Redis and
   keep screenshots/logs from the pass.
+
+## 10. Browser QA Result - 2026-04-29
+
+Pilot browser QA was run against local Docker Postgres, Docker Redis, the real
+NestJS API on `localhost:4000`, and the current Next.js dashboard on
+`localhost:3000`.
+
+### Result
+
+Decision: ready for a controlled pilot after one manual media-upload check.
+
+### Passed Checks
+
+- Docker Postgres and Redis were healthy.
+- `SMOKE_LOGIN=true pnpm smoke:phase1` passed Postgres, Redis, API health,
+  readiness, and seeded admin login checks.
+- Cookie-first login succeeded for `default-school` / `admin@schoolos.com`.
+- Logout redirected to `/login`, and direct dashboard access after logout
+  redirected to `/login?next=/dashboard`.
+- Settings showed the seeded current academic year `2026-2027`, classes, and
+  sections.
+- Admissions created a student with explicit iEMIS no-disability confirmation,
+  guardian phone, generated `SCH-2026-0003`, and created the first invoice
+  `INV-2025-2026-00001`.
+- Attendance loaded the Class 1 / Section A roster, treated students as present
+  by default, submitted absent and late exceptions, showed conflict-review state,
+  and queued parent-notification messaging.
+- Fee Collection displayed the outstanding invoice, blocked overpayment in the
+  browser, recorded a partial cash payment, generated receipt
+  `REC-2025-2026-00001`, and kept ledger posting as backend-owned preview-only
+  UI.
+- Notices showed the emergency warning, published a normal notice, created an
+  event, and listed provider-neutral delivery records.
+- Guardian photo-consent capture and revoke both updated the consent status
+  cards.
+- Cross-page shell checks passed: sidebar links, academic year header,
+  notification badge query, empty states, and user menu remained stable.
+- No raw backend JSON error blob was observed during the browser pass.
+
+### Bugs Fixed During This Pass
+
+No new code defects were found during this browser pass. The prior iEMIS
+disability-confirmation blocker was verified fixed through the admissions
+journey.
+
+### Remaining Caveats
+
+- The in-app browser automation runtime used for this pass could not attach a
+  local image file to the Activity Feed file input. Activity Feed page structure,
+  class/section targeting, 1-5 image rule copy, private media messaging, and
+  disabled publish-without-image behavior were verified; the actual one-image
+  upload/publish should be checked manually in Chrome/Safari before school staff
+  training.
+- Browser storage inspection is covered by web contract tests rather than this
+  browser runtime because the runtime does not expose a safe localStorage API.
+- Real external SMS, FCM, email, R2, payment gateways, and AI remain intentionally
+  disabled for the controlled pilot.
