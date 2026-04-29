@@ -153,6 +153,15 @@ describe('SchoolOS web production contracts', () => {
     );
   });
 
+  it('parses API JSON error messages before surfacing them to forms', () => {
+    const apiClient = read('lib/api.ts');
+
+    assert.match(apiClient, /parseApiErrorMessage/);
+    assert.match(apiClient, /JSON\.parse\(text\)/);
+    assert.match(apiClient, /payload\.message/);
+    assert.doesNotMatch(apiClient, /throw new Error\(text \|\| `Request failed/);
+  });
+
   it('uses cookie credentials instead of bearer tokens for browser API calls', () => {
     const apiClient = read('lib/api.ts');
 
@@ -294,11 +303,26 @@ describe('SchoolOS web production contracts', () => {
     assert.match(admissionForm, /formatFileSize/);
   });
 
+  it('requires iEMIS disability confirmation in the admissions flow', () => {
+    const admissionForm = read('components/forms/admission-form.tsx');
+    const coreValidation = read('../../packages/core/src/validation.ts');
+
+    assert.match(admissionForm, /Disability status \/ iEMIS requirement/);
+    assert.match(admissionForm, /No known disability/);
+    assert.match(admissionForm, /Disability \/ special support need present/);
+    assert.match(admissionForm, /confirmNoDisability/);
+    assert.match(admissionForm, /disabilityFlag/);
+    assert.match(admissionForm, /No known disability confirmed/);
+    assert.match(coreValidation, /confirmNoDisability/);
+    assert.match(coreValidation, /Confirm no known disability or enter disability\/support details/);
+  });
+
   it('keeps admissions bulk import and success next actions available', () => {
     const admissionForm = read('components/forms/admission-form.tsx');
 
     assert.match(admissionForm, /Bulk Import/);
     assert.match(admissionForm, /api\.bulkImportAdmissions/);
+    assert.match(admissionForm, /confirmNoDisability/);
     assert.match(admissionForm, /Error report CSV/);
     assert.match(admissionForm, /Collect First Fee/);
     assert.match(admissionForm, /Download ID Card/);
@@ -507,5 +531,74 @@ describe('SchoolOS web production contracts', () => {
     assert.doesNotMatch(activityForm, /api\.createAi|generateAi|AI caption button/);
     assert.doesNotMatch(activityForm, /publicUrl:\s*file|URL\.createObjectURL/);
     assert.doesNotMatch(activityForm, /replace-me/i);
+  });
+
+  it('keeps notices screen wired to real M10 APIs', () => {
+    const communicationsForm = read('components/forms/communications-form.tsx');
+    const requiredApis = [
+      'api.listClasses',
+      'api.listSections',
+      'api.listNotificationDeliveries',
+      'api.listNotices',
+      'api.listEvents',
+      'api.listAdmissions',
+      'api.getGuardianConsentStatus',
+      'api.createNotice',
+      'api.createEvent',
+      'api.captureGuardianConsent',
+      'api.revokeGuardianConsent',
+    ];
+
+    for (const apiCall of requiredApis) {
+      assert.match(communicationsForm, new RegExp(apiCall.replace('.', '\\.')));
+    }
+  });
+
+  it('keeps communications sections and notice audience controls available', () => {
+    const communicationsForm = read('components/forms/communications-form.tsx');
+    const requiredSections = ['Notices', 'Events', 'Delivery Records', 'Consent Management'];
+    const priorities = ['NORMAL', 'URGENT', 'EMERGENCY'];
+    const audiences = ['ALL', 'CLASS', 'SECTION'];
+
+    for (const section of requiredSections) {
+      assert.match(communicationsForm, new RegExp(section));
+    }
+
+    for (const priority of priorities) {
+      assert.match(communicationsForm, new RegExp(priority));
+    }
+
+    for (const audience of audiences) {
+      assert.match(communicationsForm, new RegExp(audience));
+    }
+
+    assert.match(communicationsForm, /Emergency notices may trigger forced delivery channels/);
+    assert.match(communicationsForm, /Publish notice/);
+    assert.match(communicationsForm, /Schedule notice/);
+  });
+
+  it('preserves events, delivery records, and consent management behavior', () => {
+    const communicationsForm = read('components/forms/communications-form.tsx');
+    const deliveryStatuses = ['QUEUED', 'SENT', 'FAILED', 'SKIPPED', 'PENDING', 'RETRYING'];
+
+    assert.match(communicationsForm, /Event Publisher/);
+    assert.match(communicationsForm, /Create event/);
+    assert.match(communicationsForm, /Recent provider-neutral deliveries/);
+    assert.match(communicationsForm, /Capture consent/);
+    assert.match(communicationsForm, /Revoke consent/);
+    assert.match(communicationsForm, /Photo usage consent affects Activity Feed visibility/);
+
+    for (const status of deliveryStatuses) {
+      assert.match(communicationsForm, new RegExp(status));
+    }
+  });
+
+  it('removes default emergency sample copy from communications', () => {
+    const communicationsForm = read('components/forms/communications-form.tsx');
+
+    assert.doesNotMatch(communicationsForm, /Emergency holiday notice/);
+    assert.doesNotMatch(communicationsForm, /School will remain closed tomorrow/);
+    assert.doesNotMatch(communicationsForm, /Parent-teacher meeting/);
+    assert.doesNotMatch(communicationsForm, /replace-me/i);
   });
 });

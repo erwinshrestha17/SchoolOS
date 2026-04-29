@@ -103,10 +103,30 @@ async function request<T>(path: string, init?: RequestOptions) {
       clearStoredSession();
     }
 
-    throw new Error(text || `Request failed with status ${response.status}`);
+    throw new Error(parseApiErrorMessage(text) || `Request failed with status ${response.status}`);
   }
 
   return (await response.json()) as T;
+}
+
+function parseApiErrorMessage(text: string) {
+  if (!text) {
+    return '';
+  }
+
+  try {
+    const payload = JSON.parse(text) as {
+      message?: string | string[];
+      error?: string;
+    };
+    const message = Array.isArray(payload.message)
+      ? payload.message.join(', ')
+      : payload.message;
+
+    return message || payload.error || text;
+  } catch {
+    return text;
+  }
 }
 
 async function refreshAccessCookie() {
@@ -238,7 +258,7 @@ export const api = {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(text || `Request failed with status ${response.status}`);
+      throw new Error(parseApiErrorMessage(text) || `Request failed with status ${response.status}`);
     }
 
     const blob = await response.blob();
@@ -318,7 +338,7 @@ export const api = {
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(text || `Request failed with status ${response.status}`);
+      throw new Error(parseApiErrorMessage(text) || `Request failed with status ${response.status}`);
     }
 
     const blob = await response.blob();

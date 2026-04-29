@@ -36,6 +36,9 @@ export function AdmissionForm() {
     useState<Awaited<ReturnType<typeof api.checkAdmissionDuplicates>> | null>(null);
   const [bulkCsv, setBulkCsv] = useState('');
   const [bulkConfirmDuplicates, setBulkConfirmDuplicates] = useState(false);
+  const [disabilityMode, setDisabilityMode] = useState<
+    '' | 'NO_KNOWN_DISABILITY' | 'DISABILITY_PRESENT'
+  >('');
   const [pdfError, setPdfError] = useState('');
 
   const admissionsQuery = useQuery({
@@ -64,6 +67,8 @@ export function AdmissionForm() {
     mode: 'onBlur',
     defaultValues: {
       dateOfBirth: '',
+      disabilityFlag: '',
+      confirmNoDisability: false,
       admissionDate: today,
       gender: 'FEMALE',
       mediumOfInstruction: 'English',
@@ -82,6 +87,8 @@ export function AdmissionForm() {
   const selectedClassId = form.watch('classId');
   const selectedSectionId = form.watch('sectionId');
   const watchedDateOfBirth = form.watch('dateOfBirth');
+  const watchedDisabilityFlag = form.watch('disabilityFlag');
+  const watchedConfirmNoDisability = form.watch('confirmNoDisability');
   const watchedGuardians = form.watch('guardians') ?? [];
   const watchedFirstNameEn = form.watch('firstNameEn');
   const watchedLastNameEn = form.watch('lastNameEn');
@@ -194,6 +201,8 @@ export function AdmissionForm() {
     mutation.mutate({
       ...values,
       sectionId: values.sectionId || null,
+      disabilityFlag: values.disabilityFlag?.trim() || undefined,
+      confirmNoDisability: Boolean(values.confirmNoDisability),
       admissionDate: new Date(values.admissionDate).toISOString(),
       dateOfBirth: new Date(values.dateOfBirth).toISOString(),
       confirmDuplicate,
@@ -217,6 +226,8 @@ export function AdmissionForm() {
       firstNameNp: '',
       lastNameNp: '',
       dateOfBirth: '',
+      disabilityFlag: '',
+      confirmNoDisability: false,
       admissionDate: today,
       admissionNumber: '',
       rollNumber: null,
@@ -231,6 +242,7 @@ export function AdmissionForm() {
     });
     setDocumentFile(null);
     setDuplicateWarning(null);
+    setDisabilityMode('');
     setPdfError('');
     setActiveStep(0);
     mutation.reset();
@@ -247,7 +259,7 @@ export function AdmissionForm() {
 
   const latestAdmission = mutation.data;
   const sampleBulkCsv =
-    'firstNameEn,lastNameEn,dateOfBirth,gender,admissionDate,academicYearId,classId,sectionId,guardianFullName,guardianRelation,guardianPhone,rollNumber';
+    'firstNameEn,lastNameEn,dateOfBirth,gender,admissionDate,academicYearId,classId,sectionId,guardianFullName,guardianRelation,guardianPhone,rollNumber,confirmNoDisability';
 
   async function openStudentPdf(studentId: string, kind: string) {
     setPdfError('');
@@ -310,6 +322,80 @@ export function AdmissionForm() {
                 </select>
               </Field>
             </div>
+            <fieldset className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+              <legend className="label px-2">Disability status / iEMIS requirement</legend>
+              <p className="mt-2 text-sm leading-6 text-gray-500">
+                iEMIS requires either explicit confirmation of no known disability or a
+                disability/special support detail before enrollment.
+              </p>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <label className="flex min-h-11 items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
+                  <input
+                    type="radio"
+                    name="disabilityStatus"
+                    checked={disabilityMode === 'NO_KNOWN_DISABILITY'}
+                    onChange={() => {
+                      setDisabilityMode('NO_KNOWN_DISABILITY');
+                      form.setValue('confirmNoDisability', true, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                      form.setValue('disabilityFlag', '', {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                    }}
+                  />
+                  <span>
+                    <span className="block font-semibold text-gray-900">
+                      No known disability
+                    </span>
+                    <span className="mt-1 block text-xs text-gray-500">
+                      I confirm this student has no known disability or special support need.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex min-h-11 items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
+                  <input
+                    type="radio"
+                    name="disabilityStatus"
+                    checked={disabilityMode === 'DISABILITY_PRESENT'}
+                    onChange={() => {
+                      setDisabilityMode('DISABILITY_PRESENT');
+                      form.setValue('confirmNoDisability', false, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                    }}
+                  />
+                  <span>
+                    <span className="block font-semibold text-gray-900">
+                      Disability / special support need present
+                    </span>
+                    <span className="mt-1 block text-xs text-gray-500">
+                      Enter the support detail so it can be included in iEMIS data.
+                    </span>
+                  </span>
+                </label>
+              </div>
+              {disabilityMode === 'DISABILITY_PRESENT' ? (
+                <Field
+                  label="Disability or support detail"
+                  error={fieldError(form.formState.errors.disabilityFlag)}
+                >
+                  <input
+                    className="mt-4"
+                    placeholder="Example: low vision, mobility support, hearing support"
+                    {...form.register('disabilityFlag')}
+                  />
+                </Field>
+              ) : null}
+              {fieldError(form.formState.errors.confirmNoDisability) ? (
+                <p className="mt-3 text-xs text-danger-600">
+                  {fieldError(form.formState.errors.confirmNoDisability)}
+                </p>
+              ) : null}
+            </fieldset>
           </StepCard>
         ) : null}
 
@@ -546,6 +632,11 @@ export function AdmissionForm() {
                 academicYear={selectedAcademicYear?.name ?? 'Not selected'}
                 className={selectedClass?.name ?? 'Not selected'}
                 documentCount={documentFile ? 1 : 0}
+                disabilityStatus={
+                  watchedConfirmNoDisability
+                    ? 'No known disability confirmed'
+                    : watchedDisabilityFlag || 'Not confirmed'
+                }
                 guardianNames={watchedGuardians
                   .map((guardian) => guardian.fullName)
                   .filter(Boolean)}
@@ -755,6 +846,7 @@ function SetupSkeleton() {
 function ReviewCard({
   academicYear,
   className,
+  disabilityStatus,
   documentCount,
   guardianNames,
   sectionName,
@@ -762,6 +854,7 @@ function ReviewCard({
 }: {
   academicYear: string;
   className: string;
+  disabilityStatus: string;
   documentCount: number;
   guardianNames: string[];
   sectionName: string;
@@ -778,6 +871,7 @@ function ReviewCard({
           label="Guardians"
           value={guardianNames.length > 0 ? guardianNames.join(', ') : 'Not entered'}
         />
+        <ReviewItem label="Disability status" value={disabilityStatus} />
         <ReviewItem label="Documents" value={String(documentCount)} />
       </dl>
     </div>
@@ -1107,7 +1201,14 @@ function GeneratedPdfActions({
 
 function fieldsForStep(step: number): Array<keyof AdmissionFormInput> {
   if (step === 0) {
-    return ['firstNameEn', 'lastNameEn', 'dateOfBirth', 'gender'];
+    return [
+      'firstNameEn',
+      'lastNameEn',
+      'dateOfBirth',
+      'gender',
+      'disabilityFlag',
+      'confirmNoDisability',
+    ];
   }
 
   if (step === 1) {

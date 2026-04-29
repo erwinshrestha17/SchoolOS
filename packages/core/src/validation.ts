@@ -49,6 +49,8 @@ export const admissionFormSchema = z.object({
   lastNameNp: z.string().optional().nullable(),
   dateOfBirth: z.string().min(1),
   gender: z.string().min(1),
+  disabilityFlag: z.string().optional().nullable(),
+  confirmNoDisability: z.boolean().default(false),
   admissionDate: z.string().min(1),
   academicYearId: z.string().min(1),
   classId: z.string().min(1),
@@ -61,6 +63,14 @@ export const admissionFormSchema = z.object({
   mediumOfInstruction: z.string().default('English'),
   guardians: z.array(guardianSchema).min(1),
   documents: z.array(studentDocumentFormSchema).optional()
+}).superRefine((value, ctx) => {
+  if (!value.disabilityFlag?.trim() && !value.confirmNoDisability) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Confirm no known disability or enter disability/support details.',
+      path: ['confirmNoDisability']
+    });
+  }
 });
 
 export const academicYearFormSchema = z.object({
