@@ -55,6 +55,8 @@ import type {
   TeacherAssignmentSummary,
   TeacherWorkloadSummary,
   TimetableSlotSummary,
+  UpdateStudentGuardianPayload,
+  UpdateStudentProfilePayload,
   WaiverRecord,
 } from '@schoolos/core';
 import { clearStoredSession } from './session';
@@ -227,6 +229,23 @@ export const api = {
   listStudents: () => request<StudentProfile[]>('/students'),
   getStudentProfile: (studentId: string) =>
     request<StudentProfileDetail>(`/students/${encodeURIComponent(studentId)}`),
+  updateStudent: (studentId: string, body: UpdateStudentProfilePayload) =>
+    request<StudentProfileDetail>(`/students/${encodeURIComponent(studentId)}`, {
+      method: 'PATCH',
+      json: body as JsonBody,
+    }),
+  updateStudentGuardian: (
+    studentId: string,
+    guardianId: string,
+    body: UpdateStudentGuardianPayload,
+  ) =>
+    request<StudentProfileDetail>(
+      `/students/${encodeURIComponent(studentId)}/guardians/${encodeURIComponent(guardianId)}`,
+      {
+        method: 'PATCH',
+        json: body as JsonBody,
+      },
+    ),
   listStaff: () => request<StaffSummary[]>('/staff'),
   createStaff: (body: JsonBody) =>
     request<StaffSummary>('/staff', { method: 'POST', json: body }),

@@ -81,6 +81,11 @@ export const permissionCatalog = [
   },
   {
     resource: "students",
+    action: "update",
+    description: "Update mutable student profile fields inside a tenant",
+  },
+  {
+    resource: "students",
     action: "delete",
     description: "Delete or withdraw student records",
   },
@@ -104,6 +109,11 @@ export const permissionCatalog = [
     resource: "guardians",
     action: "read",
     description: "Read guardian records inside a tenant",
+  },
+  {
+    resource: "guardians",
+    action: "update",
+    description: "Update linked guardian records inside a tenant",
   },
   {
     resource: "guardians",

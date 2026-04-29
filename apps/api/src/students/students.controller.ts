@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   StreamableFile,
   UseGuards,
@@ -21,6 +22,8 @@ import { CreateGuardianIdentityVerificationDto } from './dto/create-guardian-ide
 import { RequestStudentTransferDto } from './dto/request-student-transfer.dto';
 import { RevokeGeneratedStudentDocumentDto } from './dto/revoke-generated-student-document.dto';
 import { ReviewGuardianIdentityVerificationDto } from './dto/review-guardian-identity-verification.dto';
+import { UpdateStudentDto } from './dto/update-student.dto';
+import { UpdateStudentGuardianDto } from './dto/update-student-guardian.dto';
 import { StudentsService } from './students.service';
 
 @Controller('students')
@@ -50,6 +53,32 @@ export class StudentsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.studentsService.createStudent(dto, auth);
+  }
+
+  @Patch(':id')
+  @Permissions('students:update')
+  updateStudent(
+    @Param('id') studentId: string,
+    @Body() dto: UpdateStudentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.updateStudent(studentId, dto, auth);
+  }
+
+  @Patch(':id/guardians/:guardianId')
+  @Permissions('guardians:update')
+  updateStudentGuardian(
+    @Param('id') studentId: string,
+    @Param('guardianId') guardianId: string,
+    @Body() dto: UpdateStudentGuardianDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.updateStudentGuardian(
+      studentId,
+      guardianId,
+      dto,
+      auth,
+    );
   }
 
   @Get('iemis/export')

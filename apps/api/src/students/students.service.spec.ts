@@ -20,8 +20,10 @@ const actor = {
   roles: ['admin'],
   permissions: [
     'students:read',
+    'students:update',
     'students:manage_lifecycle',
     'students:delete',
+    'guardians:update',
     'student_documents:manage',
     'guardians:verify',
   ],
@@ -339,6 +341,287 @@ describe('students lifecycle hardening', () => {
         }),
       ]),
     );
+  });
+
+  it('rejects attempts to edit immutable student system IDs', async () => {
+    const prisma = buildPrisma({});
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.updateStudent(
+        'student-1',
+        { studentSystemId: 'SCH-2026-9999' } as never,
+        actor,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prisma.student.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('updates mutable student fields with tenant-scoped placement checks and audit logging', async () => {
+    const student = buildStudent({
+      disabilityFlag: null,
+      enrollments: [
+        {
+          id: 'enrollment-1',
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          academicYear: { name: '2083' },
+          class: { name: 'Grade 1' },
+          section: { name: 'A' },
+          status: EnrollmentStatus.ACTIVE,
+          rollNumber: 7,
+          admissionDate: new Date('2026-04-01T00:00:00.000Z'),
+        },
+      ],
+    });
+    const updatedProfileStudent = buildStudent({
+      ...student,
+      firstNameEn: 'Aarav',
+      disabilityFlag: 'No known disability',
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student, updatedProfileStudent],
+      classFindFirstResult: { id: 'class-1', tenantId: actor.tenantId },
+      sectionFindFirstResult: {
+        id: 'section-1',
+        tenantId: actor.tenantId,
+        classId: 'class-1',
+        name: 'A',
+      },
+      enrollmentFindFirstResult: null,
+      activityPostFindManyResult: [],
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await service.updateStudent(
+      student.id,
+      {
+        firstNameEn: 'Aarav',
+        disabilityFlag: 'No known disability',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        rollNumber: 8,
+      },
+      actor,
+    );
+
+    expect(prisma.class.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'class-1',
+        tenantId: actor.tenantId,
+      },
+    });
+    expect(prisma.section.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'section-1',
+        tenantId: actor.tenantId,
+        classId: 'class-1',
+      },
+    });
+    expect(prisma.enrollment.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: actor.tenantId,
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          rollNumber: 8,
+          studentId: { not: student.id },
+        }),
+      }),
+    );
+    expect(prisma.transaction.student.update).toHaveBeenCalledWith({
+      where: { id: student.id },
+      data: expect.objectContaining({
+        firstNameEn: 'Aarav',
+        disabilityFlag: 'No known disability',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        rollNumber: 8,
+      }),
+    });
+    expect(prisma.transaction.enrollment.update).toHaveBeenCalledWith({
+      where: { id: 'enrollment-1' },
+      data: expect.objectContaining({
+        classId: 'class-1',
+        sectionId: 'section-1',
+        rollNumber: 8,
+      }),
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'update',
+        resource: 'student',
+        tenantId: actor.tenantId,
+        resourceId: student.id,
+      }),
+    );
+  });
+
+  it('blocks roll number conflicts during student placement updates', async () => {
+    const student = buildStudent({
+      enrollments: [
+        {
+          id: 'enrollment-1',
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          academicYear: { name: '2083' },
+          class: { name: 'Grade 1' },
+          section: { name: 'A' },
+          status: EnrollmentStatus.ACTIVE,
+          admissionDate: new Date('2026-04-01T00:00:00.000Z'),
+        },
+      ],
+    });
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      classFindFirstResult: { id: 'class-1', tenantId: actor.tenantId },
+      sectionFindFirstResult: {
+        id: 'section-1',
+        tenantId: actor.tenantId,
+        classId: 'class-1',
+        name: 'A',
+      },
+      enrollmentFindFirstResult: {
+        id: 'enrollment-conflict',
+        studentId: 'student-2',
+        rollNumber: 7,
+        student: {
+          studentSystemId: 'SCH-2026-0002',
+          firstNameEn: 'Sita',
+          lastNameEn: 'Rai',
+        },
+        class: { name: 'Grade 1' },
+        section: { name: 'A' },
+      },
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.updateStudent(
+        student.id,
+        {
+          rollNumber: 7,
+          confirmNoDisability: true,
+        },
+        actor,
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('updates linked guardians through the student relationship with audit logging', async () => {
+    const link = {
+      id: 'student-guardian-1',
+      tenantId: actor.tenantId,
+      studentId: 'student-1',
+      guardianId: 'guardian-1',
+      relation: 'mother',
+      isPrimary: false,
+      guardian: {
+        id: 'guardian-1',
+        fullName: 'Maya Shrestha',
+        relation: 'mother',
+        primaryPhone: '9800000000',
+        secondaryPhone: null,
+        email: 'maya@example.com',
+        occupation: null,
+        homeAddress: null,
+        wardNumber: null,
+      },
+    };
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: link,
+      guardianFindFirstQueue: [null],
+      studentFindFirstQueue: [
+        buildStudent({
+          guardianLinks: [
+            {
+              guardianId: 'guardian-1',
+              guardian: {
+                id: 'guardian-1',
+                fullName: 'Maya Shrestha',
+                relation: 'mother',
+                primaryPhone: '9811111111',
+                email: 'maya@example.com',
+                wardNumber: null,
+              },
+              relation: 'mother',
+              isPrimary: true,
+            },
+          ],
+        }),
+      ],
+      activityPostFindManyResult: [],
+    });
+    const { service, auditService } = buildService(prisma);
+
+    await service.updateStudentGuardian(
+      'student-1',
+      'guardian-1',
+      {
+        primaryPhone: '9811111111',
+        isPrimary: true,
+      },
+      actor,
+    );
+
+    expect(prisma.studentGuardian.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: 'student-1',
+        guardianId: 'guardian-1',
+      },
+      include: {
+        guardian: true,
+      },
+    });
+    expect(prisma.transaction.studentGuardian.updateMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: 'student-1',
+        id: { not: link.id },
+      },
+      data: { isPrimary: false },
+    });
+    expect(prisma.transaction.guardian.update).toHaveBeenCalledWith({
+      where: { id: 'guardian-1' },
+      data: {
+        primaryPhone: '9811111111',
+      },
+    });
+    expect(prisma.transaction.studentGuardian.update).toHaveBeenCalledWith({
+      where: { id: link.id },
+      data: { isPrimary: true },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'update',
+        resource: 'student_guardian',
+        tenantId: actor.tenantId,
+        resourceId: link.id,
+      }),
+    );
+  });
+
+  it('rejects guardian updates that are not linked to the tenant-scoped student', async () => {
+    const prisma = buildPrisma({
+      studentGuardianFindFirstResult: null,
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.updateStudentGuardian(
+        'student-1',
+        'guardian-other-tenant',
+        { primaryPhone: '9811111111' },
+        actor,
+      ),
+    ).rejects.toThrow(NotFoundException);
   });
 
   it('persists signed metadata when generating student documents', async () => {
@@ -927,8 +1210,12 @@ function buildPrisma(options: {
   studentFindFirstQueue?: unknown[];
   studentFindManyResult?: unknown[];
   guardianFindFirstQueue?: unknown[];
+  studentGuardianFindFirstResult?: unknown;
   studentDocumentFindFirstQueue?: unknown[];
   invoiceFindManyQueue?: unknown[];
+  classFindFirstResult?: unknown;
+  sectionFindFirstResult?: unknown;
+  enrollmentFindFirstResult?: unknown;
   generatedStudentDocumentFindFirstQueue?: unknown[];
   generatedStudentDocumentFindManyResult?: unknown[];
   guardianIdentityVerificationCreateResult?: unknown;
@@ -939,6 +1226,7 @@ function buildPrisma(options: {
 }) {
   const transaction = {
     enrollment: {
+      update: jest.fn().mockResolvedValue({ id: 'enrollment-updated' }),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     student: {
@@ -948,6 +1236,11 @@ function buildPrisma(options: {
     },
     studentGuardian: {
       createMany: jest.fn().mockResolvedValue({ count: 1 }),
+      update: jest.fn().mockResolvedValue({ id: 'student-guardian-updated' }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    guardian: {
+      update: jest.fn().mockResolvedValue({ id: 'guardian-updated' }),
     },
     studentDocument: {
       updateMany: jest.fn().mockResolvedValue({ count: 2 }),
@@ -1021,6 +1314,21 @@ function buildPrisma(options: {
         .fn()
         .mockResolvedValue(options.studentFindManyResult ?? []),
     },
+    class: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(options.classFindFirstResult ?? { id: 'class-1' }),
+    },
+    section: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(options.sectionFindFirstResult ?? null),
+    },
+    enrollment: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(options.enrollmentFindFirstResult ?? null),
+    },
     guardian: {
       findFirst: jest.fn().mockImplementation(async () => {
         const queue = options.guardianFindFirstQueue ?? [];
@@ -1035,6 +1343,11 @@ function buildPrisma(options: {
 
         return queue.shift();
       }),
+    },
+    studentGuardian: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(options.studentGuardianFindFirstResult ?? null),
     },
     studentDocument: {
       findFirst: jest.fn().mockImplementation(async () => {

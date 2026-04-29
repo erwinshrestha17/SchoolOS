@@ -28,6 +28,8 @@ import { CreateGuardianIdentityVerificationDto } from './dto/create-guardian-ide
 import { RequestStudentTransferDto } from './dto/request-student-transfer.dto';
 import { RevokeGeneratedStudentDocumentDto } from './dto/revoke-generated-student-document.dto';
 import { ReviewGuardianIdentityVerificationDto } from './dto/review-guardian-identity-verification.dto';
+import { UpdateStudentDto } from './dto/update-student.dto';
+import { UpdateStudentGuardianDto } from './dto/update-student-guardian.dto';
 
 @Injectable()
 export class StudentsService {
@@ -262,8 +264,15 @@ export class StudentsService {
       fullName: link.guardian.fullName,
       relation: link.relation || link.guardian.relation,
       primaryPhone: link.guardian.primaryPhone,
+      secondaryPhone: link.guardian.secondaryPhone,
       email: link.guardian.email,
+      occupation: link.guardian.occupation,
+      wardNumber: link.guardian.wardNumber,
       isPrimary: link.isPrimary,
+      consentedAt:
+        link.guardian.privacyConsentAt?.toISOString() ??
+        student.privacyConsentAt?.toISOString() ??
+        null,
     }));
 
     return {
@@ -409,6 +418,295 @@ export class StudentsService {
         })),
       })),
     };
+  }
+
+  async updateStudent(
+    studentId: string,
+    dto: UpdateStudentDto,
+    actor: AuthContext,
+  ) {
+    if (
+      Object.prototype.hasOwnProperty.call(
+        dto as Record<string, unknown>,
+        'studentSystemId',
+      )
+    ) {
+      throw new BadRequestException('studentSystemId is immutable');
+    }
+
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: studentId,
+        tenantId: actor.tenantId,
+      },
+      include: {
+        enrollments: {
+          where: { status: EnrollmentStatus.ACTIVE },
+          orderBy: [{ createdAt: 'desc' }],
+          take: 1,
+        },
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    const latestEnrollment = student.enrollments[0] ?? null;
+    const nextClassId = dto.classId ?? student.classId;
+    const nextSectionId =
+      'sectionId' in dto ? dto.sectionId?.trim() || null : student.sectionId;
+    const nextRollNumber =
+      'rollNumber' in dto ? (dto.rollNumber ?? null) : student.rollNumber;
+    const nextDisabilityFlag =
+      'disabilityFlag' in dto
+        ? normalizeNullableString(dto.disabilityFlag)
+        : student.disabilityFlag;
+
+    if (!nextDisabilityFlag && dto.confirmNoDisability !== true) {
+      throw new BadRequestException(
+        'You must explicitly confirm "No known disability" (iEMIS requirement) if no disability is specified.',
+      );
+    }
+
+    const placement = await this.assertStudentPlacementForUpdate(
+      {
+        studentId,
+        classId: nextClassId,
+        sectionId: nextSectionId,
+        rollNumber: nextRollNumber,
+        academicYearId: latestEnrollment?.academicYearId ?? null,
+      },
+      actor,
+    );
+
+    const studentData: Prisma.StudentUncheckedUpdateInput = {
+      ...(dto.firstNameEn !== undefined
+        ? { firstNameEn: assertNonEmpty(dto.firstNameEn, 'firstNameEn') }
+        : {}),
+      ...(dto.lastNameEn !== undefined
+        ? { lastNameEn: assertNonEmpty(dto.lastNameEn, 'lastNameEn') }
+        : {}),
+      ...(dto.firstNameNp !== undefined
+        ? { firstNameNp: normalizeNullableString(dto.firstNameNp) }
+        : {}),
+      ...(dto.lastNameNp !== undefined
+        ? { lastNameNp: normalizeNullableString(dto.lastNameNp) }
+        : {}),
+      ...(dto.dateOfBirth !== undefined
+        ? { dateOfBirth: new Date(dto.dateOfBirth) }
+        : {}),
+      ...(dto.gender !== undefined ? { gender: dto.gender } : {}),
+      ...(dto.nationality !== undefined
+        ? { nationality: assertNonEmpty(dto.nationality, 'nationality') }
+        : {}),
+      ...(dto.motherTongue !== undefined
+        ? { motherTongue: normalizeNullableString(dto.motherTongue) }
+        : {}),
+      ...(dto.ethnicity !== undefined
+        ? { ethnicity: normalizeNullableString(dto.ethnicity) }
+        : {}),
+      ...(dto.disabilityFlag !== undefined
+        ? { disabilityFlag: nextDisabilityFlag }
+        : {}),
+      ...(dto.nationalStudentId !== undefined
+        ? { nationalStudentId: normalizeNullableString(dto.nationalStudentId) }
+        : {}),
+      ...(dto.admissionNumber !== undefined
+        ? { admissionNumber: normalizeNullableString(dto.admissionNumber) }
+        : {}),
+      ...(dto.classId !== undefined ? { classId: nextClassId } : {}),
+      ...('sectionId' in dto
+        ? {
+            sectionId: nextSectionId,
+            section: placement.section?.name ?? null,
+          }
+        : {}),
+      ...('rollNumber' in dto ? { rollNumber: nextRollNumber } : {}),
+      ...(dto.mediumOfInstruction !== undefined
+        ? {
+            mediumOfInstruct: assertNonEmpty(
+              dto.mediumOfInstruction,
+              'mediumOfInstruction',
+            ),
+          }
+        : {}),
+    };
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.student.update({
+        where: { id: student.id },
+        data: studentData,
+      });
+
+      if (
+        latestEnrollment &&
+        (dto.classId !== undefined ||
+          'sectionId' in dto ||
+          'rollNumber' in dto ||
+          dto.mediumOfInstruction !== undefined)
+      ) {
+        await tx.enrollment.update({
+          where: { id: latestEnrollment.id },
+          data: {
+            classId: nextClassId,
+            sectionId: nextSectionId,
+            rollNumber: nextRollNumber,
+            ...(dto.mediumOfInstruction !== undefined
+              ? {
+                  mediumOfInstruction: assertNonEmpty(
+                    dto.mediumOfInstruction,
+                    'mediumOfInstruction',
+                  ),
+                }
+              : {}),
+          },
+        });
+      }
+    });
+
+    await this.auditService.record({
+      action: 'update',
+      resource: 'student',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: student.id,
+      before: {
+        firstNameEn: student.firstNameEn,
+        lastNameEn: student.lastNameEn,
+        classId: student.classId,
+        sectionId: student.sectionId,
+        rollNumber: student.rollNumber,
+        disabilityFlag: student.disabilityFlag,
+      },
+      after: {
+        firstNameEn: dto.firstNameEn ?? student.firstNameEn,
+        lastNameEn: dto.lastNameEn ?? student.lastNameEn,
+        classId: nextClassId,
+        sectionId: nextSectionId,
+        rollNumber: nextRollNumber,
+        disabilityFlag: nextDisabilityFlag,
+      },
+    });
+
+    return this.getStudentProfile(student.id, actor);
+  }
+
+  async updateStudentGuardian(
+    studentId: string,
+    guardianId: string,
+    dto: UpdateStudentGuardianDto,
+    actor: AuthContext,
+  ) {
+    const link = await this.prisma.studentGuardian.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        studentId,
+        guardianId,
+      },
+      include: {
+        guardian: true,
+      },
+    });
+
+    if (!link) {
+      throw new NotFoundException(
+        'Guardian link not found for this student in this tenant',
+      );
+    }
+
+    if (dto.primaryPhone && dto.primaryPhone !== link.guardian.primaryPhone) {
+      const phoneOwner = await this.prisma.guardian.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          primaryPhone: dto.primaryPhone,
+          id: { not: guardianId },
+        },
+      });
+
+      if (phoneOwner) {
+        throw new ConflictException(
+          'Guardian phone number is already used in this tenant',
+        );
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      if (dto.isPrimary === true) {
+        await tx.studentGuardian.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId,
+            id: { not: link.id },
+          },
+          data: { isPrimary: false },
+        });
+      }
+
+      await tx.guardian.update({
+        where: { id: guardianId },
+        data: {
+          ...(dto.fullName !== undefined
+            ? { fullName: assertNonEmpty(dto.fullName, 'fullName') }
+            : {}),
+          ...(dto.relation !== undefined
+            ? { relation: assertNonEmpty(dto.relation, 'relation') }
+            : {}),
+          ...(dto.primaryPhone !== undefined
+            ? { primaryPhone: assertNonEmpty(dto.primaryPhone, 'primaryPhone') }
+            : {}),
+          ...(dto.secondaryPhone !== undefined
+            ? { secondaryPhone: normalizeNullableString(dto.secondaryPhone) }
+            : {}),
+          ...(dto.email !== undefined
+            ? { email: normalizeNullableString(dto.email) }
+            : {}),
+          ...(dto.occupation !== undefined
+            ? { occupation: normalizeNullableString(dto.occupation) }
+            : {}),
+          ...(dto.homeAddress !== undefined
+            ? { homeAddress: normalizeNullableString(dto.homeAddress) }
+            : {}),
+          ...(dto.wardNumber !== undefined
+            ? { wardNumber: normalizeNullableString(dto.wardNumber) }
+            : {}),
+        },
+      });
+
+      await tx.studentGuardian.update({
+        where: { id: link.id },
+        data: {
+          ...(dto.relation !== undefined
+            ? { relation: assertNonEmpty(dto.relation, 'relation') }
+            : {}),
+          ...(dto.isPrimary !== undefined ? { isPrimary: dto.isPrimary } : {}),
+        },
+      });
+    });
+
+    await this.auditService.record({
+      action: 'update',
+      resource: 'student_guardian',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: link.id,
+      before: {
+        guardianId,
+        fullName: link.guardian.fullName,
+        relation: link.relation || link.guardian.relation,
+        primaryPhone: link.guardian.primaryPhone,
+        isPrimary: link.isPrimary,
+      },
+      after: {
+        guardianId,
+        fullName: dto.fullName ?? link.guardian.fullName,
+        relation: dto.relation ?? link.relation ?? link.guardian.relation,
+        primaryPhone: dto.primaryPhone ?? link.guardian.primaryPhone,
+        isPrimary: dto.isPrimary ?? link.isPrimary,
+      },
+    });
+
+    return this.getStudentProfile(studentId, actor);
   }
 
   async getFeeClearance(studentId: string, actor: AuthContext) {
@@ -1575,6 +1873,82 @@ export class StudentsService {
     return `SCH-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
   }
 
+  private async assertStudentPlacementForUpdate(
+    input: {
+      studentId: string;
+      classId: string;
+      sectionId: string | null;
+      rollNumber: number | null;
+      academicYearId: string | null;
+    },
+    actor: AuthContext,
+  ) {
+    const classroom = await this.prisma.class.findFirst({
+      where: {
+        id: input.classId,
+        tenantId: actor.tenantId,
+      },
+    });
+
+    if (!classroom) {
+      throw new NotFoundException('Class not found in this tenant');
+    }
+
+    const section = input.sectionId
+      ? await this.prisma.section.findFirst({
+          where: {
+            id: input.sectionId,
+            tenantId: actor.tenantId,
+            classId: input.classId,
+          },
+        })
+      : null;
+
+    if (input.sectionId && !section) {
+      throw new BadRequestException(
+        'Section must belong to the selected class in this tenant',
+      );
+    }
+
+    if (input.rollNumber && input.academicYearId) {
+      const rollConflict = await this.prisma.enrollment.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          academicYearId: input.academicYearId,
+          classId: input.classId,
+          sectionId: input.sectionId,
+          rollNumber: input.rollNumber,
+          status: EnrollmentStatus.ACTIVE,
+          studentId: { not: input.studentId },
+        },
+        include: {
+          student: true,
+          class: true,
+          section: true,
+        },
+      });
+
+      if (rollConflict) {
+        throw new ConflictException({
+          message:
+            'Roll number is already assigned in this academic year, class, and section.',
+          conflict: {
+            enrollmentId: rollConflict.id,
+            studentId: rollConflict.studentId,
+            studentSystemId: rollConflict.student.studentSystemId,
+            fullNameEn:
+              `${rollConflict.student.firstNameEn} ${rollConflict.student.lastNameEn}`.trim(),
+            className: rollConflict.class.name,
+            sectionName: rollConflict.section?.name ?? null,
+            rollNumber: rollConflict.rollNumber,
+          },
+        });
+      }
+    }
+
+    return { classroom, section };
+  }
+
   private async findTenantStudent(studentId: string, actor: AuthContext) {
     const student = await this.prisma.student.findFirst({
       where: {
@@ -1966,6 +2340,22 @@ function escapeCsvValue(value: unknown) {
   }
 
   return text;
+}
+
+function normalizeNullableString(value: string | null | undefined) {
+  const trimmed = value?.trim();
+
+  return trimmed ? trimmed : null;
+}
+
+function assertNonEmpty(value: string, field: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    throw new BadRequestException(`${field} cannot be empty`);
+  }
+
+  return trimmed;
 }
 
 function ensureAllowedLifecycleTransition(

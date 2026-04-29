@@ -393,6 +393,25 @@ describe('SchoolOS web production contracts', () => {
     assert.doesNotMatch(detailPage, /replace-me|demo-student|student-123/i);
   });
 
+  it('adds student and guardian edit workflows to the student detail page', () => {
+    const detailPage = read('components/students/student-detail-page.tsx');
+    const apiClient = read('lib/api.ts');
+
+    assert.match(apiClient, /updateStudent:/);
+    assert.match(apiClient, /method: 'PATCH'/);
+    assert.match(apiClient, /updateStudentGuardian:/);
+    assert.match(detailPage, /Edit Student/);
+    assert.match(detailPage, /Save Student/);
+    assert.match(detailPage, /student\.studentSystemId.*immutable/s);
+    assert.match(detailPage, /confirmNoDisability/);
+    assert.match(detailPage, /Disability status \/ iEMIS requirement/);
+    assert.match(detailPage, /Edit Guardian/);
+    assert.match(detailPage, /Save Guardian/);
+    assert.match(detailPage, /Mark as primary guardian/);
+    assert.match(detailPage, /errorMessage/);
+    assert.doesNotMatch(detailPage, /demo-guardian|student-123|guardian-123/i);
+  });
+
   it('validates PDF responses before opening blob tabs', () => {
     const apiClient = read('lib/api.ts');
 

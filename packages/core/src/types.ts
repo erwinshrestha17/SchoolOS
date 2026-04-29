@@ -137,6 +137,38 @@ export type StudentProfileDetail = {
   activityPosts: ActivityPost[];
 };
 
+export type UpdateStudentProfilePayload = {
+  firstNameEn?: string;
+  lastNameEn?: string;
+  firstNameNp?: string | null;
+  lastNameNp?: string | null;
+  dateOfBirth?: string;
+  gender?: string;
+  nationality?: string;
+  motherTongue?: string | null;
+  ethnicity?: string | null;
+  disabilityFlag?: string | null;
+  confirmNoDisability?: boolean;
+  nationalStudentId?: string | null;
+  admissionNumber?: string | null;
+  classId?: string;
+  sectionId?: string | null;
+  rollNumber?: number | null;
+  mediumOfInstruction?: string;
+};
+
+export type UpdateStudentGuardianPayload = {
+  fullName?: string;
+  relation?: string;
+  primaryPhone?: string;
+  secondaryPhone?: string | null;
+  email?: string | null;
+  occupation?: string | null;
+  homeAddress?: string | null;
+  wardNumber?: string | null;
+  isPrimary?: boolean;
+};
+
 export type AdmissionSummary = {
   id: string;
   studentSystemId: string;

@@ -8,8 +8,10 @@ import type {
   StudentProfileAttendanceRecord,
   StudentProfileDetail,
   StudentProfileInvoice,
+  UpdateStudentGuardianPayload,
+  UpdateStudentProfilePayload,
 } from '@schoolos/core';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 import { api } from '../../lib/api';
@@ -40,10 +42,34 @@ const generatedDocumentActions = [
 export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('Overview');
   const [pdfError, setPdfError] = useState('');
+  const [isEditingStudent, setIsEditingStudent] = useState(false);
+  const [editingGuardianId, setEditingGuardianId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const profileQuery = useQuery({
     queryKey: ['student-profile', studentId],
     queryFn: () => api.getStudentProfile(studentId),
     enabled: Boolean(studentId),
+  });
+  const studentUpdateMutation = useMutation({
+    mutationFn: (body: UpdateStudentProfilePayload) =>
+      api.updateStudent(studentId, body),
+    onSuccess: (profile) => {
+      queryClient.setQueryData(['student-profile', studentId], profile);
+      setIsEditingStudent(false);
+    },
+  });
+  const guardianUpdateMutation = useMutation({
+    mutationFn: ({
+      guardianId,
+      body,
+    }: {
+      guardianId: string;
+      body: UpdateStudentGuardianPayload;
+    }) => api.updateStudentGuardian(studentId, guardianId, body),
+    onSuccess: (profile) => {
+      queryClient.setQueryData(['student-profile', studentId], profile);
+      setEditingGuardianId(null);
+    },
   });
 
   async function openStudentPdf(kind: string) {
@@ -138,6 +164,13 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
             </Link>
             <button
               type="button"
+              className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700"
+              onClick={() => setIsEditingStudent(true)}
+            >
+              Edit Student
+            </button>
+            <button
+              type="button"
               className="inline-flex min-h-11 items-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white"
               onClick={() => void openStudentPdf('id-card')}
             >
@@ -152,6 +185,19 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
           </p>
         ) : null}
       </section>
+
+      {isEditingStudent ? (
+        <StudentEditCard
+          profile={profile}
+          isSaving={studentUpdateMutation.isPending}
+          error={studentUpdateMutation.error}
+          onCancel={() => {
+            studentUpdateMutation.reset();
+            setIsEditingStudent(false);
+          }}
+          onSave={(body) => studentUpdateMutation.mutate(body)}
+        />
+      ) : null}
 
       <section className="rounded-3xl border border-gray-200 bg-white p-2 shadow-sm">
         <div
@@ -177,7 +223,23 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
 
       {activeTab === 'Overview' ? <OverviewTab profile={profile} /> : null}
       {activeTab === 'Guardians' ? (
-        <GuardiansTab guardians={profile.guardians} />
+        <GuardiansTab
+          guardians={profile.guardians}
+          editingGuardianId={editingGuardianId}
+          isSaving={guardianUpdateMutation.isPending}
+          error={guardianUpdateMutation.error}
+          onCancelEdit={() => {
+            guardianUpdateMutation.reset();
+            setEditingGuardianId(null);
+          }}
+          onEditGuardian={(guardianId) => {
+            guardianUpdateMutation.reset();
+            setEditingGuardianId(guardianId);
+          }}
+          onSaveGuardian={(guardianId, body) =>
+            guardianUpdateMutation.mutate({ guardianId, body })
+          }
+        />
       ) : null}
       {activeTab === 'Documents' ? (
         <DocumentsTab
@@ -195,6 +257,207 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
       ) : null}
       {activeTab === 'History' ? <HistoryTab profile={profile} /> : null}
     </StudentDetailShell>
+  );
+}
+
+function StudentEditCard({
+  error,
+  isSaving,
+  onCancel,
+  onSave,
+  profile,
+}: {
+  error: unknown;
+  isSaving: boolean;
+  onCancel: () => void;
+  onSave: (body: UpdateStudentProfilePayload) => void;
+  profile: StudentProfileDetail;
+}) {
+  const student = profile.student;
+  const [firstNameEn, setFirstNameEn] = useState(student.firstNameEn ?? '');
+  const [lastNameEn, setLastNameEn] = useState(student.lastNameEn ?? '');
+  const [firstNameNp, setFirstNameNp] = useState(
+    splitNepaliName(student.fullNameNp).firstNameNp,
+  );
+  const [lastNameNp, setLastNameNp] = useState(
+    splitNepaliName(student.fullNameNp).lastNameNp,
+  );
+  const [dateOfBirth, setDateOfBirth] = useState(
+    student.dateOfBirth ? student.dateOfBirth.slice(0, 10) : '',
+  );
+  const [gender, setGender] = useState(student.gender ?? 'FEMALE');
+  const [nationalStudentId, setNationalStudentId] = useState(
+    student.nationalStudentId ?? '',
+  );
+  const [motherTongue, setMotherTongue] = useState(student.motherTongue ?? '');
+  const [disabilityStatus, setDisabilityStatus] = useState(
+    student.disabilityFlag ? 'yes' : 'no',
+  );
+  const [disabilityFlag, setDisabilityFlag] = useState(
+    student.disabilityFlag ?? '',
+  );
+  const [validationError, setValidationError] = useState('');
+
+  function submit() {
+    setValidationError('');
+
+    if (!firstNameEn.trim() || !lastNameEn.trim()) {
+      setValidationError('First name and last name are required.');
+      return;
+    }
+
+    if (!dateOfBirth) {
+      setValidationError('Date of birth is required.');
+      return;
+    }
+
+    if (disabilityStatus === 'yes' && !disabilityFlag.trim()) {
+      setValidationError(
+        'Enter disability or special support details, or choose no known disability.',
+      );
+      return;
+    }
+
+    onSave({
+      firstNameEn: firstNameEn.trim(),
+      lastNameEn: lastNameEn.trim(),
+      firstNameNp: firstNameNp.trim() || null,
+      lastNameNp: lastNameNp.trim() || null,
+      dateOfBirth,
+      gender,
+      motherTongue: motherTongue.trim() || null,
+      nationalStudentId: nationalStudentId.trim() || null,
+      disabilityFlag:
+        disabilityStatus === 'yes' ? disabilityFlag.trim() : null,
+      confirmNoDisability: disabilityStatus === 'no',
+    });
+  }
+
+  return (
+    <SectionCard title="Edit Student">
+      <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        Student ID <strong>{student.studentSystemId}</strong> is immutable.
+        Placement changes stay backend-validated for class, section, and roll
+        conflicts.
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field label="First name (EN)">
+          <input
+            className="input"
+            value={firstNameEn}
+            onChange={(event) => setFirstNameEn(event.target.value)}
+          />
+        </Field>
+        <Field label="Last name (EN)">
+          <input
+            className="input"
+            value={lastNameEn}
+            onChange={(event) => setLastNameEn(event.target.value)}
+          />
+        </Field>
+        <Field label="First name (NP)">
+          <input
+            className="input"
+            value={firstNameNp}
+            onChange={(event) => setFirstNameNp(event.target.value)}
+          />
+        </Field>
+        <Field label="Last name (NP)">
+          <input
+            className="input"
+            value={lastNameNp}
+            onChange={(event) => setLastNameNp(event.target.value)}
+          />
+        </Field>
+        <Field label="Date of birth">
+          <input
+            className="input"
+            type="date"
+            value={dateOfBirth}
+            onChange={(event) => setDateOfBirth(event.target.value)}
+          />
+        </Field>
+        <Field label="Gender">
+          <select
+            className="input"
+            value={gender}
+            onChange={(event) => setGender(event.target.value)}
+          >
+            <option value="FEMALE">Female</option>
+            <option value="MALE">Male</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </Field>
+        <Field label="National student ID">
+          <input
+            className="input"
+            value={nationalStudentId}
+            onChange={(event) => setNationalStudentId(event.target.value)}
+          />
+        </Field>
+        <Field label="Mother tongue">
+          <input
+            className="input"
+            value={motherTongue}
+            onChange={(event) => setMotherTongue(event.target.value)}
+          />
+        </Field>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+        <p className="label mb-3">Disability status / iEMIS requirement</p>
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="flex min-h-11 items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700">
+            <input
+              type="radio"
+              name="student-disability-status"
+              checked={disabilityStatus === 'no'}
+              onChange={() => setDisabilityStatus('no')}
+            />
+            No known disability
+          </label>
+          <label className="flex min-h-11 items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700">
+            <input
+              type="radio"
+              name="student-disability-status"
+              checked={disabilityStatus === 'yes'}
+              onChange={() => setDisabilityStatus('yes')}
+            />
+            Disability / special support need present
+          </label>
+        </div>
+        {disabilityStatus === 'yes' ? (
+          <Field label="Disability or support details">
+            <input
+              className="input"
+              value={disabilityFlag}
+              onChange={(event) => setDisabilityFlag(event.target.value)}
+            />
+          </Field>
+        ) : null}
+      </div>
+
+      {validationError ? <InlineError message={validationError} /> : null}
+      {error ? <InlineError message={errorMessage(error)} /> : null}
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="inline-flex min-h-11 items-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white disabled:opacity-60"
+          disabled={isSaving}
+          onClick={submit}
+        >
+          {isSaving ? 'Saving...' : 'Save Student'}
+        </button>
+        <button
+          type="button"
+          className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700"
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
+      </div>
+    </SectionCard>
   );
 }
 
@@ -273,7 +536,26 @@ function OverviewTab({ profile }: { profile: StudentProfileDetail }) {
   );
 }
 
-function GuardiansTab({ guardians }: { guardians: GuardianProfile[] }) {
+function GuardiansTab({
+  editingGuardianId,
+  error,
+  guardians,
+  isSaving,
+  onCancelEdit,
+  onEditGuardian,
+  onSaveGuardian,
+}: {
+  editingGuardianId: string | null;
+  error: unknown;
+  guardians: GuardianProfile[];
+  isSaving: boolean;
+  onCancelEdit: () => void;
+  onEditGuardian: (guardianId: string) => void;
+  onSaveGuardian: (
+    guardianId: string,
+    body: UpdateStudentGuardianPayload,
+  ) => void;
+}) {
   return (
     <SectionCard title="Guardians">
       {guardians.length > 0 ? (
@@ -288,7 +570,16 @@ function GuardiansTab({ guardians }: { guardians: GuardianProfile[] }) {
                   <p className="font-semibold text-gray-900">{guardian.fullName}</p>
                   <p className="mt-1 text-sm text-gray-500">{guardian.relation}</p>
                 </div>
-                {guardian.isPrimary ? <Badge>Primary</Badge> : null}
+                <div className="flex flex-wrap justify-end gap-2">
+                  {guardian.isPrimary ? <Badge>Primary</Badge> : null}
+                  <button
+                    type="button"
+                    className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700"
+                    onClick={() => onEditGuardian(guardian.id)}
+                  >
+                    Edit Guardian
+                  </button>
+                </div>
               </div>
               <p className="mt-3 text-sm text-gray-600">
                 Phone: {guardian.primaryPhone || 'Not available'}
@@ -299,6 +590,15 @@ function GuardiansTab({ guardians }: { guardians: GuardianProfile[] }) {
               <p className="mt-1 text-sm text-gray-600">
                 Ward: {guardian.wardNumber || 'Not recorded'}
               </p>
+              {editingGuardianId === guardian.id ? (
+                <GuardianEditCard
+                  error={error}
+                  guardian={guardian}
+                  isSaving={isSaving}
+                  onCancel={onCancelEdit}
+                  onSave={(body) => onSaveGuardian(guardian.id, body)}
+                />
+              ) : null}
             </article>
           ))}
         </div>
@@ -306,6 +606,144 @@ function GuardiansTab({ guardians }: { guardians: GuardianProfile[] }) {
         <EmptyState message="No guardians linked to this student yet." />
       )}
     </SectionCard>
+  );
+}
+
+function GuardianEditCard({
+  error,
+  guardian,
+  isSaving,
+  onCancel,
+  onSave,
+}: {
+  error: unknown;
+  guardian: GuardianProfile;
+  isSaving: boolean;
+  onCancel: () => void;
+  onSave: (body: UpdateStudentGuardianPayload) => void;
+}) {
+  const [fullName, setFullName] = useState(guardian.fullName);
+  const [relation, setRelation] = useState(guardian.relation);
+  const [primaryPhone, setPrimaryPhone] = useState(guardian.primaryPhone ?? '');
+  const [secondaryPhone, setSecondaryPhone] = useState(
+    guardian.secondaryPhone ?? '',
+  );
+  const [email, setEmail] = useState(guardian.email ?? '');
+  const [occupation, setOccupation] = useState(guardian.occupation ?? '');
+  const [wardNumber, setWardNumber] = useState(guardian.wardNumber ?? '');
+  const [isPrimary, setIsPrimary] = useState(guardian.isPrimary);
+  const [validationError, setValidationError] = useState('');
+
+  function submit() {
+    setValidationError('');
+
+    if (!fullName.trim() || !relation.trim()) {
+      setValidationError('Guardian name and relation are required.');
+      return;
+    }
+
+    if (primaryPhone.trim().length < 7) {
+      setValidationError('Guardian primary phone must be valid.');
+      return;
+    }
+
+    onSave({
+      fullName: fullName.trim(),
+      relation: relation.trim(),
+      primaryPhone: primaryPhone.trim(),
+      secondaryPhone: secondaryPhone.trim() || null,
+      email: email.trim() || null,
+      occupation: occupation.trim() || null,
+      wardNumber: wardNumber.trim() || null,
+      isPrimary,
+    });
+  }
+
+  return (
+    <div className="mt-4 rounded-2xl border border-primary-100 bg-white p-4">
+      <p className="label mb-3">Edit Guardian</p>
+      <div className="grid gap-3">
+        <Field label="Full name">
+          <input
+            className="input"
+            value={fullName}
+            onChange={(event) => setFullName(event.target.value)}
+          />
+        </Field>
+        <Field label="Relation">
+          <input
+            className="input"
+            value={relation}
+            onChange={(event) => setRelation(event.target.value)}
+          />
+        </Field>
+        <Field label="Primary phone">
+          <input
+            className="input"
+            value={primaryPhone}
+            onChange={(event) => setPrimaryPhone(event.target.value)}
+          />
+        </Field>
+        <Field label="Secondary phone">
+          <input
+            className="input"
+            value={secondaryPhone}
+            onChange={(event) => setSecondaryPhone(event.target.value)}
+          />
+        </Field>
+        <Field label="Email">
+          <input
+            className="input"
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+        </Field>
+        <Field label="Occupation">
+          <input
+            className="input"
+            value={occupation}
+            onChange={(event) => setOccupation(event.target.value)}
+          />
+        </Field>
+        <Field label="Ward number">
+          <input
+            className="input"
+            value={wardNumber}
+            onChange={(event) => setWardNumber(event.target.value)}
+          />
+        </Field>
+        <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-gray-700">
+          <input
+            type="checkbox"
+            checked={isPrimary}
+            onChange={(event) => setIsPrimary(event.target.checked)}
+          />
+          Mark as primary guardian
+        </label>
+      </div>
+
+      {validationError ? <InlineError message={validationError} /> : null}
+      {error ? <InlineError message={errorMessage(error)} /> : null}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="inline-flex min-h-11 items-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white disabled:opacity-60"
+          disabled={isSaving}
+          onClick={submit}
+        >
+          {isSaving ? 'Saving...' : 'Save Guardian'}
+        </button>
+        <button
+          type="button"
+          className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700"
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -550,6 +988,29 @@ function SectionCard({
   );
 }
 
+function Field({
+  children,
+  label,
+}: {
+  children: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <label className="grid gap-2 text-sm font-semibold text-gray-700">
+      {label}
+      {children}
+    </label>
+  );
+}
+
+function InlineError({ message }: { message: string }) {
+  return (
+    <p className="mt-4 rounded-2xl border border-danger-200 bg-danger-50 p-3 text-sm text-danger-600">
+      {message}
+    </p>
+  );
+}
+
 function DetailItem({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
@@ -678,4 +1139,17 @@ function formatMoney(value: number) {
     maximumFractionDigits: 2,
     minimumFractionDigits: 2,
   }).format(value);
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'The record could not be saved.';
+}
+
+function splitNepaliName(fullNameNp?: string | null) {
+  const [firstNameNp = '', ...rest] = (fullNameNp ?? '').split(' ');
+
+  return {
+    firstNameNp,
+    lastNameNp: rest.join(' '),
+  };
 }
