@@ -429,4 +429,83 @@ describe('SchoolOS web production contracts', () => {
     assert.match(financeForm, /Preview only - backend posts final ledger entry/);
     assert.doesNotMatch(financeForm, /api\.createAccounting|api\.closeAccounting|api\.listAccountingReports/);
   });
+
+  it('labels the activity page as Activity Feed instead of Transport', () => {
+    const activityPage = read('app/dashboard/activity/page.tsx');
+
+    assert.match(activityPage, /Activity Feed/);
+    assert.match(activityPage, /Photo posts, student tags, mood logs, milestones/);
+    assert.doesNotMatch(activityPage, />\s*Transport\s*</);
+  });
+
+  it('keeps activity screen wired to real M5 and M10 APIs', () => {
+    const activityForm = read('components/forms/activity-feed-form.tsx');
+    const requiredApis = [
+      'api.listClasses',
+      'api.listSections',
+      'api.listStudents',
+      'api.listActivityPosts',
+      'api.listMoodLogs',
+      'api.listDevelopmentalMilestones',
+      'api.listNotificationDeliveries',
+      'api.createActivityPost',
+      'api.createMoodLog',
+      'api.createActivityReaction',
+      'api.createDevelopmentalMilestone',
+      'filesToBase64Payloads',
+    ];
+
+    for (const apiCall of requiredApis) {
+      assert.match(activityForm, new RegExp(apiCall.replace('.', '\\.')));
+    }
+  });
+
+  it('keeps activity categories and upload limits explicit', () => {
+    const activityForm = read('components/forms/activity-feed-form.tsx');
+    const categories = [
+      'LEARNING',
+      'OUTDOOR_PLAY',
+      'ART_AND_CRAFT',
+      'CELEBRATION',
+      'SPORTS',
+      'GENERAL',
+    ];
+
+    for (const category of categories) {
+      assert.match(activityForm, new RegExp(category));
+    }
+
+    assert.match(activityForm, /Attach 1 to 5 images/);
+    assert.match(activityForm, /selectedFiles\.length > 5/);
+    assert.match(activityForm, /file\.type\.startsWith\('image\/'\)/);
+    assert.match(activityForm, /10MB/);
+  });
+
+  it('preserves feed preview, mood logs, milestones, and delivery records', () => {
+    const activityForm = read('components/forms/activity-feed-form.tsx');
+
+    assert.match(activityForm, /Feed Preview/);
+    assert.match(activityForm, /Recent classroom moments/);
+    assert.match(activityForm, /No activity posts yet\. Create the first classroom moment/);
+    assert.match(activityForm, /Daily Mood Log/);
+    assert.match(activityForm, /Mood History/);
+    assert.match(activityForm, /Montessori \/ ECE Milestones/);
+    assert.match(activityForm, /DevelopmentalMilestone/);
+    assert.match(activityForm, /Activity Delivery Records/);
+    assert.match(activityForm, /QUEUED/);
+    assert.match(activityForm, /SENT/);
+    assert.match(activityForm, /FAILED/);
+    assert.match(activityForm, /SKIPPED/);
+  });
+
+  it('does not implement AI captions or permanent public media URLs in activity feed', () => {
+    const activityForm = read('components/forms/activity-feed-form.tsx');
+
+    assert.match(activityForm, /AI captions later/);
+    assert.match(activityForm, /permanent public URLs are not shown/);
+    assert.match(activityForm, /Private media/);
+    assert.doesNotMatch(activityForm, /api\.createAi|generateAi|AI caption button/);
+    assert.doesNotMatch(activityForm, /publicUrl:\s*file|URL\.createObjectURL/);
+    assert.doesNotMatch(activityForm, /replace-me/i);
+  });
 });
