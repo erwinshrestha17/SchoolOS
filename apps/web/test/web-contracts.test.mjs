@@ -364,4 +364,69 @@ describe('SchoolOS web production contracts', () => {
     assert.match(attendanceForm, /Attendance Risk Alerts/);
     assert.match(attendanceForm, /Mark reviewed/);
   });
+
+  it('keeps finance screen wired to real Phase 1 finance APIs', () => {
+    const financeForm = read('components/forms/finance-form.tsx');
+    const requiredApis = [
+      'api.listAcademicYears',
+      'api.listClasses',
+      'api.listFeeHeads',
+      'api.listFeePlans',
+      'api.listInvoices',
+      'api.listReceipts',
+      'api.listLedgerEntries',
+      'api.listDefaulters',
+      'api.listDiscounts',
+      'api.listWaivers',
+      'api.createFeeHead',
+      'api.createFeePlan',
+      'api.generateBillingRun',
+      'api.collectPayment',
+      'api.createDiscount',
+      'api.createWaiver',
+      'api.sendDefaulterReminders',
+      'api.openReceiptPdf',
+    ];
+
+    for (const apiCall of requiredApis) {
+      assert.match(financeForm, new RegExp(apiCall.replace('.', '\\.')));
+    }
+  });
+
+  it('builds finance around the collection counter without fake IDs', () => {
+    const financeForm = read('components/forms/finance-form.tsx');
+
+    assert.match(financeForm, /Collection Counter/);
+    assert.match(financeForm, /Search by name, SCH-YYYY-NNNN, or invoice number/);
+    assert.match(financeForm, /Confirm Payment & Generate Receipt/);
+    assert.match(financeForm, /No fake production IDs are used/);
+    assert.doesNotMatch(financeForm, /replace-me/i);
+  });
+
+  it('blocks overpayment in the finance UI before submitting', () => {
+    const financeForm = read('components/forms/finance-form.tsx');
+
+    assert.match(financeForm, /payment\.amount > outstanding/);
+    assert.match(financeForm, /Payment amount cannot exceed the outstanding balance/);
+    assert.match(financeForm, /Payment amount must be greater than zero/);
+  });
+
+  it('keeps receipt success, discounts, waivers, and defaulter reminders available', () => {
+    const financeForm = read('components/forms/finance-form.tsx');
+
+    assert.match(financeForm, /Receipt Generated/);
+    assert.match(financeForm, /Open receipt PDF/);
+    assert.match(financeForm, /Approval reason/);
+    assert.match(financeForm, /Approve waiver/);
+    assert.match(financeForm, /Remind all filtered/);
+    assert.match(financeForm, /Remind selected/);
+  });
+
+  it('keeps ledger preview preview-only without direct accounting calls', () => {
+    const financeForm = read('components/forms/finance-form.tsx');
+
+    assert.match(financeForm, /Ledger Entry Preview/);
+    assert.match(financeForm, /Preview only - backend posts final ledger entry/);
+    assert.doesNotMatch(financeForm, /api\.createAccounting|api\.closeAccounting|api\.listAccountingReports/);
+  });
 });
