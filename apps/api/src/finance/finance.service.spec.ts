@@ -255,6 +255,227 @@ describe('finance production controls', () => {
     );
   });
 
+  it('returns tenant-scoped invoice detail with backend-owned totals', async () => {
+    const detailedInvoice = buildInvoice({
+      invoiceNumber: 'INV-2026-00001',
+      fiscalYear: '2026/2027',
+      billNumber: 'INV-2026-00001',
+      dueDate: new Date('2026-05-15T00:00:00.000Z'),
+      issuedAt: new Date('2026-04-27T00:00:00.000Z'),
+      reportCardBlocked: false,
+      hallTicketBlocked: false,
+      billingRunId: 'run-1',
+      enrollmentId: 'enrollment-1',
+      academicYear: { id: 'ay-1', name: '2083' },
+      billingRun: { id: 'run-1', runMonth: 4, runYear: 2026 },
+      student: {
+        id: 'student-1',
+        studentSystemId: 'SCH-2026-0001',
+        firstNameEn: 'Erwin',
+        lastNameEn: 'Shrestha',
+        class: { name: 'Class 1' },
+        sectionRef: { name: 'A' },
+        guardianLinks: [
+          {
+            isPrimary: true,
+            guardian: {
+              fullName: 'Primary Guardian',
+              primaryPhone: '9800000000',
+            },
+          },
+        ],
+      },
+      lines: [
+        {
+          id: 'line-1',
+          feeHeadId: 'fee-head-1',
+          description: 'Tuition',
+          quantity: 1,
+          unitAmount: new Prisma.Decimal(1000),
+          vatAmount: new Prisma.Decimal(117),
+          totalAmount: new Prisma.Decimal(1117),
+          createdAt: new Date('2026-04-27T00:00:00.000Z'),
+          feeHead: { id: 'fee-head-1', code: 'TUITION', name: 'Tuition' },
+        },
+      ],
+      payments: [
+        {
+          id: 'payment-1',
+          amount: new Prisma.Decimal(250),
+          method: PaymentMethod.CASH,
+          referenceNumber: null,
+          paidAt: new Date('2026-04-28T00:00:00.000Z'),
+          narration: 'Counter collection',
+          createdAt: new Date('2026-04-28T00:00:00.000Z'),
+          collectedBy: { id: actor.userId, email: actor.email },
+          receipt: {
+            id: 'receipt-1',
+            receiptNumber: 'REC-2026-00001',
+            issuedAt: new Date('2026-04-28T00:00:00.000Z'),
+            pdfUrl: '/api/v1/receipts/REC-2026-00001.pdf',
+          },
+          refunds: [
+            {
+              id: 'refund-1',
+              refundNumber: 'RFD-2026-00001',
+              amount: new Prisma.Decimal(50),
+              refundDate: new Date('2026-04-29T00:00:00.000Z'),
+              reason: 'Correction',
+              referenceNumber: null,
+            },
+          ],
+        },
+      ],
+    });
+    const { service, prisma } = buildService({
+      invoice: detailedInvoice,
+      feeHead: buildFeeHead(),
+      waivers: [
+        {
+          id: 'waiver-1',
+          feeHeadId: 'fee-head-1',
+          amount: new Prisma.Decimal(50),
+          reason: 'Approved concession',
+          status: 'APPROVED',
+          approvedAt: new Date('2026-04-27T00:00:00.000Z'),
+          approvedBy: { id: actor.userId, email: actor.email },
+        },
+      ],
+      reconciliationPaymentEntries: [
+        { sourceId: 'payment-1', entryNumber: 'JE-2026-00001' },
+      ],
+    });
+
+    const result = await service.getInvoiceDetail(detailedInvoice.id, actor);
+
+    expect(prisma.invoice.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: detailedInvoice.id, tenantId: actor.tenantId },
+      }),
+    );
+    expect(result.student).toEqual(
+      expect.objectContaining({
+        studentSystemId: 'SCH-2026-0001',
+        guardianPhone: '9800000000',
+      }),
+    );
+    expect(result.totalAmount).toBe(1117);
+    expect(result.paidAmount).toBe(200);
+    expect(result.outstandingAmount).toBe(917);
+    expect(result.lines[0]).toEqual(
+      expect.objectContaining({
+        feeHeadName: 'Tuition',
+        vatAmount: 117,
+        waiverAmount: 50,
+      }),
+    );
+    expect(result.payments[0]).toEqual(
+      expect.objectContaining({
+        receipt: expect.objectContaining({
+          receiptNumber: 'REC-2026-00001',
+        }),
+        refundedAmount: 50,
+        netAmount: 200,
+        journalEntryNumber: 'JE-2026-00001',
+      }),
+    );
+  });
+
+  it('builds a tenant-scoped student fee ledger with running balance', async () => {
+    const invoice = buildInvoice({
+      id: 'invoice-ledger-1',
+      invoiceNumber: 'INV-2026-00002',
+      totalAmount: new Prisma.Decimal(1000),
+      issuedAt: new Date('2026-04-27T00:00:00.000Z'),
+      payments: [
+        {
+          id: 'payment-ledger-1',
+          amount: new Prisma.Decimal(400),
+          method: PaymentMethod.BANK,
+          paidAt: new Date('2026-04-28T00:00:00.000Z'),
+          createdAt: new Date('2026-04-28T00:00:00.000Z'),
+          receipt: {
+            receiptNumber: 'REC-2026-00002',
+          },
+          refunds: [
+            {
+              id: 'refund-ledger-1',
+              refundNumber: 'RFD-2026-00002',
+              amount: new Prisma.Decimal(100),
+              refundDate: new Date('2026-04-29T00:00:00.000Z'),
+              createdAt: new Date('2026-04-29T00:00:00.000Z'),
+            },
+          ],
+        },
+      ],
+      lines: [
+        {
+          id: 'line-ledger-1',
+          feeHead: { name: 'Tuition' },
+        },
+      ],
+    });
+    const { service, prisma } = buildService({
+      invoice: null,
+      feeHead: buildFeeHead(),
+      student: {
+        id: 'student-1',
+        tenantId: actor.tenantId,
+        studentSystemId: 'SCH-2026-0001',
+        firstNameEn: 'Erwin',
+        lastNameEn: 'Shrestha',
+        class: { name: 'Class 1' },
+        sectionRef: { name: 'A' },
+        guardianLinks: [],
+      },
+      invoices: [invoice],
+      waivers: [
+        {
+          id: 'waiver-ledger-1',
+          invoiceId: invoice.id,
+          feeHead: { name: 'Tuition' },
+          amount: new Prisma.Decimal(100),
+          reason: 'Approved concession',
+          status: 'APPROVED',
+          approvedAt: new Date('2026-04-27T12:00:00.000Z'),
+          createdAt: new Date('2026-04-27T12:00:00.000Z'),
+          approvedBy: null,
+        },
+      ],
+    });
+
+    const result = await service.getStudentFeeLedger('student-1', actor);
+
+    expect(prisma.student.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'student-1', tenantId: actor.tenantId },
+      }),
+    );
+    expect(prisma.invoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tenantId: actor.tenantId, studentId: 'student-1' },
+      }),
+    );
+    expect(result.totalInvoiced).toBe(1000);
+    expect(result.totalPaid).toBe(400);
+    expect(result.totalRefunded).toBe(100);
+    expect(result.totalWaived).toBe(100);
+    expect(result.outstandingBalance).toBe(700);
+    expect(result.rows.map((row) => row.type)).toEqual([
+      'INVOICE',
+      'WAIVER',
+      'PAYMENT',
+      'REFUND',
+    ]);
+    expect(result.rows.at(-1)?.runningBalance).toBe(700);
+    expect(result.rows[1]).toEqual(
+      expect.objectContaining({
+        type: 'WAIVER',
+        affectsBalance: false,
+      }),
+    );
+  });
+
   it('returns a valid PDF payload for tenant-scoped receipts', async () => {
     const payment = buildPayment({
       paidAt: new Date('2026-04-27T10:00:00.000Z'),
@@ -965,6 +1186,8 @@ function buildService(options: {
   cashierCloseCount?: number;
   cashierCloseList?: unknown[];
   receipt?: unknown;
+  invoices?: unknown[];
+  waivers?: unknown[];
   reconciliationPayments?: unknown[];
   reconciliationPaymentEntries?: unknown[];
   reconciliationRefundEntries?: unknown[];
@@ -980,6 +1203,7 @@ function buildService(options: {
     },
     invoice: {
       findFirst: jest.fn().mockResolvedValue(options.invoice),
+      findMany: jest.fn().mockResolvedValue(options.invoices ?? []),
       update: jest.fn().mockResolvedValue(options.updatedInvoice),
     },
     discountRule: {
@@ -988,6 +1212,7 @@ function buildService(options: {
     },
     feeWaiver: {
       create: jest.fn().mockResolvedValue(options.createdWaiver),
+      findMany: jest.fn().mockResolvedValue(options.waivers ?? []),
     },
     feeHead: {
       findFirst: jest.fn().mockResolvedValue(options.feeHead),

@@ -81,6 +81,8 @@ describe('SchoolOS web production contracts', () => {
       'bulkImportAdmissions',
       'openStudentDocumentPdf',
       'getStudentProfile',
+      'getInvoiceDetail',
+      'getStudentFeeLedger',
       'getAttendanceRoster',
       'syncAttendance',
       'reviewAttendanceConflict',
@@ -440,6 +442,30 @@ describe('SchoolOS web production contracts', () => {
     assert.doesNotMatch(detailPage, /hard delete|demo-lifecycle|student-123/i);
   });
 
+  it('adds a dedicated student document manager without exposing storage internals', () => {
+    const detailPage = read('components/students/student-detail-page.tsx');
+    const apiClient = read('lib/api.ts');
+
+    assert.match(detailPage, /Certificate Actions/);
+    assert.match(detailPage, /Uploaded Documents/);
+    assert.match(detailPage, /Generated Documents/);
+    assert.match(detailPage, /Upload Student Document/);
+    assert.match(detailPage, /Stored privately/);
+    assert.match(detailPage, /'ID card'/);
+    assert.match(detailPage, /'Transfer certificate'/);
+    assert.match(detailPage, /'Leaving certificate'/);
+    assert.match(detailPage, /'Character certificate'/);
+    assert.match(detailPage, /Confirm Revoke/);
+    assert.match(detailPage, /api\.uploadStudentDocument/);
+    assert.match(detailPage, /api\.revokeGeneratedStudentDocument/);
+    assert.match(detailPage, /fileToBase64Payload/);
+    assert.match(apiClient, /uploadStudentDocument:/);
+    assert.match(apiClient, /revokeGeneratedStudentDocument:/);
+    assert.match(apiClient, /openStudentDocumentPdf[\s\S]*openPdfBlob/);
+    assert.doesNotMatch(detailPage, /document\.objectKey|document\.publicUrl/);
+    assert.doesNotMatch(detailPage, /demo-document|document-123/i);
+  });
+
   it('validates PDF responses before opening blob tabs', () => {
     const apiClient = read('lib/api.ts');
 
@@ -522,6 +548,7 @@ describe('SchoolOS web production contracts', () => {
       'api.listFeeHeads',
       'api.listFeePlans',
       'api.listInvoices',
+      'api.getInvoiceDetail',
       'api.listReceipts',
       'api.listLedgerEntries',
       'api.listDefaulters',
@@ -546,10 +573,24 @@ describe('SchoolOS web production contracts', () => {
     const financeForm = read('components/forms/finance-form.tsx');
 
     assert.match(financeForm, /Collection Counter/);
+    assert.match(financeForm, /Invoice Detail/);
+    assert.match(financeForm, /View invoice details/);
+    assert.match(financeForm, /Payments & Receipts/);
     assert.match(financeForm, /Search by name, SCH-YYYY-NNNN, or invoice number/);
     assert.match(financeForm, /Confirm Payment & Generate Receipt/);
     assert.match(financeForm, /No fake production IDs are used/);
     assert.doesNotMatch(financeForm, /replace-me/i);
+  });
+
+  it('surfaces backend student fee ledger on the student detail page', () => {
+    const studentDetail = read('components/students/student-detail-page.tsx');
+
+    assert.match(studentDetail, /Student Fee Ledger/);
+    assert.match(studentDetail, /api\.getStudentFeeLedger/);
+    assert.match(studentDetail, /Running Balance/);
+    assert.match(studentDetail, /openReceiptPdf/);
+    assert.match(studentDetail, /Running balance is backend-calculated/);
+    assert.doesNotMatch(studentDetail, /student-123|invoice-123|fake/i);
   });
 
   it('blocks overpayment in the finance UI before submitting', () => {

@@ -65,6 +65,24 @@ export class FeesController {
     return this.financeService.listInvoices(auth);
   }
 
+  @Get('invoices/:id')
+  @Permissions('fees:manage')
+  getInvoiceDetail(
+    @Param('id') invoiceId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.getInvoiceDetail(invoiceId, auth);
+  }
+
+  @Get('students/:studentId/ledger')
+  @Permissions('fees:manage')
+  getStudentFeeLedger(
+    @Param('studentId') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.getStudentFeeLedger(studentId, auth);
+  }
+
   @Post('invoices/:id/void')
   @Permissions('fees:adjust')
   voidInvoice(

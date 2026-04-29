@@ -6,6 +6,7 @@ import type {
   GuardianProfile,
   StudentDocument,
   StudentFeeClearance,
+  StudentFeeLedger,
   StudentArchivePayload,
   StudentDeletePayload,
   StudentProfileAttendanceRecord,
@@ -15,10 +16,12 @@ import type {
   UpdateStudentGuardianPayload,
   UpdateStudentProfilePayload,
 } from '@schoolos/core';
+import type { UseQueryResult } from '@tanstack/react-query';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 import { api } from '../../lib/api';
+import { fileToBase64Payload } from '../../lib/files';
 
 type StudentDetailPageProps = {
   studentId: string;
@@ -41,6 +44,15 @@ const generatedDocumentActions = [
   ['transfer-certificate', 'Transfer certificate'],
   ['leaving-certificate', 'Leaving certificate'],
   ['character-certificate', 'Character certificate'],
+] as const;
+
+const uploadedDocumentKinds = [
+  ['BIRTH_CERTIFICATE', 'Birth certificate'],
+  ['TRANSFER_CERTIFICATE', 'Transfer certificate'],
+  ['PHOTO', 'Photo'],
+  ['ID_CARD', 'ID card'],
+  ['ENROLLMENT_CONFIRMATION', 'Enrollment confirmation'],
+  ['OTHER', 'Other'],
 ] as const;
 
 type LifecycleAction = 'transfer' | 'archive' | 'alumni' | 'delete';
@@ -316,12 +328,15 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
       ) : null}
       {activeTab === 'Documents' ? (
         <DocumentsTab
+          studentId={profile.student.id}
           documents={profile.documents}
           generatedDocuments={profile.generatedDocuments}
           onOpenPdf={openStudentPdf}
         />
       ) : null}
-      {activeTab === 'Fees' ? <FeesTab invoices={profile.invoices} /> : null}
+      {activeTab === 'Fees' ? (
+        <FeesTab studentId={profile.student.id} invoices={profile.invoices} />
+      ) : null}
       {activeTab === 'Attendance' ? (
         <AttendanceTab records={profile.attendanceRecords} />
       ) : null}
@@ -1142,14 +1157,98 @@ function DocumentsTab({
   documents,
   generatedDocuments,
   onOpenPdf,
+  studentId,
 }: {
   documents: StudentDocument[];
   generatedDocuments: GeneratedStudentDocumentMeta[];
   onOpenPdf: (kind: string) => Promise<void>;
+  studentId: string;
 }) {
+  const queryClient = useQueryClient();
+  const [uploadKind, setUploadKind] = useState<(typeof uploadedDocumentKinds)[number][0]>(
+    'BIRTH_CERTIFICATE',
+  );
+  const [uploadTitle, setUploadTitle] = useState('');
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadMessage, setUploadMessage] = useState('');
+  const [revokeDocumentId, setRevokeDocumentId] = useState<string | null>(null);
+  const [revokeReason, setRevokeReason] = useState('');
+  const [revokeMessage, setRevokeMessage] = useState('');
+  const uploadMutation = useMutation({
+    mutationFn: async () => {
+      if (!uploadFile) {
+        throw new Error('Choose a document file before uploading.');
+      }
+
+      const encoded = await fileToBase64Payload(uploadFile);
+
+      return api.uploadStudentDocument({
+        studentId,
+        kind: uploadKind,
+        title: uploadTitle.trim() || null,
+        ...encoded,
+      });
+    },
+    onSuccess: async () => {
+      setUploadFile(null);
+      setUploadTitle('');
+      setUploadMessage('Document uploaded and stored privately.');
+      await queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
+    },
+  });
+  const revokeMutation = useMutation({
+    mutationFn: ({
+      documentId,
+      reason,
+    }: {
+      documentId: string;
+      reason: string;
+    }) =>
+      api.revokeGeneratedStudentDocument(studentId, documentId, {
+        reason,
+      }),
+    onSuccess: async () => {
+      setRevokeDocumentId(null);
+      setRevokeReason('');
+      setRevokeMessage('Generated document revoked.');
+      await queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
+    },
+  });
+
+  function uploadDocument() {
+    setUploadError('');
+    setUploadMessage('');
+
+    if (!uploadFile) {
+      setUploadError('Choose a document file before uploading.');
+      return;
+    }
+
+    uploadMutation.mutate();
+  }
+
+  function revokeDocument(documentId: string) {
+    setRevokeMessage('');
+
+    if (!revokeReason.trim()) {
+      return;
+    }
+
+    revokeMutation.mutate({
+      documentId,
+      reason: revokeReason.trim(),
+    });
+  }
+
   return (
     <div className="grid gap-5">
-      <SectionCard title="PDF Actions">
+      <SectionCard title="Certificate Actions">
+        <p className="mb-4 text-sm text-gray-500">
+          Certificates open through the validated PDF helper. If fee clearance
+          or lifecycle rules block issuance, the server message is shown instead
+          of opening an invalid document.
+        </p>
         <div className="flex flex-wrap gap-2">
           {generatedDocumentActions.map(([kind, label]) => (
             <button
@@ -1164,95 +1263,386 @@ function DocumentsTab({
         </div>
       </SectionCard>
 
-      <SectionCard title="Document History">
-        {generatedDocuments.length > 0 || documents.length > 0 ? (
+      <SectionCard title="Upload Student Document">
+        <div className="grid gap-4 md:grid-cols-[0.8fr_1fr_1fr_auto] md:items-end">
+          <Field label="Document type">
+            <select
+              className="input"
+              value={uploadKind}
+              onChange={(event) =>
+                setUploadKind(
+                  event.target.value as (typeof uploadedDocumentKinds)[number][0],
+                )
+              }
+            >
+              {uploadedDocumentKinds.map(([kind, label]) => (
+                <option key={kind} value={kind}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Title">
+            <input
+              className="input"
+              placeholder="Optional document title"
+              value={uploadTitle}
+              onChange={(event) => setUploadTitle(event.target.value)}
+            />
+          </Field>
+          <Field label="Private file">
+            <input
+              className="input"
+              type="file"
+              onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
+            />
+          </Field>
+          <button
+            type="button"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white disabled:opacity-60"
+            disabled={uploadMutation.isPending}
+            onClick={uploadDocument}
+          >
+            {uploadMutation.isPending ? 'Uploading...' : 'Upload'}
+          </button>
+        </div>
+        <p className="mt-3 text-sm text-gray-500">
+          Files are stored privately. Storage object keys and permanent public
+          URLs are intentionally hidden from this screen.
+        </p>
+        {uploadFile ? (
+          <p className="mt-3 rounded-2xl border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
+            Selected: {uploadFile.name} / {formatFileSize(uploadFile.size)}
+          </p>
+        ) : null}
+        {uploadError ? <InlineError message={uploadError} /> : null}
+        {uploadMutation.error ? (
+          <InlineError message={errorMessage(uploadMutation.error)} />
+        ) : null}
+        {uploadMessage ? (
+          <p className="mt-4 rounded-2xl border border-success-200 bg-success-50 p-3 text-sm text-success-700">
+            {uploadMessage}
+          </p>
+        ) : null}
+      </SectionCard>
+
+      <SectionCard title="Uploaded Documents">
+        {documents.length > 0 ? (
           <div className="grid gap-3">
-            {generatedDocuments.map((document) => (
-              <DocumentRow
-                key={document.id}
-                title={document.fileName}
-                meta={`${document.kind} / version ${document.version}`}
-                status={document.revokedAt ? 'Revoked' : 'Current'}
-              />
-            ))}
             {documents.map((document) => (
-              <DocumentRow
+              <article
                 key={document.id}
-                title={document.fileName}
-                meta={`${document.kind} / ${document.contentType} / ${document.sizeBytes} bytes`}
-                status="Uploaded"
-              />
+                className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
+              >
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-900">
+                      {document.title || document.fileName}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {document.kind} / {document.fileName}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Uploaded {formatDate(document.uploadedAt)} /{' '}
+                      {formatFileSize(document.sizeBytes)}
+                    </p>
+                  </div>
+                  <Badge>Stored privately</Badge>
+                </div>
+                <p className="mt-3 text-sm text-gray-500">
+                  Preview/download will appear here when a signed document URL
+                  endpoint is available.
+                </p>
+              </article>
             ))}
           </div>
         ) : (
-          <EmptyState message="No uploaded or generated document history yet." />
+          <EmptyState message="No uploaded documents yet." />
+        )}
+      </SectionCard>
+
+      <SectionCard title="Generated Documents">
+        {generatedDocuments.length > 0 ? (
+          <div className="grid gap-3">
+            {generatedDocuments.map((document) => (
+              <article
+                key={document.id}
+                className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
+              >
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-900">
+                      {document.title || document.kind}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {document.fileName} / version {document.version}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Generated{' '}
+                      {formatNullableDate(document.generatedAt ?? document.signedAt)}
+                      {document.generatedById
+                        ? ` / by ${document.generatedById}`
+                        : ''}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Retention until{' '}
+                      {formatNullableDate(document.retentionUntil)}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 md:justify-end">
+                    <Badge>{document.revokedAt ? 'Revoked' : 'Current'}</Badge>
+                    <button
+                      type="button"
+                      className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700"
+                      onClick={() => void onOpenPdf(document.kind)}
+                    >
+                      Open PDF
+                    </button>
+                    {!document.revokedAt ? (
+                      <button
+                        type="button"
+                        className="inline-flex min-h-11 items-center rounded-xl border border-danger-200 bg-danger-50 px-3 text-xs font-semibold text-danger-700"
+                        onClick={() => {
+                          setRevokeDocumentId(document.id);
+                          setRevokeReason('');
+                          revokeMutation.reset();
+                        }}
+                      >
+                        Revoke
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+                {revokeDocumentId === document.id ? (
+                  <div className="mt-4 rounded-2xl border border-danger-100 bg-white p-4">
+                    <p className="text-sm font-semibold text-gray-900">
+                      Revoke generated document
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      This is audited and does not delete the historical record.
+                      Retention rules may block revocation.
+                    </p>
+                    <Field label="Revocation reason">
+                      <input
+                        className="input"
+                        value={revokeReason}
+                        onChange={(event) => setRevokeReason(event.target.value)}
+                      />
+                    </Field>
+                    {revokeMutation.error ? (
+                      <InlineError message={errorMessage(revokeMutation.error)} />
+                    ) : null}
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="inline-flex min-h-11 items-center rounded-xl bg-danger-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
+                        disabled={revokeMutation.isPending || !revokeReason.trim()}
+                        onClick={() => revokeDocument(document.id)}
+                      >
+                        {revokeMutation.isPending ? 'Revoking...' : 'Confirm Revoke'}
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700"
+                        onClick={() => setRevokeDocumentId(null)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyState message="No generated document history yet." />
+        )}
+        {revokeMessage ? (
+          <p className="mt-4 rounded-2xl border border-success-200 bg-success-50 p-3 text-sm text-success-700">
+            {revokeMessage}
+          </p>
+        ) : null}
+      </SectionCard>
+    </div>
+  );
+}
+
+function FeesTab({
+  invoices,
+  studentId,
+}: {
+  invoices: StudentProfileInvoice[];
+  studentId: string;
+}) {
+  const ledgerQuery = useQuery({
+    queryKey: ['student-fee-ledger', studentId],
+    queryFn: () => api.getStudentFeeLedger(studentId),
+    enabled: Boolean(studentId),
+  });
+
+  return (
+    <div className="grid gap-5">
+      <SectionCard title="Student Fee Ledger">
+        <StudentFeeLedgerView query={ledgerQuery} />
+      </SectionCard>
+
+      <SectionCard title="Invoices">
+        {invoices.length > 0 ? (
+          <div className="grid gap-3">
+            {invoices.map((invoice) => (
+              <article
+                key={invoice.id}
+                className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
+              >
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-900">{invoice.invoiceNumber}</p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Due {formatDate(invoice.dueDate)} / issued {formatDate(invoice.issuedAt)}
+                    </p>
+                  </div>
+                  <Badge>{invoice.status}</Badge>
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <Metric label="Total" value={`Rs. ${formatMoney(invoice.totalAmount)}`} />
+                  <Metric label="Paid" value={`Rs. ${formatMoney(invoice.paidAmount)}`} />
+                  <Metric label="Outstanding" value={`Rs. ${formatMoney(invoice.outstandingAmount)}`} />
+                </div>
+                {invoice.lines.length > 0 ? (
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead className="text-xs uppercase tracking-wide text-gray-500">
+                        <tr>
+                          <th className="py-2 pr-3">Fee Head</th>
+                          <th className="py-2 pr-3">Description</th>
+                          <th className="py-2 pr-3">VAT</th>
+                          <th className="py-2 pr-3">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {invoice.lines.map((line) => (
+                          <tr key={line.id}>
+                            <td className="py-2 pr-3 font-medium text-gray-900">
+                              {line.feeHeadName}
+                            </td>
+                            <td className="py-2 pr-3 text-gray-600">{line.description}</td>
+                            <td className="py-2 pr-3 text-gray-600">
+                              Rs. {formatMoney(line.vatAmount)}
+                            </td>
+                            <td className="py-2 pr-3 text-gray-600">
+                              Rs. {formatMoney(line.totalAmount)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyState message="No invoices found for this student." />
         )}
       </SectionCard>
     </div>
   );
 }
 
-function FeesTab({ invoices }: { invoices: StudentProfileInvoice[] }) {
+function StudentFeeLedgerView({
+  query,
+}: {
+  query: UseQueryResult<StudentFeeLedger, Error>;
+}) {
+  if (query.isLoading) {
+    return (
+      <div className="grid gap-3">
+        <div className="h-16 animate-pulse rounded-2xl bg-gray-100" />
+        <div className="h-16 animate-pulse rounded-2xl bg-gray-100" />
+      </div>
+    );
+  }
+
+  if (query.isError) {
+    return <InlineError message={errorMessage(query.error)} />;
+  }
+
+  const ledger = query.data;
+
+  if (!ledger) {
+    return <EmptyState message="No student fee ledger is available yet." />;
+  }
+
   return (
-    <SectionCard title="Fees">
-      {invoices.length > 0 ? (
-        <div className="grid gap-3">
-          {invoices.map((invoice) => (
-            <article
-              key={invoice.id}
-              className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
-            >
-              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <p className="font-semibold text-gray-900">{invoice.invoiceNumber}</p>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Due {formatDate(invoice.dueDate)} / issued {formatDate(invoice.issuedAt)}
-                  </p>
-                </div>
-                <Badge>{invoice.status}</Badge>
-              </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                <Metric label="Total" value={`Rs. ${formatMoney(invoice.totalAmount)}`} />
-                <Metric label="Paid" value={`Rs. ${formatMoney(invoice.paidAmount)}`} />
-                <Metric label="Outstanding" value={`Rs. ${formatMoney(invoice.outstandingAmount)}`} />
-              </div>
-              {invoice.lines.length > 0 ? (
-                <div className="mt-4 overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="text-xs uppercase tracking-wide text-gray-500">
-                      <tr>
-                        <th className="py-2 pr-3">Fee Head</th>
-                        <th className="py-2 pr-3">Description</th>
-                        <th className="py-2 pr-3">VAT</th>
-                        <th className="py-2 pr-3">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {invoice.lines.map((line) => (
-                        <tr key={line.id}>
-                          <td className="py-2 pr-3 font-medium text-gray-900">
-                            {line.feeHeadName}
-                          </td>
-                          <td className="py-2 pr-3 text-gray-600">{line.description}</td>
-                          <td className="py-2 pr-3 text-gray-600">
-                            Rs. {formatMoney(line.vatAmount)}
-                          </td>
-                          <td className="py-2 pr-3 text-gray-600">
-                            Rs. {formatMoney(line.totalAmount)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : null}
-            </article>
-          ))}
+    <div className="space-y-5">
+      <div className="grid gap-3 md:grid-cols-4">
+        <Metric label="Total invoiced" value={`Rs. ${formatMoney(ledger.totalInvoiced)}`} />
+        <Metric label="Total paid" value={`Rs. ${formatMoney(ledger.totalPaid)}`} />
+        <Metric label="Waivers tracked" value={`Rs. ${formatMoney(ledger.totalWaived)}`} />
+        <Metric label="Outstanding" value={`Rs. ${formatMoney(ledger.outstandingBalance)}`} />
+      </div>
+      <p className="text-sm text-gray-500">
+        Running balance is backend-calculated from official invoices, payments, and refunds.
+        Waiver rows are shown for audit visibility and marked when already reflected in invoice totals.
+      </p>
+      {ledger.rows.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="text-xs uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="py-2 pr-3">Date</th>
+                <th className="py-2 pr-3">Type</th>
+                <th className="py-2 pr-3">Reference</th>
+                <th className="py-2 pr-3">Description</th>
+                <th className="py-2 pr-3">Debit</th>
+                <th className="py-2 pr-3">Credit</th>
+                <th className="py-2 pr-3">Running Balance</th>
+                <th className="py-2 pr-3">Receipt</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {ledger.rows.map((row) => (
+                <tr key={row.id}>
+                  <td className="py-3 pr-3 text-gray-600">{formatDate(row.date)}</td>
+                  <td className="py-3 pr-3">
+                    <Badge>{row.type}</Badge>
+                  </td>
+                  <td className="py-3 pr-3 font-medium text-gray-900">{row.reference}</td>
+                  <td className="py-3 pr-3 text-gray-600">
+                    {row.description}
+                    {!row.affectsBalance ? (
+                      <span className="ml-2 rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">
+                        informational
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="py-3 pr-3">Rs. {formatMoney(row.debit)}</td>
+                  <td className="py-3 pr-3">Rs. {formatMoney(row.credit)}</td>
+                  <td className="py-3 pr-3 font-semibold">
+                    Rs. {formatMoney(row.runningBalance)}
+                  </td>
+                  <td className="py-3 pr-3">
+                    {row.receiptNumber ? (
+                      <button
+                        type="button"
+                        className="rounded-full border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700"
+                        onClick={() => void api.openReceiptPdf(row.receiptNumber as string)}
+                      >
+                        Open {row.receiptNumber}
+                      </button>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : (
-        <EmptyState message="No invoices found for this student." />
+        <EmptyState message="No invoice, payment, refund, or waiver rows yet." />
       )}
-    </SectionCard>
+    </div>
   );
 }
 
@@ -1530,6 +1920,22 @@ function formatMoney(value: number) {
     maximumFractionDigits: 2,
     minimumFractionDigits: 2,
   }).format(value);
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) {
+    return `${bytes} bytes`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatNullableDate(value?: string | null) {
+  return value ? formatDate(value) : 'Not recorded';
 }
 
 function errorMessage(error: unknown) {

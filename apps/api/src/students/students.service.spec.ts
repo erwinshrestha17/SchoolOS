@@ -782,8 +782,13 @@ describe('students lifecycle hardening', () => {
           id: 'generated-1',
           studentId: 'student-1',
           kind: 'id-card',
+          title: 'Student ID Card',
           fileName: 'SCH-2026-0001-id-card.pdf',
+          contentType: 'application/pdf',
+          sizeBytes: 512,
           pdfUrl: '/api/v1/students/student-1/documents/id-card.pdf',
+          generatedById: actor.userId,
+          generatedAt: new Date('2026-04-27T00:00:00.000Z'),
           checksumSha256: 'checksum',
           storageObjectKey: 'tenant-1/students/student-1/generated.pdf',
           signedAt: new Date('2026-04-27T00:00:00.000Z'),
@@ -862,6 +867,9 @@ describe('students lifecycle hardening', () => {
     expect(profile.guardians[0].primaryPhone).toBe('9800000000');
     expect(profile.documents[0].fileName).toBe('birth.pdf');
     expect(profile.generatedDocuments[0].kind).toBe('id-card');
+    expect(profile.generatedDocuments[0].generatedAt).toBe(
+      '2026-04-27T00:00:00.000Z',
+    );
     expect(profile.invoices[0].outstandingAmount).toBe(1000);
     expect(profile.attendanceRecords[0].attendanceDate).toBe('2026-04-27');
   });

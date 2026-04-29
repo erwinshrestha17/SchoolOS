@@ -6,6 +6,7 @@ import type {
   DiscountRule,
   FeeHeadSummary,
   FeePlanSummary,
+  InvoiceDetail,
   InvoiceSummary,
   JournalEntryView,
   ReceiptView,
@@ -172,6 +173,11 @@ export function FinanceForm() {
     queryKey: ['invoices'],
     queryFn: api.listInvoices,
   });
+  const invoiceDetailQuery = useQuery({
+    queryKey: ['invoice-detail', payment.invoiceId],
+    queryFn: () => api.getInvoiceDetail(payment.invoiceId),
+    enabled: Boolean(payment.invoiceId),
+  });
   const receiptsQuery = useQuery({
     queryKey: ['receipts'],
     queryFn: api.listReceipts,
@@ -308,12 +314,17 @@ export function FinanceForm() {
 
   const invoices = (invoicesQuery.data ?? []) as InvoiceForUi[];
   const selectedInvoice = invoices.find((invoice) => invoice.id === payment.invoiceId);
+  const selectedInvoiceDetail = invoiceDetailQuery.data;
   const selectedWaiverInvoice = invoices.find((invoice) => invoice.id === waiver.invoiceId);
-  const outstanding = selectedInvoice ? getOutstanding(selectedInvoice) : 0;
+  const outstanding =
+    selectedInvoiceDetail?.outstandingAmount ??
+    (selectedInvoice ? getOutstanding(selectedInvoice) : 0);
   const selectedWaiverOutstanding = selectedWaiverInvoice ? getOutstanding(selectedWaiverInvoice) : 0;
   const filteredInvoices = invoices.filter((invoice) => matchesInvoiceSearch(invoice, invoiceSearch));
   const outstandingInvoices = filteredInvoices.filter((invoice) => getOutstanding(invoice) > 0);
-  const selectedInvoiceLines = selectedInvoice?.lines ?? [];
+  const selectedInvoiceLines = (selectedInvoiceDetail?.lines ??
+    selectedInvoice?.lines ??
+    []) as InvoiceLineForUi[];
   const overpaymentBlocked = Boolean(selectedInvoice && payment.amount > outstanding);
   const invalidPaymentAmount = payment.amount <= 0 || overpaymentBlocked;
   const requiresReference = payment.method !== 'CASH';
@@ -401,6 +412,8 @@ export function FinanceForm() {
           filteredInvoices={filteredInvoices}
           outstandingInvoices={outstandingInvoices}
           selectedInvoice={selectedInvoice}
+          invoiceDetailQuery={invoiceDetailQuery}
+          selectedInvoiceDetail={selectedInvoiceDetail}
           selectedInvoiceLines={selectedInvoiceLines}
           outstanding={outstanding}
           payment={payment}
@@ -503,6 +516,8 @@ function CollectionCounterSection({
   filteredInvoices,
   outstandingInvoices,
   selectedInvoice,
+  selectedInvoiceDetail,
+  invoiceDetailQuery,
   selectedInvoiceLines,
   outstanding,
   payment,
@@ -522,6 +537,8 @@ function CollectionCounterSection({
   filteredInvoices: InvoiceForUi[];
   outstandingInvoices: InvoiceForUi[];
   selectedInvoice: InvoiceForUi | undefined;
+  selectedInvoiceDetail: InvoiceDetail | undefined;
+  invoiceDetailQuery: UseQueryResult<InvoiceDetail, Error>;
   selectedInvoiceLines: InvoiceLineForUi[];
   outstanding: number;
   payment: {
@@ -604,6 +621,9 @@ function CollectionCounterSection({
                       {formatCurrency(getOutstanding(invoice))}
                     </span>
                   </span>
+                  <span className="mt-3 inline-flex text-xs font-semibold text-[var(--teal)]">
+                    View invoice details
+                  </span>
                 </button>
               ))
             ) : (
@@ -623,6 +643,11 @@ function CollectionCounterSection({
       <div className="space-y-6">
         <InvoiceProfileCard invoice={selectedInvoice} outstanding={outstanding} />
         <OutstandingDuesTable invoice={selectedInvoice} lines={selectedInvoiceLines} />
+        <InvoiceDetailPanel
+          invoice={selectedInvoice}
+          detail={selectedInvoiceDetail}
+          detailQuery={invoiceDetailQuery}
+        />
         <PaymentPanel
           selectedInvoice={selectedInvoice}
           payment={payment}
@@ -749,6 +774,140 @@ function OutstandingDuesTable({
       ) : (
         <EmptyState title="No invoice selected" body="Select an outstanding invoice to review dues." />
       )}
+    </section>
+  );
+}
+
+function InvoiceDetailPanel({
+  detail,
+  detailQuery,
+  invoice,
+}: {
+  detail: InvoiceDetail | undefined;
+  detailQuery: UseQueryResult<InvoiceDetail, Error>;
+  invoice: InvoiceForUi | undefined;
+}) {
+  return (
+    <section className="shell-card rounded-[28px] p-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="label">Invoice Detail</p>
+          <h3 className="mt-2 text-lg font-bold text-gray-950">
+            {invoice?.invoiceNumber ?? 'Select an invoice'}
+          </h3>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Official totals, line items, payments, receipts, and source metadata come from the backend.
+          </p>
+        </div>
+        {detail ? (
+          <span className="rounded-full bg-gray-900 px-3 py-1 text-xs font-semibold text-white">
+            Outstanding {formatCurrency(detail.outstandingAmount)}
+          </span>
+        ) : null}
+      </div>
+
+      {!invoice ? (
+        <EmptyState title="No invoice selected" body="Choose an invoice to open the detail view." />
+      ) : detailQuery.isLoading ? (
+        <InvoiceSkeleton />
+      ) : detailQuery.isError ? (
+        <InlineError message={detailQuery.error.message} />
+      ) : detail ? (
+        <div className="mt-5 space-y-5">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Fact label="Student" value={detail.student.name} />
+            <Fact label="School ID" value={detail.student.studentSystemId} />
+            <Fact label="Guardian" value={detail.student.guardianPhone ?? 'Not recorded'} />
+            <Fact label="Academic Year" value={detail.academicYear.name} />
+            <Fact label="Subtotal" value={formatCurrency(detail.subtotal)} />
+            <Fact label="VAT" value={formatCurrency(detail.vatAmount)} />
+            <Fact label="Paid" value={formatCurrency(detail.paidAmount)} />
+            <Fact label="Outstanding" value={formatCurrency(detail.outstandingAmount)} highlight />
+          </div>
+
+          <div>
+            <p className="label mb-3">Line Items</p>
+            {detail.lines.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-left text-sm">
+                  <thead className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
+                    <tr>
+                      <th className="py-3 pr-4">Fee Head</th>
+                      <th className="py-3 pr-4">Period</th>
+                      <th className="py-3 pr-4">Base</th>
+                      <th className="py-3 pr-4">Waiver</th>
+                      <th className="py-3 pr-4">VAT</th>
+                      <th className="py-3 pr-4">Net</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.lines.map((line) => (
+                      <tr key={line.id} className="border-t border-[var(--line)]">
+                        <td className="py-3 pr-4 font-semibold">{line.feeHeadName}</td>
+                        <td className="py-3 pr-4 text-[var(--muted)]">{line.periodLabel}</td>
+                        <td className="py-3 pr-4">{formatCurrency(line.baseAmount)}</td>
+                        <td className="py-3 pr-4">{formatCurrency(line.waiverAmount)}</td>
+                        <td className="py-3 pr-4">{formatCurrency(line.vatAmount)}</td>
+                        <td className="py-3 pr-4 font-semibold">{formatCurrency(line.netAmount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState title="No line items" body="This invoice has no line item records." />
+            )}
+          </div>
+
+          <div>
+            <p className="label mb-3">Payments & Receipts</p>
+            {detail.payments.length > 0 ? (
+              <div className="grid gap-3">
+                {detail.payments.map((payment) => (
+                  <article
+                    key={payment.id}
+                    className="rounded-2xl border border-[var(--line)] bg-white p-4"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="font-semibold text-gray-950">
+                          {formatPaymentMethod(payment.method)} / {formatCurrency(payment.netAmount)}
+                        </p>
+                        <p className="mt-1 text-sm text-[var(--muted)]">
+                          Paid {formatDate(payment.paidAt)}
+                          {payment.journalEntryNumber
+                            ? ` / Journal ${payment.journalEntryNumber}`
+                            : ''}
+                        </p>
+                        {payment.refundedAmount > 0 ? (
+                          <p className="mt-1 text-sm text-amber-700">
+                            Refunded {formatCurrency(payment.refundedAmount)}
+                          </p>
+                        ) : null}
+                      </div>
+                      {payment.receipt ? (
+                        <button
+                          type="button"
+                          className="min-h-11 rounded-full border border-[var(--line)] px-4 text-sm font-semibold text-gray-700"
+                          onClick={() => void api.openReceiptPdf(payment.receipt!.receiptNumber)}
+                        >
+                          Open receipt {payment.receipt.receiptNumber}
+                        </button>
+                      ) : (
+                        <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                          No receipt
+                        </span>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState title="No payments yet" body="Payments and receipt PDFs will appear after collection." />
+            )}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

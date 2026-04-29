@@ -806,6 +806,429 @@ export class FinanceService {
     }));
   }
 
+  async getInvoiceDetail(invoiceId: string, actor: AuthContext) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: {
+        id: invoiceId,
+        tenantId: actor.tenantId,
+      },
+      include: {
+        academicYear: true,
+        billingRun: true,
+        lines: {
+          include: {
+            feeHead: true,
+          },
+          orderBy: [{ createdAt: 'asc' }],
+        },
+        payments: {
+          include: {
+            collectedBy: true,
+            receipt: true,
+            refunds: {
+              orderBy: [{ refundDate: 'asc' }, { createdAt: 'asc' }],
+            },
+          },
+          orderBy: [{ paidAt: 'asc' }, { createdAt: 'asc' }],
+        },
+        student: {
+          include: {
+            class: true,
+            sectionRef: true,
+            guardianLinks: {
+              include: {
+                guardian: true,
+              },
+              orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+            },
+          },
+        },
+      },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found in this tenant');
+    }
+
+    const [waivers, journalEntries] = await Promise.all([
+      this.prisma.feeWaiver.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          invoiceId: invoice.id,
+        },
+        include: {
+          approvedBy: true,
+          feeHead: true,
+        },
+        orderBy: [{ createdAt: 'asc' }],
+      }),
+      invoice.payments.length === 0
+        ? Promise.resolve([])
+        : this.prisma.journalEntry.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              sourceType: JournalSourceType.FEE_PAYMENT,
+              sourceId: {
+                in: invoice.payments.map((payment) => payment.id),
+              },
+            },
+            orderBy: [{ entryDate: 'asc' }, { createdAt: 'asc' }],
+          }),
+    ]);
+    const paymentEntryBySourceId = new Map<string, string>(
+      journalEntries.flatMap((entry) =>
+        entry.sourceId ? ([[entry.sourceId, entry.entryNumber]] as const) : [],
+      ),
+    );
+    const paidAmount = sumNetPaidAmount(invoice.payments);
+    const outstandingAmount = invoice.totalAmount.sub(paidAmount);
+    const primaryGuardian =
+      invoice.student.guardianLinks.find((link) => link.isPrimary) ??
+      invoice.student.guardianLinks[0];
+
+    return {
+      id: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      fiscalYear: invoice.fiscalYear,
+      billNumber: invoice.billNumber,
+      status: invoice.status,
+      dueDate: invoice.dueDate,
+      issuedAt: invoice.issuedAt,
+      paidAt: invoice.paidAt,
+      reportCardBlocked: invoice.reportCardBlocked,
+      hallTicketBlocked: invoice.hallTicketBlocked,
+      academicYear: {
+        id: invoice.academicYear.id,
+        name: invoice.academicYear.name,
+      },
+      billingRun: invoice.billingRun
+        ? {
+            id: invoice.billingRun.id,
+            runMonth: invoice.billingRun.runMonth,
+            runYear: invoice.billingRun.runYear,
+          }
+        : null,
+      student: {
+        id: invoice.student.id,
+        studentSystemId: invoice.student.studentSystemId,
+        name: formatStudentName(invoice.student),
+        className: invoice.student.class.name,
+        sectionName: invoice.student.sectionRef?.name ?? null,
+        guardianName: primaryGuardian?.guardian.fullName ?? null,
+        guardianPhone: primaryGuardian?.guardian.primaryPhone ?? null,
+      },
+      subtotal: Number(invoice.subtotal),
+      vatAmount: Number(invoice.vatAmount),
+      totalAmount: Number(invoice.totalAmount),
+      paidAmount: Number(paidAmount),
+      outstandingAmount: Math.max(0, Number(outstandingAmount)),
+      totalWaivedAmount: waivers.reduce(
+        (sum, waiver) => sum + Number(waiver.amount),
+        0,
+      ),
+      lines: invoice.lines.map((line) => {
+        const baseAmount = line.unitAmount.mul(line.quantity);
+        const matchingWaiverAmount = waivers
+          .filter((waiver) => waiver.feeHeadId === line.feeHeadId)
+          .reduce(
+            (sum, waiver) => sum.add(waiver.amount),
+            new Prisma.Decimal(0),
+          );
+
+        return {
+          id: line.id,
+          feeHeadId: line.feeHeadId,
+          feeHeadCode: line.feeHead.code,
+          feeHeadName: line.feeHead.name,
+          description: line.description,
+          periodLabel: invoice.billingRun
+            ? `${invoice.billingRun.runYear}-${String(invoice.billingRun.runMonth).padStart(2, '0')}`
+            : invoice.academicYear.name,
+          quantity: line.quantity,
+          unitAmount: Number(line.unitAmount),
+          baseAmount: Number(baseAmount),
+          discountAmount: 0,
+          waiverAmount: Number(matchingWaiverAmount),
+          lateFeeAmount: 0,
+          vatAmount: Number(line.vatAmount),
+          totalAmount: Number(line.totalAmount),
+          netAmount: Number(line.totalAmount.sub(matchingWaiverAmount)),
+        };
+      }),
+      waivers: waivers.map((waiver) => ({
+        id: waiver.id,
+        feeHeadId: waiver.feeHeadId,
+        feeHeadName: waiver.feeHead?.name ?? null,
+        amount: Number(waiver.amount),
+        reason: waiver.reason,
+        status: waiver.status,
+        approvedAt: waiver.approvedAt,
+        approvedBy: waiver.approvedBy
+          ? {
+              id: waiver.approvedBy.id,
+              email: waiver.approvedBy.email,
+            }
+          : null,
+      })),
+      payments: invoice.payments.map((payment) => {
+        const refundedAmount = sumRefundedAmount(payment.refunds);
+
+        return {
+          id: payment.id,
+          amount: Number(payment.amount),
+          refundedAmount: Number(refundedAmount),
+          netAmount: Number(payment.amount.sub(refundedAmount)),
+          method: payment.method,
+          referenceNumber: payment.referenceNumber,
+          paidAt: payment.paidAt,
+          narration: payment.narration,
+          collector: payment.collectedBy
+            ? {
+                id: payment.collectedBy.id,
+                email: payment.collectedBy.email,
+              }
+            : null,
+          receipt: payment.receipt
+            ? {
+                id: payment.receipt.id,
+                receiptNumber: payment.receipt.receiptNumber,
+                issuedAt: payment.receipt.issuedAt,
+                pdfUrl: payment.receipt.pdfUrl,
+              }
+            : null,
+          refunds: payment.refunds.map((refund) => ({
+            id: refund.id,
+            refundNumber: refund.refundNumber,
+            amount: Number(refund.amount),
+            refundDate: refund.refundDate,
+            reason: refund.reason,
+            referenceNumber: refund.referenceNumber,
+          })),
+          journalEntryNumber: paymentEntryBySourceId.get(payment.id) ?? null,
+        };
+      }),
+      source: {
+        billingRunId: invoice.billingRunId,
+        enrollmentId: invoice.enrollmentId,
+      },
+    };
+  }
+
+  async getStudentFeeLedger(studentId: string, actor: AuthContext) {
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: studentId,
+        tenantId: actor.tenantId,
+      },
+      include: {
+        class: true,
+        sectionRef: true,
+        guardianLinks: {
+          include: {
+            guardian: true,
+          },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+        },
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    const [invoices, waivers] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          studentId: student.id,
+        },
+        include: {
+          payments: {
+            include: {
+              receipt: true,
+              refunds: {
+                orderBy: [{ refundDate: 'asc' }, { createdAt: 'asc' }],
+              },
+            },
+            orderBy: [{ paidAt: 'asc' }, { createdAt: 'asc' }],
+          },
+          lines: {
+            include: {
+              feeHead: true,
+            },
+          },
+        },
+        orderBy: [{ issuedAt: 'asc' }, { createdAt: 'asc' }],
+      }),
+      this.prisma.feeWaiver.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          studentId: student.id,
+        },
+        include: {
+          feeHead: true,
+          approvedBy: true,
+        },
+        orderBy: [{ createdAt: 'asc' }],
+      }),
+    ]);
+
+    const ledgerEvents: Array<{
+      id: string;
+      date: Date;
+      type: 'INVOICE' | 'PAYMENT' | 'WAIVER' | 'REFUND';
+      reference: string;
+      description: string;
+      debit: Prisma.Decimal;
+      credit: Prisma.Decimal;
+      affectsBalance: boolean;
+      invoiceId?: string;
+      invoiceNumber?: string;
+      paymentId?: string;
+      receiptNumber?: string | null;
+      status?: string;
+    }> = [];
+
+    for (const invoice of invoices) {
+      ledgerEvents.push({
+        id: `invoice:${invoice.id}`,
+        date: invoice.issuedAt,
+        type: 'INVOICE',
+        reference: invoice.invoiceNumber,
+        description: `Invoice ${invoice.invoiceNumber}`,
+        debit: invoice.totalAmount,
+        credit: new Prisma.Decimal(0),
+        affectsBalance: true,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        status: invoice.status,
+      });
+
+      for (const payment of invoice.payments) {
+        ledgerEvents.push({
+          id: `payment:${payment.id}`,
+          date: payment.paidAt,
+          type: 'PAYMENT',
+          reference: payment.receipt?.receiptNumber ?? payment.id,
+          description: `${payment.method} payment for ${invoice.invoiceNumber}`,
+          debit: new Prisma.Decimal(0),
+          credit: payment.amount,
+          affectsBalance: true,
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          paymentId: payment.id,
+          receiptNumber: payment.receipt?.receiptNumber ?? null,
+        });
+
+        for (const refund of payment.refunds) {
+          ledgerEvents.push({
+            id: `refund:${refund.id}`,
+            date: refund.refundDate,
+            type: 'REFUND',
+            reference: refund.refundNumber,
+            description: `Refund for ${payment.receipt?.receiptNumber ?? invoice.invoiceNumber}`,
+            debit: refund.amount,
+            credit: new Prisma.Decimal(0),
+            affectsBalance: true,
+            invoiceId: invoice.id,
+            invoiceNumber: invoice.invoiceNumber,
+            paymentId: payment.id,
+            receiptNumber: payment.receipt?.receiptNumber ?? null,
+          });
+        }
+      }
+    }
+
+    for (const waiver of waivers) {
+      ledgerEvents.push({
+        id: `waiver:${waiver.id}`,
+        date: waiver.approvedAt ?? waiver.createdAt,
+        type: 'WAIVER',
+        reference: waiver.feeHead?.name ?? waiver.invoiceId ?? 'Waiver',
+        description: `${waiver.reason} (already reflected in invoice totals when invoice-linked)`,
+        debit: new Prisma.Decimal(0),
+        credit: waiver.amount,
+        affectsBalance: false,
+        invoiceId: waiver.invoiceId ?? undefined,
+        status: waiver.status,
+      });
+    }
+
+    ledgerEvents.sort((left, right) => {
+      const byDate = left.date.getTime() - right.date.getTime();
+
+      if (byDate !== 0) {
+        return byDate;
+      }
+
+      return ledgerEventOrder(left.type) - ledgerEventOrder(right.type);
+    });
+
+    let runningBalance = new Prisma.Decimal(0);
+    const rows = ledgerEvents.map((event) => {
+      if (event.affectsBalance) {
+        runningBalance = runningBalance.add(event.debit).sub(event.credit);
+      }
+
+      return {
+        id: event.id,
+        date: event.date,
+        type: event.type,
+        reference: event.reference,
+        description: event.description,
+        debit: Number(event.debit),
+        credit: Number(event.credit),
+        runningBalance: Number(runningBalance),
+        affectsBalance: event.affectsBalance,
+        invoiceId: event.invoiceId ?? null,
+        invoiceNumber: event.invoiceNumber ?? null,
+        paymentId: event.paymentId ?? null,
+        receiptNumber: event.receiptNumber ?? null,
+        status: event.status ?? null,
+      };
+    });
+    const totalInvoiced = invoices.reduce(
+      (sum, invoice) => sum.add(invoice.totalAmount),
+      new Prisma.Decimal(0),
+    );
+    const allPayments = invoices.flatMap((invoice) => invoice.payments);
+    const totalPaid = allPayments.reduce(
+      (sum, payment) => sum.add(payment.amount),
+      new Prisma.Decimal(0),
+    );
+    const totalRefunded = allPayments.reduce(
+      (sum, payment) => sum.add(sumRefundedAmount(payment.refunds)),
+      new Prisma.Decimal(0),
+    );
+    const totalWaived = waivers.reduce(
+      (sum, waiver) => sum.add(waiver.amount),
+      new Prisma.Decimal(0),
+    );
+    const outstandingBalance = totalInvoiced.sub(totalPaid).add(totalRefunded);
+    const primaryGuardian =
+      student.guardianLinks.find((link) => link.isPrimary) ??
+      student.guardianLinks[0];
+
+    return {
+      student: {
+        id: student.id,
+        studentSystemId: student.studentSystemId,
+        name: formatStudentName(student),
+        className: student.class.name,
+        sectionName: student.sectionRef?.name ?? null,
+        guardianName: primaryGuardian?.guardian.fullName ?? null,
+        guardianPhone: primaryGuardian?.guardian.primaryPhone ?? null,
+      },
+      openingBalance: 0,
+      totalInvoiced: Number(totalInvoiced),
+      totalPaid: Number(totalPaid),
+      totalWaived: Number(totalWaived),
+      totalRefunded: Number(totalRefunded),
+      outstandingBalance: Math.max(0, Number(outstandingBalance)),
+      rows,
+    };
+  }
+
   async voidInvoice(
     invoiceId: string,
     dto: VoidInvoiceDto,
@@ -2437,6 +2860,26 @@ function resolveIncomeAccountCode(feeHeadCode: string) {
       return '4040';
     default:
       return '4000';
+  }
+}
+
+function formatStudentName(student: {
+  firstNameEn: string;
+  lastNameEn: string;
+}) {
+  return `${student.firstNameEn} ${student.lastNameEn}`.trim();
+}
+
+function ledgerEventOrder(type: 'INVOICE' | 'PAYMENT' | 'WAIVER' | 'REFUND') {
+  switch (type) {
+    case 'INVOICE':
+      return 1;
+    case 'WAIVER':
+      return 2;
+    case 'PAYMENT':
+      return 3;
+    case 'REFUND':
+      return 4;
   }
 }
 

@@ -31,6 +31,7 @@ import type {
   GuardianConsentStatus,
   HomeworkAssignmentSummary,
   HomeworkSubmissionSummary,
+  InvoiceDetail,
   InvoiceSummary,
   JournalEntryView,
   MarkEntrySummary,
@@ -54,6 +55,7 @@ import type {
   StudentArchivePayload,
   StudentDeletePayload,
   StudentFeeClearance,
+  StudentFeeLedger,
   StudentLifecycleActionResult,
   StudentProfile,
   StudentTransferPayload,
@@ -63,6 +65,7 @@ import type {
   TimetableSlotSummary,
   UpdateStudentGuardianPayload,
   UpdateStudentProfilePayload,
+  UploadStudentDocumentPayload,
   WaiverRecord,
 } from '@schoolos/core';
 import { clearStoredSession } from './session';
@@ -355,6 +358,11 @@ export const api = {
     }),
   listStudentDocuments: (studentId: string) =>
     request(withQuery('/student-documents', { studentId })),
+  uploadStudentDocument: (body: UploadStudentDocumentPayload) =>
+    request('/student-documents', {
+      method: 'POST',
+      json: body as JsonBody,
+    }),
   openStudentDocumentPdf: async (studentId: string, kind: string) => {
     const response = await fetch(
       `${API_BASE_URL}/students/${encodeURIComponent(studentId)}/documents/${encodeURIComponent(kind)}.pdf`,
@@ -406,6 +414,12 @@ export const api = {
   listFeeHeads: () => request<FeeHeadSummary[]>('/fees/heads'),
   listFeePlans: () => request<FeePlanSummary[]>('/fees/plans'),
   listInvoices: () => request<InvoiceSummary[]>('/fees/invoices'),
+  getInvoiceDetail: (invoiceId: string) =>
+    request<InvoiceDetail>(`/fees/invoices/${encodeURIComponent(invoiceId)}`),
+  getStudentFeeLedger: (studentId: string) =>
+    request<StudentFeeLedger>(
+      `/fees/students/${encodeURIComponent(studentId)}/ledger`,
+    ),
   listBillingRuns: () => request<FeeBillingRun[]>('/fees/billing-runs'),
   generateBillingRun: (body: JsonBody) =>
     request('/fees/billing-runs', { method: 'POST', json: body }),

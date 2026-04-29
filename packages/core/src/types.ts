@@ -257,6 +257,146 @@ export type InvoiceSummary = {
   };
 };
 
+export type InvoiceDetailLine = {
+  id: string;
+  feeHeadId: string;
+  feeHeadCode: string;
+  feeHeadName: string;
+  description: string;
+  periodLabel: string;
+  quantity: number;
+  unitAmount: number;
+  baseAmount: number;
+  discountAmount: number;
+  waiverAmount: number;
+  lateFeeAmount: number;
+  vatAmount: number;
+  totalAmount: number;
+  netAmount: number;
+};
+
+export type InvoiceDetailPayment = {
+  id: string;
+  amount: number;
+  refundedAmount: number;
+  netAmount: number;
+  method: string;
+  referenceNumber: string | null;
+  paidAt: string;
+  narration: string | null;
+  collector: {
+    id: string;
+    email: string | null;
+  } | null;
+  receipt: {
+    id: string;
+    receiptNumber: string;
+    issuedAt: string;
+    pdfUrl: string | null;
+  } | null;
+  refunds: Array<{
+    id: string;
+    refundNumber: string;
+    amount: number;
+    refundDate: string;
+    reason: string;
+    referenceNumber: string | null;
+  }>;
+  journalEntryNumber: string | null;
+};
+
+export type InvoiceDetail = {
+  id: string;
+  invoiceNumber: string;
+  fiscalYear: string | null;
+  billNumber: string | null;
+  status: string;
+  dueDate: string;
+  issuedAt: string;
+  paidAt: string | null;
+  reportCardBlocked: boolean;
+  hallTicketBlocked: boolean;
+  academicYear: {
+    id: string;
+    name: string;
+  };
+  billingRun: {
+    id: string;
+    runMonth: number;
+    runYear: number;
+  } | null;
+  student: {
+    id: string;
+    studentSystemId: string;
+    name: string;
+    className: string;
+    sectionName: string | null;
+    guardianName: string | null;
+    guardianPhone: string | null;
+  };
+  subtotal: number;
+  vatAmount: number;
+  totalAmount: number;
+  paidAmount: number;
+  outstandingAmount: number;
+  totalWaivedAmount: number;
+  lines: InvoiceDetailLine[];
+  waivers: Array<{
+    id: string;
+    feeHeadId: string | null;
+    feeHeadName: string | null;
+    amount: number;
+    reason: string;
+    status: string;
+    approvedAt: string | null;
+    approvedBy: {
+      id: string;
+      email: string | null;
+    } | null;
+  }>;
+  payments: InvoiceDetailPayment[];
+  source: {
+    billingRunId: string | null;
+    enrollmentId: string | null;
+  };
+};
+
+export type StudentFeeLedgerRow = {
+  id: string;
+  date: string;
+  type: "INVOICE" | "PAYMENT" | "WAIVER" | "REFUND";
+  reference: string;
+  description: string;
+  debit: number;
+  credit: number;
+  runningBalance: number;
+  affectsBalance: boolean;
+  invoiceId: string | null;
+  invoiceNumber: string | null;
+  paymentId: string | null;
+  receiptNumber: string | null;
+  status: string | null;
+};
+
+export type StudentFeeLedger = {
+  student: {
+    id: string;
+    studentSystemId: string;
+    name: string;
+    className: string;
+    sectionName: string | null;
+    guardianName: string | null;
+    guardianPhone: string | null;
+  };
+  openingBalance: number;
+  totalInvoiced: number;
+  totalPaid: number;
+  totalWaived: number;
+  totalRefunded: number;
+  outstandingBalance: number;
+  rows: StudentFeeLedgerRow[];
+};
+
 export type PaymentReceipt = {
   paymentId: string;
   receiptNumber: string;
@@ -409,6 +549,15 @@ export type RevokeGeneratedStudentDocumentPayload = {
   reason: string;
 };
 
+export type UploadStudentDocumentPayload = {
+  studentId: string;
+  kind: string;
+  title?: string | null;
+  fileName: string;
+  contentType: string;
+  base64Content: string;
+};
+
 export type DuplicateStudentMergeCounts = {
   guardianLinks: number;
   documents: number;
@@ -445,8 +594,13 @@ export type GeneratedStudentDocumentMeta = {
   id: string;
   studentId: string;
   kind: string;
+  title?: string | null;
   fileName: string;
+  contentType?: string | null;
+  sizeBytes?: number | null;
   pdfUrl: string;
+  generatedById?: string | null;
+  generatedAt?: string | null;
   checksumSha256: string | null;
   storageObjectKey: string | null;
   signedAt: string | null;
