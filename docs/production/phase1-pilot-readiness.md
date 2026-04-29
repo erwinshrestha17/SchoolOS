@@ -1,71 +1,34 @@
-# SchoolOS Phase 1 Pilot Readiness
+# SchoolOS Phase 1 Pilot Onboarding Runbook
 
-This checklist is for running the current Phase 1 Web + API stack with local
-Docker Postgres and Redis before a pilot-school browser pass.
+This runbook is for onboarding a controlled pilot school onto the Phase 1 SchoolOS dashboard. It assumes the staging deployment has passed the deployment runbook, `verify:production`, health checks, and smoke checks.
 
-## 1. Install Dependencies
+Phase 1 pilot scope:
+
+- Auth, RBAC, tenant context, and cookie-first browser session.
+- M1 Admissions and Student Directory/Profile.
+- M2 Attendance with teacher-first 3-tap flow.
+- M3 Fee Collection with invoices, receipts, and ledger boundary.
+- M5 Activity Feed and milestones.
+- M10 Notices, Events, Delivery Records, and Consent Management.
+
+Out of scope for this pilot: Phase 2 academics/exams/report cards, full parent mobile app, Angular dashboard migration, AI features, and payment gateways.
+
+## 1. Local/Staging Startup Quick Reference
+
+Install dependencies:
 
 ```bash
 pnpm install
 ```
 
-## 2. Start Postgres And Redis
+Start Docker PostgreSQL and Redis:
 
 ```bash
 docker compose up -d postgres redis
 docker compose ps
 ```
 
-Expected local infrastructure:
-
-| Service | Host URL |
-| --- | --- |
-| Postgres | `localhost:5433` |
-| Redis | `localhost:6379` |
-
-The compose file includes container health checks for both services. If either
-service is unhealthy, inspect logs with `docker compose logs postgres redis`.
-
-## 3. Configure API Environment
-
-```bash
-cp apps/api/.env.example apps/api/.env
-```
-
-For Docker-backed local development, keep:
-
-```bash
-DATABASE_URL=postgresql://schoolos:password123@localhost:5433/schoolos_db?schema=public
-REDIS_HOST=localhost
-REDIS_PORT=6379
-FRONTEND_ORIGIN=http://localhost:3000
-EMAIL_DELIVERY_MODE=log
-STORAGE_PROVIDER=local
-ACCESS_COOKIE_NAME=school_os_access_token
-REFRESH_COOKIE_NAME=school_os_refresh_token
-COOKIE_SAME_SITE=lax
-```
-
-Production must replace local JWT/encryption secrets with stable values of at
-least 32 characters. Do not run production with the example secrets.
-
-## Browser Auth Flow
-
-The current Next.js dashboard authenticates browser API calls with `httpOnly`
-cookies issued by the Nest API:
-
-- Login sets a short-lived `ACCESS_COOKIE_NAME` cookie and rotating
-  `REFRESH_COOKIE_NAME` cookie.
-- Protected API requests use `credentials: include`; browser JavaScript does not
-  attach bearer tokens.
-- The web app stores only non-sensitive session metadata such as user, tenant,
-  roles, and permissions.
-- API `401` responses clear local metadata and the API client attempts one
-  refresh-cookie rotation before failing a protected request.
-- Production deployments must use HTTPS. Set `COOKIE_SAME_SITE=none` only for
-  cross-site HTTPS deployments behind a trusted proxy.
-
-## 4. Prepare Database
+Prepare database:
 
 ```bash
 pnpm db:generate
@@ -74,17 +37,13 @@ pnpm db:migrate
 pnpm db:seed
 ```
 
-`pnpm db:seed` is explicit on purpose. It adds or updates baseline roles,
-permissions, chart accounts, fee heads, academic year, and local admin users; do
-not run it against production unless intentionally provisioning baseline data.
-
-## 5. Start The Apps
+Start apps:
 
 ```bash
 pnpm dev
 ```
 
-Expected URLs:
+Expected local URLs:
 
 | Service | URL |
 | --- | --- |
@@ -94,126 +53,194 @@ Expected URLs:
 | Health | `http://localhost:4000/api/v1/health` |
 | Readiness | `http://localhost:4000/api/v1/ready` |
 
-## 6. Smoke Test Runtime Connectivity
-
-With Docker services running, validate Postgres and Redis:
-
-```bash
-SMOKE_SKIP_API=true pnpm smoke:phase1
-```
-
-With API running on port `4000`, validate API health/readiness too:
+Connectivity smoke:
 
 ```bash
 pnpm smoke:phase1
-```
-
-After seeding, you can also validate login:
-
-```bash
 SMOKE_LOGIN=true pnpm smoke:phase1
 ```
 
-Default seeded accounts:
+Seeded local accounts:
 
-| Tenant | Email | Password |
-| --- | --- | --- |
-| `default-school` | `admin@schoolos.com` | `admin123` |
-| `default-school` | `superadmin@schoolos.com` | `superadmin123` |
+| Tenant | Email | Password | Purpose |
+| --- | --- | --- | --- |
+| `default-school` | `admin@schoolos.com` | `admin123` | Tenant admin |
+| `default-school` | `superadmin@schoolos.com` | `superadmin123` | Full-access admin |
 
-## 7. Production Verification
+## 2. Pre-Pilot Checklist
 
-Run the full local gate before a pilot handoff:
+Complete this before staff training:
 
-```bash
-pnpm verify:production
-```
+- Confirm school/tenant name is correct.
+- Confirm branding/logo expectations. If logo upload is not yet configured, document the placeholder state.
+- Confirm current academic year.
+- Create or verify classes.
+- Create or verify sections.
+- Create or verify fee heads.
+- Create or verify fee plans for pilot classes.
+- Create or verify admin users.
+- Create or verify teacher users.
+- Create or verify accountant/cashier users.
+- Verify notification providers are intentionally stubbed/logged or explicitly configured.
+- Verify `FRONTEND_ORIGIN`, cookies, CORS, and HTTPS settings for staging.
+- Verify `LOCAL_STORAGE_ROOT` exists and is backed up.
+- Run `pnpm verify:production`.
+- Run `pnpm smoke:phase1`.
+- Run browser smoke with PDF checks.
 
-This runs tracked-artifact checks, Prisma generate/validate, OpenAPI gate,
-lint, typecheck, unit tests, e2e tests, and production builds.
+Go/no-go rule: do not invite pilot staff until health, readiness, smoke, and browser checks pass.
 
-## 8. Browser Smoke Checklist
+## 3. Staff Training Checklist
 
-Use the seeded admin or register a fresh tenant, then verify:
+Train in this order so staff understand the daily school flow:
 
-- Create or confirm academic year.
-- Create class and section from Settings.
-- Configure a fee head and fee plan.
-- Admit a student with at least one guardian phone number.
-- Confirm duplicate warning and roll-number conflict handling when applicable.
-- Confirm the admission-created invoice appears when a fee plan exists.
-- Mark attendance using present-by-default exceptions.
-- Confirm out-of-roster students are rejected by the API.
-- Create an activity post and verify attachments store private object keys.
-- Publish a notice/event.
-- Check notification delivery records for admissions, attendance, fees,
-  activity, and notice/event workflows.
+- Admin Command Center: KPIs, setup alerts, quick actions, and delivery health.
+- Settings: academic year, class, and section setup.
+- Student Directory/Profile: filter roster, search by name/SCH ID, open profile, open ID card PDF, jump to fee collection.
+- New Enrollment: multi-step admission, guardian phone, iEMIS disability confirmation, duplicate warning, document upload, success actions.
+- Attendance: 3-tap flow, present-by-default behavior, absent/late/leave exceptions, submit result, lock/conflict state.
+- Fee Collection: invoice search, outstanding amount, overpayment block, partial/full payment, receipt PDF, ledger preview.
+- Activity Feed: audience targeting, 1-5 image rule, private media object-key behavior, feed preview, delivery records.
+- Notices/Communications: normal/urgent/emergency notice, event creation, delivery records, guardian consent capture/revoke.
+- Logout/session behavior: logout from avatar menu; dashboard redirects to login when unauthenticated.
 
-## 9. Known Pilot Limitations
+## 4. Day-1 Pilot Script
 
-- The temporary Next.js dashboard no longer persists client-readable tokens, but
-  login/refresh JSON responses still include access tokens for direct API and
-  future mobile compatibility. A future BFF route layer can remove token-bearing
-  JSON from browser-visible responses entirely.
-- Real SMS, FCM, email webhook, R2, payment gateway, and AI providers remain
-  adapter-ready but not enabled for the pilot baseline.
-- The current automated e2e harness is mocked for speed and isolation. Before a
-  live school, run the browser smoke checklist against Docker Postgres/Redis and
-  keep screenshots/logs from the pass.
+Run this with one admin, one teacher, and one accountant:
 
-## 10. Browser QA Result - 2026-04-29
+1. Log in as admin.
+2. Confirm academic year, class, section, fee head, and fee plan exist.
+3. Admit 2-5 test students with guardian phone numbers.
+4. Confirm each student receives a generated `SCH-YYYY-NNNN` ID.
+5. Open one Student ID Card PDF from Student Directory/Profile.
+6. Confirm first invoice exists when a fee plan applies.
+7. Log in or act as accountant.
+8. Collect one partial fee payment.
+9. Open the generated receipt PDF.
+10. Log in or act as teacher.
+11. Open Attendance for the class/section.
+12. Mark one student absent, one late, and one leave if enough students exist.
+13. Submit attendance and verify notification queued messaging.
+14. Publish one normal notice.
+15. Create one event.
+16. Capture and revoke one guardian consent record.
+17. Create one activity post with one image.
+18. Confirm delivery records appear for notice/activity/attendance/fee events.
+19. Log out and confirm direct dashboard access redirects to login.
 
-Pilot browser QA was run against local Docker Postgres, Docker Redis, the real
-NestJS API on `localhost:4000`, and the current Next.js dashboard on
-`localhost:3000`.
+Record screenshots for ID card PDF, receipt PDF, admission success, attendance success, payment success, notice delivery, and activity post.
 
-### Result
+## 5. Browser QA Checklist
 
-Decision: ready for a controlled pilot after one manual media-upload check.
+Authentication:
 
-### Passed Checks
+- Login works with cookie-first auth.
+- No raw `accessToken` or `refreshToken` appears in browser storage.
+- Logout clears local session metadata.
+- Unauthenticated dashboard access redirects to login.
 
-- Docker Postgres and Redis were healthy.
-- `SMOKE_LOGIN=true pnpm smoke:phase1` passed Postgres, Redis, API health,
-  readiness, and seeded admin login checks.
-- Cookie-first login succeeded for `default-school` / `admin@schoolos.com`.
-- Logout redirected to `/login`, and direct dashboard access after logout
-  redirected to `/login?next=/dashboard`.
-- Settings showed the seeded current academic year `2026-2027`, classes, and
-  sections.
-- Admissions created a student with explicit iEMIS no-disability confirmation,
-  guardian phone, generated `SCH-2026-0003`, and created the first invoice
-  `INV-2025-2026-00001`.
-- Attendance loaded the Class 1 / Section A roster, treated students as present
-  by default, submitted absent and late exceptions, showed conflict-review state,
-  and queued parent-notification messaging.
-- Fee Collection displayed the outstanding invoice, blocked overpayment in the
-  browser, recorded a partial cash payment, generated receipt
-  `REC-2025-2026-00001`, and kept ledger posting as backend-owned preview-only
-  UI.
-- Notices showed the emergency warning, published a normal notice, created an
-  event, and listed provider-neutral delivery records.
-- Guardian photo-consent capture and revoke both updated the consent status
-  cards.
-- Cross-page shell checks passed: sidebar links, academic year header,
-  notification badge query, empty states, and user menu remained stable.
-- No raw backend JSON error blob was observed during the browser pass.
+Setup:
 
-### Bugs Fixed During This Pass
+- Academic year exists or can be created.
+- Class exists or can be created.
+- Section exists or can be created.
+- Fee head and fee plan exist or can be created.
+- Dashboard setup alerts clear when setup is complete.
 
-No new code defects were found during this browser pass. The prior iEMIS
-disability-confirmation blocker was verified fixed through the admissions
-journey.
+Admissions and student profile:
 
-### Remaining Caveats
+- Student Directory is the default Students / Admissions tab.
+- Search by name and `SCH-YYYY-NNNN` works.
+- Profile panel shows guardians, documents, invoices, attendance, and activity sections.
+- ID Card PDF opens successfully.
+- New enrollment requires guardian phone and iEMIS disability confirmation.
+- Duplicate warnings and roll conflict errors are clean.
+- Raw backend JSON is not shown to staff.
 
-- The in-app browser automation runtime used for this pass could not attach a
-  local image file to the Activity Feed file input. Activity Feed page structure,
-  class/section targeting, 1-5 image rule copy, private media messaging, and
-  disabled publish-without-image behavior were verified; the actual one-image
-  upload/publish should be checked manually in Chrome/Safari before school staff
-  training.
-- Browser storage inspection is covered by web contract tests rather than this
-  browser runtime because the runtime does not expose a safe localStorage API.
-- Real external SMS, FCM, email, R2, payment gateways, and AI remain intentionally
-  disabled for the controlled pilot.
+Attendance:
+
+- Roster loads for class/section.
+- All students default to Present.
+- Exceptions cycle through absent, late, sick leave, excused leave, and unexcused leave.
+- Future dates are blocked.
+- Submit succeeds and queues notification event.
+- Locked session shows clear state.
+
+Fees:
+
+- Invoice search works.
+- Overpayment is blocked before submit.
+- Partial payment succeeds.
+- Receipt success panel appears.
+- Receipt PDF opens successfully.
+- Ledger preview remains labeled preview-only.
+
+Activity:
+
+- Class/section/student targeting is clear.
+- Upload blocks more than 5 images.
+- Activity post with one image publishes successfully.
+- Feed preview shows new post.
+- Delivery record is queued or visible.
+
+Communications:
+
+- Normal notice publishes.
+- Scheduled notice can be created if required.
+- Emergency warning appears for emergency priority.
+- Event creation works.
+- Delivery records list statuses.
+- Guardian consent capture/revoke works.
+
+## 6. Known Pilot Limitations
+
+- Phase 2 academics, exams, CAS, report cards, timetable/homework, HR/payroll, and advanced accounting are not part of this pilot.
+- No full parent mobile app is included yet.
+- No Angular dashboard migration is included yet.
+- Real SMS, FCM, and external email are disabled unless explicitly configured.
+- Payment gateways are deferred; use cash/bank/manual collection.
+- AI captions/narratives are deferred.
+- PDF generation is functional and validated, but visual certificate/receipt design polish is deferred.
+- Local storage is acceptable only with backups for the pilot; object storage can be enabled later.
+- Activity image upload should be manually checked in the final target browser because automated browser runtimes may not attach local files reliably.
+
+## 7. Support Process
+
+Bug report format:
+
+- Tenant/school.
+- User email and role.
+- Page URL.
+- Exact steps to reproduce.
+- Expected result.
+- Actual result.
+- Screenshot or screen recording.
+- Approximate timestamp and timezone.
+- API request ID if shown in logs.
+- Browser and operating system.
+
+Severity levels:
+
+- S0: Data loss, cross-tenant data exposure, login unavailable for all users, or financial corruption. Stop pilot writes and escalate immediately.
+- S1: Admissions, attendance, fee collection, or notices blocked for pilot staff. Fix before next live school day.
+- S2: Workaround exists but staff workflow is degraded. Schedule same-week fix.
+- S3: Copy, visual polish, minor layout, or deferred enhancement. Backlog unless it affects trust during training.
+
+Rollback/disable options:
+
+- Disable staff access by pausing pilot credentials.
+- Stop API/web traffic at reverse proxy.
+- Roll back to previous release commit/image.
+- Restore database/storage from backup only after traffic is frozen and data impact is understood.
+- Keep provider stubs/log mode if external notifications misbehave.
+
+## 8. Browser QA Result - 2026-04-29
+
+Manual retest confirmed:
+
+- Student ID Card PDF opens successfully.
+- Receipt PDF opens successfully.
+- PDF response validation blocks invalid/non-PDF blobs.
+- PDF visual design/user-friendly layout remains deferred.
+
+Current decision: Phase 1 is ready for controlled pilot preparation, pending final staging deployment checks and school-specific onboarding data.
