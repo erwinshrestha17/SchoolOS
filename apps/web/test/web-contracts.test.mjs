@@ -204,4 +204,56 @@ describe('SchoolOS web production contracts', () => {
     assert.doesNotMatch(header, /const unreadCount = 3/);
     assert.doesNotMatch(header, /2081-82|2080-81|2079-80/);
   });
+
+  it('builds the admin dashboard from real Phase 1 APIs without fake KPI numbers', () => {
+    const dashboard = read('app/dashboard/page.tsx');
+    const requiredApis = [
+      'api.listAcademicYears',
+      'api.listClasses',
+      'api.listFeePlans',
+      'api.listStudents',
+      'api.listAdmissions',
+      'api.listAttendanceAnalytics',
+      'api.listInvoices',
+      'api.listDefaulters',
+      'api.listReceipts',
+      'api.listActivityPosts',
+      'api.listNotices',
+      'api.listNotificationDeliveries',
+    ];
+
+    for (const apiCall of requiredApis) {
+      assert.match(dashboard, new RegExp(apiCall.replace('.', '\\.')));
+    }
+
+    assert.doesNotMatch(dashboard, /\b847\b/);
+    assert.doesNotMatch(dashboard, /94\.2%/);
+    assert.doesNotMatch(dashboard, /8,45,000|845000/);
+    assert.doesNotMatch(dashboard, /Phase 2 Academic Cycle/);
+  });
+
+  it('keeps admin dashboard quick actions on existing Phase 1 routes', () => {
+    const dashboard = read('app/dashboard/page.tsx');
+    const requiredRoutes = [
+      '/dashboard/admissions',
+      '/dashboard/attendance',
+      '/dashboard/finance',
+      '/dashboard/activity',
+      '/dashboard/notices',
+      '/dashboard/settings',
+    ];
+
+    for (const route of requiredRoutes) {
+      assert.match(dashboard, new RegExp(`href: '${route}'`));
+    }
+  });
+
+  it('handles dashboard setup and empty-data states explicitly', () => {
+    const dashboard = read('app/dashboard/page.tsx');
+
+    assert.match(dashboard, /Setup needs attention/);
+    assert.match(dashboard, /No alerts available yet/);
+    assert.match(dashboard, /No recent operations yet/);
+    assert.match(dashboard, /\?\? \[\]/);
+  });
 });
