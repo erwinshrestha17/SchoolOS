@@ -2,18 +2,13 @@
 
 import type {
   AcademicYearSummary,
-  ActivityPost,
   AdmissionSummary,
   ClassSummary,
-  InvoiceSummary,
   SectionSummary,
   StudentProfile,
 } from '@schoolos/core';
-import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { api } from '../../lib/api';
-import { StudentProfilePanel } from './student-profile-panel';
 
 type StudentDirectoryProps = {
   academicYears: AcademicYearSummary[];
@@ -42,17 +37,7 @@ export function StudentDirectory({
   const [classId, setClassId] = useState('');
   const [sectionId, setSectionId] = useState('');
   const [search, setSearch] = useState('');
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(search);
-
-  const invoicesQuery = useQuery({
-    queryKey: ['invoices'],
-    queryFn: api.listInvoices,
-  });
-  const activityPostsQuery = useQuery({
-    queryKey: ['activity-posts'],
-    queryFn: api.listActivityPosts,
-  });
 
   const currentAcademicYear = academicYears.find((year) => year.isCurrent);
   const selectedAcademicYear =
@@ -156,50 +141,6 @@ export function StudentDirectory({
     selectedSection,
     students,
   ]);
-
-  const selectedStudent =
-    filteredStudents.find((student) => student.id === selectedStudentId) ??
-    students.find((student) => student.id === selectedStudentId) ??
-    null;
-  const selectedAdmission = selectedStudent
-    ? admissionBySystemId.get(selectedStudent.studentSystemId) ?? null
-    : null;
-  const selectedInvoices = selectedStudent
-    ? filterInvoicesForStudent(invoicesQuery.data ?? [], selectedStudent)
-    : [];
-  const selectedActivityPosts = selectedStudent
-    ? filterActivityForStudent(
-        activityPostsQuery.data ?? [],
-        selectedStudent,
-        classId,
-        sectionId,
-      )
-    : [];
-  const studentProfileQuery = useQuery({
-    queryKey: ['student-profile', selectedStudentId],
-    queryFn: () => api.getStudentProfile(selectedStudentId as string),
-    enabled: Boolean(selectedStudentId),
-  });
-
-  const attendanceSummaryQuery = useQuery({
-    queryKey: [
-      'attendance-summary',
-      selectedStudent?.id,
-      academicYearId,
-      classId,
-      sectionId,
-    ],
-    queryFn: () =>
-      api.getAttendanceSummary({
-        academicYearId,
-        classId,
-        sectionId: sectionId || null,
-        studentId: selectedStudent?.id ?? null,
-        month: new Date().getMonth() + 1,
-        year: new Date().getFullYear(),
-      }),
-    enabled: Boolean(selectedStudent?.id && academicYearId && classId),
-  });
 
   if (isLoading) {
     return <DirectorySkeleton />;
@@ -348,13 +289,12 @@ export function StudentDirectory({
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 md:justify-end">
-                    <button
-                      type="button"
+                    <Link
+                      href={`/dashboard/students/${encodeURIComponent(student.id)}`}
                       className="inline-flex min-h-11 items-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white"
-                      onClick={() => setSelectedStudentId(student.id)}
                     >
                       View Profile
-                    </button>
+                    </Link>
                     <Link
                       href={`/dashboard/finance?studentId=${encodeURIComponent(student.id)}`}
                       className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700"
@@ -383,28 +323,6 @@ export function StudentDirectory({
         )}
       </section>
 
-      {selectedStudent ? (
-        <StudentProfilePanel
-          activityPosts={
-            studentProfileQuery.data?.activityPosts ?? selectedActivityPosts
-          }
-          admission={selectedAdmission}
-          attendanceRecords={studentProfileQuery.data?.attendanceRecords ?? []}
-          attendanceSummary={attendanceSummaryQuery.data}
-          documents={studentProfileQuery.data?.documents ?? []}
-          generatedDocuments={studentProfileQuery.data?.generatedDocuments ?? []}
-          invoices={studentProfileQuery.data?.invoices ?? selectedInvoices}
-          isAttendanceLoading={
-            attendanceSummaryQuery.isLoading || studentProfileQuery.isLoading
-          }
-          onClose={() => setSelectedStudentId(null)}
-          onOpenPdf={onOpenPdf}
-          pdfError={
-            pdfError || (studentProfileQuery.error as Error | null)?.message || ''
-          }
-          student={studentProfileQuery.data?.student ?? selectedStudent}
-        />
-      ) : null}
     </div>
   );
 }
@@ -425,34 +343,6 @@ function DirectorySkeleton() {
       <div className="h-24 animate-pulse rounded-2xl bg-gray-100" />
     </div>
   );
-}
-
-function filterInvoicesForStudent(invoices: InvoiceSummary[], student: StudentProfile) {
-  const studentName = getStudentName(student, null);
-
-  return invoices.filter(
-    (invoice) =>
-      invoice.studentId === student.id ||
-      invoice.student?.id === student.id ||
-      invoice.student?.name === studentName,
-  );
-}
-
-function filterActivityForStudent(
-  posts: ActivityPost[],
-  student: StudentProfile,
-  classId: string,
-  sectionId: string,
-) {
-  return posts.filter((post) => {
-    const isTagged = post.studentTags.some((tag) => tag.studentId === student.id);
-    const classWide =
-      Boolean(classId) &&
-      post.classId === classId &&
-      (!post.sectionId || !sectionId || post.sectionId === sectionId);
-
-    return isTagged || classWide;
-  });
 }
 
 function getStudentName(student: StudentProfile, admission: AdmissionSummary | undefined | null) {

@@ -348,22 +348,49 @@ describe('SchoolOS web production contracts', () => {
 
   it('keeps student profile and directory actions wired to real helpers', () => {
     const directory = read('components/forms/student-directory.tsx');
-    const profile = read('components/forms/student-profile-panel.tsx');
+    const detailPage = read('components/students/student-detail-page.tsx');
     const admissionForm = read('components/forms/admission-form.tsx');
 
-    assert.match(directory, /api\.getStudentProfile/);
     assert.match(directory, /View Profile/);
+    assert.match(directory, /href=\{`\/dashboard\/students\/\$\{encodeURIComponent\(student\.id\)\}`\}/);
     assert.match(directory, /Collect Fee/);
     assert.match(directory, /Open ID Card/);
-    assert.match(directory, /api\.listInvoices/);
-    assert.match(directory, /api\.listActivityPosts/);
-    assert.match(directory, /api\.getAttendanceSummary/);
     assert.match(admissionForm, /api\.openStudentDocumentPdf/);
-    assert.match(profile, /Guardians/);
-    assert.match(profile, /Documents & Certificates/);
-    assert.match(profile, /Recent Invoices/);
-    assert.match(profile, /Attendance Summary/);
-    assert.match(profile, /Recent Activity/);
+    assert.match(detailPage, /api\.getStudentProfile/);
+    assert.match(detailPage, /api\.openStudentDocumentPdf/);
+    assert.match(detailPage, /Guardians/);
+    assert.match(detailPage, /Documents/);
+    assert.match(detailPage, /Fees/);
+    assert.match(detailPage, /Attendance/);
+    assert.match(detailPage, /Activity/);
+    assert.match(detailPage, /History/);
+  });
+
+  it('adds the Phase 1B student detail route with tabbed profile sections', () => {
+    const route = read('app/dashboard/students/[studentId]/page.tsx');
+    const detailPage = read('components/students/student-detail-page.tsx');
+
+    assert.equal(
+      existsSync(join(webRoot, 'app/dashboard/students/[studentId]/page.tsx')),
+      true,
+    );
+    assert.match(route, /useParams/);
+    assert.match(route, /<StudentDetailPage studentId=/);
+    assert.match(detailPage, /const detailTabs = \[/);
+
+    for (const tab of [
+      'Overview',
+      'Guardians',
+      'Documents',
+      'Fees',
+      'Attendance',
+      'Activity',
+      'History',
+    ]) {
+      assert.match(detailPage, new RegExp(tab));
+    }
+
+    assert.doesNotMatch(detailPage, /replace-me|demo-student|student-123/i);
   });
 
   it('validates PDF responses before opening blob tabs', () => {
