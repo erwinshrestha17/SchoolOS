@@ -256,4 +256,112 @@ describe('SchoolOS web production contracts', () => {
     assert.match(dashboard, /No recent operations yet/);
     assert.match(dashboard, /\?\? \[\]/);
   });
+
+  it('keeps admissions enrollment as a multi-step pilot flow', () => {
+    const admissionForm = read('components/forms/admission-form.tsx');
+    const requiredSteps = [
+      'Personal Info',
+      'Academic Placement',
+      'Guardian Contacts',
+      'Documents & Review',
+      'Success / Next Actions',
+    ];
+
+    assert.match(admissionForm, /const enrollmentSteps = \[/);
+
+    for (const step of requiredSteps) {
+      assert.match(admissionForm, new RegExp(step.replace('/', '\\/')));
+    }
+  });
+
+  it('preserves admissions setup, duplicate warning, and create-anyway behavior', () => {
+    const admissionForm = read('components/forms/admission-form.tsx');
+
+    assert.match(admissionForm, /Setup required before enrollment/);
+    assert.match(admissionForm, /api\.checkAdmissionDuplicates/);
+    assert.match(admissionForm, /Possible duplicate found/);
+    assert.match(admissionForm, /Create anyway/);
+    assert.match(admissionForm, /setupIsMissing/);
+  });
+
+  it('keeps guardian phone validation hints and document review in admissions', () => {
+    const admissionForm = read('components/forms/admission-form.tsx');
+
+    assert.match(admissionForm, /At least one guardian with a valid phone number is required/);
+    assert.match(admissionForm, /Required phone number/);
+    assert.match(admissionForm, /Document/);
+    assert.match(admissionForm, /ReviewCard/);
+    assert.match(admissionForm, /formatFileSize/);
+  });
+
+  it('keeps admissions bulk import and success next actions available', () => {
+    const admissionForm = read('components/forms/admission-form.tsx');
+
+    assert.match(admissionForm, /Bulk Import/);
+    assert.match(admissionForm, /api\.bulkImportAdmissions/);
+    assert.match(admissionForm, /Error report CSV/);
+    assert.match(admissionForm, /Collect First Fee/);
+    assert.match(admissionForm, /Download ID Card/);
+    assert.match(admissionForm, /Add Another Student/);
+  });
+
+  it('keeps attendance screen wired to real roster, submit, sync, analytics, and conflict APIs', () => {
+    const attendanceForm = read('components/forms/attendance-form.tsx');
+    const requiredApis = [
+      'api.listAcademicYears',
+      'api.listClasses',
+      'api.listSections',
+      'api.getAttendanceRoster',
+      'api.submitAttendance',
+      'api.syncAttendance',
+      'api.listAttendanceAnalytics',
+      'api.listAttendanceConflicts',
+      'api.reviewAttendanceConflict',
+    ];
+
+    for (const apiCall of requiredApis) {
+      assert.match(attendanceForm, new RegExp(apiCall.replace('.', '\\.')));
+    }
+  });
+
+  it('supports the full Phase 1 attendance exception status cycle', () => {
+    const attendanceForm = read('components/forms/attendance-form.tsx');
+    const statuses = [
+      'PRESENT',
+      'ABSENT',
+      'LATE',
+      'SICK_LEAVE',
+      'EXCUSED_LEAVE',
+      'UNEXCUSED_LEAVE',
+    ];
+
+    assert.match(attendanceForm, /const statusCycle = \[/);
+
+    for (const status of statuses) {
+      assert.match(attendanceForm, new RegExp(status));
+    }
+  });
+
+  it('blocks future attendance dates and keeps teacher summary labels visible', () => {
+    const attendanceForm = read('components/forms/attendance-form.tsx');
+
+    assert.match(attendanceForm, /max=\{today\}/);
+    assert.match(attendanceForm, /Future dates cannot be submitted/);
+    assert.match(attendanceForm, /Present/);
+    assert.match(attendanceForm, /Absent/);
+    assert.match(attendanceForm, /Late/);
+    assert.match(attendanceForm, /Leave/);
+    assert.match(attendanceForm, /exceptions only/);
+  });
+
+  it('keeps offline sync secondary and preserves analytics plus conflict review sections', () => {
+    const attendanceForm = read('components/forms/attendance-form.tsx');
+
+    assert.match(attendanceForm, /<details className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">/);
+    assert.match(attendanceForm, /Sync offline draft/);
+    assert.match(attendanceForm, /Recent Attendance Analytics/);
+    assert.match(attendanceForm, /Conflict Review/);
+    assert.match(attendanceForm, /Attendance Risk Alerts/);
+    assert.match(attendanceForm, /Mark reviewed/);
+  });
 });
