@@ -1,35 +1,65 @@
 import Link from 'next/link';
 
-const features = [
+const modules = [
   {
     icon: '🎓',
-    title: 'Admissions & Profiles',
-    desc: 'Digital application forms, guardian linkage, document uploads, and instant invoice generation on enrolment.',
+    title: 'Admissions & Student Profiles',
+    desc: 'Enrollment, guardians, documents, student photos, transfers, ID cards, certificates, and iEMIS-ready student records.',
   },
   {
     icon: '📋',
-    title: '3-Tap Attendance',
-    desc: 'Lightning-fast roll-call with present-by-default submission. Real-time absentee alerts pushed to parents instantly.',
+    title: 'Smart Attendance',
+    desc: 'Fast 3-tap attendance, absence/late/leave tracking, correction workflow, monthly history, and parent alerts.',
   },
   {
     icon: '💰',
-    title: 'Fees & Auto-Ledger',
-    desc: 'Collect fees online or at the counter. Every payment auto-posts a double-entry journal to the accounting module.',
+    title: 'Fees & Receipts',
+    desc: 'Fee setup, invoices, dues, discounts, waivers, payments, receipts, defaulters, and cashier day-end reports.',
+  },
+  {
+    icon: '📝',
+    title: 'Exams, CAS & Report Cards',
+    desc: 'Exam setup, marks entry, CAS tracking, grading, report cards, academic reports, and promotion support.',
   },
   {
     icon: '📸',
     title: 'Activity Feed & Milestones',
-    desc: 'Engage parents daily with class photos, developmental milestones, and behavior logs. The ultimate product moat.',
-  },
-  {
-    icon: '📝',
-    title: 'MoEST Academics & CAS',
-    desc: 'Terminal exams and Continuous Assessment System (CAS) with auto-computed GPA based on Nepal MoEST standards.',
+    desc: 'Classroom photos, child-specific posts, daily updates, mood logs, milestones, reactions, and parent engagement.',
   },
   {
     icon: '📢',
-    title: 'Notices & Messaging',
-    desc: 'The central notification layer. Send targeted pushes, SMS fallbacks, and manage digital consent forms seamlessly.',
+    title: 'Notices & Communication',
+    desc: 'Notices, announcements, consent, read/unread tracking, delivery records, retry/resend, SMS and push alerts.',
+  },
+  {
+    icon: '📚',
+    title: 'Homework & Timetable',
+    desc: 'Assignments, due reminders, submission tracking, class timetable, teacher schedules, and substitution support.',
+  },
+  {
+    icon: '👥',
+    title: 'HR & Payroll',
+    desc: 'Staff profiles, staff attendance, leave, salary structures, payroll processing, salary slips, PF and TDS support.',
+  },
+  {
+    icon: '📖',
+    title: 'Library Management',
+    desc: 'Book catalog, QR/barcode copy tracking, issue/return, overdue fines, lost-book charges, and library reports.',
+  },
+  {
+    icon: '🚌',
+    title: 'Transport Management',
+    desc: 'Routes, stops, vehicles, drivers, student transport enrollment, boarding/drop tracking, live GPS, ETA, and trip history.',
+  },
+  {
+    icon: '🍱',
+    title: 'Canteen Management',
+    desc: 'Menus, meal plans, QR meal serving, wallet, POS sales, parent spending controls, allergy warnings, and reports.',
+  },
+  {
+    icon: '📊',
+    title: 'Accounting & Finance',
+    desc: 'Double-entry ledger, chart of accounts, journal posting, reversals, trial balance, day-end reports, and audit-ready records.',
   },
 ];
 
@@ -37,69 +67,129 @@ const steps = [
   {
     number: '01',
     title: 'Register your school',
-    desc: 'Create an isolated tenant workspace in minutes. Configure your MoEST class levels, fee structures, and staff roles.',
+    desc: 'Create an isolated tenant workspace in minutes. Configure academic year, class levels, sections, fee structures, and staff roles.',
   },
   {
     number: '02',
     title: 'Onboard students & staff',
-    desc: 'Import students, link family profiles for sibling discounts, and assign strict RBAC roles to your staff.',
+    desc: 'Enroll students, link guardians, import records, assign teachers, define RBAC permissions, and prepare daily workflows.',
   },
   {
     number: '03',
     title: 'Run daily operations',
-    desc: 'Take attendance in seconds, collect counter fees, post to the activity feed, and watch your ledger update in real time.',
+    desc: 'Take attendance, collect fees, publish notices, post activity updates, serve canteen meals, and track transport safely.',
   },
 ];
 
 const stats = [
-  { value: '10 Modules', label: 'Fully integrated platform' },
-  { value: 'MoEST & IRD', label: '100% compliance ready' },
+  { value: '12 Domains', label: 'Integrated school operations' },
+  { value: 'MoEST & IRD', label: 'Nepal-ready compliance' },
   { value: 'Montessori–10', label: 'Supported class levels' },
-  { value: 'Real-time', label: 'Auto-posting ledger' },
+  { value: 'Real-time', label: 'Ledger, alerts, and tracking' },
 ];
 
 const pricingPlans = [
   {
     name: 'Basic Plan',
     phase: 'Phase 1 Core',
-    desc: 'Essential operations for daily school management.',
-    features: ['Admissions & Student Profiles', 'Attendance (Student + Staff)', 'Fee Management', 'Activity Feed & Milestones', 'Notices, Events & Messaging'],
+    desc: 'Essential operations for daily school management and early pilot schools.',
+    features: [
+      'Admissions & Student Profiles',
+      'Smart Attendance',
+      'Fees & Receipts',
+      'Activity Feed & Milestones',
+      'Notices & Communication',
+    ],
     cta: 'Start with Basic',
     highlighted: false,
   },
   {
     name: 'Standard Plan',
-    phase: 'Phase 2 Academic + HR',
-    desc: 'Complete academic cycle and financial control.',
-    features: ['Everything in Basic', 'Exams, CAS & Grading', 'Homework & Timetable', 'Staff HR & Payroll', 'Accounting & Financial Management', 'Library & Transport Modules'],
+    phase: 'Phase 2 Academic + Finance',
+    desc: 'Complete academic, HR, payroll, and financial control for growing schools.',
+    features: [
+      'Everything in Basic',
+      'Exams, CAS & Report Cards',
+      'Homework & Timetable',
+      'HR & Payroll',
+      'Accounting & Finance',
+      'Advanced reports and exports',
+    ],
     cta: 'Upgrade to Standard',
     highlighted: true,
-  }
+  },
+  {
+    name: 'Operations Add-ons',
+    phase: 'Phase 3 Auxiliary',
+    desc: 'Operational modules for schools that run library, transport, and canteen services.',
+    features: [
+      'Library Management',
+      'Transport Management with live GPS',
+      'Canteen Management',
+      'Canteen wallet and POS',
+      'Parent child-specific bus tracking',
+      'Inventory and vendor tracking later',
+    ],
+    cta: 'Explore Add-ons',
+    highlighted: false,
+  },
+];
+
+const phasePlan = [
+  {
+    done: true,
+    title: 'Phase 1A: Core Workflows',
+    sub: 'Admissions, Attendance, Fees, Activity Feed, and Notices working end-to-end.',
+  },
+  {
+    done: false,
+    active: true,
+    title: 'Phase 1B: Completion Sprint',
+    sub: 'Student detail/edit, fee ledger, attendance reports, notification center, signed media, global search, tests, and PDF polish.',
+  },
+  {
+    done: false,
+    title: 'Phase 2: Academics, HR & Accounting',
+    sub: 'Exams/CAS/report cards, Homework/Timetable, HR/Payroll, and full M9 Accounting & Finance.',
+  },
+  {
+    done: false,
+    title: 'Phase 3: Auxiliary Operations',
+    sub: 'Library, Transport with live GPS, Canteen wallet/POS, and parent/mobile expansion.',
+  },
+  {
+    done: false,
+    title: 'Phase 4: AI & Scale',
+    sub: 'AI captions, risk prediction, anomaly detection, smart notifications, and scale optimizations.',
+  },
 ];
 
 const faqs = [
   {
     q: 'Does attendance tracking work offline?',
-    a: 'Yes. Attendance data is saved to the device SQLite database on submission. A network check runs every 30 seconds, and on reconnection, unsynced records are queued and uploaded in order.'
+    a: 'Yes. The attendance workflow is designed around a fast teacher-first 3-tap flow, with offline draft/sync support planned for real school conditions where internet may be unstable.',
   },
   {
-    q: 'How does SchoolOS handle online fee payments?',
-    a: 'We support cash, cheque, and bank transfers, with Phase 2 introducing direct payment gateway webhooks for eSewa and Khalti. All confirmed payments automatically generate a Nepal IRD-compliant VAT receipt.'
+    q: 'How does live transport tracking work?',
+    a: 'The driver app sends GPS location during an active pickup or drop trip. SchoolOS stores the latest location in Redis and streams updates through WebSocket or SSE. Parents only see the vehicle assigned to their own child.',
+  },
+  {
+    q: 'What does the Canteen module include?',
+    a: 'Canteen Management includes menu setup, meal plans, QR/student ID meal serving, canteen wallet, parent/manual top-up, POS sales, parent spending limits, allergy warnings, low-balance alerts, and daily meal/sales reports.',
   },
   {
     q: 'Is student data secure?',
-    a: 'Absolutely. We enforce multi-tenant isolation at the database query layer so cross-school data access is architecturally impossible. Sensitive PII, such as health data, citizenship numbers, and bank accounts, is encrypted using AES-256 at rest.'
+    a: 'Yes. SchoolOS is designed as a multi-tenant SaaS platform where every tenant-owned query is scoped by tenantId. Sensitive data should use encryption, strict RBAC, audit logs, and signed private file URLs.',
   },
   {
     q: 'How does the auto-posting ledger work?',
-    a: 'SchoolOS fully integrates fees and accounting. Every rupee collected from fees and every salary paid flows automatically through a double-entry general ledger. For example, a cash fee payment instantly posts: Dr Cash in hand → Cr Tuition fee income.'
-  }
+    a: 'Fees, payroll, canteen wallet transactions, and future operational payments should post through AccountingPostingService. Confirmed financial records are handled with double-entry rules, audit trails, and reversal/correction workflows.',
+  },
 ];
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
-
       {/* ── Navbar ── */}
       <header className="sticky top-0 z-50 border-b border-slate-100 bg-white/90 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
@@ -108,9 +198,10 @@ export default function LandingPage() {
             <span className="text-lg font-black tracking-tight">SchoolOS</span>
           </div>
           <nav className="hidden items-center gap-8 text-sm font-medium text-slate-500 md:flex">
-            <a href="#features" className="hover:text-slate-900 transition-colors">Features</a>
-            <a href="#demo" className="hover:text-slate-900 transition-colors">The Ledger Demo</a>
+            <a href="#modules" className="hover:text-slate-900 transition-colors">Modules</a>
+            <a href="#demo" className="hover:text-slate-900 transition-colors">Ledger Demo</a>
             <a href="#parents" className="hover:text-slate-900 transition-colors">Parent App</a>
+            <a href="#roadmap" className="hover:text-slate-900 transition-colors">Roadmap</a>
             <a href="#pricing" className="hover:text-slate-900 transition-colors">Pricing</a>
           </nav>
           <div className="flex items-center gap-3">
@@ -129,8 +220,10 @@ export default function LandingPage() {
 
       {/* ── Hero ── */}
       <section className="relative overflow-hidden bg-slate-950 px-6 py-24 md:py-32">
-        <div className="pointer-events-none absolute inset-0 opacity-[0.03]"
-          style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '40px 40px' }} />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.03]"
+          style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}
+        />
         <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-amber-500 opacity-10 blur-3xl" />
         <div className="absolute -bottom-20 left-20 h-64 w-64 rounded-full bg-indigo-600 opacity-10 blur-3xl" />
 
@@ -140,11 +233,11 @@ export default function LandingPage() {
           </div>
 
           <h1 className="max-w-4xl text-5xl font-black tracking-tight text-white md:text-7xl leading-[1.05]">
-            One platform for every school operation.
+            One operating system for every school workflow.
           </h1>
 
           <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-400">
-            SchoolOS brings admissions, attendance, fee collection, HR, and complete double-entry accounting under one roof—designed from the ground up for Nepal's educational and financial standards.
+            SchoolOS brings admissions, attendance, fees, academics, HR, library, transport, canteen, communication, and double-entry accounting into one secure multi-tenant SaaS platform for Nepal.
           </p>
 
           <div className="mt-10 flex flex-wrap gap-4">
@@ -152,7 +245,7 @@ export default function LandingPage() {
               href="/register"
               className="rounded-full bg-amber-500 px-7 py-3.5 text-base font-bold text-white hover:bg-amber-400 transition-colors"
             >
-              Register your school — it's free
+              Register your school — it&apos;s free
             </Link>
             <Link
               href="/dashboard"
@@ -161,6 +254,15 @@ export default function LandingPage() {
               Open dashboard
             </Link>
           </div>
+
+          <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {stats.map((stat) => (
+              <div key={stat.value} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+                <p className="text-2xl font-black text-white">{stat.value}</p>
+                <p className="mt-1 text-sm text-slate-500">{stat.label}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -168,16 +270,16 @@ export default function LandingPage() {
       <section className="border-b border-slate-100 bg-slate-50 px-6 py-8">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-8 md:justify-between opacity-70 grayscale">
           <div className="flex items-center gap-2 font-bold text-slate-700">
-            <span className="text-xl">🛡️</span> Privacy Act 2075 Compliant
+            <span className="text-xl">🛡️</span> Privacy Act 2075 Aware
           </div>
           <div className="flex items-center gap-2 font-bold text-slate-700">
-            <span className="text-xl">🇳🇵</span> Nepal MoEST Standard
+            <span className="text-xl">🇳🇵</span> Nepal MoEST Ready
           </div>
           <div className="flex items-center gap-2 font-bold text-slate-700">
             <span className="text-xl">🧾</span> IRD VAT Ready
           </div>
           <div className="flex items-center gap-2 font-bold text-slate-700">
-            <span className="text-xl">🔒</span> AES-256 Data Encryption
+            <span className="text-xl">🔒</span> Tenant-Isolated SaaS
           </div>
         </div>
       </section>
@@ -191,40 +293,41 @@ export default function LandingPage() {
               Real-time ledger integration.
             </h2>
             <p className="mt-4 text-lg leading-8 text-slate-600">
-              Most Nepal school software has basic fee collection OR basic accounting—never both properly integrated. SchoolOS integrates them fully. Every rupee collected posts automatically through a double-entry general ledger.
+              Most school tools stop at fee collection. SchoolOS is designed to connect operational transactions to accounting through a controlled posting boundary, so fees, payroll, and future canteen wallet transactions remain audit-ready.
             </p>
             <p className="mt-4 text-base font-medium text-slate-500 italic border-l-4 border-amber-500 pl-4">
-              "Collect a fee payment at the counter screen. Show the principal the journal entry that auto-posted to the ledger in real time. No one in Nepal has seen this before."
+              Collect a fee payment at the counter, then show the principal the journal entry that auto-posted to the ledger in real time.
             </p>
           </div>
           <div className="mt-12 lg:mt-0 relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-amber-100 to-indigo-100 transform skew-y-3 rounded-3xl opacity-50"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-100 to-indigo-100 transform skew-y-3 rounded-3xl opacity-50" />
             <div className="relative bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-800">
               <div className="bg-slate-800 px-4 py-3 flex justify-between items-center border-b border-slate-700">
-                <span className="text-xs text-slate-400 font-mono">Module 3 → Module 9 Flow</span>
+                <span className="text-xs text-slate-400 font-mono">M3 Fees → M9 Accounting</span>
                 <div className="flex gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <div className="w-3 h-3 rounded-full bg-amber-500" />
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
                 </div>
               </div>
               <div className="p-6 space-y-6">
-                {/* Fee Collection UI Mock */}
                 <div className="bg-white rounded-lg p-4 shadow-inner">
                   <div className="flex justify-between items-center mb-2">
                     <span className="font-bold text-slate-800">Fee Counter Collection</span>
                     <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded font-bold">PAID</span>
                   </div>
                   <div className="text-sm text-slate-500 flex justify-between">
-                    <span>Student: Aarav Sharma (Cl-5)</span>
+                    <span>Student: Aarav Sharma (Class 5)</span>
                     <span className="font-mono text-slate-800">Rs. 15,000</span>
                   </div>
                 </div>
-                {/* Auto-Posting Arrow */}
+
                 <div className="flex justify-center text-amber-500">
-                  <svg className="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+                  <svg className="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
                 </div>
-                {/* Journal Entry UI Mock */}
+
                 <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
                   <div className="flex justify-between items-center mb-3">
                     <span className="font-bold text-amber-400 text-sm tracking-wide uppercase">Auto-Journal Entry</span>
@@ -250,42 +353,30 @@ export default function LandingPage() {
       {/* ── Parent App / Product Moat ── */}
       <section id="parents" className="bg-slate-50 px-6 py-24 border-y border-slate-100 overflow-hidden">
         <div className="mx-auto max-w-6xl lg:grid lg:grid-cols-2 lg:gap-16 lg:items-center">
-
-          {/* Left: Mobile Phone Mockup */}
           <div className="order-2 lg:order-1 mt-16 lg:mt-0 flex justify-center relative">
-            {/* Phone Hardware */}
             <div className="relative border-slate-900 bg-slate-900 border-[14px] rounded-[3rem] h-[600px] w-[300px] shadow-2xl flex-shrink-0">
-              
-              {/* Notch */}
               <div className="absolute top-0 inset-x-0 h-6 flex justify-center z-20">
-                <div className="w-32 h-6 bg-slate-900 rounded-b-2xl"></div>
+                <div className="w-32 h-6 bg-slate-900 rounded-b-2xl" />
               </div>
 
-              {/* Screen Content */}
               <div className="relative h-full w-full bg-slate-50 rounded-[2.25rem] overflow-hidden flex flex-col">
-                
-                {/* App Header */}
                 <div className="bg-amber-500 pt-12 pb-4 px-5 text-white shrink-0">
-                  <h3 className="font-bold text-lg leading-tight">Activity Feed</h3>
-                  <p className="text-xs font-medium opacity-90 mt-0.5">Montessori Section A</p>
+                  <h3 className="font-bold text-lg leading-tight">Parent App</h3>
+                  <p className="text-xs font-medium opacity-90 mt-0.5">Live school updates</p>
                 </div>
 
-                {/* App Feed Area */}
                 <div className="p-4 flex-1 relative">
-                  
-                  {/* Floating Notification Alert (Overlapping) */}
                   <div className="absolute top-2 left-2 right-2 bg-white/95 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-2xl p-4 border border-slate-100/80 z-10">
                     <div className="flex gap-3 items-start">
-                      <span className="text-xl leading-none">🔔</span>
+                      <span className="text-xl leading-none">🚌</span>
                       <div>
-                        <p className="text-sm font-bold text-slate-900">Attendance Alert</p>
-                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">Your child was marked absent today. Please contact the office.</p>
+                        <p className="text-sm font-bold text-slate-900">Bus Update</p>
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">Your child boarded Route A at Yogikuti Stop. ETA: 18 minutes.</p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Activity Post */}
-                  <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mt-12 opacity-40">
+                  <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 mt-20">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center text-sm">👩‍🏫</div>
                       <div>
@@ -293,74 +384,76 @@ export default function LandingPage() {
                         <p className="text-[10px] text-slate-500">10 mins ago</p>
                       </div>
                     </div>
-                    {/* Image Placeholder */}
                     <div className="h-32 bg-slate-100 rounded-xl w-full mb-3 flex items-center justify-center text-slate-400 text-xs font-medium">
-                      Image
+                      Activity photo
                     </div>
                     <p className="text-xs text-slate-600 leading-relaxed">
-                      Aarav demonstrating excellent fine motor skills during craft time! ✂️
+                      Aarav demonstrated excellent fine motor skills during craft time. ✂️
                     </p>
                   </div>
 
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-white p-3 border border-slate-100 shadow-sm">
+                      <p className="text-[10px] text-slate-500">Canteen Wallet</p>
+                      <p className="text-sm font-black text-slate-900">Rs. 920</p>
+                    </div>
+                    <div className="rounded-xl bg-white p-3 border border-slate-100 shadow-sm">
+                      <p className="text-[10px] text-slate-500">Attendance</p>
+                      <p className="text-sm font-black text-green-600">Present</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Right: Text Content */}
           <div className="order-1 lg:order-2">
             <div className="mb-4 text-xs font-bold tracking-widest text-amber-600 uppercase">
-              The Product Moat
+              Parent Trust Layer
             </div>
             <h2 className="text-4xl font-black tracking-tight text-slate-900 md:text-5xl leading-[1.1]">
-              Parents will love your school app.
+              Parents stay connected to every important moment.
             </h2>
             <p className="mt-6 text-lg leading-8 text-slate-500">
-              The activity feed is our #1 retention feature. Parents open the app daily for teacher photo posts, building deep emotional investment over time.
+              The parent experience combines activity posts, absence alerts, fee receipts, bus updates, canteen wallet visibility, and report cards in one secure app.
             </p>
             <ul className="mt-8 space-y-4">
-              <li className="flex gap-3 items-start">
-                <span className="text-amber-500 font-bold text-lg leading-none mt-0.5">✓</span>
-                <span className="text-base text-slate-600">Push notifications for absences and bus boarding.</span>
-              </li>
-              <li className="flex gap-3 items-start">
-                <span className="text-amber-500 font-bold text-lg leading-none mt-0.5">✓</span>
-                <span className="text-base text-slate-600">Real-time developmental milestone tracking for ECE.</span>
-              </li>
-              <li className="flex gap-3 items-start">
-                <span className="text-amber-500 font-bold text-lg leading-none mt-0.5">✓</span>
-                <span className="text-base text-slate-600">Secure PIN and OTP login via registered phone number.</span>
-              </li>
-              <li className="flex gap-3 items-start">
-                <span className="text-amber-500 font-bold text-lg leading-none mt-0.5">✓</span>
-                <span className="text-base text-slate-600">Immediate access to fee receipts and report cards.</span>
-              </li>
+              {[
+                'Push notifications for absences, notices, fee receipts, and bus boarding.',
+                'Child-specific vehicle tracking during active pickup/drop trips only.',
+                'Canteen wallet balance, purchase history, spending limits, and low-balance alerts.',
+                'Secure guardian access scoped only to their own child or children.',
+              ].map((item) => (
+                <li key={item} className="flex gap-3 items-start">
+                  <span className="text-amber-500 font-bold text-lg leading-none mt-0.5">✓</span>
+                  <span className="text-base text-slate-600">{item}</span>
+                </li>
+              ))}
             </ul>
           </div>
-
         </div>
       </section>
 
-      {/* ── Features Grid ── */}
-      <section id="features" className="px-6 py-24 bg-white">
+      {/* ── Modules Grid ── */}
+      <section id="modules" className="px-6 py-24 bg-white">
         <div className="mx-auto max-w-6xl">
-          <div className="mb-4 text-xs font-bold tracking-widest text-amber-600 uppercase">Everything you need</div>
+          <div className="mb-4 text-xs font-bold tracking-widest text-amber-600 uppercase">Complete SchoolOS Modules</div>
           <h2 className="max-w-2xl text-4xl font-black tracking-tight text-slate-900 md:text-5xl">
-            Core operations, fully covered.
+            Every core workflow, designed as one system.
           </h2>
-          <p className="mt-4 max-w-xl text-base leading-7 text-slate-500">
-            From the first admission to daily attendance, term-end finances, and MoEST-compliant report cards—SchoolOS handles it all.
+          <p className="mt-4 max-w-2xl text-base leading-7 text-slate-500">
+            From admissions to accounting, transport, and canteen operations, every module shares the same tenant boundary, audit discipline, and real API foundation.
           </p>
 
           <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map((f) => (
+            {modules.map((module) => (
               <div
-                key={f.title}
+                key={module.title}
                 className="group rounded-2xl border border-slate-100 bg-white p-7 shadow-sm hover:border-amber-200 hover:shadow-md transition-all"
               >
-                <span className="text-3xl">{f.icon}</span>
-                <h3 className="mt-4 text-lg font-bold text-slate-900">{f.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-500">{f.desc}</p>
+                <span className="text-3xl">{module.icon}</span>
+                <h3 className="mt-4 text-lg font-bold text-slate-900">{module.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-500">{module.desc}</p>
               </div>
             ))}
           </div>
@@ -372,7 +465,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl">
           <div className="mb-4 text-xs font-bold tracking-widest text-amber-400 uppercase">Simple by design</div>
           <h2 className="max-w-2xl text-4xl font-black tracking-tight text-white md:text-5xl">
-            Up and running in a day.
+            Up and running without operational chaos.
           </h2>
 
           <div className="mt-14 grid gap-8 md:grid-cols-3">
@@ -391,29 +484,24 @@ export default function LandingPage() {
       <section id="roadmap" className="px-6 py-24 bg-white">
         <div className="mx-auto max-w-6xl lg:grid lg:grid-cols-2 lg:gap-16 lg:items-center">
           <div>
-            <div className="mb-4 text-xs font-bold tracking-widest text-amber-600 uppercase">Strategic Rollout</div>
+            <div className="mb-4 text-xs font-bold tracking-widest text-amber-600 uppercase">Phase-wise Development Plan</div>
             <h2 className="text-4xl font-black tracking-tight text-slate-900 md:text-5xl">
-              Engineered in focused phases.
+              Build depth first, then expand modules.
             </h2>
             <p className="mt-4 text-base leading-7 text-slate-500">
-              We ship in structured phases to ensure every module is production-tested and perfectly integrated before expanding capabilities.
+              SchoolOS should finish Phase 1B operational depth before starting Phase 2. Library, Transport, and Canteen belong in Phase 3 after the core school workflows are stable.
             </p>
           </div>
 
           <div className="mt-12 lg:mt-0 space-y-4">
-            {[
-              { done: true, title: 'Phase 1: Core Operations', sub: 'Admissions, Attendance, Fees, Activity Feed, and Notices.' },
-              { done: false, title: 'Phase 2: Academic & HR', sub: 'Exams, CAS, Homework, HR, Payroll, and Accounting.' },
-              { done: false, title: 'Phase 3: Auxiliary Systems', sub: 'Library circulation and GPS Transport Management.' },
-              { done: false, title: 'Phase 4: AI Capabilities', sub: 'AI photo captions, developmental narratives, and smart templates.' },
-            ].map((item) => (
-              <div key={item.title} className="flex items-start gap-4 rounded-xl border border-slate-100 bg-slate-50 p-4">
-                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${item.done ? 'bg-amber-500 text-white' : 'border border-slate-300 text-slate-400'}`}>
-                  {item.done ? '✓' : '○'}
+            {phasePlan.map((item) => (
+              <div key={item.title} className={`flex items-start gap-4 rounded-xl border p-4 ${item.active ? 'border-amber-200 bg-amber-50' : 'border-slate-100 bg-slate-50'}`}>
+                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${item.done ? 'bg-amber-500 text-white' : item.active ? 'bg-white border border-amber-400 text-amber-500' : 'border border-slate-300 text-slate-400'}`}>
+                  {item.done ? '✓' : item.active ? '!' : '○'}
                 </span>
                 <div>
-                  <p className={`text-sm font-semibold ${item.done ? 'text-slate-900' : 'text-slate-400'}`}>{item.title}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{item.sub}</p>
+                  <p className={`text-sm font-semibold ${item.done || item.active ? 'text-slate-900' : 'text-slate-400'}`}>{item.title}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{item.sub}</p>
                 </div>
               </div>
             ))}
@@ -426,22 +514,22 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl text-center">
           <div className="mb-4 text-xs font-bold tracking-widest text-amber-400 uppercase">Subscription Plans</div>
           <h2 className="text-4xl font-black tracking-tight md:text-5xl">
-            Scale seamlessly with your school.
+            Scale module-by-module with your school.
           </h2>
           <p className="mt-4 text-lg text-slate-400 max-w-2xl mx-auto">
-            Deployed as a single API with modular activation per your subscription tier.
+            One modular platform with subscription-based activation, tenant isolation, and production-grade workflows.
           </p>
 
-          <div className="mt-16 grid md:grid-cols-2 gap-8 max-w-4xl mx-auto text-left">
+          <div className="mt-16 grid gap-8 text-left lg:grid-cols-3">
             {pricingPlans.map((plan) => (
               <div key={plan.name} className={`rounded-3xl p-8 border ${plan.highlighted ? 'border-amber-500 bg-slate-900' : 'border-slate-800 bg-slate-900/50'}`}>
                 <h3 className="text-2xl font-bold text-white">{plan.name}</h3>
                 <p className="text-sm font-mono text-amber-400 mt-2">{plan.phase}</p>
                 <p className="text-slate-400 mt-4 text-sm">{plan.desc}</p>
                 <ul className="mt-8 space-y-4 mb-8">
-                  {plan.features.map(f => (
-                    <li key={f} className="flex gap-3 text-sm text-slate-300">
-                      <span className="text-amber-500">✓</span> {f}
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex gap-3 text-sm text-slate-300">
+                      <span className="text-amber-500">✓</span> {feature}
                     </li>
                   ))}
                 </ul>
@@ -526,7 +614,6 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
-
     </div>
   );
 }

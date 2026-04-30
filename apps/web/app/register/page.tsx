@@ -39,7 +39,7 @@ export default function RegisterPage() {
               </div>
               <div>
                 <p className="text-sm font-bold text-white">Isolated Tenant Database</p>
-                <p className="text-xs text-slate-400 mt-1">Data is strictly scoped to your school[cite: 202, 363].</p>
+                <p className="text-xs text-slate-400 mt-1">Data is strictly scoped to your school.</p>
               </div>
             </li>
             <li className="flex gap-4">
@@ -48,7 +48,7 @@ export default function RegisterPage() {
               </div>
               <div>
                 <p className="text-sm font-bold text-white">Pre-configured Financials</p>
-                <p className="text-xs text-slate-400 mt-1">Nepal standard Chart of Accounts & fee heads[cite: 299].</p>
+                <p className="text-xs text-slate-400 mt-1">Nepal standard Chart of Accounts & fee heads.</p>
               </div>
             </li>
             <li className="flex gap-4">
@@ -57,7 +57,7 @@ export default function RegisterPage() {
               </div>
               <div>
                 <p className="text-sm font-bold text-white">Compliance & RBAC defaults</p>
-                <p className="text-xs text-slate-400 mt-1">MoEST grading systems and role-based access[cite: 263, 318].</p>
+                <p className="text-xs text-slate-400 mt-1">MoEST grading systems and role-based access.</p>
               </div>
             </li>
           </ul>
