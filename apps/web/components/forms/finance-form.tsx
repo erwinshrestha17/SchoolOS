@@ -1,6 +1,8 @@
 'use client';
 
 import type {
+  CashierClosePreview,
+  CashierCloseSummary,
   DefaulterReminderResult,
   DefaulterSummary,
   DiscountRule,
@@ -25,6 +27,7 @@ const financeSections = [
   'Billing Runs',
   'Discounts & Waivers',
   'Defaulters',
+  'Cashier Close',
   'Receipts & Ledger',
 ] as const;
 
@@ -32,6 +35,12 @@ const paymentMethods = ['CASH', 'BANK', 'CHEQUE', 'TRANSFER', 'MOBILE'] as const
 
 type FinanceSection = (typeof financeSections)[number];
 type PaymentMethod = (typeof paymentMethods)[number];
+type CashierCloseFilters = {
+  openedAt: string;
+  closedAt: string;
+  collectorUserId: string;
+  paymentMethod: '' | PaymentMethod;
+};
 
 type InvoiceLineForUi = {
   id?: string;
@@ -152,6 +161,15 @@ export function FinanceForm() {
     feeHeadId: '',
   });
   const [selectedReminderInvoiceIds, setSelectedReminderInvoiceIds] = useState<string[]>([]);
+  const [cashierClose, setCashierClose] = useState<CashierCloseFilters>(() => ({
+    openedAt: `${today}T00:00`,
+    closedAt: getLocalDateTimeValue(new Date()),
+    collectorUserId: '',
+    paymentMethod: '',
+  }));
+  const [cashierCloseNotes, setCashierCloseNotes] = useState('');
+  const [cashierCloseConfirmation, setCashierCloseConfirmation] = useState('');
+  const [cashierCloseMessage, setCashierCloseMessage] = useState('');
 
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years'],
@@ -201,6 +219,22 @@ export function FinanceForm() {
   const waiversQuery = useQuery({
     queryKey: ['waivers'],
     queryFn: api.listWaivers,
+  });
+  const cashierClosePreviewQuery = useQuery({
+    queryKey: ['cashier-close-preview', cashierClose],
+    queryFn: () => api.previewCashierClose(cashierCloseQueryParams(cashierClose)),
+    enabled: activeSection === 'Cashier Close' && Boolean(cashierClose.openedAt && cashierClose.closedAt),
+  });
+  const cashierClosesQuery = useQuery({
+    queryKey: ['cashier-closes'],
+    queryFn: () =>
+      api.listCashierCloses({
+        openedFrom: toIsoDateTime(cashierClose.openedAt),
+        closedTo: toIsoDateTime(cashierClose.closedAt),
+        collectorUserId: cashierClose.collectorUserId || null,
+        paymentMethod: cashierClose.paymentMethod || null,
+      }),
+    enabled: activeSection === 'Cashier Close' && Boolean(cashierClose.openedAt && cashierClose.closedAt),
   });
 
   useEffect(() => {
@@ -309,6 +343,24 @@ export function FinanceForm() {
       void queryClient.invalidateQueries({ queryKey: ['defaulters'] });
       void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
       setSelectedReminderInvoiceIds([]);
+    },
+  });
+  const cashierCloseMutation = useMutation({
+    mutationFn: () =>
+      api.finalizeCashierClose({
+        ...cashierCloseQueryParams(cashierClose),
+        notes: cashierCloseNotes.trim() || null,
+      }),
+    onSuccess: async (close) => {
+      setCashierCloseMessage(`Cashier close ${close.closeNumber} finalized.`);
+      setCashierCloseConfirmation('');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['cashier-closes'] }),
+        queryClient.invalidateQueries({ queryKey: ['cashier-close-preview'] }),
+        queryClient.invalidateQueries({ queryKey: ['receipts'] }),
+        queryClient.invalidateQueries({ queryKey: ['ledger-entries'] }),
+        queryClient.invalidateQueries({ queryKey: ['invoices'] }),
+      ]);
     },
   });
 
@@ -482,6 +534,21 @@ export function FinanceForm() {
           selectedReminderInvoiceIds={selectedReminderInvoiceIds}
           toggleReminderInvoice={toggleReminderInvoice}
           reminderMutation={reminderMutation}
+        />
+      ) : null}
+
+      {activeSection === 'Cashier Close' ? (
+        <CashierCloseSection
+          filters={cashierClose}
+          setFilters={setCashierClose}
+          notes={cashierCloseNotes}
+          setNotes={setCashierCloseNotes}
+          confirmation={cashierCloseConfirmation}
+          setConfirmation={setCashierCloseConfirmation}
+          message={cashierCloseMessage}
+          previewQuery={cashierClosePreviewQuery}
+          closesQuery={cashierClosesQuery}
+          closeMutation={cashierCloseMutation}
         />
       ) : null}
 
@@ -787,6 +854,70 @@ function InvoiceDetailPanel({
   detailQuery: UseQueryResult<InvoiceDetail, Error>;
   invoice: InvoiceForUi | undefined;
 }) {
+  const queryClient = useQueryClient();
+  const [refundPayment, setRefundPayment] = useState<InvoiceDetail['payments'][number] | null>(null);
+  const [refundAmount, setRefundAmount] = useState(0);
+  const [refundReason, setRefundReason] = useState('');
+  const [refundReference, setRefundReference] = useState('');
+  const [refundConfirmation, setRefundConfirmation] = useState('');
+  const [refundMessage, setRefundMessage] = useState('');
+  const refundMutation = useMutation({
+    mutationFn: async () => {
+      if (!refundPayment) {
+        throw new Error('Select a payment to reverse or refund.');
+      }
+
+      return api.refundPayment(refundPayment.id, {
+        amount: refundAmount,
+        reason: refundReason.trim(),
+        referenceNumber: refundReference.trim() || undefined,
+        narration: `Phase 1B correction for ${refundPayment.receipt?.receiptNumber ?? refundPayment.id}`,
+      });
+    },
+    onSuccess: async (result) => {
+      setRefundMessage(
+        `Refund ${result.refundNumber} created. Invoice status is now ${result.invoiceStatus}.`,
+      );
+      setRefundPayment(null);
+      setRefundReason('');
+      setRefundReference('');
+      setRefundConfirmation('');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['invoice-detail', invoice?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['invoices'] }),
+        queryClient.invalidateQueries({ queryKey: ['receipts'] }),
+        queryClient.invalidateQueries({ queryKey: ['ledger-entries'] }),
+        queryClient.invalidateQueries({ queryKey: ['defaulters'] }),
+        detail?.student.id
+          ? queryClient.invalidateQueries({
+              queryKey: ['student-fee-ledger', detail.student.id],
+            })
+          : Promise.resolve(),
+      ]);
+    },
+  });
+  const refundableAmount = refundPayment
+    ? getPaymentRefundableAmount(refundPayment)
+    : 0;
+  const refundBlocked =
+    !refundPayment ||
+    refundAmount <= 0 ||
+    refundAmount > refundableAmount ||
+    !refundReason.trim() ||
+    refundConfirmation !== 'REFUND';
+
+  function openRefundWorkflow(payment: InvoiceDetail['payments'][number]) {
+    const refundable = getPaymentRefundableAmount(payment);
+
+    setRefundPayment(payment);
+    setRefundAmount(refundable);
+    setRefundReason('');
+    setRefundReference('');
+    setRefundConfirmation('');
+    setRefundMessage('');
+    refundMutation.reset();
+  }
+
   return (
     <section className="shell-card rounded-[28px] p-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -886,17 +1017,37 @@ function InvoiceDetailPanel({
                         ) : null}
                       </div>
                       {payment.receipt ? (
-                        <button
-                          type="button"
-                          className="min-h-11 rounded-full border border-[var(--line)] px-4 text-sm font-semibold text-gray-700"
-                          onClick={() => void api.openReceiptPdf(payment.receipt!.receiptNumber)}
-                        >
-                          Open receipt {payment.receipt.receiptNumber}
-                        </button>
+                        <div className="flex flex-wrap gap-2 sm:justify-end">
+                          <button
+                            type="button"
+                            className="min-h-11 rounded-full border border-[var(--line)] px-4 text-sm font-semibold text-gray-700"
+                            onClick={() => void api.openReceiptPdf(payment.receipt!.receiptNumber)}
+                          >
+                            Open receipt {payment.receipt.receiptNumber}
+                          </button>
+                          <button
+                            type="button"
+                            className="min-h-11 rounded-full border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-800 disabled:opacity-50"
+                            disabled={getPaymentRefundableAmount(payment) <= 0}
+                            onClick={() => openRefundWorkflow(payment)}
+                          >
+                            Refund / Reverse
+                          </button>
+                        </div>
                       ) : (
-                        <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
-                          No receipt
-                        </span>
+                        <div className="flex flex-wrap gap-2 sm:justify-end">
+                          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                            No receipt
+                          </span>
+                          <button
+                            type="button"
+                            className="min-h-11 rounded-full border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-800 disabled:opacity-50"
+                            disabled={getPaymentRefundableAmount(payment) <= 0}
+                            onClick={() => openRefundWorkflow(payment)}
+                          >
+                            Refund / Reverse
+                          </button>
+                        </div>
                       )}
                     </div>
                   </article>
@@ -906,6 +1057,90 @@ function InvoiceDetailPanel({
               <EmptyState title="No payments yet" body="Payments and receipt PDFs will appear after collection." />
             )}
           </div>
+          {refundPayment ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="font-semibold text-amber-950">Payment reversal / correction</p>
+              <p className="mt-1 text-sm text-amber-800">
+                This creates a reversal/refund record. It does not edit the original payment.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <Fact
+                  label="Original payment"
+                  value={formatCurrency(refundPayment.amount)}
+                />
+                <Fact
+                  label="Refundable balance"
+                  value={formatCurrency(refundableAmount)}
+                />
+                <label>
+                  <span className="label mb-2 block">Refund amount</span>
+                  <input
+                    type="number"
+                    min={0.01}
+                    max={refundableAmount}
+                    value={refundAmount}
+                    onChange={(event) => setRefundAmount(Number(event.target.value))}
+                    className="min-h-11"
+                  />
+                </label>
+                <label>
+                  <span className="label mb-2 block">Reference / correction note</span>
+                  <input
+                    value={refundReference}
+                    onChange={(event) => setRefundReference(event.target.value)}
+                    placeholder="Optional counter, bank, or correction reference"
+                    className="min-h-11"
+                  />
+                </label>
+                <label className="sm:col-span-2">
+                  <span className="label mb-2 block">Reason</span>
+                  <textarea
+                    value={refundReason}
+                    onChange={(event) => setRefundReason(event.target.value)}
+                    placeholder="Required audited reason for this reversal/correction"
+                    rows={3}
+                    className="min-h-24"
+                  />
+                </label>
+                <label className="sm:col-span-2">
+                  <span className="label mb-2 block">Confirmation text: type REFUND</span>
+                  <input
+                    value={refundConfirmation}
+                    onChange={(event) => setRefundConfirmation(event.target.value)}
+                    className="min-h-11"
+                  />
+                </label>
+              </div>
+              {refundAmount > refundableAmount ? (
+                <InlineError message="Refund amount cannot exceed the refundable balance." />
+              ) : null}
+              {refundMutation.error ? (
+                <InlineError message={refundMutation.error.message} />
+              ) : null}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="min-h-11 rounded-full bg-amber-700 px-4 text-sm font-semibold text-white disabled:opacity-50"
+                  disabled={refundBlocked || refundMutation.isPending}
+                  onClick={() => refundMutation.mutate()}
+                >
+                  {refundMutation.isPending ? 'Creating refund...' : 'Confirm refund / reversal'}
+                </button>
+                <button
+                  type="button"
+                  className="min-h-11 rounded-full border border-[var(--line)] bg-white px-4 text-sm font-semibold text-gray-700"
+                  onClick={() => setRefundPayment(null)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {refundMessage ? (
+            <p className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
+              {refundMessage}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </section>
@@ -1749,6 +1984,235 @@ function DefaultersSection({
   );
 }
 
+function CashierCloseSection({
+  closeMutation,
+  closesQuery,
+  confirmation,
+  filters,
+  message,
+  notes,
+  previewQuery,
+  setConfirmation,
+  setFilters,
+  setNotes,
+}: {
+  closeMutation: UseMutationResult<CashierCloseSummary, Error, void, unknown>;
+  closesQuery: UseQueryResult<CashierCloseSummary[], Error>;
+  confirmation: string;
+  filters: CashierCloseFilters;
+  message: string;
+  notes: string;
+  previewQuery: UseQueryResult<CashierClosePreview, Error>;
+  setConfirmation: (value: string) => void;
+  setFilters: React.Dispatch<React.SetStateAction<CashierCloseFilters>>;
+  setNotes: (value: string) => void;
+}) {
+  const preview = previewQuery.data;
+  const groupedTotals = preview
+    ? {
+        cash: filters.paymentMethod === '' || filters.paymentMethod === 'CASH' ? preview.netCollected : 0,
+        bank: filters.paymentMethod === '' || filters.paymentMethod === 'BANK' ? preview.netCollected : 0,
+        cheque: filters.paymentMethod === '' || filters.paymentMethod === 'CHEQUE' ? preview.netCollected : 0,
+        digital:
+          filters.paymentMethod === '' || filters.paymentMethod === 'TRANSFER' || filters.paymentMethod === 'MOBILE'
+            ? preview.netCollected
+            : 0,
+      }
+    : null;
+  const canClose =
+    Boolean(preview) &&
+    confirmation === 'CLOSE' &&
+    !previewQuery.isError &&
+    !closeMutation.isPending;
+
+  return (
+    <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]">
+      <div className="space-y-6">
+        <section className="shell-card rounded-[28px] p-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="label">Cashier Close / Day-End</p>
+              <h2 className="mt-2 text-xl font-bold text-gray-950">Preview close totals</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                Closing records the day-end cash position. It does not edit payments.
+              </p>
+            </div>
+            <span className="rounded-full bg-gray-900 px-3 py-1 text-xs font-semibold text-white">
+              Immutable snapshot
+            </span>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <label>
+              <span className="label mb-2 block">Opened at</span>
+              <input
+                type="datetime-local"
+                value={filters.openedAt}
+                onChange={(event) =>
+                  setFilters((current) => ({ ...current, openedAt: event.target.value }))
+                }
+                className="min-h-11"
+              />
+            </label>
+            <label>
+              <span className="label mb-2 block">Closed at</span>
+              <input
+                type="datetime-local"
+                value={filters.closedAt}
+                onChange={(event) =>
+                  setFilters((current) => ({ ...current, closedAt: event.target.value }))
+                }
+                className="min-h-11"
+              />
+            </label>
+            <label>
+              <span className="label mb-2 block">Payment method</span>
+              <select
+                value={filters.paymentMethod}
+                onChange={(event) =>
+                  setFilters((current) => ({
+                    ...current,
+                    paymentMethod: event.target.value as CashierCloseFilters['paymentMethod'],
+                  }))
+                }
+                className="min-h-11"
+              >
+                <option value="">All methods</option>
+                {paymentMethods.map((method) => (
+                  <option key={method} value={method}>
+                    {formatPaymentMethod(method)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span className="label mb-2 block">Cashier / collector ID</span>
+              <input
+                value={filters.collectorUserId}
+                onChange={(event) =>
+                  setFilters((current) => ({ ...current, collectorUserId: event.target.value }))
+                }
+                placeholder="Optional user ID filter"
+                className="min-h-11"
+              />
+            </label>
+          </div>
+
+          {previewQuery.isLoading ? (
+            <div className="mt-5">
+              <InvoiceSkeleton />
+            </div>
+          ) : previewQuery.isError ? (
+            <InlineError message={previewQuery.error.message} />
+          ) : preview ? (
+            <div className="mt-5 space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <Fact label="Gross collected" value={formatCurrency(preview.grossCollected)} />
+                <Fact label="Refund / reversal total" value={formatCurrency(preview.totalRefunded)} />
+                <Fact label="Net collection" value={formatCurrency(preview.netCollected)} highlight />
+                <Fact label="Receipt count" value={String(preview.paymentCount)} />
+                <Fact label="Refund count" value={String(preview.refundCount)} />
+                <Fact label="First receipt" value={preview.firstReceiptNumber ?? 'None'} />
+                <Fact label="Last receipt" value={preview.lastReceiptNumber ?? 'None'} />
+                <Fact label="Method filter" value={filters.paymentMethod || 'All methods'} />
+              </div>
+
+              <div className="rounded-2xl border border-[var(--line)] bg-white p-4">
+                <p className="label mb-3">Printable Day-End Summary</p>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <Fact label="Cash total" value={formatCurrency(groupedTotals?.cash ?? 0)} />
+                  <Fact label="Bank total" value={formatCurrency(groupedTotals?.bank ?? 0)} />
+                  <Fact label="Cheque total" value={formatCurrency(groupedTotals?.cheque ?? 0)} />
+                  <Fact label="Digital total" value={formatCurrency(groupedTotals?.digital ?? 0)} />
+                </div>
+                <p className="mt-3 text-sm text-[var(--muted)]">
+                  Method-level totals use the selected backend filter. Select each payment method for an official
+                  method-specific close preview; PDF export is intentionally not generated in this slice.
+                </p>
+              </div>
+
+              <label className="block">
+                <span className="label mb-2 block">Close notes</span>
+                <textarea
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="Optional notes for day-end handoff or cash variance explanation"
+                  rows={3}
+                  className="min-h-24"
+                />
+              </label>
+              <label className="block">
+                <span className="label mb-2 block">Confirmation text: type CLOSE</span>
+                <input
+                  value={confirmation}
+                  onChange={(event) => setConfirmation(event.target.value)}
+                  className="min-h-11"
+                />
+              </label>
+
+              {closeMutation.error ? <InlineError message={closeMutation.error.message} /> : null}
+              {message ? (
+                <p className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
+                  {message}
+                </p>
+              ) : null}
+
+              <button
+                type="button"
+                className="min-h-12 rounded-2xl bg-[var(--teal)] px-5 py-3 font-semibold text-white disabled:opacity-50"
+                disabled={!canClose}
+                onClick={() => closeMutation.mutate()}
+              >
+                {closeMutation.isPending ? 'Finalizing close...' : 'Finalize day-end close'}
+              </button>
+            </div>
+          ) : (
+            <EmptyState title="No close preview" body="Choose a valid window to preview day-end totals." />
+          )}
+        </section>
+      </div>
+
+      <section className="shell-card rounded-[28px] p-6">
+        <p className="label mb-4">Previous Closes</p>
+        {closesQuery.isLoading ? (
+          <InvoiceSkeleton />
+        ) : closesQuery.isError ? (
+          <InlineError message={closesQuery.error.message} />
+        ) : closesQuery.data && closesQuery.data.length > 0 ? (
+          <div className="grid gap-3">
+            {closesQuery.data.slice(0, 8).map((close) => (
+              <article key={close.id} className="rounded-2xl border border-[var(--line)] bg-white/70 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-gray-950">{close.closeNumber}</p>
+                    <p className="mt-1 text-sm text-[var(--muted)]">
+                      {formatDate(close.openedAt)} - {formatDate(close.closedAt)}
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--muted)]">
+                      Receipts {close.firstReceiptNumber ?? 'none'} to {close.lastReceiptNumber ?? 'none'}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    {formatCurrency(close.netCollected)}
+                  </span>
+                </div>
+                <div className="mt-3 grid gap-2 text-sm text-[var(--muted)]">
+                  <span>Gross: {formatCurrency(close.grossCollected)}</span>
+                  <span>Refunds: {formatCurrency(close.totalRefunded)}</span>
+                  <span>Payments: {close.paymentCount} / Refunds: {close.refundCount}</span>
+                  {close.notes ? <span>Notes: {close.notes}</span> : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="No cashier closes yet" body="Finalized day-end closes will appear here." />
+        )}
+      </section>
+    </section>
+  );
+}
+
 function ReceiptsLedgerSection({
   invoices,
   receipts,
@@ -1953,6 +2417,29 @@ function matchesInvoiceSearch(invoice: InvoiceForUi, search: string) {
 
 function getOutstanding(invoice: InvoiceForUi) {
   return Math.max(0, Number(invoice.totalAmount ?? 0) - Number(invoice.paidAmount ?? 0));
+}
+
+function getPaymentRefundableAmount(payment: InvoiceDetail['payments'][number]) {
+  return Math.max(0, Number(payment.amount ?? 0) - Number(payment.refundedAmount ?? 0));
+}
+
+function cashierCloseQueryParams(filters: CashierCloseFilters) {
+  return {
+    openedAt: toIsoDateTime(filters.openedAt),
+    closedAt: toIsoDateTime(filters.closedAt),
+    collectorUserId: filters.collectorUserId.trim() || null,
+    paymentMethod: filters.paymentMethod || null,
+  };
+}
+
+function toIsoDateTime(value: string) {
+  return new Date(value).toISOString();
+}
+
+function getLocalDateTimeValue(value: Date) {
+  const offsetMs = value.getTimezoneOffset() * 60_000;
+
+  return new Date(value.getTime() - offsetMs).toISOString().slice(0, 16);
 }
 
 function formatCurrency(value: number | string | null | undefined) {

@@ -83,6 +83,10 @@ describe('SchoolOS web production contracts', () => {
       'getStudentProfile',
       'getInvoiceDetail',
       'getStudentFeeLedger',
+      'refundPayment',
+      'previewCashierClose',
+      'listCashierCloses',
+      'finalizeCashierClose',
       'getAttendanceRoster',
       'syncAttendance',
       'reviewAttendanceConflict',
@@ -558,6 +562,9 @@ describe('SchoolOS web production contracts', () => {
       'api.createFeePlan',
       'api.generateBillingRun',
       'api.collectPayment',
+      'api.previewCashierClose',
+      'api.listCashierCloses',
+      'api.finalizeCashierClose',
       'api.createDiscount',
       'api.createWaiver',
       'api.sendDefaulterReminders',
@@ -576,10 +583,27 @@ describe('SchoolOS web production contracts', () => {
     assert.match(financeForm, /Invoice Detail/);
     assert.match(financeForm, /View invoice details/);
     assert.match(financeForm, /Payments & Receipts/);
+    assert.match(financeForm, /Refund \/ Reverse/);
+    assert.match(financeForm, /This creates a reversal\/refund record\. It does not edit the original payment/);
+    assert.match(financeForm, /api\.refundPayment/);
+    assert.match(financeForm, /REFUND/);
     assert.match(financeForm, /Search by name, SCH-YYYY-NNNN, or invoice number/);
     assert.match(financeForm, /Confirm Payment & Generate Receipt/);
     assert.match(financeForm, /No fake production IDs are used/);
     assert.doesNotMatch(financeForm, /replace-me/i);
+  });
+
+  it('keeps cashier close day-end workflow wired to backend close endpoints', () => {
+    const financeForm = read('components/forms/finance-form.tsx');
+
+    assert.match(financeForm, /Cashier Close \/ Day-End/);
+    assert.match(financeForm, /api\.previewCashierClose/);
+    assert.match(financeForm, /api\.listCashierCloses/);
+    assert.match(financeForm, /api\.finalizeCashierClose/);
+    assert.match(financeForm, /Closing records the day-end cash position\. It does not edit payments/);
+    assert.match(financeForm, /Printable Day-End Summary/);
+    assert.match(financeForm, /Finalize day-end close/);
+    assert.match(financeForm, /CLOSE/);
   });
 
   it('surfaces backend student fee ledger on the student detail page', () => {

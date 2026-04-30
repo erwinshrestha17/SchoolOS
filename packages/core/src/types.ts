@@ -418,6 +418,14 @@ export type PaymentRefundSummary = {
   invoiceStatus: string;
 };
 
+export type PaymentRefundPayload = {
+  amount?: number;
+  reason: string;
+  refundDate?: string;
+  referenceNumber?: string;
+  narration?: string;
+};
+
 export type CashierClosePreview = {
   openedAt: string | Date;
   closedAt: string | Date;
@@ -437,6 +445,11 @@ export type CashierCloseSummary = {
   closeNumber: string;
   openedAt: string | Date;
   closedAt: string | Date;
+  collectorUser?: {
+    id: string;
+    email: string | null;
+  } | null;
+  paymentMethod?: string | null;
   grossCollected: number;
   totalRefunded: number;
   netCollected: number;
@@ -445,6 +458,11 @@ export type CashierCloseSummary = {
   firstReceiptNumber: string | null;
   lastReceiptNumber: string | null;
   notes?: string | null;
+  closedBy?: {
+    id: string;
+    email: string | null;
+  } | null;
+  createdAt?: string | Date;
 };
 
 export type ReconciliationRow = {

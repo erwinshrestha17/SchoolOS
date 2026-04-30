@@ -19,6 +19,8 @@ import type {
   ClassSummary,
   ConsentRecord,
   ConversationSummary,
+  CashierClosePreview,
+  CashierCloseSummary,
   DefaulterReminderResult,
   DefaulterSummary,
   DiscountRule,
@@ -41,6 +43,8 @@ import type {
   NotificationDelivery,
   NoticeSummary,
   PayrollRunSummary,
+  PaymentRefundPayload,
+  PaymentRefundSummary,
   PayslipSummary,
   PromotionReadiness,
   PromotionResult,
@@ -442,6 +446,40 @@ export const api = {
     request('/fees/plans', { method: 'POST', json: body }),
   collectPayment: (body: JsonBody) =>
     request('/payments', { method: 'POST', json: body }),
+  refundPayment: (paymentId: string, body: PaymentRefundPayload) =>
+    request<PaymentRefundSummary>(
+      `/payments/${encodeURIComponent(paymentId)}/refund`,
+      {
+        method: 'POST',
+        json: body as JsonBody,
+      },
+    ),
+  previewCashierClose: (params: {
+    openedAt: string;
+    closedAt: string;
+    collectorUserId?: string | null;
+    paymentMethod?: string | null;
+  }) => request<CashierClosePreview>(withQuery('/payments/cashier-close/preview', params)),
+  listCashierCloses: (params?: {
+    openedFrom?: string | null;
+    closedTo?: string | null;
+    collectorUserId?: string | null;
+    paymentMethod?: string | null;
+  }) =>
+    request<CashierCloseSummary[]>(
+      withQuery('/payments/cashier-close', params ?? {}),
+    ),
+  finalizeCashierClose: (body: {
+    openedAt: string;
+    closedAt: string;
+    collectorUserId?: string | null;
+    paymentMethod?: string | null;
+    notes?: string | null;
+  }) =>
+    request<CashierCloseSummary>('/payments/cashier-close', {
+      method: 'POST',
+      json: body as JsonBody,
+    }),
   listReceipts: () => request<ReceiptView[]>('/receipts'),
   openReceiptPdf: async (receiptNumber: string) => {
     const response = await fetch(

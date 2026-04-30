@@ -696,12 +696,17 @@ describe('finance production controls', () => {
       payment.id,
       {
         amount: 200,
-        reason: 'Parent requested correction',
+        reason: ' Parent requested correction ',
         refundDate: '2026-04-27',
       },
       actor,
     );
 
+    expect(prisma.payment.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: payment.id, tenantId: actor.tenantId },
+      }),
+    );
     expect(result).toEqual({
       refundId: createdRefund.id,
       refundNumber: createdRefund.refundNumber,
@@ -760,6 +765,20 @@ describe('finance production controls', () => {
     );
   });
 
+  it('requires an auditable refund reason before reversing a payment', async () => {
+    const { service, prisma } = buildService({
+      invoice: null,
+      feeHead: null,
+      payment: buildPayment(),
+      sourceJournal: buildPaymentJournal(),
+    });
+
+    await expect(
+      service.refundPayment('payment-1', { amount: 100, reason: '   ' }, actor),
+    ).rejects.toThrow('Refund reason is required');
+    expect(prisma.payment.findFirst).not.toHaveBeenCalled();
+  });
+
   it('blocks refunding more than the remaining refundable amount', async () => {
     const payment = buildPayment({
       amount: new Prisma.Decimal(300),
@@ -790,6 +809,56 @@ describe('finance production controls', () => {
         actor,
       ),
     ).rejects.toThrow('Refund exceeds the remaining refundable amount');
+  });
+
+  it('blocks refunding an already fully refunded payment', async () => {
+    const payment = buildPayment({
+      amount: new Prisma.Decimal(300),
+      refunds: [{ amount: new Prisma.Decimal(300) }],
+    });
+    const { service } = buildService({
+      invoice: null,
+      feeHead: null,
+      payment,
+      sourceJournal: buildPaymentJournal({ amount: new Prisma.Decimal(300) }),
+    });
+
+    await expect(
+      service.refundPayment(
+        payment.id,
+        { reason: 'Duplicate counter entry' },
+        actor,
+      ),
+    ).rejects.toThrow('Payment has already been fully refunded');
+  });
+
+  it('blocks refunding payments attached to voided invoices', async () => {
+    const payment = buildPayment({
+      invoice: buildInvoice({
+        status: InvoiceStatus.VOID,
+        totalAmount: new Prisma.Decimal(500),
+        payments: [
+          buildInvoicePayment({
+            id: 'payment-1',
+            amount: new Prisma.Decimal(500),
+          }),
+        ],
+      }),
+    });
+    const { service } = buildService({
+      invoice: null,
+      feeHead: null,
+      payment,
+      sourceJournal: buildPaymentJournal({ amount: new Prisma.Decimal(500) }),
+    });
+
+    await expect(
+      service.refundPayment(
+        payment.id,
+        { amount: 100, reason: 'Correction' },
+        actor,
+      ),
+    ).rejects.toThrow('Voided invoices cannot be refunded');
   });
 
   it('blocks refunds in a closed accounting period', async () => {

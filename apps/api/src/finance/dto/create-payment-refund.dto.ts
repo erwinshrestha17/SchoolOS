@@ -1,5 +1,6 @@
 import {
   IsDateString,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
@@ -13,6 +14,7 @@ export class CreatePaymentRefundDto {
   amount?: number;
 
   @IsString()
+  @IsNotEmpty()
   reason!: string;
 
   @IsOptional()

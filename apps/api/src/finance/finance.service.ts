@@ -1906,6 +1906,12 @@ export class FinanceService {
     dto: CreatePaymentRefundDto,
     actor: AuthContext,
   ) {
+    const reason = dto.reason?.trim();
+
+    if (!reason) {
+      throw new BadRequestException('Refund reason is required');
+    }
+
     const payment = await this.prisma.payment.findFirst({
       where: { id: paymentId, tenantId: actor.tenantId },
       include: {
@@ -1923,6 +1929,10 @@ export class FinanceService {
 
     if (!payment) {
       throw new NotFoundException('Payment not found in this tenant');
+    }
+
+    if (payment.invoice.status === InvoiceStatus.VOID) {
+      throw new ConflictException('Voided invoices cannot be refunded');
     }
 
     const sourceJournal = await this.prisma.journalEntry.findFirst({
@@ -1994,9 +2004,9 @@ export class FinanceService {
           refundNumber,
           amount: refundAmount,
           refundDate,
-          reason: dto.reason,
-          referenceNumber: dto.referenceNumber ?? null,
-          narration: dto.narration ?? null,
+          reason,
+          referenceNumber: dto.referenceNumber?.trim() || null,
+          narration: dto.narration?.trim() || null,
           createdById: actor.userId,
         },
       });
@@ -2007,7 +2017,7 @@ export class FinanceService {
           entryNumber: journalEntryNumber,
           entryDate: refundDate,
           narration:
-            dto.narration ??
+            dto.narration?.trim() ||
             `Refund ${refundNumber} for payment ${payment.receipt?.receiptNumber ?? payment.id}`,
           sourceType: JournalSourceType.PAYMENT_REFUND,
           sourceId: refund.id,
