@@ -28,10 +28,10 @@ export default function LoginPage() {
             Staff & Admin Portal
           </div>
           <h1 className="text-4xl font-black tracking-tight text-white leading-[1.1]">
-            Secure, tenant-aware workspace access.
+            Secure school workspace access.
           </h1>
           <p className="mt-6 text-base leading-relaxed text-slate-400">
-            Authentication is powered by a robust backend featuring short-lived access tokens, refresh token rotation, and strict role-based access control (RBAC).
+            Authentication is powered by secure cookies, refresh token rotation, strict role-based access control (RBAC), and school-level data isolation.
           </p>
 
           <ul className="mt-10 space-y-5">
@@ -49,8 +49,8 @@ export default function LoginPage() {
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
               </div>
               <div>
-                <p className="text-sm font-bold text-white">Multi-Tenant Isolation</p>
-                <p className="text-xs text-slate-400 mt-1">Database-level query scoping ensures your school's data remains strictly isolated.</p>
+                <p className="text-sm font-bold text-white">School Data Isolation</p>
+                <p className="text-xs text-slate-400 mt-1">Every request is scoped to your school workspace so each school's data remains strictly isolated.</p>
               </div>
             </li>
             <li className="flex gap-4">
@@ -108,7 +108,7 @@ export default function LoginPage() {
           </div>
 
           <p className="mt-8 text-center text-xs text-slate-500">
-            Need a new school tenant?{' '}
+            Need to register your school?{' '}
             <Link href="/register" className="font-bold text-amber-600 hover:text-amber-500 transition-colors">
               Register here
             </Link>

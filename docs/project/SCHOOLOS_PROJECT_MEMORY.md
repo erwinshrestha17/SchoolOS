@@ -41,7 +41,7 @@ SchoolOS is organized into these production modules:
 | M8B | Transport Management | Routes, stops, vehicles, drivers, student transport enrollment, boarding/drop tracking, parent notifications, live GPS tracking, ETA, and trip history. | Phase 3 |
 | M8C | Canteen Management | Menu management, meal plans, student meal enrollment, QR/student ID meal serving, wallet/POS sales, parent controls, allergy warnings, inventory, vendor purchases, and fee/accounting integration. | Phase 3 |
 | M9 | Accounting & Finance | Double-entry ledger, chart of accounts, journal posting, receipt/payment linkage, reversal/correction workflow, trial balance, day-end reports, audit-ready records, and full Phase 2 accounting expansion. | Phase 2 |
-| M10 | Notices & Communication | Notices, announcements, notification center, read/unread tracking, consent management, delivery records, retry/resend UI, and later real SMS/FCM/email provider integration. | Phase 1A/1B |
+| M10 | Notices & Communication | Notices, announcements, notification center, read/unread tracking, consent management, delivery records, retry/resend UI, real SMS/FCM/email provider integration later, and Parent–Class Teacher Chat with school-configured chat hours. | Phase 1A/1B + Phase 2/3 chat expansion |
 
 Public website / landing-page module card order:
 
@@ -207,8 +207,120 @@ Public website / landing-page module card order:
 - Delivery records, delivery status, retry/resend UI.
 - Consent capture/revoke, consent text/version templates, marketing opt-out.
 - Real SMS/FCM/email providers later.
-- Parent-teacher messaging and event RSVP later.
+- Parent–Class Teacher Chat as a Phase 2/Phase 3 communication expansion after Phase 1B notification center/read tracking is stable.
+- Event RSVP later.
 - Integrates with all modules as the notification delivery layer.
+
+#### M10 Parent–Class Teacher Chat Scope
+- One conversation thread per student per academic year.
+- Guardian/parent can message only the assigned primary class teacher for their child.
+- Class teacher can reply only to guardians of students in their assigned class/section.
+- Principal/admin can view, moderate, close, or escalate conversations based on school policy.
+- Threads are linked to `tenantId`, `academicYearId`, `studentId`, `guardianId`, and `classTeacherId`.
+- Message statuses: sent, delivered, read.
+- Read receipts for both parent and teacher.
+- Attachment support later with strict file controls: images/PDF only, size limits, virus scanning, private object storage, and signed URLs.
+- No open parent-to-any-teacher messaging in the early release.
+- No student-to-teacher private chat in the early release.
+- Abuse/report/block controls for inappropriate communication.
+- Escalation workflow to principal/admin for serious issues.
+- Audit and retention rules for message threads and moderation actions.
+- Tenant-scoped access checks on every thread/message query.
+- Consent-aware communication and notification delivery.
+
+#### Recommended Chat Days and Time
+Default Nepal-friendly school chat availability should be configurable per school:
+
+```text
+Sunday–Thursday: 4:00 PM–7:00 PM
+Friday: 2:00 PM–5:00 PM
+Saturday: Closed
+Public holidays: Closed
+Outside hours: Emergency-only notifications
+```
+
+Reasoning:
+- Teachers should not be interrupted during class hours.
+- After-school windows allow teachers to respond without affecting teaching.
+- Friday uses an earlier and shorter window because many schools have shorter working hours.
+- Saturday and public holidays should protect teacher work-life balance.
+- Parents may still send messages outside hours, but the system should clearly show that replies are expected during school chat hours.
+
+#### Chat Availability Rules
+- Chat availability must be school-configurable.
+- Default time zone: Nepal time.
+- Messages can be accepted outside chat hours but marked as queued/outside-hours.
+- Teacher push notifications should be muted outside chat hours unless an admin marks a case as emergency.
+- Parents should see a clear notice before or after sending outside hours.
+- Teachers should not be shown as instantly available.
+- Use SLA wording such as: `Usually replies within 1 school day`.
+- Emergency override should be controlled by admin/principal, not freely by parents.
+
+Example outside-hours parent notice:
+
+```text
+Your message has been sent. The class teacher usually replies during school chat hours: Sunday–Thursday, 4 PM–7 PM, and Friday, 2 PM–5 PM.
+```
+
+#### Parent–Class Teacher Chat Entities
+```text
+ParentTeacherThread
+- id
+- tenantId
+- academicYearId
+- studentId
+- guardianId
+- classTeacherId
+- status: OPEN | CLOSED | ESCALATED
+- createdAt
+- closedAt
+
+ParentTeacherMessage
+- id
+- tenantId
+- threadId
+- senderUserId
+- senderRole: PARENT | TEACHER | ADMIN
+- message
+- attachmentObjectKey nullable
+- priority: NORMAL | IMPORTANT | EMERGENCY
+- status: SENT | DELIVERED | READ
+- sentAt
+- deliveredAt nullable
+- readAt nullable
+
+ChatAvailabilityRule
+- id
+- tenantId
+- dayOfWeek
+- enabled
+- startTime
+- endTime
+- appliesToRole: TEACHER | PARENT | BOTH
+
+ChatEscalation
+- id
+- tenantId
+- threadId
+- escalatedByUserId
+- escalatedToUserId
+- reason
+- status: OPEN | RESOLVED
+- createdAt
+- resolvedAt nullable
+```
+
+#### Parent–Class Teacher Chat Implementation Order
+1. Thread model: one thread per student per academic year.
+2. Guardian-to-primary-class-teacher access rules.
+3. Message send/read APIs with tenant and student ownership checks.
+4. Read receipts and message status.
+5. School-configured chat availability and quiet hours.
+6. Outside-hours queued message notice.
+7. Teacher notification rules through M10 delivery system.
+8. Admin/principal moderation and escalation.
+9. Attachment support with signed URLs and size/type restrictions.
+10. Retention, audit, abuse reporting, and closure workflow.
 
 
 ## Current Project Stage
@@ -804,7 +916,7 @@ Detailed scope:
 - M2: teacher-specific class filtering, monthly register, student attendance history, correction request workflow, CSV/PDF export, parent attendance summary, true offline draft persistence.
 - M3: invoice detail, line items, fee-head dues table, student fee ledger, payment reversal/correction, receipt reprint history, cashier close/day-end, reports, defaulter aging, receipt PDF polish.
 - M5: signed media preview/download, object storage/direct upload, image compression, edit/delete/soft delete, moderation, parent view, teacher gallery, activity detail.
-- M10: notification center, notice detail, read/unread, unread recipient list, retry/resend, consent templates, marketing opt-out.
+- M10: notification center, notice detail, read/unread, unread recipient list, retry/resend, consent templates, marketing opt-out. Parent–Class Teacher Chat comes after these basics are stable.
 - Global UX: student search, academic year context, notification bell, profile page, role switcher, branding/logo settings.
 
 Deliverable:
@@ -822,7 +934,7 @@ Modules:
 
 Scope:
 - Build exams, CAS, marks entry, report cards, academic reports, promotion workflow.
-- Build homework assignment, submission tracking, reminders, timetable builder, conflict detection, substitution.
+- Build homework assignment, submission tracking, reminders, timetable builder, conflict detection, substitution, and Parent–Class Teacher Chat foundation if notification center is stable.
 - Build staff profiles, leave, attendance, salary structures, payroll, salary slips, PF/TDS support.
 - Build M9 chart of accounts, ledger, journals, expense vouchers, bank/cash, reconciliation, trial balance, GL, cash book, income statement, balance sheet, VAT/TDS/PF reports, fiscal period closing.
 - Connect M3 fee payments and M7 payroll to M9 through AccountingPostingService.
@@ -844,7 +956,7 @@ Scope:
 - M8A: catalog, copy tracking, QR/barcode issue-return, fines, lost/damaged books, library reports, fee/accounting integration later.
 - M8B: routes, stops, vehicles, drivers, student enrollment, trip start/complete, boarding/drop, parent notifications, live GPS, Redis latest location, WebSocket/SSE, child-specific tracking, ETA, trip history.
 - M8C: menus, meal plans, student meal enrollment, QR meal serving, wallet, POS, parent controls, allergy warnings, inventory, vendors, reports, fee/accounting integration later.
-- Parent/mobile: parent-facing attendance, fees, report cards, activity, transport tracking, canteen wallet/menu, notices.
+- Parent/mobile: parent-facing attendance, fees, report cards, activity, transport tracking, canteen wallet/menu, notices, and Parent–Class Teacher Chat with school chat hours.
 
 Deliverable:
 - Complete operational ecosystem beyond core administration, with stronger parent-facing value.

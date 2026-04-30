@@ -26,10 +26,10 @@ export default function RegisterPage() {
             Automated Provisioning
           </div>
           <h1 className="text-4xl font-black tracking-tight text-white leading-[1.1]">
-            Set up your school's digital infrastructure in seconds.
+            Set up your school workspace in seconds.
           </h1>
           <p className="mt-6 text-base leading-relaxed text-slate-400">
-            Creating your workspace automatically provisions a completely isolated backend tailored for Nepal's educational and financial standards.
+            Create a secure SchoolOS workspace for your school, with isolated data, role-based access, and Nepal-ready academic and financial defaults.
           </p>
 
           <ul className="mt-10 space-y-5">
@@ -38,8 +38,8 @@ export default function RegisterPage() {
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
               </div>
               <div>
-                <p className="text-sm font-bold text-white">Isolated Tenant Database</p>
-                <p className="text-xs text-slate-400 mt-1">Data is strictly scoped to your school.</p>
+                <p className="text-sm font-bold text-white">Isolated School Workspace</p>
+                <p className="text-xs text-slate-400 mt-1">Your school data stays securely separated from every other school.</p>
               </div>
             </li>
             <li className="flex gap-4">
@@ -81,10 +81,10 @@ export default function RegisterPage() {
         <div className="w-full max-w-md mt-12 lg:mt-0">
           <div className="mb-8">
             <h2 className="text-3xl font-black tracking-tight text-slate-900">
-              Create workspace
+              Create school workspace
             </h2>
             <p className="mt-2 text-sm text-slate-500">
-              Enter your school details to provision your tenant.
+              Enter your school details to create a secure SchoolOS workspace.
             </p>
           </div>
 
@@ -94,7 +94,7 @@ export default function RegisterPage() {
           </div>
 
           <p className="mt-8 text-center text-xs text-slate-500">
-            Already have a workspace?{' '}
+            Already have a school workspace?{' '}
             <Link href="/login" className="font-bold text-amber-600 hover:text-amber-500 transition-colors">
               Sign in to your account
             </Link>

@@ -14,6 +14,7 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const { setAuthenticatedSession } = useSession();
   const [challengeMessage, setChallengeMessage] = useState<string | null>(null);
+
   const {
     register,
     handleSubmit,
@@ -38,7 +39,9 @@ export function LoginForm() {
       }
 
       setChallengeMessage(
-        `MFA challenge issued via ${result.delivery}. Expires at ${new Date(result.challengeExpiresAt).toLocaleTimeString()}.`,
+        `MFA challenge issued via ${result.delivery}. Expires at ${new Date(
+          result.challengeExpiresAt,
+        ).toLocaleTimeString()}.`,
       );
     },
   });
@@ -49,44 +52,70 @@ export function LoginForm() {
       onSubmit={handleSubmit((values) => mutation.mutate(values))}
     >
       <div>
-        <label className="label mb-2 block">Tenant Slug</label>
-        <input {...register('tenantSlug')} />
+        <label className="label mb-2 block">School Code</label>
+        <input
+          {...register('tenantSlug')}
+          placeholder="e.g. green-valley-school"
+          autoComplete="organization"
+        />
+        <p className="mt-2 text-xs text-slate-500">
+          Enter the school code provided by your school administrator.
+        </p>
         {errors.tenantSlug ? (
           <p className="mt-2 text-sm text-[var(--accent-dark)]">
             {errors.tenantSlug.message}
           </p>
         ) : null}
       </div>
+
       <div>
         <label className="label mb-2 block">Email</label>
-        <input {...register('email')} />
+        <input
+          {...register('email')}
+          type="email"
+          placeholder="admin@school.edu.np"
+          autoComplete="email"
+        />
         {errors.email ? (
           <p className="mt-2 text-sm text-[var(--accent-dark)]">
             {errors.email.message}
           </p>
         ) : null}
       </div>
+
       <div>
         <label className="label mb-2 block">Password</label>
-        <input type="password" {...register('password')} />
+        <input
+          type="password"
+          {...register('password')}
+          placeholder="Enter your password"
+          autoComplete="current-password"
+        />
         {errors.password ? (
           <p className="mt-2 text-sm text-[var(--accent-dark)]">
             {errors.password.message}
           </p>
         ) : null}
       </div>
-      <button className="rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-600 px-5 py-3 font-semibold text-white shadow-md shadow-indigo-200 transition-all hover:from-indigo-600 hover:to-violet-700 hover:shadow-lg hover:shadow-indigo-300 active:scale-[0.98]">
 
+      <button
+        type="submit"
+        disabled={mutation.isPending}
+        className="rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-600 px-5 py-3 font-semibold text-white shadow-md shadow-indigo-200 transition-all hover:from-indigo-600 hover:to-violet-700 hover:shadow-lg hover:shadow-indigo-300 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+      >
         {mutation.isPending ? 'Signing in...' : 'Sign in'}
       </button>
+
       {mutation.isError ? (
         <p className="text-sm text-[var(--accent-dark)]">
           {mutation.error.message}
         </p>
       ) : null}
+
       {challengeMessage ? (
         <p className="text-sm text-[var(--accent)]">{challengeMessage}</p>
       ) : null}
+
       {mutation.isSuccess && !challengeMessage ? (
         <p className="text-sm text-[var(--teal)]">
           Login request completed. Secure cookie flow is active and only
