@@ -23,6 +23,13 @@ const dateFormatter = new Intl.DateTimeFormat('en-NP', {
   dateStyle: 'medium',
 });
 
+const dashboardQuickStats = [
+  'Students',
+  'Attendance',
+  'Fees',
+  'Notifications',
+] as const;
+
 export default function DashboardPage() {
   const academicYearsQuery = useQuery({
     queryKey: ['dashboard-academic-years'],
@@ -176,47 +183,56 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <section className="relative overflow-hidden rounded-[32px] border border-[var(--line)] bg-gradient-to-br from-gray-950 via-slate-900 to-indigo-950 p-6 text-white shadow-sm sm:p-8">
+        <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-indigo-400/20 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-36 w-36 rounded-full bg-emerald-400/15 blur-3xl" />
+
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="label mb-2">Phase 1 Operations</p>
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
+            <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80 ring-1 ring-white/15">
+              Phase 1 Operations
+            </span>
+            <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
               Admin Command Center
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
               Daily school operations summary for admissions, attendance, fees,
               activity feed, and parent communications.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-              Academic Year
-            </p>
-            {academicYearsQuery.isLoading ? (
-              <SkeletonLine className="mt-2 h-5 w-32" />
-            ) : (
-              <p className="mt-1 text-sm font-semibold text-gray-900">
-                {currentAcademicYear?.name ?? 'Not configured'}
-              </p>
-            )}
+          <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[420px]">
+            <CommandMetric
+              label="Academic Year"
+              value={
+                academicYearsQuery.isLoading
+                  ? 'Loading...'
+                  : currentAcademicYear?.name ?? 'Not configured'
+              }
+              tone="neutral"
+            />
+            <CommandMetric
+              label="Setup Alerts"
+              value={String(setupWarnings.length)}
+              tone={setupWarnings.length > 0 ? 'warning' : 'success'}
+            />
           </div>
         </div>
 
         {setupWarnings.length > 0 && (
-          <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative mt-6 flex flex-col gap-3 rounded-2xl border border-amber-300/25 bg-amber-400/10 p-4 text-sm text-amber-50 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
               <div>
                 <p className="font-semibold">Setup needs attention</p>
-                <p className="mt-1 text-amber-800">
+                <p className="mt-1 text-amber-100/90">
                   {setupWarnings.join(' · ')}
                 </p>
               </div>
             </div>
             <Link
               href="/dashboard/settings"
-              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-amber-900 px-4 text-sm font-semibold text-white"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-white px-4 text-sm font-semibold text-gray-950 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
             >
               Finish Setup
             </Link>
@@ -300,11 +316,13 @@ export default function DashboardPage() {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             {quickActions.map((action) => (
               <Link
-              key={`${action.href}-${action.label}`}
+                key={`${action.href}-${action.label}`}
                 href={action.href}
-                className="flex min-h-11 items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-800 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700"
+                className="flex min-h-11 items-center gap-3 rounded-2xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-800 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700"
               >
-                <action.icon className="h-5 w-5 text-gray-400" />
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 transition group-hover:bg-white">
+                  <action.icon className="h-5 w-5 text-gray-500" />
+                </span>
                 {action.label}
               </Link>
             ))}
@@ -364,7 +382,7 @@ export default function DashboardPage() {
             {recentItems.slice(0, 8).map((item) => (
               <div
                 key={`${item.kind}-${item.id}`}
-                className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between"
+                className="flex flex-col gap-1 py-4 transition hover:bg-gray-50/70 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
                   <p className="text-sm font-semibold text-gray-900">
@@ -391,6 +409,31 @@ export default function DashboardPage() {
   );
 }
 
+function CommandMetric({
+  label,
+  value,
+  tone = 'neutral',
+}: {
+  label: string;
+  value: string;
+  tone?: 'neutral' | 'success' | 'warning';
+}) {
+  const toneClass = {
+    neutral: 'bg-white/10 text-white ring-white/15',
+    success: 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/20',
+    warning: 'bg-amber-400/15 text-amber-100 ring-amber-300/20',
+  }[tone];
+
+  return (
+    <div className={`rounded-2xl p-4 ring-1 ${toneClass}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-75">
+        {label}
+      </p>
+      <p className="mt-2 text-xl font-bold">{value}</p>
+    </div>
+  );
+}
+
 function KpiCard({
   accent,
   detail,
@@ -405,10 +448,10 @@ function KpiCard({
   value: string;
 }) {
   return (
-    <div className="shell-card p-5">
+    <div className="group shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-5 shadow-sm backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
       <div className="mb-4 flex items-center justify-between gap-4">
         <p className="label">{label}</p>
-        <span className={`h-3 w-3 rounded-full ${accent}`} />
+        <span className={`h-3 w-3 rounded-full ${accent} shadow-sm`} />
       </div>
       {isLoading ? (
         <div className="space-y-3">
@@ -417,10 +460,10 @@ function KpiCard({
         </div>
       ) : (
         <>
-          <p className="text-3xl font-bold tracking-tight text-gray-900">
+          <p className="text-3xl font-bold tracking-tight text-gray-950">
             {value}
           </p>
-          <p className="mt-2 text-sm text-gray-500">{detail}</p>
+          <p className="mt-2 text-sm leading-5 text-gray-500">{detail}</p>
         </>
       )}
     </div>
@@ -437,9 +480,12 @@ function Panel({
   title: string;
 }) {
   return (
-    <section className="shell-card p-5">
+    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-5 shadow-sm backdrop-blur-sm">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-base font-bold text-gray-900">{title}</h2>
+        <div>
+          <p className="label">Overview</p>
+          <h2 className="mt-1 text-lg font-bold text-gray-950">{title}</h2>
+        </div>
       </div>
       {error ? <ErrorCard error={error} /> : children}
     </section>
@@ -465,7 +511,7 @@ function AlertRow({
         : 'border-gray-200 bg-gray-50 text-gray-600';
 
   return (
-    <div className={`rounded-2xl border p-4 ${toneClass}`}>
+    <div className={`rounded-2xl border p-4 shadow-sm ${toneClass}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="font-semibold">{alert.title}</p>
@@ -473,7 +519,7 @@ function AlertRow({
         </div>
         <Link
           href={alert.href}
-          className="inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-semibold text-gray-900 shadow-sm"
+          className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-white px-4 text-sm font-semibold text-gray-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
         >
           {alert.cta}
         </Link>
@@ -504,7 +550,7 @@ function ProgressSummary({
         <span className="font-semibold text-gray-900">{percent}%</span>
       </div>
       <div
-        className="h-3 rounded-full bg-gray-100"
+        className="h-3 overflow-hidden rounded-full bg-gray-100"
         role="progressbar"
         aria-label={label}
         aria-valuemin={0}
@@ -512,7 +558,7 @@ function ProgressSummary({
         aria-valuenow={percent}
       >
         <div
-          className="h-3 rounded-full bg-success-500"
+          className="h-3 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all"
           style={{ width: `${percent}%` }}
         />
       </div>
@@ -621,14 +667,14 @@ function MiniBar({
         <span className="font-semibold text-gray-900">{value}</span>
       </div>
       <div
-        className="h-2 rounded-full bg-gray-100"
+        className="h-2 overflow-hidden rounded-full bg-gray-100"
         role="progressbar"
         aria-label={label}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={percent}
       >
-        <div className={`h-2 rounded-full ${color}`} style={{ width: `${percent}%` }} />
+        <div className={`h-2 rounded-full ${color} transition-all`} style={{ width: `${percent}%` }} />
       </div>
     </div>
   );
@@ -646,7 +692,10 @@ function EmptyState({
   title: string;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5 text-center">
+    <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 p-6 text-center">
+      <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg shadow-sm">
+        ✦
+      </div>
       <p className="font-semibold text-gray-900">{title}</p>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-500">
         {body}
@@ -654,7 +703,7 @@ function EmptyState({
       {href && cta && (
         <Link
           href={href}
-          className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white"
+          className="mt-4 inline-flex min-h-11 items-center justify-center rounded-2xl bg-gradient-to-r from-gray-950 to-gray-800 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
         >
           {cta}
         </Link>
@@ -665,7 +714,7 @@ function EmptyState({
 
 function ErrorCard({ error }: { error: unknown }) {
   return (
-    <div className="rounded-2xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-600">
+    <div className="rounded-2xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-600 shadow-sm">
       <p className="font-semibold">This section could not load.</p>
       <p className="mt-1 opacity-85">
         {error instanceof Error ? error.message : 'Please retry after checking your session.'}
@@ -685,7 +734,11 @@ function StackedSkeleton() {
 }
 
 function SkeletonLine({ className }: { className: string }) {
-  return <div className={`animate-pulse rounded-xl bg-gray-100 ${className}`} />;
+  return (
+    <div
+      className={`animate-pulse rounded-xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 ${className}`}
+    />
+  );
 }
 
 function sumReceiptsThisMonth(
