@@ -9,7 +9,7 @@ import type {
 } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 
 const communicationSections = [
@@ -62,6 +62,36 @@ type EventState = {
   sectionId: string;
   startsAt: string;
   location: string;
+};
+
+const sectionMeta: Record<
+  CommunicationSection,
+  {
+    title: string;
+    description: string;
+    badge: string;
+  }
+> = {
+  Notices: {
+    title: 'Notice Center',
+    description: 'Publish notices instantly or schedule them for selected classes, sections, or the whole school.',
+    badge: 'Announcements',
+  },
+  Events: {
+    title: 'Event Publisher',
+    description: 'Create school events, meetings, exams, and holidays with audience-aware delivery.',
+    badge: 'Calendar Updates',
+  },
+  'Delivery Records': {
+    title: 'Delivery Records',
+    description: 'Track queued, sent, skipped, failed, and retrying notification records across channels.',
+    badge: 'Audit Trail',
+  },
+  'Consent Management': {
+    title: 'Consent Management',
+    description: 'Capture and revoke guardian consent for privacy, messaging, medical, and photo usage workflows.',
+    badge: 'Guardian Controls',
+  },
 };
 
 export function CommunicationsForm() {
@@ -140,12 +170,17 @@ export function CommunicationsForm() {
 
   const classes = classesQuery.data ?? [];
   const sections = (sectionsQuery.data ?? []) as SectionSummaryForUi[];
-  const guardians = (admissionsQuery.data ?? []).flatMap((admission) =>
-    admission.guardians.map((guardian) => ({
-      ...guardian,
-      studentName: admission.fullNameEn,
-      studentSystemId: admission.studentSystemId,
-    })),
+
+  const guardians = useMemo(
+    () =>
+      (admissionsQuery.data ?? []).flatMap((admission) =>
+        admission.guardians.map((guardian) => ({
+          ...guardian,
+          studentName: admission.fullNameEn,
+          studentSystemId: admission.studentSystemId,
+        })),
+      ),
+    [admissionsQuery.data],
   );
 
   useEffect(() => {
@@ -170,6 +205,20 @@ export function CommunicationsForm() {
     (deliveriesQuery.data ?? []).map((delivery) => delivery.sourceType),
   );
 
+  const deliveryStats = useMemo(() => {
+    const deliveries = deliveriesQuery.data ?? [];
+    return {
+      total: deliveries.length,
+      sent: deliveries.filter((item) => item.status === 'SENT').length,
+      failed: deliveries.filter((item) => item.status === 'FAILED').length,
+      pending: deliveries.filter((item) =>
+        ['QUEUED', 'PENDING', 'RETRYING'].includes(item.status),
+      ).length,
+    };
+  }, [deliveriesQuery.data]);
+
+  const activeMeta = sectionMeta[activeSection];
+
   const noticeMutation = useMutation({
     mutationFn: api.createNotice,
     onSuccess: () => {
@@ -177,10 +226,16 @@ export function CommunicationsForm() {
       void queryClient.invalidateQueries({ queryKey: ['notices'] });
       setNoticeSuccess(
         notice.scheduleMode === 'LATER'
-          ? 'Notice scheduled.'
-          : 'Notice published. Delivery records queued.',
+          ? 'Notice scheduled successfully.'
+          : 'Notice published. Delivery records have been queued.',
       );
       setNoticeError(null);
+      setNotice((current) => ({
+        ...current,
+        title: '',
+        body: '',
+        scheduledFor: current.scheduleMode === 'LATER' ? current.scheduledFor : '',
+      }));
     },
     onError: (error) => {
       setNoticeError(error.message);
@@ -193,8 +248,14 @@ export function CommunicationsForm() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
       void queryClient.invalidateQueries({ queryKey: ['events'] });
-      setEventSuccess('Event created. Delivery records queued where audience rules apply.');
+      setEventSuccess('Event created. Delivery records were queued where audience rules apply.');
       setEventError(null);
+      setEvent((current) => ({
+        ...current,
+        title: '',
+        description: '',
+        location: '',
+      }));
     },
     onError: (error) => {
       setEventError(error.message);
@@ -292,24 +353,70 @@ export function CommunicationsForm() {
 
   return (
     <div className="space-y-6">
-      <section className="shell-card rounded-[28px] p-4 sm:p-5">
-        <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Communications sections">
-          {communicationSections.map((section) => (
-            <button
-              key={section}
-              type="button"
-              className={`min-h-11 whitespace-nowrap rounded-full px-4 text-sm font-semibold transition ${
-                activeSection === section
-                  ? 'bg-[var(--ink)] text-white shadow-sm'
-                  : 'border border-[var(--line)] bg-white text-[var(--muted)] hover:text-[var(--ink)]'
-              }`}
-              onClick={() => setActiveSection(section)}
-            >
-              {section}
-            </button>
-          ))}
+      <section className="relative overflow-hidden rounded-[32px] border border-[var(--line)] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 text-white shadow-sm sm:p-8">
+        <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-cyan-400/15 blur-3xl" />
+        <div className="absolute bottom-0 left-1/4 h-40 w-40 rounded-full bg-emerald-400/15 blur-3xl" />
+
+        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80 ring-1 ring-white/15">
+              {activeMeta.badge}
+            </span>
+            <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
+              {activeMeta.title}
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
+              {activeMeta.description}
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[640px] xl:grid-cols-4">
+            <CommunicationMetric label="Notices" value={String(noticesQuery.data?.length ?? 0)} tone="neutral" />
+            <CommunicationMetric label="Events" value={String(eventsQuery.data?.length ?? 0)} tone="info" />
+            <CommunicationMetric label="Sent" value={String(deliveryStats.sent)} tone="success" />
+            <CommunicationMetric label="Failed" value={String(deliveryStats.failed)} tone="danger" />
+          </div>
         </div>
       </section>
+
+      <section className="sticky top-4 z-20 rounded-[28px] border border-[var(--line)] bg-white/85 p-3 shadow-sm backdrop-blur-xl">
+        <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Communications sections">
+          {communicationSections.map((section) => {
+            const isActive = activeSection === section;
+
+            return (
+              <button
+                key={section}
+                type="button"
+                className={`group min-h-12 whitespace-nowrap rounded-2xl border px-4 text-sm font-semibold transition-all duration-200 ${
+                  isActive
+                    ? 'border-slate-950 bg-slate-950 text-white shadow-md shadow-slate-900/20'
+                    : 'border-transparent bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-950'
+                }`}
+                onClick={() => setActiveSection(section)}
+              >
+                <span className="flex items-center gap-2">
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      isActive ? 'bg-emerald-400' : 'bg-gray-300 group-hover:bg-gray-500'
+                    }`}
+                  />
+                  {section}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {deliveryStats.pending > 0 ? (
+        <InlineMessage
+          tone="info"
+          message={`${deliveryStats.pending} delivery record${
+            deliveryStats.pending === 1 ? '' : 's'
+          } are queued, pending, or retrying.`}
+        />
+      ) : null}
 
       {activeSection === 'Notices' ? (
         <NoticesSection
@@ -352,6 +459,7 @@ export function CommunicationsForm() {
           setFilters={setDeliveryFilters}
           channels={deliveryChannels}
           sourceTypes={deliverySourceTypes}
+          totalDeliveries={deliveriesQuery.data?.length ?? 0}
         />
       ) : null}
 
@@ -401,30 +509,44 @@ function NoticesSection({
   noticeError: string | null;
   noticeSuccess: string | null;
 }) {
+  const characterCount = notice.body.trim().length;
+
   return (
-    <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-      <div className="shell-card rounded-[28px] p-6">
-        <p className="label">Notice Composer</p>
-        <h2 className="mt-2 text-xl font-bold text-gray-950">Publish school notice</h2>
-        <div className="mt-5 grid gap-4">
+    <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
+      <div className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
+        <SectionHeader
+          eyebrow="Notice Composer"
+          title="Publish school notice"
+          description="Create clear, audience-targeted announcements for guardians, students, and staff."
+        />
+
+        <div className="mt-6 grid gap-4">
           <label>
             <span className="label mb-2 block">Title</span>
             <input
               value={notice.title}
               onChange={(event) => setNotice((current) => ({ ...current, title: event.target.value }))}
-              placeholder="Notice title"
+              placeholder="Example: Parent meeting notice"
               className="min-h-11"
             />
           </label>
+
           <label>
-            <span className="label mb-2 block">Body</span>
+            <span className="label mb-2 flex items-center justify-between">
+              <span>Body</span>
+              <span className="text-[10px] font-semibold text-[var(--muted)]">
+                {characterCount} characters
+              </span>
+            </span>
             <textarea
-              rows={5}
+              rows={6}
               value={notice.body}
               onChange={(event) => setNotice((current) => ({ ...current, body: event.target.value }))}
               placeholder="Write the notice body for guardians, students, or staff."
+              className="min-h-36"
             />
           </label>
+
           <div className="grid gap-3 md:grid-cols-3">
             <label>
               <span className="label mb-2 block">Priority</span>
@@ -477,7 +599,7 @@ function NoticesSection({
                   }))
                 }
                 disabled={notice.audienceType === 'ALL'}
-                className="min-h-11"
+                className="min-h-11 disabled:bg-gray-100 disabled:text-gray-400"
               >
                 <option value="">Select class</option>
                 {classes.map((classroom) => (
@@ -488,6 +610,7 @@ function NoticesSection({
               </select>
             </label>
           </div>
+
           {notice.audienceType === 'SECTION' ? (
             <label>
               <span className="label mb-2 block">Section</span>
@@ -508,29 +631,25 @@ function NoticesSection({
             </label>
           ) : null}
 
-          <fieldset className="rounded-2xl border border-[var(--line)] bg-white/70 p-4">
+          <fieldset className="rounded-3xl border border-[var(--line)] bg-gray-50/70 p-4">
             <legend className="label px-2">Schedule option</legend>
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex min-h-11 items-center gap-3 rounded-xl border border-[var(--line)] px-4">
-                <input
-                  type="radio"
-                  name="notice-schedule-mode"
-                  checked={notice.scheduleMode === 'NOW'}
-                  onChange={() =>
-                    setNotice((current) => ({ ...current, scheduleMode: 'NOW', scheduledFor: '' }))
-                  }
-                />
-                Publish now
-              </label>
-              <label className="flex min-h-11 items-center gap-3 rounded-xl border border-[var(--line)] px-4">
-                <input
-                  type="radio"
-                  name="notice-schedule-mode"
-                  checked={notice.scheduleMode === 'LATER'}
-                  onChange={() => setNotice((current) => ({ ...current, scheduleMode: 'LATER' }))}
-                />
-                Schedule for later
-              </label>
+              <ScheduleOption
+                title="Publish now"
+                description="Queue delivery immediately."
+                checked={notice.scheduleMode === 'NOW'}
+                name="notice-schedule-mode"
+                onChange={() =>
+                  setNotice((current) => ({ ...current, scheduleMode: 'NOW', scheduledFor: '' }))
+                }
+              />
+              <ScheduleOption
+                title="Schedule later"
+                description="Publish at a selected date and time."
+                checked={notice.scheduleMode === 'LATER'}
+                name="notice-schedule-mode"
+                onChange={() => setNotice((current) => ({ ...current, scheduleMode: 'LATER' }))}
+              />
             </div>
             {notice.scheduleMode === 'LATER' ? (
               <input
@@ -548,16 +667,17 @@ function NoticesSection({
           </fieldset>
 
           {notice.priority === 'EMERGENCY' ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
-              Emergency notices may trigger forced delivery channels depending on school settings.
-            </div>
+            <InlineMessage
+              tone="error"
+              message="Emergency notices may trigger forced delivery channels depending on school settings."
+            />
           ) : null}
           {noticeError ? <InlineMessage tone="error" message={noticeError} /> : null}
           {noticeSuccess ? <InlineMessage tone="success" message={noticeSuccess} /> : null}
 
           <button
             type="button"
-            className="min-h-12 rounded-2xl bg-[var(--ink)] px-5 py-3 font-semibold text-white disabled:opacity-50"
+            className="min-h-12 rounded-2xl bg-gradient-to-r from-slate-950 to-slate-800 px-5 py-3 font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isPending}
             onClick={submitNotice}
           >
@@ -585,8 +705,13 @@ function NoticeList({
   error: string | null;
 }) {
   return (
-    <section className="shell-card rounded-[28px] p-6">
-      <p className="label">Recent Notices</p>
+    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm xl:sticky xl:top-28 xl:self-start">
+      <SectionHeader
+        eyebrow="Recent Notices"
+        title="Published & scheduled notices"
+        description="Quickly review the latest school communication records."
+      />
+
       <div className="mt-5 grid gap-3">
         {isLoading ? (
           <SkeletonList />
@@ -594,7 +719,10 @@ function NoticeList({
           <InlineMessage tone="error" message={error} />
         ) : notices.length > 0 ? (
           notices.slice(0, 8).map((item) => (
-            <article key={item.id} className="rounded-2xl border border-[var(--line)] bg-white/70 p-4">
+            <article
+              key={item.id}
+              className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+            >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="font-semibold text-gray-950">{item.title}</p>
@@ -607,7 +735,7 @@ function NoticeList({
             </article>
           ))
         ) : (
-          <EmptyState title="No notices yet" body="No notices yet. Publish your first notice." />
+          <EmptyState title="No notices yet" body="Publish your first notice to start building the communication timeline." />
         )}
       </div>
     </section>
@@ -640,10 +768,15 @@ function EventsSection({
   eventSuccess: string | null;
 }) {
   return (
-    <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-      <div className="shell-card rounded-[28px] p-6">
-        <p className="label">Event Publisher</p>
-        <div className="mt-5 grid gap-4">
+    <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
+      <div className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
+        <SectionHeader
+          eyebrow="Event Publisher"
+          title="Create school event"
+          description="Add calendar-ready events and notify the correct audience."
+        />
+
+        <div className="mt-6 grid gap-4">
           <label>
             <span className="label mb-2 block">Event title</span>
             <input
@@ -651,19 +784,20 @@ function EventsSection({
               onChange={(inputEvent) =>
                 setEvent((current) => ({ ...current, title: inputEvent.target.value }))
               }
-              placeholder="Event title"
+              placeholder="Example: First terminal exam"
               className="min-h-11"
             />
           </label>
           <label>
             <span className="label mb-2 block">Description</span>
             <textarea
-              rows={4}
+              rows={5}
               value={event.description}
               onChange={(inputEvent) =>
                 setEvent((current) => ({ ...current, description: inputEvent.target.value }))
               }
-              placeholder="Event description"
+              placeholder="Event details, instructions, or preparation notes."
+              className="min-h-32"
             />
           </label>
           <div className="grid gap-3 md:grid-cols-2">
@@ -685,7 +819,7 @@ function EventsSection({
                 onChange={(inputEvent) =>
                   setEvent((current) => ({ ...current, location: inputEvent.target.value }))
                 }
-                placeholder="Location"
+                placeholder="School hall, playground, online, etc."
                 className="min-h-11"
               />
             </label>
@@ -742,7 +876,7 @@ function EventsSection({
                   }))
                 }
                 disabled={event.audienceType === 'ALL'}
-                className="min-h-11"
+                className="min-h-11 disabled:bg-gray-100 disabled:text-gray-400"
               >
                 <option value="">Select class</option>
                 {classes.map((classroom) => (
@@ -776,7 +910,7 @@ function EventsSection({
           {eventSuccess ? <InlineMessage tone="success" message={eventSuccess} /> : null}
           <button
             type="button"
-            className="min-h-12 rounded-2xl bg-[var(--accent)] px-5 py-3 font-semibold text-white disabled:opacity-50"
+            className="min-h-12 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isPending}
             onClick={submitEvent}
           >
@@ -800,8 +934,13 @@ function EventList({
   error: string | null;
 }) {
   return (
-    <section className="shell-card rounded-[28px] p-6">
-      <p className="label">Events</p>
+    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm xl:sticky xl:top-28 xl:self-start">
+      <SectionHeader
+        eyebrow="Events"
+        title="Upcoming communication events"
+        description="Review school events created from this communication module."
+      />
+
       <div className="mt-5 grid gap-3">
         {isLoading ? (
           <SkeletonList />
@@ -809,17 +948,25 @@ function EventList({
           <InlineMessage tone="error" message={error} />
         ) : events.length > 0 ? (
           events.slice(0, 8).map((item) => (
-            <article key={item.id} className="rounded-2xl border border-[var(--line)] bg-white/70 p-4">
-              <p className="font-semibold text-gray-950">{item.title}</p>
-              <p className="mt-1 text-sm text-[var(--muted)]">
-                {formatEnumLabel(item.eventType)} / {formatEnumLabel(item.audienceType)} /{' '}
-                {formatDateTime(item.startsAt)}
-                {item.location ? ` / ${item.location}` : ''}
-              </p>
+            <article
+              key={item.id}
+              className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"
+            >
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="font-semibold text-gray-950">{item.title}</p>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    {formatEnumLabel(item.eventType)} / {formatEnumLabel(item.audienceType)} /{' '}
+                    {formatDateTime(item.startsAt)}
+                    {item.location ? ` / ${item.location}` : ''}
+                  </p>
+                </div>
+                <EventTypeBadge type={item.eventType} />
+              </div>
             </article>
           ))
         ) : (
-          <EmptyState title="No events yet" body="Create the first school event." />
+          <EmptyState title="No events yet" body="Create your first school event and notify the selected audience." />
         )}
       </div>
     </section>
@@ -834,6 +981,7 @@ function DeliveryRecordsSection({
   setFilters,
   channels,
   sourceTypes,
+  totalDeliveries,
 }: {
   deliveries: NotificationDelivery[];
   isLoading: boolean;
@@ -842,15 +990,23 @@ function DeliveryRecordsSection({
   setFilters: Dispatch<SetStateAction<{ status: string; channel: string; sourceType: string }>>;
   channels: string[];
   sourceTypes: string[];
+  totalDeliveries: number;
 }) {
   return (
-    <section className="shell-card rounded-[28px] p-6">
-      <p className="label">Delivery Records</p>
-      <h2 className="mt-2 text-xl font-bold text-gray-950">Recent provider-neutral deliveries</h2>
-      <p className="mt-1 text-sm text-[var(--muted)]">
-        Local and development providers are stubbed/logged; no real external SMS, FCM, or email is sent by the frontend.
-      </p>
-      <div className="mt-5 grid gap-3 md:grid-cols-3">
+    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <SectionHeader
+          eyebrow="Delivery Records"
+          title="Recent provider-neutral deliveries"
+          description="Local and development providers are stubbed/logged; no real external SMS, FCM, or email is sent by the frontend."
+        />
+
+        <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+          Showing {deliveries.length} of {totalDeliveries}
+        </span>
+      </div>
+
+      <div className="mt-6 grid gap-3 md:grid-cols-3">
         <select
           value={filters.status}
           onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
@@ -891,28 +1047,34 @@ function DeliveryRecordsSection({
         </select>
       </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
+      <div className="mt-6 grid gap-3 md:grid-cols-2">
         {isLoading ? (
           <SkeletonList />
         ) : error ? (
           <InlineMessage tone="error" message={error} />
         ) : deliveries.length > 0 ? (
           deliveries.slice(0, 12).map((delivery) => (
-            <article key={delivery.id} className="rounded-2xl border border-[var(--line)] bg-white/70 p-4">
+            <article
+              key={delivery.id}
+              className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
               <div className="flex items-start justify-between gap-3">
                 <p className="font-semibold text-gray-950">{delivery.title}</p>
                 <StatusBadge status={delivery.status} />
               </div>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                {delivery.channel} / {delivery.destination ?? 'no destination'}
-              </p>
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                {delivery.sourceType} / {delivery.sourceId}
-              </p>
+              <div className="mt-3 grid gap-2 text-sm text-[var(--muted)]">
+                <p>
+                  <span className="font-semibold text-gray-700">{delivery.channel}</span> /{' '}
+                  {delivery.destination ?? 'no destination'}
+                </p>
+                <p className="text-xs">
+                  {delivery.sourceType} / {delivery.sourceId}
+                </p>
+              </div>
             </article>
           ))
         ) : (
-          <EmptyState title="No delivery records yet" body="No delivery records yet." />
+          <EmptyState title="No delivery records found" body="No records match the current filter selection." />
         )}
       </div>
     </section>
@@ -948,55 +1110,77 @@ function ConsentManagementSection({
   captureError: string | null;
   revokeError: string | null;
 }) {
+  const selectedGuardian = guardians.find((guardian) => guardian.id === selectedGuardianId);
+
   return (
     <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-      <div className="shell-card rounded-[28px] p-6">
-        <p className="label">Consent Management</p>
-        <p className="mt-2 text-sm text-[var(--muted)]">
-          Privacy/data processing consent is mandatory for parent app access. Photo usage consent affects Activity Feed visibility.
-        </p>
-        <div className="mt-5 grid gap-3">
-          <select
-            value={selectedGuardianId}
-            onChange={(inputEvent) => setSelectedGuardianId(inputEvent.target.value)}
-            className="min-h-11"
-          >
-            <option value="">Select guardian</option>
-            {guardians.map((guardian) => (
-              <option key={`${guardian.id}-${guardian.studentSystemId}`} value={guardian.id}>
-                {guardian.fullName} / {guardian.studentName}
-              </option>
-            ))}
-          </select>
-          <select
-            value={selectedConsentType}
-            onChange={(inputEvent) => setSelectedConsentType(inputEvent.target.value)}
-            className="min-h-11"
-          >
-            {consentTypes.map((consentType) => (
-              <option key={consentType} value={consentType}>
-                {formatEnumLabel(consentType)}
-              </option>
-            ))}
-          </select>
+      <div className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
+        <SectionHeader
+          eyebrow="Consent Management"
+          title="Guardian consent controls"
+          description="Privacy/data processing consent is mandatory for parent app access. Photo usage consent affects Activity Feed visibility."
+        />
+
+        <div className="mt-6 grid gap-4">
+          <label>
+            <span className="label mb-2 block">Guardian</span>
+            <select
+              value={selectedGuardianId}
+              onChange={(inputEvent) => setSelectedGuardianId(inputEvent.target.value)}
+              className="min-h-11"
+            >
+              <option value="">Select guardian</option>
+              {guardians.map((guardian) => (
+                <option key={`${guardian.id}-${guardian.studentSystemId}`} value={guardian.id}>
+                  {guardian.fullName} / {guardian.studentName}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {selectedGuardian ? (
+            <div className="rounded-3xl border border-[var(--line)] bg-gray-50 p-4">
+              <p className="text-sm font-semibold text-gray-950">{selectedGuardian.fullName}</p>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                Guardian of {selectedGuardian.studentName} / {selectedGuardian.studentSystemId}
+              </p>
+            </div>
+          ) : null}
+
+          <label>
+            <span className="label mb-2 block">Consent type</span>
+            <select
+              value={selectedConsentType}
+              onChange={(inputEvent) => setSelectedConsentType(inputEvent.target.value)}
+              className="min-h-11"
+            >
+              {consentTypes.map((consentType) => (
+                <option key={consentType} value={consentType}>
+                  {formatEnumLabel(consentType)}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <div className="grid gap-2 md:grid-cols-2">
             <button
               type="button"
-              className="min-h-11 rounded-full bg-[var(--teal)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              className="min-h-11 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!selectedGuardianId || capturePending}
               onClick={captureConsent}
             >
-              Capture consent
+              {capturePending ? 'Capturing...' : 'Capture consent'}
             </button>
             <button
               type="button"
-              className="min-h-11 rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold disabled:opacity-50"
+              className="min-h-11 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!selectedGuardianId || revokePending}
               onClick={revokeConsent}
             >
-              Revoke consent
+              {revokePending ? 'Revoking...' : 'Revoke consent'}
             </button>
           </div>
+
           {captureError ? <InlineMessage tone="error" message={captureError} /> : null}
           {revokeError ? <InlineMessage tone="error" message={revokeError} /> : null}
           {guardians.length === 0 ? (
@@ -1008,8 +1192,13 @@ function ConsentManagementSection({
         </div>
       </div>
 
-      <section className="shell-card rounded-[28px] p-6">
-        <p className="label">Consent Status</p>
+      <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
+        <SectionHeader
+          eyebrow="Consent Status"
+          title="Current guardian permissions"
+          description="Review which consent types are currently granted or revoked."
+        />
+
         <div className="mt-5 grid gap-3">
           {statusesLoading ? (
             <SkeletonList />
@@ -1017,7 +1206,7 @@ function ConsentManagementSection({
             statuses.map((status) => (
               <article
                 key={status.consentType}
-                className="rounded-2xl border border-[var(--line)] bg-white/70 p-4"
+                className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
               >
                 <div className="flex items-start justify-between gap-3">
                   <p className="font-semibold text-gray-950">{formatEnumLabel(status.consentType)}</p>
@@ -1041,11 +1230,11 @@ function ConsentManagementSection({
               </article>
             ))
           ) : selectedGuardianId ? (
-            <EmptyState title="No consent records" body="No consent records yet." />
+            <EmptyState title="No consent records" body="No consent records have been captured for this guardian yet." />
           ) : (
             <EmptyState
               title="Select a guardian"
-              body="Admit a student with guardian details first."
+              body="Choose a guardian to review consent status."
             />
           )}
         </div>
@@ -1054,17 +1243,106 @@ function ConsentManagementSection({
   );
 }
 
+function SectionHeader({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div>
+      <p className="label">{eyebrow}</p>
+      <h2 className="mt-2 text-xl font-bold text-gray-950">{title}</h2>
+      {description ? <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{description}</p> : null}
+    </div>
+  );
+}
+
+function CommunicationMetric({
+  label,
+  value,
+  tone = 'neutral',
+}: {
+  label: string;
+  value: string;
+  tone?: 'neutral' | 'info' | 'success' | 'danger';
+}) {
+  const toneClass = {
+    neutral: 'bg-white/10 text-white ring-white/15',
+    info: 'bg-cyan-400/15 text-cyan-100 ring-cyan-300/20',
+    success: 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/20',
+    danger: 'bg-red-400/15 text-red-100 ring-red-300/20',
+  }[tone];
+
+  return (
+    <div className={`rounded-2xl p-4 ring-1 ${toneClass}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-75">{label}</p>
+      <p className="mt-2 text-2xl font-bold">{value}</p>
+    </div>
+  );
+}
+
+function ScheduleOption({
+  title,
+  description,
+  checked,
+  name,
+  onChange,
+}: {
+  title: string;
+  description: string;
+  checked: boolean;
+  name: string;
+  onChange: () => void;
+}) {
+  return (
+    <label
+      className={`flex min-h-20 cursor-pointer items-start gap-3 rounded-2xl border p-4 transition ${
+        checked
+          ? 'border-slate-950 bg-white shadow-sm ring-2 ring-slate-100'
+          : 'border-[var(--line)] bg-white/70 hover:bg-white'
+      }`}
+    >
+      <input type="radio" name={name} checked={checked} onChange={onChange} className="mt-1" />
+      <span>
+        <span className="block text-sm font-semibold text-gray-950">{title}</span>
+        <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">{description}</span>
+      </span>
+    </label>
+  );
+}
+
 function PriorityBadge({ priority }: { priority: string }) {
   const className =
     priority === 'EMERGENCY'
-      ? 'bg-red-50 text-red-700'
+      ? 'bg-red-50 text-red-700 ring-red-100'
       : priority === 'URGENT'
-        ? 'bg-amber-50 text-amber-700'
-        : 'bg-emerald-50 text-emerald-700';
+        ? 'bg-amber-50 text-amber-700 ring-amber-100'
+        : 'bg-emerald-50 text-emerald-700 ring-emerald-100';
 
   return (
-    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${className}`}>
+    <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${className}`}>
       {formatEnumLabel(priority)}
+    </span>
+  );
+}
+
+function EventTypeBadge({ type }: { type: string }) {
+  const className =
+    type === 'EXAM'
+      ? 'bg-indigo-50 text-indigo-700 ring-indigo-100'
+      : type === 'HOLIDAY'
+        ? 'bg-emerald-50 text-emerald-700 ring-emerald-100'
+        : type === 'MEETING'
+          ? 'bg-amber-50 text-amber-700 ring-amber-100'
+          : 'bg-gray-100 text-gray-700 ring-gray-200';
+
+  return (
+    <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${className}`}>
+      {formatEnumLabel(type)}
     </span>
   );
 }
@@ -1072,41 +1350,43 @@ function PriorityBadge({ priority }: { priority: string }) {
 function StatusBadge({ status }: { status: string }) {
   const className =
     status === 'SENT'
-      ? 'bg-emerald-50 text-emerald-700'
+      ? 'bg-emerald-50 text-emerald-700 ring-emerald-100'
       : status === 'FAILED'
-        ? 'bg-red-50 text-red-700'
+        ? 'bg-red-50 text-red-700 ring-red-100'
         : status === 'SKIPPED'
-          ? 'bg-gray-100 text-gray-700'
+          ? 'bg-gray-100 text-gray-700 ring-gray-200'
           : status === 'RETRYING'
-            ? 'bg-blue-50 text-blue-700'
-            : 'bg-amber-50 text-amber-700';
+            ? 'bg-blue-50 text-blue-700 ring-blue-100'
+            : 'bg-amber-50 text-amber-700 ring-amber-100';
 
   return (
-    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${className}`}>
+    <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${className}`}>
       {formatEnumLabel(status)}
     </span>
   );
 }
 
-function InlineMessage({ tone, message }: { tone: 'success' | 'error'; message: string }) {
-  return (
-    <p
-      className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
-        tone === 'success'
-          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-          : 'border-red-200 bg-red-50 text-red-700'
-      }`}
-    >
-      {message}
-    </p>
-  );
+function InlineMessage({
+  tone,
+  message,
+}: {
+  tone: 'success' | 'error' | 'info';
+  message: string;
+}) {
+  const className = {
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    error: 'border-red-200 bg-red-50 text-red-700',
+    info: 'border-blue-200 bg-blue-50 text-blue-700',
+  }[tone];
+
+  return <p className={`rounded-2xl border px-4 py-3 text-sm font-medium ${className}`}>{message}</p>;
 }
 
 function EmptyState({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-[var(--line)] bg-white/60 p-5 text-sm">
+    <div className="rounded-3xl border border-dashed border-[var(--line)] bg-gray-50/70 p-5 text-sm">
       <p className="font-semibold text-gray-950">{title}</p>
-      <p className="mt-1 text-[var(--muted)]">{body}</p>
+      <p className="mt-1 leading-6 text-[var(--muted)]">{body}</p>
     </div>
   );
 }
@@ -1115,7 +1395,7 @@ function SkeletonList() {
   return (
     <div className="grid gap-3">
       {[0, 1, 2].map((item) => (
-        <div key={item} className="h-24 animate-pulse rounded-2xl bg-gray-100" />
+        <div key={item} className="h-24 animate-pulse rounded-3xl bg-gray-100" />
       ))}
     </div>
   );

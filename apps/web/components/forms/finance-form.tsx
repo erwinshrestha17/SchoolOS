@@ -35,6 +35,51 @@ const paymentMethods = ['CASH', 'BANK', 'CHEQUE', 'TRANSFER', 'MOBILE'] as const
 
 type FinanceSection = (typeof financeSections)[number];
 type PaymentMethod = (typeof paymentMethods)[number];
+const financeSectionMeta: Record<
+  FinanceSection,
+  {
+    title: string;
+    description: string;
+    badge: string;
+  }
+> = {
+  'Collection Counter': {
+    title: 'Collection Counter',
+    description: 'Search invoices, collect fees, and generate official receipts from one guided counter view.',
+    badge: 'Live Counter',
+  },
+  'Fee Setup': {
+    title: 'Fee Setup',
+    description: 'Create fee heads and reusable fee plans for classes, academic years, and billing periods.',
+    badge: 'Configuration',
+  },
+  'Billing Runs': {
+    title: 'Billing Runs',
+    description: 'Generate monthly or term-based invoices from active fee plans with fewer manual steps.',
+    badge: 'Invoice Engine',
+  },
+  'Discounts & Waivers': {
+    title: 'Discounts & Waivers',
+    description: 'Manage approved discounts, scholarships, and fee waivers with clear audit visibility.',
+    badge: 'Approvals',
+  },
+  Defaulters: {
+    title: 'Defaulters',
+    description: 'Track overdue balances, filter reminder queues, and follow up with guardians quickly.',
+    badge: 'Follow-up',
+  },
+  'Cashier Close': {
+    title: 'Cashier Close',
+    description: 'Preview, verify, and finalize day-end collection summaries before closing the counter.',
+    badge: 'Day Close',
+  },
+  'Receipts & Ledger': {
+    title: 'Receipts & Ledger',
+    description: 'Review receipts, invoices, journal entries, and finance audit trail from one place.',
+    badge: 'Audit Trail',
+  },
+};
+
 type CashierCloseFilters = {
   openedAt: string;
   closedAt: string;
@@ -381,6 +426,10 @@ export function FinanceForm() {
   const invalidPaymentAmount = payment.amount <= 0 || overpaymentBlocked;
   const requiresReference = payment.method !== 'CASH';
   const defaulters = defaultersQuery.data ?? [];
+  const totalOutstanding = invoices.reduce((sum, invoice) => sum + getOutstanding(invoice), 0);
+  const paidInvoices = invoices.filter((invoice) => invoice.status === 'PAID').length;
+  const overdueInvoices = invoices.filter((invoice) => getOutstanding(invoice) > 0).length;
+  const activeMeta = financeSectionMeta[activeSection];
 
   function toggleReminderInvoice(invoiceId: string) {
     setSelectedReminderInvoiceIds((current) =>
@@ -437,22 +486,70 @@ export function FinanceForm() {
 
   return (
     <div className="space-y-6">
-      <section className="shell-card rounded-[28px] p-4 sm:p-5">
+      <section className="relative overflow-hidden rounded-[32px] border border-[var(--line)] bg-gradient-to-br from-gray-950 via-gray-900 to-gray-800 p-6 text-white shadow-sm sm:p-8">
+        <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-32 w-32 rounded-full bg-emerald-400/20 blur-3xl" />
+
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80 ring-1 ring-white/15">
+              {activeMeta.badge}
+            </span>
+            <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
+              {activeMeta.title}
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
+              {activeMeta.description}
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[560px]">
+            <FinanceMetricCard
+              label="Total Outstanding"
+              value={formatCurrency(totalOutstanding)}
+              tone="warning"
+            />
+            <FinanceMetricCard
+              label="Outstanding Invoices"
+              value={String(overdueInvoices)}
+              tone="danger"
+            />
+            <FinanceMetricCard
+              label="Paid Invoices"
+              value={String(paidInvoices)}
+              tone="success"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="sticky top-4 z-20 rounded-[28px] border border-[var(--line)] bg-white/85 p-3 shadow-sm backdrop-blur-xl">
         <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Finance sections">
-          {financeSections.map((section) => (
-            <button
-              key={section}
-              type="button"
-              className={`min-h-11 whitespace-nowrap rounded-full border px-4 text-sm font-semibold transition ${
-                activeSection === section
-                  ? 'border-gray-900 bg-gray-900 text-white shadow-sm'
-                  : 'border-[var(--line)] bg-white text-gray-700 hover:border-gray-900 hover:text-gray-950'
-              }`}
-              onClick={() => setActiveSection(section)}
-            >
-              {section}
-            </button>
-          ))}
+          {financeSections.map((section) => {
+            const isActive = activeSection === section;
+
+            return (
+              <button
+                key={section}
+                type="button"
+                className={`group relative min-h-12 whitespace-nowrap rounded-2xl border px-4 text-sm font-semibold transition-all duration-200 ${
+                  isActive
+                    ? 'border-gray-950 bg-gray-950 text-white shadow-md shadow-gray-900/20'
+                    : 'border-transparent bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-950'
+                }`}
+                onClick={() => setActiveSection(section)}
+              >
+                <span className="flex items-center gap-2">
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      isActive ? 'bg-emerald-400' : 'bg-gray-300 group-hover:bg-gray-500'
+                    }`}
+                  />
+                  {section}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </section>
 
@@ -632,9 +729,9 @@ function CollectionCounterSection({
   submitPayment: () => void;
 }) {
   return (
-    <section className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+    <section className="grid gap-6 xl:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.1fr)]">
       <div className="space-y-6">
-        <div className="shell-card rounded-[28px] p-6">
+        <div className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="label">Collection Counter</p>
@@ -667,10 +764,10 @@ function CollectionCounterSection({
                 <button
                   key={invoice.id}
                   type="button"
-                  className={`min-h-16 rounded-2xl border p-4 text-left transition ${
+                  className={`min-h-16 rounded-3xl border p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
                     selectedInvoice?.id === invoice.id
-                      ? 'border-[var(--teal)] bg-emerald-50'
-                      : 'border-[var(--line)] bg-white hover:border-[var(--teal)]'
+                      ? 'border-emerald-500 bg-emerald-50 shadow-sm ring-2 ring-emerald-100'
+                      : 'border-[var(--line)] bg-white hover:border-emerald-400 hover:bg-emerald-50/40'
                   }`}
                   onClick={() => selectInvoice(invoice)}
                 >
@@ -707,7 +804,7 @@ function CollectionCounterSection({
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-6 xl:sticky xl:top-28 xl:self-start">
         <InvoiceProfileCard invoice={selectedInvoice} outstanding={outstanding} />
         <OutstandingDuesTable invoice={selectedInvoice} lines={selectedInvoiceLines} />
         <InvoiceDetailPanel
@@ -744,7 +841,7 @@ function InvoiceProfileCard({
 }) {
   if (!invoice) {
     return (
-      <section className="shell-card rounded-[28px] p-6">
+      <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
         <p className="label">Selected Student</p>
         <EmptyState
           title="Choose an invoice"
@@ -757,7 +854,7 @@ function InvoiceProfileCard({
   const paidAmount = Number(invoice.paidAmount ?? 0);
 
   return (
-    <section className="shell-card rounded-[28px] p-6">
+    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="label">Selected Student</p>
@@ -792,12 +889,12 @@ function OutstandingDuesTable({
   lines: InvoiceLineForUi[];
 }) {
   return (
-    <section className="shell-card rounded-[28px] p-6">
+    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <p className="label">Outstanding Dues</p>
       {invoice && lines.length > 0 ? (
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[680px] text-left text-sm">
-            <thead className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
+          <table className="w-full min-w-[680px] overflow-hidden rounded-2xl text-left text-sm">
+            <thead className="bg-gray-50 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
               <tr>
                 <th className="py-3 pr-4">Fee Head</th>
                 <th className="py-3 pr-4">Period</th>
@@ -810,7 +907,7 @@ function OutstandingDuesTable({
             </thead>
             <tbody>
               {lines.map((line, index) => (
-                <tr key={line.id ?? index} className="border-t border-[var(--line)]">
+                <tr key={line.id ?? index} className="border-t border-[var(--line)] transition hover:bg-gray-50/80">
                   <td className="py-3 pr-4 font-semibold">
                     {line.feeHead?.name ?? line.feeHeadName ?? line.description ?? 'Fee item'}
                   </td>
@@ -919,7 +1016,7 @@ function InvoiceDetailPanel({
   }
 
   return (
-    <section className="shell-card rounded-[28px] p-6">
+    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="label">Invoice Detail</p>
@@ -961,7 +1058,7 @@ function InvoiceDetailPanel({
             {detail.lines.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[720px] text-left text-sm">
-                  <thead className="text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
+                  <thead className="bg-gray-50 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
                     <tr>
                       <th className="py-3 pr-4">Fee Head</th>
                       <th className="py-3 pr-4">Period</th>
@@ -973,7 +1070,7 @@ function InvoiceDetailPanel({
                   </thead>
                   <tbody>
                     {detail.lines.map((line) => (
-                      <tr key={line.id} className="border-t border-[var(--line)]">
+                      <tr key={line.id} className="border-t border-[var(--line)] transition hover:bg-gray-50/80">
                         <td className="py-3 pr-4 font-semibold">{line.feeHeadName}</td>
                         <td className="py-3 pr-4 text-[var(--muted)]">{line.periodLabel}</td>
                         <td className="py-3 pr-4">{formatCurrency(line.baseAmount)}</td>
@@ -1185,7 +1282,7 @@ function PaymentPanel({
   submitPayment: () => void;
 }) {
   return (
-    <section className="shell-card rounded-[28px] p-6">
+    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <p className="label">Payment Panel</p>
       <div className="mt-4 grid gap-4">
         <label>
@@ -1258,7 +1355,7 @@ function PaymentPanel({
 
         <button
           type="button"
-          className="min-h-12 rounded-2xl bg-[var(--teal)] px-5 py-3 font-semibold text-white disabled:opacity-50"
+          className="min-h-12 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={!selectedInvoice || invalidPaymentAmount || paymentMutation.isPending}
           onClick={submitPayment}
         >
@@ -1282,7 +1379,7 @@ function LedgerPreview({
   const creditAmount = invoice ? Math.min(Math.max(amount, 0), getOutstanding(invoice)) : 0;
 
   return (
-    <section className="shell-card rounded-[28px] p-6">
+    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <p className="label">Ledger Entry Preview</p>
       <p className="mt-2 text-sm text-[var(--muted)]">
         Preview only - backend posts final ledger entry after confirmation.
@@ -1365,7 +1462,7 @@ function FeeSetupSection({
 }) {
   return (
     <section className="grid gap-6 xl:grid-cols-2">
-      <div className="shell-card rounded-[28px] p-6">
+      <div className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
         <p className="label mb-4">Fee Head Setup</p>
         <div className="grid gap-3">
           <input
@@ -1411,7 +1508,7 @@ function FeeSetupSection({
         </div>
       </div>
 
-      <div className="shell-card rounded-[28px] p-6">
+      <div className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
         <p className="label mb-4">Fee Plan Setup</p>
         <div className="grid gap-3">
           <select
@@ -1512,7 +1609,7 @@ function BillingRunsSection({
   billingRunMutation: JsonMutation;
 }) {
   return (
-    <section className="shell-card rounded-[28px] p-6">
+    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <p className="label mb-4">Billing Runs</p>
       <div className="grid gap-3 lg:grid-cols-[1fr_1fr_0.7fr_0.7fr_1fr_auto] lg:items-end">
         <select
@@ -1632,7 +1729,7 @@ function DiscountsAndWaiversSection({
 }) {
   return (
     <section className="grid gap-6 xl:grid-cols-2">
-      <div className="shell-card rounded-[28px] p-6">
+      <div className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
         <p className="label mb-4">Discount Rule</p>
         <div className="grid gap-3">
           <div className="grid gap-3 md:grid-cols-2">
@@ -1760,7 +1857,7 @@ function DiscountsAndWaiversSection({
         </div>
       </div>
 
-      <div className="shell-card rounded-[28px] p-6">
+      <div className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
         <p className="label mb-4">Waiver</p>
         <div className="grid gap-3">
           <select
@@ -1875,7 +1972,7 @@ function DefaultersSection({
   reminderMutation: ReminderMutation;
 }) {
   return (
-    <section className="shell-card rounded-[28px] p-6">
+    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="label">Defaulters</p>
@@ -2028,7 +2125,7 @@ function CashierCloseSection({
   return (
     <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]">
       <div className="space-y-6">
-        <section className="shell-card rounded-[28px] p-6">
+        <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="label">Cashier Close / Day-End</p>
@@ -2159,7 +2256,7 @@ function CashierCloseSection({
 
               <button
                 type="button"
-                className="min-h-12 rounded-2xl bg-[var(--teal)] px-5 py-3 font-semibold text-white disabled:opacity-50"
+                className="min-h-12 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={!canClose}
                 onClick={() => closeMutation.mutate()}
               >
@@ -2172,7 +2269,7 @@ function CashierCloseSection({
         </section>
       </div>
 
-      <section className="shell-card rounded-[28px] p-6">
+      <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
         <p className="label mb-4">Previous Closes</p>
         {closesQuery.isLoading ? (
           <InvoiceSkeleton />
@@ -2236,7 +2333,7 @@ function ReceiptsLedgerSection({
           secondary: `${invoice.student?.name ?? 'Student'} / paid ${formatCurrency(invoice.paidAmount)} of ${formatCurrency(invoice.totalAmount)}`,
         }))}
       />
-      <section className="shell-card rounded-[28px] p-6">
+      <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
         <p className="label mb-4">Receipts</p>
         <div className="grid gap-3">
           {receiptsLoading ? (
@@ -2262,7 +2359,7 @@ function ReceiptsLedgerSection({
           )}
         </div>
       </section>
-      <section className="shell-card rounded-[28px] p-6">
+      <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
         <p className="label mb-4">Ledger</p>
         <div className="grid gap-3">
           {ledgerLoading ? (
@@ -2294,7 +2391,7 @@ function SummaryList({
   items: Array<{ id: string; primary: string; secondary: string }>;
 }) {
   return (
-    <section className="shell-card rounded-[28px] p-6">
+    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <p className="label mb-4">{title}</p>
       <div className="grid gap-3">
         {items.length > 0 ? (
@@ -2309,6 +2406,33 @@ function SummaryList({
         )}
       </div>
     </section>
+  );
+}
+
+
+function FinanceMetricCard({
+  label,
+  value,
+  tone = 'neutral',
+}: {
+  label: string;
+  value: string;
+  tone?: 'neutral' | 'success' | 'warning' | 'danger';
+}) {
+  const toneClass = {
+    neutral: 'bg-white/10 text-white ring-white/15',
+    success: 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/20',
+    warning: 'bg-amber-400/15 text-amber-100 ring-amber-300/20',
+    danger: 'bg-rose-400/15 text-rose-100 ring-rose-300/20',
+  }[tone];
+
+  return (
+    <div className={`rounded-2xl p-4 ring-1 ${toneClass}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-75">
+        {label}
+      </p>
+      <p className="mt-2 text-xl font-bold">{value}</p>
+    </div>
   );
 }
 

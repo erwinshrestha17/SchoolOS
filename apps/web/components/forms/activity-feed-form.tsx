@@ -25,6 +25,41 @@ const activitySections = [
   'Delivery Records',
 ] as const;
 
+const activitySectionMeta: Record<
+  ActivitySection,
+  {
+    title: string;
+    description: string;
+    badge: string;
+  }
+> = {
+  'Create Post': {
+    title: 'Activity Feed',
+    description: 'Capture classroom moments, tag students, and notify guardians with private media.',
+    badge: 'Composer',
+  },
+  'Feed Preview': {
+    title: 'Feed Preview',
+    description: 'Review recently published classroom posts, attachments, tags, and reactions.',
+    badge: 'Guardian View',
+  },
+  'Mood Logs': {
+    title: 'Mood Logs',
+    description: 'Record daily emotional context for whole classes, sections, or individual children.',
+    badge: 'Wellbeing',
+  },
+  Milestones: {
+    title: 'Development Milestones',
+    description: 'Track Montessori and ECE observations with clear child-level progress evidence.',
+    badge: 'Progress',
+  },
+  'Delivery Records': {
+    title: 'Delivery Records',
+    description: 'Audit guardian notification delivery records generated from activity posts.',
+    badge: 'Audit Trail',
+  },
+};
+
 const activityCategories = [
   'LEARNING',
   'OUTDOOR_PLAY',
@@ -307,24 +342,77 @@ export function ActivityFeedForm() {
     }));
   }
 
+  const posts = postsQuery.data ?? [];
+  const moodLogs = moodLogsQuery.data ?? [];
+  const milestones = milestonesQuery.data ?? [];
+  const activeMeta = activitySectionMeta[activeSection];
+
   return (
     <div className="space-y-6">
-      <section className="shell-card rounded-[28px] p-4 sm:p-5">
+      <section className="relative overflow-hidden rounded-[32px] border border-[var(--line)] bg-gradient-to-br from-gray-950 via-slate-900 to-emerald-950 p-6 text-white shadow-sm sm:p-8">
+        <div className="absolute right-0 top-0 h-44 w-44 rounded-full bg-emerald-400/20 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-36 w-36 rounded-full bg-white/10 blur-3xl" />
+
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80 ring-1 ring-white/15">
+              {activeMeta.badge}
+            </span>
+            <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
+              {activeMeta.title}
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
+              {activeMeta.description}
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[560px]">
+            <ActivityMetricCard
+              label="Published Posts"
+              value={String(posts.length)}
+              tone="success"
+            />
+            <ActivityMetricCard
+              label="Mood Logs"
+              value={String(moodLogs.length)}
+              tone="info"
+            />
+            <ActivityMetricCard
+              label="Milestones"
+              value={String(milestones.length)}
+              tone="warning"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="sticky top-4 z-20 rounded-[30px] border border-[var(--line)] bg-white/85 p-3 shadow-sm backdrop-blur-xl">
         <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Activity feed sections">
-          {activitySections.map((section) => (
-            <button
-              key={section}
-              type="button"
-              className={`min-h-11 whitespace-nowrap rounded-full px-4 text-sm font-semibold transition ${
-                activeSection === section
-                  ? 'bg-[var(--ink)] text-white shadow-sm'
-                  : 'border border-[var(--line)] bg-white text-[var(--muted)] hover:text-[var(--ink)]'
-              }`}
-              onClick={() => setActiveSection(section)}
-            >
-              {section}
-            </button>
-          ))}
+          {activitySections.map((section) => {
+            const isActive = activeSection === section;
+
+            return (
+              <button
+                key={section}
+                type="button"
+                className={`group min-h-12 whitespace-nowrap rounded-2xl border px-4 text-sm font-semibold transition-all duration-200 ${
+                  isActive
+                    ? 'border-gray-950 bg-gray-950 text-white shadow-md shadow-gray-900/20'
+                    : 'border-transparent bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-950'
+                }`}
+                onClick={() => setActiveSection(section)}
+              >
+                <span className="flex items-center gap-2">
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      isActive ? 'bg-emerald-400' : 'bg-gray-300 group-hover:bg-gray-500'
+                    }`}
+                  />
+                  {section}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </section>
 
@@ -350,7 +438,7 @@ export function ActivityFeedForm() {
 
       {activeSection === 'Feed Preview' ? (
         <FeedPreviewSection
-          posts={postsQuery.data ?? []}
+          posts={posts}
           isLoading={postsQuery.isLoading}
           students={students}
           reactionMutation={reactionMutation}
@@ -364,7 +452,7 @@ export function ActivityFeedForm() {
           setMoodLog={setMoodLog}
           sections={moodSections}
           students={moodStudents}
-          logs={moodLogsQuery.data ?? []}
+          logs={moodLogs}
           logsLoading={moodLogsQuery.isLoading}
           mutationError={moodMutation.isError ? moodMutation.error.message : null}
           isPending={moodMutation.isPending}
@@ -389,7 +477,7 @@ export function ActivityFeedForm() {
           allStudents={students}
           filters={milestoneFilters}
           setFilters={setMilestoneFilters}
-          milestones={milestonesQuery.data ?? []}
+          milestones={milestones}
           milestonesLoading={milestonesQuery.isLoading}
           mutationError={milestoneMutation.isError ? milestoneMutation.error.message : null}
           isPending={milestoneMutation.isPending}
@@ -456,8 +544,8 @@ function CreatePostSection({
       : 'Whole class';
 
   return (
-    <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-      <div className="shell-card rounded-[28px] p-6">
+    <section className="grid gap-6 xl:grid-cols-[minmax(0,1.12fr)_minmax(340px,0.88fr)]">
+      <div className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="label">Activity Composer</p>
@@ -524,7 +612,7 @@ function CreatePostSection({
               </label>
             </div>
 
-            <div className="rounded-3xl border border-[var(--line)] bg-white/70 p-4">
+            <div className="rounded-3xl border border-[var(--line)] bg-white/80 p-4 shadow-sm">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="label">Audience</p>
@@ -545,10 +633,10 @@ function CreatePostSection({
                       <button
                         key={student.id}
                         type="button"
-                        className={`min-h-11 rounded-full border px-3 text-xs font-semibold ${
+                        className={`min-h-11 rounded-full border px-3 text-xs font-semibold transition-all hover:-translate-y-0.5 ${
                           selected
-                            ? 'border-[var(--teal)] bg-[var(--teal)] text-white'
-                            : 'border-[var(--line)] bg-white text-gray-700'
+                            ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
+                            : 'border-[var(--line)] bg-white text-gray-700 hover:border-emerald-400 hover:bg-emerald-50'
                         }`}
                         onClick={() => toggleStudent(student.id)}
                       >
@@ -619,14 +707,14 @@ function CreatePostSection({
                 />
               </label>
               <p className="mt-2 text-sm text-[var(--muted)]">
-                Attach 1 to 5 images. Files are stored privately; permanent public URLs are not shown.
+                Attach 1 to 5 images. Files stay private; permanent public URLs are not shown.
               </p>
               {selectedFiles.length > 0 ? (
                 <div className="mt-3 grid gap-2">
                   {selectedFiles.map((file) => (
                     <div
                       key={`${file.name}-${file.size}`}
-                      className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
+                      className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm shadow-sm"
                     >
                       <span className="font-semibold">{file.name}</span>
                       <span className="text-[var(--muted)]"> / {formatFileSize(file.size)}</span>
@@ -642,7 +730,7 @@ function CreatePostSection({
 
             <button
               type="button"
-              className="min-h-12 rounded-2xl bg-[var(--ink)] px-5 py-3 font-semibold text-white disabled:opacity-50"
+              className="min-h-12 rounded-2xl bg-gradient-to-r from-gray-950 to-gray-800 px-5 py-3 font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={
                 !post.classId ||
                 post.caption.trim().length < 2 ||
@@ -687,7 +775,7 @@ function ReviewPanel({
   category: string;
 }) {
   return (
-    <section className="shell-card rounded-[28px] p-6">
+    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm xl:sticky xl:top-28 xl:self-start">
       <p className="label">Review Before Publish</p>
       <div className="mt-4 grid gap-3">
         <Fact label="Audience" value={audienceLabel} />
@@ -695,7 +783,7 @@ function ReviewPanel({
         <Fact label="Category" value={formatEnumLabel(category)} />
         <Fact label="Photo Count" value={`${photoCount} image${photoCount === 1 ? '' : 's'}`} />
       </div>
-      <div className="mt-4 rounded-2xl border border-[var(--line)] bg-white/70 p-4">
+      <div className="mt-4 rounded-2xl border border-[var(--line)] bg-white/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
         <p className="font-semibold text-gray-950">Tagged students</p>
         <p className="mt-1 text-sm text-[var(--muted)]">
           {selectedStudents.length > 0
@@ -722,7 +810,7 @@ function FeedPreviewSection({
   reactionMutation: ReactionMutation;
 }) {
   return (
-    <section className="shell-card rounded-[28px] p-6">
+    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <p className="label">Feed Preview</p>
       <h2 className="mt-2 text-xl font-bold text-gray-950">Recent classroom moments</h2>
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
@@ -761,7 +849,7 @@ function PostCard({
   const actor = findReactionActor(students, taggedStudentIds);
 
   return (
-    <article className="rounded-[24px] border border-[var(--line)] bg-white/75 p-5">
+    <article className="rounded-[26px] border border-[var(--line)] bg-white/75 p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="font-bold text-gray-950">{post.title}</h3>
@@ -866,7 +954,7 @@ function MoodLogsSection({
 }) {
   return (
     <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-      <div className="shell-card rounded-[28px] p-6">
+      <div className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
         <p className="label">Daily Mood Log</p>
         <p className="mt-2 text-sm text-[var(--muted)]">
           Record whole-class mood or a child-specific observation for parent context.
@@ -940,7 +1028,7 @@ function MoodLogsSection({
           {mutationError ? <InlineMessage tone="error" message={mutationError} /> : null}
           <button
             type="button"
-            className="min-h-12 rounded-2xl bg-[var(--teal)] px-5 py-3 font-semibold text-white disabled:opacity-50"
+            className="min-h-12 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!moodLog.classId || isPending}
             onClick={saveMoodLog}
           >
@@ -952,7 +1040,7 @@ function MoodLogsSection({
       <HistoryCard title="Mood History" isLoading={logsLoading}>
         {logs.length > 0 ? (
           logs.slice(0, 8).map((item) => (
-            <div key={item.id} className="rounded-2xl border border-[var(--line)] bg-white/70 p-4">
+            <div key={item.id} className="rounded-2xl border border-[var(--line)] bg-white/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
               <p className="font-semibold">
                 {formatEnumLabel(item.mood)}
                 {item.student
@@ -1004,7 +1092,7 @@ function MilestonesSection({
 }) {
   return (
     <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-      <div className="shell-card rounded-[28px] p-6">
+      <div className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
         <p className="label">Montessori / ECE Milestones</p>
         <p className="mt-2 text-sm text-[var(--muted)]">
           Track developmental observations without public photo URLs.
@@ -1118,7 +1206,7 @@ function MilestonesSection({
           {mutationError ? <InlineMessage tone="error" message={mutationError} /> : null}
           <button
             type="button"
-            className="min-h-12 rounded-2xl bg-[var(--accent)] px-5 py-3 font-semibold text-white disabled:opacity-50"
+            className="min-h-12 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!milestone.classId || !milestone.studentId || isPending}
             onClick={saveMilestone}
           >
@@ -1159,7 +1247,7 @@ function MilestonesSection({
         <div className="mt-4 grid gap-3">
           {milestones.length > 0 ? (
             milestones.slice(0, 8).map((item) => (
-              <div key={item.id} className="rounded-2xl border border-[var(--line)] bg-white/70 p-4">
+              <div key={item.id} className="rounded-2xl border border-[var(--line)] bg-white/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                 <p className="font-semibold">{item.milestone}</p>
                 <p className="text-sm text-[var(--muted)]">
                   {item.domain} / {formatEnumLabel(item.status)} / {formatDate(item.observedAt)}
@@ -1186,7 +1274,7 @@ function DeliveryRecordsSection({
   isLoading: boolean;
 }) {
   return (
-    <section className="shell-card rounded-[28px] p-6">
+    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <p className="label">Activity Delivery Records</p>
       <h2 className="mt-2 text-xl font-bold text-gray-950">Guardian notification delivery</h2>
       <div className="mt-5 grid gap-3 md:grid-cols-2">
@@ -1194,7 +1282,7 @@ function DeliveryRecordsSection({
           <SkeletonList />
         ) : deliveries.length > 0 ? (
           deliveries.slice(0, 10).map((delivery) => (
-            <div key={delivery.id} className="rounded-2xl border border-[var(--line)] bg-white/70 p-4">
+            <div key={delivery.id} className="rounded-2xl border border-[var(--line)] bg-white/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
               <div className="flex items-start justify-between gap-3">
                 <p className="font-semibold">{delivery.title}</p>
                 <StatusBadge status={delivery.status} />
@@ -1226,16 +1314,42 @@ function HistoryCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="shell-card rounded-[28px] p-6">
+    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <p className="label mb-4">{title}</p>
       {isLoading ? <SkeletonList /> : children}
     </section>
   );
 }
 
+function ActivityMetricCard({
+  label,
+  value,
+  tone = 'neutral',
+}: {
+  label: string;
+  value: string;
+  tone?: 'neutral' | 'success' | 'warning' | 'info';
+}) {
+  const toneClass = {
+    neutral: 'bg-white/10 text-white ring-white/15',
+    success: 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/20',
+    warning: 'bg-amber-400/15 text-amber-100 ring-amber-300/20',
+    info: 'bg-sky-400/15 text-sky-100 ring-sky-300/20',
+  }[tone];
+
+  return (
+    <div className={`rounded-2xl p-4 ring-1 ${toneClass}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-75">
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-bold">{value}</p>
+    </div>
+  );
+}
+
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-[var(--line)] bg-white/70 p-4">
+    <div className="rounded-2xl border border-[var(--line)] bg-white/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <p className="label">{label}</p>
       <p className="mt-1 font-semibold text-gray-950">{value}</p>
     </div>
@@ -1244,7 +1358,7 @@ function Fact({ label, value }: { label: string; value: string }) {
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-full border border-[var(--line)] bg-white px-3 py-1 text-xs font-semibold text-[var(--muted)]">
+    <span className="rounded-full border border-[var(--line)] bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700">
       {children}
     </span>
   );
@@ -1272,7 +1386,10 @@ function StatusBadge({ status }: { status: string }) {
 
 function EmptyState({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-[var(--line)] bg-white/60 p-5 text-sm">
+    <div className="rounded-2xl border border-dashed border-[var(--line)] bg-gray-50/80 p-5 text-sm">
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg shadow-sm">
+        ✦
+      </div>
       <p className="font-semibold text-gray-950">{title}</p>
       <p className="mt-1 text-[var(--muted)]">{body}</p>
     </div>
@@ -1297,7 +1414,7 @@ function SkeletonList() {
   return (
     <div className="grid gap-3">
       {[0, 1, 2].map((item) => (
-        <div key={item} className="h-24 animate-pulse rounded-2xl bg-gray-100" />
+        <div key={item} className="h-24 animate-pulse rounded-2xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
       ))}
     </div>
   );

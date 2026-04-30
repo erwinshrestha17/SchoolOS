@@ -35,6 +35,36 @@ const workspaceTabs = [
   ['recent', 'Recent Admissions'],
 ] as const;
 
+const workspaceMeta: Record<
+  WorkspaceTab,
+  {
+    title: string;
+    description: string;
+    badge: string;
+  }
+> = {
+  directory: {
+    title: 'Student Admissions',
+    description: 'Search student records, open generated PDFs, and manage the student directory.',
+    badge: 'Directory',
+  },
+  enrollment: {
+    title: 'New Enrollment',
+    description: 'Create a complete admission record with placement, guardians, documents, and review checks.',
+    badge: 'Wizard',
+  },
+  bulk: {
+    title: 'Bulk Import',
+    description: 'Paste CSV admissions, validate rows, handle duplicates, and create records in batches.',
+    badge: 'CSV Import',
+  },
+  recent: {
+    title: 'Recent Admissions',
+    description: 'Review newly enrolled students with guardian, invoice, and document actions.',
+    badge: 'Audit View',
+  },
+};
+
 type WorkspaceTab = (typeof workspaceTabs)[number][0];
 
 export function AdmissionForm() {
@@ -283,32 +313,73 @@ export function AdmissionForm() {
     }
   }
 
+  const admissions = admissionsQuery.data ?? [];
+  const students = studentsQuery.data ?? [];
+  const latestInvoices = admissions.filter((admission) => admission.latestInvoice).length;
+  const activeMeta = workspaceMeta[activeWorkspaceTab];
+
   return (
     <div className="grid gap-6">
+      <section className="relative overflow-hidden rounded-[32px] border border-[var(--line)] bg-gradient-to-br from-gray-950 via-slate-900 to-indigo-950 p-6 text-white shadow-sm sm:p-8">
+        <div className="absolute right-0 top-0 h-44 w-44 rounded-full bg-indigo-400/20 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-36 w-36 rounded-full bg-white/10 blur-3xl" />
+
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80 ring-1 ring-white/15">
+              {activeMeta.badge}
+            </span>
+            <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
+              {activeMeta.title}
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
+              {activeMeta.description}
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[560px]">
+            <AdmissionMetricCard label="Admissions" value={String(admissions.length)} tone="success" />
+            <AdmissionMetricCard label="Students" value={String(students.length)} tone="info" />
+            <AdmissionMetricCard label="Invoices" value={String(latestInvoices)} tone="warning" />
+          </div>
+        </div>
+      </section>
+
       <div
-        className="grid gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-2 md:grid-cols-4"
+        className="sticky top-4 z-20 grid gap-2 rounded-[28px] border border-[var(--line)] bg-white/85 p-2 shadow-sm backdrop-blur-xl md:grid-cols-4"
         aria-label="Students workspace sections"
       >
-        {workspaceTabs.map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            className={`min-h-11 rounded-xl px-4 text-sm font-semibold transition-colors ${
-              activeWorkspaceTab === value
-                ? 'bg-gray-900 text-white shadow-sm'
-                : 'bg-white text-gray-600 hover:bg-gray-100'
-            }`}
-            onClick={() => setActiveWorkspaceTab(value)}
-          >
-            {label}
-          </button>
-        ))}
+        {workspaceTabs.map(([value, label]) => {
+          const isActive = activeWorkspaceTab === value;
+
+          return (
+            <button
+              key={value}
+              type="button"
+              className={`group min-h-12 rounded-2xl px-4 text-sm font-semibold transition-all duration-200 ${
+                isActive
+                  ? 'bg-gray-950 text-white shadow-md shadow-gray-900/20'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-950'
+              }`}
+              onClick={() => setActiveWorkspaceTab(value)}
+            >
+              <span className="flex items-center justify-center gap-2">
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    isActive ? 'bg-emerald-400' : 'bg-gray-300 group-hover:bg-gray-500'
+                  }`}
+                />
+                {label}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {activeWorkspaceTab === 'directory' ? (
         <StudentDirectory
           academicYears={academicYearsQuery.data ?? []}
-          admissions={admissionsQuery.data ?? []}
+          admissions={admissions}
           classes={classesQuery.data ?? []}
           isError={
             academicYearsQuery.isError ||
@@ -326,7 +397,7 @@ export function AdmissionForm() {
           }
           pdfError={pdfError}
           sections={sectionsQuery.data ?? []}
-          students={studentsQuery.data ?? []}
+          students={students}
           onOpenPdf={(studentId, kind) => void openStudentPdf(studentId, kind)}
         />
       ) : null}
@@ -381,7 +452,7 @@ export function AdmissionForm() {
                 </select>
               </Field>
             </div>
-            <fieldset className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+            <fieldset className="mt-5 rounded-2xl border border-gray-200 bg-gray-50/80 p-4 shadow-sm">
               <legend className="label px-2">Disability status / iEMIS requirement</legend>
               <p className="mt-2 text-sm leading-6 text-gray-500">
                 iEMIS requires either explicit confirmation of no known disability or a
@@ -556,7 +627,7 @@ export function AdmissionForm() {
               action={
                 <button
                   type="button"
-                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-200 px-4 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-gray-50 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={guardians.fields.length >= 3}
                   onClick={() =>
                     guardians.append({
@@ -575,7 +646,7 @@ export function AdmissionForm() {
               {guardians.fields.map((field, index) => (
                 <div
                   key={field.id}
-                  className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
+                  className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 shadow-sm transition hover:shadow-md"
                 >
                   <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
@@ -660,7 +731,7 @@ export function AdmissionForm() {
               description="Attach an admission document, review the placement, and submit the enrollment."
             >
             <div className="grid gap-5 lg:grid-cols-[1fr_0.9fr]">
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+              <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 shadow-sm">
                 <p className="label mb-4">Admission Document</p>
                 <div className="grid gap-3 md:grid-cols-[220px_1fr]">
                   <select
@@ -734,7 +805,7 @@ export function AdmissionForm() {
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
               <button
                 type="button"
-                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-200 px-4 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-gray-50 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={activeStep === 0}
                 onClick={() => setActiveStep((step) => Math.max(0, step - 1))}
               >
@@ -743,14 +814,14 @@ export function AdmissionForm() {
               {activeStep < 3 ? (
                 <button
                   type="button"
-                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-gray-900 px-5 text-sm font-semibold text-white"
+                  className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-gradient-to-r from-gray-950 to-gray-800 px-5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                   onClick={() => void goToNextStep()}
                 >
                   Continue
                 </button>
               ) : (
                 <button
-                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-primary-600 px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={mutation.isPending || setupIsMissing}
                 >
                   {mutation.isPending ? 'Creating admission...' : 'Create admission'}
@@ -774,14 +845,40 @@ export function AdmissionForm() {
 
       {activeWorkspaceTab === 'recent' ? (
         <RecentAdmissions
-          admissions={admissionsQuery.data ?? []}
+          admissions={admissions}
           isError={admissionsQuery.isError}
           isLoading={admissionsQuery.isLoading}
           pdfError={pdfError}
-          students={studentsQuery.data ?? []}
+          students={students}
           onOpenPdf={(studentId, kind) => void openStudentPdf(studentId, kind)}
         />
       ) : null}
+    </div>
+  );
+}
+
+function AdmissionMetricCard({
+  label,
+  value,
+  tone = 'neutral',
+}: {
+  label: string;
+  value: string;
+  tone?: 'neutral' | 'success' | 'warning' | 'info';
+}) {
+  const toneClass = {
+    neutral: 'bg-white/10 text-white ring-white/15',
+    success: 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/20',
+    warning: 'bg-amber-400/15 text-amber-100 ring-amber-300/20',
+    info: 'bg-sky-400/15 text-sky-100 ring-sky-300/20',
+  }[tone];
+
+  return (
+    <div className={`rounded-2xl p-4 ring-1 ${toneClass}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-75">
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-bold">{value}</p>
     </div>
   );
 }
@@ -794,29 +891,42 @@ function Stepper({
   completed: boolean;
 }) {
   return (
-    <div className="grid gap-2 sm:grid-cols-5" aria-label="Admission steps">
-      {enrollmentSteps.map((label, index) => {
-        const isActive = index === activeStep;
-        const isDone = completed || index < activeStep;
+    <div className="rounded-[28px] border border-[var(--line)] bg-white/90 p-3 shadow-sm backdrop-blur-sm">
+      <div className="grid gap-2 sm:grid-cols-5" aria-label="Admission steps">
+        {enrollmentSteps.map((label, index) => {
+          const isActive = index === activeStep;
+          const isDone = completed || index < activeStep;
 
-        return (
-          <div
-            key={label}
-            className={`rounded-2xl border p-3 text-sm ${
-              isActive
-                ? 'border-primary-200 bg-primary-50 text-primary-700'
-                : isDone
-                  ? 'border-success-200 bg-success-50 text-success-600'
-                  : 'border-gray-200 bg-white text-gray-500'
-            }`}
-          >
-            <span className="block text-xs font-semibold uppercase tracking-[0.14em]">
-              Step {index + 1}
-            </span>
-            <span className="mt-1 block font-semibold">{label}</span>
-          </div>
-        );
-      })}
+          return (
+            <div
+              key={label}
+              className={`rounded-2xl border p-3 text-sm transition ${
+                isActive
+                  ? 'border-indigo-200 bg-indigo-50 text-indigo-700 shadow-sm'
+                  : isDone
+                    ? 'border-success-200 bg-success-50 text-success-600'
+                    : 'border-gray-200 bg-white text-gray-500'
+              }`}
+            >
+              <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em]">
+                <span
+                  className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] ${
+                    isActive
+                      ? 'bg-indigo-600 text-white'
+                      : isDone
+                        ? 'bg-success-600 text-white'
+                        : 'bg-gray-100 text-gray-500'
+                  }`}
+                >
+                  {isDone ? '✓' : index + 1}
+                </span>
+                Step {index + 1}
+              </span>
+              <span className="mt-2 block font-semibold">{label}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -835,12 +945,14 @@ function StepCard({
   title: string;
 }) {
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <section className="rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="label mb-2">{eyebrow}</p>
-          <h2 className="text-xl font-bold text-gray-900">{title}</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500">
+          <span className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+            {eyebrow}
+          </span>
+          <h2 className="mt-3 text-2xl font-bold text-gray-950">{title}</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
             {description}
           </p>
         </div>
@@ -877,7 +989,7 @@ function SetupRequiredCard({
   hasClasses: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+    <div className="rounded-[28px] border border-amber-200 bg-amber-50 p-5 shadow-sm text-sm text-amber-900">
       <p className="font-semibold">Setup required before enrollment</p>
       <p className="mt-2 leading-6">
         {!hasAcademicYears ? 'Create at least one academic year. ' : ''}
@@ -886,7 +998,7 @@ function SetupRequiredCard({
       </p>
       <Link
         href="/dashboard/settings"
-        className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-amber-900 px-4 text-sm font-semibold text-white"
+        className="mt-4 inline-flex min-h-11 items-center rounded-2xl bg-amber-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"
       >
         Open setup
       </Link>
@@ -896,12 +1008,12 @@ function SetupRequiredCard({
 
 function SetupSkeleton() {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
-      <div className="h-4 w-40 animate-pulse rounded-full bg-gray-100" />
+    <div className="rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
+      <div className="h-4 w-40 animate-pulse rounded-full bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
       <div className="mt-4 grid gap-3 md:grid-cols-3">
-        <div className="h-12 animate-pulse rounded-xl bg-gray-100" />
-        <div className="h-12 animate-pulse rounded-xl bg-gray-100" />
-        <div className="h-12 animate-pulse rounded-xl bg-gray-100" />
+        <div className="h-12 animate-pulse rounded-xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
+        <div className="h-12 animate-pulse rounded-xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
+        <div className="h-12 animate-pulse rounded-xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
       </div>
     </div>
   );
@@ -925,7 +1037,7 @@ function ReviewCard({
   studentName: string;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4">
+    <div className="rounded-2xl border border-gray-200 bg-white/90 p-4 shadow-sm">
       <p className="label mb-4">Review</p>
       <dl className="grid gap-3 text-sm">
         <ReviewItem label="Student" value={studentName || 'Not entered'} />
@@ -944,7 +1056,7 @@ function ReviewCard({
 
 function ReviewItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-4">
+    <div className="flex justify-between gap-4 rounded-xl bg-gray-50 px-3 py-2">
       <dt className="text-gray-500">{label}</dt>
       <dd className="text-right font-semibold text-gray-900">{value}</dd>
     </div>
@@ -972,7 +1084,7 @@ function DuplicateWarning({
       </div>
       <button
         type="button"
-        className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-warning-600 px-4 text-sm font-semibold text-white"
+        className="mt-4 inline-flex min-h-11 items-center rounded-2xl bg-warning-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"
         onClick={onCreateAnyway}
       >
         Create anyway
@@ -993,7 +1105,7 @@ function SuccessPanel({
   pdfError: string;
 }) {
   return (
-    <section className="rounded-2xl border border-success-200 bg-success-50 p-5">
+    <section className="rounded-[30px] border border-success-200 bg-success-50 p-6 shadow-sm">
       <p className="label mb-3 text-success-600">Success / Next Actions</p>
       <h2 className="text-xl font-bold text-gray-900">
         {latestAdmission.student.fullNameEn} enrolled as{' '}
@@ -1015,13 +1127,13 @@ function SuccessPanel({
       <div className="mt-5 flex flex-wrap gap-3">
         <Link
           href="/dashboard/finance"
-          className="inline-flex min-h-11 items-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white"
+          className="inline-flex min-h-11 items-center rounded-2xl bg-gradient-to-r from-gray-950 to-gray-800 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"
         >
           Collect First Fee
         </Link>
         <button
           type="button"
-          className="inline-flex min-h-11 items-center rounded-xl border border-success-200 bg-white px-4 text-sm font-semibold text-success-600"
+          className="inline-flex min-h-11 items-center rounded-2xl border border-success-200 bg-white px-4 text-sm font-semibold text-success-600 shadow-sm transition hover:-translate-y-0.5"
           onClick={() => onOpenPdf('id-card')}
         >
           Download ID Card
@@ -1032,7 +1144,7 @@ function SuccessPanel({
         />
         <button
           type="button"
-          className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700"
+          className="inline-flex min-h-11 items-center rounded-2xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-gray-50"
           onClick={onAddAnother}
         >
           Add Another Student
@@ -1059,7 +1171,7 @@ function BulkImportPanel({
   setBulkCsv: (value: string) => void;
 }) {
   return (
-    <details className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+    <details className="rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <summary className="cursor-pointer text-base font-bold text-gray-900">
         Bulk Import
       </summary>
@@ -1085,14 +1197,14 @@ function BulkImportPanel({
       <div className="mt-4 flex flex-wrap gap-3">
         <button
           type="button"
-          className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 px-4 text-sm font-semibold text-gray-700"
+          className="inline-flex min-h-11 items-center rounded-2xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-gray-50"
           onClick={() => setBulkCsv(sampleBulkCsv)}
         >
           Insert headers
         </button>
         <button
           type="button"
-          className="inline-flex min-h-11 items-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white disabled:opacity-50"
+          className="inline-flex min-h-11 items-center rounded-2xl bg-gradient-to-r from-gray-950 to-gray-800 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:opacity-50"
           disabled={!bulkCsv.trim() || bulkMutation.isPending}
           onClick={() =>
             bulkMutation.mutate({
@@ -1105,7 +1217,7 @@ function BulkImportPanel({
         </button>
       </div>
       {bulkMutation.data ? (
-        <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+        <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50/80 p-4 shadow-sm text-sm text-gray-600">
           <p className="font-semibold text-gray-900">
             Rows {bulkMutation.data.totalRows}, created {bulkMutation.data.created},
             failed {bulkMutation.data.failed}
@@ -1156,12 +1268,12 @@ function RecentAdmissions({
   students: Awaited<ReturnType<typeof api.listStudents>>;
 }) {
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+    <section className="rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <p className="label mb-4">Recent Admissions</p>
       {isLoading ? (
         <div className="grid gap-3">
-          <div className="h-24 animate-pulse rounded-2xl bg-gray-100" />
-          <div className="h-24 animate-pulse rounded-2xl bg-gray-100" />
+          <div className="h-24 animate-pulse rounded-2xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
+          <div className="h-24 animate-pulse rounded-2xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
         </div>
       ) : null}
       {isError ? (
@@ -1179,7 +1291,7 @@ function RecentAdmissions({
             return (
               <div
                 key={admission.id}
-                className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
+                className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
               >
                 <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                   <div>
@@ -1218,7 +1330,7 @@ function RecentAdmissions({
             );
           })}
           {admissions.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5 text-center">
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 p-6 text-center">
               <p className="font-semibold text-gray-900">No admissions yet.</p>
               <p className="mt-2 text-sm text-gray-500">
                 Completed enrollments will appear here with guardian, invoice, and
@@ -1253,7 +1365,7 @@ function GeneratedPdfActions({
         <button
           key={kind}
           type="button"
-          className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700"
+          className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-gray-50"
           onClick={() => onOpen(kind)}
         >
           Open {label}
