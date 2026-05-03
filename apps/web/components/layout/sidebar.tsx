@@ -80,7 +80,12 @@ export const dashboardNavItems: NavItem[] = [
     href: '/dashboard/settings',
     label: 'Settings',
     icon: Settings,
-    permissions: ['roles:read', 'classes:read', 'academic_years:read'],
+    permissions: [
+      'settings:read',
+      'roles:read',
+      'classes:read',
+      'academic_years:read',
+    ],
     phase: 'phase1',
   },
   {
@@ -123,13 +128,6 @@ export const dashboardNavItems: NavItem[] = [
     phase: 'future',
     disabled: true,
   },
-  {
-    href: '/dashboard/settings',
-    label: 'Settings',
-    icon: Settings,
-    permissions: ['settings:read'],
-    phase: 'phase1',
-  },
 ];
 
 export const platformNavItems: NavItem[] = [
@@ -143,7 +141,7 @@ export const platformNavItems: NavItem[] = [
   {
     href: '/platform/schools',
     label: 'Manage Schools',
-    icon: School, // Assuming School icon is available or imported
+    icon: School,
     phase: 'phase1',
     permissions: ['platform:manage'],
   },
@@ -168,8 +166,8 @@ export function Sidebar({
   const visiblePrimaryItems = dashboardNavItems.filter(
     (item) => item.phase === 'phase1' && canSeeNavItem(item, session),
   );
-  const visiblePlatformItems = platformNavItems.filter(
-    (item) => canSeeNavItem(item, session),
+  const visiblePlatformItems = platformNavItems.filter((item) =>
+    canSeeNavItem(item, session),
   );
   const futureItems = dashboardNavItems.filter((item) => item.phase === 'future');
 
