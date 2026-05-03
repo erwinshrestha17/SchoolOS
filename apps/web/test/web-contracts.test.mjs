@@ -110,11 +110,33 @@ describe('SchoolOS web production contracts', () => {
       'createConversation',
       'createMessage',
       'markMessageRead',
+      'listPlatformTenants',
+      'getPlatformTenantDetail',
+      'updatePlatformTenantStatus',
     ];
 
     for (const helper of requiredHelpers) {
       assert.match(apiClient, new RegExp(`${helper}:`), `Missing API helper: ${helper}`);
     }
+  });
+
+  it('keeps platform administration routes present and secure', () => {
+    const platformRoutes = [
+      'dashboard',
+      'schools',
+    ];
+
+    for (const route of platformRoutes) {
+      assert.equal(
+        existsSync(join(webRoot, `app/platform/${route}/page.tsx`)),
+        true,
+        `Missing platform route: ${route}`,
+      );
+    }
+
+    const layout = read('app/platform/layout.tsx');
+    assert.match(layout, /platform_super_admin|platform_support|platform_billing_admin/);
+    assert.match(layout, /router\.push\('\/dashboard'\)/);
   });
 
   it('does not keep raw demo replacement IDs in production-facing forms', () => {
@@ -190,7 +212,9 @@ describe('SchoolOS web production contracts', () => {
 
     assert.match(sidebar, /export const dashboardNavItems/);
     assert.match(sidebar, /visiblePrimaryItems = dashboardNavItems\.filter/);
+    assert.match(sidebar, /visiblePlatformItems = platformNavItems\.filter/);
     assert.match(sidebar, /canSeeNavItem\(item, session\)/);
+    assert.match(sidebar, /label: 'Platform Control'/);
 
     for (const label of requiredPhaseOneLabels) {
       assert.match(sidebar, new RegExp(label.replace('/', '\\/')));

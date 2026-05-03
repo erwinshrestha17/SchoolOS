@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Lock,
+  School,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -124,6 +125,23 @@ export const dashboardNavItems: NavItem[] = [
   },
 ];
 
+export const platformNavItems: NavItem[] = [
+  {
+    href: '/platform/dashboard',
+    label: 'Platform Overview',
+    icon: LayoutDashboard,
+    phase: 'phase1',
+    permissions: ['platform:read'],
+  },
+  {
+    href: '/platform/schools',
+    label: 'Manage Schools',
+    icon: School, // Assuming School icon is available or imported
+    phase: 'phase1',
+    permissions: ['platform:manage'],
+  },
+];
+
 type SidebarProps = {
   collapsed: boolean;
   onToggle: () => void;
@@ -143,6 +161,9 @@ export function Sidebar({
   const visiblePrimaryItems = dashboardNavItems.filter(
     (item) => item.phase === 'phase1' && canSeeNavItem(item, session),
   );
+  const visiblePlatformItems = platformNavItems.filter(
+    (item) => canSeeNavItem(item, session),
+  );
   const futureItems = dashboardNavItems.filter((item) => item.phase === 'future');
 
   const sidebarContent = (
@@ -151,6 +172,7 @@ export function Sidebar({
       futureItems={futureItems}
       pathname={pathname}
       primaryItems={visiblePrimaryItems}
+      platformItems={visiblePlatformItems}
       onMobileClose={onMobileClose}
       onToggle={onToggle}
     />
@@ -185,6 +207,7 @@ export function Sidebar({
           futureItems={futureItems}
           pathname={pathname}
           primaryItems={visiblePrimaryItems}
+          platformItems={visiblePlatformItems}
           onMobileClose={onMobileClose}
         />
       </aside>
@@ -209,6 +232,7 @@ function SidebarContent({
   futureItems: NavItem[];
   pathname: string | null;
   primaryItems: NavItem[];
+  platformItems: NavItem[];
   onMobileClose: () => void;
   onToggle?: () => void;
 }) {
@@ -242,6 +266,14 @@ function SidebarContent({
           collapsed={collapsed}
           items={primaryItems}
           label="Phase 1 Core"
+          pathname={pathname}
+          onMobileClose={onMobileClose}
+        />
+
+        <NavSection
+          collapsed={collapsed}
+          items={platformItems}
+          label="Platform Control"
           pathname={pathname}
           onMobileClose={onMobileClose}
         />

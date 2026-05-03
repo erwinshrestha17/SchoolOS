@@ -377,12 +377,34 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     action: 'read',
     description: 'Read the current tenant profile',
   },
+  {
+    resource: 'platform',
+    action: 'read',
+    description: 'Read platform global data (platform admins only)',
+  },
+  {
+    resource: 'platform',
+    action: 'manage',
+    description: 'Manage platform, tenants, and global settings',
+  },
 ];
 
 export const SYSTEM_ROLE_DEFINITIONS = [
   {
     name: 'super_admin',
     description: 'System preset role with every SchoolOS permission',
+  },
+  {
+    name: 'platform_super_admin',
+    description: 'Global platform role with full access to all tenants and settings',
+  },
+  {
+    name: 'platform_support',
+    description: 'Global platform role for support access and tenant viewing',
+  },
+  {
+    name: 'platform_billing_admin',
+    description: 'Global platform role for managing SaaS billing and plans',
   },
   {
     name: 'admin',
@@ -542,6 +564,15 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'transport:read',
     'transport:operate',
   ],
+  platform_super_admin: [
+    'platform:read',
+    'platform:manage',
+    ...PERMISSION_CATALOG.map(({ resource, action }) =>
+      buildPermissionKey(resource, action),
+    ),
+  ],
+  platform_support: ['platform:read', 'students:read', 'staff:read', 'tenants:read'],
+  platform_billing_admin: ['platform:read', 'tenants:read'],
 };
 
 export function buildPermissionKey(resource: string, action: string) {

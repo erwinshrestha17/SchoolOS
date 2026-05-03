@@ -1706,3 +1706,28 @@ export type TransportLogSummary = {
   status: string;
   occurredAt: string;
 };
+
+export type PlatformTenantSummary = {
+  id: string;
+  name: string;
+  slug: string;
+  plan: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  studentCount: number;
+  staffCount: number;
+};
+
+export type PlatformTenantUsage = {
+  tenantId: string;
+  studentCount: number;
+  staffCount: number;
+  userCount: number;
+  lastActivityAt?: string | null;
+};
+
+export type PlatformTenantDetail = PlatformTenantSummary & {
+  usage: PlatformTenantUsage;
+  panNumber?: string | null;
+};

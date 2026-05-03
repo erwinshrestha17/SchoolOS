@@ -35,6 +35,7 @@ import { PayrollModule } from './payroll/payroll.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { LibraryModule } from './library/library.module';
 import { TransportModule } from './transport/transport.module';
+import { PlatformModule } from './platform/platform.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from './config/config.service';
 import { ClsModule } from 'nestjs-cls';
@@ -88,6 +89,7 @@ import { ClsModule } from 'nestjs-cls';
     MessagingModule,
     LibraryModule,
     TransportModule,
+    PlatformModule,
     TenantsModule,
     RedisModule,
     NotificationsModule,

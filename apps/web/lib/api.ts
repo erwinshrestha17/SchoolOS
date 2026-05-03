@@ -45,6 +45,8 @@ import type {
   PayrollRunSummary,
   PaymentRefundPayload,
   PaymentRefundSummary,
+  PlatformTenantSummary,
+  PlatformTenantDetail,
   PayslipSummary,
   PromotionReadiness,
   PromotionResult,
@@ -608,4 +610,12 @@ export const api = {
       `/consents/guardians/${encodeURIComponent(guardianId)}/revoke`,
       { method: 'POST', json: body },
     ),
+  listPlatformTenants: () => request<PlatformTenantSummary[]>('/platform/tenants'),
+  getPlatformTenantDetail: (tenantId: string) =>
+    request<PlatformTenantDetail>(`/platform/tenants/${encodeURIComponent(tenantId)}`),
+  updatePlatformTenantStatus: (tenantId: string, isActive: boolean) =>
+    request<{ success: true }>(`/platform/tenants/${encodeURIComponent(tenantId)}/status`, {
+      method: 'PATCH',
+      json: { isActive },
+    }),
 };
