@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { ConfigService } from '../config/config.service';
 import { FileStatus, Prisma } from '@prisma/client';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class FileRegistryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly configService: ConfigService,
   ) {}
 
   async registerFile(input: {
@@ -108,10 +110,34 @@ export class FileRegistryService {
   async getSignedUrl(tenantId: string, assetId: string) {
     const asset = await this.getFileMetadata(tenantId, assetId);
 
+    if (asset.module === 'activity') {
+      const attachment = await this.prisma.activityAttachment.findFirst({
+        where: {
+          tenantId,
+          fileAssetId: asset.id,
+        },
+        select: { id: true },
+      });
+
+      if (attachment) {
+        return `${this.apiBaseUrl}/activity-feed/attachments/${encodeURIComponent(attachment.id)}/preview`;
+      }
+    }
+
     // Placeholder for actual S3/R2 signed URL generation
     // For now, return a simulated URL if it's not local, or the publicUrl
     return asset.objectKey.startsWith('http')
       ? asset.objectKey
       : `https://storage.schoolos.cloud/${asset.objectKey}?token=simulated-jwt-for-${assetId}`;
+  }
+
+  private get apiBaseUrl() {
+    const configuredBaseUrl = process.env.API_PUBLIC_BASE_URL?.trim();
+
+    if (configuredBaseUrl) {
+      return configuredBaseUrl.replace(/\/$/, '');
+    }
+
+    return `http://localhost:${this.configService.port}/api/v1`;
   }
 }
