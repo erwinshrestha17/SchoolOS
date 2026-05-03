@@ -98,6 +98,50 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
     const audit = prisma.__state.auditLogs.find(a => a.action === 'tenant_suspended' && a.resourceId === tenantId);
     expect(audit).toBeDefined();
     expect(audit.tenantId).toBe('platform');
+
+    // 9. Setup platform support admin (Read-only)
+    const supportRole = prisma.__state.roles.find(r => r.tenantId === platformId && r.name === 'platform_support');
+    const platformSupport = { id: 'user-support', email: 'support@schoolos.com', passwordHash: schoolAdminPassword, tenantId: platformId, status: 'ACTIVE', authMethod: 'PASSWORD', lastLoginAt: new Date(), failedLoginCount: 0 };
+    prisma.__state.users.push(platformSupport);
+    prisma.__state.userRoles.push({ id: 'ur-s', userId: platformSupport.id, roleId: supportRole.id, tenantId: platformId });
+
+    const sLoginRes = await authController.login({ tenantSlug: 'platform', email: 'support@schoolos.com', password: 'school123' }, createResponseMock() as any);
+    const sAccessToken = (sLoginRes as any).accessToken;
+    const sMockReq = { headers: { authorization: `Bearer ${sAccessToken}` } } as any;
+    const sMockContext = { switchToHttp: () => ({ getRequest: () => sMockReq }), getHandler: () => platformController.listTenants, getClass: () => PlatformController } as any;
+
+    // 10. Support can read tenants
+    await jwtAuthGuard.canActivate(sMockContext);
+    expect(platformGuard.canActivate(sMockContext)).toBe(true);
+    const tenantsList = await platformController.listTenants();
+    expect(tenantsList).toBeDefined();
+
+    // 11. Support CANNOT update tenant status
+    const sUpdateContext = { switchToHttp: () => ({ getRequest: () => sMockReq }), getHandler: () => platformController.updateTenantStatus, getClass: () => PlatformController } as any;
+    await jwtAuthGuard.canActivate(sUpdateContext);
+    await expect(platformGuard.canActivate(sUpdateContext)).rejects.toBeInstanceOf(ForbiddenException);
+
+    // 12. Setup platform billing admin (Read-only)
+    const billingRole = prisma.__state.roles.find(r => r.tenantId === platformId && r.name === 'platform_billing_admin');
+    const platformBilling = { id: 'user-billing', email: 'billing@schoolos.com', passwordHash: schoolAdminPassword, tenantId: platformId, status: 'ACTIVE', authMethod: 'PASSWORD', lastLoginAt: new Date(), failedLoginCount: 0 };
+    prisma.__state.users.push(platformBilling);
+    prisma.__state.userRoles.push({ id: 'ur-b', userId: platformBilling.id, roleId: billingRole.id, tenantId: platformId });
+
+    const bLoginRes = await authController.login({ tenantSlug: 'platform', email: 'billing@schoolos.com', password: 'school123' }, createResponseMock() as any);
+    const bAccessToken = (bLoginRes as any).accessToken;
+    const bMockReq = { headers: { authorization: `Bearer ${bAccessToken}` } } as any;
+    const bMockContext = { switchToHttp: () => ({ getRequest: () => bMockReq }), getHandler: () => platformController.getTenantUsage, getClass: () => PlatformController } as any;
+
+    // 13. Billing can read usage
+    await jwtAuthGuard.canActivate(bMockContext);
+    expect(platformGuard.canActivate(bMockContext)).toBe(true);
+    const usage = await platformController.getTenantUsage(tenantId);
+    expect(usage).toBeDefined();
+
+    // 14. Billing CANNOT update tenant status
+    const bUpdateContext = { switchToHttp: () => ({ getRequest: () => bMockReq }), getHandler: () => platformController.updateTenantStatus, getClass: () => PlatformController } as any;
+    await jwtAuthGuard.canActivate(bUpdateContext);
+    await expect(platformGuard.canActivate(bUpdateContext)).rejects.toBeInstanceOf(ForbiddenException);
   });
 });
 
