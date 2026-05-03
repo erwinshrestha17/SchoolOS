@@ -22,6 +22,22 @@ export type PaginatedResponse<T> = {
   total: number;
 };
 
+export type ApiResponse<T> = {
+  success: boolean;
+  message: string;
+  data: T;
+  meta?: Record<string, any>;
+  timestamp: string;
+  requestId?: string;
+};
+
+export type ApiErrorMeta = {
+  statusCode: number;
+  error: string;
+  path?: string;
+  method?: string;
+};
+
 export type TenantSummary = {
   id: string;
   name: string;

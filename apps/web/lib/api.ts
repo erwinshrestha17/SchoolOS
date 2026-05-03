@@ -74,6 +74,7 @@ import type {
   UpdateStudentProfilePayload,
   UploadStudentDocumentPayload,
   WaiverRecord,
+  ApiResponse,
 } from '@schoolos/core';
 import { clearStoredSession } from './session';
 
@@ -125,7 +126,8 @@ async function request<T>(path: string, init?: RequestOptions) {
     throw new Error(parseApiErrorMessage(text) || `Request failed with status ${response.status}`);
   }
 
-  return (await response.json()) as T;
+  const payload = (await response.json()) as ApiResponse<T>;
+  return payload.data;
 }
 
 function parseApiErrorMessage(text: string) {
@@ -134,9 +136,9 @@ function parseApiErrorMessage(text: string) {
   }
 
   try {
-    const payload = JSON.parse(text) as {
-      message?: string | string[];
+    const payload = JSON.parse(text) as ApiResponse<unknown> & {
       error?: string;
+      statusCode?: number;
     };
     const message = Array.isArray(payload.message)
       ? payload.message.join(', ')

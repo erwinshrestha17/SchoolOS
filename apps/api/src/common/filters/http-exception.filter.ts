@@ -35,18 +35,22 @@ export class HttpExceptionFilter implements ExceptionFilter {
           : 'Internal server error';
 
     const payload = {
-      statusCode: status,
-      error:
-        typeof exceptionResponse === 'object' &&
-        exceptionResponse !== null &&
-        'error' in exceptionResponse
-          ? (exceptionResponse as { error: string }).error
-          : HttpStatus[status] || 'Error',
+      success: false,
       message,
-      path: request.url,
-      method: request.method,
-      requestId: request.requestId,
+      data: null,
+      meta: {
+        statusCode: status,
+        error:
+          typeof exceptionResponse === 'object' &&
+          exceptionResponse !== null &&
+          'error' in exceptionResponse
+            ? (exceptionResponse as { error: string }).error
+            : HttpStatus[status] || 'Error',
+        path: request.url,
+        method: request.method,
+      },
       timestamp: new Date().toISOString(),
+      requestId: request.requestId,
     };
 
     this.logger.error(
