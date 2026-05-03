@@ -580,15 +580,12 @@ export class ReportsService {
       resourceId: reportKey,
       tenantId: actor.tenantId,
       userId: actor.userId,
-      metadata: {
+      after: {
         reportKey,
         format: request.format,
         filters: request.filters,
         fromDate: request.filters.fromDate,
         toDate: request.filters.toDate,
-      },
-      after: {
-        format: request.format,
         filterCount: Object.keys(request.filters).length,
       },
     });

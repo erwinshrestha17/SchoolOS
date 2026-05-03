@@ -45,6 +45,28 @@ import { ListCashierClosesDto } from './dto/list-cashier-closes.dto';
 import { VoidInvoiceDto } from './dto/void-invoice.dto';
 import { resolveCashAccountCode } from './finance.defaults';
 
+export interface FeeCollectionReportRow {
+  receiptNumber: string;
+  paymentDate: Date;
+  studentSystemId: string;
+  studentName: string;
+  className: string;
+  sectionName: string;
+  guardianName: string;
+  guardianPhone: string;
+  invoiceNumber: string;
+  feeHeadName: string | null;
+  paymentMethod: PaymentMethod;
+  collectedBy: string;
+  grossAmount: number;
+  discountAmount: number;
+  waiverAmount: number;
+  paidAmount: number;
+  refundAmount: number;
+  netCollectedAmount: number;
+  status: InvoiceStatus;
+}
+
 @Injectable()
 export class FinanceService {
   constructor(
@@ -752,6 +774,15 @@ export class FinanceService {
       throw new BadRequestException('fromDate and toDate must be valid dates');
     }
 
+    if (
+      filters.paymentMethod &&
+      !Object.values(PaymentMethod).includes(filters.paymentMethod as any)
+    ) {
+      throw new BadRequestException(
+        `Invalid payment method: ${filters.paymentMethod}`,
+      );
+    }
+
     const payments = await this.prisma.payment.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -864,7 +895,7 @@ export class FinanceService {
         refundAmount: Number(refundAmount),
         netCollectedAmount: Number(netCollectedAmount),
         status: p.invoice.status,
-      };
+      } satisfies FeeCollectionReportRow;
     });
 
     const summary = {
@@ -889,7 +920,11 @@ export class FinanceService {
     return { rows, summary };
   }
 
-  private groupBySimple(rows: any[], key: string, sumKey: string) {
+  private groupBySimple(
+    rows: FeeCollectionReportRow[],
+    key: keyof FeeCollectionReportRow,
+    sumKey: keyof FeeCollectionReportRow,
+  ) {
     const grouped = new Map<string, number>();
     for (const row of rows) {
       const k = String(row[key]);
