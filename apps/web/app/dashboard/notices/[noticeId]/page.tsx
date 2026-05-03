@@ -4,7 +4,7 @@ import type { ApiResponse } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, CalendarClock, Megaphone, Paperclip, Send } from 'lucide-react';
+import { ArrowLeft, CalendarClock, Megaphone, Paperclip, Send, UsersRound } from 'lucide-react';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
@@ -37,6 +37,39 @@ type NoticeDetail = {
   };
 };
 
+type UnreadNoticeRecipient = {
+  deliveryId: string;
+  channel: string;
+  status: string;
+  destination: string | null;
+  errorMessage: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  recipientUserId: string | null;
+  recipientEmail: string | null;
+  guardian: {
+    id: string;
+    fullName: string;
+    primaryPhone: string | null;
+    email: string | null;
+  } | null;
+  student: {
+    id: string;
+    studentSystemId: string;
+    fullName: string;
+    className: string | null;
+    sectionName: string | null;
+  } | null;
+};
+
+type NoticeUnreadRecipientsResult = {
+  noticeId: string;
+  totalDeliveries: number;
+  readCount: number;
+  unreadCount: number;
+  recipients: UnreadNoticeRecipient[];
+};
+
 export default function NoticeDetailPage() {
   const params = useParams<{ noticeId: string }>();
   const noticeId = params.noticeId;
@@ -44,6 +77,12 @@ export default function NoticeDetailPage() {
   const noticeQuery = useQuery({
     queryKey: ['notice-detail', noticeId],
     queryFn: () => fetchNoticeDetail(noticeId),
+    enabled: Boolean(noticeId),
+  });
+
+  const unreadRecipientsQuery = useQuery({
+    queryKey: ['notice-unread-recipients', noticeId],
+    queryFn: () => fetchUnreadRecipients(noticeId),
     enabled: Boolean(noticeId),
   });
 
@@ -178,6 +217,12 @@ export default function NoticeDetailPage() {
           />
         </aside>
       </section>
+
+      <UnreadRecipientsPanel
+        result={unreadRecipientsQuery.data}
+        isLoading={unreadRecipientsQuery.isLoading}
+        error={unreadRecipientsQuery.isError ? unreadRecipientsQuery.error.message : null}
+      />
     </NoticePageShell>
   );
 }
@@ -214,6 +259,123 @@ function PriorityBadge({ priority }: { priority: string }) {
     <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${tone}`}>
       {formatEnumLabel(priority)}
     </span>
+  );
+}
+
+function UnreadRecipientsPanel({
+  result,
+  isLoading,
+  error,
+}: {
+  result: NoticeUnreadRecipientsResult | undefined;
+  isLoading: boolean;
+  error: string | null;
+}) {
+  return (
+    <section className="rounded-[32px] border border-[var(--line)] bg-white p-6 shadow-sm sm:p-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
+            <UsersRound size={20} />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-950">Unread recipients</p>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-500">
+              Recipients below have a delivery record for this notice but no read receipt yet.
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/dashboard/notices"
+          className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+        >
+          Back to Delivery Records
+        </Link>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <UnreadMetric label="Total deliveries" value={String(result?.totalDeliveries ?? 0)} />
+        <UnreadMetric label="Read" value={String(result?.readCount ?? 0)} tone="success" />
+        <UnreadMetric label="Unread" value={String(result?.unreadCount ?? 0)} tone="warning" />
+      </div>
+
+      <div className="mt-6 overflow-hidden rounded-3xl border border-gray-100">
+        {isLoading ? (
+          <div className="p-6 text-sm text-gray-500">Loading unread recipients...</div>
+        ) : error ? (
+          <div className="p-6 text-sm text-danger-700">{error}</div>
+        ) : !result || result.recipients.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="text-sm font-semibold text-gray-950">No unread recipients</p>
+            <p className="mt-1 text-sm text-gray-500">
+              All available recipients have read this notice, or no delivery records exist yet.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {result.recipients.map((recipient) => (
+              <article
+                key={recipient.deliveryId}
+                className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-amber-50 px-2 py-1 text-[0.68rem] font-bold uppercase text-amber-700">
+                      Unread
+                    </span>
+                    <span className="rounded-full bg-gray-100 px-2 py-1 text-[0.68rem] font-semibold uppercase text-gray-500">
+                      {recipient.channel}
+                    </span>
+                    <span className="rounded-full bg-gray-100 px-2 py-1 text-[0.68rem] font-semibold uppercase text-gray-500">
+                      {recipient.status}
+                    </span>
+                  </div>
+                  <h3 className="mt-2 text-sm font-semibold text-gray-950">
+                    {recipient.guardian?.fullName ?? recipient.recipientEmail ?? 'Recipient unavailable'}
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {recipient.student
+                      ? `${recipient.student.fullName} (${recipient.student.studentSystemId})`
+                      : recipient.destination ?? 'No destination'}
+                  </p>
+                  {recipient.errorMessage ? (
+                    <p className="mt-1 text-xs text-danger-700">{recipient.errorMessage}</p>
+                  ) : null}
+                </div>
+                <div className="text-left text-xs text-gray-500 lg:text-right">
+                  <p>{recipient.student?.className ?? 'Class unavailable'}</p>
+                  <p>{recipient.student?.sectionName ? `Section ${recipient.student.sectionName}` : 'All/No section'}</p>
+                  <p className="mt-1">Queued {formatDateTime(recipient.createdAt)}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function UnreadMetric({
+  label,
+  value,
+  tone = 'neutral',
+}: {
+  label: string;
+  value: string;
+  tone?: 'neutral' | 'success' | 'warning';
+}) {
+  const toneClass = {
+    neutral: 'bg-gray-50 text-gray-700',
+    success: 'bg-success-50 text-success-700',
+    warning: 'bg-amber-50 text-amber-700',
+  }[tone];
+
+  return (
+    <div className={`rounded-2xl p-4 ${toneClass}`}>
+      <p className="text-xs font-semibold uppercase tracking-wide opacity-70">{label}</p>
+      <p className="mt-1 text-2xl font-bold">{value}</p>
+    </div>
   );
 }
 
@@ -263,6 +425,26 @@ async function fetchNoticeDetail(noticeId: string) {
   }
 
   const payload = (await response.json()) as ApiResponse<NoticeDetail>;
+  return payload.data;
+}
+
+async function fetchUnreadRecipients(noticeId: string) {
+  const response = await fetch(
+    `${API_BASE_URL}/notices/${encodeURIComponent(noticeId)}/unread-recipients`,
+    {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(parseApiErrorMessage(text) || `Request failed with status ${response.status}`);
+  }
+
+  const payload = (await response.json()) as ApiResponse<NoticeUnreadRecipientsResult>;
   return payload.data;
 }
 
