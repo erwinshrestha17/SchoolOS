@@ -20,7 +20,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Lock,
-  School,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -130,23 +129,6 @@ export const dashboardNavItems: NavItem[] = [
   },
 ];
 
-export const platformNavItems: NavItem[] = [
-  {
-    href: '/platform/dashboard',
-    label: 'Platform Overview',
-    icon: LayoutDashboard,
-    phase: 'phase1',
-    permissions: ['platform:read'],
-  },
-  {
-    href: '/platform/schools',
-    label: 'Manage Schools',
-    icon: School,
-    phase: 'phase1',
-    permissions: ['platform:manage'],
-  },
-];
-
 type SidebarProps = {
   collapsed: boolean;
   onToggle: () => void;
@@ -166,9 +148,6 @@ export function Sidebar({
   const visiblePrimaryItems = dashboardNavItems.filter(
     (item) => item.phase === 'phase1' && canSeeNavItem(item, session),
   );
-  const visiblePlatformItems = platformNavItems.filter((item) =>
-    canSeeNavItem(item, session),
-  );
   const futureItems = dashboardNavItems.filter((item) => item.phase === 'future');
 
   const sidebarContent = (
@@ -177,7 +156,6 @@ export function Sidebar({
       futureItems={futureItems}
       pathname={pathname}
       primaryItems={visiblePrimaryItems}
-      platformItems={visiblePlatformItems}
       onMobileClose={onMobileClose}
       onToggle={onToggle}
     />
@@ -212,7 +190,6 @@ export function Sidebar({
           futureItems={futureItems}
           pathname={pathname}
           primaryItems={visiblePrimaryItems}
-          platformItems={visiblePlatformItems}
           onMobileClose={onMobileClose}
         />
       </aside>
@@ -230,7 +207,6 @@ function SidebarContent({
   futureItems,
   pathname,
   primaryItems,
-  platformItems,
   onMobileClose,
   onToggle,
 }: {
@@ -238,7 +214,6 @@ function SidebarContent({
   futureItems: NavItem[];
   pathname: string | null;
   primaryItems: NavItem[];
-  platformItems: NavItem[];
   onMobileClose: () => void;
   onToggle?: () => void;
 }) {
@@ -259,7 +234,7 @@ function SidebarContent({
             SchoolOS
           </span>
           <span className="block truncate text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-slate-500">
-            Pilot workspace
+            School workspace
           </span>
         </div>
       </div>
@@ -272,14 +247,6 @@ function SidebarContent({
           collapsed={collapsed}
           items={primaryItems}
           label="Phase 1 Core"
-          pathname={pathname}
-          onMobileClose={onMobileClose}
-        />
-
-        <NavSection
-          collapsed={collapsed}
-          items={platformItems}
-          label="Platform Control"
           pathname={pathname}
           onMobileClose={onMobileClose}
         />
