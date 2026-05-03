@@ -12,6 +12,7 @@
     "prisma:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "prisma db seed",
+    "db:seed:platform": "tsx prisma/platform-seed.ts",
     "start": "node dist/apps/api/src/main.js",
     "start:dev": "nest start --watch --entryFile apps/api/src/main",
     "start:debug": "nest start --debug --watch --entryFile apps/api/src/main",
