@@ -3,6 +3,7 @@ import { ReportsService } from './reports.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
+import { FinanceService } from '../finance/finance.service';
 import { AuthMethod } from '@prisma/client';
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
 
@@ -23,6 +24,7 @@ describe('ReportsService', () => {
       'students:read',
       'classes:read',
       'attendance:read',
+      'ledger:read',
     ],
     tenantSlug: 'everest',
   };
@@ -102,6 +104,35 @@ describe('ReportsService', () => {
           },
         },
         {
+          provide: FinanceService,
+          useValue: {
+            getStudentFeeLedger: jest.fn().mockResolvedValue({
+              student: {
+                studentSystemId: 'SCH-001',
+                name: 'Erwin Shrestha',
+                className: 'Grade 10',
+                sectionName: 'A',
+                guardianName: 'John Doe',
+                guardianPhone: '9800000000',
+              },
+              rows: [
+                {
+                  date: new Date('2024-05-01'),
+                  type: 'INVOICE',
+                  reference: 'INV-001',
+                  description: 'Tuition Fee',
+                  debit: 1000,
+                  credit: 0,
+                  runningBalance: 1000,
+                  invoiceNumber: 'INV-001',
+                  receiptNumber: null,
+                  status: 'ISSUED',
+                },
+              ],
+            }),
+          },
+        },
+        {
           provide: AuditService,
           useValue: {
             record: jest.fn(),
@@ -121,6 +152,7 @@ describe('ReportsService', () => {
     expect(reports.map((r) => r.key)).toContain('student-roster');
     expect(reports.map((r) => r.key)).toContain('class-roster');
     expect(reports.map((r) => r.key)).toContain('monthly-attendance-register');
+    expect(reports.map((r) => r.key)).toContain('student-fee-ledger');
   });
 
   it('filters out reports user cannot access', () => {
@@ -193,5 +225,30 @@ describe('ReportsService', () => {
         actor,
       ),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('exports student-fee-ledger in CSV format', async () => {
+    const result = await service.exportReport(
+      'student-fee-ledger',
+      {
+        format: 'csv',
+        filters: {
+          studentId: 's1',
+        },
+      },
+      actor,
+    );
+
+    expect(result.format).toBe('csv');
+    const csvString = result.content.toString();
+    expect(csvString).toContain(
+      'Student ID,Student Name,Class,Section,Guardian Name,Guardian Phone',
+    );
+    expect(csvString).toContain('Date,Type,Reference,Description,Debit,Credit');
+    expect(csvString).toContain(
+      '"SCH-001","Erwin Shrestha","Grade 10","A","John Doe","9800000000"',
+    );
+    expect(csvString).toContain('"2024-05-01","INVOICE","INV-001"');
+    expect(audit.record).toHaveBeenCalled();
   });
 });

@@ -4,8 +4,10 @@ import { ReportsController } from './reports.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 
+import { FinanceModule } from '../finance/finance.module';
+
 @Module({
-  imports: [PrismaModule, AuditModule],
+  imports: [PrismaModule, AuditModule, FinanceModule],
   providers: [ReportsService],
   controllers: [ReportsController],
   exports: [ReportsService],

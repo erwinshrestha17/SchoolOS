@@ -1655,6 +1655,24 @@ function StudentFeeLedgerView({
 }: {
   query: UseQueryResult<StudentFeeLedger, Error>;
 }) {
+  const [isExporting, setIsExporting] = React.useState(false);
+
+  const onExportCsv = async () => {
+    const ledger = query.data;
+    if (!ledger) return;
+
+    setIsExporting(true);
+    try {
+      await api.exportReport('student-fee-ledger', {
+        format: 'csv',
+        filters: { studentId: ledger.student.id },
+      });
+    } catch (error) {
+      console.error('Failed to export ledger:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
   if (query.isLoading) {
     return (
       <div className="grid gap-3">
@@ -1676,11 +1694,21 @@ function StudentFeeLedgerView({
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 md:grid-cols-4">
-        <Metric label="Total invoiced" value={`Rs. ${formatMoney(ledger.totalInvoiced)}`} />
-        <Metric label="Total paid" value={`Rs. ${formatMoney(ledger.totalPaid)}`} />
-        <Metric label="Waivers tracked" value={`Rs. ${formatMoney(ledger.totalWaived)}`} />
-        <Metric label="Outstanding" value={`Rs. ${formatMoney(ledger.outstandingBalance)}`} />
+      <div className="flex items-center justify-between">
+        <div className="grid flex-1 gap-3 md:grid-cols-4">
+          <Metric label="Total invoiced" value={`Rs. ${formatMoney(ledger.totalInvoiced)}`} />
+          <Metric label="Total paid" value={`Rs. ${formatMoney(ledger.totalPaid)}`} />
+          <Metric label="Waivers tracked" value={`Rs. ${formatMoney(ledger.totalWaived)}`} />
+          <Metric label="Outstanding" value={`Rs. ${formatMoney(ledger.outstandingBalance)}`} />
+        </div>
+        <button
+          type="button"
+          className="ml-4 inline-flex min-h-11 items-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white disabled:opacity-60"
+          disabled={isExporting}
+          onClick={onExportCsv}
+        >
+          {isExporting ? 'Exporting...' : 'Export Ledger CSV'}
+        </button>
       </div>
       <p className="text-sm text-gray-500">
         Running balance is backend-calculated from official invoices, payments, and refunds.

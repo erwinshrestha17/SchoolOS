@@ -18,10 +18,12 @@ import {
   Prisma,
 } from '@prisma/client';
 
+import { FinanceService } from '../finance/finance.service';
+
 export interface ReportExecutor {
   definition: ReportDefinition;
   execute: (
-    tenantId: string,
+    actor: AuthContext,
     filters: Record<string, unknown>,
     format: string,
   ) => Promise<Record<string, unknown>[]>;
@@ -34,6 +36,7 @@ export class ReportsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly financeService: FinanceService,
   ) {
     this.registerInternalReports();
   }
@@ -63,10 +66,10 @@ export class ReportsService {
         ],
         requiredPermissions: ['students:read'],
       },
-      execute: async (tenantId, filters) => {
+      execute: async (actor, filters) => {
         const students = await this.prisma.student.findMany({
           where: {
-            tenantId,
+            tenantId: actor.tenantId,
             ...(filters.classId ? { classId: filters.classId } : {}),
             ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
             ...(filters.status
@@ -122,10 +125,10 @@ export class ReportsService {
         ],
         requiredPermissions: ['classes:read', 'students:read'],
       },
-      execute: async (tenantId, filters) => {
+      execute: async (actor, filters) => {
         const enrollments = await this.prisma.enrollment.findMany({
           where: {
-            tenantId,
+            tenantId: actor.tenantId,
             ...(filters.classId ? { classId: String(filters.classId) } : {}),
             ...(filters.sectionId
               ? { sectionId: String(filters.sectionId) }
@@ -230,7 +233,7 @@ export class ReportsService {
         ],
         requiredPermissions: ['reports:read', 'attendance:read'],
       },
-      execute: async (tenantId, filters) => {
+      execute: async (actor, filters) => {
         const month = Number(filters.month);
         const year = Number(filters.year);
         const academicYearId = filters.academicYearId
@@ -252,7 +255,7 @@ export class ReportsService {
 
         const enrollments = await this.prisma.enrollment.findMany({
           where: {
-            tenantId,
+            tenantId: actor.tenantId,
             academicYearId,
             classId,
             ...(sectionId ? { sectionId } : {}),
@@ -270,7 +273,7 @@ export class ReportsService {
 
         const sessions = await this.prisma.attendanceSession.findMany({
           where: {
-            tenantId,
+            tenantId: actor.tenantId,
             academicYearId,
             classId,
             ...(sectionId ? { sectionId } : {}),
@@ -343,6 +346,70 @@ export class ReportsService {
         });
       },
     });
+
+    this.register({
+      definition: {
+        key: 'student-fee-ledger',
+        name: 'Student Fee Ledger',
+        description: 'Complete financial ledger for a specific student',
+        category: 'finance',
+        module: 'finance',
+        formats: ['json', 'csv'],
+        filters: [
+          {
+            key: 'studentId',
+            label: 'Student',
+            type: 'student',
+            required: true,
+          },
+          { key: 'academicYearId', label: 'Academic Year', type: 'select' },
+          { key: 'fromDate', label: 'From Date', type: 'date' },
+          { key: 'toDate', label: 'To Date', type: 'date' },
+          { key: 'status', label: 'Invoice Status', type: 'select' },
+        ],
+        requiredPermissions: ['reports:export', 'ledger:read'],
+      },
+      execute: async (actor, filters) => {
+        const studentId = filters.studentId
+          ? String(filters.studentId)
+          : undefined;
+        if (!studentId) {
+          throw new ForbiddenException('studentId filter is required');
+        }
+
+        const ledger = await this.financeService.getStudentFeeLedger(
+          studentId,
+          actor,
+          {
+            academicYearId: filters.academicYearId
+              ? String(filters.academicYearId)
+              : undefined,
+            fromDate: filters.fromDate ? String(filters.fromDate) : undefined,
+            toDate: filters.toDate ? String(filters.toDate) : undefined,
+            status: filters.status ? String(filters.status) : undefined,
+          },
+        );
+
+        return ledger.rows.map((row) => ({
+          'Student ID': ledger.student.studentSystemId,
+          'Student Name': ledger.student.name,
+          Class: ledger.student.className,
+          Section: ledger.student.sectionName || '-',
+          'Guardian Name': ledger.student.guardianName || '-',
+          'Guardian Phone': ledger.student.guardianPhone || '-',
+          Date: row.date.toISOString().split('T')[0],
+          Type: row.type,
+          Reference: row.reference,
+          Description: row.description,
+          Debit: row.debit,
+          Credit: row.credit,
+          Balance: row.runningBalance,
+          'Invoice Number': row.invoiceNumber || '-',
+          'Receipt Number': row.receiptNumber || '-',
+          Status: row.status || '-',
+        }));
+      },
+    });
   }
 
   register(executor: ReportExecutor) {
@@ -384,7 +451,7 @@ export class ReportsService {
     }
 
     const data = await executor.execute(
-      actor.tenantId,
+      actor,
       request.filters,
       request.format,
     );

@@ -1014,7 +1014,16 @@ export class FinanceService {
     };
   }
 
-  async getStudentFeeLedger(studentId: string, actor: AuthContext) {
+  async getStudentFeeLedger(
+    studentId: string,
+    actor: AuthContext,
+    filters?: {
+      fromDate?: string;
+      toDate?: string;
+      academicYearId?: string;
+      status?: string;
+    },
+  ) {
     const student = await this.prisma.student.findFirst({
       where: {
         id: studentId,
@@ -1041,6 +1050,20 @@ export class FinanceService {
         where: {
           tenantId: actor.tenantId,
           studentId: student.id,
+          ...(filters?.academicYearId
+            ? { academicYearId: filters.academicYearId }
+            : {}),
+          ...(filters?.status ? { status: filters.status as any } : {}),
+          ...(filters?.fromDate || filters?.toDate
+            ? {
+                issuedAt: {
+                  ...(filters.fromDate
+                    ? { gte: new Date(filters.fromDate) }
+                    : {}),
+                  ...(filters.toDate ? { lte: new Date(filters.toDate) } : {}),
+                },
+              }
+            : {}),
         },
         include: {
           payments: {
@@ -1064,6 +1087,19 @@ export class FinanceService {
         where: {
           tenantId: actor.tenantId,
           studentId: student.id,
+          ...(filters?.academicYearId
+            ? { academicYearId: filters.academicYearId }
+            : {}),
+          ...(filters?.fromDate || filters?.toDate
+            ? {
+                createdAt: {
+                  ...(filters.fromDate
+                    ? { gte: new Date(filters.fromDate) }
+                    : {}),
+                  ...(filters.toDate ? { lte: new Date(filters.toDate) } : {}),
+                },
+              }
+            : {}),
         },
         include: {
           feeHead: true,
