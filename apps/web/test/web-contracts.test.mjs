@@ -664,6 +664,14 @@ describe('SchoolOS web production contracts', () => {
     assert.match(financeForm, /Remind selected/);
   });
 
+  it('adds a fee collection export action to the finance screen', () => {
+    const financeForm = read('components/forms/finance-form.tsx');
+
+    assert.match(financeForm, /Export Fee Collection CSV/);
+    assert.match(financeForm, /api\.exportReport\('fee-collection-report'/);
+    assert.match(financeForm, /History & Reports/);
+  });
+
   it('keeps ledger preview preview-only without direct accounting calls', () => {
     const financeForm = read('components/forms/finance-form.tsx');
 

@@ -656,6 +656,7 @@ export function FinanceForm() {
           ledgerEntries={ledgerQuery.data ?? []}
           receiptsLoading={receiptsQuery.isLoading}
           ledgerLoading={ledgerQuery.isLoading}
+          filters={cashierClose}
         />
       ) : null}
 
@@ -2316,15 +2317,56 @@ function ReceiptsLedgerSection({
   ledgerEntries,
   receiptsLoading,
   ledgerLoading,
+  filters,
 }: {
   invoices: InvoiceForUi[];
   receipts: ReceiptView[];
   ledgerEntries: JournalEntryView[];
   receiptsLoading: boolean;
   ledgerLoading: boolean;
+  filters: CashierCloseFilters;
 }) {
+  const [isExporting, setIsExporting] = useState(false);
+
+  const onExportCsv = async () => {
+    setIsExporting(true);
+    try {
+      await api.exportReport('fee-collection-report', {
+        format: 'csv',
+        filters: {
+          fromDate: toIsoDateTime(filters.openedAt),
+          toDate: toIsoDateTime(filters.closedAt),
+          collectorUserId: filters.collectorUserId || undefined,
+          paymentMethod: filters.paymentMethod || undefined,
+        },
+      });
+    } catch (error) {
+      console.error('Export failed:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
-    <section className="grid gap-6 xl:grid-cols-3">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-950">History & Reports</h2>
+          <p className="text-sm text-[var(--muted)]">
+            Review detailed collection logs and export financial reports.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="inline-flex min-h-11 items-center rounded-2xl bg-gray-900 px-5 text-sm font-semibold text-white transition-all hover:bg-gray-800 disabled:opacity-50"
+          disabled={isExporting}
+          onClick={onExportCsv}
+        >
+          {isExporting ? 'Exporting...' : 'Export Fee Collection CSV'}
+        </button>
+      </div>
+
+      <section className="grid gap-6 xl:grid-cols-3">
       <SummaryList
         title="Invoices"
         items={invoices.slice(0, 6).map((invoice) => ({

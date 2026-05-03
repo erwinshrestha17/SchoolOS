@@ -410,6 +410,128 @@ export class ReportsService {
         }));
       },
     });
+
+    this.register({
+      definition: {
+        key: 'fee-collection-report',
+        name: 'Fee Collection Report',
+        description:
+          'Detailed collection report for a specific period with breakdown',
+        category: 'finance',
+        module: 'finance',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'fromDate', label: 'From Date', type: 'date', required: true },
+          { key: 'toDate', label: 'To Date', type: 'date', required: true },
+          { key: 'academicYearId', label: 'Academic Year', type: 'select' },
+          { key: 'classId', label: 'Class', type: 'class' },
+          { key: 'sectionId', label: 'Section', type: 'section' },
+          { key: 'studentId', label: 'Student', type: 'student' },
+          { key: 'collectorUserId', label: 'Collector', type: 'select' },
+          { key: 'paymentMethod', label: 'Payment Method', type: 'select' },
+          { key: 'feeHeadId', label: 'Fee Head', type: 'select' },
+        ],
+        requiredPermissions: ['reports:export', 'ledger:read'],
+      },
+      execute: async (actor, filters) => {
+        const report = await this.financeService.getFeeCollectionReportRows(
+          actor,
+          {
+            fromDate: String(filters.fromDate),
+            toDate: String(filters.toDate),
+            academicYearId: filters.academicYearId
+              ? String(filters.academicYearId)
+              : undefined,
+            classId: filters.classId ? String(filters.classId) : undefined,
+            sectionId: filters.sectionId ? String(filters.sectionId) : undefined,
+            studentId: filters.studentId ? String(filters.studentId) : undefined,
+            collectorUserId: filters.collectorUserId
+              ? String(filters.collectorUserId)
+              : undefined,
+            paymentMethod: filters.paymentMethod
+              ? String(filters.paymentMethod)
+              : undefined,
+            feeHeadId: filters.feeHeadId ? String(filters.feeHeadId) : undefined,
+          },
+        );
+
+        const rows = report.rows.map((row) => ({
+          'Receipt No': row.receiptNumber,
+          Date: row.paymentDate.toISOString().split('T')[0],
+          'Student ID': row.studentSystemId,
+          Student: row.studentName,
+          Class: row.className,
+          Section: row.sectionName,
+          'Guardian Name': row.guardianName,
+          'Guardian Phone': row.guardianPhone,
+          'Invoice No': row.invoiceNumber,
+          'Fee Head': row.feeHeadName || 'Multiple',
+          Method: row.paymentMethod,
+          Collector: row.collectedBy,
+          Gross: row.grossAmount,
+          Discount: row.discountAmount,
+          Waiver: row.waiverAmount,
+          Paid: row.paidAmount,
+          Refund: row.refundAmount,
+          Net: row.netCollectedAmount,
+          Status: row.status,
+        }));
+
+        // Add summary rows at the bottom for CSV
+        const divider = Object.keys(rows[0] || {}).reduce(
+          (acc, key) => ({ ...acc, [key]: '---' }),
+          {},
+        );
+
+        const summaryRows = [
+          divider,
+          {
+            'Receipt No': 'SUMMARY',
+            Date: '',
+            'Student ID': '',
+            Student: '',
+            Class: '',
+            Section: '',
+            'Guardian Name': '',
+            'Guardian Phone': '',
+            'Invoice No': '',
+            'Fee Head': '',
+            Method: '',
+            Collector: '',
+            Gross: report.summary.totalGrossAmount,
+            Discount: report.summary.totalDiscountAmount,
+            Waiver: report.summary.totalWaiverAmount,
+            Paid: report.summary.totalPaidAmount,
+            Refund: report.summary.totalRefundAmount,
+            Net: report.summary.totalNetCollectedAmount,
+            Status: '',
+          },
+          {
+            'Receipt No': 'Total Receipts',
+            Date: report.summary.totalReceipts,
+            'Student ID': '',
+            Student: '',
+            Class: '',
+            Section: '',
+            'Guardian Name': '',
+            'Guardian Phone': '',
+            'Invoice No': '',
+            'Fee Head': '',
+            Method: '',
+            Collector: '',
+            Gross: '',
+            Discount: '',
+            Waiver: '',
+            Paid: '',
+            Refund: '',
+            Net: '',
+            Status: '',
+          },
+        ];
+
+        return [...rows, ...summaryRows];
+      },
+    });
   }
 
   register(executor: ReportExecutor) {
@@ -454,10 +576,17 @@ export class ReportsService {
 
     await this.auditService.record({
       action: 'export_report',
-      resource: 'reports',
+      resource: 'report',
       resourceId: reportKey,
       tenantId: actor.tenantId,
       userId: actor.userId,
+      metadata: {
+        reportKey,
+        format: request.format,
+        filters: request.filters,
+        fromDate: request.filters.fromDate,
+        toDate: request.filters.toDate,
+      },
       after: {
         format: request.format,
         filterCount: Object.keys(request.filters).length,

@@ -731,6 +731,176 @@ export class FinanceService {
     };
   }
 
+  async getFeeCollectionReportRows(
+    actor: AuthContext,
+    filters: {
+      fromDate: string;
+      toDate: string;
+      academicYearId?: string;
+      classId?: string;
+      sectionId?: string;
+      studentId?: string;
+      collectorUserId?: string;
+      paymentMethod?: string;
+      feeHeadId?: string;
+    },
+  ) {
+    const from = new Date(filters.fromDate);
+    const to = new Date(filters.toDate);
+
+    if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+      throw new BadRequestException('fromDate and toDate must be valid dates');
+    }
+
+    const payments = await this.prisma.payment.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        paidAt: { gte: from, lte: to },
+        ...(filters.studentId ? { studentId: filters.studentId } : {}),
+        ...(filters.collectorUserId
+          ? { collectedById: filters.collectorUserId }
+          : {}),
+        ...(filters.paymentMethod
+          ? { method: filters.paymentMethod as PaymentMethod }
+          : {}),
+        ...(filters.academicYearId ||
+        filters.classId ||
+        filters.sectionId ||
+        filters.feeHeadId
+          ? {
+              invoice: {
+                ...(filters.academicYearId
+                  ? { academicYearId: filters.academicYearId }
+                  : {}),
+                ...(filters.classId || filters.sectionId
+                  ? {
+                      student: {
+                        ...(filters.classId ? { classId: filters.classId } : {}),
+                        ...(filters.sectionId
+                          ? { sectionId: filters.sectionId }
+                          : {}),
+                      },
+                    }
+                  : {}),
+                ...(filters.feeHeadId
+                  ? {
+                      lines: {
+                        some: { feeHeadId: filters.feeHeadId },
+                      },
+                    }
+                  : {}),
+              },
+            }
+          : {}),
+      },
+      include: {
+        receipt: true,
+        collectedBy: true,
+        refunds: true,
+        student: {
+          include: {
+            class: true,
+            sectionRef: true,
+            guardianLinks: {
+              include: {
+                guardian: true,
+              },
+            },
+          },
+        },
+        invoice: {
+          include: {
+            lines: {
+              include: {
+                feeHead: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { paidAt: 'asc' },
+    });
+
+    const rows = payments.map((p) => {
+      const primaryGuardianLink =
+        p.student.guardianLinks.find((l) => l.isPrimary) ||
+        p.student.guardianLinks[0];
+      const guardian = primaryGuardianLink?.guardian;
+
+      const refundAmount = p.refunds.reduce(
+        (sum, r) => sum.add(r.amount),
+        new Prisma.Decimal(0),
+      );
+
+      const grossAmount = p.invoice.lines.reduce(
+        (sum, l) => sum.add(l.unitAmount.mul(l.quantity)),
+        new Prisma.Decimal(0),
+      );
+
+      const discountAmount = new Prisma.Decimal(0);
+      const waiverAmount = new Prisma.Decimal(0);
+
+      const paidAmount = p.amount;
+      const netCollectedAmount = paidAmount.sub(refundAmount);
+
+      return {
+        receiptNumber: p.receipt?.receiptNumber || '-',
+        paymentDate: p.paidAt,
+        studentSystemId: p.student.studentSystemId,
+        studentName: formatStudentName(p.student),
+        className: p.student.class.name,
+        sectionName: p.student.sectionRef?.name || '-',
+        guardianName: guardian?.fullName || '-',
+        guardianPhone: guardian?.primaryPhone || '-',
+        invoiceNumber: p.invoice.invoiceNumber,
+        feeHeadName:
+          p.invoice.lines.length === 1 ? p.invoice.lines[0].feeHead.name : null,
+        paymentMethod: p.method,
+        collectedBy: p.collectedBy?.email || 'System',
+        grossAmount: Number(grossAmount),
+        discountAmount: Number(discountAmount),
+        waiverAmount: Number(waiverAmount),
+        paidAmount: Number(paidAmount),
+        refundAmount: Number(refundAmount),
+        netCollectedAmount: Number(netCollectedAmount),
+        status: p.invoice.status,
+      };
+    });
+
+    const summary = {
+      totalReceipts: rows.length,
+      totalGrossAmount: rows.reduce((sum, r) => sum + r.grossAmount, 0),
+      totalDiscountAmount: rows.reduce((sum, r) => sum + r.discountAmount, 0),
+      totalWaiverAmount: rows.reduce((sum, r) => sum + r.waiverAmount, 0),
+      totalPaidAmount: rows.reduce((sum, r) => sum + r.paidAmount, 0),
+      totalRefundAmount: rows.reduce((sum, r) => sum + r.refundAmount, 0),
+      totalNetCollectedAmount: rows.reduce(
+        (sum, r) => sum + r.netCollectedAmount,
+        0,
+      ),
+      paymentMethodBreakdown: this.groupBySimple(
+        rows,
+        'paymentMethod',
+        'paidAmount',
+      ),
+      collectorBreakdown: this.groupBySimple(rows, 'collectedBy', 'paidAmount'),
+    };
+
+    return { rows, summary };
+  }
+
+  private groupBySimple(rows: any[], key: string, sumKey: string) {
+    const grouped = new Map<string, number>();
+    for (const row of rows) {
+      const k = String(row[key]);
+      grouped.set(k, (grouped.get(k) ?? 0) + Number(row[sumKey]));
+    }
+    return Array.from(grouped.entries()).map(([label, value]) => ({
+      label,
+      value,
+    }));
+  }
+
   async recalculateAutomaticDiscounts(actor: AuthContext) {
     const [siblingRule, staffChildRule] = await Promise.all([
       this.prisma.discountRule.findFirst({

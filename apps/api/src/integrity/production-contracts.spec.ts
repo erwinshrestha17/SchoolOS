@@ -219,8 +219,21 @@ describe('production data integrity contracts', () => {
       join(sourceRoot, 'auth/guards/jwt-auth.guard.ts'),
       'utf8',
     );
-
     expect(guardSource).toContain('TENANT_ID_KEY');
     expect(guardSource).toContain('this.cls.set(TENANT_ID_KEY');
+  });
+
+  it('registers the fee collection report with proper permissions and audit logging', () => {
+    const reportsService = readFileSync(
+      join(sourceRoot, 'reports/reports.service.ts'),
+      'utf8',
+    );
+
+    expect(reportsService).toContain("key: 'fee-collection-report'");
+    expect(reportsService).toContain(
+      "requiredPermissions: ['reports:export', 'ledger:read']",
+    );
+    expect(reportsService).toContain('this.auditService.record({');
+    expect(reportsService).toContain('resourceId: reportKey');
   });
 });
