@@ -561,11 +561,11 @@ export class StudentsService {
       totalRecords: records.length,
       attendancePercentage: records.length
         ? Math.round(
-            ((records.filter(
+            (records.filter(
               (r) =>
                 r.status === AttendanceStatus.PRESENT ||
                 r.status === AttendanceStatus.LATE,
-            ).length) /
+            ).length /
               records.length) *
               10000,
           ) / 100
@@ -593,7 +593,8 @@ export class StudentsService {
         markedByName: record.attendanceSession.submittedBy?.staff
           ? `${record.attendanceSession.submittedBy.staff.firstName} ${record.attendanceSession.submittedBy.staff.lastName}`.trim()
           : (record.attendanceSession.submittedBy?.email ?? null),
-        submittedAt: record.attendanceSession.submittedAt?.toISOString() ?? null,
+        submittedAt:
+          record.attendanceSession.submittedAt?.toISOString() ?? null,
       })),
     };
   }

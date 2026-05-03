@@ -1115,101 +1115,101 @@ describe('students lifecycle hardening', () => {
   });
 });
 
-  describe('attendance history', () => {
-    it('returns student attendance history with summary and records', async () => {
-      const student = buildStudent({
-        id: 'student-1',
-        firstNameEn: 'Erwin',
-        lastNameEn: 'Shrestha',
-        class: { id: 'class-1', name: 'Grade 10' },
-        sectionRef: { id: 'section-1', name: 'A' },
-      });
+describe('attendance history', () => {
+  it('returns student attendance history with summary and records', async () => {
+    const student = buildStudent({
+      id: 'student-1',
+      firstNameEn: 'Erwin',
+      lastNameEn: 'Shrestha',
+      class: { id: 'class-1', name: 'Grade 10' },
+      sectionRef: { id: 'section-1', name: 'A' },
+    });
 
-      const records = [
-        {
-          id: 'record-1',
-          attendanceSessionId: 'session-1',
+    const records = [
+      {
+        id: 'record-1',
+        attendanceSessionId: 'session-1',
+        status: AttendanceStatus.PRESENT,
+        remark: 'On time',
+        attendanceSession: {
+          attendanceDate: new Date('2026-05-01'),
+          class: { name: 'Grade 10' },
+          section: { name: 'A' },
+          submittedById: 'user-2',
+          submittedAt: new Date('2026-05-01T09:00:00Z'),
+          submittedBy: {
+            email: 'teacher@schoolos.test',
+            staff: { firstName: 'John', lastName: 'Doe' },
+          },
+        },
+      },
+      {
+        id: 'record-2',
+        attendanceSessionId: 'session-2',
+        status: AttendanceStatus.ABSENT,
+        remark: 'Sick',
+        attendanceSession: {
+          attendanceDate: new Date('2026-05-02'),
+          class: { name: 'Grade 10' },
+          section: { name: 'A' },
+          submittedById: 'user-2',
+          submittedAt: new Date('2026-05-02T09:00:00Z'),
+          submittedBy: {
+            email: 'teacher@schoolos.test',
+            staff: { firstName: 'John', lastName: 'Doe' },
+          },
+        },
+      },
+    ];
+
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [student],
+      attendanceRecordFindManyResult: records,
+    });
+    const { service } = buildService(prisma);
+
+    const result = await service.getAttendanceHistory(
+      student.id,
+      { status: AttendanceStatus.PRESENT },
+      actor,
+    );
+
+    expect(prisma.student.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: student.id, tenantId: actor.tenantId },
+      }),
+    );
+
+    expect(prisma.attendanceRecord.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          studentId: student.id,
+          tenantId: actor.tenantId,
           status: AttendanceStatus.PRESENT,
-          remark: 'On time',
-          attendanceSession: {
-            attendanceDate: new Date('2026-05-01'),
-            class: { name: 'Grade 10' },
-            section: { name: 'A' },
-            submittedById: 'user-2',
-            submittedAt: new Date('2026-05-01T09:00:00Z'),
-            submittedBy: {
-              email: 'teacher@schoolos.test',
-              staff: { firstName: 'John', lastName: 'Doe' },
-            },
-          },
-        },
-        {
-          id: 'record-2',
-          attendanceSessionId: 'session-2',
-          status: AttendanceStatus.ABSENT,
-          remark: 'Sick',
-          attendanceSession: {
-            attendanceDate: new Date('2026-05-02'),
-            class: { name: 'Grade 10' },
-            section: { name: 'A' },
-            submittedById: 'user-2',
-            submittedAt: new Date('2026-05-02T09:00:00Z'),
-            submittedBy: {
-              email: 'teacher@schoolos.test',
-              staff: { firstName: 'John', lastName: 'Doe' },
-            },
-          },
-        },
-      ];
-
-      const prisma = buildPrisma({
-        studentFindFirstQueue: [student],
-        attendanceRecordFindManyResult: records,
-      });
-      const { service } = buildService(prisma);
-
-      const result = await service.getAttendanceHistory(
-        student.id,
-        { status: AttendanceStatus.PRESENT },
-        actor,
-      );
-
-      expect(prisma.student.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: student.id, tenantId: actor.tenantId },
         }),
-      );
+      }),
+    );
 
-      expect(prisma.attendanceRecord.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            studentId: student.id,
-            tenantId: actor.tenantId,
-            status: AttendanceStatus.PRESENT,
-          }),
-        }),
-      );
-
-      expect(result.summary.totalRecords).toBe(2);
-      expect(result.summary.presentCount).toBe(1);
-      expect(result.summary.absentCount).toBe(1);
-      expect(result.summary.attendancePercentage).toBe(50);
-      expect(result.records).toHaveLength(2);
-      expect(result.records[0].markedByName).toBe('John Doe');
-      expect(result.student.fullNameEn).toBe('Erwin Shrestha');
-    });
-
-    it('enforces tenant isolation for attendance history', async () => {
-      const prisma = buildPrisma({
-        studentFindFirstQueue: [null],
-      });
-      const { service } = buildService(prisma);
-
-      await expect(
-        service.getAttendanceHistory('student-other-tenant', {}, actor),
-      ).rejects.toThrow(NotFoundException);
-    });
+    expect(result.summary.totalRecords).toBe(2);
+    expect(result.summary.presentCount).toBe(1);
+    expect(result.summary.absentCount).toBe(1);
+    expect(result.summary.attendancePercentage).toBe(50);
+    expect(result.records).toHaveLength(2);
+    expect(result.records[0].markedByName).toBe('John Doe');
+    expect(result.student.fullNameEn).toBe('Erwin Shrestha');
   });
+
+  it('enforces tenant isolation for attendance history', async () => {
+    const prisma = buildPrisma({
+      studentFindFirstQueue: [null],
+    });
+    const { service } = buildService(prisma);
+
+    await expect(
+      service.getAttendanceHistory('student-other-tenant', {}, actor),
+    ).rejects.toThrow(NotFoundException);
+  });
+});
 
 function buildStudent(
   overrides: Partial<{

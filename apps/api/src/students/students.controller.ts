@@ -229,6 +229,7 @@ export class StudentsController {
     return this.studentsService.revokeGeneratedStudentDocument(
       studentId,
       documentId,
+      dto,
       auth,
     );
   }

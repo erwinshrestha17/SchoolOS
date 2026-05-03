@@ -320,6 +320,8 @@ export const api = {
         json: body as JsonBody,
       },
     ),
+  getStudentFeeClearance: (studentId: string) =>
+    request<StudentFeeClearance>(
       `/students/${encodeURIComponent(studentId)}/fee-clearance`,
     ),
   getStudentAttendanceHistory: (
