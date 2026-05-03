@@ -2,12 +2,15 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Post,
   Query,
+  Res,
   Sse,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Observable, fromEvent, map, filter } from 'rxjs';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
@@ -16,6 +19,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { ActivityFeedService } from './activity-feed.service';
+import { ActivityMediaService } from './activity-media.service';
 import { CreateActivityPostDto } from './dto/create-activity-post.dto';
 import { CreateActivityReactionDto } from './dto/create-activity-reaction.dto';
 import { CreateDevelopmentalMilestoneDto } from './dto/create-developmental-milestone.dto';
@@ -28,6 +32,7 @@ type FeedPostEvent = { tenantId: string };
 export class ActivityFeedController {
   constructor(
     private readonly activityFeedService: ActivityFeedService,
+    private readonly activityMediaService: ActivityMediaService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -136,11 +141,55 @@ export class ActivityFeedController {
   async getAttachmentPreview(
     @Param('id') attachmentId: string,
     @CurrentAuth() auth: AuthContext,
+    @Res() res: Response,
   ) {
-    const url = await this.activityFeedService.getAttachmentPreview(
+    const media = await this.activityMediaService.getAttachmentMedia(
       auth,
       attachmentId,
+      'preview',
     );
-    return { url };
+
+    if (media.redirectUrl) {
+      return res.redirect(media.redirectUrl);
+    }
+
+    res.setHeader('Content-Type', media.contentType);
+    res.setHeader('Content-Length', String(media.sizeBytes));
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.setHeader('Content-Disposition', `inline; filename="${sanitizeFileName(media.fileName)}"`);
+
+    return media.stream?.pipe(res);
   }
+
+  @Get('attachments/:id/download')
+  @Permissions('activity_feed:read')
+  @Header('Cache-Control', 'private, max-age=60')
+  async downloadAttachment(
+    @Param('id') attachmentId: string,
+    @CurrentAuth() auth: AuthContext,
+    @Res() res: Response,
+  ) {
+    const media = await this.activityMediaService.getAttachmentMedia(
+      auth,
+      attachmentId,
+      'download',
+    );
+
+    if (media.redirectUrl) {
+      return res.redirect(media.redirectUrl);
+    }
+
+    res.setHeader('Content-Type', media.contentType);
+    res.setHeader('Content-Length', String(media.sizeBytes));
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${sanitizeFileName(media.fileName)}"`,
+    );
+
+    return media.stream?.pipe(res);
+  }
+}
+
+function sanitizeFileName(fileName: string) {
+  return fileName.replace(/[\r\n"]/g, '_');
 }
