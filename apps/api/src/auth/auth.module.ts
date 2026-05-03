@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { AuditModule } from '../audit/audit.module';
 import { ConfigModule } from '../config/config.module';
@@ -8,6 +8,7 @@ import { AuthController } from './auth.controller';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from './guards/roles-permissions.guard';
 
+@Global()
 @Module({
   imports: [
     JwtModule.register({}),
