@@ -95,4 +95,14 @@ export class FileRegistryService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  async getSignedUrl(tenantId: string, assetId: string) {
+    const asset = await this.getFileMetadata(tenantId, assetId);
+    
+    // Placeholder for actual S3/R2 signed URL generation
+    // For now, return a simulated URL if it's not local, or the publicUrl
+    return asset.objectKey.startsWith('http') 
+      ? asset.objectKey 
+      : `https://storage.schoolos.cloud/${asset.objectKey}?token=simulated-jwt-for-${assetId}`;
+  }
 }

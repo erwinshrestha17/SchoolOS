@@ -370,6 +370,12 @@ export const api = {
       method: 'POST',
       json: body as JsonBody,
     }),
+  previewStudentDocument: (id: string) =>
+    request<{ url: string }>(`/student-documents/${id}/preview`),
+  downloadStudentDocument: (id: string) =>
+    request<{ url: string }>(`/student-documents/${id}/download`),
+  deleteStudentDocument: (id: string) =>
+    request(`/student-documents/${id}`, { method: 'DELETE' }),
   openStudentDocumentPdf: async (studentId: string, kind: string) => {
     const response = await fetch(
       `${API_BASE_URL}/students/${encodeURIComponent(studentId)}/documents/${encodeURIComponent(kind)}.pdf`,

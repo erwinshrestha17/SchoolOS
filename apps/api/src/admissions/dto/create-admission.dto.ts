@@ -216,4 +216,12 @@ export class CreateAdmissionDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  @IsOptional()
+  @IsString()
+  photo?: string;
+
+  @IsOptional()
+  @IsString()
+  photoFileName?: string;
 }

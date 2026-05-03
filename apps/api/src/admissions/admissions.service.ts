@@ -14,6 +14,8 @@ import { ConfigService } from '../config/config.service';
 import { FinanceService } from '../finance/finance.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { StudentRecordsService } from '../student-records/student-records.service';
 import { ArchiveStudentDto } from '../students/dto/archive-student.dto';
 import { DeleteStudentDto } from '../students/dto/delete-student.dto';
@@ -51,6 +53,8 @@ export class AdmissionsService {
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
     private readonly studentsService: StudentsService,
+    private readonly storageService: StorageService,
+    private readonly fileRegistryService: FileRegistryService,
   ) {}
 
   async listAdmissions(actor: AuthContext) {
@@ -223,6 +227,33 @@ export class AdmissionsService {
                 : null,
           },
         });
+
+        if (dto.photo && dto.photoFileName) {
+          const stored = await this.storageService.saveBase64Object({
+            tenantId: actor.tenantId,
+            prefix: `students/${student.id}/photo`,
+            fileName: dto.photoFileName,
+            contentType: 'image/jpeg',
+            base64Content: dto.photo,
+          });
+
+          const asset = await this.fileRegistryService.registerFile({
+            tenantId: actor.tenantId,
+            uploadedByUserId: actor.userId,
+            originalFilename: dto.photoFileName,
+            objectKey: stored.objectKey,
+            mimeType: 'image/jpeg',
+            sizeBytes: stored.sizeBytes,
+            module: 'students',
+            entityId: student.id,
+            metadata: { kind: 'PHOTO', title: 'Student Photo' },
+          });
+
+          await tx.student.update({
+            where: { id: student.id },
+            data: { photoUrl: asset.id },
+          });
+        }
 
         if (dto.siblingStudentSystemId) {
           const sibling = await tx.student.findFirst({

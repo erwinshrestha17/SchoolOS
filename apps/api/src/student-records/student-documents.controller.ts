@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -28,5 +28,32 @@ export class StudentDocumentsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.studentRecordsService.uploadDocument(dto, auth);
+  }
+
+  @Get(':id/preview')
+  @Permissions('students:read')
+  async previewDocument(
+    @Param('id') assetId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentRecordsService.getSignedUrl(auth, assetId, 'preview');
+  }
+
+  @Get(':id/download')
+  @Permissions('students:read')
+  async downloadDocument(
+    @Param('id') assetId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentRecordsService.getSignedUrl(auth, assetId, 'download');
+  }
+
+  @Delete(':id')
+  @Permissions('student_documents:manage')
+  async deleteDocument(
+    @Param('id') assetId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentRecordsService.deleteDocument(auth, assetId);
   }
 }

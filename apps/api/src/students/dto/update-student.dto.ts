@@ -110,4 +110,12 @@ export class UpdateStudentDto {
   @IsOptional()
   @IsString()
   doctorPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  photo?: string;
+
+  @IsOptional()
+  @IsString()
+  photoFileName?: string;
 }

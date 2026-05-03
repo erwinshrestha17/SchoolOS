@@ -39,6 +39,7 @@ export class StudentsService {
     private readonly communicationsService: CommunicationsService,
     private readonly auditService: AuditService,
     private readonly storageService: StorageService,
+    private readonly fileRegistryService: FileRegistryService,
   ) {}
 
   async createStudent(dto: CreateStudentDto, actor: AuthContext) {
@@ -258,7 +259,28 @@ export class StudentsService {
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       take: 12,
     });
+
+    const registryDocuments = await this.fileRegistryService.listFilesByEntity(
+      actor.tenantId,
+      'students',
+      student.id,
+    );
+
     const latestEnrollment = student.enrollments[0] ?? null;
+
+    let photoUrl = student.photoUrl;
+    if (photoUrl && !photoUrl.startsWith('http')) {
+      try {
+        const signed = await this.fileRegistryService.getSignedUrl(
+          actor.tenantId,
+          photoUrl,
+        );
+        photoUrl = signed;
+      } catch (e) {
+        photoUrl = null;
+      }
+    }
+
     const guardians = student.guardianLinks.map((link) => ({
       id: link.guardian.id,
       fullName: link.guardian.fullName,
@@ -290,6 +312,7 @@ export class StudentsService {
         motherTongue: student.motherTongue,
         disabilityFlag: student.disabilityFlag,
         nationalStudentId: student.nationalStudentId,
+        photoUrl,
         className: student.class.name,
         sectionName: student.sectionRef?.name ?? student.section,
         class: {
@@ -322,19 +345,36 @@ export class StudentsService {
         status: enrollment.status,
         admissionDate: enrollment.admissionDate.toISOString(),
       })),
-      documents: student.documents.map((document) => ({
-        id: document.id,
-        studentId: document.studentId,
-        kind: document.kind,
-        title: document.title,
-        fileName: document.fileName,
-        contentType: document.contentType,
-        sizeBytes: document.sizeBytes,
-        provider: document.provider,
-        objectKey: document.objectKey,
-        publicUrl: document.publicUrl,
-        uploadedAt: document.createdAt.toISOString(),
-      })),
+      documents: [
+        ...student.documents.map((document) => ({
+          id: document.id,
+          studentId: document.studentId,
+          kind: document.kind,
+          title: document.title,
+          fileName: document.fileName,
+          contentType: document.contentType,
+          sizeBytes: document.sizeBytes,
+          provider: document.provider,
+          objectKey: document.objectKey,
+          publicUrl: document.publicUrl,
+          uploadedAt: document.createdAt.toISOString(),
+          isLegacy: true,
+        })),
+        ...registryDocuments.map((asset) => ({
+          id: asset.id,
+          studentId: student.id,
+          kind: (asset.metadata as any)?.kind || 'OTHER',
+          title: (asset.metadata as any)?.title || asset.originalFilename,
+          fileName: asset.originalFilename,
+          contentType: asset.mimeType,
+          sizeBytes: Number(asset.sizeBytes),
+          provider: 'REGISTRY',
+          objectKey: asset.objectKey,
+          publicUrl: null,
+          uploadedAt: asset.createdAt.toISOString(),
+          isLegacy: false,
+        })),
+      ],
       generatedDocuments: student.generatedDocuments.map((document) => ({
         id: document.id,
         studentId: document.studentId,
@@ -569,6 +609,30 @@ export class StudentsService {
         ? { doctorPhone: normalizeNullableString(dto.doctorPhone) }
         : {}),
     };
+
+    if (dto.photo && dto.photoFileName) {
+      const stored = await this.storageService.saveBase64Object({
+        tenantId: actor.tenantId,
+        prefix: `students/${student.id}/photo`,
+        fileName: dto.photoFileName,
+        contentType: 'image/jpeg', // Default to jpeg if not specified, or we could extract from base64
+        base64Content: dto.photo,
+      });
+
+      const asset = await this.fileRegistryService.registerFile({
+        tenantId: actor.tenantId,
+        uploadedByUserId: actor.userId,
+        originalFilename: dto.photoFileName,
+        objectKey: stored.objectKey,
+        mimeType: 'image/jpeg',
+        sizeBytes: stored.sizeBytes,
+        module: 'students',
+        entityId: student.id,
+        metadata: { kind: 'PHOTO', title: 'Student Photo' },
+      });
+
+      studentData.photoUrl = asset.id; // Store asset ID as the photoUrl
+    }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.student.update({
@@ -1746,6 +1810,23 @@ export class StudentsService {
             storageProvider: stored.provider,
             layoutVersion: 'certificate-v2',
           } as Prisma.InputJsonValue,
+        },
+      });
+
+      await this.fileRegistryService.registerFile({
+        tenantId: actor.tenantId,
+        uploadedByUserId: actor.userId,
+        originalFilename: fileName,
+        objectKey: stored.objectKey,
+        mimeType: 'application/pdf',
+        sizeBytes: stored.sizeBytes,
+        module: 'students',
+        entityId: student.id,
+        metadata: {
+          kind: normalizedKind,
+          title: getStudentDocumentTitle(normalizedKind),
+          source: 'generated_student_document',
+          version,
         },
       });
     });

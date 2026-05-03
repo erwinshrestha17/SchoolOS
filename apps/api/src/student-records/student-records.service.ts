@@ -4,6 +4,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { CreateSiblingGroupDto } from './dto/create-sibling-group.dto';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { UploadStudentDocumentDto } from './dto/upload-student-document.dto';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class StudentRecordsService {
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
     private readonly auditService: AuditService,
+    private readonly fileRegistryService: FileRegistryService,
   ) {}
 
   async listDocuments(actor: AuthContext, studentId?: string) {
@@ -57,6 +59,23 @@ export class StudentRecordsService {
         objectKey: stored.objectKey,
         publicUrl: stored.publicUrl,
         uploadedById: actor.userId,
+      },
+    });
+
+    await this.fileRegistryService.registerFile({
+      tenantId: actor.tenantId,
+      uploadedByUserId: actor.userId,
+      originalFilename: dto.fileName,
+      objectKey: stored.objectKey,
+      mimeType: dto.contentType,
+      sizeBytes: stored.sizeBytes,
+      module: 'students',
+      entityId: student.id,
+      metadata: {
+        kind: dto.kind,
+        title: dto.title ?? dto.fileName,
+        source: 'student_document',
+        sourceId: document.id,
       },
     });
 
@@ -146,5 +165,22 @@ export class StudentRecordsService {
     });
 
     return group;
+  }
+
+  async getSignedUrl(actor: AuthContext, assetId: string, action: 'preview' | 'download') {
+    // 1. Audit the access via Registry
+    await this.fileRegistryService.auditAccess(actor.tenantId, assetId, actor.userId, action);
+
+    // 2. Get the signed URL
+    const url = await this.fileRegistryService.getSignedUrl(actor.tenantId, assetId);
+
+    return { url };
+  }
+
+  async deleteDocument(actor: AuthContext, assetId: string) {
+    // Soft delete in registry (this also audits)
+    await this.fileRegistryService.softDeleteFile(actor.tenantId, assetId, actor.userId);
+
+    return { success: true };
   }
 }
