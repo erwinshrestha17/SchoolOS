@@ -5,6 +5,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { CommunicationsService } from './communications.service';
 import { ConsentsController } from './consents.controller';
 import { DeliveriesController } from './deliveries.controller';
+import { DeliveryRetryService } from './delivery-retry.service';
 import { EventsController } from './events.controller';
 import { NoticeDetailController } from './notice-detail.controller';
 import { NoticeDetailService } from './notice-detail.service';
@@ -22,7 +23,17 @@ import { NoticesController } from './notices.controller';
     ConsentsController,
     NotificationCenterController,
   ],
-  providers: [CommunicationsService, NotificationCenterService, NoticeDetailService],
-  exports: [CommunicationsService, NotificationCenterService, NoticeDetailService],
+  providers: [
+    CommunicationsService,
+    NotificationCenterService,
+    NoticeDetailService,
+    DeliveryRetryService,
+  ],
+  exports: [
+    CommunicationsService,
+    NotificationCenterService,
+    NoticeDetailService,
+    DeliveryRetryService,
+  ],
 })
 export class CommunicationsModule {}
