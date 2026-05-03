@@ -6,6 +6,8 @@ import { CommunicationsService } from './communications.service';
 import { ConsentsController } from './consents.controller';
 import { DeliveriesController } from './deliveries.controller';
 import { EventsController } from './events.controller';
+import { NoticeDetailController } from './notice-detail.controller';
+import { NoticeDetailService } from './notice-detail.service';
 import { NotificationCenterController } from './notification-center.controller';
 import { NotificationCenterService } from './notification-center.service';
 import { NoticesController } from './notices.controller';
@@ -14,12 +16,13 @@ import { NoticesController } from './notices.controller';
   imports: [AuthModule, NotificationsModule, AuditModule],
   controllers: [
     NoticesController,
+    NoticeDetailController,
     EventsController,
     DeliveriesController,
     ConsentsController,
     NotificationCenterController,
   ],
-  providers: [CommunicationsService, NotificationCenterService],
-  exports: [CommunicationsService, NotificationCenterService],
+  providers: [CommunicationsService, NotificationCenterService, NoticeDetailService],
+  exports: [CommunicationsService, NotificationCenterService, NoticeDetailService],
 })
 export class CommunicationsModule {}
