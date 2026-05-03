@@ -9,6 +9,7 @@ import { DeliveryRetryService } from './delivery-retry.service';
 import { EventsController } from './events.controller';
 import { NoticeDetailController } from './notice-detail.controller';
 import { NoticeDetailService } from './notice-detail.service';
+import { NoticeUnreadRecipientsService } from './notice-unread-recipients.service';
 import { NotificationCenterController } from './notification-center.controller';
 import { NotificationCenterService } from './notification-center.service';
 import { NoticesController } from './notices.controller';
@@ -27,12 +28,14 @@ import { NoticesController } from './notices.controller';
     CommunicationsService,
     NotificationCenterService,
     NoticeDetailService,
+    NoticeUnreadRecipientsService,
     DeliveryRetryService,
   ],
   exports: [
     CommunicationsService,
     NotificationCenterService,
     NoticeDetailService,
+    NoticeUnreadRecipientsService,
     DeliveryRetryService,
   ],
 })
