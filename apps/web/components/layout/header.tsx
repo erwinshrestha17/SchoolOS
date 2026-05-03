@@ -3,9 +3,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from '../session-provider';
 import { api } from '../../lib/api';
+import { NotificationBell } from './notification-bell';
 import {
   Search,
-  Bell,
   ChevronDown,
   Menu,
   User,
@@ -29,19 +29,12 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
   const yearMenuRef = useRef<HTMLDivElement>(null);
 
   const canReadAcademicYears = hasPermissions(['academic_years:read']);
-  const canReadDeliveries = hasPermissions(['communications:read_deliveries']);
+  const canReadNotifications = hasPermissions(['notices:read']);
 
   const academicYearsQuery = useQuery({
     queryKey: ['layout-academic-years'],
     queryFn: api.listAcademicYears,
     enabled: canReadAcademicYears,
-  });
-
-  const deliveriesQuery = useQuery({
-    queryKey: ['layout-notification-deliveries'],
-    queryFn: api.listNotificationDeliveries,
-    enabled: canReadDeliveries,
-    refetchInterval: 60_000,
   });
 
   const academicYears = academicYearsQuery.data ?? [];
@@ -50,11 +43,6 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
   const selectedAcademicYear =
     academicYears.find((year) => year.id === selectedAcademicYearId) ??
     currentAcademicYear;
-  const unreadCount = (deliveriesQuery.data ?? []).filter((delivery) =>
-    ['PENDING', 'QUEUED', 'RETRYING', 'FAILED'].includes(
-      delivery.status.toUpperCase(),
-    ),
-  ).length;
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -186,19 +174,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
           )}
         </div>
 
-        <button
-          type="button"
-          className="relative flex h-11 w-11 items-center justify-center rounded-xl text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
-          aria-label="Notifications"
-          disabled={!canReadDeliveries}
-        >
-          <Bell size={20} />
-          {unreadCount > 0 && (
-            <span className="notification-badge">
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          )}
-        </button>
+        <NotificationBell enabled={canReadNotifications} />
 
         <div className="hidden sm:block h-6 w-px bg-gray-200 mx-1" />
 
