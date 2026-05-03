@@ -3,7 +3,7 @@
 import { useSession } from '../../components/session-provider';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { DashboardShell } from '../../components/layout/dashboard-shell';
+import { PlatformShell } from '../../components/layout/platform-shell';
 
 export default function PlatformLayout({
   children,
@@ -21,10 +21,14 @@ export default function PlatformLayout({
 
     if (status === 'authenticated' && session) {
       const roles = session.user.roles;
-      const isPlatformAdmin = roles.includes('platform_super_admin') || 
-                             roles.includes('platform_support') || 
-                             roles.includes('platform_billing_admin');
-      
+      const permissions = session.user.permissions;
+      const isPlatformAdmin =
+        roles.includes('platform_super_admin') ||
+        roles.includes('platform_support') ||
+        roles.includes('platform_billing_admin') ||
+        permissions.includes('platform:read') ||
+        permissions.includes('platform:manage');
+
       if (!isPlatformAdmin) {
         router.push('/dashboard');
       }
@@ -33,11 +37,11 @@ export default function PlatformLayout({
 
   if (status === 'loading' || !session) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-50">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
+      <div className="flex h-screen items-center justify-center bg-slate-950">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-cyan-400 border-t-transparent" />
       </div>
     );
   }
 
-  return <DashboardShell>{children}</DashboardShell>;
+  return <PlatformShell>{children}</PlatformShell>;
 }
