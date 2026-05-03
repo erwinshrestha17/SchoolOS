@@ -6,6 +6,8 @@ import { CommunicationsService } from './communications.service';
 import { ConsentsController } from './consents.controller';
 import { DeliveriesController } from './deliveries.controller';
 import { EventsController } from './events.controller';
+import { NotificationCenterController } from './notification-center.controller';
+import { NotificationCenterService } from './notification-center.service';
 import { NoticesController } from './notices.controller';
 
 @Module({
@@ -15,8 +17,9 @@ import { NoticesController } from './notices.controller';
     EventsController,
     DeliveriesController,
     ConsentsController,
+    NotificationCenterController,
   ],
-  providers: [CommunicationsService],
-  exports: [CommunicationsService],
+  providers: [CommunicationsService, NotificationCenterService],
+  exports: [CommunicationsService, NotificationCenterService],
 })
 export class CommunicationsModule {}
