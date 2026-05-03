@@ -605,6 +605,7 @@ model FileAsset {
 
   tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   uploadedBy User?  @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  activityAttachments ActivityAttachment[]
 
   @@index([tenantId, module, entityId])
 }
@@ -1671,13 +1672,16 @@ model ActivityAttachment {
   provider       StorageProvider @default(LOCAL)
   objectKey      String
   publicUrl      String?
+  fileAssetId    String?
   sortOrder      Int             @default(0)
   createdAt      DateTime        @default(now())
 
   tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   activityPost ActivityPost @relation(fields: [activityPostId], references: [id], onDelete: Cascade)
+  fileAsset    FileAsset?   @relation(fields: [fileAssetId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, activityPostId])
+  @@index([fileAssetId])
 }
 
 model ActivityPostStudent {

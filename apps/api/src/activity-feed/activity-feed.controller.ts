@@ -130,4 +130,17 @@ export class ActivityFeedController {
   ) {
     return this.activityFeedService.createMilestone(dto, auth);
   }
+
+  @Get('attachments/:id/preview')
+  @Permissions('activity_feed:read')
+  async getAttachmentPreview(
+    @Param('id') attachmentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    const url = await this.activityFeedService.getAttachmentPreview(
+      auth,
+      attachmentId,
+    );
+    return { url };
+  }
 }

@@ -864,18 +864,34 @@ function PostCard({
       </div>
       <p className="mt-4 text-sm text-gray-700">{post.caption ?? post.body ?? 'No caption'}</p>
 
-      <div className="mt-4 grid gap-2">
+      <div className="mt-4 grid gap-3">
         {post.attachments.length > 0 ? (
           post.attachments.map((attachment) => (
             <div
               key={attachment.id}
-              className="rounded-2xl border border-dashed border-[var(--line)] bg-gray-50 px-4 py-3 text-sm"
+              className="group relative overflow-hidden rounded-2xl border border-[var(--line)] bg-gray-50 transition hover:shadow-md"
             >
-              <span className="font-semibold">Private media</span>
-              <span className="text-[var(--muted)]">
-                {' '}
-                / {attachment.fileName} / {formatFileSize(attachment.sizeBytes)}
-              </span>
+              {attachment.previewUrl ? (
+                <div className="aspect-[16/10] w-full overflow-hidden">
+                  <img
+                    src={attachment.previewUrl}
+                    alt={attachment.fileName}
+                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3 text-white">
+                    <p className="text-xs font-medium truncate">{attachment.fileName}</p>
+                    <p className="text-[10px] opacity-80">{formatFileSize(attachment.sizeBytes)}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="px-4 py-3 text-sm">
+                  <span className="font-semibold">Private media</span>
+                  <span className="text-[var(--muted)]">
+                    {' '}
+                    / {attachment.fileName} / {formatFileSize(attachment.sizeBytes)}
+                  </span>
+                </div>
+              )}
             </div>
           ))
         ) : (

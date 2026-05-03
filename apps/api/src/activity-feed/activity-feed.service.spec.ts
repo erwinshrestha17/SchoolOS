@@ -7,7 +7,9 @@ import {
   StorageProvider,
 } from '@prisma/client';
 import { ForbiddenException } from '@nestjs/common';
-import type { AuthContext } from '../auth/auth.types';
+import { StorageService } from '../storage/storage.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
+import { AuthContext } from '../auth/auth.types.js';
 import { ActivityFeedService } from './activity-feed.service';
 
 describe('ActivityFeedService', () => {
@@ -15,6 +17,7 @@ describe('ActivityFeedService', () => {
   let storageService: any;
   let communicationsService: any;
   let auditService: any;
+  let fileRegistry: any;
   let service: ActivityFeedService;
   let actor: AuthContext;
 
@@ -74,12 +77,19 @@ describe('ActivityFeedService', () => {
       permissions: ['activity_feed:create'],
     };
 
+    fileRegistry = {
+      registerFile: jest.fn(),
+      getSignedUrl: jest.fn(),
+      auditAccess: jest.fn(),
+    };
+
     service = new ActivityFeedService(
       prisma,
       storageService,
       communicationsService,
       auditService,
       { emit: jest.fn() } as any,
+      fileRegistry,
     );
   });
 
@@ -91,6 +101,7 @@ describe('ActivityFeedService', () => {
     });
     prisma.student.findMany.mockResolvedValue([{ id: 'student-1' }]);
     prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    fileRegistry.registerFile.mockResolvedValue({ id: 'file-asset-1' });
     storageService.saveBase64Object.mockResolvedValue({
       provider: StorageProvider.LOCAL,
       objectKey: 'tenant-1/activity-feed/class-1/photo.jpg',

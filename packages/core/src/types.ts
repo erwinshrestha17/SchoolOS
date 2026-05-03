@@ -1192,9 +1192,9 @@ export type ActivityAttachment = {
   fileName: string;
   contentType: string;
   sizeBytes: number;
-  provider: string;
-  objectKey: string;
   publicUrl: string | null;
+  fileAssetId: string | null;
+  previewUrl?: string | null;
   sortOrder: number;
 };
 

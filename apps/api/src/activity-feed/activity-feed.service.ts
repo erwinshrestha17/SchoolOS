@@ -21,6 +21,7 @@ import { CreateActivityPostDto } from './dto/create-activity-post.dto';
 import { CreateActivityReactionDto } from './dto/create-activity-reaction.dto';
 import { CreateDevelopmentalMilestoneDto } from './dto/create-developmental-milestone.dto';
 import { CreateMoodLogDto } from './dto/create-mood-log.dto';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import {
   isParentOnly,
   isStudentOnly,
@@ -38,6 +39,7 @@ export class ActivityFeedService {
     private readonly communicationsService: CommunicationsService,
     private readonly auditService: AuditService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly fileRegistryService: FileRegistryService,
   ) {}
 
   async listPosts(
@@ -64,7 +66,7 @@ export class ActivityFeedService {
       });
     }
 
-    return this.prisma.activityPost.findMany({
+    const posts = await this.prisma.activityPost.findMany({
       where: {
         tenantId: actor.tenantId,
         ...(filters.classId ? { classId: filters.classId } : {}),
@@ -78,8 +80,8 @@ export class ActivityFeedService {
               publishedAt: {
                 gte: monthRange.start,
                 lt: monthRange.end,
-              },
-            }
+                },
+              }
           : {}),
       },
       include: {
@@ -98,6 +100,23 @@ export class ActivityFeedService {
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       take: 50,
     });
+
+    return Promise.all(
+      posts.map(async (post) => ({
+        ...post,
+        attachments: await Promise.all(
+          post.attachments.map(async (attachment) => ({
+            ...attachment,
+            previewUrl: (attachment as any).fileAssetId
+              ? await this.fileRegistryService.getSignedUrl(
+                  actor.tenantId,
+                  (attachment as any).fileAssetId,
+                )
+              : null,
+          })),
+        ),
+      })),
+    );
   }
 
   async getReactionAnalytics(actor: AuthContext) {
@@ -163,22 +182,34 @@ export class ActivityFeedService {
     }
 
     const storedAttachments = await Promise.all(
-      dto.attachments.map((attachment, index) =>
-        this.storageService
-          .saveBase64Object({
-            tenantId: actor.tenantId,
-            prefix: `activity-feed/${dto.classId}`,
-            fileName: attachment.fileName,
-            contentType: attachment.contentType,
-            base64Content: attachment.base64Content,
-          })
-          .then((stored) => ({
-            ...attachment,
-            ...stored,
-            publicUrl: null,
-            sortOrder: index,
-          })),
-      ),
+      dto.attachments.map(async (attachment, index) => {
+        const stored = await this.storageService.saveBase64Object({
+          tenantId: actor.tenantId,
+          prefix: `activity-feed/${dto.classId}`,
+          fileName: attachment.fileName,
+          contentType: attachment.contentType,
+          base64Content: attachment.base64Content,
+        });
+
+        const asset = await this.fileRegistryService.registerFile({
+          tenantId: actor.tenantId,
+          uploadedByUserId: actor.userId,
+          originalFilename: attachment.fileName,
+          objectKey: stored.objectKey,
+          mimeType: attachment.contentType,
+          sizeBytes: stored.sizeBytes,
+          module: 'activity',
+          metadata: { sortOrder: index },
+        });
+
+        return {
+          ...attachment,
+          ...stored,
+          fileAssetId: asset.id,
+          publicUrl: null,
+          sortOrder: index,
+        };
+      }),
     );
 
     const audienceType =
@@ -209,6 +240,7 @@ export class ActivityFeedService {
             provider: attachment.provider,
             objectKey: attachment.objectKey,
             publicUrl: attachment.publicUrl,
+            fileAssetId: attachment.fileAssetId,
             sortOrder: attachment.sortOrder,
           })),
         },
@@ -226,6 +258,18 @@ export class ActivityFeedService {
         studentTags: true,
       },
     });
+
+    // Update FileAssets with entityId
+    await Promise.all(
+      post.attachments.map((attachment) =>
+        (attachment as any).fileAssetId
+          ? this.prisma.fileAsset.update({
+              where: { id: (attachment as any).fileAssetId },
+              data: { entityId: post.id },
+            })
+          : Promise.resolve(),
+      ),
+    );
 
     await this.communicationsService.recordDeliveryRecords({
       actor,
@@ -445,6 +489,35 @@ export class ActivityFeedService {
     });
 
     return reaction;
+  }
+
+  async getAttachmentPreview(actor: AuthContext, attachmentId: string) {
+    const attachment = await this.prisma.activityAttachment.findFirst({
+      where: { id: attachmentId, tenantId: actor.tenantId },
+      include: { activityPost: true },
+    });
+
+    if (!attachment) {
+      throw new NotFoundException('Attachment not found');
+    }
+
+    if (!(attachment as any).fileAssetId) {
+      throw new BadRequestException('Attachment has no linked file asset');
+    }
+
+    await this.ensurePostVisibleToActor(actor, attachment.activityPostId);
+
+    await this.fileRegistryService.auditAccess(
+      actor.tenantId,
+      (attachment as any).fileAssetId,
+      actor.userId,
+      'preview',
+    );
+
+    return this.fileRegistryService.getSignedUrl(
+      actor.tenantId,
+      (attachment as any).fileAssetId,
+    );
   }
 
   async listMoodLogs(actor: AuthContext) {
