@@ -1731,3 +1731,25 @@ export type PlatformTenantDetail = PlatformTenantSummary & {
   usage: PlatformTenantUsage;
   panNumber?: string | null;
 };
+
+export type TenantSettingKey =
+  | 'school_logo'
+  | 'branding_primary_color'
+  | 'timezone'
+  | 'currency'
+  | 'date_format'
+  | 'attendance_lock_hours'
+  | 'receipt_format'
+  | 'fee_reminder_days'
+  | 'sms_provider'
+  | 'feature_toggles';
+
+export type TenantSettingSummary = {
+  key: TenantSettingKey;
+  value: any;
+  updatedAt: string;
+};
+
+export type UpdateTenantSettingPayload = {
+  value: any;
+};

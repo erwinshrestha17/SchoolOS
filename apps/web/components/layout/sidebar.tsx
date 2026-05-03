@@ -123,6 +123,13 @@ export const dashboardNavItems: NavItem[] = [
     phase: 'future',
     disabled: true,
   },
+  {
+    href: '/dashboard/settings',
+    label: 'Settings',
+    icon: Settings,
+    permissions: ['settings:read'],
+    phase: 'phase1',
+  },
 ];
 
 export const platformNavItems: NavItem[] = [

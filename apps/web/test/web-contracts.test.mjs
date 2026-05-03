@@ -113,6 +113,8 @@ describe('SchoolOS web production contracts', () => {
       'listPlatformTenants',
       'getPlatformTenantDetail',
       'updatePlatformTenantStatus',
+      'getTenantSettings',
+      'updateTenantSetting',
     ];
 
     for (const helper of requiredHelpers) {

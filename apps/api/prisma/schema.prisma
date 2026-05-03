@@ -430,6 +430,7 @@ model Tenant {
   staffLeaveBalances            StaffLeaveBalance[]
   staffLeaveRequests            StaffLeaveRequest[]
   syllabusTopics                SyllabusTopic[]
+  settings                      TenantSetting[]
 }
 
 model User {
@@ -562,6 +563,19 @@ model AuditLog {
   createdAt  DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model TenantSetting {
+  id        String   @id @default(uuid())
+  tenantId  String
+  key       String
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
 }
 
 model AcademicYear {

@@ -387,6 +387,16 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     action: 'manage',
     description: 'Manage platform, tenants, and global settings',
   },
+  {
+    resource: 'settings',
+    action: 'read',
+    description: 'Read tenant settings and preferences',
+  },
+  {
+    resource: 'settings',
+    action: 'manage',
+    description: 'Manage tenant branding, localization, and operational settings',
+  },
 ];
 
 export const SYSTEM_ROLE_DEFINITIONS = [
@@ -474,6 +484,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'attendance:read',
     'notices:read',
     'events:read',
+    'settings:read',
   ],
   principal: PERMISSION_CATALOG.map(({ resource, action }) =>
     buildPermissionKey(resource, action),
@@ -484,6 +495,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
         'accounting:close',
         'accounting:reverse',
         'tenants:manage',
+        'settings:manage',
       ].includes(permission),
   ),
   subject_teacher: [
@@ -518,6 +530,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'events:read',
     'activity_feed:read',
     'homework:read',
+    'settings:read',
   ],
   parent: [
     'students:read',
@@ -527,6 +540,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'homework:read',
     'messaging:create',
     'messaging:read',
+    'settings:read',
   ],
   accountant: [
     'roles:read',
@@ -547,6 +561,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'accounting:reverse',
     'payroll:read',
     'payroll:manage',
+    'settings:read',
   ],
   librarian: [
     'roles:read',

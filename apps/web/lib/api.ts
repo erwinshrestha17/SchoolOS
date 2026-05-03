@@ -47,6 +47,7 @@ import type {
   PaymentRefundSummary,
   PlatformTenantSummary,
   PlatformTenantDetail,
+  TenantSettingSummary,
   PayslipSummary,
   PromotionReadiness,
   PromotionResult,
@@ -617,5 +618,11 @@ export const api = {
     request<{ success: true }>(`/platform/tenants/${encodeURIComponent(tenantId)}/status`, {
       method: 'PATCH',
       json: { isActive },
+    }),
+  getTenantSettings: () => request<TenantSettingSummary[]>('/settings'),
+  updateTenantSetting: (key: string, value: any) =>
+    request<{ success: true }>(`/settings/${encodeURIComponent(key)}`, {
+      method: 'PATCH',
+      json: { value },
     }),
 };

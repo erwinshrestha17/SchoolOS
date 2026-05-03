@@ -369,6 +369,16 @@ export const permissionCatalog = [
     action: "manage",
     description: "Manage platform, tenants, and global settings",
   },
+  {
+    resource: "settings",
+    action: "read",
+    description: "Read tenant settings and preferences",
+  },
+  {
+    resource: "settings",
+    action: "manage",
+    description: "Manage tenant branding, localization, and operational settings",
+  },
 ] as const;
 
 export type PermissionResource = (typeof permissionCatalog)[number]["resource"];
