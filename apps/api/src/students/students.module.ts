@@ -6,6 +6,8 @@ import { StorageModule } from '../storage/storage.module';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { UsersModule } from '../users/users.module';
 import { StudentDocumentRetentionCron } from './student-document-retention.cron';
+import { StudentSearchController } from './student-search.controller';
+import { StudentSearchService } from './student-search.service';
 import { StudentsService } from './students.service';
 import { StudentsController } from './students.controller';
 
@@ -18,8 +20,8 @@ import { StudentsController } from './students.controller';
     StorageModule,
     FileRegistryModule,
   ],
-  providers: [StudentsService, StudentDocumentRetentionCron],
-  controllers: [StudentsController],
-  exports: [StudentsService],
+  providers: [StudentsService, StudentSearchService, StudentDocumentRetentionCron],
+  controllers: [StudentSearchController, StudentsController],
+  exports: [StudentsService, StudentSearchService],
 })
 export class StudentsModule {}
