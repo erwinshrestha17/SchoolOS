@@ -91,9 +91,33 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     const tSettings = await settingsController.getSettings({ auth: authTeacher } as any);
     expect(tSettings).toBeDefined();
 
-    // Teacher CANNOT update (Guard would normally block this, but we're testing the service/permission logic here if needed)
-    // In e2e we'd usually use supertest, but here we are mocking the controller calls.
-    // The controller has @Permissions('settings:manage'), which 'teacher' doesn't have.
+    // 9. Test Exposure - Parent Role
+    const parentRoleA = prisma.__state.roles.find(r => r.tenantId === tenantAId && r.name === 'parent');
+    const parentA = { id: 'parent-a', email: 'parent@school-a.com', passwordHash: password, tenantId: tenantAId, status: 'ACTIVE' };
+    prisma.__state.users.push(parentA);
+    prisma.__state.userRoles.push({ userId: parentA.id, roleId: parentRoleA.id, tenantId: tenantAId });
+
+    const authParent = { tenantId: tenantAId, userId: parentA.id, roles: ['parent'], permissions: SYSTEM_ROLE_PERMISSIONS['parent'] };
+
+    // Parent CANNOT read private settings
+    // In a real request, RolesPermissionsGuard would block this because 'parent' lacks 'settings:read'
+    // Here we can just verify the permission mapping
+    expect(authParent.permissions.includes('settings:read')).toBe(false);
+
+    // Parent CAN read public settings
+    expect(authParent.permissions.includes('settings:read_public')).toBe(true);
+
+    // 10. Verify Public Endpoint Key Filtering
+    // Add a sensitive setting
+    await settingsController.updateSetting('sms_provider', { value: 'twilio' }, { auth: authA } as any);
+    
+    const publicSettings = await settingsController.getPublicSettings({ auth: authParent } as any);
+    
+    // Branding should be there
+    expect(publicSettings.find(s => s.key === 'branding_primary_color')).toBeDefined();
+    // SMS provider should NOT be there
+    expect(publicSettings.find(s => s.key === 'sms_provider')).toBeUndefined();
+    expect(publicSettings.find(s => s.key === 'feature_toggles')).toBeUndefined();
   });
 });
 

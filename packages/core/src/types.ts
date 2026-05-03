@@ -1753,3 +1753,16 @@ export type TenantSettingSummary = {
 export type UpdateTenantSettingPayload = {
   value: any;
 };
+
+export type FileStatus = 'PENDING' | 'UPLOADED' | 'FAILED' | 'DELETED';
+
+export type FileAssetSummary = {
+  id: string;
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: number;
+  module: string | null;
+  entityId: string | null;
+  status: FileStatus;
+  createdAt: string;
+};

@@ -28,6 +28,12 @@ export class SettingsController {
     return this.settingsService.getSettings(req.auth.tenantId);
   }
 
+  @Get('public')
+  @Permissions('settings:read_public')
+  async getPublicSettings(@Req() req: AuthenticatedRequest): Promise<TenantSettingSummary[]> {
+    return this.settingsService.getPublicSettings(req.auth.tenantId);
+  }
+
   @Patch(':key')
   @Permissions('settings:manage')
   async updateSetting(

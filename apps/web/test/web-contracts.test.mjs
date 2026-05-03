@@ -114,6 +114,7 @@ describe('SchoolOS web production contracts', () => {
       'getPlatformTenantDetail',
       'updatePlatformTenantStatus',
       'getTenantSettings',
+      'getPublicTenantSettings',
       'updateTenantSetting',
     ];
 

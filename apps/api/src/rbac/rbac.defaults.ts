@@ -389,6 +389,11 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
   },
   {
     resource: 'settings',
+    action: 'read_public',
+    description: 'Read public-safe tenant branding and localization settings',
+  },
+  {
+    resource: 'settings',
     action: 'read',
     description: 'Read tenant settings and preferences',
   },
@@ -484,6 +489,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'attendance:read',
     'notices:read',
     'events:read',
+    'settings:read_public',
     'settings:read',
   ],
   principal: PERMISSION_CATALOG.map(({ resource, action }) =>
@@ -516,6 +522,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'attendance:read',
     'notices:read',
     'events:read',
+    'settings:read_public',
   ],
   support_staff: [
     'roles:read',
@@ -524,13 +531,14 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'notices:read',
     'events:read',
     'messaging:read',
+    'settings:read_public',
   ],
   student: [
     'notices:read',
     'events:read',
     'activity_feed:read',
     'homework:read',
-    'settings:read',
+    'settings:read_public',
   ],
   parent: [
     'students:read',
@@ -540,7 +548,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'homework:read',
     'messaging:create',
     'messaging:read',
-    'settings:read',
+    'settings:read_public',
   ],
   accountant: [
     'roles:read',
@@ -561,6 +569,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'accounting:reverse',
     'payroll:read',
     'payroll:manage',
+    'settings:read_public',
     'settings:read',
   ],
   librarian: [
@@ -571,6 +580,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'library:read',
     'library:manage',
     'fees:manage',
+    'settings:read_public',
   ],
   driver: [
     'roles:read',
@@ -578,6 +588,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'events:read',
     'transport:read',
     'transport:operate',
+    'settings:read_public',
   ],
   platform_super_admin: [
     'platform:read',

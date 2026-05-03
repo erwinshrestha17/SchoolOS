@@ -40,6 +40,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from './config/config.service';
 import { ClsModule } from 'nestjs-cls';
 import { SettingsModule } from './settings/settings.module';
+import { FileRegistryModule } from './file-registry/file-registry.module';
 
 @Module({
   imports: [
@@ -92,6 +93,7 @@ import { SettingsModule } from './settings/settings.module';
     TransportModule,
     PlatformModule,
     SettingsModule,
+    FileRegistryModule,
     TenantsModule,
     RedisModule,
     NotificationsModule,

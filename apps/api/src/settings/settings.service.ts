@@ -23,9 +23,32 @@ export class SettingsService {
     'feature_toggles',
   ];
 
+  private readonly publicKeys: TenantSettingKey[] = [
+    'school_logo',
+    'branding_primary_color',
+    'timezone',
+    'currency',
+    'date_format',
+  ];
+
   async getSettings(tenantId: string): Promise<TenantSettingSummary[]> {
     const settings = await this.prisma.tenantSetting.findMany({
       where: { tenantId },
+    });
+
+    return settings.map((s) => ({
+      key: s.key as TenantSettingKey,
+      value: s.value,
+      updatedAt: s.updatedAt.toISOString(),
+    }));
+  }
+
+  async getPublicSettings(tenantId: string): Promise<TenantSettingSummary[]> {
+    const settings = await this.prisma.tenantSetting.findMany({
+      where: {
+        tenantId,
+        key: { in: this.publicKeys },
+      },
     });
 
     return settings.map((s) => ({

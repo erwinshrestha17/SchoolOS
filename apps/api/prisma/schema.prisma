@@ -337,6 +337,13 @@ enum TransportBoardingStatus {
   MISSED
 }
 
+enum FileStatus {
+  PENDING
+  UPLOADED
+  FAILED
+  DELETED
+}
+
 model Tenant {
   id        String   @id @default(uuid())
   name      String
@@ -431,6 +438,7 @@ model Tenant {
   staffLeaveRequests            StaffLeaveRequest[]
   syllabusTopics                SyllabusTopic[]
   settings                      TenantSetting[]
+  fileAssets                    FileAsset[]
 }
 
 model User {
@@ -446,6 +454,7 @@ model User {
   failedLoginCount Int        @default(0)
   lockedUntil      DateTime?
   createdAt        DateTime   @default(now())
+  fileAssets       FileAsset[]
 
   userRoles                   UserRole[]
   refreshTokens               RefreshToken[]
@@ -576,6 +585,28 @@ model TenantSetting {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, key])
+}
+
+model FileAsset {
+  id               String      @id @default(uuid())
+  tenantId         String
+  uploadedByUserId String?
+  originalFilename String
+  objectKey        String      @unique
+  mimeType         String
+  sizeBytes        BigInt
+  module           String?
+  entityId         String?
+  status           FileStatus  @default(UPLOADED)
+  metadata         Json?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  softDeletedAt    DateTime?
+
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  uploadedBy User?  @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, module, entityId])
 }
 
 model AcademicYear {

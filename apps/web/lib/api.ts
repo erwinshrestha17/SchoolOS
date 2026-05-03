@@ -620,6 +620,7 @@ export const api = {
       json: { isActive },
     }),
   getTenantSettings: () => request<TenantSettingSummary[]>('/settings'),
+  getPublicTenantSettings: () => request<TenantSettingSummary[]>('/settings/public'),
   updateTenantSetting: (key: string, value: any) =>
     request<{ success: true }>(`/settings/${encodeURIComponent(key)}`, {
       method: 'PATCH',

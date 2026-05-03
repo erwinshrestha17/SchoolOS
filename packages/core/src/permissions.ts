@@ -371,6 +371,11 @@ export const permissionCatalog = [
   },
   {
     resource: "settings",
+    action: "read_public",
+    description: "Read public-safe tenant branding and localization settings",
+  },
+  {
+    resource: "settings",
     action: "read",
     description: "Read tenant settings and preferences",
   },
