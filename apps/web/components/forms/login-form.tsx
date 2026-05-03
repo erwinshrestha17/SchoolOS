@@ -38,15 +38,20 @@ export function LoginForm() {
     mutationFn: api.login,
     onSuccess: (result) => {
       if (isAuthSession(result)) {
-        const defaultRedirect = result.user.roles.some((role) =>
+        const isPlatformUser = result.user.roles.some((role) =>
           PLATFORM_ROLES.includes(role),
-        )
-          ? '/platform/dashboard'
-          : '/dashboard';
+        );
+        const defaultRedirect = isPlatformUser ? '/platform/dashboard' : '/dashboard';
+        const requestedRedirect = searchParams.get('next');
+        const safeRedirect = resolvePostLoginRedirect(
+          requestedRedirect,
+          defaultRedirect,
+          isPlatformUser,
+        );
 
         setChallengeMessage(null);
         setAuthenticatedSession(result);
-        router.push(searchParams.get('next') ?? defaultRedirect);
+        router.push(safeRedirect);
         return;
       }
 
@@ -133,4 +138,22 @@ export function LoginForm() {
       ) : null}
     </form>
   );
+}
+
+function resolvePostLoginRedirect(
+  requestedRedirect: string | null,
+  defaultRedirect: string,
+  isPlatformUser: boolean,
+) {
+  if (!requestedRedirect?.startsWith('/')) {
+    return defaultRedirect;
+  }
+
+  if (isPlatformUser) {
+    return requestedRedirect.startsWith('/platform')
+      ? requestedRedirect
+      : defaultRedirect;
+  }
+
+  return requestedRedirect.startsWith('/dashboard') ? requestedRedirect : defaultRedirect;
 }
