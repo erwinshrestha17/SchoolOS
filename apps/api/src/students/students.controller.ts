@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   StreamableFile,
   UseGuards,
 } from '@nestjs/common';
@@ -24,6 +25,7 @@ import { RevokeGeneratedStudentDocumentDto } from './dto/revoke-generated-studen
 import { ReviewGuardianIdentityVerificationDto } from './dto/review-guardian-identity-verification.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { UpdateStudentGuardianDto } from './dto/update-student-guardian.dto';
+import { AttendanceHistoryQueryDto } from './dto/attendance-history.dto';
 import { StudentsService } from './students.service';
 
 @Controller('students')
@@ -227,9 +229,18 @@ export class StudentsController {
     return this.studentsService.revokeGeneratedStudentDocument(
       studentId,
       documentId,
-      dto,
       auth,
     );
+  }
+
+  @Get(':id/attendance-history')
+  @Permissions('students:read', 'attendance:read')
+  getAttendanceHistory(
+    @Param('id') studentId: string,
+    @Query() query: AttendanceHistoryQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.getAttendanceHistory(studentId, query, auth);
   }
 }
 
