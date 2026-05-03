@@ -18,23 +18,26 @@ describe('ResponseEnvelopeInterceptor', () => {
     const mockRequest = { requestId: 'test-req-id' };
     const mockResponse = { headersSent: false, statusCode: 200 };
     const mockContext: Partial<ExecutionContext> = {
-      switchToHttp: () => ({
-        getRequest: () => mockRequest,
-        getResponse: () => mockResponse,
-      } as any),
-      getHandler: () => ({ name: 'testHandler' } as any),
+      switchToHttp: () =>
+        ({
+          getRequest: () => mockRequest,
+          getResponse: () => mockResponse,
+        }) as any,
+      getHandler: () => ({ name: 'testHandler' }) as any,
     };
 
-    interceptor.intercept(mockContext as ExecutionContext, callHandler).subscribe((result) => {
-      expect(result).toEqual({
-        success: true,
-        message: 'Operation successful',
-        data,
-        timestamp: expect.any(String),
-        requestId: 'test-req-id',
+    interceptor
+      .intercept(mockContext as ExecutionContext, callHandler)
+      .subscribe((result) => {
+        expect(result).toEqual({
+          success: true,
+          message: 'Operation successful',
+          data,
+          timestamp: expect.any(String),
+          requestId: 'test-req-id',
+        });
+        done();
       });
-      done();
-    });
   });
 
   it('should NOT wrap StreamableFile', (done) => {
@@ -46,17 +49,20 @@ describe('ResponseEnvelopeInterceptor', () => {
     const mockRequest = {};
     const mockResponse = { headersSent: false, statusCode: 200 };
     const mockContext: Partial<ExecutionContext> = {
-      switchToHttp: () => ({
-        getRequest: () => mockRequest,
-        getResponse: () => mockResponse,
-      } as any),
-      getHandler: () => ({ name: 'testHandler' } as any),
+      switchToHttp: () =>
+        ({
+          getRequest: () => mockRequest,
+          getResponse: () => mockResponse,
+        }) as any,
+      getHandler: () => ({ name: 'testHandler' }) as any,
     };
 
-    interceptor.intercept(mockContext as ExecutionContext, callHandler).subscribe((result) => {
-      expect(result).toBeInstanceOf(StreamableFile);
-      done();
-    });
+    interceptor
+      .intercept(mockContext as ExecutionContext, callHandler)
+      .subscribe((result) => {
+        expect(result).toBeInstanceOf(StreamableFile);
+        done();
+      });
   });
 
   it('should NOT wrap if already wrapped', (done) => {
@@ -73,16 +79,19 @@ describe('ResponseEnvelopeInterceptor', () => {
     const mockRequest = {};
     const mockResponse = { headersSent: false, statusCode: 200 };
     const mockContext: Partial<ExecutionContext> = {
-      switchToHttp: () => ({
-        getRequest: () => mockRequest,
-        getResponse: () => mockResponse,
-      } as any),
-      getHandler: () => ({ name: 'testHandler' } as any),
+      switchToHttp: () =>
+        ({
+          getRequest: () => mockRequest,
+          getResponse: () => mockResponse,
+        }) as any,
+      getHandler: () => ({ name: 'testHandler' }) as any,
     };
 
-    interceptor.intercept(mockContext as ExecutionContext, callHandler).subscribe((result) => {
-      expect(result).toEqual(data);
-      done();
-    });
+    interceptor
+      .intercept(mockContext as ExecutionContext, callHandler)
+      .subscribe((result) => {
+        expect(result).toEqual(data);
+        done();
+      });
   });
 });

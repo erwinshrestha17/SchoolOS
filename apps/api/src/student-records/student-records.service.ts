@@ -167,19 +167,35 @@ export class StudentRecordsService {
     return group;
   }
 
-  async getSignedUrl(actor: AuthContext, assetId: string, action: 'preview' | 'download') {
+  async getSignedUrl(
+    actor: AuthContext,
+    assetId: string,
+    action: 'preview' | 'download',
+  ) {
     // 1. Audit the access via Registry
-    await this.fileRegistryService.auditAccess(actor.tenantId, assetId, actor.userId, action);
+    await this.fileRegistryService.auditAccess(
+      actor.tenantId,
+      assetId,
+      actor.userId,
+      action,
+    );
 
     // 2. Get the signed URL
-    const url = await this.fileRegistryService.getSignedUrl(actor.tenantId, assetId);
+    const url = await this.fileRegistryService.getSignedUrl(
+      actor.tenantId,
+      assetId,
+    );
 
     return { url };
   }
 
   async deleteDocument(actor: AuthContext, assetId: string) {
     // Soft delete in registry (this also audits)
-    await this.fileRegistryService.softDeleteFile(actor.tenantId, assetId, actor.userId);
+    await this.fileRegistryService.softDeleteFile(
+      actor.tenantId,
+      assetId,
+      actor.userId,
+    );
 
     return { success: true };
   }

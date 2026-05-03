@@ -25,7 +25,9 @@ export class SettingsController {
 
   @Get()
   @Permissions('settings:read')
-  async getSettings(@Req() req: AuthenticatedRequest): Promise<TenantSettingSummary[]> {
+  async getSettings(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<TenantSettingSummary[]> {
     if (!req.auth) {
       throw new UnauthorizedException('Authentication context required');
     }
@@ -34,7 +36,9 @@ export class SettingsController {
 
   @Get('public')
   @Permissions('settings:read_public')
-  async getPublicSettings(@Req() req: AuthenticatedRequest): Promise<TenantSettingSummary[]> {
+  async getPublicSettings(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<TenantSettingSummary[]> {
     if (!req.auth) {
       throw new UnauthorizedException('Authentication context required');
     }

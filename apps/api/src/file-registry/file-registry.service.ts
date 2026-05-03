@@ -1,4 +1,8 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { FileStatus } from '@prisma/client';
@@ -74,7 +78,12 @@ export class FileRegistryService {
     });
   }
 
-  async auditAccess(tenantId: string, assetId: string, userId: string, action: 'preview' | 'download') {
+  async auditAccess(
+    tenantId: string,
+    assetId: string,
+    userId: string,
+    action: 'preview' | 'download',
+  ) {
     await this.auditService.record({
       action: `file_${action}`,
       resource: 'file_registry',
@@ -98,11 +107,11 @@ export class FileRegistryService {
 
   async getSignedUrl(tenantId: string, assetId: string) {
     const asset = await this.getFileMetadata(tenantId, assetId);
-    
+
     // Placeholder for actual S3/R2 signed URL generation
     // For now, return a simulated URL if it's not local, or the publicUrl
-    return asset.objectKey.startsWith('http') 
-      ? asset.objectKey 
+    return asset.objectKey.startsWith('http')
+      ? asset.objectKey
       : `https://storage.schoolos.cloud/${asset.objectKey}?token=simulated-jwt-for-${assetId}`;
   }
 }

@@ -8,7 +8,13 @@ import { ActivityFeedService } from './activity-feed.service';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
 
 @Module({
-  imports: [AuthModule, AuditModule, StorageModule, CommunicationsModule, FileRegistryModule],
+  imports: [
+    AuthModule,
+    AuditModule,
+    StorageModule,
+    CommunicationsModule,
+    FileRegistryModule,
+  ],
   controllers: [ActivityFeedController],
   providers: [ActivityFeedService],
 })

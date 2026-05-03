@@ -52,7 +52,12 @@ describe('StudentRecordsService', () => {
       permissions: ['student_documents:manage'],
     };
 
-    service = new StudentRecordsService(prisma, storageService, auditService, fileRegistryService);
+    service = new StudentRecordsService(
+      prisma,
+      storageService,
+      auditService,
+      fileRegistryService,
+    );
   });
 
   it('stores document metadata only after validating tenant-scoped student access', async () => {

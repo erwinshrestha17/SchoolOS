@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TenantSettingKey, TenantSettingSummary } from '@schoolos/core';
@@ -108,14 +112,21 @@ export class SettingsService {
   private validateSettingValue(key: TenantSettingKey, value: any): void {
     switch (key) {
       case 'branding_primary_color':
-        if (typeof value !== 'string' || !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(value)) {
-          throw new BadRequestException('Invalid color format. Expected hex code.');
+        if (
+          typeof value !== 'string' ||
+          !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(value)
+        ) {
+          throw new BadRequestException(
+            'Invalid color format. Expected hex code.',
+          );
         }
         break;
       case 'attendance_lock_hours':
       case 'fee_reminder_days':
         if (typeof value !== 'number' || value < 0) {
-          throw new BadRequestException(`Invalid value for ${key}. Expected positive number.`);
+          throw new BadRequestException(
+            `Invalid value for ${key}. Expected positive number.`,
+          );
         }
         break;
       case 'timezone':
@@ -125,12 +136,16 @@ export class SettingsService {
       case 'sms_provider':
       case 'school_logo':
         if (typeof value !== 'string') {
-          throw new BadRequestException(`Invalid value for ${key}. Expected string.`);
+          throw new BadRequestException(
+            `Invalid value for ${key}. Expected string.`,
+          );
         }
         break;
       case 'feature_toggles':
         if (typeof value !== 'object' || value === null) {
-          throw new BadRequestException('Invalid value for feature_toggles. Expected object.');
+          throw new BadRequestException(
+            'Invalid value for feature_toggles. Expected object.',
+          );
         }
         break;
       default:

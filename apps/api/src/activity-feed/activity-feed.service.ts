@@ -80,8 +80,8 @@ export class ActivityFeedService {
               publishedAt: {
                 gte: monthRange.start,
                 lt: monthRange.end,
-                },
-              }
+              },
+            }
           : {}),
       },
       include: {

@@ -332,8 +332,14 @@ function buildService(prisma = buildPrisma()) {
     archiveAlumni: jest.fn(),
   };
 
-  const storageService = { saveBase64Object: jest.fn(), saveBufferObject: jest.fn() };
-  const fileRegistryService = { registerFile: jest.fn(), getSignedUrl: jest.fn() };
+  const storageService = {
+    saveBase64Object: jest.fn(),
+    saveBufferObject: jest.fn(),
+  };
+  const fileRegistryService = {
+    registerFile: jest.fn(),
+    getSignedUrl: jest.fn(),
+  };
 
   const service = new AdmissionsService(
     prisma as unknown as PrismaService,

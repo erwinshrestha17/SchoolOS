@@ -400,7 +400,8 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
   {
     resource: 'settings',
     action: 'manage',
-    description: 'Manage tenant branding, localization, and operational settings',
+    description:
+      'Manage tenant branding, localization, and operational settings',
   },
 ];
 
@@ -411,7 +412,8 @@ export const SYSTEM_ROLE_DEFINITIONS = [
   },
   {
     name: 'platform_super_admin',
-    description: 'Global platform role with full access to all tenants and settings',
+    description:
+      'Global platform role with full access to all tenants and settings',
   },
   {
     name: 'platform_support',
@@ -597,7 +599,12 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
       buildPermissionKey(resource, action),
     ),
   ],
-  platform_support: ['platform:read', 'students:read', 'staff:read', 'tenants:read'],
+  platform_support: [
+    'platform:read',
+    'students:read',
+    'staff:read',
+    'tenants:read',
+  ],
   platform_billing_admin: ['platform:read', 'tenants:read'],
 };
 
