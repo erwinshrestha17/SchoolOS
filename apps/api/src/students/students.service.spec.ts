@@ -1231,7 +1231,7 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
   const fileRegistryService = {
     registerFile: jest.fn(),
     getSignedUrl: jest.fn(),
-    listFilesByEntity: jest.fn(),
+    listFilesByEntity: jest.fn().mockResolvedValue([]),
   };
 
   return {

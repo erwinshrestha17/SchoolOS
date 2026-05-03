@@ -261,11 +261,12 @@ export class StudentsService {
       take: 12,
     });
 
-    const registryDocuments = await this.fileRegistryService.listFilesByEntity(
-      actor.tenantId,
-      'students',
-      student.id,
-    );
+    const registryDocuments =
+      (await this.fileRegistryService.listFilesByEntity(
+        actor.tenantId,
+        'students',
+        student.id,
+      )) || [];
 
     const latestEnrollment = student.enrollments[0] ?? null;
 
@@ -361,20 +362,23 @@ export class StudentsService {
           uploadedAt: document.createdAt.toISOString(),
           isLegacy: true,
         })),
-        ...registryDocuments.map((asset) => ({
-          id: asset.id,
-          studentId: student.id,
-          kind: (asset.metadata as any)?.kind || 'OTHER',
-          title: (asset.metadata as any)?.title || asset.originalFilename,
-          fileName: asset.originalFilename,
-          contentType: asset.mimeType,
-          sizeBytes: Number(asset.sizeBytes),
-          provider: 'REGISTRY',
-          objectKey: asset.objectKey,
-          publicUrl: null,
-          uploadedAt: asset.createdAt.toISOString(),
-          isLegacy: false,
-        })),
+        ...registryDocuments.map((asset) => {
+          const metadata = asset.metadata as Prisma.JsonObject;
+          return {
+            id: asset.id,
+            studentId: student.id,
+            kind: (metadata?.kind as string) || 'OTHER',
+            title: (metadata?.title as string) || asset.originalFilename,
+            fileName: asset.originalFilename,
+            contentType: asset.mimeType,
+            sizeBytes: Number(asset.sizeBytes),
+            provider: 'REGISTRY',
+            objectKey: asset.objectKey,
+            publicUrl: null,
+            uploadedAt: asset.createdAt.toISOString(),
+            isLegacy: false,
+          };
+        }),
       ],
       generatedDocuments: student.generatedDocuments.map((document) => ({
         id: document.id,
@@ -629,7 +633,10 @@ export class StudentsService {
         sizeBytes: stored.sizeBytes,
         module: 'students',
         entityId: student.id,
-        metadata: { kind: 'PHOTO', title: 'Student Photo' },
+        metadata: {
+          kind: 'PHOTO',
+          title: 'Student Photo',
+        } as Prisma.JsonObject,
       });
 
       studentData.photoUrl = asset.id; // Store asset ID as the photoUrl

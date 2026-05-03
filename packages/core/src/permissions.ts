@@ -382,7 +382,8 @@ export const permissionCatalog = [
   {
     resource: "settings",
     action: "manage",
-    description: "Manage tenant branding, localization, and operational settings",
+    description:
+      "Manage tenant branding, localization, and operational settings",
   },
 ] as const;
 
@@ -398,7 +399,8 @@ export const systemRoleDefinitions = [
   },
   {
     name: "platform_super_admin",
-    description: "Global platform role with full access to all tenants and settings",
+    description:
+      "Global platform role with full access to all tenants and settings",
   },
   {
     name: "platform_support",
@@ -456,6 +458,8 @@ export const systemRolePermissions: Record<string, string[]> = {
     "attendance:read",
     "notices:read",
     "events:read",
+    "settings:read_public",
+    "settings:read",
   ],
   principal: permissionCatalog
     .map(({ resource, action }) => buildPermissionKey(resource, action))
@@ -466,6 +470,7 @@ export const systemRolePermissions: Record<string, string[]> = {
           "accounting:close",
           "accounting:reverse",
           "tenants:manage",
+          "settings:manage",
         ].includes(permission),
     ),
   subject_teacher: [
@@ -486,6 +491,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     "attendance:read",
     "notices:read",
     "events:read",
+    "settings:read_public",
   ],
   support_staff: [
     "roles:read",
@@ -494,12 +500,14 @@ export const systemRolePermissions: Record<string, string[]> = {
     "notices:read",
     "events:read",
     "messaging:read",
+    "settings:read_public",
   ],
   student: [
     "events:read",
     "notices:read",
     "activity_feed:read",
     "homework:read",
+    "settings:read_public",
   ],
   parent: [
     "events:read",
@@ -509,6 +517,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     "homework:read",
     "messaging:create",
     "messaging:read",
+    "settings:read_public",
   ],
   accountant: [
     "roles:read",
@@ -529,6 +538,8 @@ export const systemRolePermissions: Record<string, string[]> = {
     "accounting:reverse",
     "payroll:read",
     "payroll:manage",
+    "settings:read_public",
+    "settings:read",
   ],
   librarian: [
     "roles:read",
@@ -538,6 +549,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     "library:read",
     "library:manage",
     "fees:manage",
+    "settings:read_public",
   ],
   driver: [
     "roles:read",
@@ -545,6 +557,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     "events:read",
     "transport:read",
     "transport:operate",
+    "settings:read_public",
   ],
   platform_super_admin: [
     "platform:read",
@@ -553,6 +566,11 @@ export const systemRolePermissions: Record<string, string[]> = {
       buildPermissionKey(resource, action),
     ),
   ],
-  platform_support: ["platform:read", "students:read", "staff:read", "tenants:read"],
+  platform_support: [
+    "platform:read",
+    "students:read",
+    "staff:read",
+    "tenants:read",
+  ],
   platform_billing_admin: ["platform:read", "tenants:read"],
 };

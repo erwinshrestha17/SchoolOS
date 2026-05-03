@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { Prisma } from '@prisma/client';
 import { TenantSettingKey, TenantSettingSummary } from '@schoolos/core';
 
 @Injectable()
@@ -62,7 +63,10 @@ export class SettingsService {
     }));
   }
 
-  async getSetting(tenantId: string, key: TenantSettingKey): Promise<any> {
+  async getSetting(
+    tenantId: string,
+    key: TenantSettingKey,
+  ): Promise<Prisma.JsonValue | null> {
     const setting = await this.prisma.tenantSetting.findUnique({
       where: { tenantId_key: { tenantId, key } },
     });
@@ -73,7 +77,7 @@ export class SettingsService {
   async updateSetting(
     tenantId: string,
     key: string,
-    value: any,
+    value: Prisma.InputJsonValue,
     userId: string,
   ): Promise<void> {
     if (!this.allowedKeys.includes(key as TenantSettingKey)) {
@@ -109,7 +113,7 @@ export class SettingsService {
     });
   }
 
-  private validateSettingValue(key: TenantSettingKey, value: any): void {
+  private validateSettingValue(key: TenantSettingKey, value: unknown): void {
     switch (key) {
       case 'branding_primary_color':
         if (

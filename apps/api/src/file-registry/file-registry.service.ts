@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { FileStatus } from '@prisma/client';
+import { FileStatus, Prisma } from '@prisma/client';
 
 @Injectable()
 export class FileRegistryService {
@@ -23,7 +23,7 @@ export class FileRegistryService {
     sizeBytes: number;
     module?: string;
     entityId?: string;
-    metadata?: any;
+    metadata?: Prisma.InputJsonValue;
   }) {
     return this.prisma.fileAsset.create({
       data: {

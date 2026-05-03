@@ -10,6 +10,7 @@ import {
   ConsentType,
   NotificationChannel,
   Prisma,
+  ActivityAttachment,
 } from '@prisma/client';
 import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../audit/audit.service';
@@ -107,10 +108,13 @@ export class ActivityFeedService {
         attachments: await Promise.all(
           post.attachments.map(async (attachment) => ({
             ...attachment,
-            previewUrl: (attachment as any).fileAssetId
+            previewUrl: (
+              attachment as ActivityAttachment & { fileAssetId?: string }
+            ).fileAssetId
               ? await this.fileRegistryService.getSignedUrl(
                   actor.tenantId,
-                  (attachment as any).fileAssetId,
+                  (attachment as ActivityAttachment & { fileAssetId?: string })
+                    .fileAssetId!,
                 )
               : null,
           })),
@@ -262,9 +266,14 @@ export class ActivityFeedService {
     // Update FileAssets with entityId
     await Promise.all(
       post.attachments.map((attachment) =>
-        (attachment as any).fileAssetId
+        (attachment as ActivityAttachment & { fileAssetId?: string })
+          .fileAssetId
           ? this.prisma.fileAsset.update({
-              where: { id: (attachment as any).fileAssetId },
+              where: {
+                id: (
+                  attachment as ActivityAttachment & { fileAssetId?: string }
+                ).fileAssetId!,
+              },
               data: { entityId: post.id },
             })
           : Promise.resolve(),
@@ -501,7 +510,10 @@ export class ActivityFeedService {
       throw new NotFoundException('Attachment not found');
     }
 
-    if (!(attachment as any).fileAssetId) {
+    const fileAssetId = (
+      attachment as ActivityAttachment & { fileAssetId?: string }
+    ).fileAssetId;
+    if (!fileAssetId) {
       throw new BadRequestException('Attachment has no linked file asset');
     }
 
@@ -509,15 +521,12 @@ export class ActivityFeedService {
 
     await this.fileRegistryService.auditAccess(
       actor.tenantId,
-      (attachment as any).fileAssetId,
+      fileAssetId,
       actor.userId,
       'preview',
     );
 
-    return this.fileRegistryService.getSignedUrl(
-      actor.tenantId,
-      (attachment as any).fileAssetId,
-    );
+    return this.fileRegistryService.getSignedUrl(actor.tenantId, fileAssetId);
   }
 
   async listMoodLogs(actor: AuthContext) {
