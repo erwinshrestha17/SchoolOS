@@ -9,7 +9,13 @@ type TenantScopedArgs = {
   data?: Record<string, unknown> | Array<Record<string, unknown>>;
 };
 
-const TENANT_SCOPE_EXCLUDED_MODELS = ['Tenant', 'Permission'];
+const TENANT_SCOPE_EXCLUDED_MODELS = [
+  'Tenant',
+  'Permission',
+  'RefreshToken',
+  'OtpCode',
+  'RolePermission',
+];
 const TENANT_SCOPED_READ_WRITE_OPERATIONS = [
   'findUnique',
   'findFirst',

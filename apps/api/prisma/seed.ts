@@ -164,7 +164,7 @@ async function main() {
       },
     });
 
-    for (const permissionKey of permissionKeys) {
+    for (const permissionKey of Array.from(new Set(permissionKeys))) {
       const [resource, action] = permissionKey.split(':');
 
       if (!resource || !action) {

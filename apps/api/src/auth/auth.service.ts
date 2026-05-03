@@ -10,6 +10,7 @@ import {
   ForbiddenException,
   HttpException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -45,6 +46,8 @@ const LOGIN_LOCK_MINUTES = 15;
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -335,64 +338,79 @@ export class AuthService {
     cookieHeader?: string,
     requestMeta?: RequestMeta,
   ) {
-    const rawToken =
-      dto.refreshToken ??
-      parseCookie(cookieHeader, this.configService.refreshCookieName);
+    try {
+      if (!cookieHeader && !dto.refreshToken) {
+        throw new UnauthorizedException('Refresh token is required');
+      }
 
-    if (!rawToken) {
-      throw new UnauthorizedException('Refresh token is required');
-    }
+      const rawToken =
+        dto.refreshToken ??
+        parseCookie(cookieHeader, this.configService.refreshCookieName);
 
-    const existingSession = await this.prisma.refreshToken.findUnique({
-      where: { tokenHash: hashToken(rawToken) },
-      include: {
-        user: {
-          include: this.userAuthInclude,
+      if (!rawToken) {
+        throw new UnauthorizedException('Refresh token is invalid');
+      }
+
+      const existingSession = await this.prisma.refreshToken.findUnique({
+        where: { tokenHash: hashToken(rawToken) },
+        include: {
+          user: {
+            include: this.userAuthInclude,
+          },
         },
-      },
-    });
+      });
 
-    if (
-      !existingSession ||
-      existingSession.revokedAt ||
-      existingSession.expiresAt.getTime() <= Date.now()
-    ) {
-      throw new UnauthorizedException('Refresh token is invalid');
+      if (
+        !existingSession ||
+        existingSession.revokedAt ||
+        existingSession.expiresAt.getTime() < Date.now()
+      ) {
+        throw new UnauthorizedException('Refresh token is invalid');
+      }
+
+      this.assertUserIsActive(existingSession.user);
+
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: existingSession.user.tenantId },
+      });
+
+      if (!tenant) {
+        throw new UnauthorizedException('Tenant not found');
+      }
+
+      if (!tenant.isActive) {
+        throw new UnauthorizedException('Tenant is not active');
+      }
+
+      await this.prisma.refreshToken.update({
+        where: { id: existingSession.id },
+        data: { revokedAt: new Date() },
+      });
+
+      const authContext = this.buildAuthContext(
+        existingSession.user,
+        tenant.slug,
+      );
+
+      const session = await this.issueSession(authContext);
+
+      this.attachRefreshCookie(response, session.refreshToken);
+      this.attachAccessCookie(response, session.accessToken);
+
+      await this.auditService.record({
+        action: 'refresh',
+        resource: 'auth',
+        tenantId: authContext.tenantId,
+        userId: authContext.userId,
+        ipAddress: requestMeta?.ipAddress,
+        userAgent: requestMeta?.userAgent,
+      });
+
+      return this.buildAuthSession(session.accessToken, authContext, tenant);
+    } catch (error) {
+      this.logger.error(`Refresh failed: ${error.message}`, error.stack);
+      throw error;
     }
-
-    this.assertUserIsActive(existingSession.user);
-
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: existingSession.user.tenantId },
-    });
-
-    if (!tenant?.isActive) {
-      throw new UnauthorizedException('Tenant is not active');
-    }
-
-    await this.prisma.refreshToken.update({
-      where: { id: existingSession.id },
-      data: { revokedAt: new Date() },
-    });
-
-    const authContext = this.buildAuthContext(
-      existingSession.user,
-      tenant.slug,
-    );
-    const session = await this.issueSession(authContext);
-    this.attachRefreshCookie(response, session.refreshToken);
-    this.attachAccessCookie(response, session.accessToken);
-
-    await this.auditService.record({
-      action: 'refresh',
-      resource: 'auth',
-      tenantId: authContext.tenantId,
-      userId: authContext.userId,
-      ipAddress: requestMeta?.ipAddress,
-      userAgent: requestMeta?.userAgent,
-    });
-
-    return this.buildAuthSession(session.accessToken, authContext, tenant);
   }
 
   async logout(
