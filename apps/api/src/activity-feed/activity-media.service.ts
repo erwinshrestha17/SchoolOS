@@ -88,7 +88,10 @@ export class ActivityMediaService {
       },
     });
 
-    if (fileAsset.provider === StorageProvider.R2 && fileAsset.objectKey.startsWith('http')) {
+    if (
+      attachment.provider === StorageProvider.R2 &&
+      fileAsset.objectKey.startsWith('http')
+    ) {
       return {
         redirectUrl: fileAsset.objectKey,
         fileName: attachment.fileName,
