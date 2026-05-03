@@ -443,15 +443,21 @@ export class ReportsService {
               ? String(filters.academicYearId)
               : undefined,
             classId: filters.classId ? String(filters.classId) : undefined,
-            sectionId: filters.sectionId ? String(filters.sectionId) : undefined,
-            studentId: filters.studentId ? String(filters.studentId) : undefined,
+            sectionId: filters.sectionId
+              ? String(filters.sectionId)
+              : undefined,
+            studentId: filters.studentId
+              ? String(filters.studentId)
+              : undefined,
             collectorUserId: filters.collectorUserId
               ? String(filters.collectorUserId)
               : undefined,
             paymentMethod: filters.paymentMethod
               ? String(filters.paymentMethod)
               : undefined,
-            feeHeadId: filters.feeHeadId ? String(filters.feeHeadId) : undefined,
+            feeHeadId: filters.feeHeadId
+              ? String(filters.feeHeadId)
+              : undefined,
           },
         );
 
@@ -542,7 +548,12 @@ export class ReportsService {
         module: 'finance',
         formats: ['json', 'csv'],
         filters: [
-          { key: 'asOfDate', label: 'As Of Date', type: 'date', required: true },
+          {
+            key: 'asOfDate',
+            label: 'As Of Date',
+            type: 'date',
+            required: true,
+          },
           { key: 'academicYearId', label: 'Academic Year', type: 'select' },
           { key: 'classId', label: 'Class', type: 'class' },
           { key: 'sectionId', label: 'Section', type: 'section' },
@@ -572,9 +583,15 @@ export class ReportsService {
               ? String(filters.academicYearId)
               : undefined,
             classId: filters.classId ? String(filters.classId) : undefined,
-            sectionId: filters.sectionId ? String(filters.sectionId) : undefined,
-            studentId: filters.studentId ? String(filters.studentId) : undefined,
-            feeHeadId: filters.feeHeadId ? String(filters.feeHeadId) : undefined,
+            sectionId: filters.sectionId
+              ? String(filters.sectionId)
+              : undefined,
+            studentId: filters.studentId
+              ? String(filters.studentId)
+              : undefined,
+            feeHeadId: filters.feeHeadId
+              ? String(filters.feeHeadId)
+              : undefined,
             minOutstanding: filters.minOutstanding
               ? Number(filters.minOutstanding)
               : undefined,

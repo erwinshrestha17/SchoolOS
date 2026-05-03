@@ -829,7 +829,9 @@ export class FinanceService {
                 ...(filters.classId || filters.sectionId
                   ? {
                       student: {
-                        ...(filters.classId ? { classId: filters.classId } : {}),
+                        ...(filters.classId
+                          ? { classId: filters.classId }
+                          : {}),
                         ...(filters.sectionId
                           ? { sectionId: filters.sectionId }
                           : {}),
