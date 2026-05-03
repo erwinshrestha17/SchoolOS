@@ -450,11 +450,7 @@ export class ReportsService {
       );
     }
 
-    const data = await executor.execute(
-      actor,
-      request.filters,
-      request.format,
-    );
+    const data = await executor.execute(actor, request.filters, request.format);
 
     await this.auditService.record({
       action: 'export_report',

@@ -1024,6 +1024,12 @@ export class FinanceService {
       status?: string;
     },
   ) {
+    const ledgerInvoiceStatus =
+      filters?.status &&
+      Object.values(InvoiceStatus).includes(filters.status as InvoiceStatus)
+        ? (filters.status as InvoiceStatus)
+        : undefined;
+
     const student = await this.prisma.student.findFirst({
       where: {
         id: studentId,
@@ -1053,7 +1059,7 @@ export class FinanceService {
           ...(filters?.academicYearId
             ? { academicYearId: filters.academicYearId }
             : {}),
-          ...(filters?.status ? { status: filters.status as any } : {}),
+          ...(ledgerInvoiceStatus ? { status: ledgerInvoiceStatus } : {}),
           ...(filters?.fromDate || filters?.toDate
             ? {
                 issuedAt: {
