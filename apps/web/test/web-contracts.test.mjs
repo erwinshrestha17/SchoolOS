@@ -217,7 +217,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(sidebar, /visiblePrimaryItems = dashboardNavItems\.filter/);
     assert.match(sidebar, /visiblePlatformItems = platformNavItems\.filter/);
     assert.match(sidebar, /canSeeNavItem\(item, session\)/);
-    assert.match(sidebar, /label: 'Platform Control'/);
+    assert.match(sidebar, /label(?:=|:\\s*)['\"]Platform Control['\"]/);
 
     for (const label of requiredPhaseOneLabels) {
       assert.match(sidebar, new RegExp(label.replace('/', '\\/')));
