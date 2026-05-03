@@ -5,6 +5,7 @@ This file gives Codex and other coding assistants a short, stable context file s
 For full project memory, read:
 
 - `docs/project/SCHOOLOS_PROJECT_MEMORY.md`
+- `docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md`
 - `ARCHITECTURE.md`
 - `DEVELOPMENT_RULES.md`
 
@@ -67,6 +68,37 @@ Do not rename `tenantId` to `schoolId` unless a future migration is explicitly p
 7. Playwright browser smoke tests
 8. PDF visual polish
 
+## M0 Platform Core Additions Now Documented
+
+The long-term memory now includes a separate `M0 Platform Core` roadmap in `docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md`.
+
+These features are documented for future implementation and should be added gradually without disrupting Phase 1B:
+
+1. Tenant Settings Module
+2. Global API Response Envelope
+3. Generic Reports Foundation
+4. Safe Activity Logs Module
+5. Usage Limits and Plan Rules
+6. API Key Management
+7. Webhook System
+8. Generic File Registry
+9. SaaS Subscription and Billing Module
+
+Important distinction:
+
+```text
+SchoolOS Finance/M3/M9 = school collects money from students/parents.
+SaaS Billing = SchoolOS company charges schools for using the platform.
+```
+
+Recommended near-term platform sequence after or alongside Phase 1B depth:
+
+1. Tenant Settings foundation
+2. Global API response envelope with safe binary/PDF exceptions
+3. Reports foundation for Phase 1B reports
+4. Safe Activity Logs projection
+5. Usage limits and plan rules
+
 ## Core Rules
 
 - Backend-first for data integrity.
@@ -77,6 +109,7 @@ Do not rename `tenantId` to `schoolId` unless a future migration is explicitly p
 - Prefer small, focused tasks over broad rewrites.
 - Do not start AI features until reliable production data exists.
 - Do not start Phase 2 until Phase 1B priorities are completed or explicitly deferred.
+- Do not copy generic SaaS-template modules blindly; adapt reusable platform pieces into SchoolOS only when they strengthen production readiness.
 
 ## Recommended Codex Prompt Format
 
@@ -86,6 +119,7 @@ Read these files first:
 - ARCHITECTURE.md
 - DEVELOPMENT_RULES.md
 - docs/project/SCHOOLOS_PROJECT_MEMORY.md
+- docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md
 
 Task:
 [Exact feature/change]
