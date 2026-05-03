@@ -77,6 +77,14 @@ export type StudentProfile = {
   section?: string | null;
   rollNumber?: number | null;
   guardians?: GuardianProfile[];
+  medicalConditions?: string | null;
+  severeAllergies?: string | null;
+  medications?: string | null;
+  specialNeeds?: string | null;
+  emergencyName?: string | null;
+  emergencyPhone?: string | null;
+  doctorName?: string | null;
+  doctorPhone?: string | null;
 };
 
 export type StudentProfileEnrollment = {
@@ -155,6 +163,14 @@ export type UpdateStudentProfilePayload = {
   sectionId?: string | null;
   rollNumber?: number | null;
   mediumOfInstruction?: string;
+  medicalConditions?: string | null;
+  severeAllergies?: string | null;
+  medications?: string | null;
+  specialNeeds?: string | null;
+  emergencyName?: string | null;
+  emergencyPhone?: string | null;
+  doctorName?: string | null;
+  doctorPhone?: string | null;
 };
 
 export type UpdateStudentGuardianPayload = {

@@ -300,6 +300,14 @@ export class StudentsService {
         rollNumber: student.rollNumber ?? latestEnrollment?.rollNumber ?? null,
         guardians,
         lifecycleStatus: student.lifecycleStatus,
+        medicalConditions: student.medicalConditions,
+        severeAllergies: student.severeAllergies,
+        medications: student.medications,
+        specialNeeds: student.specialNeeds,
+        emergencyName: student.emergencyName,
+        emergencyPhone: student.emergencyPhone,
+        doctorName: student.doctorName,
+        doctorPhone: student.doctorPhone,
       },
       guardians,
       enrollments: student.enrollments.map((enrollment) => ({
@@ -535,6 +543,30 @@ export class StudentsService {
               'mediumOfInstruction',
             ),
           }
+        : {}),
+      ...(dto.medicalConditions !== undefined
+        ? { medicalConditions: normalizeNullableString(dto.medicalConditions) }
+        : {}),
+      ...(dto.severeAllergies !== undefined
+        ? { severeAllergies: normalizeNullableString(dto.severeAllergies) }
+        : {}),
+      ...(dto.medications !== undefined
+        ? { medications: normalizeNullableString(dto.medications) }
+        : {}),
+      ...(dto.specialNeeds !== undefined
+        ? { specialNeeds: normalizeNullableString(dto.specialNeeds) }
+        : {}),
+      ...(dto.emergencyName !== undefined
+        ? { emergencyName: normalizeNullableString(dto.emergencyName) }
+        : {}),
+      ...(dto.emergencyPhone !== undefined
+        ? { emergencyPhone: normalizeNullableString(dto.emergencyPhone) }
+        : {}),
+      ...(dto.doctorName !== undefined
+        ? { doctorName: normalizeNullableString(dto.doctorName) }
+        : {}),
+      ...(dto.doctorPhone !== undefined
+        ? { doctorPhone: normalizeNullableString(dto.doctorPhone) }
         : {}),
     };
 

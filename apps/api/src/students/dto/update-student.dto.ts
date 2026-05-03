@@ -78,4 +78,36 @@ export class UpdateStudentDto {
   @IsOptional()
   @IsString()
   mediumOfInstruction?: string;
+
+  @IsOptional()
+  @IsString()
+  medicalConditions?: string;
+
+  @IsOptional()
+  @IsString()
+  severeAllergies?: string;
+
+  @IsOptional()
+  @IsString()
+  medications?: string;
+
+  @IsOptional()
+  @IsString()
+  specialNeeds?: string;
+
+  @IsOptional()
+  @IsString()
+  emergencyName?: string;
+
+  @IsOptional()
+  @IsString()
+  emergencyPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  doctorName?: string;
+
+  @IsOptional()
+  @IsString()
+  doctorPhone?: string;
 }

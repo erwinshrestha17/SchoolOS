@@ -387,6 +387,7 @@ describe('SchoolOS web production contracts', () => {
     for (const tab of [
       'Overview',
       'Guardians',
+      'Health',
       'Documents',
       'Fees',
       'Attendance',
@@ -536,7 +537,7 @@ describe('SchoolOS web production contracts', () => {
   it('keeps offline sync secondary and preserves analytics plus conflict review sections', () => {
     const attendanceForm = read('components/forms/attendance-form.tsx');
 
-    assert.match(attendanceForm, /<details className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">/);
+    assert.match(attendanceForm, /<details className="rounded-\[30px\] border border-\[var\(--line\)\] bg-white\/90 p-5 shadow-sm backdrop-blur-sm">/);
     assert.match(attendanceForm, /Sync offline draft/);
     assert.match(attendanceForm, /Recent Attendance Analytics/);
     assert.match(attendanceForm, /Conflict Review/);

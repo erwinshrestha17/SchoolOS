@@ -30,6 +30,7 @@ type StudentDetailPageProps = {
 const detailTabs = [
   'Overview',
   'Guardians',
+  'Health',
   'Documents',
   'Fees',
   'Attendance',
@@ -326,6 +327,7 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
           }
         />
       ) : null}
+      {activeTab === 'Health' ? <HealthTab profile={profile} /> : null}
       {activeTab === 'Documents' ? (
         <DocumentsTab
           studentId={profile.student.id}
@@ -384,6 +386,22 @@ function StudentEditCard({
   const [disabilityFlag, setDisabilityFlag] = useState(
     student.disabilityFlag ?? '',
   );
+  const [medicalConditions, setMedicalConditions] = useState(
+    student.medicalConditions ?? '',
+  );
+  const [severeAllergies, setSevereAllergies] = useState(
+    student.severeAllergies ?? '',
+  );
+  const [medications, setMedications] = useState(student.medications ?? '');
+  const [specialNeeds, setSpecialNeeds] = useState(student.specialNeeds ?? '');
+  const [emergencyName, setEmergencyName] = useState(
+    student.emergencyName ?? '',
+  );
+  const [emergencyPhone, setEmergencyPhone] = useState(
+    student.emergencyPhone ?? '',
+  );
+  const [doctorName, setDoctorName] = useState(student.doctorName ?? '');
+  const [doctorPhone, setDoctorPhone] = useState(student.doctorPhone ?? '');
   const [validationError, setValidationError] = useState('');
 
   function submit() {
@@ -418,6 +436,14 @@ function StudentEditCard({
       disabilityFlag:
         disabilityStatus === 'yes' ? disabilityFlag.trim() : null,
       confirmNoDisability: disabilityStatus === 'no',
+      medicalConditions: medicalConditions.trim() || null,
+      severeAllergies: severeAllergies.trim() || null,
+      medications: medications.trim() || null,
+      specialNeeds: specialNeeds.trim() || null,
+      emergencyName: emergencyName.trim() || null,
+      emergencyPhone: emergencyPhone.trim() || null,
+      doctorName: doctorName.trim() || null,
+      doctorPhone: doctorPhone.trim() || null,
     });
   }
 
@@ -490,6 +516,76 @@ function StudentEditCard({
             onChange={(event) => setMotherTongue(event.target.value)}
           />
         </Field>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+        <p className="label mb-3">Health & Special Needs</p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Medical conditions">
+            <input
+              className="input"
+              placeholder="e.g. Asthma, Diabetes"
+              value={medicalConditions}
+              onChange={(event) => setMedicalConditions(event.target.value)}
+            />
+          </Field>
+          <Field label="Severe allergies">
+            <input
+              className="input"
+              placeholder="e.g. Peanuts, Penicillin"
+              value={severeAllergies}
+              onChange={(event) => setSevereAllergies(event.target.value)}
+            />
+          </Field>
+          <Field label="Regular medications">
+            <input
+              className="input"
+              value={medications}
+              onChange={(event) => setMedications(event.target.value)}
+            />
+          </Field>
+          <Field label="Special support needs">
+            <input
+              className="input"
+              value={specialNeeds}
+              onChange={(event) => setSpecialNeeds(event.target.value)}
+            />
+          </Field>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+        <p className="label mb-3">Emergency Contact & Doctor</p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Emergency contact name">
+            <input
+              className="input"
+              value={emergencyName}
+              onChange={(event) => setEmergencyName(event.target.value)}
+            />
+          </Field>
+          <Field label="Emergency contact phone">
+            <input
+              className="input"
+              value={emergencyPhone}
+              onChange={(event) => setEmergencyPhone(event.target.value)}
+            />
+          </Field>
+          <Field label="Family doctor name">
+            <input
+              className="input"
+              value={doctorName}
+              onChange={(event) => setDoctorName(event.target.value)}
+            />
+          </Field>
+          <Field label="Family doctor phone">
+            <input
+              className="input"
+              value={doctorPhone}
+              onChange={(event) => setDoctorPhone(event.target.value)}
+            />
+          </Field>
+        </div>
       </div>
 
       <div className="mt-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
@@ -1981,4 +2077,59 @@ function lifecycleActionSubmitLabel(action: LifecycleAction) {
   }
 
   return 'Confirm Soft Delete';
+}
+
+function HealthTab({ profile }: { profile: StudentProfileDetail }) {
+  const student = profile.student;
+
+  return (
+    <div className="grid gap-5">
+      <SectionCard title="Health & Medical Records">
+        <div className="grid gap-4 md:grid-cols-2">
+          <DetailItem
+            label="Medical conditions"
+            value={student.medicalConditions || 'None recorded'}
+          />
+          <DetailItem
+            label="Severe allergies"
+            value={student.severeAllergies || 'No known allergies'}
+          />
+          <DetailItem
+            label="Regular medications"
+            value={student.medications || 'None'}
+          />
+          <DetailItem
+            label="Special support needs"
+            value={student.specialNeeds || 'None'}
+          />
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Emergency Contact">
+        <div className="grid gap-4 md:grid-cols-2">
+          <DetailItem
+            label="Contact person"
+            value={student.emergencyName || 'Not specified'}
+          />
+          <DetailItem
+            label="Emergency phone"
+            value={student.emergencyPhone || 'Not specified'}
+          />
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Family Doctor">
+        <div className="grid gap-4 md:grid-cols-2">
+          <DetailItem
+            label="Doctor name"
+            value={student.doctorName || 'Not recorded'}
+          />
+          <DetailItem
+            label="Doctor phone"
+            value={student.doctorPhone || 'Not recorded'}
+          />
+        </div>
+      </SectionCard>
+    </div>
+  );
 }
