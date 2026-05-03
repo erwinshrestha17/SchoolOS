@@ -3,9 +3,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from '../session-provider';
 import { api } from '../../lib/api';
+import { GlobalStudentSearch } from './global-student-search';
 import { NotificationBell } from './notification-bell';
 import {
-  Search,
   ChevronDown,
   Menu,
   User,
@@ -109,22 +109,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
         </div>
       </div>
 
-      <div className="relative max-w-md flex-1">
-        <label htmlFor="global-student-search" className="sr-only">
-          Search students
-        </label>
-        <Search
-          size={16}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-        />
-        <input
-          id="global-student-search"
-          type="text"
-          placeholder="Search students by name or SCH-YYYY-NNNN..."
-          className="search-input"
-          aria-label="Search students by name or SchoolOS student ID"
-        />
-      </div>
+      <GlobalStudentSearch />
 
       <div className="ml-auto flex items-center gap-2">
         <div className="relative" ref={yearMenuRef}>
