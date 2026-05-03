@@ -385,6 +385,16 @@ export const permissionCatalog = [
     description:
       "Manage tenant branding, localization, and operational settings",
   },
+  {
+    resource: "reports",
+    action: "read",
+    description: "List available reports",
+  },
+  {
+    resource: "reports",
+    action: "export",
+    description: "Execute and export reports in various formats",
+  },
 ] as const;
 
 export type PermissionResource = (typeof permissionCatalog)[number]["resource"];
@@ -460,6 +470,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     "events:read",
     "settings:read_public",
     "settings:read",
+    "reports:read",
   ],
   principal: permissionCatalog
     .map(({ resource, action }) => buildPermissionKey(resource, action))
@@ -492,6 +503,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     "notices:read",
     "events:read",
     "settings:read_public",
+    "reports:read",
   ],
   support_staff: [
     "roles:read",
@@ -540,6 +552,8 @@ export const systemRolePermissions: Record<string, string[]> = {
     "payroll:manage",
     "settings:read_public",
     "settings:read",
+    "reports:read",
+    "reports:export",
   ],
   librarian: [
     "roles:read",

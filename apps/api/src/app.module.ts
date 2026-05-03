@@ -41,6 +41,7 @@ import { ConfigService } from './config/config.service';
 import { ClsModule } from 'nestjs-cls';
 import { SettingsModule } from './settings/settings.module';
 import { FileRegistryModule } from './file-registry/file-registry.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -94,6 +95,7 @@ import { FileRegistryModule } from './file-registry/file-registry.module';
     PlatformModule,
     SettingsModule,
     FileRegistryModule,
+    ReportsModule,
     TenantsModule,
     RedisModule,
     NotificationsModule,

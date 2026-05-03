@@ -403,6 +403,16 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description:
       'Manage tenant branding, localization, and operational settings',
   },
+  {
+    resource: 'reports',
+    action: 'read',
+    description: 'List available reports',
+  },
+  {
+    resource: 'reports',
+    action: 'export',
+    description: 'Execute and export reports in various formats',
+  },
 ];
 
 export const SYSTEM_ROLE_DEFINITIONS = [
@@ -469,9 +479,11 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
   super_admin: PERMISSION_CATALOG.map(({ resource, action }) =>
     buildPermissionKey(resource, action),
   ),
-  admin: PERMISSION_CATALOG.map(({ resource, action }) =>
-    buildPermissionKey(resource, action),
-  ),
+  admin: [
+    ...PERMISSION_CATALOG.map(({ resource, action }) =>
+      buildPermissionKey(resource, action),
+    ),
+  ],
   teacher: [
     'roles:read',
     'classes:read',
@@ -493,6 +505,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'events:read',
     'settings:read_public',
     'settings:read',
+    'reports:read',
   ],
   principal: PERMISSION_CATALOG.map(({ resource, action }) =>
     buildPermissionKey(resource, action),
@@ -525,6 +538,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'notices:read',
     'events:read',
     'settings:read_public',
+    'reports:read',
   ],
   support_staff: [
     'roles:read',
@@ -573,6 +587,8 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'payroll:manage',
     'settings:read_public',
     'settings:read',
+    'reports:read',
+    'reports:export',
   ],
   librarian: [
     'roles:read',

@@ -108,7 +108,8 @@
     ],
     "rootDir": ".",
     "moduleNameMapper": {
-      "^@prisma/client$": "<rootDir>/test/mocks/prisma-client.ts"
+      "^@prisma/client$": "<rootDir>/test/mocks/prisma-client.ts",
+      "^@schoolos/core$": "<rootDir>/../../packages/core/src/index.ts"
     },
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
