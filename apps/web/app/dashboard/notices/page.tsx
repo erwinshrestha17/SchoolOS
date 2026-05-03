@@ -2,6 +2,7 @@
 
 import { CommunicationsForm } from '../../../components/forms/communications-form';
 import { DeliveryRetryPanel } from '../../../components/forms/delivery-retry-panel';
+import { NoticeDetailLinksPanel } from '../../../components/forms/notice-detail-links-panel';
 
 export default function NoticesPage() {
   return (
@@ -15,6 +16,7 @@ export default function NoticesPage() {
         </p>
       </div>
       <CommunicationsForm />
+      <NoticeDetailLinksPanel />
       <DeliveryRetryPanel />
     </div>
   );
