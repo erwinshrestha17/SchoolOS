@@ -12,13 +12,15 @@ import type {
   ReportExportResult,
 } from '@schoolos/core';
 
+import { StudentLifecycleStatus, Prisma } from '@prisma/client';
+
 export interface ReportExecutor {
   definition: ReportDefinition;
   execute: (
     tenantId: string,
-    filters: Record<string, any>,
+    filters: Record<string, unknown>,
     format: string,
-  ) => Promise<any[]>;
+  ) => Promise<Record<string, unknown>[]>;
 }
 
 @Injectable()
@@ -64,7 +66,7 @@ export class ReportsService {
             ...(filters.classId ? { classId: filters.classId } : {}),
             ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
             ...(filters.status
-              ? { lifecycleStatus: filters.status as any }
+              ? { lifecycleStatus: filters.status as StudentLifecycleStatus }
               : {}),
           },
           include: {
@@ -179,7 +181,7 @@ export class ReportsService {
     throw new ForbiddenException('Unsupported format');
   }
 
-  private convertToCsv(data: any[]): string {
+  private convertToCsv(data: Record<string, unknown>[]): string {
     if (data.length === 0) return '';
 
     const headers = Object.keys(data[0]);

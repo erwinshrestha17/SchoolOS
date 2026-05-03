@@ -105,7 +105,7 @@ describe('ReportsService', () => {
     expect(Buffer.isBuffer(result.content)).toBe(true);
     const csvString = result.content.toString();
     expect(csvString).toContain('System ID,First Name,Last Name');
-    expect(csvString).toContain('SCH-001,Erwin,Shrestha');
+    expect(csvString).toContain('"SCH-001","Erwin","Shrestha"');
   });
 
   it('enforces tenant scoping during execution', async () => {

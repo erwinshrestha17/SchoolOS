@@ -7,5 +7,5 @@ export class ReportExportDto {
 
   @IsObject()
   @IsOptional()
-  filters: Record<string, any> = {};
+  filters: Record<string, unknown> = {};
 }
