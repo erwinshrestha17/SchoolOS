@@ -26,6 +26,7 @@ export interface ReportDefinition {
     | "students"
     | "hr"
     | "inventory"
+    | "attendance"
     | "platform";
   module: string;
   formats: ReportFormat[];
