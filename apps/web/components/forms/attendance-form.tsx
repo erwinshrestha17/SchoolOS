@@ -54,6 +54,8 @@ export function AttendanceForm() {
   const [exceptions, setExceptions] = useState<Record<string, AttendanceStatus>>({});
   const [remarks, setRemarks] = useState<Record<string, string>>({});
   const [submitMessage, setSubmitMessage] = useState('');
+  const [exportError, setExportError] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
 
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years'],
@@ -108,6 +110,7 @@ export function AttendanceForm() {
     setExceptions({});
     setRemarks({});
     setSubmitMessage('');
+    setExportError('');
   }, [academicYearId, classId, sectionId, attendanceDate]);
 
   useEffect(() => {
@@ -181,6 +184,32 @@ export function AttendanceForm() {
       void queryClient.invalidateQueries({ queryKey: ['attendance-conflicts'] });
       void queryClient.invalidateQueries({ queryKey: ['attendance-analytics'] });
       void queryClient.invalidateQueries({ queryKey: ['attendance-roster'] });
+    },
+  });
+  const registerExportMutation = useMutation({
+    mutationFn: (format: 'csv' | 'json') => {
+      const date = new Date(attendanceDate);
+      return api.exportReport('monthly-attendance-register', {
+        format,
+        filters: {
+          academicYearId,
+          classId,
+          sectionId: sectionId || undefined,
+          month: date.getMonth() + 1,
+          year: date.getFullYear(),
+        },
+      });
+    },
+    onMutate: () => {
+      setIsExporting(true);
+      setExportError('');
+    },
+    onSuccess: () => {
+      setIsExporting(false);
+    },
+    onError: (error: unknown) => {
+      setIsExporting(false);
+      setExportError(error instanceof Error ? error.message : 'Export failed');
     },
   });
 
@@ -386,9 +415,19 @@ export function AttendanceForm() {
               Tap a student row to cycle status
             </h2>
           </div>
-          <p className="text-sm font-medium text-[var(--muted)]">
-            {exceptionCount} exception{exceptionCount === 1 ? '' : 's'} selected
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-gray-50 disabled:translate-y-0 disabled:opacity-50"
+              disabled={!academicYearId || !classId || isExporting}
+              onClick={() => registerExportMutation.mutate('csv')}
+            >
+              {isExporting ? 'Exporting...' : 'Export Monthly Register CSV'}
+            </button>
+            <p className="text-sm font-medium text-[var(--muted)]">
+              {exceptionCount} exception{exceptionCount === 1 ? '' : 's'} selected
+            </p>
+          </div>
         </div>
 
         <div className="grid gap-3">
@@ -503,6 +542,9 @@ export function AttendanceForm() {
               : ''
           }`}
         />
+      ) : null}
+      {exportError ? (
+        <InlineMessage tone="danger" message={exportError} />
       ) : null}
       {submitMessage ? <InlineMessage tone="success" message={submitMessage} /> : null}
 

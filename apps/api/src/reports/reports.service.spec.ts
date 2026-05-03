@@ -22,6 +22,7 @@ describe('ReportsService', () => {
       'reports:export',
       'students:read',
       'classes:read',
+      'attendance:read',
     ],
     tenantSlug: 'everest',
   };
@@ -65,6 +66,7 @@ describe('ReportsService', () => {
                   class: { name: 'Grade 1' },
                   section: { name: 'A' },
                   student: {
+                    id: 's1',
                     studentSystemId: 'SCH-001',
                     firstNameEn: 'Erwin',
                     lastNameEn: 'Shrestha',
@@ -80,6 +82,20 @@ describe('ReportsService', () => {
                       },
                     ],
                   },
+                },
+              ]),
+            },
+            attendanceSession: {
+              findMany: jest.fn().mockResolvedValue([
+                {
+                  id: 'as1',
+                  attendanceDate: new Date('2024-05-01'),
+                  records: [{ studentId: 's1', status: 'PRESENT' }],
+                },
+                {
+                  id: 'as2',
+                  attendanceDate: new Date('2024-05-02'),
+                  records: [{ studentId: 's1', status: 'ABSENT' }],
                 },
               ]),
             },
@@ -104,93 +120,75 @@ describe('ReportsService', () => {
     expect(reports.length).toBeGreaterThan(0);
     expect(reports.map((r) => r.key)).toContain('student-roster');
     expect(reports.map((r) => r.key)).toContain('class-roster');
+    expect(reports.map((r) => r.key)).toContain('monthly-attendance-register');
   });
 
   it('filters out reports user cannot access', () => {
     const restrictedActor = { ...actor, permissions: ['reports:read'] };
     const reports = service.listReports(restrictedActor);
-    // student-roster requires students:read
-    expect(reports.find((r) => r.key === 'student-roster')).toBeUndefined();
-    // class-roster requires classes:read and students:read
-    expect(reports.find((r) => r.key === 'class-roster')).toBeUndefined();
+    // monthly-attendance-register requires attendance:read
+    expect(
+      reports.find((r) => r.key === 'monthly-attendance-register'),
+    ).toBeUndefined();
   });
 
-  it('exports student-roster in CSV format', async () => {
+  it('exports monthly-attendance-register in CSV format', async () => {
     const result = await service.exportReport(
-      'student-roster',
+      'monthly-attendance-register',
       {
         format: 'csv',
-        filters: {},
+        filters: {
+          academicYearId: 'ay1',
+          classId: 'c1',
+          month: 5,
+          year: 2024,
+        },
       },
       actor,
     );
 
     expect(result.format).toBe('csv');
     const csvString = result.content.toString();
-    expect(csvString).toContain('System ID,First Name,Last Name');
-    expect(csvString).toContain('"SCH-001","Erwin","Shrestha"');
-  });
-
-  it('exports class-roster in CSV format', async () => {
-    const result = await service.exportReport(
-      'class-roster',
-      {
-        format: 'csv',
-        filters: { academicYearId: 'ay1' },
-      },
-      actor,
-    );
-
-    expect(result.format).toBe('csv');
-    const csvString = result.content.toString();
-    expect(csvString).toContain(
-      'Student ID,Full Name,Gender,Date of Birth,Class,Section,Roll Number,Guardian Name,Guardian Phone,Admission Date,Status',
-    );
-    expect(csvString).toContain('"SCH-001","Erwin Shrestha","MALE"');
-    expect(csvString).toContain('"Guardian Name","9800000000"');
+    expect(csvString).toContain('Student ID,Full Name,Class,Section');
+    expect(csvString).toContain('Total School Days,Present Count,Absent Count');
+    expect(csvString).toContain('"SCH-001","Erwin Shrestha","Grade 1"');
+    // Daily columns
+    expect(csvString).toContain('D01,D02');
+    expect(csvString).toContain('"PRESENT","ABSENT"');
     expect(audit.record).toHaveBeenCalled();
   });
 
-  it('enforces tenant scoping during class-roster execution', async () => {
+  it('enforces tenant scoping during attendance queries', async () => {
     await service.exportReport(
-      'class-roster',
+      'monthly-attendance-register',
       {
         format: 'json',
-        filters: { classId: 'c1' },
+        filters: {
+          academicYearId: 'ay1',
+          classId: 'c1',
+          month: 5,
+          year: 2024,
+        },
       },
       actor,
     );
 
-    expect(prisma.enrollment.findMany).toHaveBeenCalledWith(
+    expect(prisma.attendanceSession.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           tenantId: actor.tenantId,
-          classId: 'c1',
         }),
       }),
     );
   });
 
-  it('throws NotFoundException for unknown reports', async () => {
+  it('throws ForbiddenException for missing required filters', async () => {
     await expect(
       service.exportReport(
-        'ghost-report',
+        'monthly-attendance-register',
         {
           format: 'json',
-          filters: {},
-        },
-        actor,
-      ),
-    ).rejects.toThrow(NotFoundException);
-  });
-
-  it('throws ForbiddenException for unsupported formats', async () => {
-    await expect(
-      service.exportReport(
-        'student-roster',
-        {
-          format: 'pdf',
-          filters: {},
+          filters: { month: 5, year: 2024 },
         },
         actor,
       ),

@@ -12,7 +12,11 @@ import type {
   ReportExportResult,
 } from '@schoolos/core';
 
-import { StudentLifecycleStatus, EnrollmentStatus, Prisma } from '@prisma/client';
+import {
+  StudentLifecycleStatus,
+  EnrollmentStatus,
+  Prisma,
+} from '@prisma/client';
 
 export interface ReportExecutor {
   definition: ReportDefinition;
@@ -167,6 +171,145 @@ export class ReportsService {
             'Guardian Phone': guardian?.primaryPhone || '-',
             'Admission Date': e.admissionDate.toISOString().split('T')[0],
             Status: e.status,
+          };
+        });
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'monthly-attendance-register',
+        name: 'Monthly Attendance Register',
+        description:
+          'Complete attendance register for a specific month and class',
+        category: 'Attendance',
+        module: 'attendance',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'academicYearId', label: 'Academic Year', type: 'select' },
+          { key: 'classId', label: 'Class', type: 'class' },
+          { key: 'sectionId', label: 'Section', type: 'section' },
+          { key: 'month', label: 'Month (1-12)', type: 'number' },
+          { key: 'year', label: 'Year', type: 'number' },
+          {
+            key: 'studentId',
+            label: 'Student',
+            type: 'student',
+            optional: true,
+          },
+          { key: 'status', label: 'Status', type: 'select', optional: true },
+        ],
+        requiredPermissions: ['reports:read', 'attendance:read'],
+      },
+      execute: async (tenantId, filters) => {
+        const month = Number(filters.month);
+        const year = Number(filters.year);
+        const academicYearId = filters.academicYearId
+          ? String(filters.academicYearId)
+          : undefined;
+        const classId = filters.classId ? String(filters.classId) : undefined;
+        const sectionId = filters.sectionId
+          ? String(filters.sectionId)
+          : undefined;
+
+        if (!month || !year || !academicYearId || !classId) {
+          throw new ForbiddenException(
+            'Missing required filters: month, year, academicYearId, classId',
+          );
+        }
+
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0);
+
+        const enrollments = await this.prisma.enrollment.findMany({
+          where: {
+            tenantId,
+            academicYearId,
+            classId,
+            ...(sectionId ? { sectionId } : {}),
+            ...(filters.studentId
+              ? { studentId: String(filters.studentId) }
+              : {}),
+          },
+          include: {
+            student: true,
+            class: true,
+            section: true,
+          },
+          orderBy: { student: { firstNameEn: 'asc' } },
+        });
+
+        const sessions = await this.prisma.attendanceSession.findMany({
+          where: {
+            tenantId,
+            academicYearId,
+            classId,
+            ...(sectionId ? { sectionId } : {}),
+            attendanceDate: {
+              gte: startDate,
+              lte: endDate,
+            },
+          },
+          include: {
+            records: true,
+          },
+          orderBy: { attendanceDate: 'asc' },
+        });
+
+        const totalSchoolDays = sessions.length;
+
+        return enrollments.map((e) => {
+          const s = e.student;
+          const records = sessions.flatMap((session) =>
+            session.records.filter((r) => r.studentId === s.id),
+          );
+
+          const presentCount = records.filter(
+            (r) => r.status === 'PRESENT',
+          ).length;
+          const absentCount = records.filter(
+            (r) => r.status === 'ABSENT',
+          ).length;
+          const lateCount = records.filter((r) => r.status === 'LATE').length;
+          const sickLeaveCount = records.filter(
+            (r) => r.status === 'SICK_LEAVE',
+          ).length;
+          const excusedLeaveCount = records.filter(
+            (r) => r.status === 'EXCUSED_LEAVE',
+          ).length;
+          const unexcusedLeaveCount = records.filter(
+            (r) => r.status === 'UNEXCUSED_LEAVE',
+          ).length;
+
+          const attendancePercentage =
+            totalSchoolDays > 0
+              ? ((presentCount + lateCount) / totalSchoolDays) * 100
+              : 0;
+
+          const dailyStatusMap: Record<string, string> = {};
+          sessions.forEach((session) => {
+            const dayNum = session.attendanceDate.getDate();
+            const dayKey = `D${dayNum.toString().padStart(2, '0')}`;
+            const record = session.records.find((r) => r.studentId === s.id);
+            dailyStatusMap[dayKey] = record?.status || '-';
+          });
+
+          return {
+            'Student ID': s.studentSystemId,
+            'Full Name': `${s.firstNameEn} ${s.lastNameEn}`,
+            Class: e.class.name,
+            Section: e.section?.name || '-',
+            'Roll Number': e.rollNumber || '-',
+            Month: `${year}-${month.toString().padStart(2, '0')}`,
+            'Total School Days': totalSchoolDays,
+            'Present Count': presentCount,
+            'Absent Count': absentCount,
+            'Late Count': lateCount,
+            'Sick Leave Count': sickLeaveCount,
+            'Excused Leave Count': excusedLeaveCount,
+            'Unexcused Leave Count': unexcusedLeaveCount,
+            'Attendance %': attendancePercentage.toFixed(2),
+            ...dailyStatusMap,
           };
         });
       },
