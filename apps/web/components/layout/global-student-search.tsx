@@ -1,14 +1,31 @@
 'use client';
 
+import type { ApiResponse } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { api } from '../../lib/api';
 import { useSession } from '../session-provider';
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
+
+type StudentSearchResult = {
+  id: string;
+  studentSystemId: string;
+  fullNameEn: string;
+  admissionNumber: string | null;
+  className: string;
+  sectionName: string | null;
+  rollNumber: number | null;
+  guardianName: string | null;
+  guardianPhone: string | null;
+  lifecycleStatus: string;
+};
 
 export function GlobalStudentSearch() {
   const router = useRouter();
+  const pathname = usePathname();
   const { hasPermissions } = useSession();
   const canSearchStudents = hasPermissions(['students:read']);
   const [query, setQuery] = useState('');
@@ -27,6 +44,13 @@ export function GlobalStudentSearch() {
   }, [query]);
 
   useEffect(() => {
+    setOpen(false);
+    setQuery('');
+    setDebouncedQuery('');
+    setActiveIndex(0);
+  }, [pathname]);
+
+  useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
         containerRef.current &&
@@ -42,16 +66,21 @@ export function GlobalStudentSearch() {
 
   const searchQuery = useQuery({
     queryKey: ['global-student-search', debouncedQuery],
-    queryFn: () => api.searchStudents(debouncedQuery),
+    queryFn: () => searchStudents(debouncedQuery),
     enabled: canSearchStudents && debouncedQuery.length >= 2,
   });
 
   const results = searchQuery.data ?? [];
 
-  function goToStudent(studentId: string) {
+  function clearSearch() {
     setOpen(false);
     setQuery('');
     setDebouncedQuery('');
+    setActiveIndex(0);
+  }
+
+  function goToStudent(studentId: string) {
+    clearSearch();
     router.push(`/dashboard/students/${encodeURIComponent(studentId)}`);
   }
 
@@ -76,8 +105,13 @@ export function GlobalStudentSearch() {
           setQuery(event.target.value);
           setOpen(true);
         }}
-        onFocus={() => setOpen(true)}
+        onFocus={() => setOpen(Boolean(query.trim()))}
         onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            clearSearch();
+            return;
+          }
+
           if (!open || results.length === 0) return;
 
           if (event.key === 'ArrowDown') {
@@ -98,10 +132,6 @@ export function GlobalStudentSearch() {
             if (selected) {
               goToStudent(selected.id);
             }
-          }
-
-          if (event.key === 'Escape') {
-            setOpen(false);
           }
         }}
       />
@@ -164,4 +194,39 @@ export function GlobalStudentSearch() {
       ) : null}
     </div>
   );
+}
+
+async function searchStudents(query: string) {
+  const response = await fetch(
+    `${API_BASE_URL}/students/search?q=${encodeURIComponent(query)}`,
+    {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(parseApiErrorMessage(text) || `Request failed with status ${response.status}`);
+  }
+
+  const payload = (await response.json()) as ApiResponse<StudentSearchResult[]>;
+  return payload.data;
+}
+
+function parseApiErrorMessage(text: string) {
+  if (!text) {
+    return '';
+  }
+
+  try {
+    const payload = JSON.parse(text) as { message?: string | string[]; error?: string };
+    return Array.isArray(payload.message)
+      ? payload.message.join(', ')
+      : payload.message || payload.error || text;
+  } catch {
+    return text;
+  }
 }
