@@ -19,5 +19,9 @@ apps/api/dist
 apps/api/coverage
 apps/api/storage
 
+apps/web/.next
+apps/web/playwright-report
+apps/web/test-results
+
 *.log
 pnpm-debug.log*
