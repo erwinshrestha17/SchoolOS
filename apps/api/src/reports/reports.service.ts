@@ -12,7 +12,7 @@ import type {
   ReportExportResult,
 } from '@schoolos/core';
 
-import { StudentLifecycleStatus, Prisma } from '@prisma/client';
+import { StudentLifecycleStatus, EnrollmentStatus, Prisma } from '@prisma/client';
 
 export interface ReportExecutor {
   definition: ReportDefinition;
@@ -88,6 +88,87 @@ export class ReportsService {
           'Admission Date': s.admissionDate.toISOString().split('T')[0],
           Status: s.lifecycleStatus,
         }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'class-roster',
+        name: 'Class Roster',
+        description:
+          'Detailed list of students in a class/section with guardian info',
+        category: 'academics',
+        module: 'academics',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'academicYearId', label: 'Academic Year', type: 'select' },
+          { key: 'classId', label: 'Class', type: 'class' },
+          { key: 'sectionId', label: 'Section', type: 'section' },
+          {
+            key: 'status',
+            label: 'Status',
+            type: 'select',
+            options: [
+              { label: 'Active', value: 'ACTIVE' },
+              { label: 'Promoted', value: 'PROMOTED' },
+              { label: 'Transferred', value: 'TRANSFERRED' },
+              { label: 'Exited', value: 'EXITED' },
+            ],
+          },
+        ],
+        requiredPermissions: ['classes:read', 'students:read'],
+      },
+      execute: async (tenantId, filters) => {
+        const enrollments = await this.prisma.enrollment.findMany({
+          where: {
+            tenantId,
+            ...(filters.classId ? { classId: String(filters.classId) } : {}),
+            ...(filters.sectionId
+              ? { sectionId: String(filters.sectionId) }
+              : {}),
+            ...(filters.academicYearId
+              ? { academicYearId: String(filters.academicYearId) }
+              : {}),
+            ...(filters.status
+              ? { status: filters.status as EnrollmentStatus }
+              : {}),
+          },
+          include: {
+            class: true,
+            section: true,
+            student: {
+              include: {
+                guardianLinks: {
+                  include: {
+                    guardian: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { student: { firstNameEn: 'asc' } },
+        });
+
+        return enrollments.map((e) => {
+          const s = e.student;
+          const primaryGuardianLink =
+            s.guardianLinks.find((l) => l.isPrimary) || s.guardianLinks[0];
+          const guardian = primaryGuardianLink?.guardian;
+
+          return {
+            'Student ID': s.studentSystemId,
+            'Full Name': `${s.firstNameEn} ${s.lastNameEn}`,
+            Gender: s.gender,
+            'Date of Birth': s.dateOfBirth.toISOString().split('T')[0],
+            Class: e.class.name,
+            Section: e.section?.name || '-',
+            'Roll Number': e.rollNumber || '-',
+            'Guardian Name': guardian?.fullName || '-',
+            'Guardian Phone': guardian?.primaryPhone || '-',
+            'Admission Date': e.admissionDate.toISOString().split('T')[0],
+            Status: e.status,
+          };
+        });
       },
     });
   }

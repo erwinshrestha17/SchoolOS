@@ -20,6 +20,14 @@ type StudentDirectoryProps = {
   pdfError: string;
   sections: SectionSummary[];
   students: StudentProfile[];
+  onExportRoster: (
+    format: 'csv' | 'json',
+    filters: {
+      academicYearId?: string;
+      classId?: string;
+      sectionId?: string;
+    },
+  ) => void;
 };
 
 export function StudentDirectory({
@@ -32,6 +40,7 @@ export function StudentDirectory({
   pdfError,
   sections,
   students,
+  onExportRoster,
 }: StudentDirectoryProps) {
   const [academicYearId, setAcademicYearId] = useState('');
   const [classId, setClassId] = useState('');
@@ -183,9 +192,20 @@ export function StudentDirectory({
               individual student profiles.
             </p>
           </div>
-          <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-500">
-            {filteredStudents.length} students
-          </span>
+          <div className="flex items-start gap-2">
+            <button
+              type="button"
+              className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50"
+              onClick={() =>
+                onExportRoster('csv', { academicYearId, classId, sectionId })
+              }
+            >
+              Export CSV
+            </button>
+            <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-500">
+              {filteredStudents.length} students
+            </span>
+          </div>
         </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">

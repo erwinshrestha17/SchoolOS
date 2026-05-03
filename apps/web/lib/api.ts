@@ -74,6 +74,8 @@ import type {
   UpdateStudentProfilePayload,
   UploadStudentDocumentPayload,
   WaiverRecord,
+  ReportDefinition,
+  ReportExportRequest,
   ApiResponse,
 } from '@schoolos/core';
 import { clearStoredSession } from './session';
@@ -179,6 +181,58 @@ async function openPdfBlob(response: Response) {
   }
 
   window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer');
+}
+
+async function downloadReport(reportKey: string, payload: ReportExportRequest) {
+  const response = await fetch(
+    `${API_BASE_URL}/reports/${encodeURIComponent(reportKey)}/export`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      parseApiErrorMessage(text) ||
+        `Export failed with status ${response.status}`,
+    );
+  }
+
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+
+  if (contentType.includes('application/pdf')) {
+    return openPdfBlob(response);
+  }
+
+  if (contentType.includes('application/json') && payload.format === 'json') {
+    const blob = await response.blob();
+    const text = await blob.text();
+    return JSON.parse(text).data;
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+
+  const contentDisposition = response.headers.get('content-disposition');
+  let fileName = `${reportKey}-export.${payload.format}`;
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename="(.+)"/);
+    if (match) fileName = match[1];
+  }
+
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
 }
 
 async function refreshAccessCookie() {
@@ -634,4 +688,7 @@ export const api = {
       method: 'PATCH',
       json: { value },
     }),
+  listReports: () => request<ReportDefinition[]>('/reports'),
+  exportReport: (reportKey: string, payload: ReportExportRequest) =>
+    downloadReport(reportKey, payload),
 };

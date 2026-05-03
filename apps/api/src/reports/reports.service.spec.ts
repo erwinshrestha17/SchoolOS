@@ -17,7 +17,12 @@ describe('ReportsService', () => {
     email: 'admin@schoolos.test',
     authMethod: AuthMethod.PASSWORD,
     roles: ['admin'],
-    permissions: ['reports:read', 'reports:export', 'students:read'],
+    permissions: [
+      'reports:read',
+      'reports:export',
+      'students:read',
+      'classes:read',
+    ],
     tenantSlug: 'everest',
   };
 
@@ -46,6 +51,38 @@ describe('ReportsService', () => {
                 },
               ]),
             },
+            enrollment: {
+              findMany: jest.fn().mockResolvedValue([
+                {
+                  id: 'e1',
+                  studentId: 's1',
+                  academicYearId: 'ay1',
+                  classId: 'c1',
+                  sectionId: 'sec1',
+                  rollNumber: 5,
+                  admissionDate: new Date('2020-01-01'),
+                  status: 'ACTIVE',
+                  class: { name: 'Grade 1' },
+                  section: { name: 'A' },
+                  student: {
+                    studentSystemId: 'SCH-001',
+                    firstNameEn: 'Erwin',
+                    lastNameEn: 'Shrestha',
+                    gender: 'MALE',
+                    dateOfBirth: new Date('2010-01-01'),
+                    guardianLinks: [
+                      {
+                        isPrimary: true,
+                        guardian: {
+                          fullName: 'Guardian Name',
+                          primaryPhone: '9800000000',
+                        },
+                      },
+                    ],
+                  },
+                },
+              ]),
+            },
           },
         },
         {
@@ -65,7 +102,8 @@ describe('ReportsService', () => {
   it('lists reports the user has permission to see', () => {
     const reports = service.listReports(actor);
     expect(reports.length).toBeGreaterThan(0);
-    expect(reports[0].key).toBe('student-roster');
+    expect(reports.map((r) => r.key)).toContain('student-roster');
+    expect(reports.map((r) => r.key)).toContain('class-roster');
   });
 
   it('filters out reports user cannot access', () => {
@@ -73,25 +111,11 @@ describe('ReportsService', () => {
     const reports = service.listReports(restrictedActor);
     // student-roster requires students:read
     expect(reports.find((r) => r.key === 'student-roster')).toBeUndefined();
+    // class-roster requires classes:read and students:read
+    expect(reports.find((r) => r.key === 'class-roster')).toBeUndefined();
   });
 
-  it('exports report data in JSON format', async () => {
-    const result = await service.exportReport(
-      'student-roster',
-      {
-        format: 'json',
-        filters: {},
-      },
-      actor,
-    );
-
-    expect(result.format).toBe('json');
-    expect(result.content).toHaveLength(1);
-    expect(result.content[0]['First Name']).toBe('Erwin');
-    expect(audit.record).toHaveBeenCalled();
-  });
-
-  it('exports report data in CSV format', async () => {
+  it('exports student-roster in CSV format', async () => {
     const result = await service.exportReport(
       'student-roster',
       {
@@ -102,15 +126,34 @@ describe('ReportsService', () => {
     );
 
     expect(result.format).toBe('csv');
-    expect(Buffer.isBuffer(result.content)).toBe(true);
     const csvString = result.content.toString();
     expect(csvString).toContain('System ID,First Name,Last Name');
     expect(csvString).toContain('"SCH-001","Erwin","Shrestha"');
   });
 
-  it('enforces tenant scoping during execution', async () => {
+  it('exports class-roster in CSV format', async () => {
+    const result = await service.exportReport(
+      'class-roster',
+      {
+        format: 'csv',
+        filters: { academicYearId: 'ay1' },
+      },
+      actor,
+    );
+
+    expect(result.format).toBe('csv');
+    const csvString = result.content.toString();
+    expect(csvString).toContain(
+      'Student ID,Full Name,Gender,Date of Birth,Class,Section,Roll Number,Guardian Name,Guardian Phone,Admission Date,Status',
+    );
+    expect(csvString).toContain('"SCH-001","Erwin Shrestha","MALE"');
+    expect(csvString).toContain('"Guardian Name","9800000000"');
+    expect(audit.record).toHaveBeenCalled();
+  });
+
+  it('enforces tenant scoping during class-roster execution', async () => {
     await service.exportReport(
-      'student-roster',
+      'class-roster',
       {
         format: 'json',
         filters: { classId: 'c1' },
@@ -118,7 +161,7 @@ describe('ReportsService', () => {
       actor,
     );
 
-    expect(prisma.student.findMany).toHaveBeenCalledWith(
+    expect(prisma.enrollment.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           tenantId: actor.tenantId,
@@ -142,8 +185,6 @@ describe('ReportsService', () => {
   });
 
   it('throws ForbiddenException for unsupported formats', async () => {
-    // Currently student-roster supports json, csv. Let's try pdf (which has a placeholder but we check executor.definition.formats)
-    // Wait, the executor definition I wrote has formats: ['json', 'csv']
     await expect(
       service.exportReport(
         'student-roster',

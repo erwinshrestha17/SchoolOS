@@ -309,7 +309,24 @@ export function AdmissionForm() {
     try {
       await api.openStudentDocumentPdf(studentId, kind);
     } catch (error) {
-      setPdfError(error instanceof Error ? error.message : 'Unable to open generated PDF');
+      setPdfError(
+        error instanceof Error ? error.message : 'Unable to open generated PDF',
+      );
+    }
+  }
+
+  async function handleExportRoster(
+    format: 'csv' | 'json',
+    filters: Record<string, any>,
+  ) {
+    setPdfError('');
+    try {
+      await api.exportReport('class-roster', {
+        format,
+        filters,
+      });
+    } catch (error) {
+      setPdfError(error instanceof Error ? error.message : 'Export failed');
     }
   }
 
@@ -399,6 +416,9 @@ export function AdmissionForm() {
           sections={sectionsQuery.data ?? []}
           students={students}
           onOpenPdf={(studentId, kind) => void openStudentPdf(studentId, kind)}
+          onExportRoster={(format, filters) =>
+            void handleExportRoster(format, filters)
+          }
         />
       ) : null}
 
