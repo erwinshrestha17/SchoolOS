@@ -9,6 +9,12 @@ import { useForm } from 'react-hook-form';
 import { api, isAuthSession } from '../../lib/api';
 import { useSession } from '../session-provider';
 
+const PLATFORM_ROLES = [
+  'platform_super_admin',
+  'platform_support',
+  'platform_billing_admin',
+];
+
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -32,9 +38,15 @@ export function LoginForm() {
     mutationFn: api.login,
     onSuccess: (result) => {
       if (isAuthSession(result)) {
+        const defaultRedirect = result.user.roles.some((role) =>
+          PLATFORM_ROLES.includes(role),
+        )
+          ? '/platform/dashboard'
+          : '/dashboard';
+
         setChallengeMessage(null);
         setAuthenticatedSession(result);
-        router.push(searchParams.get('next') ?? '/dashboard');
+        router.push(searchParams.get('next') ?? defaultRedirect);
         return;
       }
 
@@ -117,10 +129,7 @@ export function LoginForm() {
       ) : null}
 
       {mutation.isSuccess && !challengeMessage ? (
-        <p className="text-sm text-[var(--teal)]">
-          Login request completed. Secure cookie flow is active and only
-          non-sensitive dashboard session metadata is stored in the browser.
-        </p>
+        <p className="text-sm text-[var(--teal)]">Login request completed.</p>
       ) : null}
     </form>
   );
