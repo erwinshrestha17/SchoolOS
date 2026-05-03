@@ -1,9 +1,8 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "resolvePackageJsonExports": true,
+    "module": "CommonJS",
+    "moduleResolution": "Node",
     "esModuleInterop": true,
     "isolatedModules": true,
     "declaration": true,
@@ -22,5 +21,9 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "prisma/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "prisma/**/*.ts"
+  ]
 }
