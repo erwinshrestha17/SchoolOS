@@ -9,6 +9,11 @@ import type {
   StudentFeeLedger,
   StudentArchivePayload,
   StudentDeletePayload,
+  RevokeGeneratedStudentDocumentPayload,
+  StudentAttendanceHistory,
+  StudentAttendanceHistoryFilters,
+  StudentAttendanceHistoryRow,
+  StudentAttendanceHistorySummary,
   StudentProfileAttendanceRecord,
   StudentProfileDetail,
   StudentProfileInvoice,
@@ -340,7 +345,7 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
         <FeesTab studentId={profile.student.id} invoices={profile.invoices} />
       ) : null}
       {activeTab === 'Attendance' ? (
-        <AttendanceTab records={profile.attendanceRecords} />
+        <AttendanceTab studentId={profile.student.id} />
       ) : null}
       {activeTab === 'Activity' ? (
         <ActivityTab posts={profile.activityPosts} />
@@ -1742,36 +1747,201 @@ function StudentFeeLedgerView({
   );
 }
 
-function AttendanceTab({ records }: { records: StudentProfileAttendanceRecord[] }) {
+function AttendanceTab({ studentId }: { studentId: string }) {
+  const [filters, setFilters] = useState<StudentAttendanceHistoryFilters>({});
+  const query = useQuery({
+    queryKey: ['student-attendance-history', studentId, filters],
+    queryFn: () => api.getStudentAttendanceHistory(studentId, filters),
+    enabled: Boolean(studentId),
+  });
+
+  const academicYearsQuery = useQuery({
+    queryKey: ['academic-years'],
+    queryFn: () => api.listAcademicYears(),
+  });
+
   return (
-    <SectionCard title="Attendance">
-      {records.length > 0 ? (
-        <div className="grid gap-2">
-          {records.map((record) => (
-            <div
-              key={record.id}
-              className="grid gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-4 md:grid-cols-[1fr_auto]"
+    <div className="grid gap-5">
+      <SectionCard title="Attendance Summary">
+        {query.isLoading ? (
+          <div className="grid animate-pulse gap-4 md:grid-cols-3">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-20 rounded-2xl bg-gray-100" />
+            ))}
+          </div>
+        ) : query.isError ? (
+          <InlineError message={errorMessage(query.error)} />
+        ) : query.data ? (
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+            <SummaryStat
+              label="Present"
+              value={query.data.summary.presentCount}
+            />
+            <SummaryStat label="Absent" value={query.data.summary.absentCount} />
+            <SummaryStat label="Late" value={query.data.summary.lateCount} />
+            <SummaryStat
+              label="On Leave"
+              value={
+                query.data.summary.leaveCount +
+                query.data.summary.sickLeaveCount +
+                query.data.summary.excusedLeaveCount
+              }
+            />
+            <SummaryStat
+              label="Percentage"
+              value={`${query.data.summary.attendancePercentage}%`}
+              variant="primary"
+            />
+          </div>
+        ) : null}
+      </SectionCard>
+
+      <SectionCard title="Attendance History">
+        <div className="mb-6 flex flex-wrap gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-gray-500">
+              Academic Year
+            </label>
+            <select
+              className="input min-w-[160px]"
+              value={filters.academicYearId ?? ''}
+              onChange={(e) =>
+                setFilters((f) => ({
+                  ...f,
+                  academicYearId: e.target.value || undefined,
+                }))
+              }
             >
-              <div>
-                <p className="font-semibold text-gray-900">
-                  {formatDate(record.attendanceDate)}
-                </p>
-                <p className="mt-1 text-sm text-gray-500">
-                  Submitted {record.submittedAt ? formatDate(record.submittedAt) : 'not recorded'}
-                  {record.lateAt ? ` / late at ${formatDate(record.lateAt)}` : ''}
-                </p>
-                {record.remark ? (
-                  <p className="mt-1 text-sm text-gray-600">{record.remark}</p>
-                ) : null}
-              </div>
-              <Badge>{record.status}</Badge>
-            </div>
-          ))}
+              <option value="">All Years</option>
+              {academicYearsQuery.data?.map((year) => (
+                <option key={year.id} value={year.id}>
+                  {year.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-gray-500">From</label>
+            <input
+              type="date"
+              className="input"
+              value={filters.fromDate ?? ''}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, fromDate: e.target.value || undefined }))
+              }
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-gray-500">To</label>
+            <input
+              type="date"
+              className="input"
+              value={filters.toDate ?? ''}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, toDate: e.target.value || undefined }))
+              }
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-gray-500">Status</label>
+            <select
+              className="input min-w-[140px]"
+              value={filters.status ?? ''}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, status: e.target.value || undefined }))
+              }
+            >
+              <option value="">All Status</option>
+              <option value="PRESENT">Present</option>
+              <option value="ABSENT">Absent</option>
+              <option value="LATE">Late</option>
+              <option value="LEAVE">Leave</option>
+              <option value="SICK_LEAVE">Sick Leave</option>
+              <option value="EXCUSED_LEAVE">Excused Leave</option>
+              <option value="UNEXCUSED_LEAVE">Unexcused Leave</option>
+            </select>
+          </div>
         </div>
-      ) : (
-        <EmptyState message="No attendance records found for this student." />
-      )}
-    </SectionCard>
+
+        {query.isLoading ? (
+          <div className="grid gap-2 animate-pulse">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-16 rounded-2xl bg-gray-50" />
+            ))}
+          </div>
+        ) : query.isError ? (
+          <InlineError message={errorMessage(query.error)} />
+        ) : query.data?.records.length ? (
+          <div className="grid gap-2">
+            {query.data.records.map((record) => (
+              <div
+                key={record.id}
+                className="grid gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-4 md:grid-cols-[1fr_auto]"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-gray-900">
+                      {formatDate(record.date)}
+                    </p>
+                    <span className="text-xs font-medium text-gray-400">
+                      {record.className} {record.sectionName ? `- ${record.sectionName}` : ''}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Marked by {record.markedByName || 'System'}
+                    {record.submittedAt ? ` on ${formatDate(record.submittedAt)}` : ''}
+                  </p>
+                  {record.remarks ? (
+                    <p className="mt-1 text-sm text-gray-600">{record.remarks}</p>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant={record.status === 'PRESENT' ? 'success' : record.status === 'ABSENT' ? 'danger' : 'warning'}>
+                    {record.status}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState message="No attendance records found for the selected filters." />
+        )}
+      </SectionCard>
+    </div>
+  );
+}
+
+function SummaryStat({
+  label,
+  value,
+  variant = 'default',
+}: {
+  label: string;
+  value: string | number;
+  variant?: 'default' | 'primary';
+}) {
+  return (
+    <div
+      className={`rounded-2xl border p-4 ${
+        variant === 'primary'
+          ? 'border-primary-100 bg-primary-50'
+          : 'border-gray-100 bg-gray-50'
+      }`}
+    >
+      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+        {label}
+      </p>
+      <p
+        className={`mt-1 text-2xl font-bold ${
+          variant === 'primary' ? 'text-primary-700' : 'text-gray-900'
+        }`}
+      >
+        {value}
+      </p>
+    </div>
   );
 }
 
@@ -1908,9 +2078,25 @@ function Metric({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function Badge({ children }: { children: React.ReactNode }) {
+function Badge({
+  children,
+  variant = 'default',
+}: {
+  children: React.ReactNode;
+  variant?: 'default' | 'success' | 'danger' | 'warning' | 'primary';
+}) {
+  const styles = {
+    default: 'bg-gray-100 text-gray-600',
+    success: 'bg-success-50 text-success-700 border border-success-100',
+    danger: 'bg-danger-50 text-danger-700 border border-danger-100',
+    warning: 'bg-warning-50 text-warning-700 border border-warning-100',
+    primary: 'bg-primary-50 text-primary-700 border border-primary-100',
+  };
+
   return (
-    <span className="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${styles[variant]}`}
+    >
       {children}
     </span>
   );

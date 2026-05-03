@@ -6,12 +6,18 @@ import {
 } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import {
+  AttendanceStatus,
   AudienceType,
   EnrollmentStatus,
   NotificationChannel,
   Prisma,
   StudentLifecycleStatus,
 } from '@prisma/client';
+import {
+  StudentAttendanceHistory,
+  StudentAttendanceHistoryRow,
+  StudentAttendanceHistorySummary,
+} from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
@@ -31,6 +37,7 @@ import { RevokeGeneratedStudentDocumentDto } from './dto/revoke-generated-studen
 import { ReviewGuardianIdentityVerificationDto } from './dto/review-guardian-identity-verification.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { UpdateStudentGuardianDto } from './dto/update-student-guardian.dto';
+import { AttendanceHistoryQueryDto } from './dto/attendance-history.dto';
 
 @Injectable()
 export class StudentsService {
@@ -474,6 +481,119 @@ export class StudentsService {
           reaction: reaction.reaction,
           createdAt: reaction.createdAt.toISOString(),
         })),
+      })),
+    };
+  }
+
+  async getAttendanceHistory(
+    studentId: string,
+    query: AttendanceHistoryQueryDto,
+    actor: AuthContext,
+  ): Promise<StudentAttendanceHistory> {
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: studentId,
+        tenantId: actor.tenantId,
+      },
+      include: {
+        class: true,
+        sectionRef: true,
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    const where: Prisma.AttendanceRecordWhereInput = {
+      studentId,
+      tenantId: actor.tenantId,
+      attendanceSession: {
+        attendanceDate: {
+          gte: query.fromDate ? new Date(query.fromDate) : undefined,
+          lte: query.toDate ? new Date(query.toDate) : undefined,
+        },
+        academicYearId: query.academicYearId,
+      },
+      status: query.status,
+    };
+
+    const records = await this.prisma.attendanceRecord.findMany({
+      where,
+      include: {
+        attendanceSession: {
+          include: {
+            class: true,
+            section: true,
+            submittedBy: {
+              include: {
+                staff: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        attendanceSession: {
+          attendanceDate: 'desc',
+        },
+      },
+    });
+
+    const summary: StudentAttendanceHistorySummary = {
+      presentCount: records.filter((r) => r.status === AttendanceStatus.PRESENT)
+        .length,
+      absentCount: records.filter((r) => r.status === AttendanceStatus.ABSENT)
+        .length,
+      lateCount: records.filter((r) => r.status === AttendanceStatus.LATE)
+        .length,
+      leaveCount: records.filter((r) => r.status === AttendanceStatus.LEAVE)
+        .length,
+      sickLeaveCount: records.filter(
+        (r) => r.status === AttendanceStatus.SICK_LEAVE,
+      ).length,
+      excusedLeaveCount: records.filter(
+        (r) => r.status === AttendanceStatus.EXCUSED_LEAVE,
+      ).length,
+      unexcusedLeaveCount: records.filter(
+        (r) => r.status === AttendanceStatus.UNEXCUSED_LEAVE,
+      ).length,
+      totalRecords: records.length,
+      attendancePercentage: records.length
+        ? Math.round(
+            ((records.filter(
+              (r) =>
+                r.status === AttendanceStatus.PRESENT ||
+                r.status === AttendanceStatus.LATE,
+            ).length) /
+              records.length) *
+              10000,
+          ) / 100
+        : 100,
+    };
+
+    return {
+      student: {
+        id: student.id,
+        studentSystemId: student.studentSystemId,
+        fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+        className: student.class.name,
+        sectionName: student.sectionRef?.name ?? student.section ?? null,
+      },
+      summary,
+      records: records.map((record) => ({
+        id: record.id,
+        sessionId: record.attendanceSessionId,
+        date: record.attendanceSession.attendanceDate.toISOString(),
+        status: record.status,
+        remarks: record.remark,
+        className: record.attendanceSession.class.name,
+        sectionName: record.attendanceSession.section?.name ?? null,
+        markedByUserId: record.attendanceSession.submittedById,
+        markedByName: record.attendanceSession.submittedBy?.staff
+          ? `${record.attendanceSession.submittedBy.staff.firstName} ${record.attendanceSession.submittedBy.staff.lastName}`.trim()
+          : (record.attendanceSession.submittedBy?.email ?? null),
+        submittedAt: record.attendanceSession.submittedAt?.toISOString() ?? null,
       })),
     };
   }

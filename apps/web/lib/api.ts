@@ -58,6 +58,8 @@ import type {
   StaffSummary,
   StaffContractSummary,
   RevokeGeneratedStudentDocumentPayload,
+  StudentAttendanceHistory,
+  StudentAttendanceHistoryFilters,
   StudentProfileDetail,
   StudentArchivePayload,
   StudentDeletePayload,
@@ -318,9 +320,17 @@ export const api = {
         json: body as JsonBody,
       },
     ),
-  getStudentFeeClearance: (studentId: string) =>
-    request<StudentFeeClearance>(
       `/students/${encodeURIComponent(studentId)}/fee-clearance`,
+    ),
+  getStudentAttendanceHistory: (
+    studentId: string,
+    params?: StudentAttendanceHistoryFilters,
+  ) =>
+    request<StudentAttendanceHistory>(
+      withQuery(
+        `/students/${encodeURIComponent(studentId)}/attendance-history`,
+        params ?? {},
+      ),
     ),
   transferStudent: (studentId: string, body: StudentTransferPayload) =>
     request<StudentLifecycleActionResult>(
