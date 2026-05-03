@@ -408,7 +408,11 @@ export class AuthService {
 
       return this.buildAuthSession(session.accessToken, authContext, tenant);
     } catch (error) {
-      this.logger.error(`Refresh failed: ${error.message}`, error.stack);
+      if (error instanceof Error) {
+        this.logger.error(`Refresh failed: ${error.message}`, error.stack);
+      } else {
+        this.logger.error('Refresh failed with a non-Error value');
+      }
       throw error;
     }
   }
