@@ -206,5 +206,5 @@ export class DeliveryRetryService {
 }
 
 function isRetryable(status: NotificationStatus) {
-  return [NotificationStatus.FAILED, NotificationStatus.QUEUED].includes(status);
+  return status === NotificationStatus.FAILED || status === NotificationStatus.QUEUED;
 }
