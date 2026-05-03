@@ -1,6 +1,7 @@
 'use client';
 
 import { CommunicationsForm } from '../../../components/forms/communications-form';
+import { DeliveryRetryPanel } from '../../../components/forms/delivery-retry-panel';
 
 export default function NoticesPage() {
   return (
@@ -10,10 +11,11 @@ export default function NoticesPage() {
           Notices
         </h1>
         <p className="mt-1 text-sm text-gray-500">
-          Notices, events, and audience targeting.
+          Notices, events, audience targeting, delivery tracking, and retry actions.
         </p>
       </div>
       <CommunicationsForm />
+      <DeliveryRetryPanel />
     </div>
   );
 }
