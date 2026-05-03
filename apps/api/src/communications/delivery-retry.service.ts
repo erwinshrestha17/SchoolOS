@@ -55,7 +55,7 @@ export class DeliveryRetryService {
 
     if (!isRetryable(delivery.status)) {
       throw new BadRequestException(
-        `Only failed, retrying, or queued deliveries can be retried. Current status: ${delivery.status}`,
+        `Only failed or queued deliveries can be retried. Current status: ${delivery.status}`,
       );
     }
 
@@ -128,7 +128,7 @@ export class DeliveryRetryService {
     await this.prisma.notificationDelivery.update({
       where: { id: delivery.id },
       data: {
-        status: NotificationStatus.RETRYING,
+        status: NotificationStatus.QUEUED,
         errorMessage: null,
       },
     });
@@ -138,12 +138,12 @@ export class DeliveryRetryService {
         throw new Error(`No destination resolved for ${delivery.channel}`);
       }
 
-      const metadata = {
+      const metadata: Record<string, string> = {
         tenantId: delivery.tenantId,
         notificationDeliveryId: delivery.id,
         sourceType: delivery.sourceType,
         sourceId: delivery.sourceId,
-        retry: true,
+        retry: 'true',
       };
 
       if (delivery.channel === NotificationChannel.EMAIL) {
@@ -206,9 +206,5 @@ export class DeliveryRetryService {
 }
 
 function isRetryable(status: NotificationStatus) {
-  return [
-    NotificationStatus.FAILED,
-    NotificationStatus.RETRYING,
-    NotificationStatus.QUEUED,
-  ].includes(status);
+  return [NotificationStatus.FAILED, NotificationStatus.QUEUED].includes(status);
 }
