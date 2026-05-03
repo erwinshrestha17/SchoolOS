@@ -16,6 +16,7 @@ import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { buildCertificatePdf } from '../common/pdf/simple-pdf';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { UsersService } from '../users/users.service';

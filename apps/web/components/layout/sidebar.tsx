@@ -232,6 +232,7 @@ function SidebarContent({
   futureItems,
   pathname,
   primaryItems,
+  platformItems,
   onMobileClose,
   onToggle,
 }: {

@@ -6,13 +6,14 @@ import {
   Body,
   UseGuards,
   Req,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { PlatformService } from './platform.service';
 import { PlatformGuard } from '../auth/guards/platform.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AuthenticatedRequest } from '../auth/auth-request.interface';
+import type { AuthenticatedRequest } from '../auth/auth-request.interface';
 import { Permissions } from '../auth/decorators/permissions.decorator';
-import {
+import type {
   PlatformTenantSummary,
   PlatformTenantDetail,
   PlatformTenantUsage,
@@ -44,6 +45,10 @@ export class PlatformController {
     @Body('isActive') isActive: boolean,
     @Req() req: AuthenticatedRequest,
   ): Promise<{ success: true }> {
+    if (!req.auth) {
+      throw new UnauthorizedException('Authentication context required');
+    }
+
     await this.platformService.updateTenantStatus(
       tenantId,
       isActive,

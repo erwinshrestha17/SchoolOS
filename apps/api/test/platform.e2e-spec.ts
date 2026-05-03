@@ -55,7 +55,11 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
     prisma.__state.userRoles.push({ id: 'ur-1', userId: schoolAdmin.id, roleId: adminRole.id, tenantId });
 
     // 2. Login as school admin
-    const loginRes = await authController.login({ tenantSlug: 'school-1', email: 'admin@school1.com', password: 'school123' }, createResponseMock() as any);
+    const loginRes = await authController.login(
+      { tenantSlug: 'school-1', email: 'admin@school1.com', password: 'school123' },
+      createResponseMock() as any,
+      { ip: '127.0.0.1', headers: {} } as any
+    );
     const accessToken = (loginRes as any).accessToken;
 
     // 3. Try to access platform API - should fail
@@ -77,7 +81,11 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
     prisma.__state.userRoles.push({ id: 'ur-p', userId: platformAdmin.id, roleId: platformRole.id, tenantId: platformId });
 
     // 5. Login as platform admin
-    const pLoginRes = await authController.login({ tenantSlug: 'platform', email: 'super@schoolos.com', password: 'school123' }, createResponseMock() as any);
+    const pLoginRes = await authController.login(
+      { tenantSlug: 'platform', email: 'super@schoolos.com', password: 'school123' },
+      createResponseMock() as any,
+      { ip: '127.0.0.1', headers: {} } as any
+    );
     const pAccessToken = (pLoginRes as any).accessToken;
     mockReq.headers.authorization = `Bearer ${pAccessToken}`;
 
@@ -105,7 +113,11 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
     prisma.__state.users.push(platformSupport);
     prisma.__state.userRoles.push({ id: 'ur-s', userId: platformSupport.id, roleId: supportRole.id, tenantId: platformId });
 
-    const sLoginRes = await authController.login({ tenantSlug: 'platform', email: 'support@schoolos.com', password: 'school123' }, createResponseMock() as any);
+    const sLoginRes = await authController.login(
+      { tenantSlug: 'platform', email: 'support@schoolos.com', password: 'school123' },
+      createResponseMock() as any,
+      { ip: '127.0.0.1', headers: {} } as any
+    );
     const sAccessToken = (sLoginRes as any).accessToken;
     const sMockReq = { headers: { authorization: `Bearer ${sAccessToken}` } } as any;
     const sMockContext = { switchToHttp: () => ({ getRequest: () => sMockReq }), getHandler: () => platformController.listTenants, getClass: () => PlatformController } as any;
@@ -127,7 +139,11 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
     prisma.__state.users.push(platformBilling);
     prisma.__state.userRoles.push({ id: 'ur-b', userId: platformBilling.id, roleId: billingRole.id, tenantId: platformId });
 
-    const bLoginRes = await authController.login({ tenantSlug: 'platform', email: 'billing@schoolos.com', password: 'school123' }, createResponseMock() as any);
+    const bLoginRes = await authController.login(
+      { tenantSlug: 'platform', email: 'billing@schoolos.com', password: 'school123' },
+      createResponseMock() as any,
+      { ip: '127.0.0.1', headers: {} } as any
+    );
     const bAccessToken = (bLoginRes as any).accessToken;
     const bMockReq = { headers: { authorization: `Bearer ${bAccessToken}` } } as any;
     const bMockContext = { switchToHttp: () => ({ getRequest: () => bMockReq }), getHandler: () => platformController.getTenantUsage, getClass: () => PlatformController } as any;
@@ -146,7 +162,19 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
 });
 
 async function createPrismaMock() {
-  const state = {
+  const state: {
+    tenants: any[];
+    permissions: any[];
+    roles: any[];
+    rolePermissions: any[];
+    users: any[];
+    userRoles: any[];
+    students: any[];
+    staff: any[];
+    auditLogs: any[];
+    refreshTokens: any[];
+    otpCodes: any[];
+  } = {
     tenants: [],
     permissions: PERMISSION_CATALOG.map((p, i) => ({ id: `perm-${i+1}`, ...p })),
     roles: [],

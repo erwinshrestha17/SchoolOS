@@ -1228,6 +1228,11 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
       sizeBytes: 512,
     })),
   };
+  const fileRegistryService = {
+    registerFile: jest.fn(),
+    getSignedUrl: jest.fn(),
+    listFilesByEntity: jest.fn(),
+  };
 
   return {
     service: new StudentsService(
@@ -1236,6 +1241,7 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
       communicationsService as never,
       auditService as never,
       storageService as never,
+      fileRegistryService as never,
     ),
     prisma,
     auditService,

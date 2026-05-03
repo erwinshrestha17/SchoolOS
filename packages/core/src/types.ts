@@ -1,4 +1,4 @@
-import type { PermissionKey } from "./permissions";
+import type { PermissionKey } from "./permissions.js";
 
 export type AuthSessionUser = {
   id: string;

@@ -1,3 +1,3 @@
-export * from './permissions';
-export * from './types';
-export * from './validation';
+export * from './permissions.js';
+export * from './types.js';
+export * from './validation.js';

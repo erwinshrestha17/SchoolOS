@@ -95,7 +95,12 @@ describe('Student Documents Registry Integration (E2E)', () => {
 });
 
 async function createPrismaMock() {
-  const state = {
+  const state: {
+    fileAssets: any[];
+    auditLogs: any[];
+    studentDocuments: any[];
+    students: any[];
+  } = {
     fileAssets: [],
     auditLogs: [],
     studentDocuments: [],

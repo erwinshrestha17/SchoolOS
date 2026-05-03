@@ -6,13 +6,14 @@ import {
   Body,
   UseGuards,
   Req,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { SettingsService } from './settings.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
-import { AuthenticatedRequest } from '../auth/auth-request.interface';
-import {
+import type { AuthenticatedRequest } from '../auth/auth-request.interface';
+import type {
   TenantSettingSummary,
   UpdateTenantSettingPayload,
 } from '@schoolos/core';
@@ -25,12 +26,18 @@ export class SettingsController {
   @Get()
   @Permissions('settings:read')
   async getSettings(@Req() req: AuthenticatedRequest): Promise<TenantSettingSummary[]> {
+    if (!req.auth) {
+      throw new UnauthorizedException('Authentication context required');
+    }
     return this.settingsService.getSettings(req.auth.tenantId);
   }
 
   @Get('public')
   @Permissions('settings:read_public')
   async getPublicSettings(@Req() req: AuthenticatedRequest): Promise<TenantSettingSummary[]> {
+    if (!req.auth) {
+      throw new UnauthorizedException('Authentication context required');
+    }
     return this.settingsService.getPublicSettings(req.auth.tenantId);
   }
 
@@ -41,6 +48,9 @@ export class SettingsController {
     @Body() payload: UpdateTenantSettingPayload,
     @Req() req: AuthenticatedRequest,
   ): Promise<{ success: true }> {
+    if (!req.auth) {
+      throw new UnauthorizedException('Authentication context required');
+    }
     await this.settingsService.updateSetting(
       req.auth.tenantId,
       key,

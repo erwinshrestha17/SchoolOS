@@ -11,6 +11,7 @@ describe('StudentRecordsService', () => {
   let prisma: any;
   let storageService: any;
   let auditService: any;
+  let fileRegistryService: any;
   let service: StudentRecordsService;
   let actor: AuthContext;
 
@@ -35,6 +36,12 @@ describe('StudentRecordsService', () => {
     auditService = {
       record: jest.fn(),
     };
+    fileRegistryService = {
+      registerFile: jest.fn(),
+      getSignedUrl: jest.fn(),
+      softDeleteFile: jest.fn(),
+      auditAccess: jest.fn(),
+    };
     actor = {
       userId: 'user-1',
       tenantId: 'tenant-1',
@@ -45,7 +52,7 @@ describe('StudentRecordsService', () => {
       permissions: ['student_documents:manage'],
     };
 
-    service = new StudentRecordsService(prisma, storageService, auditService);
+    service = new StudentRecordsService(prisma, storageService, auditService, fileRegistryService);
   });
 
   it('stores document metadata only after validating tenant-scoped student access', async () => {

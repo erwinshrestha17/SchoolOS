@@ -3,7 +3,7 @@
 import { useSession } from '../../components/session-provider';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { AppShell } from '../../components/layout/app-shell';
+import { DashboardShell } from '../../components/layout/dashboard-shell';
 
 export default function PlatformLayout({
   children,
@@ -14,7 +14,7 @@ export default function PlatformLayout({
   const router = useRouter();
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
+    if (status === 'anonymous') {
       router.push('/login');
       return;
     }
@@ -39,5 +39,5 @@ export default function PlatformLayout({
     );
   }
 
-  return <AppShell>{children}</AppShell>;
+  return <DashboardShell>{children}</DashboardShell>;
 }

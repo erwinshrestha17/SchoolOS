@@ -58,7 +58,11 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     ensureTenantDefaults(prisma.__state, tenantBId);
 
     // 3. Login as Admin A
-    const loginRes = await authController.login({ tenantSlug: 'school-a', email: 'admin@school-a.com', password: 'pass123' }, createResponseMock() as any);
+    const loginRes = await authController.login(
+      { tenantSlug: 'school-a', email: 'admin@school-a.com', password: 'pass123' },
+      createResponseMock() as any,
+      { ip: '127.0.0.1', headers: {} } as any
+    );
     const authA = { tenantId: tenantAId, userId: adminA.id };
 
     // 4. Admin A updates a setting
@@ -122,7 +126,16 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
 });
 
 async function createPrismaMock() {
-  const state = {
+  const state: {
+    tenants: any[];
+    tenantSettings: any[];
+    permissions: any[];
+    roles: any[];
+    rolePermissions: any[];
+    users: any[];
+    userRoles: any[];
+    auditLogs: any[];
+  } = {
     tenants: [],
     tenantSettings: [],
     permissions: PERMISSION_CATALOG.map((p, i) => ({ id: `perm-${i+1}`, ...p })),

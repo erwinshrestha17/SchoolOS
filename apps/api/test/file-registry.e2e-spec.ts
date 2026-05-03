@@ -89,7 +89,10 @@ describe('SchoolOS File Registry (E2E)', () => {
 });
 
 async function createPrismaMock() {
-  const state = {
+  const state: {
+    fileAssets: any[];
+    auditLogs: any[];
+  } = {
     fileAssets: [],
     auditLogs: [],
   };

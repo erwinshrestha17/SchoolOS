@@ -13,6 +13,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StudentRecordsService } from '../student-records/student-records.service';
 import { StudentsService } from '../students/students.service';
 import { UsersService } from '../users/users.service';
+import { StorageService } from '../storage/storage.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { AdmissionsService } from './admissions.service';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
 
@@ -330,6 +332,9 @@ function buildService(prisma = buildPrisma()) {
     archiveAlumni: jest.fn(),
   };
 
+  const storageService = { saveBase64Object: jest.fn(), saveBufferObject: jest.fn() };
+  const fileRegistryService = { registerFile: jest.fn(), getSignedUrl: jest.fn() };
+
   const service = new AdmissionsService(
     prisma as unknown as PrismaService,
     usersService as unknown as UsersService,
@@ -340,6 +345,8 @@ function buildService(prisma = buildPrisma()) {
     configService as ConfigService,
     eventEmitter as unknown as EventEmitter2,
     studentsService as unknown as StudentsService,
+    storageService as unknown as StorageService,
+    fileRegistryService as unknown as FileRegistryService,
   );
 
   return {
