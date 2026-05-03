@@ -672,6 +672,14 @@ describe('SchoolOS web production contracts', () => {
     assert.match(financeForm, /History & Reports/);
   });
 
+  it('adds a defaulter aging export action to the finance screen', () => {
+    const financeForm = read('components/forms/finance-form.tsx');
+
+    assert.match(financeForm, /Export Defaulter Aging CSV/);
+    assert.match(financeForm, /api\.exportReport\('defaulter-aging-report'/);
+    assert.match(financeForm, /asOfDate: new Date\(\)\.toISOString\(\)/);
+  });
+
   it('keeps ledger preview preview-only without direct accounting calls', () => {
     const financeForm = read('components/forms/finance-form.tsx');
 

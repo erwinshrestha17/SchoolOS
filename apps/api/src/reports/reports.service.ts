@@ -532,6 +532,133 @@ export class ReportsService {
         return [...rows, ...summaryRows];
       },
     });
+
+    this.register({
+      definition: {
+        key: 'defaulter-aging-report',
+        name: 'Defaulter Aging Report',
+        description: 'Aging analysis of outstanding fees as of a specific date',
+        category: 'finance',
+        module: 'finance',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'asOfDate', label: 'As Of Date', type: 'date', required: true },
+          { key: 'academicYearId', label: 'Academic Year', type: 'select' },
+          { key: 'classId', label: 'Class', type: 'class' },
+          { key: 'sectionId', label: 'Section', type: 'section' },
+          { key: 'studentId', label: 'Student', type: 'student' },
+          { key: 'feeHeadId', label: 'Fee Head', type: 'select' },
+          { key: 'minOutstanding', label: 'Min Outstanding', type: 'text' },
+          {
+            key: 'agingBucket',
+            label: 'Aging Bucket',
+            type: 'select',
+            options: [
+              { label: '0-30 days', value: '0-30' },
+              { label: '31-60 days', value: '31-60' },
+              { label: '61-90 days', value: '61-90' },
+              { label: '90+ days', value: '90+' },
+            ],
+          },
+        ],
+        requiredPermissions: ['reports:export', 'ledger:read'],
+      },
+      execute: async (actor, filters) => {
+        const report = await this.financeService.getDefaulterAgingReportRows(
+          actor,
+          {
+            asOfDate: String(filters.asOfDate),
+            academicYearId: filters.academicYearId
+              ? String(filters.academicYearId)
+              : undefined,
+            classId: filters.classId ? String(filters.classId) : undefined,
+            sectionId: filters.sectionId ? String(filters.sectionId) : undefined,
+            studentId: filters.studentId ? String(filters.studentId) : undefined,
+            feeHeadId: filters.feeHeadId ? String(filters.feeHeadId) : undefined,
+            minOutstanding: filters.minOutstanding
+              ? Number(filters.minOutstanding)
+              : undefined,
+            agingBucket: filters.agingBucket
+              ? String(filters.agingBucket)
+              : undefined,
+          },
+        );
+
+        const rows = report.rows.map((row) => ({
+          'Student ID': row.studentSystemId,
+          Student: row.studentName,
+          Class: row.className,
+          Section: row.sectionName,
+          'Guardian Name': row.guardianName,
+          'Guardian Phone': row.guardianPhone,
+          'Invoice No': row.invoiceNumber,
+          'Fee Head': row.feeHeadName || 'Multiple',
+          'Due Date': row.dueDate.toISOString().split('T')[0],
+          'Invoice Amt': row.invoiceAmount,
+          Paid: row.paidAmount,
+          Waiver: row.waiverAmount,
+          Refund: row.refundAmount,
+          Outstanding: row.outstandingAmount,
+          'Days Overdue': row.daysOverdue,
+          Bucket: row.agingBucket,
+          'Last Payment': row.lastPaymentDate
+            ? row.lastPaymentDate.toISOString().split('T')[0]
+            : '-',
+          Status: row.status,
+        }));
+
+        const divider = Object.keys(rows[0] || {}).reduce(
+          (acc, key) => ({ ...acc, [key]: '---' }),
+          {},
+        );
+
+        const summaryRows = [
+          divider,
+          {
+            'Student ID': 'SUMMARY',
+            Student: '',
+            Class: '',
+            Section: '',
+            'Guardian Name': '',
+            'Guardian Phone': '',
+            'Invoice No': '',
+            'Fee Head': '',
+            'Due Date': '',
+            'Invoice Amt': '',
+            Paid: '',
+            Waiver: '',
+            Refund: '',
+            Outstanding: report.summary.totalOutstanding,
+            'Days Overdue': '',
+            Bucket: '',
+            'Last Payment': '',
+            Status: '',
+          },
+          {
+            'Student ID': 'Total Defaulters',
+            Student: report.summary.totalDefaulters,
+            Class: '',
+            Section: '',
+            'Guardian Name': '',
+            'Guardian Phone': '',
+            'Invoice No': '',
+            'Fee Head': '',
+            'Due Date': '',
+            'Invoice Amt': '',
+            Paid: '',
+            Waiver: '',
+            Refund: '',
+            Outstanding: '',
+            'Days Overdue': '',
+            Bucket: '',
+            'Last Payment': '',
+            Status: '',
+          },
+        ];
+
+        return [...rows, ...summaryRows];
+      },
+    });
   }
 
   register(executor: ReportExecutor) {

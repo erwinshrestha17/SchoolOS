@@ -236,4 +236,17 @@ describe('production data integrity contracts', () => {
     expect(reportsService).toContain('this.auditService.record({');
     expect(reportsService).toContain('resourceId: reportKey');
   });
+
+  it('registers the defaulter aging report with proper permissions and audit logging', () => {
+    const reportsService = readFileSync(
+      join(sourceRoot, 'reports/reports.service.ts'),
+      'utf8',
+    );
+
+    expect(reportsService).toContain("key: 'defaulter-aging-report'");
+    expect(reportsService).toContain(
+      "requiredPermissions: ['reports:export', 'ledger:read']",
+    );
+    expect(reportsService).toContain('asOfDate: String(filters.asOfDate)');
+  });
 });

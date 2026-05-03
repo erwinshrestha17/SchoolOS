@@ -1967,19 +1967,44 @@ function DefaultersSection({
   classes: Array<{ id: string; name: string }>;
   feeHeads: FeeHeadSummary[];
   defaulterFilters: { classId: string; feeHeadId: string };
-  setDefaulterFilters: React.Dispatch<React.SetStateAction<{ classId: string; feeHeadId: string }>>;
+  setDefaulterFilters: React.Dispatch<
+    React.SetStateAction<{ classId: string; feeHeadId: string }>
+  >;
   selectedReminderInvoiceIds: string[];
   toggleReminderInvoice: (invoiceId: string) => void;
   reminderMutation: ReminderMutation;
 }) {
+  const [isExporting, setIsExporting] = useState(false);
+
+  const onExportAgingCsv = async () => {
+    setIsExporting(true);
+    try {
+      await api.exportReport('defaulter-aging-report', {
+        format: 'csv',
+        filters: {
+          asOfDate: new Date().toISOString(),
+          classId: defaulterFilters.classId || undefined,
+          feeHeadId: defaulterFilters.feeHeadId || undefined,
+        },
+      });
+    } catch (error) {
+      console.error('Export failed:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="label">Defaulters</p>
-          <h2 className="mt-2 text-xl font-bold text-gray-950">Reminder queue</h2>
+          <h2 className="mt-2 text-xl font-bold text-gray-950">
+            Reminder queue
+          </h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            Filter overdue invoices and send provider-neutral reminder delivery records.
+            Filter overdue invoices and send provider-neutral reminder delivery
+            records.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -2020,17 +2045,25 @@ function DefaultersSection({
 
       <div className="mt-5 grid gap-3 lg:grid-cols-2">
         {defaulters.map((defaulter) => (
-          <label key={defaulter.invoiceId} className="rounded-2xl border border-[var(--line)] bg-white/70 p-4">
+          <label
+            key={defaulter.invoiceId}
+            className="rounded-2xl border border-[var(--line)] bg-white/70 p-4"
+          >
             <span className="flex items-start gap-3">
               <input
                 type="checkbox"
-                checked={selectedReminderInvoiceIds.includes(defaulter.invoiceId)}
+                checked={selectedReminderInvoiceIds.includes(
+                  defaulter.invoiceId,
+                )}
                 onChange={() => toggleReminderInvoice(defaulter.invoiceId)}
               />
               <span>
-                <span className="block font-semibold">{defaulter.studentName}</span>
+                <span className="block font-semibold">
+                  {defaulter.studentName}
+                </span>
                 <span className="block text-sm text-[var(--muted)]">
-                  {defaulter.invoiceNumber} / {defaulter.agingBucket} / {formatCurrency(defaulter.outstanding)}
+                  {defaulter.invoiceNumber} / {defaulter.agingBucket} /{' '}
+                  {formatCurrency(defaulter.outstanding)}
                   {defaulter.reportCardBlocked ? ' / report card blocked' : ''}
                   {defaulter.hallTicketBlocked ? ' / hall ticket blocked' : ''}
                 </span>
@@ -2038,10 +2071,23 @@ function DefaultersSection({
             </span>
           </label>
         ))}
-        {defaulters.length === 0 ? <EmptyState title="No defaulters" body="No overdue invoices match the filters." /> : null}
+        {defaulters.length === 0 ? (
+          <EmptyState
+            title="No defaulters"
+            body="No overdue invoices match the filters."
+          />
+        ) : null}
       </div>
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+        <button
+          type="button"
+          className="min-h-11 rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold disabled:opacity-50"
+          disabled={isExporting}
+          onClick={onExportAgingCsv}
+        >
+          {isExporting ? 'Exporting...' : 'Export Defaulter Aging CSV'}
+        </button>
         <button
           type="button"
           className="min-h-11 rounded-full border border-[var(--line)] px-4 py-2 text-sm font-semibold disabled:opacity-50"
@@ -2422,6 +2468,7 @@ function ReceiptsLedgerSection({
         </div>
       </section>
     </section>
+    </div>
   );
 }
 

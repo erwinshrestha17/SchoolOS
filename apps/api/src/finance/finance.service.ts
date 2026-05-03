@@ -67,6 +67,27 @@ export interface FeeCollectionReportRow {
   status: InvoiceStatus;
 }
 
+export interface DefaulterAgingReportRow {
+  studentSystemId: string;
+  studentName: string;
+  className: string;
+  sectionName: string;
+  guardianName: string;
+  guardianPhone: string;
+  invoiceNumber: string;
+  feeHeadName: string | null;
+  dueDate: Date;
+  invoiceAmount: number;
+  paidAmount: number;
+  waiverAmount: number;
+  refundAmount: number;
+  outstandingAmount: number;
+  daysOverdue: number;
+  agingBucket: string;
+  lastPaymentDate: Date | null;
+  status: InvoiceStatus;
+}
+
 @Injectable()
 export class FinanceService {
   constructor(
@@ -776,7 +797,9 @@ export class FinanceService {
 
     if (
       filters.paymentMethod &&
-      !Object.values(PaymentMethod).includes(filters.paymentMethod as any)
+      !Object.values(PaymentMethod).includes(
+        filters.paymentMethod as PaymentMethod,
+      )
     ) {
       throw new BadRequestException(
         `Invalid payment method: ${filters.paymentMethod}`,
@@ -920,14 +943,182 @@ export class FinanceService {
     return { rows, summary };
   }
 
-  private groupBySimple(
-    rows: FeeCollectionReportRow[],
-    key: keyof FeeCollectionReportRow,
-    sumKey: keyof FeeCollectionReportRow,
+  async getDefaulterAgingReportRows(
+    actor: AuthContext,
+    filters: {
+      asOfDate: string;
+      academicYearId?: string;
+      classId?: string;
+      sectionId?: string;
+      studentId?: string;
+      feeHeadId?: string;
+      minOutstanding?: number;
+      agingBucket?: string;
+    },
   ) {
+    const asOf = new Date(filters.asOfDate);
+    if (isNaN(asOf.getTime())) {
+      throw new BadRequestException('asOfDate must be a valid date');
+    }
+
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        issuedAt: { lte: asOf },
+        dueDate: { lt: asOf },
+        status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
+        ...(filters.studentId ? { studentId: filters.studentId } : {}),
+        ...(filters.academicYearId
+          ? { academicYearId: filters.academicYearId }
+          : {}),
+        ...(filters.classId || filters.sectionId
+          ? {
+              student: {
+                ...(filters.classId ? { classId: filters.classId } : {}),
+                ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+              },
+            }
+          : {}),
+        ...(filters.feeHeadId
+          ? {
+              lines: {
+                some: { feeHeadId: filters.feeHeadId },
+              },
+            }
+          : {}),
+      },
+      include: {
+        student: {
+          include: {
+            class: true,
+            sectionRef: true,
+            guardianLinks: {
+              include: { guardian: true },
+              orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+            },
+          },
+        },
+        lines: {
+          include: { feeHead: true },
+        },
+        payments: {
+          include: { refunds: true },
+          where: { paidAt: { lte: asOf } },
+        },
+      },
+    });
+
+    const waivers = await this.prisma.feeWaiver.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        createdAt: { lte: asOf },
+        invoiceId: { in: invoices.map((i) => i.id) },
+      },
+    });
+
+    const waiverMap = new Map<string, Prisma.Decimal>();
+    for (const w of waivers) {
+      if (w.invoiceId) {
+        const current = waiverMap.get(w.invoiceId) || new Prisma.Decimal(0);
+        waiverMap.set(w.invoiceId, current.add(w.amount));
+      }
+    }
+
+    const rows = invoices
+      .map((invoice) => {
+        const paidAmount = sumNetPaidAmount(invoice.payments);
+        const waiverAmount = waiverMap.get(invoice.id) || new Prisma.Decimal(0);
+        const outstandingAmount = invoice.totalAmount
+          .sub(paidAmount)
+          .sub(waiverAmount);
+
+        if (outstandingAmount.lte(0)) return null;
+        if (
+          filters.minOutstanding &&
+          outstandingAmount.lt(filters.minOutstanding)
+        )
+          return null;
+
+        const daysOverdue = Math.floor(
+          (asOf.getTime() - invoice.dueDate.getTime()) / 86_400_000,
+        );
+        const bucket = this.calculateAgingBucket(daysOverdue);
+
+        if (filters.agingBucket && bucket !== filters.agingBucket) return null;
+
+        const primaryGuardianLink = invoice.student.guardianLinks[0];
+        const guardian = primaryGuardianLink?.guardian;
+
+        const lastPayment =
+          invoice.payments.length > 0
+            ? invoice.payments[invoice.payments.length - 1].paidAt
+            : null;
+
+        return {
+          studentSystemId: invoice.student.studentSystemId,
+          studentName: formatStudentName(invoice.student),
+          className: invoice.student.class.name,
+          sectionName: invoice.student.sectionRef?.name || '-',
+          guardianName: guardian?.fullName || '-',
+          guardianPhone: guardian?.primaryPhone || '-',
+          invoiceNumber: invoice.invoiceNumber,
+          feeHeadName:
+            invoice.lines.length === 1 ? invoice.lines[0].feeHead.name : null,
+          dueDate: invoice.dueDate,
+          invoiceAmount: Number(invoice.totalAmount),
+          paidAmount: Number(paidAmount),
+          waiverAmount: Number(waiverAmount),
+          refundAmount: 0,
+          outstandingAmount: Number(outstandingAmount),
+          daysOverdue,
+          agingBucket: bucket,
+          lastPaymentDate: lastPayment,
+          status: invoice.status,
+        } satisfies DefaulterAgingReportRow;
+      })
+      .filter((r): r is DefaulterAgingReportRow => r !== null);
+
+    const summary = {
+      totalDefaulters: new Set(rows.map((r) => r.studentSystemId)).size,
+      totalOutstanding: rows.reduce((sum, r) => sum + r.outstandingAmount, 0),
+      bucket0To30Total: rows
+        .filter((r) => r.agingBucket === '0-30')
+        .reduce((sum, r) => sum + r.outstandingAmount, 0),
+      bucket31To60Total: rows
+        .filter((r) => r.agingBucket === '31-60')
+        .reduce((sum, r) => sum + r.outstandingAmount, 0),
+      bucket61To90Total: rows
+        .filter((r) => r.agingBucket === '61-90')
+        .reduce((sum, r) => sum + r.outstandingAmount, 0),
+      bucket90PlusTotal: rows
+        .filter((r) => r.agingBucket === '90+')
+        .reduce((sum, r) => sum + r.outstandingAmount, 0),
+      classBreakdown: this.groupBySimple(
+        rows,
+        'className',
+        'outstandingAmount',
+      ),
+      feeHeadBreakdown: this.groupBySimple(
+        rows,
+        'feeHeadName',
+        'outstandingAmount',
+      ),
+    };
+
+    return { rows, summary };
+  }
+
+  private calculateAgingBucket(daysOverdue: number) {
+    if (daysOverdue <= 30) return '0-30';
+    if (daysOverdue <= 60) return '31-60';
+    if (daysOverdue <= 90) return '61-90';
+    return '90+';
+  }
+
+  private groupBySimple<T>(rows: T[], key: keyof T, sumKey: keyof T) {
     const grouped = new Map<string, number>();
     for (const row of rows) {
-      const k = String(row[key]);
+      const k = String(row[key] ?? 'Unknown');
       grouped.set(k, (grouped.get(k) ?? 0) + Number(row[sumKey]));
     }
     return Array.from(grouped.entries()).map(([label, value]) => ({
