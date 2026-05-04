@@ -178,17 +178,23 @@ export class AccountingPostingService {
   ) {
     const totals = lines.reduce(
       (acc, line) => {
+        const amount = toDecimal(line.amount);
+
         if (line.side === JournalLineSide.DEBIT) {
-          return { ...acc, debit: acc.debit.plus(line.amount) };
+          return { ...acc, debit: toDecimal(acc.debit).add(amount) };
         }
 
-        return { ...acc, credit: acc.credit.plus(line.amount) };
+        return { ...acc, credit: toDecimal(acc.credit).add(amount) };
       },
       { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(0) },
     );
 
-    if (!totals.debit.equals(totals.credit)) {
+    if (!toDecimal(totals.debit).equals(toDecimal(totals.credit))) {
       throw new ConflictException('Accounting posting must be balanced');
     }
   }
+}
+
+function toDecimal(value: Prisma.Decimal | number | string) {
+  return new Prisma.Decimal(value);
 }
