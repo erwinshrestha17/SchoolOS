@@ -15,12 +15,16 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
 import { PayrollPreviewQueryDto } from './dto/payroll-preview-query.dto';
+import { PayrollSalarySlipService } from './payroll-salary-slip.service';
 import { PayrollService } from './payroll.service';
 
 @Controller('payroll')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class PayrollController {
-  constructor(private readonly payrollService: PayrollService) {}
+  constructor(
+    private readonly payrollService: PayrollService,
+    private readonly salarySlipService: PayrollSalarySlipService,
+  ) {}
 
   @Get('preview')
   @Permissions('payroll:read')
@@ -65,6 +69,17 @@ export class PayrollController {
   @Permissions('payroll:manage')
   reviewRun(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.payrollService.reviewPayrollRun(id, auth);
+  }
+
+  @Get('runs/:runId/lines/:lineId/salary-slip.pdf')
+  @Header('Content-Type', 'application/pdf')
+  @Permissions('payroll:read')
+  getApprovedSalarySlipPdf(
+    @Param('runId') runId: string,
+    @Param('lineId') lineId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.salarySlipService.getApprovedSalarySlipPdf(runId, lineId, auth);
   }
 
   @Post('runs/:id/post')
