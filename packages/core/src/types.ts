@@ -1591,6 +1591,12 @@ export type PayrollLineSummary = {
   attendanceDays: number;
   workingDays: number;
   status: string;
+  staff?: {
+    id: string;
+    firstNameEn?: string;
+    lastNameEn?: string;
+    employeeId?: string;
+  };
 };
 
 export type PayrollPreviewResult = {
