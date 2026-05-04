@@ -1,21 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { 
-  Users, 
-  FileText, 
-  CalendarDays, 
+import {
+  Users,
+  FileText,
+  CalendarDays,
   ClipboardCheck,
-  Search,
-  Plus,
-  Calculator
+  Calculator,
 } from 'lucide-react';
 import { StaffList } from './staff-list';
 import { ContractList } from './contract-list';
 import { LeaveRequestList } from './leave-request-list';
 import { StaffAttendanceSummary } from './staff-attendance-summary';
 import { LeaveBalanceList } from './leave-balance-list';
-import { PayrollPreview } from './payroll-preview';
+import { PayrollRuns } from './payroll-runs';
 
 type TabId = 'staff' | 'contracts' | 'leave' | 'attendance' | 'balances' | 'payroll';
 
@@ -28,7 +26,7 @@ export function HRWorkspace() {
     { id: 'leave' as TabId, label: 'Leave Requests', icon: CalendarDays },
     { id: 'attendance' as TabId, label: 'Attendance Summary', icon: ClipboardCheck },
     { id: 'balances' as TabId, label: 'Leave Balances', icon: CalendarDays },
-    { id: 'payroll' as TabId, label: 'Payroll Preview', icon: Calculator },
+    { id: 'payroll' as TabId, label: 'Payroll Runs', icon: Calculator },
   ];
 
   return (
@@ -47,9 +45,9 @@ export function HRWorkspace() {
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
               }`}
             >
-              <tab.icon 
-                size={18} 
-                className={isActive ? 'text-primary-600' : 'text-gray-400 group-hover:text-gray-500'} 
+              <tab.icon
+                size={18}
+                className={isActive ? 'text-primary-600' : 'text-gray-400 group-hover:text-gray-500'}
               />
               {tab.label}
             </button>
@@ -64,7 +62,7 @@ export function HRWorkspace() {
         {activeTab === 'leave' && <LeaveRequestList />}
         {activeTab === 'attendance' && <StaffAttendanceSummary />}
         {activeTab === 'balances' && <LeaveBalanceList />}
-        {activeTab === 'payroll' && <PayrollPreview />}
+        {activeTab === 'payroll' && <PayrollRuns />}
       </div>
     </div>
   );
