@@ -43,6 +43,7 @@ import type {
   NotificationDelivery,
   NoticeSummary,
   PayrollRunSummary,
+  PayrollPreviewResult,
   PaymentRefundPayload,
   PaymentRefundSummary,
   PlatformTenantSummary,
@@ -700,7 +701,12 @@ export const api = {
       json: body,
     }),
   listStaffLeaveBalances: () =>
-    request<StaffLeaveBalanceSummary[]>('/attendance/staff/leave-balances'),
+    request<StaffLeaveBalanceSummary[]>('/hr/leave-balances'),
+  getPayrollPreview: (params: {
+    year: number;
+    month: number;
+    workingDays?: number;
+  }) => request<PayrollPreviewResult[]>(withQuery('/payroll/preview', params)),
   listAccountingPeriods: () =>
     request<AccountingPeriodSummary[]>('/accounting/periods'),
   createAccountingPeriod: (body: JsonBody) =>

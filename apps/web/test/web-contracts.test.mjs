@@ -852,7 +852,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(sidebar, /href: '\/dashboard\/payroll'/);
     assert.match(sidebar, /permissions: \['hr:read', 'payroll:read', 'payroll:manage'\]/);
     assert.match(page, /<HRWorkspace/);
-    assert.match(hrWorkspace, /'Staff Directory'|'Contracts'|'Leave Requests'|'Attendance Summary'|'Leave Balances'/);
+    assert.match(hrWorkspace, /'Staff Directory'|'Contracts'|'Leave Requests'|'Attendance Summary'|'Leave Balances'|'Payroll Preview'/);
     
     assert.match(contractList, /api\.listStaffContracts/);
     assert.match(contractList, /api\.createStaffContract/);
@@ -869,6 +869,14 @@ describe('SchoolOS web production contracts', () => {
     
     assert.match(attendanceSummary, /api\.listStaffAttendanceSummary/);
     assert.match(attendanceSummary, /Present|Late|Absent|Leave/);
+
+    const payrollPreview = read('components/hr/payroll-preview.tsx');
+    assert.match(payrollPreview, /api\.getPayrollPreview/);
+    assert.match(payrollPreview, /Preview Only/);
+    assert.match(payrollPreview, /No accounting entries/);
+    assert.match(payrollPreview, /payroll runs/);
+    assert.match(payrollPreview, /created from this screen/);
+    assert.match(payrollPreview, /Gross Pay|Net Pay|Deductions/);
 
     assert.doesNotMatch(hrWorkspace, /replace-me|demo-staff|fake-contract/i);
     // Note: Payroll processing, salary slips, and M9 accounting auto-posting are deferred to future Phase 2 HR/Accounting work.

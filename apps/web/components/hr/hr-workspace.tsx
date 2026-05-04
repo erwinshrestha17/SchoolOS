@@ -7,15 +7,17 @@ import {
   CalendarDays, 
   ClipboardCheck,
   Search,
-  Plus
+  Plus,
+  Calculator
 } from 'lucide-react';
 import { StaffList } from './staff-list';
 import { ContractList } from './contract-list';
 import { LeaveRequestList } from './leave-request-list';
 import { StaffAttendanceSummary } from './staff-attendance-summary';
 import { LeaveBalanceList } from './leave-balance-list';
+import { PayrollPreview } from './payroll-preview';
 
-type TabId = 'staff' | 'contracts' | 'leave' | 'attendance' | 'balances';
+type TabId = 'staff' | 'contracts' | 'leave' | 'attendance' | 'balances' | 'payroll';
 
 export function HRWorkspace() {
   const [activeTab, setActiveTab] = useState<TabId>('staff');
@@ -26,6 +28,7 @@ export function HRWorkspace() {
     { id: 'leave' as TabId, label: 'Leave Requests', icon: CalendarDays },
     { id: 'attendance' as TabId, label: 'Attendance Summary', icon: ClipboardCheck },
     { id: 'balances' as TabId, label: 'Leave Balances', icon: CalendarDays },
+    { id: 'payroll' as TabId, label: 'Payroll Preview', icon: Calculator },
   ];
 
   return (
@@ -61,6 +64,7 @@ export function HRWorkspace() {
         {activeTab === 'leave' && <LeaveRequestList />}
         {activeTab === 'attendance' && <StaffAttendanceSummary />}
         {activeTab === 'balances' && <LeaveBalanceList />}
+        {activeTab === 'payroll' && <PayrollPreview />}
       </div>
     </div>
   );
