@@ -106,6 +106,7 @@ describe('SchoolOS web production contracts', () => {
       'createStaffContract',
       'createPayrollRun',
       'postPayrollRun',
+      'getPayrollPreview',
       'listAccountingReports',
       'createConversation',
       'createMessage',
@@ -877,6 +878,11 @@ describe('SchoolOS web production contracts', () => {
     assert.match(payrollPreview, /payroll runs/);
     assert.match(payrollPreview, /created from this screen/);
     assert.match(payrollPreview, /Gross Pay|Net Pay|Deductions/);
+    
+    // Negative checks: Payroll preview should be read-only and isolated from direct accounting writes in Phase 2C
+    assert.doesNotMatch(payrollPreview, /api\.approvePayroll|api\.createPayrollRun|api\.postPayrollRun/);
+    assert.doesNotMatch(payrollPreview, /api\.createJournalEntry|api\.getPayslipPdf/);
+    assert.doesNotMatch(payrollPreview, /\/accounting\/journal-entries|\/accounting\/ledger/i);
 
     assert.doesNotMatch(hrWorkspace, /replace-me|demo-staff|fake-contract/i);
     // Note: Payroll processing, salary slips, and M9 accounting auto-posting are deferred to future Phase 2 HR/Accounting work.
