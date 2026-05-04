@@ -202,6 +202,11 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Review homework submissions and scores',
   },
   {
+    resource: 'homework',
+    action: 'submit',
+    description: 'Submit homework assignments as a student',
+  },
+  {
     resource: 'hr',
     action: 'manage',
     description: 'Manage HR contracts and staff employment records',
@@ -554,6 +559,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'events:read',
     'activity_feed:read',
     'homework:read',
+    'homework:submit',
     'settings:read_public',
   ],
   parent: [
@@ -562,6 +568,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'events:read',
     'activity_feed:read',
     'homework:read',
+    'homework:submit',
     'messaging:create',
     'messaging:read',
     'settings:read_public',

@@ -18,6 +18,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { CreateTimetableSlotDto } from './dto/create-timetable-slot.dto';
 import { ReviewHomeworkSubmissionDto } from './dto/review-homework-submission.dto';
+import { SubmitHomeworkDto } from './dto/submit-homework.dto';
 
 @Injectable()
 export class TimetableService {
@@ -347,12 +348,18 @@ export class TimetableService {
   }
 
   async listHomeworkSubmissions(actor: AuthContext) {
+    const studentId = await this.resolveActorStudentId(actor);
+
     return this.prisma.homeworkSubmission.findMany({
-      where: { tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        ...(studentId ? { studentId } : {}),
+      },
       include: {
         homework: {
           include: {
             subject: true,
+            assignedByStaff: true,
           },
         },
         student: true,
@@ -413,6 +420,63 @@ export class TimetableService {
     return updated;
   }
 
+  async submitHomework(dto: SubmitHomeworkDto, actor: AuthContext) {
+    const studentId = await this.resolveActorStudentId(actor);
+
+    if (!studentId) {
+      throw new ForbiddenException('Student profile not found');
+    }
+
+    const submission = await this.prisma.homeworkSubmission.findFirst({
+      where: {
+        id: dto.submissionId,
+        tenantId: actor.tenantId,
+        studentId,
+      },
+    });
+
+    if (!submission) {
+      throw new NotFoundException('Homework submission not found');
+    }
+
+    if (
+      submission.status === HomeworkStatus.REVIEWED ||
+      submission.status === HomeworkStatus.SUBMITTED
+    ) {
+      throw new ConflictException('Homework already submitted or reviewed');
+    }
+
+    const updated = await this.prisma.homeworkSubmission.update({
+      where: { id: submission.id },
+      data: {
+        status: HomeworkStatus.SUBMITTED,
+        submissionContent: dto.content ?? null,
+        submittedAt: new Date(),
+      },
+      include: {
+        homework: {
+          include: {
+            subject: true,
+          },
+        },
+      },
+    });
+
+    await this.auditService.record({
+      action: 'submit',
+      resource: 'homework_submission',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      after: {
+        homeworkId: updated.homeworkId,
+        studentId: updated.studentId,
+      },
+    });
+
+    return updated;
+  }
+
   private resolveHomeworkAssignee(
     dto: CreateHomeworkDto,
     actorStaffId: string | null,
@@ -462,6 +526,15 @@ export class TimetableService {
     });
 
     return staff?.id ?? null;
+  }
+
+  private async resolveActorStudentId(actor: AuthContext) {
+    const student = await this.prisma.student.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+      select: { id: true },
+    });
+
+    return student?.id ?? null;
   }
 
   private isScopedSubjectTeacher(actor: AuthContext) {

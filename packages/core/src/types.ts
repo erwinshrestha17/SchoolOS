@@ -1512,6 +1512,12 @@ export type HomeworkAssignmentSummary = {
   dueAt: string;
   maxScore: number | null;
   submissions?: HomeworkSubmissionSummary[];
+  subject?: SubjectSummary;
+  assignedByStaff?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  };
 };
 
 export type HomeworkSubmissionSummary = {
@@ -1520,9 +1526,11 @@ export type HomeworkSubmissionSummary = {
   studentId: string;
   status: string;
   submittedAt: string | null;
+  submissionContent: string | null;
   score: number | null;
   feedback: string | null;
   student?: StudentProfile;
+  homework?: HomeworkAssignmentSummary;
 };
 
 export type StaffContractSummary = {

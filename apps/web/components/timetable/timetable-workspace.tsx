@@ -3,17 +3,24 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../../lib/api';
+import { useSession } from '../session-provider';
 import { TimetableBuilderTab } from './tabs/timetable-builder-tab';
 import { TeacherWorkloadTab } from './tabs/teacher-workload-tab';
 import { HomeworkTab } from './tabs/homework-tab';
+import { StudentHomeworkTab } from './tabs/student-homework-tab';
 
-const sections = [
+const adminSections = [
   'Timetable Builder',
   'Teacher Workload',
   'Homework',
 ] as const;
 
-type Section = (typeof sections)[number];
+const studentSections = [
+  'My Homework',
+  // 'My Timetable', // Future
+] as const;
+
+type Section = (typeof adminSections)[number] | (typeof studentSections)[number];
 
 const sectionMeta: Record<Section, { title: string; description: string; badge: string }> = {
   'Timetable Builder': {
@@ -31,10 +38,19 @@ const sectionMeta: Record<Section, { title: string; description: string; badge: 
     description: 'Assign, track, and grade homework for your students across classes and subjects.',
     badge: 'Academics',
   },
+  'My Homework': {
+    title: 'My Homework Portal',
+    description: 'View your assigned homework, submit your work, and check teacher feedback and scores.',
+    badge: 'Student',
+  },
 };
 
 export function TimetableWorkspace() {
-  const [activeSection, setActiveSection] = useState<Section>('Timetable Builder');
+  const { session } = useSession();
+  const isStudent = session?.user.roles.includes('student');
+  const sections = isStudent ? studentSections : adminSections;
+  
+  const [activeSection, setActiveSection] = useState<Section>(sections[0]);
   const [classId, setClassId] = useState('');
   const activeMeta = sectionMeta[activeSection];
 
@@ -47,12 +63,13 @@ export function TimetableWorkspace() {
   const workloadQuery = useQuery({
     queryKey: ['teacher-workload'],
     queryFn: api.listTeacherWorkload,
+    enabled: !isStudent,
   });
 
   const timetableQuery = useQuery({
     queryKey: ['timetable', classId],
     queryFn: () => api.listTimetable({ classId }),
-    enabled: Boolean(classId),
+    enabled: Boolean(classId) && !isStudent,
   });
 
   const slotCount = timetableQuery.data?.length ?? 0;
@@ -78,10 +95,12 @@ export function TimetableWorkspace() {
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[320px]">
-            <MetricCard label="Class Slots" value={classId ? String(slotCount) : '—'} tone="warning" />
-            <MetricCard label="Total Faculty" value={String(staffCount)} tone="info" />
-          </div>
+          {!isStudent && (
+            <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[320px]">
+              <MetricCard label="Class Slots" value={classId ? String(slotCount) : '—'} tone="warning" />
+              <MetricCard label="Total Faculty" value={String(staffCount)} tone="info" />
+            </div>
+          )}
         </div>
       </section>
 
@@ -143,6 +162,10 @@ export function TimetableWorkspace() {
           classId={classId}
           setClassId={setClassId}
         />
+      )}
+
+      {activeSection === 'My Homework' && (
+        <StudentHomeworkTab />
       )}
     </div>
   );

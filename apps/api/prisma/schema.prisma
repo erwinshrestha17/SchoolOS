@@ -2085,6 +2085,7 @@ model HomeworkSubmission {
   studentId   String
   status      HomeworkStatus @default(ASSIGNED)
   submittedAt DateTime?
+  submissionContent String?
   score       Decimal?       @db.Decimal(8, 2)
   feedback    String?
   createdAt   DateTime       @default(now())

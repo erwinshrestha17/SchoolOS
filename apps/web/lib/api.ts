@@ -649,6 +649,11 @@ export const api = {
       method: 'POST',
       json: body,
     }),
+  submitHomework: (body: { submissionId: string; content?: string }) =>
+    request<HomeworkSubmissionSummary>('/homework/submit', {
+      method: 'POST',
+      json: body,
+    }),
   listStaffContracts: () => request<StaffContractSummary[]>('/hr/contracts'),
   createStaffContract: (body: JsonBody) =>
     request<StaffContractSummary>('/hr/contracts', { method: 'POST', json: body }),
