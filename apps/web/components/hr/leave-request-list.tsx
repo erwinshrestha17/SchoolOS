@@ -60,7 +60,7 @@ export function LeaveRequestList() {
                   </div>
                   <div>
                     <p className="font-bold text-gray-900">
-                      {(request as any).staff?.firstName} {(request as any).staff?.lastName}
+                      {request.staff?.firstName} {request.staff?.lastName}
                     </p>
                     <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
                       {request.leaveType.replace('_', ' ')}

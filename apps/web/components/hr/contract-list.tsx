@@ -37,7 +37,7 @@ export function ContractList() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (body: any) => api.createStaffContract(body),
+    mutationFn: (body: Parameters<typeof api.createStaffContract>[0]) => api.createStaffContract(body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['staff-contracts'] });
       setIsCreating(false);

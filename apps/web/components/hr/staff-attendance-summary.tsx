@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { StaffAttendanceMonthlySummary } from '@schoolos/core';
 import { api } from '../../lib/api';
 import { ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { useState } from 'react';
@@ -75,7 +76,7 @@ export function StaffAttendanceSummary() {
                   </tr>
                 ))
               ) : summaryQuery.data?.items.length ? (
-                summaryQuery.data.items.map((item) => (
+                summaryQuery.data.items.map((item: StaffAttendanceMonthlySummary['items'][number]) => (
                   <tr key={item.staffId} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4">
                       <p className="font-semibold text-gray-900">{item.fullName}</p>

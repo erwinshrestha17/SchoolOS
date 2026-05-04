@@ -57,6 +57,10 @@ import type {
   SectionSummary,
   StaffSummary,
   StaffContractSummary,
+  StaffLeaveRequestSummary,
+  StaffLeaveBalanceSummary,
+  StaffLeaveReviewResult,
+  StaffAttendanceMonthlySummary,
   RevokeGeneratedStudentDocumentPayload,
   StudentAttendanceHistory,
   StudentAttendanceHistoryFilters,
@@ -691,13 +695,12 @@ export const api = {
       json: body,
     }),
   reviewLeaveRequest: (id: string, body: JsonBody) =>
-    request<{ reviewed: StaffLeaveRequestSummary; overlapAnomalies: any[] }>(
-      `/attendance/staff/leave-requests/${id}/review`,
-      {
-        method: 'PATCH',
-        json: body,
-      },
-    ),
+    request<StaffLeaveReviewResult>(`/attendance/staff/leave-requests/${id}/review`, {
+      method: 'PATCH',
+      json: body,
+    }),
+  listStaffLeaveBalances: () =>
+    request<StaffLeaveBalanceSummary[]>('/attendance/staff/leave-balances'),
   listAccountingPeriods: () =>
     request<AccountingPeriodSummary[]>('/accounting/periods'),
   createAccountingPeriod: (body: JsonBody) =>

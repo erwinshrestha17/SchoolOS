@@ -1034,6 +1034,29 @@ export type StaffLeaveRequestSummary = {
   reason: string;
   status: string;
   reviewedAt: string | null;
+  staff?: StaffSummary;
+};
+
+export type StaffLeaveBalanceSummary = {
+  id: string;
+  staffId: string;
+  leaveType: string;
+  year: number;
+  entitlement: number;
+  carriedForward: number;
+  used: number;
+  pending: number;
+  remaining: number;
+  staff?: StaffSummary;
+};
+
+export type StaffLeaveReviewResult = {
+  reviewed: StaffLeaveRequestSummary;
+  overlapAnomalies: Array<{
+    attendanceDate: string;
+    existingStatus: string;
+    proposedStatus: string;
+  }>;
 };
 
 export type AttendanceCalendarDayView = {
