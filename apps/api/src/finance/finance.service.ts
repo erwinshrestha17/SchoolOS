@@ -2845,11 +2845,11 @@ export class FinanceService {
     const { payment } = receipt;
     const { invoice, student } = payment;
 
-    const subtotal = invoice.lines.reduce((sum, line) => sum + Number(line.amount), 0);
-    const discount = Number(invoice.discountAmount ?? 0);
+    const subtotal = invoice.lines?.reduce((sum, line) => sum + Number(line.totalAmount), 0) ?? 0;
+    const discount = 0;
     const total = Number(invoice.totalAmount);
     const paidAmount = Number(payment.amount);
-    const refundedAmount = payment.refunds.reduce((sum, r) => sum + Number(r.amount), 0);
+    const refundedAmount = payment.refunds?.reduce((sum, r) => sum + Number(r.amount), 0) ?? 0;
     const balance = total - paidAmount + refundedAmount;
 
     return buildReceiptPdf({
@@ -2863,14 +2863,14 @@ export class FinanceService {
       student: {
         id: student.studentSystemId,
         name: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
-        className: student.class.name,
+        className: student.class?.name ?? 'Unknown',
         sectionName: student.sectionRef?.name ?? student.section,
         rollNumber: student.rollNumber,
       },
-      lines: invoice.lines.map((line) => ({
+      lines: invoice.lines?.map((line) => ({
         name: line.feeHead?.name ?? 'Fee',
-        amount: Number(line.amount),
-      })),
+        amount: Number(line.totalAmount),
+      })) ?? [],
       subtotal,
       discount,
       total,
