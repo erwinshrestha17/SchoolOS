@@ -7,11 +7,21 @@ import {
 
 describe('payroll salary slip PDFs', () => {
   it('allows salary slip generation only for approved payroll runs', () => {
-    expect(canGenerateSalarySlipForRunStatus(PayrollRunStatus.DRAFT)).toBe(false);
-    expect(canGenerateSalarySlipForRunStatus(PayrollRunStatus.REVIEWED)).toBe(false);
-    expect(canGenerateSalarySlipForRunStatus(PayrollRunStatus.APPROVED)).toBe(true);
-    expect(canGenerateSalarySlipForRunStatus(PayrollRunStatus.POSTED)).toBe(false);
-    expect(canGenerateSalarySlipForRunStatus(PayrollRunStatus.VOID)).toBe(false);
+    expect(canGenerateSalarySlipForRunStatus(PayrollRunStatus.DRAFT)).toBe(
+      false,
+    );
+    expect(canGenerateSalarySlipForRunStatus(PayrollRunStatus.REVIEWED)).toBe(
+      false,
+    );
+    expect(canGenerateSalarySlipForRunStatus(PayrollRunStatus.APPROVED)).toBe(
+      true,
+    );
+    expect(canGenerateSalarySlipForRunStatus(PayrollRunStatus.POSTED)).toBe(
+      false,
+    );
+    expect(canGenerateSalarySlipForRunStatus(PayrollRunStatus.VOID)).toBe(
+      false,
+    );
   });
 
   it('builds approved salary slip lines with payroll and staff details', () => {
