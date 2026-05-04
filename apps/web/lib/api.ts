@@ -478,6 +478,13 @@ export const api = {
         year: params.year ? String(params.year) : null,
       }),
     ),
+  getAttendanceRegister: (params: {
+    academicYearId: string;
+    classId: string;
+    sectionId?: string | null;
+    month?: number;
+    year?: number;
+  }) => request<any>(withQuery('/attendance/register', params)),
   listAttendanceConflicts: () =>
     request<AttendanceConflict[]>('/attendance/conflicts'),
   submitAttendance: (body: JsonBody) =>

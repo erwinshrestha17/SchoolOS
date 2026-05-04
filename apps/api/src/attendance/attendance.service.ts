@@ -1571,6 +1571,182 @@ export class AttendanceService {
     };
   }
 
+  async getMonthlyRegister(
+    query: ListAttendanceSummaryDto,
+    actor: AuthContext,
+  ) {
+    await this.validateAttendanceScope(actor, {
+      academicYearId: query.academicYearId,
+      classId: query.classId,
+      sectionId: query.sectionId,
+    });
+
+    const attendanceDate = stripTime(
+      query.attendanceDate ? new Date(query.attendanceDate) : new Date(),
+    );
+    const month = query.month ?? attendanceDate.getMonth() + 1;
+    const year = query.year ?? attendanceDate.getFullYear();
+    const monthStart = new Date(year, month - 1, 1);
+    const nextMonthStart = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month, 0).getDate();
+
+    const [students, sessions, calendarDays] = await Promise.all([
+      this.prisma.student.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          classId: query.classId,
+          ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+          enrollments: {
+            some: {
+              academicYearId: query.academicYearId,
+              status: EnrollmentStatus.ACTIVE,
+            },
+          },
+        },
+        orderBy: [{ rollNumber: 'asc' }, { firstNameEn: 'asc' }],
+      }),
+      this.prisma.attendanceSession.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          academicYearId: query.academicYearId,
+          classId: query.classId,
+          sectionId: query.sectionId ?? null,
+          attendanceDate: {
+            gte: monthStart,
+            lt: nextMonthStart,
+          },
+        },
+        include: {
+          records: true,
+        },
+      }),
+      this.prisma.schoolCalendarDay.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          calendarDate: {
+            gte: monthStart,
+            lt: nextMonthStart,
+          },
+        },
+      }),
+    ]);
+
+    const calendarMap = new Map(
+      calendarDays.map((day) => [day.calendarDate.getDate(), day]),
+    );
+
+    const sessionByDate = new Map(
+      sessions.map((session) => [session.attendanceDate.getDate(), session]),
+    );
+
+    const days = Array.from({ length: daysInMonth }, (_, i) => {
+      const date = i + 1;
+      const calendarDay = calendarMap.get(date);
+      const session = sessionByDate.get(date);
+      const dateObj = new Date(year, month - 1, date);
+      const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+      const isWorkingDay = calendarDay ? calendarDay.isWorkingDay : !isWeekend;
+
+      return {
+        date,
+        isWorkingDay,
+        holidayType: calendarDay?.holidayType ?? null,
+        label: calendarDay?.label ?? null,
+        hasSession: !!session,
+      };
+    });
+
+    const studentsRegister = students.map((student) => {
+      const statuses = Array.from({ length: daysInMonth }, (_, i) => {
+        const date = i + 1;
+        const session = sessionByDate.get(date);
+        if (!session) return null;
+        const record = session.records.find((r) => r.studentId === student.id);
+        return record?.status ?? null;
+      });
+
+      const totalPresent = statuses.filter(
+        (s) => s === AttendanceStatus.PRESENT || s === AttendanceStatus.LATE,
+      ).length;
+      const totalAbsent = statuses.filter(
+        (s) =>
+          s === AttendanceStatus.ABSENT ||
+          s === AttendanceStatus.UNEXCUSED_LEAVE,
+      ).length;
+      const totalLeave = statuses.filter(
+        (s) =>
+          s === AttendanceStatus.SICK_LEAVE ||
+          s === AttendanceStatus.EXCUSED_LEAVE,
+      ).length;
+
+      return {
+        studentId: student.id,
+        rollNumber: student.rollNumber,
+        studentSystemId: student.studentSystemId,
+        fullName: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+        statuses,
+        totalPresent,
+        totalAbsent,
+        totalLeave,
+      };
+    });
+
+    return {
+      month,
+      year,
+      days,
+      students: studentsRegister,
+    };
+  }
+
+  async exportMonthlyRegister(
+    query: ListAttendanceSummaryDto,
+    actor: AuthContext,
+  ) {
+    const data = await this.getMonthlyRegister(query, actor);
+
+    const headers = [
+      'Roll No',
+      'Student ID',
+      'Student Name',
+      ...data.days.map((d) => d.date.toString()),
+      'Present',
+      'Absent',
+      'Leave',
+    ];
+
+    const rows = data.students.map((student) => [
+      student.rollNumber?.toString() ?? '',
+      student.studentSystemId,
+      student.fullName,
+      ...student.statuses.map((status, i) => {
+        const day = data.days[i];
+        if (!day.isWorkingDay) return 'H';
+        if (!status) return '-';
+        if (status === AttendanceStatus.PRESENT) return 'P';
+        if (status === AttendanceStatus.ABSENT) return 'A';
+        if (status === AttendanceStatus.LATE) return 'L';
+        if (status === AttendanceStatus.SICK_LEAVE) return 'S';
+        if (
+          status === AttendanceStatus.EXCUSED_LEAVE ||
+          status === AttendanceStatus.UNEXCUSED_LEAVE
+        )
+          return 'E';
+        return 'U';
+      }),
+      student.totalPresent.toString(),
+      student.totalAbsent.toString(),
+      student.totalLeave.toString(),
+    ]);
+
+    const escapeCsv = (str: string) => `"${str.replace(/"/g, '""')}"`;
+
+    return [
+      headers.map(escapeCsv).join(','),
+      ...rows.map((row) => row.map(escapeCsv).join(',')),
+    ].join('\n');
+  }
+
   async processDailyEscalationWarnings(
     actor: AuthContext,
     runDate = new Date(),

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Patch,
   Post,
@@ -67,6 +68,26 @@ export class AttendanceController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.attendanceService.getSummary(query, auth);
+  }
+
+  @Get('register')
+  @Permissions('attendance:read')
+  getMonthlyRegister(
+    @Query() query: ListAttendanceSummaryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.getMonthlyRegister(query, auth);
+  }
+
+  @Get('register/export')
+  @Permissions('attendance:read')
+  @Header('Content-Type', 'text/csv')
+  @Header('Content-Disposition', 'attachment; filename="attendance-register.csv"')
+  exportMonthlyRegister(
+    @Query() query: ListAttendanceSummaryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.exportMonthlyRegister(query, auth);
   }
 
   @Get('conflicts')
