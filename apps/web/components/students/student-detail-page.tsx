@@ -26,7 +26,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 import { api } from '../../lib/api';
-
+import { fileToBase64Payload } from '../../lib/files';
 type StudentDetailPageProps = {
   studentId: string;
 };
