@@ -852,7 +852,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(sidebar, /href: '\/dashboard\/payroll'/);
     assert.match(sidebar, /permissions: \['hr:read', 'payroll:read', 'payroll:manage'\]/);
     assert.match(page, /<HRWorkspace/);
-    assert.match(hrWorkspace, /'Staff Directory'|'Contracts'|'Leave Requests'|'Attendance Summary'/);
+    assert.match(hrWorkspace, /'Staff Directory'|'Contracts'|'Leave Requests'|'Attendance Summary'|'Leave Balances'/);
     
     assert.match(contractList, /api\.listStaffContracts/);
     assert.match(contractList, /api\.createStaffContract/);
@@ -862,6 +862,10 @@ describe('SchoolOS web production contracts', () => {
     assert.match(leaveList, /api\.listLeaveRequests/);
     assert.match(leaveList, /api\.reviewLeaveRequest/);
     assert.match(leaveList, /PENDING|APPROVED|REJECTED/);
+
+    const leaveBalanceList = read('components/hr/leave-balance-list.tsx');
+    assert.match(leaveBalanceList, /api\.listStaffLeaveBalances/);
+    assert.match(leaveBalanceList, /Entitlement|Used|Pending|Remaining/);
     
     assert.match(attendanceSummary, /api\.listStaffAttendanceSummary/);
     assert.match(attendanceSummary, /Present|Late|Absent|Leave/);

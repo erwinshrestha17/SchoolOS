@@ -13,8 +13,9 @@ import { StaffList } from './staff-list';
 import { ContractList } from './contract-list';
 import { LeaveRequestList } from './leave-request-list';
 import { StaffAttendanceSummary } from './staff-attendance-summary';
+import { LeaveBalanceList } from './leave-balance-list';
 
-type TabId = 'staff' | 'contracts' | 'leave' | 'attendance';
+type TabId = 'staff' | 'contracts' | 'leave' | 'attendance' | 'balances';
 
 export function HRWorkspace() {
   const [activeTab, setActiveTab] = useState<TabId>('staff');
@@ -24,6 +25,7 @@ export function HRWorkspace() {
     { id: 'contracts' as TabId, label: 'Contracts', icon: FileText },
     { id: 'leave' as TabId, label: 'Leave Requests', icon: CalendarDays },
     { id: 'attendance' as TabId, label: 'Attendance Summary', icon: ClipboardCheck },
+    { id: 'balances' as TabId, label: 'Leave Balances', icon: CalendarDays },
   ];
 
   return (
@@ -58,6 +60,7 @@ export function HRWorkspace() {
         {activeTab === 'contracts' && <ContractList />}
         {activeTab === 'leave' && <LeaveRequestList />}
         {activeTab === 'attendance' && <StaffAttendanceSummary />}
+        {activeTab === 'balances' && <LeaveBalanceList />}
       </div>
     </div>
   );
