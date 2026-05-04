@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Calculator,
   CheckCircle2,
+  Download,
   Eye,
   FileText,
   Loader2,
@@ -15,6 +16,7 @@ import {
 import { useMemo, useState } from 'react';
 import { useSession } from '../session-provider';
 import { api } from '../../lib/api';
+import { openApprovedSalarySlipPdf } from '../../lib/payroll-pdf';
 
 type PayrollLineView = {
   id?: string;
@@ -42,9 +44,7 @@ type PayrollRunView = PayrollRunSummary & {
   grossAmount?: number | string | null;
   deductionAmount?: number | string | null;
   netAmount?: number | string | null;
-  notes?: string | null;
   approvedAt?: string | null;
-  createdAt?: string | null;
   lines?: PayrollLineView[];
 };
 
@@ -134,6 +134,7 @@ export function PayrollRuns() {
   const [workingDays, setWorkingDays] = useState(30);
   const [showDraftWorkflow, setShowDraftWorkflow] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [salarySlipError, setSalarySlipError] = useState<string | null>(null);
 
   const runsQuery = useQuery({
     queryKey: ['payroll-runs'],
@@ -160,7 +161,7 @@ export function PayrollRuns() {
         periodYear: year,
         workingDays,
         notes:
-          'Draft payroll run created from Payroll Runs preview. M9 posting and salary slips are deferred.',
+          'Draft payroll run created from Payroll Runs preview. M9 posting remains deferred.',
       }),
     onSuccess: (run) => {
       const savedRun = normalizeRun(run);
@@ -179,6 +180,18 @@ export function PayrollRuns() {
     },
   });
 
+  const salarySlipMutation = useMutation({
+    mutationFn: (line: PayrollLineView) => {
+      if (!selectedRun?.id || !line.id) {
+        throw new Error('Payroll run line is missing.');
+      }
+
+      return openApprovedSalarySlipPdf(selectedRun.id, line.id);
+    },
+    onMutate: () => setSalarySlipError(null),
+    onError: (error) => setSalarySlipError((error as Error).message),
+  });
+
   const previewRows = previewQuery.data ?? [];
   const totals = previewTotals(previewRows);
   const years = Array.from({ length: 5 }, (_, index) => currentYear - 2 + index);
@@ -193,7 +206,7 @@ export function PayrollRuns() {
           <div className="space-y-1">
             <p className="text-sm font-bold text-amber-900">Payroll Runs — Phase 2 approval boundary</p>
             <p className="text-xs leading-relaxed text-amber-800">
-              This workspace can create draft payroll runs and approve them. Approval locks the payroll run, but it still does not post to accounting, does not post to M9 Accounting, create journal entries, generate salary slips, or disburse salaries. Salary slips are not generated yet.
+              Approval locks the payroll run, but it still does not post to accounting, does not post to M9 Accounting, create journal entries, or disburse salaries. Salary slip PDFs are available only after approval and DRAFT runs cannot generate salary slips.
             </p>
           </div>
         </div>
@@ -473,7 +486,7 @@ export function PayrollRuns() {
               </div>
 
               <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs leading-relaxed text-amber-800">
-                <strong>Approval note:</strong> Approval locks the payroll run for payroll operations. It still does not post to M9 Accounting, create journal entries, generate salary slips, or disburse salaries.
+                <strong>Approval note:</strong> Approval locks the payroll run for payroll operations. It still does not post to M9 Accounting, create journal entries, or disburse salaries. Salary slip PDFs are available only for APPROVED runs.
               </div>
 
               {selectedRun.status === 'DRAFT' && (
@@ -497,6 +510,12 @@ export function PayrollRuns() {
               {approveMutation.error && (
                 <p className="rounded-xl bg-danger-50 px-4 py-3 text-xs font-semibold text-danger-700">
                   {(approveMutation.error as Error).message}
+                </p>
+              )}
+
+              {salarySlipError && (
+                <p className="rounded-xl bg-danger-50 px-4 py-3 text-xs font-semibold text-danger-700">
+                  {salarySlipError}
                 </p>
               )}
 
@@ -527,6 +546,17 @@ export function PayrollRuns() {
                           <p className="font-bold text-gray-900">{line.attendanceDays ?? 0}/{line.workingDays ?? 0}</p>
                         </div>
                       </div>
+                      {selectedRun.status === 'APPROVED' && line.id && (
+                        <button
+                          type="button"
+                          disabled={salarySlipMutation.isPending}
+                          onClick={() => salarySlipMutation.mutate(line)}
+                          className="mt-3 inline-flex items-center gap-2 rounded-lg border border-primary-200 px-3 py-1.5 text-xs font-bold text-primary-700 transition-colors hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {salarySlipMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                          Open Salary Slip PDF
+                        </button>
+                      )}
                     </div>
                   ))
                 ) : (
