@@ -367,7 +367,9 @@ async function createPrismaMock() {
       }),
       update: jest.fn(async (q) => {
         const u = state.users.find((u) => u.id === q.where.id);
-        Object.assign(u, q.data);
+        if (u) {
+          Object.assign(u, q.data);
+        }
         return u;
       }),
     },

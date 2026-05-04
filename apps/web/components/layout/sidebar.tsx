@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Lock,
+  School,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -129,6 +130,27 @@ export const dashboardNavItems: NavItem[] = [
   },
 ];
 
+export const platformNavItems: NavItem[] = [
+  {
+    href: '/platform/dashboard',
+    label: 'Platform Control',
+    icon: Lock,
+    permissions: [
+      'platform_super_admin',
+      'platform_support',
+      'platform_billing_admin',
+    ],
+    phase: 'phase1',
+  },
+  {
+    href: '/platform/schools',
+    label: 'Managed Schools',
+    icon: School,
+    permissions: ['platform_super_admin', 'platform_support'],
+    phase: 'phase1',
+  },
+];
+
 type SidebarProps = {
   collapsed: boolean;
   onToggle: () => void;
@@ -148,6 +170,9 @@ export function Sidebar({
   const visiblePrimaryItems = dashboardNavItems.filter(
     (item) => item.phase === 'phase1' && canSeeNavItem(item, session),
   );
+  const visiblePlatformItems = platformNavItems.filter((item) =>
+    canSeeNavItem(item, session),
+  );
   const futureItems = dashboardNavItems.filter((item) => item.phase === 'future');
 
   const sidebarContent = (
@@ -155,6 +180,7 @@ export function Sidebar({
       collapsed={collapsed}
       futureItems={futureItems}
       pathname={pathname}
+      platformItems={visiblePlatformItems}
       primaryItems={visiblePrimaryItems}
       onMobileClose={onMobileClose}
       onToggle={onToggle}
@@ -189,6 +215,7 @@ export function Sidebar({
           collapsed={false}
           futureItems={futureItems}
           pathname={pathname}
+          platformItems={visiblePlatformItems}
           primaryItems={visiblePrimaryItems}
           onMobileClose={onMobileClose}
         />
@@ -213,6 +240,7 @@ function SidebarContent({
   collapsed: boolean;
   futureItems: NavItem[];
   pathname: string | null;
+  platformItems: NavItem[];
   primaryItems: NavItem[];
   onMobileClose: () => void;
   onToggle?: () => void;
@@ -247,6 +275,14 @@ function SidebarContent({
           collapsed={collapsed}
           items={primaryItems}
           label="Phase 1 Core"
+          pathname={pathname}
+          onMobileClose={onMobileClose}
+        />
+
+        <NavSection
+          collapsed={collapsed}
+          items={platformItems}
+          label="Platform Administration"
           pathname={pathname}
           onMobileClose={onMobileClose}
         />

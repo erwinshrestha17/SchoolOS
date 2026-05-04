@@ -323,6 +323,13 @@ async function createPrismaMock() {
             })),
         };
       }),
+      update: jest.fn(async (q) => {
+        const u = state.users.find((u) => u.id === q.where.id);
+        if (u) {
+          Object.assign(u, q.data);
+        }
+        return u;
+      }),
     },
     auditLog: {
       create: jest.fn(async (q) => {

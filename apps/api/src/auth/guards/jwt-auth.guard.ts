@@ -60,7 +60,9 @@ export class JwtAuthGuard implements CanActivate {
       roles: payload.roles,
       permissions: payload.permissions,
     };
-    this.cls.set(TENANT_ID_KEY, effectiveTenantId);
+    if (this.cls.isActive()) {
+      this.cls.set(TENANT_ID_KEY, effectiveTenantId);
+    }
 
     if (overrideTenantId) {
       await this.auditService.record({

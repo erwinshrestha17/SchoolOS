@@ -1849,20 +1849,25 @@ export class StudentsService {
       'Admission Date',
     ];
 
-    const rows = students.map((student) => {
+    const rows: Array<Record<string, unknown>> = students.map((student) => {
       const primaryGuardian = student.guardianLinks[0]?.guardian;
-      const studentName = [student.firstNameEn, student.lastNameEn].filter(Boolean).join(' ');
-      return [
-        student.studentSystemId,
-        studentName,
-        student.class.name,
-        student.sectionName ?? student.sectionRef?.name ?? 'N/A',
-        student.rollNumber ?? 'N/A',
-        primaryGuardian?.fullName ?? 'N/A',
-        primaryGuardian?.primaryPhone ?? 'N/A',
-        student.lifecycleStatus ?? 'ACTIVE',
-        student.admissionDate ? student.admissionDate.toISOString().slice(0, 10) : 'N/A',
-      ];
+      const studentName = [student.firstNameEn, student.lastNameEn]
+        .filter(Boolean)
+        .join(' ');
+
+      return {
+        'Student ID': student.studentSystemId,
+        Name: studentName,
+        Class: student.class.name,
+        Section: student.sectionRef?.name ?? student.section ?? 'N/A',
+        'Roll Number': student.rollNumber ?? 'N/A',
+        'Guardian Name': primaryGuardian?.fullName ?? 'N/A',
+        'Guardian Phone': primaryGuardian?.primaryPhone ?? 'N/A',
+        Status: student.lifecycleStatus ?? 'ACTIVE',
+        'Admission Date': student.admissionDate
+          ? student.admissionDate.toISOString().slice(0, 10)
+          : 'N/A',
+      };
     });
 
     return buildCsv(headers, rows);

@@ -37,6 +37,12 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
     enabled: canReadAcademicYears,
   });
 
+  const deliveriesQuery = useQuery({
+    queryKey: ['header-notification-deliveries'],
+    queryFn: api.listNotificationDeliveries,
+    enabled: canReadNotifications,
+  });
+
   const academicYears = academicYearsQuery.data ?? [];
   const currentAcademicYear =
     academicYears.find((year) => year.isCurrent) ?? academicYears[0];
