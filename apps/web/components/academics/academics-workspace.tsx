@@ -7,12 +7,16 @@ import { SubjectsTab } from './tabs/subjects-tab';
 import { ExamTermsTab } from './tabs/exam-terms-tab';
 import { MarksEntryTab } from './tabs/marks-entry-tab';
 import { ReportCardsTab } from './tabs/report-cards-tab';
+import { CasRecordsTab } from './tabs/cas-records-tab';
+import { PromotionTab } from './tabs/promotion-tab';
 
 const sections = [
   'Subjects',
   'Exam Terms',
   'Marks Entry',
+  'CAS Records',
   'Report Cards',
+  'Promotion',
 ] as const;
 
 type Section = (typeof sections)[number];
@@ -33,10 +37,20 @@ const sectionMeta: Record<Section, { title: string; description: string; badge: 
     description: 'Select class, subject, and exam to enter marks for all students in one view.',
     badge: 'Grading',
   },
+  'CAS Records': {
+    title: 'CAS Observations',
+    description: 'Track continuous assessment scores for classwork, projects, and participation.',
+    badge: 'Observation',
+  },
   'Report Cards': {
-    title: 'Report Cards & Promotions',
-    description: 'Generate report cards, review grades, and manage student promotions.',
+    title: 'Report Cards',
+    description: 'Generate report cards and review final grades for students.',
     badge: 'Results',
+  },
+  Promotion: {
+    title: 'Batch Promotion',
+    description: 'Review readiness and batch promote students to the next academic year.',
+    badge: 'Transition',
   },
 };
 
@@ -142,6 +156,16 @@ export function AcademicsWorkspace() {
         />
       )}
 
+      {activeSection === 'CAS Records' && (
+        <CasRecordsTab
+          academicYears={academicYearsQuery.data ?? []}
+          classes={classesQuery.data ?? []}
+          allSections={sectionsQuery.data ?? []}
+          students={studentsQuery.data ?? []}
+          subjects={subjectsQuery.data ?? []}
+        />
+      )}
+
       {activeSection === 'Report Cards' && (
         <ReportCardsTab
           academicYears={academicYearsQuery.data ?? []}
@@ -150,6 +174,14 @@ export function AcademicsWorkspace() {
           students={studentsQuery.data ?? []}
           exams={examsQuery.data ?? []}
           reports={reportsQuery.data ?? []}
+        />
+      )}
+
+      {activeSection === 'Promotion' && (
+        <PromotionTab
+          academicYears={academicYearsQuery.data ?? []}
+          classes={classesQuery.data ?? []}
+          allSections={sectionsQuery.data ?? []}
         />
       )}
     </div>

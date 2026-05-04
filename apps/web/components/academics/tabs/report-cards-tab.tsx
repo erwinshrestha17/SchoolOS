@@ -13,17 +13,24 @@ type Props = {
   reports: any[];
 };
 
-export function ReportCardsTab({ academicYears, students, exams, reports }: Props) {
+export function ReportCardsTab({ academicYears, classes, allSections, students, exams, reports }: Props) {
   const queryClient = useQueryClient();
   const currentYear = academicYears.find((y: any) => y.isCurrent) ?? academicYears[0];
 
   const [report, setReport] = useState({
     academicYearId: currentYear?.id ?? '',
     examTermId: '',
+    classId: '',
+    sectionId: '',
     studentId: '',
     remarks: '',
     lock: true,
   });
+
+  const sectionsForClass = allSections.filter((s: any) => s.classId === report.classId);
+  const studentsForClass = students.filter(
+    (s: any) => s.class?.id === report.classId && (!report.sectionId || s.section?.id === report.sectionId),
+  );
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['report-cards'] });
@@ -64,9 +71,19 @@ export function ReportCardsTab({ academicYears, students, exams, reports }: Prop
             <option value="">Exam term</option>
             {exams.map((e: any) => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
+        </div>
+        <div className="grid mt-3 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <select value={report.classId} onChange={(e) => setReport((c) => ({ ...c, classId: e.target.value, sectionId: '', studentId: '' }))}>
+            <option value="">Class</option>
+            {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <select value={report.sectionId} onChange={(e) => setReport((c) => ({ ...c, sectionId: e.target.value, studentId: '' }))}>
+            <option value="">All sections</option>
+            {sectionsForClass.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
           <select value={report.studentId} onChange={(e) => setReport((c) => ({ ...c, studentId: e.target.value }))}>
             <option value="">Student</option>
-            {students.map((s: any) => <option key={s.id} value={s.id}>{s.studentSystemId} — {s.firstNameEn} {s.lastNameEn}</option>)}
+            {studentsForClass.map((s: any) => <option key={s.id} value={s.id}>{s.studentSystemId} — {s.firstNameEn} {s.lastNameEn}</option>)}
           </select>
           <div className="flex items-center gap-4">
             <label className="flex items-center gap-2 text-sm text-gray-600">

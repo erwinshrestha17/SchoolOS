@@ -434,6 +434,11 @@ export const api = {
       method: 'POST',
       json: body,
     }),
+  batchPromote: (body: JsonBody) =>
+    request<PromotionResult[]>('/academics/promotions/batch', {
+      method: 'POST',
+      json: body,
+    }),
   listAdmissions: () => request<AdmissionSummary[]>('/admissions'),
   createAdmission: (body: JsonBody) =>
     request<AdmissionCreationResult>('/admissions', { method: 'POST', json: body }),
