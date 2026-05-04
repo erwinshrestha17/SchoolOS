@@ -845,6 +845,33 @@ function PostCard({
   students: StudentProfile[];
   reactionMutation: ReactionMutation;
 }) {
+  const [loadingAttachmentId, setLoadingAttachmentId] = useState<string | null>(null);
+  const [errorAttachmentId, setErrorAttachmentId] = useState<string | null>(null);
+
+  const handlePreview = async (attachmentId: string) => {
+    try {
+      setLoadingAttachmentId(attachmentId);
+      setErrorAttachmentId(null);
+      await api.previewActivityAttachment(attachmentId);
+    } catch (error) {
+      setErrorAttachmentId(attachmentId);
+    } finally {
+      setLoadingAttachmentId(null);
+    }
+  };
+
+  const handleDownload = async (attachmentId: string, fileName: string) => {
+    try {
+      setLoadingAttachmentId(attachmentId);
+      setErrorAttachmentId(null);
+      await api.downloadActivityAttachment(attachmentId, fileName);
+    } catch (error) {
+      setErrorAttachmentId(attachmentId);
+    } finally {
+      setLoadingAttachmentId(null);
+    }
+  };
+
   const taggedStudentIds = post.studentTags.map((tag) => tag.studentId);
   const actor = findReactionActor(students, taggedStudentIds);
 
@@ -878,18 +905,69 @@ function PostCard({
                     alt={attachment.fileName}
                     className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                   />
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3 text-white">
-                    <p className="text-xs font-medium truncate">{attachment.fileName}</p>
-                    <p className="text-[10px] opacity-80">{formatFileSize(attachment.sizeBytes)}</p>
+                  <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+                  <div className="absolute inset-x-0 bottom-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 transition-transform duration-200 translate-y-full group-hover:translate-y-0">
+                    <p className="text-sm font-semibold text-white truncate">{attachment.fileName}</p>
+                    <div className="mt-3 flex items-center justify-between">
+                      <p className="text-[11px] text-white/80">{formatFileSize(attachment.sizeBytes)}</p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handlePreview(attachment.id)}
+                          disabled={loadingAttachmentId === attachment.id}
+                          className="rounded-full bg-white/20 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-white/30 disabled:opacity-50"
+                        >
+                          {loadingAttachmentId === attachment.id ? 'Wait...' : 'Preview'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDownload(attachment.id, attachment.fileName)}
+                          disabled={loadingAttachmentId === attachment.id}
+                          className="rounded-full bg-emerald-500/90 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-emerald-400 disabled:opacity-50"
+                        >
+                          {loadingAttachmentId === attachment.id ? 'Wait...' : 'Download'}
+                        </button>
+                      </div>
+                    </div>
+                    {errorAttachmentId === attachment.id && (
+                      <p className="mt-2 text-xs text-red-300">Action failed. Try again.</p>
+                    )}
+                  </div>
+                  <div className="absolute left-3 top-3 rounded bg-black/60 px-2 py-1 text-[10px] font-medium text-white backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-0">
+                    {formatFileSize(attachment.sizeBytes)}
                   </div>
                 </div>
               ) : (
-                <div className="px-4 py-3 text-sm">
-                  <span className="font-semibold">Private media</span>
-                  <span className="text-[var(--muted)]">
-                    {' '}
-                    / {attachment.fileName} / {formatFileSize(attachment.sizeBytes)}
-                  </span>
+                <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <span className="text-sm font-semibold text-gray-900 truncate block">
+                      {attachment.fileName}
+                    </span>
+                    <span className="text-xs text-[var(--muted)]">
+                      Private media • {formatFileSize(attachment.sizeBytes)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handlePreview(attachment.id)}
+                      disabled={loadingAttachmentId === attachment.id}
+                      className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      {loadingAttachmentId === attachment.id ? 'Wait...' : 'Preview'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDownload(attachment.id, attachment.fileName)}
+                      disabled={loadingAttachmentId === attachment.id}
+                      className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 disabled:opacity-50"
+                    >
+                      {loadingAttachmentId === attachment.id ? 'Wait...' : 'Download'}
+                    </button>
+                  </div>
+                  {errorAttachmentId === attachment.id && (
+                    <p className="mt-2 w-full text-xs text-red-500 sm:w-auto">Action failed.</p>
+                  )}
                 </div>
               )}
             </div>

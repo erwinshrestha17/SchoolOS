@@ -640,6 +640,47 @@ export const api = {
       json: body,
     }),
   listActivityPosts: () => request<ActivityPost[]>('/activity-feed/posts'),
+  previewActivityAttachment: async (attachmentId: string) => {
+    const response = await fetch(
+      `${API_BASE_URL}/activity-feed/attachments/${encodeURIComponent(attachmentId)}/preview`,
+      { credentials: 'include' }
+    );
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(parseApiErrorMessage(text) || `Preview failed with status ${response.status}`);
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setTimeout(() => URL.revokeObjectURL(url), 60000); // Cleanup after a minute
+  },
+  downloadActivityAttachment: async (attachmentId: string, fileName: string) => {
+    const response = await fetch(
+      `${API_BASE_URL}/activity-feed/attachments/${encodeURIComponent(attachmentId)}/download`,
+      { credentials: 'include' }
+    );
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(parseApiErrorMessage(text) || `Download failed with status ${response.status}`);
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    
+    const contentDisposition = response.headers.get('content-disposition');
+    let finalFileName = fileName;
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="([^"]+)"/);
+      if (match) finalFileName = match[1];
+    }
+    
+    a.download = finalFileName;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
   createActivityPost: (body: JsonBody) =>
     request('/activity-feed/posts', { method: 'POST', json: body }),
   createActivityReaction: (postId: string, body: JsonBody) =>
