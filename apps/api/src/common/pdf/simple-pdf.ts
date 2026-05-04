@@ -100,6 +100,149 @@ export function buildCertificatePdf(input: {
   return buildPdfFromContent(contentParts.join('\n'));
 }
 
+export function buildReceiptPdf(input: {
+  schoolName: string;
+  panNumber?: string | null;
+  receiptNumber: string;
+  invoiceNumber: string;
+  paymentDate: Date;
+  method: string;
+  cashierName: string;
+  student: {
+    id: string;
+    name: string;
+    className: string;
+    sectionName?: string | null;
+    rollNumber?: number | null;
+  };
+  lines: Array<{ name: string; amount: number }>;
+  subtotal: number;
+  discount: number;
+  total: number;
+  paidAmount: number;
+  balance: number;
+}) {
+  const contentParts = [
+    '0.5 w',
+    '36 36 540 720 re S', // Outer border
+    text(input.schoolName, 48, 726, 16, 'F2'),
+    input.panNumber ? text(`PAN: ${input.panNumber}`, 48, 712, 10, 'F1') : '',
+    text('FEE RECEIPT', 460, 726, 14, 'F2'),
+    '36 696 m 576 696 l S',
+    
+    // Receipt Info
+    text('Receipt No:', 48, 670, 10, 'F2'), text(input.receiptNumber, 120, 670, 10, 'F1'),
+    text('Date:', 380, 670, 10, 'F2'), text(input.paymentDate.toISOString().slice(0, 10), 420, 670, 10, 'F1'),
+    text('Invoice Ref:', 48, 650, 10, 'F2'), text(input.invoiceNumber, 120, 650, 10, 'F1'),
+    text('Method:', 380, 650, 10, 'F2'), text(input.method, 420, 650, 10, 'F1'),
+    
+    '36 630 m 576 630 l S',
+    
+    // Student Info
+    text('Student ID:', 48, 604, 10, 'F2'), text(input.student.id, 120, 604, 10, 'F1'),
+    text('Name:', 48, 584, 10, 'F2'), text(input.student.name, 120, 584, 10, 'F1'),
+    text('Class:', 380, 604, 10, 'F2'), text(input.student.className, 420, 604, 10, 'F1'),
+    text('Section:', 380, 584, 10, 'F2'), text(input.student.sectionName ?? 'N/A', 420, 584, 10, 'F1'),
+    
+    '36 558 m 576 558 l S',
+    
+    // Line Items Header
+    text('Description', 48, 532, 10, 'F2'),
+    text('Amount', 500, 532, 10, 'F2'),
+    '36 520 m 576 520 l S',
+  ];
+
+  let y = 496;
+  for (const line of input.lines) {
+    contentParts.push(
+      text(line.name, 48, y, 10, 'F1'),
+      text(line.amount.toFixed(2), 500, y, 10, 'F1')
+    );
+    y -= 20;
+  }
+
+  y -= 10;
+  contentParts.push('300 ' + (y + 16) + ' m 576 ' + (y + 16) + ' l S');
+  
+  if (input.discount > 0 || input.subtotal !== input.total) {
+    contentParts.push(text('Subtotal:', 380, y, 10, 'F1'), text(input.subtotal.toFixed(2), 500, y, 10, 'F1'));
+    y -= 20;
+    if (input.discount > 0) {
+      contentParts.push(text('Discount:', 380, y, 10, 'F1'), text('-' + input.discount.toFixed(2), 500, y, 10, 'F1'));
+      y -= 20;
+    }
+  }
+  
+  contentParts.push(
+    text('Total:', 380, y, 10, 'F2'), text(input.total.toFixed(2), 500, y, 10, 'F2'),
+    text('Paid Amount:', 380, y - 20, 10, 'F2'), text(input.paidAmount.toFixed(2), 500, y - 20, 10, 'F1')
+  );
+  
+  y -= 40;
+  if (input.balance > 0) {
+    contentParts.push(text('Balance Due:', 380, y, 10, 'F2'), text(input.balance.toFixed(2), 500, y, 10, 'F2'));
+  }
+  
+  contentParts.push(
+    '36 120 m 576 120 l S',
+    text('Cashier: ' + input.cashierName, 48, 90, 10, 'F1'),
+    text('Printed: ' + new Date().toISOString().replace('T', ' ').slice(0, 19), 380, 90, 8, 'F1'),
+    text('Thank you for your payment.', 220, 60, 10, 'F2')
+  );
+
+  return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
+}
+
+export function buildIdCardPdf(input: {
+  schoolName: string;
+  studentName: string;
+  studentId: string;
+  className: string;
+  sectionName?: string | null;
+  rollNumber?: number | null;
+  bloodGroup?: string | null;
+  guardianName?: string | null;
+  guardianPhone?: string | null;
+  academicYear?: string | null;
+}) {
+  // CR80 standard ID card size (2.125" x 3.375") rotated portrait: ~ 153 x 243 points
+  // But since we print on A4, we'll draw a bounding box in the center of the page to represent the ID card
+  
+  const contentParts = [
+    '0.5 w',
+    '200 450 212 337 re S', // 2.125 * 100 x 3.375 * 100 -> roughly ID card size
+    
+    // Header
+    '200 750 m 412 750 l S',
+    text(input.schoolName.substring(0, 30), 210, 765, 12, 'F2'),
+    text('STUDENT ID', 270, 730, 12, 'F2'),
+    
+    // Photo Placeholder
+    '0.2 w',
+    '256 610 100 100 re S',
+    text('[ PHOTO ]', 280, 656, 10, 'F1'),
+    
+    // Student Details
+    text(input.studentName, 210, 580, 14, 'F2'),
+    text(`ID: ${input.studentId}`, 210, 560, 10, 'F1'),
+    text(`Class: ${input.className} ${input.sectionName ? '- ' + input.sectionName : ''}`, 210, 545, 10, 'F1'),
+    
+    ...(input.rollNumber ? [text(`Roll No: ${input.rollNumber}`, 210, 530, 10, 'F1')] : []),
+    ...(input.bloodGroup ? [text(`Blood: ${input.bloodGroup}`, 320, 530, 10, 'F1')] : []),
+    
+    // Footer / Emergency
+    '200 490 m 412 490 l S',
+    text('Emergency Contact:', 210, 475, 8, 'F2'),
+    text(input.guardianName ?? 'N/A', 210, 465, 8, 'F1'),
+    text(input.guardianPhone ?? 'N/A', 310, 465, 8, 'F1'),
+    
+    // Year
+    ...(input.academicYear ? [text(`Valid for: ${input.academicYear}`, 210, 455, 7, 'F1')] : []),
+  ];
+
+  return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
+}
+
 function escapePdfText(text: string) {
   return text
     .replace(/\\/g, '\\\\')

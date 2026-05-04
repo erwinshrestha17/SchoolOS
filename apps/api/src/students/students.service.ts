@@ -21,7 +21,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
-import { buildCertificatePdf } from '../common/pdf/simple-pdf';
+import { buildCertificatePdf, buildIdCardPdf } from '../common/pdf/simple-pdf';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
@@ -2388,20 +2388,17 @@ function buildStudentDocumentPdf(input: {
   ];
 
   if (kind === 'id-card') {
-    return buildCertificatePdf({
+    return buildIdCardPdf({
       schoolName: student.tenant.name,
-      title,
-      subtitle: 'Operational student identity document',
-      referenceNumber,
-      issuedAt,
-      fields,
-      body: [
-        'This card identifies the student as currently enrolled in the school.',
-      ],
-      footer: [
-        'This document is valid only when verified against the current SchoolOS student record.',
-      ],
-      signature: buildSignatureBlock(actor),
+      studentName: fullName,
+      studentId: student.studentSystemId,
+      className: student.class.name,
+      sectionName: sectionName,
+      rollNumber: student.rollNumber ?? latestEnrollment?.rollNumber,
+      bloodGroup: student.bloodGroup,
+      guardianName: primaryGuardian?.fullName,
+      guardianPhone: primaryGuardian?.primaryPhone,
+      academicYear: latestEnrollment?.academicYear.name,
     });
   }
 

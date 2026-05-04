@@ -22,7 +22,7 @@ import {
   ReconciliationExportFormat,
   ReconciliationQueryDto,
 } from '../accounting/dto/reconciliation-query.dto';
-import { buildSimplePdf } from '../common/pdf/simple-pdf';
+import { buildSimplePdf, buildReceiptPdf } from '../common/pdf/simple-pdf';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CashierCloseWindowDto } from './dto/cashier-close-window.dto';
@@ -2817,11 +2817,24 @@ export class FinanceService {
       include: {
         payment: {
           include: {
-            invoice: true,
-            student: true,
+            invoice: {
+              include: {
+                lines: {
+                  include: { feeHead: true }
+                }
+              }
+            },
+            student: {
+              include: {
+                class: true,
+                sectionRef: true,
+              }
+            },
             refunds: true,
+            collectedBy: true,
           },
         },
+        tenant: true,
       },
     });
 
@@ -2829,15 +2842,41 @@ export class FinanceService {
       throw new NotFoundException('Receipt not found in this tenant');
     }
 
-    return buildSimplePdf([
-      'SchoolOS Fee Receipt',
-      `Receipt: ${receipt.receiptNumber}`,
-      `Invoice: ${receipt.payment.invoice.invoiceNumber}`,
-      `Student: ${receipt.payment.student.firstNameEn} ${receipt.payment.student.lastNameEn}`,
-      `Amount: Rs ${Number(receipt.payment.amount).toFixed(2)}`,
-      `Method: ${receipt.payment.method}`,
-      `Paid at: ${receipt.payment.paidAt.toISOString()}`,
-    ]);
+    const { payment } = receipt;
+    const { invoice, student } = payment;
+
+    const subtotal = invoice.lines.reduce((sum, line) => sum + Number(line.amount), 0);
+    const discount = Number(invoice.discountAmount ?? 0);
+    const total = Number(invoice.totalAmount);
+    const paidAmount = Number(payment.amount);
+    const refundedAmount = payment.refunds.reduce((sum, r) => sum + Number(r.amount), 0);
+    const balance = total - paidAmount + refundedAmount;
+
+    return buildReceiptPdf({
+      schoolName: receipt.tenant.name,
+      panNumber: receipt.tenant.panNumber,
+      receiptNumber: receipt.receiptNumber,
+      invoiceNumber: invoice.invoiceNumber,
+      paymentDate: payment.paidAt,
+      method: payment.method,
+      cashierName: payment.collectedBy?.email ?? 'System',
+      student: {
+        id: student.studentSystemId,
+        name: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+        className: student.class.name,
+        sectionName: student.sectionRef?.name ?? student.section,
+        rollNumber: student.rollNumber,
+      },
+      lines: invoice.lines.map((line) => ({
+        name: line.feeHead?.name ?? 'Fee',
+        amount: Number(line.amount),
+      })),
+      subtotal,
+      discount,
+      total,
+      paidAmount,
+      balance,
+    });
   }
 
   async listLedgerEntries(actor: AuthContext) {
