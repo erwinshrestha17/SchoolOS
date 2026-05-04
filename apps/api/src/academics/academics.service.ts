@@ -461,9 +461,7 @@ export class AcademicsService {
           ? {
               student: {
                 classId: filters.classId,
-                ...(filters.sectionId
-                  ? { sectionId: filters.sectionId }
-                  : {}),
+                ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
               },
             }
           : {}),
