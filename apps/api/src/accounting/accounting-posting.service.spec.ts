@@ -89,7 +89,7 @@ describe('AccountingPostingService payroll posting', () => {
     const debit = sumLines(entry.lines, JournalLineSide.DEBIT);
     const credit = sumLines(entry.lines, JournalLineSide.CREDIT);
 
-    expect(debit.equals(credit)).toBe(true);
+    expect(debit.toString()).toBe(credit.toString());
     expect(client.chartAccount.upsert).toHaveBeenCalledTimes(3);
   });
 
