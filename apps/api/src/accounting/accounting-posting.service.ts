@@ -134,7 +134,10 @@ export class AccountingPostingService {
     }
   }
 
-  private async generateJournalEntryNumber(tx: PostingClient, tenantId: string) {
+  private async generateJournalEntryNumber(
+    tx: PostingClient,
+    tenantId: string,
+  ) {
     const count = await tx.journalEntry.count({
       where: { tenantId },
     });

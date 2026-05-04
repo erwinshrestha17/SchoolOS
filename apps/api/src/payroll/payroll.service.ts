@@ -3,11 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  PayrollLineStatus,
-  PayrollRunStatus,
-  Prisma,
-} from '@prisma/client';
+import { PayrollLineStatus, PayrollRunStatus, Prisma } from '@prisma/client';
 import type { PayrollPreviewResult } from '@schoolos/core';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
 import { AuditService } from '../audit/audit.service';
@@ -275,7 +271,9 @@ export class PayrollService {
       },
     });
 
-    const contractsByStaff = new Map(contracts.map((contract) => [contract.staffId, contract]));
+    const contractsByStaff = new Map(
+      contracts.map((contract) => [contract.staffId, contract]),
+    );
     const attendanceByStaff = new Map<string, number>();
     attendanceRecords.forEach((attendance) => {
       attendanceByStaff.set(
@@ -292,7 +290,10 @@ export class PayrollService {
         period.startsOn,
         period.endsOn,
       );
-      leaveByStaff.set(leave.staffId, (leaveByStaff.get(leave.staffId) ?? 0) + overlap);
+      leaveByStaff.set(
+        leave.staffId,
+        (leaveByStaff.get(leave.staffId) ?? 0) + overlap,
+      );
     });
 
     const lines = contracts.map((contract) => {
@@ -432,23 +433,26 @@ export class PayrollService {
     }
 
     if (!actions.canPost) {
-      throw new ConflictException('Payroll run must be approved before posting');
+      throw new ConflictException(
+        'Payroll run must be approved before posting',
+      );
     }
 
     const posted = await this.prisma.$transaction(async (tx) => {
-      const journalEntry = await this.accountingPostingService.postPayrollAccrual(
-        {
-          tenantId: actor.tenantId,
-          payrollRunId: run.id,
-          periodMonth: run.periodMonth,
-          periodYear: run.periodYear,
-          grossAmount: run.grossAmount,
-          deductionAmount: run.deductionAmount,
-          netAmount: run.netAmount,
-        },
-        actor,
-        tx,
-      );
+      const journalEntry =
+        await this.accountingPostingService.postPayrollAccrual(
+          {
+            tenantId: actor.tenantId,
+            payrollRunId: run.id,
+            periodMonth: run.periodMonth,
+            periodYear: run.periodYear,
+            grossAmount: run.grossAmount,
+            deductionAmount: run.deductionAmount,
+            netAmount: run.netAmount,
+          },
+          actor,
+          tx,
+        );
 
       await tx.payrollLine.updateMany({
         where: { tenantId: actor.tenantId, payrollRunId: run.id },

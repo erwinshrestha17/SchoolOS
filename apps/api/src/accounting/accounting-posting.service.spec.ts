@@ -23,7 +23,9 @@ function createPostingClient(overrides?: {
     },
     journalEntry: {
       count: jest.fn().mockResolvedValue(4),
-      findFirst: jest.fn().mockResolvedValue(overrides?.existingJournal ?? null),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(overrides?.existingJournal ?? null),
       create: jest.fn().mockImplementation(({ data }) =>
         Promise.resolve({
           id: 'journal-1',
@@ -54,7 +56,8 @@ function sumLines(
   return lines
     .filter((line) => line.side === side)
     .reduce(
-      (sum, line) => new Prisma.Decimal(sum).add(new Prisma.Decimal(line.amount)),
+      (sum, line) =>
+        new Prisma.Decimal(sum).add(new Prisma.Decimal(line.amount)),
       new Prisma.Decimal(0),
     );
 }
