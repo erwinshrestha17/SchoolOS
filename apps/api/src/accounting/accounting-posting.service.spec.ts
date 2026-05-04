@@ -47,6 +47,18 @@ function createPostingClient(overrides?: {
   };
 }
 
+function sumLines(
+  lines: Array<{ side: JournalLineSide; amount: Prisma.Decimal }>,
+  side: JournalLineSide,
+) {
+  return lines
+    .filter((line) => line.side === side)
+    .reduce(
+      (sum, line) => new Prisma.Decimal(sum).add(new Prisma.Decimal(line.amount)),
+      new Prisma.Decimal(0),
+    );
+}
+
 describe('AccountingPostingService payroll posting', () => {
   it('creates a balanced immutable payroll accrual journal', async () => {
     const client = createPostingClient();
@@ -71,18 +83,8 @@ describe('AccountingPostingService payroll posting', () => {
     expect(entry.sourceId).toBe('run-1');
     expect(entry.lines).toHaveLength(3);
 
-    const debit = entry.lines
-      .filter((line: { side: JournalLineSide }) => line.side === JournalLineSide.DEBIT)
-      .reduce(
-        (sum: Prisma.Decimal, line: { amount: Prisma.Decimal }) => sum.plus(line.amount),
-        new Prisma.Decimal(0),
-      );
-    const credit = entry.lines
-      .filter((line: { side: JournalLineSide }) => line.side === JournalLineSide.CREDIT)
-      .reduce(
-        (sum: Prisma.Decimal, line: { amount: Prisma.Decimal }) => sum.plus(line.amount),
-        new Prisma.Decimal(0),
-      );
+    const debit = sumLines(entry.lines, JournalLineSide.DEBIT);
+    const credit = sumLines(entry.lines, JournalLineSide.CREDIT);
 
     expect(debit.equals(credit)).toBe(true);
     expect(client.chartAccount.upsert).toHaveBeenCalledTimes(3);
