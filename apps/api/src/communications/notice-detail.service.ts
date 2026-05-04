@@ -34,7 +34,10 @@ export type NoticeDetail = {
 export class NoticeDetailService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getNoticeDetail(noticeId: string, actor: AuthContext): Promise<NoticeDetail> {
+  async getNoticeDetail(
+    noticeId: string,
+    actor: AuthContext,
+  ): Promise<NoticeDetail> {
     const notice = await this.prisma.notice.findFirst({
       where: {
         id: noticeId,
@@ -103,7 +106,10 @@ export class NoticeDetailService {
       createdAt: notice.createdAt.toISOString(),
       updatedAt: notice.updatedAt.toISOString(),
       deliverySummary: {
-        total: deliveryGroups.reduce((sum, group) => sum + group._count.status, 0),
+        total: deliveryGroups.reduce(
+          (sum, group) => sum + group._count.status,
+          0,
+        ),
         queued: deliveryCounts.get('QUEUED') ?? 0,
         sent: deliveryCounts.get('SENT') ?? 0,
         failed: deliveryCounts.get('FAILED') ?? 0,

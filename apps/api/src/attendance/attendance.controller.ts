@@ -82,7 +82,10 @@ export class AttendanceController {
   @Get('register/export')
   @Permissions('attendance:read')
   @Header('Content-Type', 'text/csv')
-  @Header('Content-Disposition', 'attachment; filename="attendance-register.csv"')
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="attendance-register.csv"',
+  )
   exportMonthlyRegister(
     @Query() query: ListAttendanceSummaryDto,
     @CurrentAuth() auth: AuthContext,

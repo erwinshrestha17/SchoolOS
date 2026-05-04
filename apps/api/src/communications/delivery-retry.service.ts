@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { NotificationChannel, NotificationStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -83,7 +87,9 @@ export class DeliveryRetryService {
     return result;
   }
 
-  async retryFailedDeliveries(actor: AuthContext): Promise<BulkDeliveryRetryResult> {
+  async retryFailedDeliveries(
+    actor: AuthContext,
+  ): Promise<BulkDeliveryRetryResult> {
     const deliveries = await this.prisma.notificationDelivery.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -206,5 +212,7 @@ export class DeliveryRetryService {
 }
 
 function isRetryable(status: NotificationStatus) {
-  return status === NotificationStatus.FAILED || status === NotificationStatus.QUEUED;
+  return (
+    status === NotificationStatus.FAILED || status === NotificationStatus.QUEUED
+  );
 }

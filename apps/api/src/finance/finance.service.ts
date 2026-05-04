@@ -2820,15 +2820,15 @@ export class FinanceService {
             invoice: {
               include: {
                 lines: {
-                  include: { feeHead: true }
-                }
-              }
+                  include: { feeHead: true },
+                },
+              },
             },
             student: {
               include: {
                 class: true,
                 sectionRef: true,
-              }
+              },
             },
             refunds: true,
             collectedBy: true,
@@ -2845,16 +2845,19 @@ export class FinanceService {
     const { payment } = receipt;
     const { invoice, student } = payment;
 
-    const subtotal = invoice.lines?.reduce((sum, line) => sum + Number(line.totalAmount), 0) ?? 0;
+    const subtotal =
+      invoice.lines?.reduce((sum, line) => sum + Number(line.totalAmount), 0) ??
+      0;
     const discount = 0;
     const total = Number(invoice.totalAmount);
     const paidAmount = Number(payment.amount);
-    const refundedAmount = payment.refunds?.reduce((sum, r) => sum + Number(r.amount), 0) ?? 0;
+    const refundedAmount =
+      payment.refunds?.reduce((sum, r) => sum + Number(r.amount), 0) ?? 0;
     const balance = total - paidAmount + refundedAmount;
 
     return buildReceiptPdf({
-      schoolName: receipt.tenant.name,
-      panNumber: receipt.tenant.panNumber,
+      schoolName: receipt.tenant?.name ?? 'SchoolOS',
+      panNumber: receipt.tenant?.panNumber ?? '',
       receiptNumber: receipt.receiptNumber,
       invoiceNumber: invoice.invoiceNumber,
       paymentDate: payment.paidAt,
@@ -2867,10 +2870,11 @@ export class FinanceService {
         sectionName: student.sectionRef?.name ?? student.section,
         rollNumber: student.rollNumber,
       },
-      lines: invoice.lines?.map((line) => ({
-        name: line.feeHead?.name ?? 'Fee',
-        amount: Number(line.totalAmount),
-      })) ?? [],
+      lines:
+        invoice.lines?.map((line) => ({
+          name: line.feeHead?.name ?? 'Fee',
+          amount: Number(line.totalAmount),
+        })) ?? [],
       subtotal,
       discount,
       total,

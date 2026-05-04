@@ -484,7 +484,11 @@ export const api = {
     sectionId?: string | null;
     month?: number;
     year?: number;
-  }) => request<any>(withQuery('/attendance/register', params)),
+  }) => request<any>(withQuery('/attendance/register', {
+    ...params,
+    month: params.month ? String(params.month) : undefined,
+    year: params.year ? String(params.year) : undefined,
+  })),
   listAttendanceConflicts: () =>
     request<AttendanceConflict[]>('/attendance/conflicts'),
   submitAttendance: (body: JsonBody) =>

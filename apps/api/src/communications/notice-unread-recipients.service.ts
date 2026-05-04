@@ -82,7 +82,11 @@ export class NoticeUnreadRecipientsService {
 
     const [summaryRows, recipientRows] = await Promise.all([
       this.prisma.$queryRaw<
-        Array<{ totalDeliveries: bigint; readCount: bigint; unreadCount: bigint }>
+        Array<{
+          totalDeliveries: bigint;
+          readCount: bigint;
+          unreadCount: bigint;
+        }>
       >(Prisma.sql`
         SELECT
           COUNT(*)::bigint AS "totalDeliveries",

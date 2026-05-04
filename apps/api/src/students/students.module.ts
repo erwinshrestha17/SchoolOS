@@ -20,7 +20,11 @@ import { StudentsController } from './students.controller';
     StorageModule,
     FileRegistryModule,
   ],
-  providers: [StudentsService, StudentSearchService, StudentDocumentRetentionCron],
+  providers: [
+    StudentsService,
+    StudentSearchService,
+    StudentDocumentRetentionCron,
+  ],
   controllers: [StudentSearchController, StudentsController],
   exports: [StudentsService, StudentSearchService],
 })

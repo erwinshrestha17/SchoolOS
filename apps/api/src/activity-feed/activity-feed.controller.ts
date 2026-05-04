@@ -156,7 +156,10 @@ export class ActivityFeedController {
     res.setHeader('Content-Type', media.contentType);
     res.setHeader('Content-Length', String(media.sizeBytes));
     res.setHeader('Cache-Control', 'private, max-age=60');
-    res.setHeader('Content-Disposition', `inline; filename="${sanitizeFileName(media.fileName)}"`);
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${sanitizeFileName(media.fileName)}"`,
+    );
 
     return media.stream?.pipe(res);
   }

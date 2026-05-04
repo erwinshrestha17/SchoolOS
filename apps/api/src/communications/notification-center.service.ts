@@ -59,7 +59,9 @@ export class NotificationCenterService {
   }
 
   async getRecentItems(actor: AuthContext): Promise<NotificationCenterItem[]> {
-    const rows = await this.prisma.$queryRaw<NotificationCenterRow[]>(Prisma.sql`
+    const rows = await this.prisma.$queryRaw<
+      NotificationCenterRow[]
+    >(Prisma.sql`
       SELECT
         d."id",
         d."tenantId",
@@ -95,7 +97,9 @@ export class NotificationCenterService {
   }
 
   async getUnreadCount(actor: AuthContext) {
-    const rows = await this.prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+    const rows = await this.prisma.$queryRaw<
+      Array<{ count: bigint }>
+    >(Prisma.sql`
       SELECT COUNT(*)::bigint AS count
       FROM "NotificationDelivery" d
       LEFT JOIN "NotificationReadReceipt" r

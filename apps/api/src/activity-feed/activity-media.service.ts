@@ -151,7 +151,11 @@ export class ActivityMediaService {
       (tag) => tag.studentId,
     );
 
-    if (taggedStudentIds.some((studentId) => visibleStudentIds.includes(studentId))) {
+    if (
+      taggedStudentIds.some((studentId) =>
+        visibleStudentIds.includes(studentId),
+      )
+    ) {
       return;
     }
 
