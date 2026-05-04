@@ -495,7 +495,7 @@ export const api = {
     sectionId?: string;
   }) => {
     const response = await fetch(
-      `${API_BASE_URL}${withQuery('/students/roster/export', params)}`,
+      `${API_BASE_URL}${withQuery('/students/roster/export', params ?? {})}`,
       {
         credentials: 'include',
       },

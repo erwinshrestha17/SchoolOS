@@ -154,36 +154,8 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
     }
   }
 
-  async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      setPhotoError('Photo must be less than 5MB.');
-      return;
-    }
-    if (!file.type.startsWith('image/')) {
-      setPhotoError('File must be an image.');
-      return;
-    }
-
-    setPhotoError('');
-    setIsUploadingPhoto(true);
-
-    try {
-      const payload = await fileToBase64Payload(file);
-      await api.updateStudent(studentId, {
-        photo: payload.base64Content,
-        photoFileName: payload.fileName,
-      });
-      await queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
-    } catch (error) {
-      setPhotoError(error instanceof Error ? error.message : 'Upload failed.');
-    } finally {
-      setIsUploadingPhoto(false);
-      if (event.target) event.target.value = '';
-    }
-  }
+  // Student photo upload disabled for Phase 1B as backend storage contract is not fully aligned
+  // async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) { ... }
 
   if (!studentId) {
     return (
@@ -233,18 +205,6 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
               ) : (
                 initials(studentName)
               )}
-              <label className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                <span className="text-[10px] font-semibold text-white uppercase tracking-wider">
-                  {isUploadingPhoto ? '...' : 'Upload'}
-                </span>
-                <input
-                  type="file"
-                  accept="image/png, image/jpeg"
-                  className="hidden"
-                  onChange={(e) => void handlePhotoUpload(e)}
-                  disabled={isUploadingPhoto}
-                />
-              </label>
             </div>
             <div>
               <p className="label mb-2">Student Profile</p>

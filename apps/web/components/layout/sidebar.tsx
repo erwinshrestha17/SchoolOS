@@ -234,6 +234,7 @@ function SidebarContent({
   collapsed,
   futureItems,
   pathname,
+  platformItems,
   primaryItems,
   onMobileClose,
   onToggle,
