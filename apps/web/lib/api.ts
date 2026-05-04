@@ -629,7 +629,8 @@ export const api = {
     await openPdfBlob(response);
   },
   listLedgerEntries: () => request<JournalEntryView[]>('/ledger/entries'),
-  listTimetable: () => request<TimetableSlotSummary[]>('/timetable'),
+  listTimetable: (params?: { classId?: string | null }) =>
+    request<TimetableSlotSummary[]>(withQuery('/timetable', params ?? {})),
   listTeacherWorkload: () =>
     request<TeacherWorkloadSummary[]>('/timetable/workload'),
   createTimetableSlot: (body: JsonBody) =>

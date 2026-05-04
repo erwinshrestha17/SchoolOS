@@ -28,9 +28,12 @@ export class TimetableService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  async listTimetable(actor: AuthContext) {
+  async listTimetable(actor: AuthContext, classId?: string) {
     return this.prisma.timetableSlot.findMany({
-      where: { tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        ...(classId ? { classId } : {}),
+      },
       include: {
         academicYear: true,
         class: true,

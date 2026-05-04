@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -14,8 +14,11 @@ export class TimetableController {
 
   @Get()
   @Permissions('timetable:read')
-  listTimetable(@CurrentAuth() auth: AuthContext) {
-    return this.timetableService.listTimetable(auth);
+  listTimetable(
+    @CurrentAuth() auth: AuthContext,
+    @Query('classId') classId?: string,
+  ) {
+    return this.timetableService.listTimetable(auth, classId);
   }
 
   @Get('workload')

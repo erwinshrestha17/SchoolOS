@@ -1,6 +1,6 @@
 'use client';
 
-import { TimetableHomeworkForm } from '../../../components/forms/timetable-homework-form';
+import { TimetableWorkspace } from '../../../components/timetable/timetable-workspace';
 
 export default function TimetablePage() {
   return (
@@ -13,7 +13,7 @@ export default function TimetablePage() {
           Timetable and homework workflow.
         </p>
       </div>
-      <TimetableHomeworkForm />
+      <TimetableWorkspace />
     </div>
   );
 }

@@ -47,7 +47,7 @@ export function TimetableHomeworkForm() {
   const staffQuery = useQuery({ queryKey: ['staff'], queryFn: api.listStaff });
   const timetableQuery = useQuery({
     queryKey: ['timetable'],
-    queryFn: api.listTimetable,
+    queryFn: () => api.listTimetable(),
   });
   const workloadQuery = useQuery({
     queryKey: ['teacher-workload'],
