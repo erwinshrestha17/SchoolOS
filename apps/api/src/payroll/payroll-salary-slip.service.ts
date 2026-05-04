@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PayrollRunStatus } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { buildSimplePdf } from '../common/pdf/simple-pdf';
@@ -94,7 +98,9 @@ export function buildApprovedSalarySlipLines(input: SalarySlipPdfInput) {
     `Deductions: Rs ${input.deductions.toFixed(2)}`,
     `Net Salary: Rs ${input.netSalary.toFixed(2)}`,
     `Attendance Days: ${input.attendanceDays}/${input.workingDays}`,
-    `Approved Date: ${input.approvedAt ? input.approvedAt.toISOString().slice(0, 10) : 'N/A'}`,
+    `Approved Date: ${
+      input.approvedAt ? input.approvedAt.toISOString().slice(0, 10) : 'N/A'
+    }`,
     'Note: This salary slip is generated from an approved payroll run only.',
     'No M9 accounting journal entry or salary disbursement is created by this PDF.',
   ];
