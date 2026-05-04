@@ -1834,7 +1834,11 @@ export class StudentsService {
           orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
         },
       },
-      orderBy: [{ classId: 'asc' }, { sectionId: 'asc' }, { firstNameEn: 'asc' }],
+      orderBy: [
+        { classId: 'asc' },
+        { sectionId: 'asc' },
+        { firstNameEn: 'asc' },
+      ],
     });
 
     const headers = [
