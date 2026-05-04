@@ -4,28 +4,26 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
-  ChartAccountType,
-  JournalLineSide,
-  JournalSourceType,
   PayrollLineStatus,
   PayrollRunStatus,
-  PayslipStatus,
   Prisma,
 } from '@prisma/client';
+import type { PayrollPreviewResult } from '@schoolos/core';
+import { AccountingPostingService } from '../accounting/accounting-posting.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { buildSimplePdf } from '../common/pdf/simple-pdf';
-import { PrismaService } from '../prisma/prisma.service';
 import { CreateStaffContractDto } from '../hr/dto/create-staff-contract.dto';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
 import { PayrollPreviewQueryDto } from './dto/payroll-preview-query.dto';
-import { PayrollPreviewResult } from '@schoolos/core';
 
 @Injectable()
 export class PayrollService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly accountingPostingService: AccountingPostingService,
   ) {}
 
   async listContracts(actor: AuthContext) {
@@ -117,7 +115,6 @@ export class PayrollService {
     }
 
     if (existing?.status === PayrollRunStatus.VOID) {
-      // Delete VOID run to satisfy unique constraint [tenantId, periodMonth, periodYear]
       await this.prisma.payrollRun.delete({ where: { id: existing.id } });
     }
 
@@ -195,7 +192,7 @@ export class PayrollService {
         actor,
       );
 
-    const linesByStaff = new Map(lines.map((l) => [l.staffId, l]));
+    const linesByStaff = new Map(lines.map((line) => [line.staffId, line]));
 
     return staffMembers.map((staff) => {
       const line = linesByStaff.get(staff.id);
@@ -278,24 +275,24 @@ export class PayrollService {
       },
     });
 
-    const contractsByStaff = new Map(contracts.map((c) => [c.staffId, c]));
+    const contractsByStaff = new Map(contracts.map((contract) => [contract.staffId, contract]));
     const attendanceByStaff = new Map<string, number>();
-    attendanceRecords.forEach((a) => {
+    attendanceRecords.forEach((attendance) => {
       attendanceByStaff.set(
-        a.staffId,
-        (attendanceByStaff.get(a.staffId) ?? 0) + 1,
+        attendance.staffId,
+        (attendanceByStaff.get(attendance.staffId) ?? 0) + 1,
       );
     });
 
     const leaveByStaff = new Map<string, number>();
-    leaveRequests.forEach((l) => {
+    leaveRequests.forEach((leave) => {
       const overlap = getOverlapDays(
-        l.startsOn,
-        l.endsOn,
+        leave.startsOn,
+        leave.endsOn,
         period.startsOn,
         period.endsOn,
       );
-      leaveByStaff.set(l.staffId, (leaveByStaff.get(l.staffId) ?? 0) + overlap);
+      leaveByStaff.set(leave.staffId, (leaveByStaff.get(leave.staffId) ?? 0) + overlap);
     });
 
     const lines = contracts.map((contract) => {
@@ -435,105 +432,28 @@ export class PayrollService {
     }
 
     if (!actions.canPost) {
-      throw new ConflictException(
-        'Payroll run must be approved before posting',
-      );
+      throw new ConflictException('Payroll run must be approved before posting');
     }
 
-    const entryNumber = await this.generateJournalEntryNumber(actor.tenantId);
-    const payslipStart = await this.prisma.payslip.count({
-      where: { tenantId: actor.tenantId },
-    });
-
     const posted = await this.prisma.$transaction(async (tx) => {
-      const salaryExpense = await ensureAccount(tx, actor.tenantId, {
-        code: '5010',
-        name: 'Salary Expense',
-        type: ChartAccountType.EXPENSE,
-      });
-      const salaryPayable = await ensureAccount(tx, actor.tenantId, {
-        code: '2200',
-        name: 'Salary Payable',
-        type: ChartAccountType.LIABILITY,
-      });
-      const statutoryPayable = await ensureAccount(tx, actor.tenantId, {
-        code: '2300',
-        name: 'Statutory Deductions Payable',
-        type: ChartAccountType.LIABILITY,
-      });
-
-      const creditLines = [
+      const journalEntry = await this.accountingPostingService.postPayrollAccrual(
         {
           tenantId: actor.tenantId,
-          chartAccountId: salaryPayable.id,
-          side: JournalLineSide.CREDIT,
-          amount: run.netAmount,
-          description: `Net salary payable ${run.periodMonth}/${run.periodYear}`,
+          payrollRunId: run.id,
+          periodMonth: run.periodMonth,
+          periodYear: run.periodYear,
+          grossAmount: run.grossAmount,
+          deductionAmount: run.deductionAmount,
+          netAmount: run.netAmount,
         },
-      ];
-
-      if (Number(run.deductionAmount) > 0) {
-        creditLines.push({
-          tenantId: actor.tenantId,
-          chartAccountId: statutoryPayable.id,
-          side: JournalLineSide.CREDIT,
-          amount: run.deductionAmount,
-          description: `Payroll deductions ${run.periodMonth}/${run.periodYear}`,
-        });
-      }
-
-      const journalEntry = await tx.journalEntry.create({
-        data: {
-          tenantId: actor.tenantId,
-          entryNumber,
-          entryDate: new Date(),
-          narration: `Payroll posting ${run.periodMonth}/${run.periodYear}`,
-          sourceType: JournalSourceType.PAYROLL,
-          sourceId: run.id,
-          createdById: actor.userId,
-          lines: {
-            create: [
-              {
-                tenantId: actor.tenantId,
-                chartAccountId: salaryExpense.id,
-                side: JournalLineSide.DEBIT,
-                amount: run.grossAmount,
-                description: `Gross salary ${run.periodMonth}/${run.periodYear}`,
-              },
-              ...creditLines,
-            ],
-          },
-        },
-      });
+        actor,
+        tx,
+      );
 
       await tx.payrollLine.updateMany({
         where: { tenantId: actor.tenantId, payrollRunId: run.id },
         data: { status: PayrollLineStatus.POSTED },
       });
-
-      for (const [index, line] of run.lines.entries()) {
-        await tx.payslip.upsert({
-          where: { payrollLineId: line.id },
-          update: {
-            status: PayslipStatus.ISSUED,
-            issuedAt: new Date(),
-          },
-          create: {
-            tenantId: actor.tenantId,
-            payrollRunId: run.id,
-            payrollLineId: line.id,
-            staffId: line.staffId,
-            payslipNumber: `PAY-${run.periodYear}-${String(
-              payslipStart + index + 1,
-            ).padStart(5, '0')}`,
-            status: PayslipStatus.ISSUED,
-            grossSalary: line.grossSalary,
-            deductionAmount: line.deductions,
-            netSalary: line.netSalary,
-            issuedAt: new Date(),
-          },
-        });
-      }
 
       return tx.payrollRun.update({
         where: { id: run.id },
@@ -635,14 +555,6 @@ export class PayrollService {
 
     return run;
   }
-
-  private async generateJournalEntryNumber(tenantId: string) {
-    const count = await this.prisma.journalEntry.count({
-      where: { tenantId },
-    });
-
-    return `JE-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, '0')}`;
-  }
 }
 
 interface PayrollLineInput {
@@ -711,37 +623,6 @@ function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-async function ensureAccount(
-  tx: Prisma.TransactionClient,
-  tenantId: string,
-  account: {
-    code: string;
-    name: string;
-    type: ChartAccountType;
-  },
-) {
-  return tx.chartAccount.upsert({
-    where: {
-      tenantId_code: {
-        tenantId,
-        code: account.code,
-      },
-    },
-    update: {
-      name: account.name,
-      type: account.type,
-      isSystem: true,
-    },
-    create: {
-      tenantId,
-      code: account.code,
-      name: account.name,
-      type: account.type,
-      isSystem: true,
-    },
-  });
-}
-
 export function getOverlapDays(
   start1: Date,
   end1: Date,
@@ -753,7 +634,6 @@ export function getOverlapDays(
 
   if (start > end) return 0;
 
-  // Set to UTC midnight to ensure we count full calendar days inclusive
   const s = Date.UTC(
     start.getUTCFullYear(),
     start.getUTCMonth(),
