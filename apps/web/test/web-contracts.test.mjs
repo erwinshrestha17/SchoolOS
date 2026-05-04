@@ -110,6 +110,10 @@ describe('SchoolOS web production contracts', () => {
       'createConversation',
       'createMessage',
       'markMessageRead',
+      'listStaffAttendanceSummary',
+      'listLeaveRequests',
+      'reviewLeaveRequest',
+      'listStaffLeaveBalances',
       'listPlatformTenants',
       'getPlatformTenantDetail',
       'updatePlatformTenantStatus',
@@ -834,5 +838,35 @@ describe('SchoolOS web production contracts', () => {
     assert.doesNotMatch(communicationsForm, /School will remain closed tomorrow/);
     assert.doesNotMatch(communicationsForm, /Parent-teacher meeting/);
     assert.doesNotMatch(communicationsForm, /replace-me/i);
+  });
+
+  it('provides a dedicated HR & Payroll workspace with contract and leave management', () => {
+    const sidebar = read('components/layout/sidebar.tsx');
+    const hrWorkspace = read('components/hr/hr-workspace.tsx');
+    const contractList = read('components/hr/contract-list.tsx');
+    const leaveList = read('components/hr/leave-request-list.tsx');
+    const attendanceSummary = read('components/hr/staff-attendance-summary.tsx');
+    const page = read('app/dashboard/payroll/page.tsx');
+
+    assert.match(sidebar, /label: 'HR & Payroll'/);
+    assert.match(sidebar, /href: '\/dashboard\/payroll'/);
+    assert.match(sidebar, /permissions: \['hr:read', 'payroll:read', 'payroll:manage'\]/);
+    assert.match(page, /<HRWorkspace/);
+    assert.match(hrWorkspace, /'Staff Directory'|'Contracts'|'Leave Requests'|'Attendance Summary'/);
+    
+    assert.match(contractList, /api\.listStaffContracts/);
+    assert.match(contractList, /api\.createStaffContract/);
+    assert.match(contractList, /Base Salary/);
+    assert.match(contractList, /Allowances/);
+    
+    assert.match(leaveList, /api\.listLeaveRequests/);
+    assert.match(leaveList, /api\.reviewLeaveRequest/);
+    assert.match(leaveList, /PENDING|APPROVED|REJECTED/);
+    
+    assert.match(attendanceSummary, /api\.listStaffAttendanceSummary/);
+    assert.match(attendanceSummary, /Present|Late|Absent|Leave/);
+
+    assert.doesNotMatch(hrWorkspace, /replace-me|demo-staff|fake-contract/i);
+    assert.doesNotMatch(contractList, /api\.createAccountingEntry|api\.postLedger/i);
   });
 });
