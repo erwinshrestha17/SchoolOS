@@ -43,7 +43,7 @@ export function TimetableHomeworkForm() {
   });
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
   const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
-  const subjectsQuery = useQuery({ queryKey: ['subjects'], queryFn: api.listSubjects });
+  const subjectsQuery = useQuery({ queryKey: ['subjects'], queryFn: () => api.listSubjects() });
   const staffQuery = useQuery({ queryKey: ['staff'], queryFn: api.listStaff });
   const timetableQuery = useQuery({
     queryKey: ['timetable'],

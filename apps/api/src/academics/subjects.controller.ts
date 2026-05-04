@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -15,7 +15,14 @@ export class SubjectsController {
 
   @Get()
   @Permissions('academics:read')
-  listSubjects(@CurrentAuth() auth: AuthContext) {
+  listSubjects(
+    @CurrentAuth() auth: AuthContext,
+    @Query('classId') classId?: string,
+  ) {
+    if (classId) {
+      return this.academicsService.listSubjectsByClass(auth, classId);
+    }
+
     return this.academicsService.listSubjects(auth);
   }
 

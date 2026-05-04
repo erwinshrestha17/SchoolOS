@@ -382,7 +382,8 @@ export const api = {
   createStaff: (body: JsonBody) =>
     request<StaffSummary>('/staff', { method: 'POST', json: body }),
   listRoles: () => request<RoleSummary[]>('/roles'),
-  listSubjects: () => request<SubjectSummary[]>('/subjects'),
+  listSubjects: (params?: { classId?: string | null }) =>
+    request<SubjectSummary[]>(withQuery('/subjects', params ?? {})),
   createSubject: (body: JsonBody) =>
     request<SubjectSummary>('/subjects', { method: 'POST', json: body }),
   listTeacherAssignments: () =>
@@ -400,9 +401,24 @@ export const api = {
       method: 'POST',
       json: body,
     }),
-  listMarks: () => request<MarkEntrySummary[]>('/academics/marks'),
+  listMarks: (params?: {
+    examTermId?: string | null;
+    assessmentComponentId?: string | null;
+    classId?: string | null;
+    sectionId?: string | null;
+    subjectId?: string | null;
+  }) => request<MarkEntrySummary[]>(withQuery('/academics/marks', params ?? {})),
   enterMark: (body: JsonBody) =>
     request<MarkEntrySummary>('/academics/marks', { method: 'POST', json: body }),
+  batchEnterMarks: (body: JsonBody) =>
+    request<{ saved: number; entries: MarkEntrySummary[] }>('/academics/marks/batch', {
+      method: 'POST',
+      json: body,
+    }),
+  listComponentsByExamTerm: (examTermId: string, params?: { subjectId?: string | null }) =>
+    request<AssessmentComponentSummary[]>(
+      withQuery(`/academics/exams/${encodeURIComponent(examTermId)}/components`, params ?? {}),
+    ),
   listCasRecords: () => request<CasRecordSummary[]>('/academics/cas'),
   createCasRecord: (body: JsonBody) =>
     request<CasRecordSummary>('/academics/cas', { method: 'POST', json: body }),

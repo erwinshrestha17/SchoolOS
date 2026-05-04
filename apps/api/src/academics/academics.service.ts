@@ -26,6 +26,7 @@ import { EnterMarkDto } from './dto/enter-mark.dto';
 import { GenerateReportCardDto } from './dto/generate-report-card.dto';
 import { PromoteStudentDto } from './dto/promote-student.dto';
 import { BatchPromoteDto } from './dto/batch-promote.dto';
+import { BatchEnterMarksDto } from './dto/batch-enter-marks.dto';
 import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 
@@ -52,6 +53,23 @@ export class AcademicsService {
         },
       },
       orderBy: [{ class: { level: 'asc' } }, { code: 'asc' }],
+    });
+  }
+
+  async listSubjectsByClass(actor: AuthContext, classId: string) {
+    return this.prisma.subject.findMany({
+      where: { tenantId: actor.tenantId, classId },
+      include: {
+        class: true,
+        teacherAssignments: {
+          include: {
+            staff: true,
+            section: true,
+            academicYear: true,
+          },
+        },
+      },
+      orderBy: [{ code: 'asc' }],
     });
   }
 
@@ -388,6 +406,25 @@ export class AcademicsService {
     return { examTermId, publishedSlots: slots.length };
   }
 
+  async listComponentsByExamTerm(
+    actor: AuthContext,
+    examTermId: string,
+    subjectId?: string,
+  ) {
+    return this.prisma.assessmentComponent.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        examTermId,
+        ...(subjectId ? { subjectId } : {}),
+      },
+      include: {
+        subject: true,
+        examTerm: true,
+      },
+      orderBy: [{ subject: { code: 'asc' } }, { name: 'asc' }],
+    });
+  }
+
   async listMarks(actor: AuthContext) {
     return this.prisma.markEntry.findMany({
       where: { tenantId: actor.tenantId },
@@ -399,6 +436,45 @@ export class AcademicsService {
       },
       orderBy: [{ updatedAt: 'desc' }],
       take: 100,
+    });
+  }
+
+  async listMarksByFilters(
+    actor: AuthContext,
+    filters: {
+      examTermId?: string;
+      assessmentComponentId?: string;
+      classId?: string;
+      sectionId?: string;
+      subjectId?: string;
+    },
+  ) {
+    return this.prisma.markEntry.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        ...(filters.examTermId ? { examTermId: filters.examTermId } : {}),
+        ...(filters.assessmentComponentId
+          ? { assessmentComponentId: filters.assessmentComponentId }
+          : {}),
+        ...(filters.subjectId ? { subjectId: filters.subjectId } : {}),
+        ...(filters.classId
+          ? {
+              student: {
+                classId: filters.classId,
+                ...(filters.sectionId
+                  ? { sectionId: filters.sectionId }
+                  : {}),
+              },
+            }
+          : {}),
+      },
+      include: {
+        student: true,
+        subject: true,
+        assessmentComponent: true,
+        examTerm: true,
+      },
+      orderBy: [{ student: { rollNumber: 'asc' } }, { updatedAt: 'desc' }],
     });
   }
 
@@ -479,6 +555,107 @@ export class AcademicsService {
     });
 
     return mark;
+  }
+
+  async batchEnterMarks(dto: BatchEnterMarksDto, actor: AuthContext) {
+    const component = await this.prisma.assessmentComponent.findFirst({
+      where: {
+        id: dto.assessmentComponentId,
+        tenantId: actor.tenantId,
+        examTermId: dto.examTermId,
+      },
+      include: {
+        examTerm: true,
+        subject: true,
+      },
+    });
+
+    if (!component) {
+      throw new NotFoundException('Assessment component not found');
+    }
+
+    if (component.examTerm.isLocked) {
+      throw new ConflictException('Exam term is locked');
+    }
+
+    const studentIds = dto.entries.map((entry) => entry.studentId);
+    const students = await this.prisma.student.findMany({
+      where: {
+        id: { in: studentIds },
+        tenantId: actor.tenantId,
+      },
+      select: { id: true },
+    });
+
+    const foundIds = new Set(students.map((s) => s.id));
+    const missing = studentIds.filter((id) => !foundIds.has(id));
+
+    if (missing.length > 0) {
+      throw new NotFoundException(
+        `Students not found: ${missing.slice(0, 5).join(', ')}`,
+      );
+    }
+
+    const overMax = dto.entries.filter(
+      (entry) => entry.marksObtained > Number(component.maxMarks),
+    );
+
+    if (overMax.length > 0) {
+      throw new ConflictException(
+        `${overMax.length} entries exceed max marks (${component.maxMarks})`,
+      );
+    }
+
+    const results = await this.prisma.$transaction(
+      dto.entries.map((entry) =>
+        this.prisma.markEntry.upsert({
+          where: {
+            tenantId_assessmentComponentId_studentId: {
+              tenantId: actor.tenantId,
+              assessmentComponentId: dto.assessmentComponentId,
+              studentId: entry.studentId,
+            },
+          },
+          update: {
+            marksObtained: new Prisma.Decimal(entry.marksObtained),
+            remarks: entry.remarks ?? null,
+            enteredById: actor.userId,
+          },
+          create: {
+            tenantId: actor.tenantId,
+            examTermId: dto.examTermId,
+            assessmentComponentId: dto.assessmentComponentId,
+            subjectId: component.subjectId,
+            studentId: entry.studentId,
+            enteredById: actor.userId,
+            marksObtained: new Prisma.Decimal(entry.marksObtained),
+            remarks: entry.remarks ?? null,
+          },
+          include: {
+            student: true,
+            subject: true,
+            assessmentComponent: true,
+          },
+        }),
+      ),
+    );
+
+    await this.auditService.record({
+      action: 'batch_upsert',
+      resource: 'mark_entry',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        examTermId: dto.examTermId,
+        componentId: dto.assessmentComponentId,
+        count: results.length,
+      },
+    });
+
+    return {
+      saved: results.length,
+      entries: results,
+    };
   }
 
   async listMarkLockRequests(actor: AuthContext) {

@@ -89,7 +89,7 @@ export function AcademicsForm() {
   const staffQuery = useQuery({ queryKey: ['staff'], queryFn: api.listStaff });
   const subjectsQuery = useQuery({
     queryKey: ['subjects'],
-    queryFn: api.listSubjects,
+    queryFn: () => api.listSubjects(),
   });
   const assignmentsQuery = useQuery({
     queryKey: ['teacher-assignments'],
@@ -99,7 +99,7 @@ export function AcademicsForm() {
     queryKey: ['exam-terms'],
     queryFn: api.listExamTerms,
   });
-  const marksQuery = useQuery({ queryKey: ['marks'], queryFn: api.listMarks });
+  const marksQuery = useQuery({ queryKey: ['marks'], queryFn: () => api.listMarks() });
   const casQuery = useQuery({ queryKey: ['cas-records'], queryFn: api.listCasRecords });
   const reportsQuery = useQuery({
     queryKey: ['report-cards'],
