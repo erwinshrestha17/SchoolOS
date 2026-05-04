@@ -867,6 +867,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(attendanceSummary, /Present|Late|Absent|Leave/);
 
     assert.doesNotMatch(hrWorkspace, /replace-me|demo-staff|fake-contract/i);
+    // Note: Payroll processing, salary slips, and M9 accounting auto-posting are deferred to future Phase 2 HR/Accounting work.
     assert.doesNotMatch(contractList, /api\.createAccountingEntry|api\.postLedger/i);
   });
 });
