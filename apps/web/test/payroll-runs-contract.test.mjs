@@ -58,7 +58,7 @@ describe('Payroll Runs UI contracts', () => {
     assert.doesNotMatch(payrollRuns, /\/accounting\/journal-entries/);
     assert.doesNotMatch(payrollRuns, /\/accounting\/ledger/);
     assert.doesNotMatch(payrollRuns, /\/ledger\/entries/);
-    assert.doesNotMatch(payrollRuns, /payslipNumber|openPdfBlob|salary slip pdf/i);
+    assert.doesNotMatch(payrollRuns, /payslipNumber|openPdfBlob|getPayslipPdf|listPayslips/);
   });
 
   it('keeps Payroll Runs permission-aware and avoids internal tenant leakage', () => {
