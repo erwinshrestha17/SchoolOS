@@ -9,6 +9,7 @@ import {
   Download,
   Eye,
   FileText,
+  Landmark,
   Loader2,
   Plus,
   ShieldCheck,
@@ -45,6 +46,8 @@ type PayrollRunView = PayrollRunSummary & {
   deductionAmount?: number | string | null;
   netAmount?: number | string | null;
   approvedAt?: string | null;
+  postedAt?: string | null;
+  journalEntryId?: string | null;
   lines?: PayrollLineView[];
 };
 
@@ -90,6 +93,8 @@ function statusClasses(status: string) {
       return 'border-blue-200 bg-blue-100 text-blue-700';
     case 'APPROVED':
       return 'border-success-200 bg-success-100 text-success-700';
+    case 'POSTED':
+      return 'border-purple-200 bg-purple-100 text-purple-700';
     case 'VOID':
     case 'CANCELLED':
       return 'border-gray-200 bg-gray-100 text-gray-600';
@@ -161,7 +166,7 @@ export function PayrollRuns() {
         periodYear: year,
         workingDays,
         notes:
-          'Draft payroll run created from Payroll Runs preview. M9 posting remains deferred.',
+          'Draft payroll run created from Payroll Runs preview. M9 posting requires a separate approval-to-post action.',
       }),
     onSuccess: (run) => {
       const savedRun = normalizeRun(run);
@@ -177,6 +182,15 @@ export function PayrollRuns() {
       const approvedRun = normalizeRun(run);
       void queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
       setSelectedRunId(approvedRun.id);
+    },
+  });
+
+  const postMutation = useMutation({
+    mutationFn: (id: string) => api.postPayrollRun(id),
+    onSuccess: (run) => {
+      const postedRun = normalizeRun(run);
+      void queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
+      setSelectedRunId(postedRun.id);
     },
   });
 
@@ -204,9 +218,9 @@ export function PayrollRuns() {
             <ShieldCheck className="text-amber-600" size={20} />
           </div>
           <div className="space-y-1">
-            <p className="text-sm font-bold text-amber-900">Payroll Runs — Phase 2 approval boundary</p>
+            <p className="text-sm font-bold text-amber-900">Payroll Runs — Phase 2 accounting boundary</p>
             <p className="text-xs leading-relaxed text-amber-800">
-              Approval locks the payroll run, but it still does not post to accounting, does not post to M9 Accounting, create journal entries, or disburse salaries. Salary slip PDFs are available only after approval and DRAFT runs cannot generate salary slips.
+              Approval locks payroll calculations. Posting is a separate APPROVED-to-POSTED action that creates the M9 payroll accrual journal through the backend accounting posting boundary. It does not disburse salaries, pay staff, create reversal entries, or allow editing posted runs.
             </p>
           </div>
         </div>
@@ -382,7 +396,7 @@ export function PayrollRuns() {
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div className="border-b border-gray-100 p-5">
             <h3 className="text-lg font-bold text-gray-900">Payroll Runs</h3>
-            <p className="text-xs text-gray-500">Draft, reviewed, and approved payroll runs. Posting is intentionally deferred.</p>
+            <p className="text-xs text-gray-500">Draft, reviewed, approved, and posted payroll runs. Posting is a controlled M9 accrual action.</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left text-sm">
@@ -456,7 +470,7 @@ export function PayrollRuns() {
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
               <h3 className="text-lg font-bold text-gray-900">Run Detail</h3>
-              <p className="text-xs text-gray-500">Line-level payroll breakdown and approval boundary.</p>
+              <p className="text-xs text-gray-500">Line-level payroll breakdown and approval/posting boundary.</p>
             </div>
             {selectedRun && (
               <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${statusClasses(selectedRun.status)}`}>
@@ -486,7 +500,7 @@ export function PayrollRuns() {
               </div>
 
               <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs leading-relaxed text-amber-800">
-                <strong>Approval note:</strong> Approval locks the payroll run for payroll operations. It still does not post to M9 Accounting, create journal entries, or disburse salaries. Salary slip PDFs are available only for APPROVED runs.
+                <strong>Posting note:</strong> Approved payroll can be posted once to M9 Accounting. Posting creates the payroll accrual journal through the backend accounting boundary and changes the run to POSTED. It does not disburse salaries, create reversal entries, or enable editing posted runs.
               </div>
 
               {selectedRun.status === 'DRAFT' && (
@@ -501,9 +515,21 @@ export function PayrollRuns() {
                 </button>
               )}
 
-              {!canManagePayroll && selectedRun.status === 'DRAFT' && (
+              {selectedRun.status === 'APPROVED' && (
+                <button
+                  type="button"
+                  disabled={!canManagePayroll || postMutation.isPending}
+                  onClick={() => postMutation.mutate(selectedRun.id)}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {postMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Landmark size={16} />}
+                  Post to M9 Accounting
+                </button>
+              )}
+
+              {!canManagePayroll && (selectedRun.status === 'DRAFT' || selectedRun.status === 'APPROVED') && (
                 <p className="rounded-xl bg-gray-50 px-4 py-3 text-xs font-medium text-gray-600">
-                  Approval requires payroll:manage permission.
+                  Approval and posting require payroll:manage permission.
                 </p>
               )}
 
@@ -513,9 +539,21 @@ export function PayrollRuns() {
                 </p>
               )}
 
+              {postMutation.error && (
+                <p className="rounded-xl bg-danger-50 px-4 py-3 text-xs font-semibold text-danger-700">
+                  {(postMutation.error as Error).message}
+                </p>
+              )}
+
               {salarySlipError && (
                 <p className="rounded-xl bg-danger-50 px-4 py-3 text-xs font-semibold text-danger-700">
                   {salarySlipError}
+                </p>
+              )}
+
+              {selectedRun.status === 'POSTED' && selectedRun.journalEntryId && (
+                <p className="rounded-xl bg-purple-50 px-4 py-3 text-xs font-semibold text-purple-700">
+                  Posted to M9 Accounting. Journal entry is recorded by the backend accounting boundary.
                 </p>
               )}
 
