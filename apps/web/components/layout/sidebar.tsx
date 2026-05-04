@@ -29,6 +29,7 @@ export type NavItem = {
   label: string;
   icon: LucideIcon;
   permissions?: PermissionKey[];
+  platformRoles?: string[];
   badge?: number;
   phase: 'phase1' | 'future';
   disabled?: boolean;
@@ -135,7 +136,7 @@ export const platformNavItems: NavItem[] = [
     href: '/platform/dashboard',
     label: 'Platform Control',
     icon: Lock,
-    permissions: [
+    platformRoles: [
       'platform_super_admin',
       'platform_support',
       'platform_billing_admin',
@@ -146,7 +147,7 @@ export const platformNavItems: NavItem[] = [
     href: '/platform/schools',
     label: 'Managed Schools',
     icon: School,
-    permissions: ['platform_super_admin', 'platform_support'],
+    platformRoles: ['platform_super_admin', 'platform_support'],
     phase: 'phase1',
   },
 ];
@@ -445,6 +446,14 @@ function canSeeNavItem(
   item: NavItem,
   session: ReturnType<typeof useSession>['session'],
 ) {
+  const hasPlatformRole =
+    item.platformRoles?.some((role) => session?.user.roles.includes(role)) ??
+    false;
+
+  if (hasPlatformRole) {
+    return true;
+  }
+
   if (!item.permissions?.length) {
     return true;
   }

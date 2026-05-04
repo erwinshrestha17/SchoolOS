@@ -43,6 +43,7 @@ describe('JwtAuthGuard', () => {
     };
     cls = {
       set: jest.fn(),
+      isActive: jest.fn(() => true),
     };
 
     guard = new JwtAuthGuard(

@@ -60,7 +60,10 @@ export class JwtAuthGuard implements CanActivate {
       roles: payload.roles,
       permissions: payload.permissions,
     };
-    if (this.cls.isActive()) {
+    const hasActiveCls =
+      typeof this.cls.isActive === 'function' ? this.cls.isActive() : true;
+
+    if (hasActiveCls) {
       this.cls.set(TENANT_ID_KEY, effectiveTenantId);
     }
 
