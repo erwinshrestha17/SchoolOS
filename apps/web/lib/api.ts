@@ -635,7 +635,8 @@ export const api = {
     request<TeacherWorkloadSummary[]>('/timetable/workload'),
   createTimetableSlot: (body: JsonBody) =>
     request<TimetableSlotSummary>('/timetable', { method: 'POST', json: body }),
-  listHomework: () => request<HomeworkAssignmentSummary[]>('/homework'),
+  listHomework: (params?: { studentId?: string; classId?: string; sectionId?: string }) =>
+    request<HomeworkAssignmentSummary[]>(withQuery('/homework', params ?? {})),
   createHomework: (body: JsonBody) =>
     request<HomeworkAssignmentSummary>('/homework', {
       method: 'POST',

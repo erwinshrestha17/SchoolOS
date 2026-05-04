@@ -5,10 +5,12 @@ import { useState } from 'react';
 import { api } from '../../lib/api';
 import { TimetableBuilderTab } from './tabs/timetable-builder-tab';
 import { TeacherWorkloadTab } from './tabs/teacher-workload-tab';
+import { HomeworkTab } from './tabs/homework-tab';
 
 const sections = [
   'Timetable Builder',
   'Teacher Workload',
+  'Homework',
 ] as const;
 
 type Section = (typeof sections)[number];
@@ -23,6 +25,11 @@ const sectionMeta: Record<Section, { title: string; description: string; badge: 
     title: 'Faculty Workload',
     description: 'Monitor teaching hours, slot assignments, and homework counts across all faculty.',
     badge: 'Analytics',
+  },
+  Homework: {
+    title: 'Homework & Assignments',
+    description: 'Assign, track, and grade homework for your students across classes and subjects.',
+    badge: 'Academics',
   },
 };
 
@@ -123,6 +130,18 @@ export function TimetableWorkspace() {
         <TeacherWorkloadTab
           workload={workloadQuery.data ?? []}
           isLoading={workloadQuery.isLoading}
+        />
+      )}
+
+      {activeSection === 'Homework' && (
+        <HomeworkTab
+          academicYears={academicYearsQuery.data ?? []}
+          classes={classesQuery.data ?? []}
+          allSections={sectionsQuery.data ?? []}
+          subjects={subjectsQuery.data ?? []}
+          staff={staffQuery.data ?? []}
+          classId={classId}
+          setClassId={setClassId}
         />
       )}
     </div>
