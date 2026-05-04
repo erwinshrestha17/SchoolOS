@@ -676,6 +676,28 @@ export const api = {
       json: {},
     }),
   listPayslips: () => request<PayslipSummary[]>('/payroll/payslips'),
+  listStaffAttendanceSummary: (params: { month?: number; year?: number }) =>
+    request<StaffAttendanceMonthlySummary>(
+      withQuery('/attendance/staff/summary', {
+        month: params.month ? String(params.month) : undefined,
+        year: params.year ? String(params.year) : undefined,
+      }),
+    ),
+  listLeaveRequests: () =>
+    request<StaffLeaveRequestSummary[]>('/attendance/staff/leave-requests'),
+  createLeaveRequest: (body: JsonBody) =>
+    request<StaffLeaveRequestSummary>('/attendance/staff/leave-requests', {
+      method: 'POST',
+      json: body,
+    }),
+  reviewLeaveRequest: (id: string, body: JsonBody) =>
+    request<{ reviewed: StaffLeaveRequestSummary; overlapAnomalies: any[] }>(
+      `/attendance/staff/leave-requests/${id}/review`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
   listAccountingPeriods: () =>
     request<AccountingPeriodSummary[]>('/accounting/periods'),
   createAccountingPeriod: (body: JsonBody) =>

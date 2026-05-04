@@ -99,11 +99,10 @@ export const dashboardNavItems: NavItem[] = [
   },
   {
     href: '/dashboard/payroll',
-    label: 'Staff & HR',
+    label: 'HR & Payroll',
     icon: UserCog,
     permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
-    phase: 'future',
-    disabled: true,
+    phase: 'phase1',
   },
   {
     href: '/dashboard/timetable',
