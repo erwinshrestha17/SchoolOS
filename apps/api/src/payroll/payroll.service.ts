@@ -18,6 +18,8 @@ import { buildSimplePdf } from '../common/pdf/simple-pdf';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateStaffContractDto } from '../hr/dto/create-staff-contract.dto';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
+import { PayrollPreviewQueryDto } from './dto/payroll-preview-query.dto';
+import { PayrollPreviewResult } from '@schoolos/core';
 
 @Injectable()
 export class PayrollService {
@@ -219,6 +221,122 @@ export class PayrollService {
     });
 
     return run;
+  }
+
+  async getPayrollPreview(
+    query: PayrollPreviewQueryDto,
+    actor: AuthContext,
+  ): Promise<PayrollPreviewResult[]> {
+    const period = getPayrollPeriod(query.year, query.month);
+    const workingDays = query.workingDays ?? 30;
+
+    const staffMembers = await this.prisma.staff.findMany({
+      where: {
+        tenantId: actor.tenantId,
+      },
+    });
+
+    const contracts = await this.prisma.staffContract.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        status: 'ACTIVE',
+        startDate: { lte: period.endsOn },
+        OR: [{ endDate: null }, { endDate: { gte: period.startsOn } }],
+      },
+    });
+
+    const attendanceRecords = await this.prisma.staffAttendance.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        attendanceDate: {
+          gte: period.startsOn,
+          lte: period.endsOn,
+        },
+        status: { in: ['PRESENT', 'LATE'] },
+      },
+    });
+
+    const leaveRequests = await this.prisma.staffLeaveRequest.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        status: 'APPROVED',
+        startsOn: { lte: period.endsOn },
+        endsOn: { gte: period.startsOn },
+      },
+    });
+
+    const contractsByStaff = new Map(contracts.map((c) => [c.staffId, c]));
+    const attendanceByStaff = new Map<string, number>();
+    attendanceRecords.forEach((a) => {
+      attendanceByStaff.set(
+        a.staffId,
+        (attendanceByStaff.get(a.staffId) ?? 0) + 1,
+      );
+    });
+
+    const leaveByStaff = new Map<string, number>();
+    leaveRequests.forEach((l) => {
+      const overlap = getOverlapDays(
+        l.startsOn,
+        l.endsOn,
+        period.startsOn,
+        period.endsOn,
+      );
+      leaveByStaff.set(l.staffId, (leaveByStaff.get(l.staffId) ?? 0) + overlap);
+    });
+
+    return staffMembers.map((staff) => {
+      const contract = contractsByStaff.get(staff.id);
+      const presentDays = attendanceByStaff.get(staff.id) ?? 0;
+      const approvedPaidLeaveDays = leaveByStaff.get(staff.id) ?? 0;
+      const warnings: string[] = [];
+
+      if (!contract) {
+        warnings.push('No active contract found for this period');
+      }
+
+      const totalEffectiveDays = presentDays + approvedPaidLeaveDays;
+      const unpaidLeaveDays = Math.max(0, workingDays - totalEffectiveDays);
+
+      const baseSalary = contract ? Number(contract.baseSalary) : 0;
+      const allowances = contract ? Number(contract.allowances) : 0;
+      const contractDeductions = contract ? Number(contract.deductions) : 0;
+
+      const calculated = calculatePayrollLine({
+        baseSalary,
+        allowances,
+        contractDeductions,
+        attendanceDays: totalEffectiveDays,
+        workingDays,
+      });
+
+      return {
+        staffId: staff.id,
+        fullName: `${staff.firstName} ${staff.lastName}`,
+        employeeId: staff.employeeId,
+        contractSummary: contract
+          ? {
+              contractNumber: contract.contractNumber,
+              position: contract.position,
+              baseSalary,
+              allowances,
+              deductions: contractDeductions,
+            }
+          : undefined,
+        periodMonth: query.month,
+        periodYear: query.year,
+        workingDays,
+        presentDays,
+        approvedPaidLeaveDays,
+        unpaidLeaveDays,
+        baseSalary,
+        allowances,
+        grossPay: calculated.grossSalary,
+        deductions: calculated.deductions,
+        netPay: calculated.netSalary,
+        warnings,
+      };
+    });
   }
 
   async approvePayrollRun(id: string, actor: AuthContext) {
@@ -598,4 +716,20 @@ async function ensureAccount(
       isSystem: true,
     },
   });
+}
+
+export function getOverlapDays(
+  start1: Date,
+  end1: Date,
+  start2: Date,
+  end2: Date,
+): number {
+  const start = new Date(Math.max(start1.getTime(), start2.getTime()));
+  const end = new Date(Math.min(end1.getTime(), end2.getTime()));
+
+  if (start > end) return 0;
+
+  const diffTime = Math.abs(end.getTime() - start.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  return diffDays;
 }

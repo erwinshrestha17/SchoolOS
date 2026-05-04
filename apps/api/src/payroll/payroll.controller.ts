@@ -5,6 +5,7 @@ import {
   Header,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
@@ -13,12 +14,22 @@ import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
+import { PayrollPreviewQueryDto } from './dto/payroll-preview-query.dto';
 import { PayrollService } from './payroll.service';
 
 @Controller('payroll')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class PayrollController {
   constructor(private readonly payrollService: PayrollService) {}
+
+  @Get('preview')
+  @Permissions('payroll:read')
+  getPreview(
+    @Query() query: PayrollPreviewQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.getPayrollPreview(query, auth);
+  }
 
   @Get('runs')
   @Permissions('payroll:read')

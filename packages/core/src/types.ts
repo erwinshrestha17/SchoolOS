@@ -1593,6 +1593,31 @@ export type PayrollLineSummary = {
   status: string;
 };
 
+export type PayrollPreviewResult = {
+  staffId: string;
+  fullName: string;
+  employeeId: string;
+  contractSummary?: {
+    contractNumber: string;
+    position: string;
+    baseSalary: number;
+    allowances: number;
+    deductions: number;
+  };
+  periodMonth: number;
+  periodYear: number;
+  workingDays: number;
+  presentDays: number;
+  approvedPaidLeaveDays: number;
+  unpaidLeaveDays: number;
+  baseSalary: number;
+  allowances: number;
+  grossPay: number;
+  deductions: number;
+  netPay: number;
+  warnings: string[];
+};
+
 export type PayslipSummary = {
   id: string;
   payrollRunId: string;

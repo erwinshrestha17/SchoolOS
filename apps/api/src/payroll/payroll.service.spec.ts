@@ -52,4 +52,52 @@ describe('payroll calculations', () => {
       canPost: true,
     });
   });
+
+  it('calculates overlap days correctly for leave requests', () => {
+    const { getOverlapDays } = require('./payroll.service');
+    
+    // Period: May 2026 (May 1 to May 31)
+    const periodStart = new Date(Date.UTC(2026, 4, 1));
+    const periodEnd = new Date(Date.UTC(2026, 4, 31, 23, 59, 59, 999));
+
+    // Case 1: Leave fully within period (May 5 to May 10 = 6 days)
+    expect(getOverlapDays(
+      new Date(Date.UTC(2026, 4, 5)), 
+      new Date(Date.UTC(2026, 4, 10)),
+      periodStart,
+      periodEnd
+    )).toBe(6);
+
+    // Case 2: Leave starts before, ends within (April 25 to May 5 = 5 days in May)
+    expect(getOverlapDays(
+      new Date(Date.UTC(2026, 3, 25)), 
+      new Date(Date.UTC(2026, 4, 5)),
+      periodStart,
+      periodEnd
+    )).toBe(5);
+
+    // Case 3: Leave starts within, ends after (May 25 to June 5 = 7 days in May)
+    expect(getOverlapDays(
+      new Date(Date.UTC(2026, 4, 25)), 
+      new Date(Date.UTC(2026, 5, 5)),
+      periodStart,
+      periodEnd
+    )).toBe(7);
+
+    // Case 4: Leave spans entire period (April 1 to June 30 = 31 days in May)
+    expect(getOverlapDays(
+      new Date(Date.UTC(2026, 3, 1)), 
+      new Date(Date.UTC(2026, 5, 30)),
+      periodStart,
+      periodEnd
+    )).toBe(31);
+
+    // Case 5: No overlap (April 1 to April 30)
+    expect(getOverlapDays(
+      new Date(Date.UTC(2026, 3, 1)), 
+      new Date(Date.UTC(2026, 3, 30)),
+      periodStart,
+      periodEnd
+    )).toBe(0);
+  });
 });
