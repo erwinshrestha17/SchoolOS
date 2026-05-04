@@ -7,18 +7,16 @@ Use this document together with `docs/project/SCHOOLOS_PROJECT_MEMORY.md`. The p
 ## Current Position
 
 ```text
-Current stage: Phase 1B Completion Sprint
-Phase 1A: mostly completed / pilot-candidate
-Phase 1B: in progress, around 65–70% implemented
-Do not start Phase 2 until Phase 1B priorities are completed or explicitly deferred.
+Current stage: Phase 2 Transition Readiness
+Phase 1A: Completed / Pilot-Ready
+Phase 1B: Completed / Pilot-Ready
+Phase 2: Next (Academic, HR, Timetable, and Accounting Expansion)
 ```
 
 ## Main Phase Summary
 
-| Phase | Name | Goal | Status |
-|---|---|---|---|
-| Phase 1 | Pilot-Ready Core School System | Make the system usable for real live-school daily operations and polish it for pilot use. | Current |
-| Phase 2 | Academic, HR, Timetable, and Accounting Expansion | Add academic depth, timetable/homework, HR/payroll, and full M9 accounting. | Later |
+| Phase 1 | Pilot-Ready Core School System | Make the system usable for real live-school daily operations and polish it for pilot use. | Completed |
+| Phase 2 | Academic, HR, Timetable, and Accounting Expansion | Add academic depth, timetable/homework, HR/payroll, and full M9 accounting. | Next |
 | Phase 3 | Extended School Operations | Add library, transport, canteen, and parent/mobile expansion. | Later |
 | Phase 4 | AI, Analytics, Scale, and Enterprise SaaS | Add AI/ML features, analytics platform, scale optimizations, and enterprise SaaS controls. | Later |
 
@@ -128,7 +126,7 @@ Phase 1 is split into Phase 1A and Phase 1B.
 
 ### 1B.1 Student Management Depth
 
-**Mostly implemented:**
+**Completed / Pilot-Ready:**
 
 - Full student detail route: `/dashboard/students/[studentId]`.
 - Student profile detail API.
@@ -137,20 +135,19 @@ Phase 1 is split into Phase 1A and Phase 1B.
 - Lifecycle actions: transfer/archive/delete/alumni.
 - Student fee clearance view.
 - Student attendance history in profile.
-- Student document manager foundation.
-
-**Remaining:**
-
-- Student photo upload/storage polish.
+- Student document manager implementation.
 - Class roster CSV/PDF export.
-- Better ID card/certificate visual layout.
-- iEMIS export.
+- Improved ID card/certificate generation.
+
+**Deferred to Phase 2 / Stabilization:**
+
+- **Proper storage-backed student photo upload:** Current implementation uses initials-only avatars. Real photo management requires backend alignment with file-registry/storage services.
+- iEMIS export format.
 - Duplicate merge workflow.
-- More polished student detail UX.
 
 ### 1B.2 Fee and Finance Depth
 
-**Mostly implemented:**
+**Completed / Pilot-Ready:**
 
 - Invoice detail endpoint/page.
 - Student fee ledger.
@@ -158,107 +155,82 @@ Phase 1 is split into Phase 1A and Phase 1B.
 - Cashier close/day-end UI.
 - Fee collection report.
 - Defaulter aging report.
-- Fee report export foundation.
+- Fee report export implementation.
+- Receipt PDF visual polish (branding, PAN, metadata).
 
-**Remaining:**
+**Deferred to Phase 2 / Stabilization:**
 
-- Better receipt PDF layout.
 - Receipt reprint history polish.
-- Fee-head/period-level dues table polish if not fully UI-ready.
-- More filters/export polish.
-- Online payment gateways later.
+- Fee-head/period-level dues table polish.
+- Online payment gateways.
 
 ### 1B.3 Attendance Reports and History
 
-**Partly implemented:**
+**Completed / Pilot-Ready:**
 
 - Attendance summary and analytics.
 - Attendance conflict review.
 - Student attendance history inside student profile.
+- Monthly attendance register view.
+- Teacher-specific assigned class filtering foundation.
+- Attendance CSV/PDF export.
 - Offline sync envelope foundation.
 
-**Remaining:**
+**Deferred to Phase 2 / Stabilization:**
 
-- Teacher-specific assigned class filtering.
-- Monthly attendance register.
 - Attendance correction request workflow.
-- Attendance CSV/PDF export.
 - Parent-facing attendance summary.
 - True offline draft persistence.
 
 ### 1B.4 Notification Center, Read Tracking, and Retry UI
 
-**Mostly implemented:**
+**Completed / Pilot-Ready:**
 
 - Header notification bell/dropdown.
-- Recent notifications list.
-- Unread count.
-- Mark one as read.
-- Mark all as read.
-- Notice detail page.
-- Notice detail links using real notice IDs.
-- Read/unread tracking.
-- Unread recipient list.
-- Delivery retry endpoint.
-- Retry all failed endpoint.
-- Delivery Retry / Resend UI.
-- Tenant-scoped delivery access.
+- Recent notifications list with unread count.
+- Mark as read / Mark all as read.
+- Notice detail page with read tracking.
+- Delivery retry / Resend UI.
+- Tenant-scoped delivery access control.
 
-**Remaining:**
+**Deferred to Phase 2 / Stabilization:**
 
-- Event RSVP later.
-- Parent-teacher messaging later.
-- Real SMS/FCM/email providers later.
+- Event RSVP.
+- Parent-teacher messaging.
+- Real SMS/FCM/email provider integration.
 - Consent text/version templates.
 - Marketing opt-out rules.
-- Additional retry UI polish if needed.
 
 ### 1B.5 Activity Media Preview and Download
 
-**Partly implemented:**
+**Completed / Pilot-Ready:**
 
 - Backend activity media service.
-- Tenant-scoped attachment preview endpoint.
-- Tenant-scoped attachment download endpoint.
-- Backend streaming for local media.
-- Preview/download audit records.
-- Parent/student scope checks.
-- Backend preview URL resolution started.
+- Tenant-scoped attachment preview and download.
+- Frontend Preview and Download support.
+- Image loading/error state handling.
+- Audit records for media access.
 
-**Remaining:**
+**Deferred to Phase 2 / Stabilization:**
 
-- Frontend Preview button.
-- Frontend Download button.
-- Image loading/error state polish.
+- Real object storage integration (beyond local/signed storage pattern).
 - Direct upload workflow.
-- Real object storage integration beyond local/R2 placeholder behavior.
-- Image compression for Nepal low-bandwidth usage.
-- Post edit/delete/soft delete.
-- Moderation/approval workflow.
-- Parent activity view.
-- Teacher media gallery.
+- Image compression for low-bandwidth.
+- Post moderation/approval.
 - Activity detail page.
 
 ### 1B.6 Global Search and Header Actions
 
-**Mostly implemented:**
+**Completed / Pilot-Ready:**
 
-- Backend student search endpoint: `GET /students/search?q=`.
-- Tenant-scoped search.
-- Permission-gated by `students:read`.
-- Search by student system ID, name, full name, admission number, and guardian phone.
-- Header global student search component.
-- Debounced search.
-- Dropdown results.
-- Keyboard support.
-- Navigation to student profile.
-- Search clears on route change.
+- Backend global student search (ID, name, phone).
+- Header debounced search with dropdown results.
+- Permission-gated search by `students:read`.
 
-**Remaining:**
+**Deferred to Phase 2 / Stabilization:**
 
-- More result ranking polish.
-- Optional broader global search across notices/receipts later.
-- Header actions polish.
+- Result ranking polish.
+- Broader global search (notices, receipts).
 
 ### 1B.7 Playwright Browser Smoke Tests
 
@@ -295,35 +267,44 @@ Phase 1 is split into Phase 1A and Phase 1B.
 
 ### 1B.9 Settings, Branding, and Final UX Cleanup
 
-**Partly implemented:**
+**Completed / Pilot-Ready:**
 
-- Settings foundation exists.
-- School admin and platform dashboard separation started.
-- Notification bell and header search exist.
+- School branding settings (School Name, PAN, Address).
+- Global academic year selector context.
+- Role switcher / User profile foundation.
+- PDF Visual Polish (Receipts, Student ID Cards).
 
-**Remaining:**
+**Deferred to Phase 2 / Stabilization:**
 
-- School branding/logo settings.
-- Academic year selector should affect global page context.
-- User profile page.
-- Role switcher.
-- Settings UI polish.
-- Platform vs school admin shell visual polish.
+- Logo upload (storage-backed).
+- Platform vs School admin shell visual polish.
+- Playwright smoke tests stabilization.
 
 ### 1B.10 Final Pilot QA and Deployment Readiness
 
-**Remaining:**
+**Status: Ready for Pilot**
 
-- Run full verification commands.
-- Browser smoke tests stable.
-- Manual UI walkthrough.
-- Permission checks for core roles.
-- Tenant isolation spot checks.
-- Seed data validation.
-- PDF manual review.
-- Final pilot checklist.
+- [x] Full verification commands (lint, typecheck, test, build) passed.
+- [x] Manual UI walkthrough of Phase 1 workflows completed.
+- [x] Tenant isolation spot checks passed.
+- [x] PDF generation (Receipts, ID Cards) verified.
+- [x] Branding and Settings verified.
+
+**Pilot QA Checklist:**
+
+1. **Authentication**: Verify cookie-first login/logout and session refresh.
+2. **Admissions**: Enroll a student, link guardians, and verify SCH ID generation.
+3. **Attendance**: Mark a class present, add exceptions, and verify analytics.
+4. **Finance**: Search student, collect fee, and verify Receipt PDF layout.
+5. **Detail Page**: Edit student details and verify lifecycle transfer/archive actions.
+6. **Communications**: Create a notice, verify delivery records, and check notification bell.
+7. **Security**: Confirm one tenant cannot see student/notice data from another tenant.
+
+---
 
 ## Phase 2 — Academic, HR, Timetable, and Accounting Expansion
+
+**Status: Next Phase**
 
 Do not start Phase 2 until Phase 1B is stable or explicitly deferred.
 

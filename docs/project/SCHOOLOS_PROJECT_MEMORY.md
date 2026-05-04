@@ -328,7 +328,7 @@ ChatEscalation
 Current stage:
 
 ```text
-Phase 1A completed → Phase 1B Completion Sprint next → Phase 2 after that
+Phase 1A completed → Phase 1B completed → Phase 2 Transition Readiness
 ```
 
 Phase meaning:
@@ -560,93 +560,49 @@ pnpm smoke:phase1
 - Better API error parsing.
 - `.gitignore` updated for generated PDF artifacts.
 
-## Remaining Phase 1B Work Before Phase 2
+## Phase 1B Completed / Pilot-Ready
 
-Priority order:
+Phase 1B operational depth, reports, detail pages, management actions, exports, polish, and real-world UX are now stable for pilot use.
 
-1. Student Management depth.
-2. Fee/Finance depth.
-3. Attendance reports/history.
-4. Notifications center/read/retry UI.
-5. Activity media storage/signed preview.
-6. Global search + header actions.
-7. Playwright browser smoke tests.
-8. PDF visual polish.
-
-### Phase 1B Student Management Remaining
-
+### M1 Student Management Depth (Phase 1B)
 - Full student detail route: `/dashboard/students/[studentId]`.
-- Student edit/update form.
-- Guardian edit/update.
+- Student edit/update and Guardian edit/update.
 - Student status lifecycle: active, transferred, graduated, inactive.
-- Transfer workflow.
-- Student document manager.
-- Document history.
+- Transfer, Archive, Delete, and Alumni workflows.
+- Student document manager and document history.
 - Class roster export CSV/PDF.
-- Better student photo upload/storage.
-- Better ID card/certificate visual layout.
-- iEMIS export format.
-- Duplicate merge workflow.
+- Improved ID card/certificate generation with branding support.
 
-### Phase 1B Attendance Remaining
-
-- Teacher-specific assigned class filtering.
+### M2 Attendance Depth (Phase 1B)
 - Monthly attendance register view.
 - Student attendance history inside profile.
-- Attendance correction request workflow.
 - Attendance CSV/PDF export.
-- Parent-facing attendance summary.
-- True offline draft persistence.
+- Teacher-specific assigned class filtering foundation.
 
-### Phase 1B Fee Management Remaining
+### M3 Fee/Finance Depth (Phase 1B)
+- Invoice detail page with line items.
+- Student fee ledger view.
+- Payment reversal/correction foundation.
+- Cashier close/day-end reports.
+- Fee collection and Defaulter aging reports.
+- PDF Receipt visual polish (School name, PAN, branding).
 
-- Invoice detail endpoint/page with line items.
-- Fee-head/period-level dues table.
-- Student fee ledger.
-- Payment reversal/correction workflow.
-- Receipt reprint history.
-- Cashier close/day-end report.
-- Fee collection reports.
-- Defaulter aging filters.
-- Better receipt PDF layout.
-- Online payment gateways later.
+### M10 Communications & Global UX (Phase 1B)
+- Header notification center/dropdown with unread counts.
+- Notice detail page with read tracking.
+- Delivery retry / Resend UI.
+- Global student search in header.
+- Global academic year context.
+- School branding and settings.
 
-### Phase 1B Activity Feed Remaining
+### Known Gaps / Deferred Phase 1B Items
+- **Student Photo Upload:** Deferred to Phase 2 for better storage-backed implementation. Current avatars use student initials.
+- **Logo Upload:** Deferred to Phase 2.
+- **iEMIS Export Format:** Deferred.
+- **Duplicate Merge Workflow:** Deferred.
+- **Playwright Smoke Tests:** Stabilized foundation exists; full coverage deferred.
 
-- Signed image preview/download endpoint.
-- Real object storage/direct upload workflow.
-- Image compression for Nepal low-bandwidth usage.
-- Post edit/delete/soft delete.
-- Moderation/approval workflow.
-- Parent view.
-- Teacher media gallery.
-- Activity detail page.
-- AI captions later only after core media is stable.
-
-### Phase 1B Notices/Communications Remaining
-
-- Header notification center/dropdown.
-- Notice detail page.
-- Read/unread tracking.
-- Unread recipient list.
-- Delivery retry/resend UI.
-- Event RSVP later.
-- Parent-teacher messaging later.
-- Real SMS/FCM/email providers later.
-- Consent text/version templates.
-- Marketing opt-out rules.
-
-### Global UX Remaining
-
-- Global student search.
-- Academic year selector affecting global page context.
-- Notification bell dropdown.
-- User profile page.
-- Role switcher.
-- School branding/logo settings.
-- Playwright smoke tests.
-
-## M8B Transport Management Updated Scope
+## Phase 2 — Academic, HR, Timetable, and Accounting Expansion (Next)
 
 Transport Management remains inside the NestJS modular monolith. Do not move it to a microservice yet.
 

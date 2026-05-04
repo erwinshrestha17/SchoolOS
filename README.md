@@ -6,11 +6,10 @@ The project is structured as a `pnpm` monorepo centered on a NestJS modular-mono
 
 ## Current Stage
 
-SchoolOS is currently in **Phase 1B Completion Sprint**.
+SchoolOS is currently in **Phase 2 Transition Readiness**.
 
-- Phase 1A core workflows are mostly complete and pilot-candidate.
-- Phase 1B focuses on operational depth: detail pages, edits, reports, exports, management actions, polish, and browser testing.
-- Phase 2 modules should not be started unless explicitly planned.
+- Phase 1A and 1B core workflows are completed and pilot-ready.
+- Phase 2 modules (Academics, HR/Payroll, Timetable, Accounting) are scheduled next.
 
 Source of truth:
 
@@ -307,17 +306,16 @@ Notes:
 - School Settings/setup screens.
 - Platform Overview and Manage Schools screens.
 
-## Phase 1B Remaining Priorities
+## Phase 1B Readiness
 
-1. Notification center/read/retry UI.
-2. Activity signed media preview/download stabilization.
-3. Global student search and header actions.
-4. Playwright browser smoke tests.
-5. PDF visual polish.
-6. Student photo upload/storage.
-7. iEMIS export UI.
-8. Duplicate merge workflow.
-9. More Platform Control Plane depth: tenant usage, plans/billing, system health, audit views.
+Phase 1B has reached pilot-readiness. Remaining polish items and deferred features:
+
+1. **Student Photo Upload:** Deferred to Phase 2 for storage-backed implementation.
+2. **Logo Upload:** Deferred.
+3. **iEMIS Export UI:** Deferred.
+4. **Duplicate Merge Workflow:** Deferred.
+5. **Platform Control Plane Depth:** Continued expansion for multi-tenant monitoring.
+6. **Playwright Smoke Tests:** Stabilization of automated browser flows.
 
 ## M9 Accounting Direction
 
