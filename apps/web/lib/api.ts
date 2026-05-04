@@ -706,7 +706,14 @@ export const api = {
     year: number;
     month: number;
     workingDays?: number;
-  }) => request<PayrollPreviewResult[]>(withQuery('/payroll/preview', params)),
+  }) =>
+    request<PayrollPreviewResult[]>(
+      withQuery('/payroll/preview', {
+        year: String(params.year),
+        month: String(params.month),
+        workingDays: params.workingDays ? String(params.workingDays) : undefined,
+      }),
+    ),
   listAccountingPeriods: () =>
     request<AccountingPeriodSummary[]>('/accounting/periods'),
   createAccountingPeriod: (body: JsonBody) =>
