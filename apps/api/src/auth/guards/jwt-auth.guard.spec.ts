@@ -17,7 +17,7 @@ describe('JwtAuthGuard', () => {
   let jwtService: { verifyAsync: jest.Mock };
   let auditService: { record: jest.Mock };
   let prisma: { tenant: { findUnique: jest.Mock } };
-  let cls: { set: jest.Mock };
+  let cls: { set: jest.Mock; isActive: jest.Mock<boolean, []> };
 
   const basePayload: JwtAccessPayload = {
     sub: 'user-1',

@@ -26,7 +26,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 import { api } from '../../lib/api';
-import { fileToBase64Payload } from '../../lib/files';
 
 type StudentDetailPageProps = {
   studentId: string;
@@ -76,8 +75,6 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
   const [lifecycleAction, setLifecycleAction] =
     useState<LifecycleAction | null>(null);
   const [lifecycleMessage, setLifecycleMessage] = useState('');
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
-  const [photoError, setPhotoError] = useState('');
   const queryClient = useQueryClient();
   const profileQuery = useQuery({
     queryKey: ['student-profile', studentId],
@@ -154,8 +151,7 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
     }
   }
 
-  // Student photo upload disabled for Phase 1B as backend storage contract is not fully aligned
-  // async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) { ... }
+
 
   if (!studentId) {
     return (
@@ -195,16 +191,7 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-4">
             <div className="relative group flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-primary-50 text-xl font-bold text-primary-700 overflow-hidden ring-1 ring-gray-200">
-              {profile.student.photoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={profile.student.photoUrl}
-                  alt={studentName}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                initials(studentName)
-              )}
+              {initials(studentName)}
             </div>
             <div>
               <p className="label mb-2">Student Profile</p>
@@ -262,11 +249,6 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
         {pdfError ? (
           <p className="mt-4 rounded-2xl border border-danger-200 bg-danger-50 p-3 text-sm text-danger-600">
             {pdfError}
-          </p>
-        ) : null}
-        {photoError ? (
-          <p className="mt-4 rounded-2xl border border-danger-200 bg-danger-50 p-3 text-sm text-danger-600">
-            {photoError}
           </p>
         ) : null}
       </section>
