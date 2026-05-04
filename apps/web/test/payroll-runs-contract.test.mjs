@@ -22,7 +22,7 @@ describe('Payroll Runs UI contracts', () => {
     assert.doesNotMatch(workspace, /<PayrollPreview \/>/);
   });
 
-  it('uses only preview, create, approve, list, and approved salary-slip PDF helpers', () => {
+  it('uses only preview, create, approve, post, list, and approved salary-slip PDF helpers', () => {
     const apiClient = read('lib/api.ts');
     const payrollRuns = read('components/hr/payroll-runs.tsx');
     const payrollPdf = read('lib/payroll-pdf.ts');
@@ -31,6 +31,7 @@ describe('Payroll Runs UI contracts', () => {
       'listPayrollRuns',
       'createPayrollRun',
       'approvePayrollRun',
+      'postPayrollRun',
       'getPayrollPreview',
     ]) {
       assert.match(apiClient, new RegExp(`${helper}:`), `Missing API helper: ${helper}`);
@@ -43,36 +44,39 @@ describe('Payroll Runs UI contracts', () => {
     assert.match(payrollRuns, /openApprovedSalarySlipPdf/);
     assert.match(payrollRuns, /selectedRun\.status === 'APPROVED'/);
     assert.match(payrollRuns, /Open Salary Slip PDF/);
+    assert.match(payrollRuns, /Post to M9 Accounting/);
 
-    assert.doesNotMatch(payrollRuns, /api\.postPayrollRun/);
     assert.doesNotMatch(payrollRuns, /api\.listPayslips/);
     assert.doesNotMatch(payrollRuns, /api\.getPayslipPdf/);
-    assert.doesNotMatch(payrollRuns, /postPayrollRun/);
     assert.doesNotMatch(payrollRuns, /listPayslips/);
     assert.doesNotMatch(payrollRuns, /getPayslipPdf/);
   });
 
-  it('keeps Payroll Runs UI inside the Phase 2 approval boundary without M9 posting', () => {
+  it('keeps Payroll Runs UI inside the Phase 2 posting boundary without disbursement or reversals', () => {
     const payrollRuns = read('components/hr/payroll-runs.tsx');
     const payrollPdf = read('lib/payroll-pdf.ts');
 
-    assert.match(payrollRuns, /Approval locks the payroll run/i);
-    assert.match(payrollRuns, /does not post to accounting/i);
-    assert.match(payrollRuns, /does not post to M9 Accounting/i);
-    assert.match(payrollRuns, /Salary slip PDFs are available only after approval|Salary slip PDFs are available only for APPROVED runs/i);
-    assert.match(payrollRuns, /DRAFT runs cannot generate salary slips/i);
-    assert.match(payrollRuns, /disburse salaries|payroll disbursement/i);
+    assert.match(payrollRuns, /Approval locks payroll calculations/i);
+    assert.match(payrollRuns, /Posting is a separate APPROVED-to-POSTED action/i);
+    assert.match(payrollRuns, /creates the M9 payroll accrual journal/i);
+    assert.match(payrollRuns, /backend accounting posting boundary/i);
+    assert.match(payrollRuns, /does not disburse salaries/i);
+    assert.match(payrollRuns, /does not.*create reversal entries/i);
+    assert.match(payrollRuns, /allow editing posted runs|enable editing posted runs/i);
+    assert.match(payrollRuns, /selectedRun\.status === 'APPROVED'/);
+    assert.match(payrollRuns, /selectedRun\.status === 'POSTED'/);
 
     assert.doesNotMatch(payrollRuns, /createJournalEntry/);
     assert.doesNotMatch(payrollRuns, /AccountingPostingService/);
     assert.doesNotMatch(payrollRuns, /\/accounting\/journal-entries/);
     assert.doesNotMatch(payrollRuns, /\/accounting\/ledger/);
     assert.doesNotMatch(payrollRuns, /\/ledger\/entries/);
+    assert.doesNotMatch(payrollRuns, /disbursePayroll|paySalary|releasePayment|reversePayroll|voidPostedPayroll/i);
     assert.doesNotMatch(payrollRuns, /payslipNumber|openPdfBlob|getPayslipPdf|listPayslips/);
     assert.doesNotMatch(payrollPdf, /postPayrollRun|createJournalEntry|AccountingPostingService|\/accounting\/journal-entries|\/accounting\/ledger/);
   });
 
-  it('keeps Payroll Runs permission-aware and avoids internal tenant leakage', () => {
+  it('keeps Payroll Runs permission-aware and avoids internal tenant or journal identifier leakage', () => {
     const payrollRuns = read('components/hr/payroll-runs.tsx');
     const payrollPdf = read('lib/payroll-pdf.ts');
 
@@ -81,6 +85,7 @@ describe('Payroll Runs UI contracts', () => {
     assert.match(payrollRuns, /payroll:manage/);
     assert.doesNotMatch(payrollRuns, /tenantId/);
     assert.doesNotMatch(payrollRuns, /objectKey|storageObjectKey|database/i);
+    assert.doesNotMatch(payrollRuns, /\{selectedRun\.journalEntryId\}|Journal ID|journalEntryId:/);
     assert.doesNotMatch(payrollPdf, /tenantId|objectKey|storageObjectKey|database/i);
   });
 });
