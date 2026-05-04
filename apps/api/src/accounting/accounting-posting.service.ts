@@ -189,7 +189,7 @@ export class AccountingPostingService {
       { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(0) },
     );
 
-    if (!toDecimal(totals.debit).equals(toDecimal(totals.credit))) {
+    if (decimalText(totals.debit) !== decimalText(totals.credit)) {
       throw new ConflictException('Accounting posting must be balanced');
     }
   }
@@ -197,4 +197,8 @@ export class AccountingPostingService {
 
 function toDecimal(value: Prisma.Decimal | number | string) {
   return new Prisma.Decimal(value);
+}
+
+function decimalText(value: Prisma.Decimal | number | string) {
+  return toDecimal(value).toString();
 }
