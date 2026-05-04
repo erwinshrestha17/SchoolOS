@@ -55,7 +55,7 @@ export function TimetableHomeworkForm() {
   });
   const homeworkQuery = useQuery({
     queryKey: ['homework'],
-    queryFn: api.listHomework,
+    queryFn: () => api.listHomework(),
   });
   const submissionsQuery = useQuery({
     queryKey: ['homework-submissions'],

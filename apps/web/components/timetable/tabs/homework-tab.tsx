@@ -14,6 +14,24 @@ type Props = {
   setClassId: (id: string) => void;
 };
 
+type GradingPayload = {
+  submissionId: string;
+  status: string;
+  score: number;
+  feedback: string;
+};
+
+type HomeworkPayload = {
+  academicYearId: string;
+  classId: string;
+  sectionId?: string;
+  subjectId: string;
+  title: string;
+  instructions: string;
+  dueAt: string;
+  maxScore: number;
+};
+
 export function HomeworkTab({
   academicYears,
   classes,
@@ -225,7 +243,17 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function GradingForm({ submissionId, maxScore, onReview, isPending }: any) {
+function GradingForm({
+  submissionId,
+  maxScore,
+  onReview,
+  isPending,
+}: {
+  submissionId: string;
+  maxScore: number | null;
+  onReview: (data: GradingPayload) => void;
+  isPending: boolean;
+}) {
   const [score, setScore] = useState('');
   const [feedback, setFeedback] = useState('');
 
@@ -233,7 +261,9 @@ function GradingForm({ submissionId, maxScore, onReview, isPending }: any) {
     <div className="space-y-3">
       <div className="flex gap-3">
         <div className="flex-1">
-          <label className="mb-1 block text-xs font-semibold text-gray-600">Score (max {maxScore})</label>
+          <label className="mb-1 block text-xs font-semibold text-gray-600">
+            Score (max {maxScore ?? '—'})
+          </label>
           <input
             type="number"
             value={score}
@@ -274,8 +304,17 @@ function CreateHomeworkModal({
   staff,
   onClose,
   onSave,
-  isPending
-}: any) {
+  isPending,
+}: {
+  academicYears: any[];
+  classes: any[];
+  allSections: any[];
+  subjects: any[];
+  staff: any[];
+  onClose: () => void;
+  onSave: (data: HomeworkPayload) => void;
+  isPending: boolean;
+}) {
   const [formData, setFormData] = useState({
     academicYearId: academicYears.find((y: any) => y.isCurrent)?.id ?? '',
     classId: '',
