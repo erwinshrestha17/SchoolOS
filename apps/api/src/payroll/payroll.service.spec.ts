@@ -2,6 +2,7 @@ import {
   calculatePayrollLine,
   calculatePayrollTotals,
   getPayrollRunActions,
+  getOverlapDays,
 } from './payroll.service';
 
 describe('payroll calculations', () => {
@@ -38,7 +39,7 @@ describe('payroll calculations', () => {
   it('enforces draft to reviewed to approved to posted workflow actions', () => {
     expect(getPayrollRunActions('DRAFT')).toEqual({
       canReview: true,
-      canApprove: false,
+      canApprove: true,
       canPost: false,
     });
     expect(getPayrollRunActions('REVIEWED')).toEqual({
@@ -53,9 +54,14 @@ describe('payroll calculations', () => {
     });
   });
 
-  it('calculates overlap days correctly for leave requests', () => {
-    const { getOverlapDays } = require('./payroll.service');
+  it('allows approval from both DRAFT and REVIEWED statuses', () => {
+    expect(getPayrollRunActions('DRAFT').canApprove).toBe(true);
+    expect(getPayrollRunActions('REVIEWED').canApprove).toBe(true);
+    expect(getPayrollRunActions('APPROVED').canApprove).toBe(false);
+    expect(getPayrollRunActions('POSTED').canApprove).toBe(false);
+  });
 
+  it('calculates overlap days correctly for leave requests', () => {
     // Period: May 2026 (May 1 to May 31)
     const periodStart = new Date(Date.UTC(2026, 4, 1));
     const periodEnd = new Date(Date.UTC(2026, 4, 31, 23, 59, 59, 999));

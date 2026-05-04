@@ -110,79 +110,29 @@ export class PayrollService {
       },
     });
 
-    if (existing) {
-      throw new ConflictException('Payroll run already exists for this period');
+    if (existing && existing.status !== PayrollRunStatus.VOID) {
+      throw new ConflictException(
+        'A payroll run already exists for this period. Void the existing one first if a re-run is needed.',
+      );
     }
 
-    const period = getPayrollPeriod(dto.periodYear, dto.periodMonth);
+    if (existing?.status === PayrollRunStatus.VOID) {
+      // Delete VOID run to satisfy unique constraint [tenantId, periodMonth, periodYear]
+      await this.prisma.payrollRun.delete({ where: { id: existing.id } });
+    }
+
     const workingDays = dto.workingDays ?? 30;
-    const contracts = await this.prisma.staffContract.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        status: 'ACTIVE',
-        startDate: { lte: period.endsOn },
-        OR: [{ endDate: null }, { endDate: { gte: period.startsOn } }],
-      },
-      include: {
-        staff: true,
-      },
-    });
 
-    if (contracts.length === 0) {
-      throw new NotFoundException('No active staff contracts found');
+    const { lines, totals } = await this.calculatePeriodPayrollLines(
+      dto.periodYear,
+      dto.periodMonth,
+      workingDays,
+      actor,
+    );
+
+    if (lines.length === 0) {
+      throw new NotFoundException('No active staff contracts found to process');
     }
-
-    const attendanceCounts = await Promise.all(
-      contracts.map(async (contract) => ({
-        staffId: contract.staffId,
-        count: await this.prisma.staffAttendance.count({
-          where: {
-            tenantId: actor.tenantId,
-            staffId: contract.staffId,
-            attendanceDate: {
-              gte: period.startsOn,
-              lte: period.endsOn,
-            },
-            status: { in: ['PRESENT', 'LATE'] },
-          },
-        }),
-      })),
-    );
-    const attendanceByStaff = new Map(
-      attendanceCounts.map((item) => [item.staffId, item.count]),
-    );
-
-    const lines = contracts.map((contract) => {
-      const recordedAttendance = attendanceByStaff.get(contract.staffId) ?? 0;
-      const attendanceDays =
-        recordedAttendance > 0 ? recordedAttendance : workingDays;
-      const calculated = calculatePayrollLine({
-        baseSalary: Number(contract.baseSalary),
-        allowances: Number(contract.allowances),
-        contractDeductions: Number(contract.deductions),
-        attendanceDays,
-        workingDays,
-      });
-
-      return {
-        tenantId: actor.tenantId,
-        staffId: contract.staffId,
-        contractId: contract.id,
-        grossSalary: new Prisma.Decimal(calculated.grossSalary),
-        allowances: new Prisma.Decimal(calculated.allowances),
-        deductions: new Prisma.Decimal(calculated.deductions),
-        netSalary: new Prisma.Decimal(calculated.netSalary),
-        attendanceDays,
-        workingDays,
-      };
-    });
-    const totals = calculatePayrollTotals(
-      lines.map((line) => ({
-        grossSalary: Number(line.grossSalary),
-        deductions: Number(line.deductions),
-        netSalary: Number(line.netSalary),
-      })),
-    );
 
     const run = await this.prisma.payrollRun.create({
       data: {
@@ -194,7 +144,17 @@ export class PayrollService {
         deductionAmount: new Prisma.Decimal(totals.deductionAmount),
         netAmount: new Prisma.Decimal(totals.netAmount),
         lines: {
-          create: lines,
+          create: lines.map((line) => ({
+            tenantId: actor.tenantId,
+            staffId: line.staffId,
+            contractId: line.contractId,
+            grossSalary: new Prisma.Decimal(line.grossSalary),
+            allowances: new Prisma.Decimal(line.allowances),
+            deductions: new Prisma.Decimal(line.deductions),
+            netSalary: new Prisma.Decimal(line.netSalary),
+            attendanceDays: line.attendanceDays,
+            workingDays: line.workingDays,
+          })),
         },
       },
       include: {
@@ -227,8 +187,61 @@ export class PayrollService {
     query: PayrollPreviewQueryDto,
     actor: AuthContext,
   ): Promise<PayrollPreviewResult[]> {
-    const period = getPayrollPeriod(query.year, query.month);
-    const workingDays = query.workingDays ?? 30;
+    const { lines, staffMembers, contractsByStaff } =
+      await this.calculatePeriodPayrollLines(
+        query.year,
+        query.month,
+        query.workingDays ?? 30,
+        actor,
+      );
+
+    const linesByStaff = new Map(lines.map((l) => [l.staffId, l]));
+
+    return staffMembers.map((staff) => {
+      const line = linesByStaff.get(staff.id);
+      const contract = contractsByStaff.get(staff.id);
+      const warnings: string[] = [];
+
+      if (!contract) {
+        warnings.push('No active contract found for this period');
+      }
+
+      return {
+        staffId: staff.id,
+        fullName: `${staff.firstName} ${staff.lastName}`,
+        employeeId: staff.employeeId,
+        contractSummary: contract
+          ? {
+              contractNumber: contract.contractNumber,
+              position: contract.position,
+              baseSalary: Number(contract.baseSalary),
+              allowances: Number(contract.allowances),
+              deductions: Number(contract.deductions),
+            }
+          : undefined,
+        periodMonth: query.month,
+        periodYear: query.year,
+        workingDays: line?.workingDays ?? query.workingDays ?? 30,
+        presentDays: line?.presentDays ?? 0,
+        approvedPaidLeaveDays: line?.approvedPaidLeaveDays ?? 0,
+        unpaidLeaveDays: line?.unpaidLeaveDays ?? 0,
+        baseSalary: line?.baseSalary ?? 0,
+        allowances: line?.allowances ?? 0,
+        grossPay: line?.grossSalary ?? 0,
+        deductions: line?.deductions ?? 0,
+        netPay: line?.netSalary ?? 0,
+        warnings,
+      };
+    });
+  }
+
+  private async calculatePeriodPayrollLines(
+    year: number,
+    month: number,
+    workingDays: number,
+    actor: AuthContext,
+  ) {
+    const period = getPayrollPeriod(year, month);
 
     const staffMembers = await this.prisma.staff.findMany({
       where: {
@@ -285,22 +298,15 @@ export class PayrollService {
       leaveByStaff.set(l.staffId, (leaveByStaff.get(l.staffId) ?? 0) + overlap);
     });
 
-    return staffMembers.map((staff) => {
-      const contract = contractsByStaff.get(staff.id);
-      const presentDays = attendanceByStaff.get(staff.id) ?? 0;
-      const approvedPaidLeaveDays = leaveByStaff.get(staff.id) ?? 0;
-      const warnings: string[] = [];
-
-      if (!contract) {
-        warnings.push('No active contract found for this period');
-      }
-
+    const lines = contracts.map((contract) => {
+      const presentDays = attendanceByStaff.get(contract.staffId) ?? 0;
+      const approvedPaidLeaveDays = leaveByStaff.get(contract.staffId) ?? 0;
       const totalEffectiveDays = presentDays + approvedPaidLeaveDays;
       const unpaidLeaveDays = Math.max(0, workingDays - totalEffectiveDays);
 
-      const baseSalary = contract ? Number(contract.baseSalary) : 0;
-      const allowances = contract ? Number(contract.allowances) : 0;
-      const contractDeductions = contract ? Number(contract.deductions) : 0;
+      const baseSalary = Number(contract.baseSalary);
+      const allowances = Number(contract.allowances);
+      const contractDeductions = Number(contract.deductions);
 
       const calculated = calculatePayrollLine({
         baseSalary,
@@ -311,32 +317,35 @@ export class PayrollService {
       });
 
       return {
-        staffId: staff.id,
-        fullName: `${staff.firstName} ${staff.lastName}`,
-        employeeId: staff.employeeId,
-        contractSummary: contract
-          ? {
-              contractNumber: contract.contractNumber,
-              position: contract.position,
-              baseSalary,
-              allowances,
-              deductions: contractDeductions,
-            }
-          : undefined,
-        periodMonth: query.month,
-        periodYear: query.year,
+        staffId: contract.staffId,
+        contractId: contract.id,
+        baseSalary,
+        allowances,
+        grossSalary: calculated.grossSalary,
+        deductions: calculated.deductions,
+        netSalary: calculated.netSalary,
         workingDays,
         presentDays,
         approvedPaidLeaveDays,
         unpaidLeaveDays,
-        baseSalary,
-        allowances,
-        grossPay: calculated.grossSalary,
-        deductions: calculated.deductions,
-        netPay: calculated.netSalary,
-        warnings,
+        attendanceDays: totalEffectiveDays,
       };
     });
+
+    const totals = calculatePayrollTotals(
+      lines.map((line) => ({
+        grossSalary: line.grossSalary,
+        deductions: line.deductions,
+        netSalary: line.netSalary,
+      })),
+    );
+
+    return {
+      lines,
+      totals,
+      staffMembers,
+      contractsByStaff,
+    };
   }
 
   async approvePayrollRun(id: string, actor: AuthContext) {
@@ -353,7 +362,7 @@ export class PayrollService {
 
     if (!actions.canApprove) {
       throw new ConflictException(
-        'Payroll run must be reviewed before approval',
+        `Payroll run in ${run.status} status cannot be approved`,
       );
     }
 
@@ -362,7 +371,7 @@ export class PayrollService {
       data: { status: PayrollLineStatus.APPROVED },
     });
 
-    return this.prisma.payrollRun.update({
+    const updated = await this.prisma.payrollRun.update({
       where: { id: run.id },
       data: {
         status: PayrollRunStatus.APPROVED,
@@ -376,6 +385,20 @@ export class PayrollService {
         },
       },
     });
+
+    await this.auditService.record({
+      action: 'approve',
+      resource: 'payroll_run',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      after: {
+        status: updated.status,
+        approvedAt: updated.approvedAt,
+      },
+    });
+
+    return updated;
   }
 
   async reviewPayrollRun(id: string, actor: AuthContext) {
@@ -622,13 +645,13 @@ export class PayrollService {
   }
 }
 
-type PayrollLineInput = {
+interface PayrollLineInput {
   baseSalary: number;
   allowances: number;
   contractDeductions: number;
   attendanceDays: number;
   workingDays: number;
-};
+}
 
 export function calculatePayrollLine(input: PayrollLineInput) {
   const attendanceRatio =
@@ -666,10 +689,11 @@ export function calculatePayrollTotals(
   );
 }
 
-export function getPayrollRunActions(status: PayrollRunStatus | string) {
+export function getPayrollRunActions(status: string) {
   return {
     canReview: status === PayrollRunStatus.DRAFT,
-    canApprove: status === PayrollRunStatus.REVIEWED,
+    canApprove:
+      status === PayrollRunStatus.DRAFT || status === PayrollRunStatus.REVIEWED,
     canPost: status === PayrollRunStatus.APPROVED,
   };
 }

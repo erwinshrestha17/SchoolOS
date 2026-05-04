@@ -46,6 +46,15 @@ export class PayrollController {
     return this.payrollService.createPayrollRun(dto, auth);
   }
 
+  @Post('runs/preview-to-draft')
+  @Permissions('payroll:manage')
+  createDraftFromPreview(
+    @Body() dto: CreatePayrollRunDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.createPayrollRun(dto, auth);
+  }
+
   @Post('runs/:id/approve')
   @Permissions('payroll:manage')
   approveRun(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
