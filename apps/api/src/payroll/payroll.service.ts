@@ -729,7 +729,11 @@ export function getOverlapDays(
 
   if (start > end) return 0;
 
-  const diffTime = Math.abs(end.getTime() - start.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  // Set to UTC midnight to ensure we count full calendar days inclusive
+  const s = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+  const e = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
+
+  const diffTime = Math.abs(e - s);
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
   return diffDays;
 }
