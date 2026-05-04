@@ -489,6 +489,34 @@ export const api = {
     month: params.month ? String(params.month) : undefined,
     year: params.year ? String(params.year) : undefined,
   })),
+  exportRoster: async (params?: {
+    academicYearId?: string;
+    classId?: string;
+    sectionId?: string;
+  }) => {
+    const response = await fetch(
+      `${API_BASE_URL}${withQuery('/students/roster/export', params)}`,
+      {
+        credentials: 'include',
+      },
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(parseApiErrorMessage(text) || 'Export failed');
+    }
+
+    const text = await response.text();
+    const blob = new Blob([text], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `class-roster-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
   listAttendanceConflicts: () =>
     request<AttendanceConflict[]>('/attendance/conflicts'),
   submitAttendance: (body: JsonBody) =>

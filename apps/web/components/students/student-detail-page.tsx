@@ -76,6 +76,8 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
   const [lifecycleAction, setLifecycleAction] =
     useState<LifecycleAction | null>(null);
   const [lifecycleMessage, setLifecycleMessage] = useState('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState('');
   const queryClient = useQueryClient();
   const profileQuery = useQuery({
     queryKey: ['student-profile', studentId],
@@ -152,6 +154,37 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
     }
   }
 
+  async function handlePhotoUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setPhotoError('Photo must be less than 5MB.');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      setPhotoError('File must be an image.');
+      return;
+    }
+
+    setPhotoError('');
+    setIsUploadingPhoto(true);
+
+    try {
+      const payload = await fileToBase64Payload(file);
+      await api.updateStudent(studentId, {
+        photo: payload.base64Content,
+        photoFileName: payload.fileName,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : 'Upload failed.');
+    } finally {
+      setIsUploadingPhoto(false);
+      if (event.target) event.target.value = '';
+    }
+  }
+
   if (!studentId) {
     return (
       <StudentDetailShell title="Student profile unavailable">
@@ -189,8 +222,29 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
       <section className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-primary-50 text-xl font-bold text-primary-700">
-              {initials(studentName)}
+            <div className="relative group flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-primary-50 text-xl font-bold text-primary-700 overflow-hidden ring-1 ring-gray-200">
+              {profile.student.photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={profile.student.photoUrl}
+                  alt={studentName}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                initials(studentName)
+              )}
+              <label className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                <span className="text-[10px] font-semibold text-white uppercase tracking-wider">
+                  {isUploadingPhoto ? '...' : 'Upload'}
+                </span>
+                <input
+                  type="file"
+                  accept="image/png, image/jpeg"
+                  className="hidden"
+                  onChange={(e) => void handlePhotoUpload(e)}
+                  disabled={isUploadingPhoto}
+                />
+              </label>
             </div>
             <div>
               <p className="label mb-2">Student Profile</p>
@@ -248,6 +302,11 @@ export function StudentDetailPage({ studentId }: StudentDetailPageProps) {
         {pdfError ? (
           <p className="mt-4 rounded-2xl border border-danger-200 bg-danger-50 p-3 text-sm text-danger-600">
             {pdfError}
+          </p>
+        ) : null}
+        {photoError ? (
+          <p className="mt-4 rounded-2xl border border-danger-200 bg-danger-50 p-3 text-sm text-danger-600">
+            {photoError}
           </p>
         ) : null}
       </section>

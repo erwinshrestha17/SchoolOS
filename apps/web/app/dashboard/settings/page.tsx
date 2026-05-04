@@ -69,7 +69,59 @@ export default function TenantSettingsPage() {
             <Palette size={20} className="text-primary-600" />
             <h2 className="text-lg font-semibold">Branding</h2>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">School Name</label>
+                <input 
+                  type="text" 
+                  value={getSettingValue('school_name', '')}
+                  onChange={(e) => updateSetting('school_name', e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-sm focus:border-primary-500 focus:outline-none"
+                  placeholder="Official school name"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">School Address</label>
+                <input 
+                  type="text" 
+                  value={getSettingValue('school_address', '')}
+                  onChange={(e) => updateSetting('school_address', e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-sm focus:border-primary-500 focus:outline-none"
+                  placeholder="Full school address"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Contact Phone</label>
+                <input 
+                  type="text" 
+                  value={getSettingValue('school_phone', '')}
+                  onChange={(e) => updateSetting('school_phone', e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-sm focus:border-primary-500 focus:outline-none"
+                  placeholder="Primary contact number"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Contact Email</label>
+                <input 
+                  type="email" 
+                  value={getSettingValue('school_email', '')}
+                  onChange={(e) => updateSetting('school_email', e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-sm focus:border-primary-500 focus:outline-none"
+                  placeholder="Official contact email"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">PAN / Registration Number</label>
+                <input 
+                  type="text" 
+                  value={getSettingValue('school_pan_number', '')}
+                  onChange={(e) => updateSetting('school_pan_number', e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 py-2 px-3 text-sm focus:border-primary-500 focus:outline-none"
+                  placeholder="Tax or registration number"
+                />
+              </div>
+            </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Primary Branding Color</label>
               <div className="flex items-center gap-3">

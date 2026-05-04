@@ -509,11 +509,26 @@ describe('finance production controls', () => {
       include: {
         payment: {
           include: {
-            invoice: true,
-            student: true,
+            collectedBy: true,
+            invoice: {
+              include: {
+                lines: {
+                  include: {
+                    feeHead: true,
+                  },
+                },
+              },
+            },
+            student: {
+              include: {
+                class: true,
+                sectionRef: true,
+              },
+            },
             refunds: true,
           },
         },
+        tenant: true,
       },
     });
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');

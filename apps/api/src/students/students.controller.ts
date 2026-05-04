@@ -89,6 +89,20 @@ export class StudentsController {
     return this.studentsService.exportIemis(auth);
   }
 
+  @Get('roster/export')
+  @Permissions('students:read')
+  exportRoster(
+    @Query('academicYearId') academicYearId: string | undefined,
+    @Query('classId') classId: string | undefined,
+    @Query('sectionId') sectionId: string | undefined,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.exportRoster(
+      { academicYearId, classId, sectionId },
+      auth,
+    );
+  }
+
   @Post('duplicates/merge')
   @Permissions('students:manage_lifecycle')
   mergeDuplicateStudent(

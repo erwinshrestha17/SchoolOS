@@ -1811,6 +1811,63 @@ export class StudentsService {
     };
   }
 
+  async exportRoster(
+    filters: {
+      academicYearId?: string;
+      classId?: string;
+      sectionId?: string;
+    },
+    actor: AuthContext,
+  ) {
+    const students = await this.prisma.student.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        lifecycleStatus: 'ACTIVE',
+        ...(filters.classId ? { classId: filters.classId } : {}),
+        ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+      },
+      include: {
+        class: true,
+        sectionRef: true,
+        guardianLinks: {
+          include: { guardian: true },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+        },
+      },
+      orderBy: [{ classId: 'asc' }, { sectionId: 'asc' }, { firstNameEn: 'asc' }],
+    });
+
+    const headers = [
+      'Student ID',
+      'Name',
+      'Class',
+      'Section',
+      'Roll Number',
+      'Guardian Name',
+      'Guardian Phone',
+      'Status',
+      'Admission Date',
+    ];
+
+    const rows = students.map((student) => {
+      const primaryGuardian = student.guardianLinks[0]?.guardian;
+      const studentName = [student.firstNameEn, student.lastNameEn].filter(Boolean).join(' ');
+      return [
+        student.studentSystemId,
+        studentName,
+        student.class.name,
+        student.sectionName ?? student.sectionRef?.name ?? 'N/A',
+        student.rollNumber ?? 'N/A',
+        primaryGuardian?.fullName ?? 'N/A',
+        primaryGuardian?.primaryPhone ?? 'N/A',
+        student.lifecycleStatus ?? 'ACTIVE',
+        student.admissionDate ? student.admissionDate.toISOString().slice(0, 10) : 'N/A',
+      ];
+    });
+
+    return buildCsv(headers, rows);
+  }
+
   async generateStudentDocumentPdf(
     studentId: string,
     documentKind: string,

@@ -280,8 +280,9 @@ export function buildIdCardPdf(input: {
   return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
 }
 
-function escapePdfText(text: string) {
-  return text
+function escapePdfText(text: string | number | null | undefined) {
+  const safeText = String(text ?? 'N/A');
+  return safeText
     .replace(/\\/g, '\\\\')
     .replace(/\(/g, '\\(')
     .replace(/\)/g, '\\)');
@@ -321,7 +322,7 @@ function buildPdfFromContent(content: string) {
 }
 
 function text(
-  value: string,
+  value: string | number | null | undefined,
   x: number,
   y: number,
   size: number,

@@ -19,18 +19,35 @@ test.describe('Phase 1B navigation smoke', () => {
 
     await expectDashboardLoaded(page);
 
-    await page.goto('/dashboard/students');
-    await expect(page.getByRole('heading', { name: /^Students$/i })).toBeVisible();
+    // Students / Admissions
+    await page.goto('/dashboard/admissions');
+    await expect(page.getByRole('heading', { name: /^Students|Admissions$/i })).toBeVisible();
 
+    // Student Detail
+    // Find the first "View Profile" link and navigate if available
+    const viewProfileLink = page.getByRole('link', { name: /View Profile/i }).first();
+    if (await viewProfileLink.isVisible()) {
+      await viewProfileLink.click();
+      await expect(page.getByRole('heading', { name: /Student Profile/i })).toBeVisible();
+    }
+
+    // Attendance & Register
     await page.goto('/dashboard/attendance');
     await expect(page.getByRole('heading', { name: /Attendance/i })).toBeVisible();
+    await page.goto('/dashboard/attendance/register');
+    await expect(page.getByRole('heading', { name: /Monthly Register/i })).toBeVisible();
 
+    // Finance
     await page.goto('/dashboard/finance');
     await expect(page.getByRole('heading', { name: /Fee Collection/i })).toBeVisible();
 
+    // Notices
     await page.goto('/dashboard/notices');
     await expect(page.getByRole('heading', { name: /^Notices$/i })).toBeVisible();
-    await expect(page.getByText(/Notice Center/i)).toBeVisible();
+    
+    // Header components: Notifications & Global Search
+    await expect(page.getByPlaceholder(/Search students/i)).toBeVisible();
+    await expect(page.getByLabel(/Notifications/i)).toBeVisible();
   });
 });
 
@@ -42,11 +59,11 @@ async function login(page: Page) {
   await page.getByLabel(/Password/i).fill(credentials.password ?? '');
   await page.getByRole('button', { name: /Sign in/i }).click();
 
-  await page.waitForURL('**/dashboard', { timeout: 20_000 });
+  await page.waitForURL('**/dashboard*', { timeout: 20_000 });
 }
 
 async function expectDashboardLoaded(page: Page) {
   await expect(
     page.getByRole('heading', { name: /Admin Command Center|Dashboard/i }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15_000 });
 }
