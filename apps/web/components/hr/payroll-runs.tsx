@@ -22,8 +22,8 @@ type PayrollLineView = {
   staff?: {
     id?: string;
     employeeId?: string;
-    firstName?: string;
-    lastName?: string;
+    firstNameEn?: string;
+    lastNameEn?: string;
   } | null;
   grossSalary?: number | string | null;
   allowances?: number | string | null;
@@ -44,7 +44,6 @@ type PayrollRunView = PayrollRunSummary & {
   netAmount?: number | string | null;
   notes?: string | null;
   approvedAt?: string | null;
-  postedAt?: string | null;
   createdAt?: string | null;
   lines?: PayrollLineView[];
 };
@@ -86,16 +85,16 @@ function formatPeriod(month: number, year: number) {
 function statusClasses(status: string) {
   switch (status) {
     case 'DRAFT':
-      return 'bg-amber-100 text-amber-700 border-amber-200';
+      return 'border-amber-200 bg-amber-100 text-amber-700';
     case 'REVIEWED':
-      return 'bg-blue-100 text-blue-700 border-blue-200';
+      return 'border-blue-200 bg-blue-100 text-blue-700';
     case 'APPROVED':
-      return 'bg-success-100 text-success-700 border-success-200';
+      return 'border-success-200 bg-success-100 text-success-700';
     case 'VOID':
     case 'CANCELLED':
-      return 'bg-gray-100 text-gray-600 border-gray-200';
+      return 'border-gray-200 bg-gray-100 text-gray-600';
     default:
-      return 'bg-gray-100 text-gray-700 border-gray-200';
+      return 'border-gray-200 bg-gray-100 text-gray-700';
   }
 }
 
@@ -112,6 +111,14 @@ function previewTotals(preview: PayrollPreviewResult[]) {
     }),
     { grossPay: 0, deductions: 0, netPay: 0 },
   );
+}
+
+function getStaffName(line: PayrollLineView) {
+  if (!line.staff) {
+    return `Staff ${line.staffId?.slice(0, 8) ?? 'unknown'}`;
+  }
+
+  return `${line.staff.firstNameEn ?? ''} ${line.staff.lastNameEn ?? ''}`.trim() || 'Staff member';
 }
 
 export function PayrollRuns() {
@@ -144,8 +151,7 @@ export function PayrollRuns() {
     [runsQuery.data],
   );
 
-  const selectedRun =
-    runs.find((run) => run.id === selectedRunId) ?? runs[0] ?? null;
+  const selectedRun = runs.find((run) => run.id === selectedRunId) ?? runs[0] ?? null;
 
   const createDraftMutation = useMutation({
     mutationFn: () =>
@@ -187,7 +193,7 @@ export function PayrollRuns() {
           <div className="space-y-1">
             <p className="text-sm font-bold text-amber-900">Payroll Runs — Phase 2 approval boundary</p>
             <p className="text-xs leading-relaxed text-amber-800">
-              This workspace can create draft payroll runs and approve them. Approval locks the payroll run, but it still does not post to accounting, create journal entries, generate salary slips, or disburse salaries. M9 Accounting posting and salary slip PDFs are deferred.
+              This workspace can create draft payroll runs and approve them. Approval locks the payroll run, but it still does not post to accounting, does not post to M9 Accounting, create journal entries, generate salary slips, or disburse salaries. Salary slips are not generated yet.
             </p>
           </div>
         </div>
@@ -467,7 +473,7 @@ export function PayrollRuns() {
               </div>
 
               <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs leading-relaxed text-amber-800">
-                <strong>Approval note:</strong> approving locks this payroll run for payroll operations. It still does not post to M9 Accounting, create journal entries, generate salary slips, or disburse salaries.
+                <strong>Approval note:</strong> Approval locks the payroll run for payroll operations. It still does not post to M9 Accounting, create journal entries, generate salary slips, or disburse salaries.
               </div>
 
               {selectedRun.status === 'DRAFT' && (
@@ -496,39 +502,33 @@ export function PayrollRuns() {
 
               <div className="space-y-2">
                 {(selectedRun.lines ?? []).length > 0 ? (
-                  (selectedRun.lines ?? []).map((line) => {
-                    const staffName = line.staff
-                      ? `${line.staff.firstName ?? ''} ${line.staff.lastName ?? ''}`.trim()
-                      : `Staff ${line.staffId?.slice(0, 8) ?? 'unknown'}`;
-
-                    return (
-                      <div key={line.id ?? line.staffId} className="rounded-xl border border-gray-100 p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-bold text-gray-900">{staffName || 'Staff member'}</p>
-                            <p className="font-mono text-[10px] text-gray-500">{line.staff?.employeeId ?? line.staffId}</p>
-                          </div>
-                          <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${statusClasses(line.status ?? selectedRun.status)}`}>
-                            {line.status ?? selectedRun.status}
-                          </span>
+                  (selectedRun.lines ?? []).map((line) => (
+                    <div key={line.id ?? line.staffId} className="rounded-xl border border-gray-100 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold text-gray-900">{getStaffName(line)}</p>
+                          <p className="font-mono text-[10px] text-gray-500">{line.staff?.employeeId ?? line.staffId}</p>
                         </div>
-                        <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                          <div>
-                            <p className="font-semibold uppercase tracking-wider text-gray-400">Gross</p>
-                            <p className="font-bold text-gray-900">{formatMoney(line.grossSalary)}</p>
-                          </div>
-                          <div>
-                            <p className="font-semibold uppercase tracking-wider text-gray-400">Net</p>
-                            <p className="font-bold text-primary-700">{formatMoney(line.netSalary)}</p>
-                          </div>
-                          <div>
-                            <p className="font-semibold uppercase tracking-wider text-gray-400">Days</p>
-                            <p className="font-bold text-gray-900">{line.attendanceDays ?? 0}/{line.workingDays ?? 0}</p>
-                          </div>
+                        <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase ${statusClasses(line.status ?? selectedRun.status)}`}>
+                          {line.status ?? selectedRun.status}
+                        </span>
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <p className="font-semibold uppercase tracking-wider text-gray-400">Gross</p>
+                          <p className="font-bold text-gray-900">{formatMoney(line.grossSalary)}</p>
+                        </div>
+                        <div>
+                          <p className="font-semibold uppercase tracking-wider text-gray-400">Net</p>
+                          <p className="font-bold text-primary-700">{formatMoney(line.netSalary)}</p>
+                        </div>
+                        <div>
+                          <p className="font-semibold uppercase tracking-wider text-gray-400">Days</p>
+                          <p className="font-bold text-gray-900">{line.attendanceDays ?? 0}/{line.workingDays ?? 0}</p>
                         </div>
                       </div>
-                    );
-                  })
+                    </div>
+                  ))
                 ) : (
                   <p className="rounded-xl bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
                     No line details returned for this run yet.
