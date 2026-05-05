@@ -62,8 +62,8 @@ export function SetupForm() {
   });
 
   const academicYears = academicYearsQuery.data ?? [];
-  const classes = classesQuery.data ?? [];
-  const sections = sectionsQuery.data ?? [];
+  const classes = useMemo(() => classesQuery.data ?? [], [classesQuery.data]);
+  const sections = useMemo(() => sectionsQuery.data ?? [], [sectionsQuery.data]);
 
   const totalStudents = useMemo(
     () => classes.reduce((sum, item) => sum + Number(item.studentCount ?? 0), 0),

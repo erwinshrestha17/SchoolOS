@@ -458,6 +458,15 @@ export type PaymentRefundPayload = {
   narration?: string;
 };
 
+export type CashierCloseMethodBreakdown = {
+  method: string;
+  grossCollected: number;
+  totalRefunded: number;
+  netCollected: number;
+  paymentCount: number;
+  refundCount: number;
+};
+
 export type CashierClosePreview = {
   openedAt: string | Date;
   closedAt: string | Date;
@@ -466,6 +475,12 @@ export type CashierClosePreview = {
   grossCollected: number;
   totalRefunded: number;
   netCollected: number;
+  expectedCashAmount: number;
+  actualCashAmount?: number | null;
+  varianceAmount?: number | null;
+  varianceReason?: string | null;
+  denominationBreakdown?: Record<string, unknown> | null;
+  methodBreakdown: CashierCloseMethodBreakdown[];
   paymentCount: number;
   refundCount: number;
   firstReceiptNumber: string | null;
@@ -485,6 +500,12 @@ export type CashierCloseSummary = {
   grossCollected: number;
   totalRefunded: number;
   netCollected: number;
+  expectedCashAmount: number;
+  actualCashAmount?: number | null;
+  varianceAmount?: number | null;
+  varianceReason?: string | null;
+  denominationBreakdown?: Record<string, unknown> | null;
+  methodBreakdown: CashierCloseMethodBreakdown[];
   paymentCount: number;
   refundCount: number;
   firstReceiptNumber: string | null;

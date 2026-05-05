@@ -50,7 +50,10 @@ export function StaffDashboard() {
             <div className="flex flex-col items-center text-center space-y-4">
               <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center">
                 {profile.photoUrl ? (
-                  <img src={profile.photoUrl} alt="" className="w-full h-full rounded-full object-cover" />
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={profile.photoUrl} alt="" className="w-full h-full rounded-full object-cover" />
+                  </>
                 ) : (
                   <User className="w-12 h-12 text-primary" />
                 )}

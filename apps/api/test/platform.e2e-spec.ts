@@ -115,7 +115,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
     } as any;
 
     await jwtAuthGuard.canActivate(mockContext);
-    await expect(platformGuard.canActivate(mockContext)).rejects.toThrow(
+    expect(() => platformGuard.canActivate(mockContext)).toThrow(
       ForbiddenException,
     );
 
@@ -241,7 +241,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       getClass: () => PlatformController,
     } as any;
     await jwtAuthGuard.canActivate(sUpdateContext);
-    await expect(platformGuard.canActivate(sUpdateContext)).rejects.toThrow(
+    expect(() => platformGuard.canActivate(sUpdateContext)).toThrow(
       ForbiddenException,
     );
 
@@ -299,7 +299,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       getClass: () => PlatformController,
     } as any;
     await jwtAuthGuard.canActivate(bUpdateContext);
-    await expect(platformGuard.canActivate(bUpdateContext)).rejects.toThrow(
+    expect(() => platformGuard.canActivate(bUpdateContext)).toThrow(
       ForbiddenException,
     );
   });
@@ -372,6 +372,10 @@ async function createPrismaMock() {
         }
         return u;
       }),
+      count: jest.fn(
+        async (q) =>
+          state.users.filter((u) => u.tenantId === q.where.tenantId).length,
+      ),
     },
     role: { findMany: jest.fn(async () => state.roles) },
     userRole: { findMany: jest.fn(async () => state.userRoles) },

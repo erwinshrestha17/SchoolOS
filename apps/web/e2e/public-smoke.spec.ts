@@ -1,6 +1,15 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('Public route smoke', () => {
+  test('home page renders the public SchoolOS landing page', async ({ page }) => {
+    await page.goto('/');
+
+    await expect(
+      page.getByRole('heading', { name: /One operating system for every school workflow/i }),
+    ).toBeVisible();
+    await expect(page.getByRole('banner').getByRole('link', { name: /^Sign in$/i })).toBeVisible();
+  });
+
   test('login page renders expected UI', async ({ page }) => {
     await page.goto('/login');
 

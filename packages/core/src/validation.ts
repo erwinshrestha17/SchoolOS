@@ -179,6 +179,9 @@ export const cashierCloseWindowSchema = z.object({
 });
 
 export const cashierCloseCreateSchema = cashierCloseWindowSchema.extend({
+  actualCashAmount: z.coerce.number().min(0).optional().nullable(),
+  varianceReason: z.string().optional().nullable(),
+  denominationBreakdown: z.record(z.string(), z.unknown()).optional().nullable(),
   notes: z.string().optional().nullable()
 });
 

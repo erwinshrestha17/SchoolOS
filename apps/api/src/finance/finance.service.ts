@@ -88,6 +88,35 @@ export interface DefaulterAgingReportRow {
   status: InvoiceStatus;
 }
 
+type CashierCloseMethodBreakdown = {
+  method: PaymentMethod;
+  grossCollected: number;
+  totalRefunded: number;
+  netCollected: number;
+  paymentCount: number;
+  refundCount: number;
+};
+
+type CashierCloseSummary = {
+  openedAt: Date;
+  closedAt: Date;
+  collectorUserId: string | null;
+  paymentMethod: PaymentMethod | null;
+  grossCollected: number;
+  totalRefunded: number;
+  netCollected: number;
+  expectedCashAmount: number;
+  actualCashAmount: number | null;
+  varianceAmount: number | null;
+  varianceReason: string | null;
+  denominationBreakdown: Record<string, unknown> | null;
+  methodBreakdown: CashierCloseMethodBreakdown[];
+  paymentCount: number;
+  refundCount: number;
+  firstReceiptNumber: string | null;
+  lastReceiptNumber: string | null;
+};
+
 @Injectable()
 export class FinanceService {
   constructor(
@@ -2554,6 +2583,8 @@ export class FinanceService {
         grossCollected: summary.grossCollected,
         totalRefunded: summary.totalRefunded,
         netCollected: summary.netCollected,
+        expectedCashAmount: summary.expectedCashAmount,
+        methodBreakdown: summary.methodBreakdown,
       },
     });
 
@@ -2597,6 +2628,14 @@ export class FinanceService {
       grossCollected: Number(close.grossCollected),
       totalRefunded: Number(close.totalRefunded),
       netCollected: Number(close.netCollected),
+      expectedCashAmount: Number(close.expectedCashAmount ?? 0),
+      actualCashAmount:
+        close.actualCashAmount === null ? null : Number(close.actualCashAmount),
+      varianceAmount:
+        close.varianceAmount === null ? null : Number(close.varianceAmount),
+      varianceReason: close.varianceReason,
+      denominationBreakdown: normalizeJsonObject(close.denominationBreakdown),
+      methodBreakdown: parseCashierCloseMethodBreakdown(close.methodBreakdown),
       paymentCount: close.paymentCount,
       refundCount: close.refundCount,
       firstReceiptNumber: close.firstReceiptNumber,
@@ -2617,16 +2656,14 @@ export class FinanceService {
     const existing = await this.prisma.cashierClose.findFirst({
       where: {
         tenantId: actor.tenantId,
-        openedAt: window.openedAt,
-        closedAt: window.closedAt,
-        collectorUserId: dto.collectorUserId ?? null,
-        paymentMethod: dto.paymentMethod ?? null,
+        openedAt: { lt: window.closedAt },
+        closedAt: { gt: window.openedAt },
       },
     });
 
     if (existing) {
       throw new ConflictException(
-        `Cashier close ${existing.closeNumber} already exists for the selected window`,
+        `Cashier close ${existing.closeNumber} already overlaps the selected window`,
       );
     }
 
@@ -2639,6 +2676,28 @@ export class FinanceService {
       },
       actor,
     );
+    const actualCashAmount =
+      dto.actualCashAmount === undefined || dto.actualCashAmount === null
+        ? null
+        : new Prisma.Decimal(Number(dto.actualCashAmount).toFixed(2));
+    const expectedCashAmount = new Prisma.Decimal(
+      Number(summary.expectedCashAmount).toFixed(2),
+    );
+    const varianceAmount = actualCashAmount
+      ? new Prisma.Decimal(
+          Number(actualCashAmount.sub(expectedCashAmount)).toFixed(2),
+        )
+      : null;
+    const hasCashVariance = Boolean(
+      varianceAmount && Math.abs(Number(varianceAmount)) > 0,
+    );
+
+    if (hasCashVariance && !dto.varianceReason?.trim()) {
+      throw new BadRequestException(
+        'A variance reason is required when actual cash differs from expected cash',
+      );
+    }
+
     const closeNumber = await this.generateCashierCloseNumber(actor.tenantId);
 
     const close = await this.prisma.cashierClose.create({
@@ -2652,6 +2711,14 @@ export class FinanceService {
         grossCollected: new Prisma.Decimal(summary.grossCollected),
         totalRefunded: new Prisma.Decimal(summary.totalRefunded),
         netCollected: new Prisma.Decimal(summary.netCollected),
+        expectedCashAmount,
+        actualCashAmount,
+        varianceAmount,
+        varianceReason: hasCashVariance ? dto.varianceReason?.trim() : null,
+        denominationBreakdown:
+          (dto.denominationBreakdown as Prisma.InputJsonValue | undefined) ??
+          Prisma.JsonNull,
+        methodBreakdown: summary.methodBreakdown as Prisma.InputJsonValue,
         paymentCount: summary.paymentCount,
         refundCount: summary.refundCount,
         firstReceiptNumber: summary.firstReceiptNumber,
@@ -2680,6 +2747,14 @@ export class FinanceService {
         grossCollected: Number(close.grossCollected),
         totalRefunded: Number(close.totalRefunded),
         netCollected: Number(close.netCollected),
+        expectedCashAmount: Number(close.expectedCashAmount ?? 0),
+        actualCashAmount:
+          close.actualCashAmount === null
+            ? null
+            : Number(close.actualCashAmount),
+        varianceAmount:
+          close.varianceAmount === null ? null : Number(close.varianceAmount),
+        varianceReason: close.varianceReason,
       },
     });
 
@@ -2691,6 +2766,14 @@ export class FinanceService {
       grossCollected: Number(close.grossCollected),
       totalRefunded: Number(close.totalRefunded),
       netCollected: Number(close.netCollected),
+      expectedCashAmount: Number(close.expectedCashAmount ?? 0),
+      actualCashAmount:
+        close.actualCashAmount === null ? null : Number(close.actualCashAmount),
+      varianceAmount:
+        close.varianceAmount === null ? null : Number(close.varianceAmount),
+      varianceReason: close.varianceReason,
+      denominationBreakdown: normalizeJsonObject(close.denominationBreakdown),
+      methodBreakdown: parseCashierCloseMethodBreakdown(close.methodBreakdown),
       paymentCount: close.paymentCount,
       refundCount: close.refundCount,
       firstReceiptNumber: close.firstReceiptNumber,
@@ -2959,28 +3042,40 @@ export class FinanceService {
       },
       orderBy: [{ refundDate: 'asc' }, { createdAt: 'asc' }],
     });
-    const grossCollected = payments.reduce(
-      (sum, payment) => sum + Number(payment.amount),
-      0,
+    const methodBreakdown = buildCashierMethodBreakdown(payments, refunds);
+    const grossCollected = methodBreakdown.reduce(
+      (sum, row) => sum.add(row.grossCollected),
+      new Prisma.Decimal(0),
     );
-    const totalRefunded = refunds.reduce(
-      (sum, refund) => sum + Number(refund.amount),
-      0,
+    const totalRefunded = methodBreakdown.reduce(
+      (sum, row) => sum.add(row.totalRefunded),
+      new Prisma.Decimal(0),
     );
+    const expectedCashAmount =
+      methodBreakdown.find((row) => row.method === PaymentMethod.CASH)
+        ?.netCollected ?? 0;
 
     return {
       openedAt: input.openedAt,
       closedAt: input.closedAt,
       collectorUserId: input.collectorUserId ?? null,
       paymentMethod: input.paymentMethod ?? null,
-      grossCollected,
-      totalRefunded,
-      netCollected: grossCollected - totalRefunded,
+      grossCollected: Number(grossCollected.toDecimalPlaces(2)),
+      totalRefunded: Number(totalRefunded.toDecimalPlaces(2)),
+      netCollected: Number(
+        grossCollected.sub(totalRefunded).toDecimalPlaces(2),
+      ),
+      expectedCashAmount,
+      actualCashAmount: null,
+      varianceAmount: null,
+      varianceReason: null,
+      denominationBreakdown: null,
+      methodBreakdown,
       paymentCount: payments.length,
       refundCount: refunds.length,
       firstReceiptNumber: payments[0]?.receipt?.receiptNumber ?? null,
       lastReceiptNumber: payments.at(-1)?.receipt?.receiptNumber ?? null,
-    };
+    } satisfies CashierCloseSummary;
   }
 
   private async buildReconciliationRows(
@@ -3629,6 +3724,80 @@ function buildReconciliationCsv(
   ];
 
   return lines.join('\n');
+}
+
+function buildCashierMethodBreakdown(
+  payments: Array<{ method: PaymentMethod; amount: Prisma.Decimal }>,
+  refunds: Array<{
+    amount: Prisma.Decimal;
+    payment: { method: PaymentMethod };
+  }>,
+): CashierCloseMethodBreakdown[] {
+  return Object.values(PaymentMethod).map((method) => {
+    const methodPayments = payments.filter(
+      (payment) => payment.method === method,
+    );
+    const methodRefunds = refunds.filter(
+      (refund) => refund.payment.method === method,
+    );
+    const grossCollected = methodPayments.reduce(
+      (sum, payment) => sum.add(payment.amount),
+      new Prisma.Decimal(0),
+    );
+    const totalRefunded = methodRefunds.reduce(
+      (sum, refund) => sum.add(refund.amount),
+      new Prisma.Decimal(0),
+    );
+
+    return {
+      method,
+      grossCollected: Number(grossCollected.toDecimalPlaces(2)),
+      totalRefunded: Number(totalRefunded.toDecimalPlaces(2)),
+      netCollected: Number(
+        grossCollected.sub(totalRefunded).toDecimalPlaces(2),
+      ),
+      paymentCount: methodPayments.length,
+      refundCount: methodRefunds.length,
+    };
+  });
+}
+
+function parseCashierCloseMethodBreakdown(
+  value: Prisma.JsonValue | null,
+): CashierCloseMethodBreakdown[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isCashierCloseMethodBreakdown);
+}
+
+function isCashierCloseMethodBreakdown(
+  value: Prisma.JsonValue,
+): value is CashierCloseMethodBreakdown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const row = value as Record<string, Prisma.JsonValue>;
+  return (
+    typeof row.method === 'string' &&
+    typeof row.grossCollected === 'number' &&
+    typeof row.totalRefunded === 'number' &&
+    typeof row.netCollected === 'number' &&
+    typeof row.paymentCount === 'number' &&
+    typeof row.refundCount === 'number'
+  );
+}
+
+function normalizeJsonObject(
+  value: Prisma.JsonValue | null,
+): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
 }
 
 function escapeCsv(value: string) {

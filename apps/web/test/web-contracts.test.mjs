@@ -634,6 +634,11 @@ describe('SchoolOS web production contracts', () => {
     assert.match(financeForm, /api\.listCashierCloses/);
     assert.match(financeForm, /api\.finalizeCashierClose/);
     assert.match(financeForm, /Closing records the day-end cash position\. It does not edit payments/);
+    assert.match(financeForm, /Actual cash counted/);
+    assert.match(financeForm, /Expected cash amount/);
+    assert.match(financeForm, /Variance reason/);
+    assert.match(financeForm, /methodBreakdown/);
+    assert.match(financeForm, /actualCashAmount/);
     assert.match(financeForm, /Printable Day-End Summary/);
     assert.match(financeForm, /Finalize day-end close/);
     assert.match(financeForm, /CLOSE/);

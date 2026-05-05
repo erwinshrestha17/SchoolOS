@@ -179,7 +179,7 @@ export function StudentDirectory({
   }
 
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-5" data-testid="student-directory">
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>

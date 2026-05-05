@@ -1268,6 +1268,12 @@ model CashierClose {
   grossCollected     Decimal        @db.Decimal(12, 2)
   totalRefunded      Decimal        @db.Decimal(12, 2)
   netCollected       Decimal        @db.Decimal(12, 2)
+  expectedCashAmount Decimal?       @db.Decimal(12, 2)
+  actualCashAmount   Decimal?       @db.Decimal(12, 2)
+  varianceAmount     Decimal?       @db.Decimal(12, 2)
+  varianceReason     String?
+  denominationBreakdown Json?
+  methodBreakdown    Json?
   paymentCount       Int
   refundCount        Int
   firstReceiptNumber String?

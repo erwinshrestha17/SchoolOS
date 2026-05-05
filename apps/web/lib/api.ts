@@ -656,6 +656,9 @@ export const api = {
     closedAt: string;
     collectorUserId?: string | null;
     paymentMethod?: string | null;
+    actualCashAmount?: number | null;
+    varianceReason?: string | null;
+    denominationBreakdown?: Record<string, unknown> | null;
     notes?: string | null;
   }) =>
     request<CashierCloseSummary>('/payments/cashier-close', {

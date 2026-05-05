@@ -1,5 +1,6 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import type { AuthContext } from '../auth/auth.types';
@@ -34,6 +35,7 @@ export class FileRegistryController {
   ) {}
 
   @Post('upload')
+  @Permissions('homework:submit')
   async uploadFile(
     @CurrentAuth() auth: AuthContext,
     @Body() dto: UploadFileDto,

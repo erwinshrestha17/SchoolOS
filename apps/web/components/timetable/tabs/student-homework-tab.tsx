@@ -17,6 +17,14 @@ import {
 } from 'lucide-react';
 import type { HomeworkSubmissionSummary } from '@schoolos/core';
 
+type HomeworkAttachment = {
+  id: string;
+  fileAsset?: {
+    publicUrl?: string | null;
+    originalFilename?: string | null;
+  } | null;
+};
+
 // Simple local format helper since date-fns is missing
 function format(date: Date | string, pattern: string) {
   const d = typeof date === 'string' ? new Date(date) : date;
@@ -58,7 +66,7 @@ export function StudentHomeworkTab() {
       <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--line)] bg-white/50 text-center">
         <BookOpen className="mb-2 h-10 w-10 text-[var(--muted)]" />
         <h3 className="text-lg font-semibold">No homework assigned</h3>
-        <p className="text-sm text-[var(--muted)]">Great job! You're all caught up.</p>
+        <p className="text-sm text-[var(--muted)]">Great job! You&apos;re all caught up.</p>
       </div>
     );
   }
@@ -145,7 +153,7 @@ export function StudentHomeworkTab() {
                   <div className="space-y-3">
                     <h4 className="text-sm font-bold uppercase tracking-wider text-[var(--muted)]">Attachments</h4>
                     <div className="grid gap-2 sm:grid-cols-2">
-                      {selectedSubmission.attachments.map((a: any) => (
+                      {selectedSubmission.attachments.map((a: HomeworkAttachment) => (
                         <a
                           key={a.id}
                           href={a.fileAsset?.publicUrl || '#'}
@@ -167,7 +175,7 @@ export function StudentHomeworkTab() {
                     <div className="rounded-2xl bg-primary-50/50 p-4 text-sm border border-primary-100 shadow-inner">
                       <div className="flex items-start gap-3">
                         <MessageSquare className="mt-1 h-4 w-4 shrink-0 text-primary-600" />
-                        <p className="text-gray-800 italic">"{selectedSubmission.feedback}"</p>
+                        <p className="text-gray-800 italic">&ldquo;{selectedSubmission.feedback}&rdquo;</p>
                       </div>
                     </div>
                   </div>

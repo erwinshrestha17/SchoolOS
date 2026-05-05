@@ -32,6 +32,35 @@ import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
 
+type ReportCardPdfComponent = {
+  max: number;
+  obtained: number;
+  grade: string;
+};
+
+type ReportCardPdfSubject = {
+  name: string;
+  theory: ReportCardPdfComponent | null;
+  practical: ReportCardPdfComponent | null;
+  totalObtained: number;
+  totalMax: number;
+};
+
+type PromotionReadinessRow = {
+  reportCardId: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  sectionName: string | null;
+  examTerm: string;
+  percentage: number;
+  grade: string;
+  status: string;
+  locked: boolean;
+  outstandingBalance: number;
+  reviewReason: string | null;
+};
+
 @Injectable()
 export class AcademicsService {
   constructor(
@@ -989,7 +1018,7 @@ export class AcademicsService {
     }
 
     // Group marks by subject
-    const subjectMap = new Map<string, any>();
+    const subjectMap = new Map<string, ReportCardPdfSubject>();
 
     for (const mark of marks) {
       if (!subjectMap.has(mark.subjectId)) {
@@ -1003,6 +1032,9 @@ export class AcademicsService {
       }
 
       const sub = subjectMap.get(mark.subjectId);
+      if (!sub) {
+        continue;
+      }
       const componentType = mark.assessmentComponent.type.toUpperCase();
 
       if (componentType === 'THEORY' || componentType === 'TH') {
@@ -1042,8 +1074,8 @@ export class AcademicsService {
 
       return {
         name: sub.name,
-        theory: sub.theory,
-        practical: sub.practical,
+        theory: sub.theory ?? undefined,
+        practical: sub.practical ?? undefined,
         totalGrade: grade,
         gradePoint: gpa,
       };
@@ -1216,7 +1248,7 @@ export class AcademicsService {
     dto: BatchGenerateReportCardsDto,
     actor: AuthContext,
   ) {
-    const results: any[] = [];
+    const results: unknown[] = [];
 
     for (const studentId of dto.studentIds) {
       try {
@@ -1359,7 +1391,7 @@ export class AcademicsService {
       orderBy: [{ percentage: 'desc' }],
     });
 
-    const results: any[] = [];
+    const results: PromotionReadinessRow[] = [];
 
     for (const card of reportCards) {
       const invoices = await this.prisma.invoice.findMany({

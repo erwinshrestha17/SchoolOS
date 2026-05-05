@@ -155,11 +155,12 @@ export function GlobalStudentSearch() {
               No student found for “{debouncedQuery}”.
             </div>
           ) : (
-            <div className="max-h-96 overflow-y-auto py-2">
+            <div className="max-h-96 overflow-y-auto py-2" data-testid="global-student-search-results">
               {results.map((student, index) => (
                 <button
                   key={student.id}
                   type="button"
+                  data-testid="global-student-search-result"
                   className={`grid w-full gap-1 px-4 py-3 text-left transition hover:bg-primary-50 ${
                     index === activeIndex ? 'bg-primary-50' : 'bg-white'
                   }`}
