@@ -7,6 +7,7 @@ import { AcademicsFoundationService } from './academics-foundation.service';
 import { AcademicsService } from './academics.service';
 import { AssessmentComponentsService } from './assessment-components.service';
 import { CasRecordsService } from './cas-records.service';
+import { GradeCalculatorService } from './grade-calculator.service';
 import {
   SubjectsController,
   TeacherAssignmentsController,
@@ -24,12 +25,14 @@ import {
     AcademicsFoundationService,
     AssessmentComponentsService,
     CasRecordsService,
+    GradeCalculatorService,
   ],
   exports: [
     AcademicsService,
     AcademicsFoundationService,
     AssessmentComponentsService,
     CasRecordsService,
+    GradeCalculatorService,
   ],
 })
 export class AcademicsModule {}
