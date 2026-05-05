@@ -24,7 +24,6 @@ import { UpdateSubjectDto } from './dto/update-subject.dto';
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class SubjectsController {
   constructor(
-    private readonly academicsService: AcademicsService,
     private readonly academicsFoundationService: AcademicsFoundationService,
   ) {}
 
