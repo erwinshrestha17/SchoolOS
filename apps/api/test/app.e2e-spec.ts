@@ -28,10 +28,19 @@ import {
   SYSTEM_ROLE_PERMISSIONS,
   buildPermissionKey,
 } from '../src/rbac/rbac.defaults';
+import {
+  MockState,
+  PrismaMock,
+  createRequestMock,
+  createResponseMock,
+  createQueueMock,
+  applyMockUpdate,
+  buildCookieHeader,
+} from './test-helpers';
 
 describe('School OS Auth + RBAC integration', () => {
   let moduleRef: TestingModule;
-  let prisma: Awaited<ReturnType<typeof createPrismaMock>>;
+  let prisma: PrismaMock;
   let authController: AuthController;
   let classesController: ClassesController;
   let staffController: StaffController;
@@ -48,7 +57,7 @@ describe('School OS Auth + RBAC integration', () => {
   }[];
 
   beforeEach(async () => {
-    prisma = await createPrismaMock();
+    prisma = createPrismaMock();
     sentCodes = [];
 
     moduleRef = await Test.createTestingModule({
@@ -552,7 +561,7 @@ function getLatestCode(
 
 function asSession(
   result:
-    | { accessToken: string; user: any }
+    | { accessToken: string; user: unknown }
     | { requiresMfa: boolean; challengeToken: string },
 ) {
   if (!('accessToken' in result)) {
@@ -564,7 +573,7 @@ function asSession(
 
 function asChallenge(
   result:
-    | { accessToken: string; user: any }
+    | { accessToken: string; user: unknown }
     | { requiresMfa: boolean; challengeToken: string },
 ) {
   if (!('challengeToken' in result)) {
@@ -578,14 +587,14 @@ async function authenticateRequest(
   jwtAuthGuard: JwtAuthGuard,
   rolesGuard: RolesPermissionsGuard,
   accessToken: string,
-  handler: (...args: any[]) => unknown,
-  controllerClass: new (...args: any[]) => unknown,
+  handler: (...args: unknown[]) => unknown,
+  controllerClass: new (...args: unknown[]) => unknown,
 ) {
   const request = {
     headers: {
       authorization: `Bearer ${accessToken}`,
     },
-  } as any;
+  } as unknown;
 
   const context = {
     switchToHttp: () => ({
@@ -593,7 +602,7 @@ async function authenticateRequest(
     }),
     getHandler: () => handler,
     getClass: () => controllerClass,
-  } as any;
+  } as unknown;
 
   const cls = (
     jwtAuthGuard as unknown as {
@@ -628,7 +637,7 @@ function createResponseMock() {
     clearCookie(name: string) {
       this.clearedCookies.push(name);
     },
-  };
+  } as unknown;
 }
 
 function buildCookieHeader(
@@ -653,8 +662,8 @@ function createQueueMock() {
 }
 
 function applyMockUpdate(
-  target: Record<string, any>,
-  update: Record<string, any>,
+  target: Record<string, unknown>,
+  update: Record<string, unknown>,
 ) {
   for (const [key, value] of Object.entries(update)) {
     if (
@@ -671,9 +680,9 @@ function applyMockUpdate(
   }
 }
 
-async function createPrismaMock() {
-  const adminPasswordHash = await bcrypt.hash('admin12345', 4);
-  const state = {
+function createPrismaMock() {
+  const adminPasswordHash = bcrypt.hashSync('admin12345', 4);
+  const state: MockState = {
     tenants: [
       {
         id: 'tenant-default',
@@ -689,24 +698,24 @@ async function createPrismaMock() {
       id: `perm-${index + 1}`,
       ...permission,
     })),
-    roles: [] as any[],
-    rolePermissions: [] as any[],
-    users: [] as any[],
-    userRoles: [] as any[],
-    classes: [] as any[],
-    students: [] as any[],
-    staff: [] as any[],
-    staffLeaveBalances: [] as any[],
-    academicYears: [] as any[],
-    chartAccounts: [] as any[],
-    feeHeads: [] as any[],
-    otpCodes: [] as any[],
-    refreshTokens: [] as any[],
-    auditLogs: [] as any[],
+    roles: [] as Record<string, unknown>[],
+    rolePermissions: [] as Record<string, unknown>[],
+    users: [] as Record<string, unknown>[],
+    userRoles: [] as Record<string, unknown>[],
+    classes: [] as Record<string, unknown>[],
+    students: [] as Record<string, unknown>[],
+    staff: [] as Record<string, unknown>[],
+    staffLeaveBalances: [] as Record<string, unknown>[],
+    academicYears: [] as Record<string, unknown>[],
+    chartAccounts: [] as Record<string, unknown>[],
+    feeHeads: [] as Record<string, unknown>[],
+    otpCodes: [] as Record<string, unknown>[],
+    refreshTokens: [] as Record<string, unknown>[],
+    auditLogs: [] as Record<string, unknown>[],
   };
 
   let idCounter = 1;
-  const nextId = (prefix: string) => `${prefix}-${idCounter++}`;
+  const nextId = (prefix: string) => `${prefix}-${String(idCounter++)}`;
 
   function permissionByKey(permissionKey: string) {
     return state.permissions.find(
@@ -766,7 +775,7 @@ async function createPrismaMock() {
 
   ensureTenantDefaults('tenant-default');
 
-  const roleWithRelations = (role: any) => ({
+  const roleWithRelations = (role: Record<string, unknown>) => ({
     ...role,
     rolePermissions: state.rolePermissions
       .filter((item) => item.roleId === role.id)
@@ -778,7 +787,7 @@ async function createPrismaMock() {
       })),
   });
 
-  const userWithRelations = (user: any) => ({
+  const userWithRelations = (user: Record<string, unknown>) => ({
     ...user,
     tenant: state.tenants.find((tenant) => tenant.id === user.tenantId) ?? null,
     staff: state.staff.find((member) => member.userId === user.id) ?? null,
@@ -797,7 +806,10 @@ async function createPrismaMock() {
       .map((membership) => ({
         ...membership,
         role: roleWithRelations(
-          state.roles.find((role) => role.id === membership.roleId)!,
+          state.roles.find((role) => role.id === membership.roleId) as Record<
+            string,
+            unknown
+          >,
         ),
       })),
   });
@@ -805,20 +817,24 @@ async function createPrismaMock() {
   return {
     __state: state,
     tenant: {
-      findUnique: jest.fn(async ({ where }: any) => {
-        if (where.slug) {
-          return (
-            state.tenants.find((tenant) => tenant.slug === where.slug) ?? null
-          );
-        }
+      findUnique: jest.fn(
+        async ({ where }: { where: Record<string, unknown> }) => {
+          if (where.slug) {
+            return (
+              state.tenants.find((tenant) => tenant.slug === where.slug) ?? null
+            );
+          }
 
-        if (where.id) {
-          return state.tenants.find((tenant) => tenant.id === where.id) ?? null;
-        }
+          if (where.id) {
+            return (
+              state.tenants.find((tenant) => tenant.id === where.id) ?? null
+            );
+          }
 
-        return null;
-      }),
-      create: jest.fn(async ({ data }: any) => {
+          return null;
+        },
+      ),
+      create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => {
         const tenant = {
           id: nextId('tenant'),
           name: data.name,
@@ -833,45 +849,61 @@ async function createPrismaMock() {
       }),
     },
     user: {
-      findUnique: jest.fn(async ({ where }: any) => {
-        if (where.tenantId_email) {
+      findUnique: jest.fn(
+        async ({ where }: { where: Record<string, unknown> }) => {
+          if (where.tenantId_email) {
+            const match = state.users.find(
+              (user) =>
+                user.tenantId === where.tenantId_email.tenantId &&
+                user.email === where.tenantId_email.email,
+            );
+            return match ? userWithRelations(match) : null;
+          }
+
+          if (where.id) {
+            const match = state.users.find((user) => user.id === where.id);
+            return match ? userWithRelations(match) : null;
+          }
+
+          return null;
+        },
+      ),
+      findFirst: jest.fn(
+        async ({ where }: { where: Record<string, unknown> }) => {
           const match = state.users.find(
             (user) =>
-              user.tenantId === where.tenantId_email.tenantId &&
-              user.email === where.tenantId_email.email,
+              (!where.id || user.id === where.id) &&
+              (!where.tenantId || user.tenantId === where.tenantId),
           );
           return match ? userWithRelations(match) : null;
-        }
-
-        if (where.id) {
-          const match = state.users.find((user) => user.id === where.id);
-          return match ? userWithRelations(match) : null;
-        }
-
-        return null;
-      }),
-      findFirst: jest.fn(async ({ where }: any) => {
-        const match = state.users.find(
-          (user) =>
-            (!where.id || user.id === where.id) &&
-            (!where.tenantId || user.tenantId === where.tenantId),
-        );
-        return match ? userWithRelations(match) : null;
-      }),
-      findMany: jest.fn(async ({ where }: any = {}) => {
-        return state.users
-          .filter((user) => !where.tenantId || user.tenantId === where.tenantId)
-          .map((user) => userWithRelations(user));
-      }),
-      update: jest.fn(async ({ where, data }: any) => {
-        const user = state.users.find((item) => item.id === where.id);
-        if (!user) {
-          throw new Error(`User ${where.id} not found`);
-        }
-        Object.assign(user, data);
-        return userWithRelations(user);
-      }),
-      create: jest.fn(async ({ data }: any) => {
+        },
+      ),
+      findMany: jest.fn(
+        async ({ where }: { where?: Record<string, unknown> } = {}) => {
+          return state.users
+            .filter(
+              (user) => !where.tenantId || user.tenantId === where.tenantId,
+            )
+            .map((user) => userWithRelations(user));
+        },
+      ),
+      update: jest.fn(
+        async ({
+          where,
+          data,
+        }: {
+          where: Record<string, unknown>;
+          data: Record<string, unknown>;
+        }) => {
+          const user = state.users.find((item) => item.id === where.id);
+          if (!user) {
+            throw new Error(`User ${where.id} not found`);
+          }
+          Object.assign(user, data);
+          return userWithRelations(user);
+        },
+      ),
+      create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => {
         const user = {
           id: nextId('user'),
           tenantId: data.tenantId,

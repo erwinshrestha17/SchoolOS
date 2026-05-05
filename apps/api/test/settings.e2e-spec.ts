@@ -1,4 +1,4 @@
-import { ForbiddenException, BadRequestException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '../src/app.module';
 import { AuthController } from '../src/auth/auth.controller';
@@ -9,20 +9,25 @@ import { NotificationsService } from '../src/notifications/notifications.service
 import { getQueueToken } from '@nestjs/bullmq';
 import * as bcrypt from 'bcrypt';
 import {
-  PERMISSION_CATALOG,
   SYSTEM_ROLE_DEFINITIONS,
   SYSTEM_ROLE_PERMISSIONS,
   buildPermissionKey,
 } from '../src/rbac/rbac.defaults';
+import {
+  MockState,
+  PrismaMock,
+  createResponseMock,
+  createQueueMock,
+} from './test-helpers';
 
 describe('SchoolOS Tenant Settings (E2E)', () => {
   let moduleRef: TestingModule;
-  let prisma: any;
+  let prisma: PrismaMock;
   let authController: AuthController;
   let settingsController: SettingsController;
 
   beforeEach(async () => {
-    prisma = await createPrismaMock();
+    prisma = createPrismaMock();
     moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -52,7 +57,7 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
   });
 
   it('enforces tenant scoping and role-based permissions', async () => {
-    const password = await bcrypt.hash('pass123', 4);
+    const password = bcrypt.hashSync('pass123', 4);
 
     // 1. Setup Tenant A with Admin
     const tenantAId = 'tenant-a';
@@ -94,14 +99,14 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     ensureTenantDefaults(prisma.__state, tenantBId);
 
     // 3. Login as Admin A
-    const loginRes = await authController.login(
+    const adminLogin = await authController.login(
       {
         tenantSlug: 'school-a',
         email: 'admin@school-a.com',
         password: 'pass123',
       },
-      createResponseMock() as any,
-      { ip: '127.0.0.1', headers: {} } as any,
+      createResponseMock() as unknown,
+      { ip: '127.0.0.1', headers: {} } as unknown,
     );
     const authA = { tenantId: tenantAId, userId: adminA.id };
 
@@ -109,12 +114,12 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     await settingsController.updateSetting(
       'branding_primary_color',
       { value: '#ff0000' },
-      { auth: authA } as any,
+      { auth: authA } as unknown,
     );
 
     const settingsA = await settingsController.getSettings({
       auth: authA,
-    } as any);
+    } as unknown);
     expect(
       settingsA.find((s) => s.key === 'branding_primary_color')?.value,
     ).toBe('#ff0000');
@@ -130,7 +135,7 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
       settingsController.updateSetting(
         'branding_primary_color',
         { value: 'not-a-color' },
-        { auth: authA } as any,
+        { auth: authA } as unknown,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
 
@@ -138,7 +143,7 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     await expect(
       settingsController.updateSetting('timezone', { value: 123 }, {
         auth: authA,
-      } as any),
+      } as unknown),
     ).rejects.toBeInstanceOf(BadRequestException);
 
     // 8. Test Permissions - Teacher (Read only)
@@ -169,7 +174,7 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     // Teacher can read
     const tSettings = await settingsController.getSettings({
       auth: authTeacher,
-    } as any);
+    } as unknown);
     expect(tSettings).toBeDefined();
 
     // 9. Test Exposure - Parent Role
@@ -210,12 +215,12 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     await settingsController.updateSetting(
       'sms_provider',
       { value: 'twilio' },
-      { auth: authA } as any,
+      { auth: authA } as unknown,
     );
 
     const publicSettings = await settingsController.getPublicSettings({
       auth: authParent,
-    } as any);
+    } as unknown);
 
     // Branding should be there
     expect(
@@ -232,53 +237,53 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
 });
 
 async function createPrismaMock() {
-  const state: {
-    tenants: any[];
-    tenantSettings: any[];
-    permissions: any[];
-    roles: any[];
-    rolePermissions: any[];
-    users: any[];
-    userRoles: any[];
-    auditLogs: any[];
-  } = {
+  const state: MockState & { tenantSettings: Record<string, unknown>[] } = {
     tenants: [],
     tenantSettings: [],
-    permissions: PERMISSION_CATALOG.map((p, i) => ({
+    permissions: SYSTEM_ROLE_DEFINITIONS.map((d, i) => ({
       id: `perm-${i + 1}`,
-      ...p,
+      ...d,
     })),
     roles: [],
     rolePermissions: [],
     users: [],
     userRoles: [],
+    classes: [],
+    students: [],
+    staff: [],
+    staffLeaveBalances: [],
+    academicYears: [],
+    chartAccounts: [],
+    feeHeads: [],
+    otpCodes: [],
+    refreshTokens: [],
     auditLogs: [],
   };
   return {
     __state: state,
     tenant: {
-      findUnique: jest.fn(async (q) =>
+      findUnique: jest.fn(async (q: Record<string, unknown>) =>
         state.tenants.find(
           (t) => t.id === q.where.id || t.slug === q.where.slug,
         ),
       ),
     },
     tenantSetting: {
-      findMany: jest.fn(async (q) =>
+      findMany: jest.fn(async (q: Record<string, unknown>) =>
         state.tenantSettings.filter((s) => {
           if (s.tenantId !== q.where.tenantId) return false;
           const keys = q.where.key?.in as string[] | undefined;
           return keys ? keys.includes(s.key) : true;
         }),
       ),
-      findUnique: jest.fn(async (q) =>
+      findUnique: jest.fn(async (q: Record<string, unknown>) =>
         state.tenantSettings.find(
           (s) =>
             s.tenantId === q.where.tenantId_key.tenantId &&
             s.key === q.where.tenantId_key.key,
         ),
       ),
-      upsert: jest.fn(async (q) => {
+      upsert: jest.fn(async (q: Record<string, unknown>) => {
         const existing = state.tenantSettings.find(
           (s) =>
             s.tenantId === q.where.tenantId_key.tenantId &&
@@ -289,7 +294,7 @@ async function createPrismaMock() {
           return existing;
         }
         const created = {
-          id: `s-${state.tenantSettings.length}`,
+          id: `s-${String(state.tenantSettings.length)}`,
           ...q.create,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -299,7 +304,7 @@ async function createPrismaMock() {
       }),
     },
     user: {
-      findUnique: jest.fn(async (q) => {
+      findUnique: jest.fn(async (q: Record<string, unknown>) => {
         const u = state.users.find(
           (u) =>
             (u.tenantId === q.where?.tenantId_email?.tenantId &&
@@ -327,7 +332,7 @@ async function createPrismaMock() {
             })),
         };
       }),
-      update: jest.fn(async (q) => {
+      update: jest.fn(async (q: Record<string, unknown>) => {
         const u = state.users.find((u) => u.id === q.where.id);
         if (u) {
           Object.assign(u, q.data);
@@ -336,9 +341,9 @@ async function createPrismaMock() {
       }),
     },
     auditLog: {
-      create: jest.fn(async (q) => {
+      create: jest.fn(async (q: Record<string, unknown>) => {
         const log = {
-          id: `log-${state.auditLogs.length}`,
+          id: `log-${String(state.auditLogs.length)}`,
           ...q.data,
           createdAt: new Date(),
         };
@@ -350,7 +355,7 @@ async function createPrismaMock() {
   };
 }
 
-function ensureTenantDefaults(state: any, tenantId: string) {
+function ensureTenantDefaults(state: MockState, tenantId: string) {
   for (const def of SYSTEM_ROLE_DEFINITIONS) {
     const role = {
       id: `role-${tenantId}-${def.name}`,

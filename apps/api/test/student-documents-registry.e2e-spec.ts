@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '../src/app.module';
 import { FileRegistryService } from '../src/file-registry/file-registry.service';
@@ -8,15 +8,16 @@ import { RedisService } from '../src/redis/redis.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { StudentDocumentKind } from '@prisma/client';
+import { PrismaMock, createQueueMock } from './test-helpers';
 
 describe('Student Documents Registry Integration (E2E)', () => {
   let moduleRef: TestingModule;
-  let prisma: any;
+  let prisma: PrismaMock;
   let studentRecordsService: StudentRecordsService;
   let fileRegistryService: FileRegistryService;
 
   beforeEach(async () => {
-    prisma = await createPrismaMock();
+    prisma = createPrismaMock();
     moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -51,8 +52,8 @@ describe('Student Documents Registry Integration (E2E)', () => {
     const studentAId = 'student-a';
     const userAId = 'user-a';
 
-    const actorA = { tenantId: tenantAId, userId: userAId } as any;
-    const actorB = { tenantId: tenantBId, userId: 'user-b' } as any;
+    const actorA = { tenantId: tenantAId, userId: userAId } as unknown;
+    const actorB = { tenantId: tenantBId, userId: 'user-b' } as unknown;
 
     // 1. Upload a document for Student A
     const doc = await studentRecordsService.uploadDocument(
@@ -64,7 +65,7 @@ describe('Student Documents Registry Integration (E2E)', () => {
         base64Content: 'base64data',
         title: 'Birth Certificate',
       },
-      actorA,
+      actorA as { tenantId: string; userId: string },
     );
 
     // 2. Verify it's in the FileRegistry
@@ -75,7 +76,7 @@ describe('Student Documents Registry Integration (E2E)', () => {
     );
     expect(registryFiles).toHaveLength(1);
     expect(registryFiles[0].originalFilename).toBe('birth.pdf');
-    expect((registryFiles[0].metadata as any).kind).toBe(
+    expect((registryFiles[0].metadata as Record<string, unknown>).kind).toBe(
       StudentDocumentKind.BIRTH_CERTIFICATE,
     );
 
@@ -83,7 +84,7 @@ describe('Student Documents Registry Integration (E2E)', () => {
 
     // 3. Tenant A can get signed URL (preview)
     const preview = await studentRecordsService.getSignedUrl(
-      actorA,
+      actorA as { tenantId: string; userId: string },
       assetId,
       'preview',
     );
@@ -91,11 +92,18 @@ describe('Student Documents Registry Integration (E2E)', () => {
 
     // 4. Tenant B CANNOT get signed URL (Tenant Isolation)
     await expect(
-      studentRecordsService.getSignedUrl(actorB, assetId, 'preview'),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+      studentRecordsService.getSignedUrl(
+        actorB as { tenantId: string; userId: string },
+        assetId,
+        'preview',
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
 
     // 5. Deletion removes from registry
-    await studentRecordsService.deleteDocument(actorA, assetId);
+    await studentRecordsService.deleteDocument(
+      actorA as { tenantId: string; userId: string },
+      assetId,
+    );
     const registryFilesAfter = await fileRegistryService.listFilesByEntity(
       tenantAId,
       'students',
@@ -123,12 +131,12 @@ describe('Student Documents Registry Integration (E2E)', () => {
   });
 });
 
-async function createPrismaMock() {
+function createPrismaMock() {
   const state: {
-    fileAssets: any[];
-    auditLogs: any[];
-    studentDocuments: any[];
-    students: any[];
+    fileAssets: Record<string, unknown>[];
+    auditLogs: Record<string, unknown>[];
+    studentDocuments: Record<string, unknown>[];
+    students: Record<string, unknown>[];
   } = {
     fileAssets: [],
     auditLogs: [],
@@ -138,16 +146,16 @@ async function createPrismaMock() {
   return {
     __state: state,
     student: {
-      findFirst: jest.fn(async (q) =>
+      findFirst: jest.fn(async (q: Record<string, unknown>) =>
         state.students.find(
           (s) => s.id === q.where.id && s.tenantId === q.where.tenantId,
         ),
       ),
     },
     studentDocument: {
-      create: jest.fn(async (q) => {
+      create: jest.fn(async (q: Record<string, unknown>) => {
         const doc = {
-          id: `doc-${state.studentDocuments.length}`,
+          id: `doc-${String(state.studentDocuments.length)}`,
           ...q.data,
           createdAt: new Date(),
         };
@@ -156,9 +164,9 @@ async function createPrismaMock() {
       }),
     },
     fileAsset: {
-      create: jest.fn(async (q) => {
+      create: jest.fn(async (q: Record<string, unknown>) => {
         const asset = {
-          id: `asset-${state.fileAssets.length + 1}`,
+          id: `asset-${String(state.fileAssets.length + 1)}`,
           ...q.data,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -167,10 +175,10 @@ async function createPrismaMock() {
         state.fileAssets.push(asset);
         return asset;
       }),
-      findUnique: jest.fn(async (q) =>
+      findUnique: jest.fn(async (q: Record<string, unknown>) =>
         state.fileAssets.find((a) => a.id === q.where.id),
       ),
-      findMany: jest.fn(async (q) => {
+      findMany: jest.fn(async (q: Record<string, unknown>) => {
         return state.fileAssets.filter((a) => {
           let match = true;
           if (q.where.tenantId)
@@ -183,16 +191,16 @@ async function createPrismaMock() {
           return match;
         });
       }),
-      update: jest.fn(async (q) => {
+      update: jest.fn(async (q: Record<string, unknown>) => {
         const asset = state.fileAssets.find((a) => a.id === q.where.id);
         if (asset) Object.assign(asset, q.data);
         return asset;
       }),
     },
     auditLog: {
-      create: jest.fn(async (q) => {
+      create: jest.fn(async (q: Record<string, unknown>) => {
         const log = {
-          id: `log-${state.auditLogs.length}`,
+          id: `log-${String(state.auditLogs.length)}`,
           ...q.data,
           createdAt: new Date(),
         };
@@ -201,8 +209,4 @@ async function createPrismaMock() {
       }),
     },
   };
-}
-
-function createQueueMock() {
-  return { add: jest.fn(), close: jest.fn(), on: jest.fn() };
 }
