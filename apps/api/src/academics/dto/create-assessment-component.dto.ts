@@ -1,5 +1,5 @@
 import { AssessmentType } from '@prisma/client';
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class CreateAssessmentComponentDto {
   @IsString()
@@ -16,12 +16,13 @@ export class CreateAssessmentComponentDto {
   type?: AssessmentType;
 
   @IsNumber()
-  @Min(0)
+  @Min(1)
   maxMarks!: number;
 
   @IsOptional()
   @IsNumber()
-  @Min(0)
+  @Min(1)
+  @Max(100)
   weightPercent?: number;
 
   @IsOptional()
