@@ -1,11 +1,12 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { api } from '../../lib/api';
 import { SubjectsTab } from './tabs/subjects-tab';
 import { ExamTermsTab } from './tabs/exam-terms-tab';
 import { MarksEntryTab } from './tabs/marks-entry-tab';
+import { MarksLockTab } from './tabs/marks-lock-tab';
 import { ReportCardsTab } from './tabs/report-cards-tab';
 import { CasRecordsTab } from './tabs/cas-records-tab';
 import { PromotionTab } from './tabs/promotion-tab';
@@ -14,6 +15,7 @@ const sections = [
   'Subjects',
   'Exam Terms',
   'Marks Entry',
+  'Marks Lock',
   'CAS Records',
   'Report Cards',
   'Promotion',
@@ -36,6 +38,11 @@ const sectionMeta: Record<Section, { title: string; description: string; badge: 
     title: 'Marks Entry Grid',
     description: 'Select class, subject, and exam to enter marks for all students in one view.',
     badge: 'Grading',
+  },
+  'Marks Lock': {
+    title: 'Marks Lock Workflow',
+    description: 'Request, review, lock, and unlock marks with audit-backed correction controls.',
+    badge: 'Control',
   },
   'CAS Records': {
     title: 'CAS Observations',
@@ -154,6 +161,10 @@ export function AcademicsWorkspace() {
           students={studentsQuery.data ?? []}
           exams={examsQuery.data ?? []}
         />
+      )}
+
+      {activeSection === 'Marks Lock' && (
+        <MarksLockTab exams={examsQuery.data ?? []} />
       )}
 
       {activeSection === 'CAS Records' && (
