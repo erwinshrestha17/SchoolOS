@@ -115,7 +115,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
     } as any;
 
     await jwtAuthGuard.canActivate(mockContext);
-    await expect(platformGuard.canActivate(mockContext)).rejects.toBeInstanceOf(
+    await expect(platformGuard.canActivate(mockContext)).rejects.toThrow(
       ForbiddenException,
     );
 
@@ -243,7 +243,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
     await jwtAuthGuard.canActivate(sUpdateContext);
     await expect(
       platformGuard.canActivate(sUpdateContext),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    ).rejects.toThrow(ForbiddenException);
 
     // 12. Setup platform billing admin (Read-only)
     const billingRole = prisma.__state.roles.find(
@@ -301,7 +301,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
     await jwtAuthGuard.canActivate(bUpdateContext);
     await expect(
       platformGuard.canActivate(bUpdateContext),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    ).rejects.toThrow(ForbiddenException);
   });
 });
 

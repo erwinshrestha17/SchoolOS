@@ -342,6 +342,7 @@ async function createPrismaMock() {
         return log;
       }),
     },
+    refreshToken: { create: jest.fn() },
   };
 }
 

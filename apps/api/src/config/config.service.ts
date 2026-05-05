@@ -274,9 +274,7 @@ export class ConfigService {
       try {
         const parsedOrigin = new URL(origin);
         if (parsedOrigin.protocol !== 'https:') {
-          errors.push(
-            `Frontend origin ${origin} must use https in production`,
-          );
+          errors.push(`Frontend origin ${origin} must use https in production`);
         }
       } catch {
         errors.push(`Frontend origin ${origin} must be a valid URL`);

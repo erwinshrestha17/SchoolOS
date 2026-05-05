@@ -69,9 +69,10 @@ export function LoginForm() {
       onSubmit={handleSubmit((values) => mutation.mutate(values))}
     >
       <div>
-        <label className="label mb-2 block">School Code</label>
+        <label htmlFor="tenantSlug" className="label mb-2 block">School Code</label>
         <input
           {...register('tenantSlug')}
+          id="tenantSlug"
           placeholder="e.g. green-valley-school"
           autoComplete="organization"
         />
@@ -86,9 +87,10 @@ export function LoginForm() {
       </div>
 
       <div>
-        <label className="label mb-2 block">Email</label>
+        <label htmlFor="email" className="label mb-2 block">Email</label>
         <input
           {...register('email')}
+          id="email"
           type="email"
           placeholder="admin@school.edu.np"
           autoComplete="email"
@@ -101,8 +103,9 @@ export function LoginForm() {
       </div>
 
       <div>
-        <label className="label mb-2 block">Password</label>
+        <label htmlFor="password" className="label mb-2 block">Password</label>
         <input
+          id="password"
           type="password"
           {...register('password')}
           placeholder="Enter your password"
