@@ -31,7 +31,7 @@ export type NavItem = {
   permissions?: PermissionKey[];
   platformRoles?: string[];
   badge?: number;
-  phase: 'phase1' | 'future';
+  phase: 'phase1' | 'phase2' | 'future';
   disabled?: boolean;
 };
 
@@ -94,8 +94,7 @@ export const dashboardNavItems: NavItem[] = [
     label: 'Academics',
     icon: GraduationCap,
     permissions: ['academics:read', 'academics:manage'],
-    phase: 'future',
-    disabled: true,
+    phase: 'phase2',
   },
   {
     href: '/dashboard/payroll',
@@ -169,7 +168,7 @@ export function Sidebar({
   const { session } = useSession();
 
   const visiblePrimaryItems = dashboardNavItems.filter(
-    (item) => item.phase === 'phase1' && canSeeNavItem(item, session),
+    (item) => item.phase !== 'future' && canSeeNavItem(item, session),
   );
   const visiblePlatformItems = platformNavItems.filter((item) =>
     canSeeNavItem(item, session),
@@ -276,7 +275,7 @@ function SidebarContent({
         <NavSection
           collapsed={collapsed}
           items={primaryItems}
-          label="Phase 1 Core"
+          label="Live Modules"
           pathname={pathname}
           onMobileClose={onMobileClose}
         />
