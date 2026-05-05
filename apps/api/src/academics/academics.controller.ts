@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { AcademicsFoundationService } from './academics-foundation.service';
 import { AcademicsService } from './academics.service';
+import { AssessmentComponentsService } from './assessment-components.service';
 import { CreateAssessmentComponentDto } from './dto/create-assessment-component.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
 import { CreateExamTermDto } from './dto/create-exam-term.dto';
@@ -31,6 +32,7 @@ import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
 import { UpdateExamTermDto } from './dto/update-exam-term.dto';
+import { UpdateAssessmentComponentDto } from './dto/update-assessment-component.dto';
 
 @Controller('academics')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -38,6 +40,7 @@ export class AcademicsController {
   constructor(
     private readonly academicsService: AcademicsService,
     private readonly academicsFoundationService: AcademicsFoundationService,
+    private readonly assessmentComponentsService: AssessmentComponentsService,
   ) {}
 
   @Get('exams')
@@ -95,7 +98,7 @@ export class AcademicsController {
     @Body() dto: CreateAssessmentComponentDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.academicsService.createAssessmentComponent(dto, auth);
+    return this.assessmentComponentsService.create(dto, auth);
   }
 
   @Get('exams/:id/components')
@@ -105,11 +108,34 @@ export class AcademicsController {
     @Query('subjectId') subjectId: string | undefined,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.academicsService.listComponentsByExamTerm(
+    return this.assessmentComponentsService.listByExamTerm(
       auth,
       examTermId,
       subjectId,
     );
+  }
+
+  @Patch('exams/components/:id')
+  @Permissions('academics:update')
+  updateComponent(
+    @Param('id') assessmentComponentId: string,
+    @Body() dto: UpdateAssessmentComponentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.assessmentComponentsService.update(
+      assessmentComponentId,
+      dto,
+      auth,
+    );
+  }
+
+  @Delete('exams/components/:id')
+  @Permissions('academics:delete')
+  deleteComponent(
+    @Param('id') assessmentComponentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.assessmentComponentsService.delete(assessmentComponentId, auth);
   }
 
   @Get('exams/timetable')

@@ -1,32 +1,36 @@
 import { AssessmentType } from '@prisma/client';
 import { IsEnum, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
-export class CreateAssessmentComponentDto {
+export class UpdateAssessmentComponentDto {
+  @IsOptional()
   @IsString()
-  examTermId!: string;
+  examTermId?: string;
 
+  @IsOptional()
   @IsString()
-  subjectId!: string;
+  subjectId?: string;
 
+  @IsOptional()
   @IsString()
-  name!: string;
+  name?: string;
 
   @IsOptional()
   @IsEnum(AssessmentType)
   type?: AssessmentType;
 
+  @IsOptional()
   @IsNumber()
   @Min(1)
-  maxMarks!: number;
+  maxMarks?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  passMarks?: number;
 
   @IsOptional()
   @IsNumber()
   @Min(1)
   @Max(100)
   weightPercent?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  passMarks?: number;
 }
