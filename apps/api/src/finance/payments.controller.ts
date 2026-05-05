@@ -44,7 +44,7 @@ export class PaymentsController {
   previewCashierClose(
     @Query() query: CashierCloseWindowDto,
     @CurrentAuth() auth: AuthContext,
-  ) {
+  ): Promise<unknown> {
     return this.financeService.previewCashierClose(query, auth);
   }
 
@@ -53,7 +53,7 @@ export class PaymentsController {
   listCashierCloses(
     @Query() query: ListCashierClosesDto,
     @CurrentAuth() auth: AuthContext,
-  ) {
+  ): Promise<unknown> {
     return this.financeService.listCashierCloses(query, auth);
   }
 
@@ -62,7 +62,7 @@ export class PaymentsController {
   finalizeCashierClose(
     @Body() dto: CreateCashierCloseDto,
     @CurrentAuth() auth: AuthContext,
-  ) {
+  ): Promise<unknown> {
     return this.financeService.finalizeCashierClose(dto, auth);
   }
 
