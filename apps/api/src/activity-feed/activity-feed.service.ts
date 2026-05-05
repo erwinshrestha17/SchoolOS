@@ -114,7 +114,7 @@ export class ActivityFeedService {
               ? await this.fileRegistryService.getSignedUrl(
                   actor.tenantId,
                   (attachment as ActivityAttachment & { fileAssetId?: string })
-                    .fileAssetId!,
+                    .fileAssetId,
                 )
               : null,
           })),
@@ -272,7 +272,7 @@ export class ActivityFeedService {
               where: {
                 id: (
                   attachment as ActivityAttachment & { fileAssetId?: string }
-                ).fileAssetId!,
+                ).fileAssetId,
               },
               data: { entityId: post.id },
             })

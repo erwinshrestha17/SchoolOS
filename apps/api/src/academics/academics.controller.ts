@@ -74,7 +74,11 @@ export class AcademicsController {
     @Body() dto: UpdateExamTermDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.academicsFoundationService.updateExamTerm(examTermId, dto, auth);
+    return this.academicsFoundationService.updateExamTerm(
+      examTermId,
+      dto,
+      auth,
+    );
   }
 
   @Delete('exams/:id')

@@ -88,16 +88,16 @@ export interface DefaulterAgingReportRow {
   status: InvoiceStatus;
 }
 
-type CashierCloseMethodBreakdown = {
+interface CashierCloseMethodBreakdown {
   method: PaymentMethod;
   grossCollected: number;
   totalRefunded: number;
   netCollected: number;
   paymentCount: number;
   refundCount: number;
-};
+}
 
-type CashierCloseSummary = {
+interface CashierCloseSummary {
   openedAt: Date;
   closedAt: Date;
   collectorUserId: string | null;
@@ -115,7 +115,7 @@ type CashierCloseSummary = {
   refundCount: number;
   firstReceiptNumber: string | null;
   lastReceiptNumber: string | null;
-};
+}
 
 @Injectable()
 export class FinanceService {
@@ -2718,7 +2718,7 @@ export class FinanceService {
         denominationBreakdown:
           (dto.denominationBreakdown as Prisma.InputJsonValue | undefined) ??
           Prisma.JsonNull,
-        methodBreakdown: summary.methodBreakdown as Prisma.InputJsonValue,
+        methodBreakdown: summary.methodBreakdown,
         paymentCount: summary.paymentCount,
         refundCount: summary.refundCount,
         firstReceiptNumber: summary.firstReceiptNumber,
@@ -3797,7 +3797,7 @@ function normalizeJsonObject(
     return null;
   }
 
-  return value as Record<string, unknown>;
+  return value;
 }
 
 function escapeCsv(value: string) {

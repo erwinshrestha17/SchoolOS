@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 
-export type NoticeDetail = {
+export interface NoticeDetail {
   id: string;
   title: string;
   body: string;
@@ -28,7 +28,7 @@ export type NoticeDetail = {
     failed: number;
     skipped: number;
   };
-};
+}
 
 @Injectable()
 export class NoticeDetailService {

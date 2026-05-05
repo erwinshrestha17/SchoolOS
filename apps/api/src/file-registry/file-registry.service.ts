@@ -38,7 +38,7 @@ export class FileRegistryService {
         module: input.module,
         entityId: input.entityId,
         metadata: input.metadata || {},
-        status: (FileStatus?.UPLOADED || 'UPLOADED') as FileStatus,
+        status: FileStatus?.UPLOADED || 'UPLOADED',
       },
     });
   }
@@ -65,7 +65,7 @@ export class FileRegistryService {
     await this.prisma.fileAsset.update({
       where: { id: assetId },
       data: {
-        status: (FileStatus?.DELETED || 'DELETED') as FileStatus,
+        status: FileStatus?.DELETED || 'DELETED',
         softDeletedAt: new Date(),
       },
     });

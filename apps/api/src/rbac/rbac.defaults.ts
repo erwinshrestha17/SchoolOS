@@ -1,8 +1,8 @@
-export type PermissionDefinition = {
+export interface PermissionDefinition {
   resource: string;
   action: string;
   description: string;
-};
+}
 
 export const PERMISSION_CATALOG: PermissionDefinition[] = [
   {

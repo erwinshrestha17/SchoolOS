@@ -18,13 +18,13 @@ import {
 import { ConfigService } from '../config/config.service';
 import { PrismaService } from '../prisma/prisma.service';
 
-export type ActivityMediaFile = {
+export interface ActivityMediaFile {
   stream?: NodeJS.ReadableStream;
   redirectUrl?: string;
   fileName: string;
   contentType: string;
   sizeBytes: number;
-};
+}
 
 @Injectable()
 export class ActivityMediaService {

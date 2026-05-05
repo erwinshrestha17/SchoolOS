@@ -12,13 +12,13 @@ import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateExamTermDto } from './dto/update-exam-term.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
 
-type ExamTermFilters = {
+interface ExamTermFilters {
   academicYearId?: string;
-};
+}
 
-type SubjectFilters = {
+interface SubjectFilters {
   classId?: string;
-};
+}
 
 @Injectable()
 export class AcademicsFoundationService {

@@ -1,33 +1,33 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-type SendEmailInput = {
+interface SendEmailInput {
   to: string;
   subject: string;
   text: string;
   html?: string;
   metadata?: Record<string, string>;
-};
+}
 
-type SendSmsInput = {
+interface SendSmsInput {
   to: string;
   message: string;
   metadata?: Record<string, string>;
-};
+}
 
-type SendPushNotificationInput = {
+interface SendPushNotificationInput {
   title: string;
   body: string;
   audience: string;
   metadata?: Record<string, string>;
-};
+}
 
-type SendAuthCodeEmailInput = {
+interface SendAuthCodeEmailInput {
   to: string;
   tenantName: string;
   code: string;
   purpose: 'login' | 'password_recovery' | 'mfa_setup';
   resetUrl?: string;
-};
+}
 
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';

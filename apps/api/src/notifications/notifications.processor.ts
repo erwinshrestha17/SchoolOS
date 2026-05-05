@@ -4,26 +4,26 @@ import { NotificationStatus } from '@prisma/client';
 import { Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 
-type EmailJobData = {
+interface EmailJobData {
   to: string;
   subject: string;
   text?: string;
   html?: string;
   metadata?: Record<string, unknown>;
-};
+}
 
-type SmsJobData = {
+interface SmsJobData {
   to: string;
   message: string;
   metadata?: Record<string, unknown>;
-};
+}
 
-type PushJobData = {
+interface PushJobData {
   title: string;
   body: string;
   audience?: unknown;
   metadata?: Record<string, unknown>;
-};
+}
 
 type NotificationJobData = EmailJobData | SmsJobData | PushJobData;
 
@@ -35,7 +35,7 @@ export class NotificationsProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<NotificationJobData, void, string>): Promise<void> {
+  async process(job: Job<NotificationJobData, void>): Promise<void> {
     try {
       switch (job.name) {
         case 'sendEmail':

@@ -11,7 +11,9 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { ReadMessageDto } from './dto/read-message.dto';
 import { MessagingService } from './messaging.service';
 
-type MessageSentEvent = { tenantId: string };
+interface MessageSentEvent {
+  tenantId: string;
+}
 
 @Controller('messaging')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)

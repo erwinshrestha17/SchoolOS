@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 
-export type StudentSearchResult = {
+export interface StudentSearchResult {
   id: string;
   studentSystemId: string;
   fullNameEn: string;
@@ -14,9 +14,9 @@ export type StudentSearchResult = {
   guardianName: string | null;
   guardianPhone: string | null;
   lifecycleStatus: string;
-};
+}
 
-type StudentSearchRow = {
+interface StudentSearchRow {
   id: string;
   studentSystemId: string;
   firstNameEn: string;
@@ -28,7 +28,7 @@ type StudentSearchRow = {
   sectionName: string | null;
   guardianName: string | null;
   guardianPhone: string | null;
-};
+}
 
 @Injectable()
 export class StudentSearchService {

@@ -305,7 +305,7 @@ export class UsersService {
   }
 }
 
-type CreateManagedUserInput = {
+interface CreateManagedUserInput {
   tenantId: string;
   email: string;
   password: string;
@@ -313,9 +313,9 @@ type CreateManagedUserInput = {
   roleIds: string[];
   assignedById?: string | null;
   status?: UserStatus;
-};
+}
 
-type UserWithRelations = {
+interface UserWithRelations {
   id: string;
   email: string | null;
   phone: string | null;
@@ -334,4 +334,4 @@ type UserWithRelations = {
   student: {
     id: string;
   } | null;
-};
+}

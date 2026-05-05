@@ -41,11 +41,11 @@ describe('School OS Auth + RBAC integration', () => {
   let rolesController: RolesController;
   let jwtAuthGuard: JwtAuthGuard;
   let rolesGuard: RolesPermissionsGuard;
-  let sentCodes: Array<{
+  let sentCodes: {
     to: string;
     code: string;
     purpose: 'login' | 'password_recovery' | 'mfa_setup';
-  }>;
+  }[];
 
   beforeEach(async () => {
     prisma = await createPrismaMock();
@@ -531,11 +531,11 @@ describe('School OS Auth + RBAC integration', () => {
 });
 
 function getLatestCode(
-  sentCodes: Array<{
+  sentCodes: {
     to: string;
     code: string;
     purpose: 'login' | 'password_recovery' | 'mfa_setup';
-  }>,
+  }[],
   to: string,
   purpose: 'login' | 'password_recovery' | 'mfa_setup',
 ) {
@@ -632,7 +632,7 @@ function createResponseMock() {
 }
 
 function buildCookieHeader(
-  cookies: Array<{ name: string; value: string }>,
+  cookies: { name: string; value: string }[],
   name: string,
 ) {
   const cookie = cookies.find((item) => item.name === name);

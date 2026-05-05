@@ -1,10 +1,10 @@
 import { Gender } from '@prisma/client';
-import { CreateAdmissionDto } from './dto/create-admission.dto';
+import { type CreateAdmissionDto } from './dto/create-admission.dto';
 
-export type ParsedAdmissionRow = {
+export interface ParsedAdmissionRow {
   rowNumber: number;
   raw: Record<string, string>;
-};
+}
 
 export function normalizeAdmissionName(value: string) {
   return value.trim().replace(/\s+/g, ' ').toLowerCase();

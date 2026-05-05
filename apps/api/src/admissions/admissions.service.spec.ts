@@ -464,11 +464,11 @@ function buildTransaction() {
   };
 }
 
-type PrismaMockOptions = {
+interface PrismaMockOptions {
   academicYearFindFirstResult: typeof academicYear | null;
   classFindFirstResult: typeof classroom | null;
   sectionFindFirstResult: typeof section | null;
   studentFindManyResult: unknown[];
   studentFindFirstResult: unknown;
   enrollmentFindFirstResult: unknown;
-};
+}
