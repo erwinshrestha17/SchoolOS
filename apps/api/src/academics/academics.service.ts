@@ -29,6 +29,7 @@ import { BatchPromoteDto } from './dto/batch-promote.dto';
 import { BatchEnterMarksDto } from './dto/batch-enter-marks.dto';
 import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
+import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
 
 @Injectable()
 export class AcademicsService {
@@ -198,14 +199,35 @@ export class AcademicsService {
   async createExamTerm(dto: CreateExamTermDto, actor: AuthContext) {
     await this.ensureAcademicYear(actor, dto.academicYearId);
 
+    const startsOn = this.parseIsoDateOrThrow(dto.startsOn, 'startsOn');
+    const endsOn = this.parseIsoDateOrThrow(dto.endsOn, 'endsOn');
+    if (startsOn > endsOn) {
+      throw new ConflictException('Exam term startsOn cannot be after endsOn');
+    }
+
+    const requestedWeight = new Prisma.Decimal(dto.weightPercent ?? 100);
+    const aggregate = await this.prisma.examTerm.aggregate({
+      where: {
+        tenantId: actor.tenantId,
+        academicYearId: dto.academicYearId,
+      },
+      _sum: { weightPercent: true },
+    });
+    const existingWeight = Number(aggregate._sum.weightPercent ?? 0);
+    if (existingWeight + Number(requestedWeight) > 100) {
+      throw new ConflictException(
+        'Total exam term weight for the academic year cannot exceed 100%',
+      );
+    }
+
     const term = await this.prisma.examTerm.create({
       data: {
         tenantId: actor.tenantId,
         academicYearId: dto.academicYearId,
         name: dto.name,
-        startsOn: new Date(dto.startsOn),
-        endsOn: new Date(dto.endsOn),
-        weightPercent: new Prisma.Decimal(dto.weightPercent ?? 100),
+        startsOn,
+        endsOn,
+        weightPercent: requestedWeight,
       },
       include: {
         academicYear: true,
@@ -252,6 +274,26 @@ export class AcademicsService {
       throw new ConflictException('Exam term is locked');
     }
 
+    if (dto.passMarks !== undefined && dto.passMarks > dto.maxMarks) {
+      throw new ConflictException('passMarks cannot exceed maxMarks');
+    }
+
+    const requestedWeight = new Prisma.Decimal(dto.weightPercent ?? 100);
+    const subjectWeights = await this.prisma.assessmentComponent.aggregate({
+      where: {
+        tenantId: actor.tenantId,
+        examTermId: dto.examTermId,
+        subjectId: dto.subjectId,
+      },
+      _sum: { weightPercent: true },
+    });
+    const existingWeight = Number(subjectWeights._sum.weightPercent ?? 0);
+    if (existingWeight + Number(requestedWeight) > 100) {
+      throw new ConflictException(
+        'Total component weight per subject in an exam term cannot exceed 100%',
+      );
+    }
+
     return this.prisma.assessmentComponent.create({
       data: {
         tenantId: actor.tenantId,
@@ -260,7 +302,7 @@ export class AcademicsService {
         name: dto.name,
         type: dto.type,
         maxMarks: new Prisma.Decimal(dto.maxMarks),
-        weightPercent: new Prisma.Decimal(dto.weightPercent ?? 100),
+        weightPercent: requestedWeight,
         passMarks:
           dto.passMarks === undefined
             ? null
@@ -313,6 +355,15 @@ export class AcademicsService {
       await this.ensureSection(actor, dto.sectionId, dto.classId);
     }
 
+    const startsAt = this.parseIsoDateOrThrow(dto.startsAt, 'startsAt');
+    const endsAt = this.parseIsoDateOrThrow(dto.endsAt, 'endsAt');
+    if (startsAt >= endsAt) {
+      throw new ConflictException('startsAt must be earlier than endsAt');
+    }
+    if (startsAt < term.startsOn || endsAt > term.endsOn) {
+      throw new ConflictException('Exam slot must fall within exam term dates');
+    }
+
     const slot = await this.prisma.examTimetableSlot.create({
       data: {
         tenantId: actor.tenantId,
@@ -321,8 +372,8 @@ export class AcademicsService {
         subjectId: dto.subjectId,
         classId: dto.classId,
         sectionId: dto.sectionId ?? null,
-        startsAt: new Date(dto.startsAt),
-        endsAt: new Date(dto.endsAt),
+        startsAt,
+        endsAt,
         room: dto.room ?? null,
       },
       include: {
@@ -752,6 +803,65 @@ export class AcademicsService {
     });
 
     return reviewed;
+  }
+
+  async unlockExamTerm(
+    examTermId: string,
+    dto: UnlockExamTermDto,
+    actor: AuthContext,
+  ) {
+    const term = await this.prisma.examTerm.findFirst({
+      where: { id: examTermId, tenantId: actor.tenantId },
+    });
+
+    if (!term) {
+      throw new NotFoundException('Exam term not found in this tenant');
+    }
+
+    if (!term.isLocked) {
+      throw new ConflictException('Exam term is already unlocked');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.examTerm.update({
+        where: { id: term.id },
+        data: { isLocked: false },
+      });
+
+      await tx.markEntry.updateMany({
+        where: {
+          tenantId: actor.tenantId,
+          examTermId: term.id,
+        },
+        data: { isLocked: false },
+      });
+
+      await tx.markLockRequest.create({
+        data: {
+          tenantId: actor.tenantId,
+          examTermId: term.id,
+          requestedById: actor.userId,
+          reviewedById: actor.userId,
+          status: 'UNLOCKED',
+          reason: dto.reason ?? 'Manual unlock requested by authorized user',
+          reviewNote: dto.reason ?? null,
+          reviewedAt: new Date(),
+        },
+      });
+    });
+
+    await this.auditService.record({
+      action: 'unlock',
+      resource: 'exam_term',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: term.id,
+      after: {
+        reason: dto.reason ?? null,
+      },
+    });
+
+    return { examTermId: term.id, unlocked: true };
   }
 
   async listCasRecords(actor: AuthContext) {
@@ -1559,6 +1669,14 @@ export class AcademicsService {
     }
 
     return staff;
+  }
+
+  private parseIsoDateOrThrow(rawValue: string, fieldName: string) {
+    const parsed = new Date(rawValue);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new ConflictException(`${fieldName} must be a valid ISO date`);
+    }
+    return parsed;
   }
 }
 

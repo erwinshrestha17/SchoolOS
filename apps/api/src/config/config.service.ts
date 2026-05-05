@@ -198,6 +198,12 @@ export class ConfigService {
     return process.env.NODE_ENV === 'production';
   }
 
+  get isProductionBootExplicitlyAllowed() {
+    return ['1', 'true', 'yes'].includes(
+      (process.env.ALLOW_PROD_BOOT ?? '').toLowerCase(),
+    );
+  }
+
   private validateNumericEnv() {
     const errors: string[] = [];
     const numericFields: Array<[string, number]> = [
@@ -229,6 +235,12 @@ export class ConfigService {
   private validateProductionEnv() {
     const errors: string[] = [];
 
+    if (!this.isProductionBootExplicitlyAllowed) {
+      errors.push(
+        'ALLOW_PROD_BOOT=true is required when NODE_ENV=production to prevent accidental prod startup',
+      );
+    }
+
     if (!process.env.DATABASE_URL) {
       errors.push('DATABASE_URL is required in production');
     }
@@ -256,6 +268,19 @@ export class ConfigService {
       errors.push(
         'FRONTEND_ORIGIN or FRONTEND_ORIGINS is required in production',
       );
+    }
+
+    for (const origin of this.frontendOrigins) {
+      try {
+        const parsedOrigin = new URL(origin);
+        if (parsedOrigin.protocol !== 'https:') {
+          errors.push(
+            `Frontend origin ${origin} must use https in production`,
+          );
+        }
+      } catch {
+        errors.push(`Frontend origin ${origin} must be a valid URL`);
+      }
     }
 
     if (!process.env.REDIS_HOST) {

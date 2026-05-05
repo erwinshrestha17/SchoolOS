@@ -14,6 +14,7 @@ const generatedArtifactPatterns = [
   /(^|\/)coverage\//,
   /(^|\/)\.turbo\//,
   /(^|\/)\.cache\//,
+  /(^|\/)packages\/core\/src\/.+\.(d\.ts|js|js\.map)$/,
 ];
 
 const offenders = trackedFiles.filter(

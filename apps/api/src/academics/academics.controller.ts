@@ -26,6 +26,7 @@ import { BatchPromoteDto } from './dto/batch-promote.dto';
 import { BatchEnterMarksDto } from './dto/batch-enter-marks.dto';
 import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
+import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
 
 @Controller('academics')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -45,6 +46,16 @@ export class AcademicsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.academicsService.createExamTerm(dto, auth);
+  }
+
+  @Patch('exams/:id/unlock')
+  @Permissions('academics:manage')
+  unlockExamTerm(
+    @Param('id') examTermId: string,
+    @Body() dto: UnlockExamTermDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsService.unlockExamTerm(examTermId, dto, auth);
   }
 
   @Post('exams/components')
