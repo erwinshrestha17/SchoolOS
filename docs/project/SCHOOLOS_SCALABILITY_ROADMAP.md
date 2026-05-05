@@ -3,7 +3,7 @@
 **Repository:** `erwinshrestha17/SchoolOS`  
 **Stage:** Phase 2 Transition Readiness  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard  
-**Purpose:** This document explains how SchoolOS should become scalable phase by phase, and how scalability work must be implemented alongside normal product development instead of being postponed until the end.
+**Purpose:** Define how SchoolOS scales phase by phase while development continues across the SaaS starter/platform core and school-domain modules.
 
 ---
 
@@ -16,93 +16,136 @@ The correct scalability path is:
 ```text
 1. Keep the modular monolith.
 2. Make module boundaries strict.
-3. Make tenant isolation impossible to bypass.
-4. Make PostgreSQL queries/indexes production-safe.
-5. Move slow work into Redis/BullMQ workers.
-6. Add observability, readiness, backup, and smoke gates.
-7. Scale API and workers horizontally.
-8. Split only proven high-pressure modules later.
+3. Align backend/API/frontend structure with M0 Platform Core + M1-M10 school modules.
+4. Make tenant isolation impossible to bypass.
+5. Make PostgreSQL queries/indexes production-safe.
+6. Move slow work into Redis/BullMQ workers.
+7. Add observability, readiness, backup, and smoke gates.
+8. Scale API and workers horizontally.
+9. Split only proven high-pressure modules later.
 ```
 
 Do **not** jump to microservices now. The repo already has a good foundation: NestJS modules, Prisma, Redis/BullMQ, throttling, CLS tenant context, health/readiness endpoints, production verification scripts, Docker PostgreSQL/Redis, and Phase 1 smoke/preflight work.
 
-The main risk now is not lack of microservices. The main risk is Phase 2 breadth growing faster than tenant isolation, indexing, queue boundaries, report performance, audit depth, and operational monitoring.
+The main risk now is not lack of microservices. The main risk is Phase 2/3 module breadth growing faster than tenant isolation, indexing, queue boundaries, report performance, audit depth, operational monitoring, and frontend route separation.
 
 ---
 
-## 2. Current Repo Scalability Assessment
+## 2. Source Documents Used
 
-## 2.1 Strengths Already Present
-
-Current strengths:
+This roadmap must stay aligned with these files:
 
 ```text
-✅ pnpm monorepo
-✅ NestJS modular-monolith backend
-✅ PostgreSQL + Prisma data layer
-✅ Redis module
-✅ BullMQ dependency and root configuration
-✅ EventEmitter module
-✅ Schedule module
-✅ Global throttling guard
-✅ CLS tenant context foundation
-✅ Health endpoint
-✅ Readiness endpoint checking database and Redis
-✅ Docker Compose for local Postgres and Redis
-✅ Production verification scripts
-✅ Phase 1 smoke test command
-✅ Platform Control Plane separation
-✅ Tenant Configuration Plane separation
-✅ School Operations Plane separation
-✅ M9 Accounting boundary rules documented
+PROJECT_CONTEXT.md
+ARCHITECTURE.md
+DEVELOPMENT_RULES.md
+docs/project/SCHOOLOS_PROJECT_MEMORY.md
+docs/project/SCHOOLOS_PHASE_STRUCTURE.md
+docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md
+docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
 ```
 
-The repo is already in a better scaling position than a basic CRUD school app because the critical platform primitives are present.
-
-## 2.2 Current Scalability Gaps / Risks
-
-Remaining risks:
+Important findings from those docs:
 
 ```text
-⚠️ Some older context docs still need to consistently reflect Phase 2 Transition Readiness.
-⚠️ Phase 2 modules are expanding quickly: academics, timetable, payroll, accounting, library, transport.
-⚠️ Canteen is planned but not yet fully active.
-⚠️ Report-heavy workflows may become slow without background generation and caching.
-⚠️ Attendance, notification, audit, transport, delivery, and ledger tables will grow quickly.
-⚠️ Prisma query patterns must consistently enforce tenantId and pagination.
-⚠️ Object storage/provider configuration still needs production hardening.
-⚠️ Readiness is present but metrics/structured observability need deeper implementation.
-⚠️ API and worker process separation should become explicit before broad pilot rollout.
+- SchoolOS is in Phase 2 Transition Readiness.
+- Phase 1A/1B are pilot-ready.
+- M0 Platform Core contains reusable SaaS starter/platform capabilities.
+- M1-M10 define the real school product modules.
+- Current frontend stays in apps/web Next.js for now.
+- Future apps/admin Angular dashboard is deferred.
+- Microservices are deferred until scale/team/deployment/compliance justify them.
 ```
-
-## 2.3 Current Scalability Verdict
-
-```text
-Single-school local development: Strong
-Controlled pilot: Good, with staging checks
-Multi-school early production: Needs Phase S1/S2 scalability hardening
-Large multi-school SaaS: Not ready yet
-Microservices: Not needed yet
-```
-
-SchoolOS should scale first to several pilot schools using the same modular monolith, then optimize based on real bottlenecks.
 
 ---
 
-## 3. Core Scalability Principles
+## 3. Product Module Map
 
-## 3.1 Modular Monolith First
+## 3.1 M0 SaaS Starter / Platform Core Modules
 
-SchoolOS must use one backend application for now, but it must be split clearly by business modules.
+These are the reusable SaaS/starter capabilities already documented in the platform core roadmap. They should be added gradually into SchoolOS instead of blindly copying a generic SaaS template.
 
-Expected backend shape:
+| M0 Capability | Backend Module Area | API Namespace | Current/Future Frontend Area | Scaling Notes |
+|---|---|---|---|---|
+| Platform Control Plane | `platform/` | `/api/v1/platform/*` | `/platform/*` | Cross-tenant access; platform-only permissions; audit every tenant-impacting action. |
+| Tenant Settings | `settings/` | `/api/v1/settings/*` or `/api/v1/tenant-settings/*` | `/dashboard/settings/*` | Tenant-scoped config; cache safe read settings; audit writes. |
+| Generic File Registry | `file-registry/`, `storage/` | `/api/v1/files/*` | shared upload/download UI | Central metadata for files; signed URLs; object storage-ready. |
+| Global API Response Envelope | common/interceptors/filters | all JSON APIs | shared API client | Include requestId later; exempt PDF/CSV/file streams. |
+| Generic Reports Foundation | `reports/` | `/api/v1/reports/*` | module report tabs | Background heavy exports; audit report exports. |
+| Safe Activity Logs | `audit/` + future activity-log projection | `/api/v1/activity-logs/*` later | admin/user history panels | Safe operational logs separate from compliance audit and parent activity feed. |
+| Usage Limits & Plan Rules | `platform/`, `tenants/` | `/api/v1/platform/plans/*` | `/platform/*`, locked feature UI | Server-side entitlement enforcement; start read-only before hard blocking. |
+| API Key Management | future `api-keys/` | `/api/v1/api-keys/*` | `/platform/*` or tenant settings | Hash keys only; scopes; rate limits; tenant isolation. |
+| Webhook System | future `webhooks/` | `/api/v1/webhooks/*` | `/platform/*` or tenant settings | BullMQ delivery; signed payloads; retry/backoff. |
+| SaaS Subscription & Billing | future `platform-billing/` | `/api/v1/platform/billing/*` | `/platform/billing/*` | Separate from school fees; platform audit; safe suspension rules. |
+
+## 3.2 M1-M10 School Product Modules
+
+| Module | Name | Phase | Current Backend Area | API Namespace Direction | Frontend Area Direction |
+|---|---|---:|---|---|---|
+| M1 | Admissions & Student Profiles | Phase 1 | `admissions/`, `students/`, `student-records/` | `/api/v1/admissions`, `/api/v1/students`, `/api/v1/student-records` | `/dashboard/admissions`, `/dashboard/students/*` |
+| M2 | Smart Attendance | Phase 1 | `attendance/` | `/api/v1/attendance/*` | `/dashboard/attendance` |
+| M3 | Fees & Receipts | Phase 1 | `finance/` | `/api/v1/finance/*` | `/dashboard/finance` |
+| M4 | Exams, CAS & Report Cards | Phase 2 | `academics/` | `/api/v1/academics/*` | `/dashboard/academics` |
+| M5 | Activity Feed & Milestones | Phase 1 | `activity-feed/` | `/api/v1/activity-feed/*` | `/dashboard/activity` |
+| M6 | Homework & Timetable | Phase 2 | `timetable/` | `/api/v1/timetable/*`, `/api/v1/homework/*` if split later | `/dashboard/timetable`, `/dashboard/homework` |
+| M7 | HR & Payroll | Phase 2 | `staff/`, `payroll/` | `/api/v1/staff/*`, `/api/v1/payroll/*` | `/dashboard/hr`, `/dashboard/payroll` |
+| M8A | Library Management | Phase 3 | `library/` | `/api/v1/library/*` | `/dashboard/library` |
+| M8B | Transport Management | Phase 3 | `transport/` | `/api/v1/transport/*` | `/dashboard/transport`; parent tracking later |
+| M8C | Canteen Management | Phase 3 | future `canteen/` | `/api/v1/canteen/*` | `/dashboard/canteen` |
+| M9 | Accounting & Finance | Phase 2 | `accounting/` + finance posting boundary | `/api/v1/accounting/*` | `/dashboard/accounting` |
+| M10 | Notices & Communication | Phase 1 + Phase 2/3 chat | `communications/`, `notifications/`, `messaging/` | `/api/v1/communications/*`, `/api/v1/notifications/*`, `/api/v1/messaging/*` | `/dashboard/notices`, notification center, chat later |
+
+## 3.3 Mapping from Generic Names to Current Repo Modules
+
+Use the current repo names unless a deliberate refactor is planned:
+
+```text
+fees/receipts          -> finance/
+exams/CAS/report cards -> academics/
+homework-timetable     -> timetable/ now; split homework/ later only if useful
+hr-payroll             -> staff/ + payroll/
+notices                -> communications/ + notifications/
+parent-teacher chat    -> messaging/ + communications/
+file uploads           -> file-registry/ + storage/
+SaaS starter modules   -> platform/, tenants/, settings/, reports/, audit/, file-registry/
+```
+
+---
+
+## 4. Scalable Repository Structure
+
+## 4.1 Current Monorepo Direction
+
+```text
+SchoolOS/
+  apps/
+    api/         NestJS modular monolith backend
+    web/         Current Next.js dashboard + platform console + public/root pages
+    admin/       Future Angular internal dashboard, not now
+  packages/
+    core/        Shared contracts, validation, permissions, types
+  docs/
+    project/     project memory, roadmap, scalability docs
+    production/  deployment/runbook/backup docs
+  scripts/       verification, smoke, deploy checks
+```
+
+## 4.2 Scalable Backend Structure
+
+Expected backend module shape:
 
 ```text
 apps/api/src
+  main.ts
+  app.module.ts
+
   auth/
   tenants/
   platform/
   settings/
+  users/
+  roles/
+
   admissions/
   students/
   student-records/
@@ -110,6 +153,7 @@ apps/api/src
   finance/
   academics/
   timetable/
+  staff/
   payroll/
   library/
   transport/
@@ -119,34 +163,201 @@ apps/api/src
   communications/
   messaging/
   notifications/
+
   reports/
   file-registry/
+  storage/
   audit/
+  redis/
+  prisma/
+  config/
+
   shared/               shared utilities only, not business dumping ground
-```
-
-Mapping note:
-
-```text
-fees/receipts          -> current finance module
-exams/CAS/report cards -> current academics module
-homework-timetable     -> current timetable module
-hr-payroll             -> current staff + payroll modules
-notices                -> current communications + notifications modules
 ```
 
 Each production module should own or clearly define:
 
 ```text
-controller(s)
-service(s)
-repository/data-access boundary where useful
-dto/validation contracts
-entities/schema ownership or Prisma model ownership notes
-permissions/RBAC keys
-domain events/integration events where needed
-tests: unit, integration, e2e/contract where relevant
+<module>.module.ts
+<module>.controller.ts
+<module>.service.ts
+repositories/ or data-access boundary where useful
+dto/ request/response validation contracts
+policies/ permissions/RBAC helpers where useful
+events/ domain events and integration event handlers where useful
+processors/ BullMQ processors if the module owns background jobs
+schemas/ Prisma ownership notes or module model documentation
+tests/ unit, integration, e2e/contract tests where relevant
 ```
+
+Suggested internal module shape:
+
+```text
+apps/api/src/<module>/
+  <module>.module.ts
+  <module>.controller.ts
+  <module>.service.ts
+  dto/
+  events/
+  processors/
+  repositories/
+  policies/
+  tests/
+```
+
+This does not require moving every existing file immediately. Use this shape for new work and refactor old modules gradually only when touching them.
+
+## 4.3 Scalable API Namespace Structure
+
+All external APIs remain versioned under `/api/v1`.
+
+```text
+/api/v1/auth/*
+/api/v1/platform/*                 M0 platform control plane
+/api/v1/tenants/*                  tenant onboarding/internal tenant mgmt
+/api/v1/settings/*                 tenant configuration
+/api/v1/files/*                    file registry/signed download
+/api/v1/reports/*                  generic reports/export foundation
+
+/api/v1/admissions/*               M1
+/api/v1/students/*                 M1
+/api/v1/student-records/*          M1
+/api/v1/attendance/*               M2
+/api/v1/finance/*                  M3
+/api/v1/academics/*                M4
+/api/v1/activity-feed/*            M5
+/api/v1/timetable/*                M6
+/api/v1/homework/*                 M6 later if split from timetable
+/api/v1/staff/*                    M7
+/api/v1/payroll/*                  M7
+/api/v1/library/*                  M8A
+/api/v1/transport/*                M8B
+/api/v1/canteen/*                  M8C later
+/api/v1/accounting/*               M9
+/api/v1/communications/*           M10
+/api/v1/notifications/*            M10
+/api/v1/messaging/*                M10 chat/messaging
+```
+
+API rules:
+
+```text
+- Controllers stay thin.
+- DTOs validate every external input.
+- Tenant-owned APIs derive tenantId from auth/CLS, not frontend payloads.
+- List endpoints use pagination and filters from the start.
+- File/PDF/CSV endpoints may bypass the JSON envelope when raw streams are required.
+- Business-critical writes use transactions and audit logs.
+- Slow/provider/report/PDF work goes to BullMQ.
+```
+
+## 4.4 Scalable Frontend Structure
+
+Current frontend remains Next.js in `apps/web`.
+
+Route plane separation:
+
+```text
+apps/web/app
+  /(public)/ or root pages       public website/login/admissions later
+  /platform/*                    SchoolOS owner/operator console
+  /dashboard/settings/*          tenant/school configuration
+  /dashboard/*                   school operations
+```
+
+Recommended feature structure:
+
+```text
+apps/web
+  app/
+    platform/
+    dashboard/
+      admissions/
+      students/
+      attendance/
+      finance/
+      academics/
+      activity/
+      timetable/
+      homework/
+      hr/
+      payroll/
+      library/
+      transport/
+      canteen/
+      accounting/
+      notices/
+      messages/
+      settings/
+  components/
+    shells/
+    forms/
+    modules/
+  lib/
+    api.ts or api/
+    auth.ts
+    query.ts
+    permissions.ts
+  test/
+```
+
+Frontend scalability rules:
+
+```text
+- Do not load every module on the dashboard landing page.
+- Use route-level/lazy feature separation.
+- Use server-side filtering, pagination, and search; do not fetch all rows and filter in browser.
+- Keep platform UI visually and permission-separated from school dashboard UI.
+- Use shared API client conventions for pagination, errors, and requestId later.
+- Keep role-based menu rendering, but never treat hidden frontend menus as security.
+- Preserve cookie-first auth; do not store raw tokens in browser storage.
+```
+
+## 4.5 Future Angular Admin Structure
+
+Angular admin migration is deferred. When it happens:
+
+```text
+apps/admin
+  src/app/core/          auth, API client, guards, interceptors
+  src/app/layouts/       platform shell, dashboard shell
+  src/app/features/      admissions, attendance, finance, academics, etc.
+  src/app/shared/        reusable UI components only
+```
+
+Do not start Angular migration until current Next.js dashboard and pilot workflow are stable.
+
+## 4.6 Shared Package Structure
+
+`packages/core` should contain shared contracts, not backend business logic.
+
+Allowed:
+
+```text
+permission keys
+DTO-style TypeScript types
+Zod schemas / validation contracts where shared safely
+report contracts
+frontend/backend shared constants
+```
+
+Avoid:
+
+```text
+Prisma access
+business service logic
+module-specific domain workflows
+secrets/provider code
+frontend-only UI code
+```
+
+---
+
+## 5. Core Scalability Principles
+
+## 5.1 Modular Monolith First
+
+SchoolOS must use one backend application for now, but it must be split clearly by business modules.
 
 Module communication rule:
 
@@ -155,16 +366,17 @@ Modules communicate through public services, domain events, queues, or explicit 
 Modules must not directly bypass another module's business rules by writing its internal tables.
 ```
 
-Examples:
+Good examples:
 
 ```text
 finance -> AccountingPostingService -> journal entries
 payroll -> PayrollPostingService / AccountingPostingService -> journal entries
 notices -> Notification queue -> delivery worker
 transport -> Redis latest location cache -> parent tracking API
+reports -> module report service -> background export worker
 ```
 
-Bad:
+Bad examples:
 
 ```text
 Any module writes another module's internal tables directly.
@@ -176,7 +388,7 @@ shared/ becomes a dumping ground for business logic.
 
 This keeps SchoolOS simple now and easier to split later if one module proves it needs independent scaling.
 
-## 3.2 Tenant Isolation Is the First Scaling Rule
+## 5.2 Tenant Isolation Is the First Scaling Rule
 
 Every tenant-owned table must include `tenantId` unless it is explicitly global/platform metadata.
 
@@ -201,9 +413,7 @@ where: {
 
 Exception: platform-control APIs may access cross-tenant data only with explicit platform permissions and audited support/tenant override.
 
-## 3.3 Every New Phase Must Include Scalability Work
-
-Do not build features first and add scalability later.
+## 5.3 Every New Phase Must Include Scalability Work
 
 Every feature phase must include:
 
@@ -216,13 +426,14 @@ Every feature phase must include:
 6. Queue decision: sync or async?
 7. Cache decision: cache or not?
 8. Report/export decision: immediate or background?
-9. Test coverage
-10. Production verification command
+9. Frontend route/API-client impact
+10. Test coverage
+11. Production verification command
 ```
 
 ---
 
-## 4. Target Scalable Architecture
+## 6. Target Scalable Runtime Architecture
 
 Near-term target:
 
@@ -253,22 +464,11 @@ At first these can run from the same codebase. They should eventually be separat
 
 ---
 
-## 5. Phase-Wise Scalability Implementation Plan
+## 7. Phase-Wise Scalability Implementation Plan
 
 ## Phase S0 — Current Baseline Lock
 
 **Goal:** Protect what is already working before Phase 2 grows further.
-
-Current baseline:
-
-```text
-Phase 1A: completed
-Phase 1B: pilot-ready
-Phase 2A Academics foundation: started/merged
-Payroll/accounting posting foundation: active
-Cashier close: recently improved
-Production preflight/smoke checks: present
-```
 
 Implementation tasks:
 
@@ -278,20 +478,12 @@ Implementation tasks:
 ✅ Keep module communication through public services/events/queues, not direct database hacks.
 ✅ Keep each module responsible for controller/service/repository-or-data-access/dto/permissions/events/tests.
 ✅ Keep Next.js dashboard for now.
+✅ Keep backend/API/frontend route structure aligned with M0 + M1-M10 module map.
 ✅ Keep tenantId as the tenant boundary.
 ✅ Keep PostgreSQL + Prisma.
 ✅ Keep Redis + BullMQ.
 ✅ Keep current /health and /ready endpoints.
 ✅ Keep verify:production and smoke:phase1 gates.
-```
-
-Do now:
-
-```text
-1. Update all project context docs to reflect Phase 2 Transition Readiness.
-2. Add this scalability roadmap as a required planning reference.
-3. Stop broad feature expansion without scalability gate checks.
-4. Keep Phase 2 work vertical, not horizontal.
 ```
 
 Exit criteria:
@@ -303,42 +495,19 @@ Exit criteria:
 - No module bypasses another module's public service/event/queue boundary for business-critical writes.
 ```
 
----
+## Phase S1 — Database, API, and Tenant Query Hardening
 
-## Phase S1 — Database and Tenant Query Hardening
-
-**Goal:** Make PostgreSQL safe for multi-school growth.
-
-When to do:
-
-```text
-Start immediately during Phase 2A/2B development.
-```
+**Goal:** Make PostgreSQL and APIs safe for multi-school growth.
 
 High-growth tables:
 
 ```text
-students
-attendance_sessions
-attendance_records
-invoices
-invoice_lines
-payments
-receipts
-cashier_closes
-journal_entries
-journal_lines
-audit_logs
-notification_deliveries
-activity_posts
-activity_attachments
-mark_entries
-report_cards
-payroll_runs
-payroll_lines
-messages
-transport_logs
-file_assets
+students, attendance_sessions, attendance_records,
+invoices, invoice_lines, payments, receipts, cashier_closes,
+journal_entries, journal_lines, audit_logs,
+notification_deliveries, activity_posts, activity_attachments,
+mark_entries, report_cards, payroll_runs, payroll_lines,
+messages, transport_logs, file_assets
 ```
 
 Implementation tasks:
@@ -350,7 +519,8 @@ Implementation tasks:
 4. Add composite uniqueness where duplicates are dangerous.
 5. Add tenantId to missing tenant-owned entities if any are found.
 6. Add tests that verify cross-tenant access is rejected.
-7. Add slow-query logging configuration for staging.
+7. Add frontend API helpers that expect paginated responses.
+8. Add slow-query logging configuration for staging.
 ```
 
 Recommended index patterns:
@@ -366,19 +536,6 @@ Recommended index patterns:
 @@index([tenantId, sourceType, sourceId])
 ```
 
-Module-specific checks:
-
-```text
-M1 Students: tenantId + classId + sectionId + lifecycleStatus + search fields
-M2 Attendance: tenantId + date + class/section + session uniqueness
-M3 Fees: tenantId + invoice/payment/receipt status and dates
-M4 Academics: tenantId + examTerm + class/section + subject + student
-M6 Timetable: tenantId + academicYear + class/section + teacher + time slot
-M7 Payroll: tenantId + payroll month/status/staff
-M9 Accounting: tenantId + fiscal year/period + journal source + posted date
-M10 Notices: tenantId + audience + priority + createdAt/read status
-```
-
 Exit criteria:
 
 ```text
@@ -388,17 +545,9 @@ Exit criteria:
 - No frontend list depends on loading all rows.
 ```
 
----
-
 ## Phase S2 — API/Worker Separation and Queue Discipline
 
 **Goal:** Keep API requests fast by moving slow or retryable work out of request-response.
-
-When to do:
-
-```text
-Before broad pilot or before enabling report-heavy Phase 2 workflows.
-```
 
 Move to BullMQ workers:
 
@@ -415,37 +564,6 @@ large CSV/PDF exports
 activity media processing/compression
 future transport ETA jobs
 future canteen low-balance alerts
-```
-
-Synchronous request is allowed only when:
-
-```text
-- the operation is fast,
-- must be transactional,
-- user needs immediate confirmation,
-- failure should block the business action.
-```
-
-Queue required when:
-
-```text
-- external provider call is involved,
-- PDF/report may take more than a few seconds,
-- work is retryable,
-- work can be done after commit,
-- work fans out to many guardians/students/staff,
-- work needs scheduled retry/backoff.
-```
-
-Implementation tasks:
-
-```text
-1. Add explicit worker bootstrap/entrypoint.
-2. Separate API process from queue processors in deployment docs.
-3. Define queue names by module.
-4. Add idempotency keys for retryable jobs.
-5. Add dead-letter/failure visibility in Platform Control Plane later.
-6. Ensure provider failures do not rollback core school transactions.
 ```
 
 Recommended queues:
@@ -472,17 +590,7 @@ Exit criteria:
 - Notification/report/PDF work is not blocking core transactions.
 ```
 
----
-
 ## Phase S3 — Caching and Read Model Strategy
-
-**Goal:** Avoid recalculating dashboard and operational summaries repeatedly.
-
-When to do:
-
-```text
-After Phase S1 indexing and before multi-school production rollout.
-```
 
 Good cache targets:
 
@@ -520,36 +628,7 @@ notification:{tenantId}:{userId}:unread-count
 transport:{tenantId}:trip:{tripId}:latest-location
 ```
 
-Implementation tasks:
-
-```text
-1. Add cache wrapper/helper with tenant-aware key naming.
-2. Add TTLs and invalidation rules.
-3. Cache dashboard summaries, not source-of-truth rows.
-4. Use Redis latest-value cache for transport GPS later.
-5. Add tests for stale-cache-sensitive workflows.
-```
-
-Exit criteria:
-
-```text
-- Dashboard pages do not run heavy aggregate queries repeatedly.
-- Cache keys are tenant-scoped.
-- Financial/accounting source of truth remains PostgreSQL.
-- Cache invalidation rules are documented per module.
-```
-
----
-
 ## Phase S4 — Observability, Operational Safety, and Release Gates
-
-**Goal:** Know when the system is slow, broken, unsafe, or overloaded.
-
-When to do:
-
-```text
-Before charging schools commercially.
-```
 
 Required signals:
 
@@ -574,18 +653,6 @@ GET /api/v1/ready
 GET /api/v1/metrics     later
 ```
 
-Implementation tasks:
-
-```text
-1. Add request/correlation ID middleware.
-2. Include request ID in API responses and logs.
-3. Add structured logger.
-4. Add queue failure logging with job metadata.
-5. Add platform health dashboard later.
-6. Add daily backup status visibility.
-7. Add deployment checklist requiring smoke and readiness.
-```
-
 Minimum deployment gate:
 
 ```bash
@@ -601,26 +668,7 @@ pnpm verify:production
 pnpm smoke:phase1
 ```
 
-Exit criteria:
-
-```text
-- Every production error can be traced using request ID.
-- Readiness fails if DB/Redis are unhealthy.
-- Failed jobs are visible.
-- Staging release is blocked if verification fails.
-```
-
----
-
 ## Phase S5 — File Storage and Media Scaling
-
-**Goal:** Prevent uploaded files and generated PDFs from breaking server storage.
-
-When to do:
-
-```text
-Before enabling large activity media, student photo upload, homework attachments, or broad certificate/report-card generation.
-```
 
 Use object storage for:
 
@@ -650,39 +698,7 @@ Implementation tasks:
 8. Add backup/restore test for storage.
 ```
 
-Exit criteria:
-
-```text
-- Local storage is not the long-term production dependency.
-- Files are tenant-scoped.
-- Signed downloads are permission-checked.
-- Large uploads do not pass through fragile server memory paths where avoidable.
-```
-
----
-
 ## Phase S6 — Horizontal Scaling
-
-**Goal:** Run multiple API instances and separate worker instances safely.
-
-When to do:
-
-```text
-When more than one school is active or when API latency rises during peak usage.
-```
-
-Implementation tasks:
-
-```text
-1. Ensure API is stateless.
-2. Keep browser auth cookie-first and server-verified.
-3. Use Redis/shared backing for queues and cache.
-4. Run multiple API containers behind a load balancer.
-5. Run workers separately from API instances.
-6. Ensure scheduled jobs are not duplicated across replicas.
-7. Use database connection pooling.
-8. Add graceful shutdown for API and workers.
-```
 
 Deployment target:
 
@@ -702,22 +718,20 @@ Redis
 Object Storage
 ```
 
-Exit criteria:
+Implementation tasks:
 
 ```text
-- API can be scaled from 1 to 2+ instances safely.
-- Workers can be scaled independently by queue pressure.
-- Scheduled jobs do not run multiple times accidentally.
-- Readiness works per instance.
+1. Ensure API is stateless.
+2. Keep browser auth cookie-first and server-verified.
+3. Use Redis/shared backing for queues and cache.
+4. Run multiple API containers behind a load balancer.
+5. Run workers separately from API instances.
+6. Ensure scheduled jobs are not duplicated across replicas.
+7. Use database connection pooling.
+8. Add graceful shutdown for API and workers.
 ```
 
----
-
 ## Phase S7 — High-Volume Module Specialization
-
-**Goal:** Optimize modules that naturally create heavy write/read pressure.
-
-Do this only after S1-S6.
 
 High-volume candidates:
 
@@ -742,27 +756,7 @@ ai-inference-service
 
 Do **not** extract M1 students, M2 attendance, M3 fees, M4 exams, or M9 accounting early unless there is a strong reason. These modules are highly relational and transaction-sensitive.
 
-Exit criteria before microservice extraction:
-
-```text
-- Clear bottleneck exists.
-- Module has stable API boundary.
-- Data ownership is clear.
-- Events/outbox pattern is ready.
-- Team/deployment benefit exceeds complexity.
-```
-
----
-
 ## Phase S8 — Data Partitioning, Archival, and Reporting Scale
-
-**Goal:** Keep long-term data growth manageable.
-
-When to do:
-
-```text
-After real production data begins accumulating.
-```
 
 Partition/archive candidates:
 
@@ -784,31 +778,11 @@ Analytics dashboards: use read models/materialized views later.
 AI/ML datasets: export anonymized/consented data through controlled pipelines later.
 ```
 
-Exit criteria:
-
-```text
-- Old data remains available but does not slow daily workflows.
-- Reports are reproducible and audited.
-- Exports do not block API request threads.
-```
-
 ---
 
-## 6. Module-by-Module Scalability Rules
+## 8. Module-by-Module Scalability Rules
 
 ## M0 Platform Core
-
-Scalability focus:
-
-```text
-tenant onboarding
-plan limits
-usage tracking
-platform health
-support override audit
-provider health
-queue failure visibility
-```
 
 Must implement:
 
@@ -817,21 +791,11 @@ Must implement:
 - Audit all support/tenant override actions.
 - Track per-tenant usage counters gradually.
 - Add platform health dashboard once workers/providers are active.
+- Keep SaaS billing separate from school fees.
+- Keep platform routes `/platform/*` separate from school dashboard routes.
 ```
 
 ## M1 Admissions & Student Profiles
-
-Scalability focus:
-
-```text
-student search
-student documents
-guardian relationships
-student lifecycle audit
-certificate generation
-```
-
-Must implement:
 
 ```text
 - Paginated student directory.
@@ -841,18 +805,7 @@ Must implement:
 - Cross-tenant access tests.
 ```
 
-## M2 Attendance
-
-Scalability focus:
-
-```text
-daily bulk writes
-monthly registers
-history reports
-offline sync/conflict handling
-```
-
-Must implement:
+## M2 Smart Attendance
 
 ```text
 - Unique tenant/date/class/section session rule.
@@ -864,19 +817,6 @@ Must implement:
 
 ## M3 Fees & Receipts
 
-Scalability focus:
-
-```text
-invoice generation
-payment collection
-cashier close
-receipt PDFs
-defaulter reports
-ledger posting
-```
-
-Must implement:
-
 ```text
 - Decimal-only money handling.
 - Transactional payment + receipt + ledger posting.
@@ -886,19 +826,7 @@ Must implement:
 - Strict audit for reversals/refunds/cashier close.
 ```
 
-## M4 Exams/CAS/Report Cards
-
-Scalability focus:
-
-```text
-marks entry
-CAS records
-report card generation
-promotion readiness
-parent result delivery
-```
-
-Must implement:
+## M4 Exams, CAS & Report Cards
 
 ```text
 - Tenant/class/section/term/subject indexes.
@@ -910,17 +838,6 @@ Must implement:
 
 ## M5 Activity Feed & Milestones
 
-Scalability focus:
-
-```text
-media uploads
-class/section targeting
-guardian visibility
-low-bandwidth experience
-```
-
-Must implement:
-
 ```text
 - Object storage and signed previews.
 - Media compression queue.
@@ -930,18 +847,6 @@ Must implement:
 ```
 
 ## M6 Homework & Timetable
-
-Scalability focus:
-
-```text
-teacher conflict detection
-timetable versions
-substitutions
-homework attachments
-submission tracking
-```
-
-Must implement:
 
 ```text
 - Teacher/room/time conflict indexes.
@@ -954,18 +859,6 @@ Must implement:
 
 ## M7 HR & Payroll
 
-Scalability focus:
-
-```text
-staff contracts
-leave
-payroll runs
-payslip PDFs
-accounting posting
-```
-
-Must implement:
-
 ```text
 - Payroll run status machine.
 - Payroll posting through accounting boundary only.
@@ -974,17 +867,7 @@ Must implement:
 - Audit approval/posting/void actions.
 ```
 
-## M8A Library
-
-Scalability focus:
-
-```text
-catalog search
-copy tracking
-issue/return/overdue jobs
-```
-
-Must implement:
+## M8A Library Management
 
 ```text
 - Indexed book/copy search.
@@ -993,20 +876,7 @@ Must implement:
 - Fine posting through finance/accounting boundary if used.
 ```
 
-## M8B Transport
-
-Scalability focus:
-
-```text
-route setup
-student stop assignment
-driver trips
-latest GPS
-parent bus tracking
-ETA
-```
-
-Must implement:
+## M8B Transport Management
 
 ```text
 - Store latest GPS in Redis.
@@ -1016,42 +886,18 @@ Must implement:
 - Future device/geofence/overspeed features should be isolated behind transport boundaries.
 ```
 
-## M8C Canteen
-
-Scalability focus:
-
-```text
-meal plans
-QR/student ID serving
-wallet
-POS sales
-low balance alerts
-inventory later
-```
-
-Must implement:
+## M8C Canteen Management
 
 ```text
 - Wallet ledger with immutable movements.
 - QR serving idempotency.
 - Parent spending controls cached carefully.
 - Low-balance notifications queued.
+- Allergy warnings from M1 health/allergy profile.
 - AccountingPostingService integration for financial movements.
 ```
 
 ## M9 Accounting & Finance
-
-Scalability focus:
-
-```text
-immutable ledger
-journal lines
-period close
-financial reports
-source document links
-```
-
-Must implement:
 
 ```text
 - Never edit confirmed journal entries.
@@ -1065,50 +911,41 @@ Must implement:
 
 ## M10 Notices & Communication
 
-Scalability focus:
-
-```text
-recipient fanout
-delivery retries
-read tracking
-parent-teacher chat later
-quiet hours
-```
-
-Must implement:
-
 ```text
 - Queue all external delivery work.
 - Store delivery status per recipient/channel.
 - Retry with backoff.
 - Respect quiet hours and school-configured chat hours.
 - Use Redis unread counters only as cache, not source of truth.
+- Parent-class teacher chat must be one thread per student per academic year.
 ```
 
 ---
 
-## 7. Scalability Gate for Every New Feature
+## 9. Scalability Gate for Every New Feature
 
 Before implementing any feature, answer:
 
 ```text
-1. Which tenant owns this data?
-2. Which role/permission can access it?
-3. Is the list paginated?
-4. Which index supports the main query?
-5. Does the write need a transaction?
-6. Is the operation idempotent?
-7. Should this be sync or queued?
-8. Does it require audit logging?
-9. Does it affect accounting/ledger?
-10. What tests prove tenant isolation and permissions?
+1. Which module owns this feature: M0 or M1-M10?
+2. Which backend folder/API namespace/frontend route owns it?
+3. Which tenant owns this data?
+4. Which role/permission can access it?
+5. Is the list paginated?
+6. Which index supports the main query?
+7. Does the write need a transaction?
+8. Is the operation idempotent?
+9. Should this be sync or queued?
+10. Does it require audit logging?
+11. Does it affect accounting/ledger?
+12. What tests prove tenant isolation and permissions?
 ```
 
 Feature is not production-ready until these are answered.
 
 ---
 
-## 8. Codex / AI Agent Implementation Prompt Template
+## 10. Codex / AI Agent Implementation Prompt Template
 
 Use this for future implementation phases:
 
@@ -1118,6 +955,8 @@ Read these first:
 - ARCHITECTURE.md
 - DEVELOPMENT_RULES.md
 - docs/project/SCHOOLOS_PROJECT_MEMORY.md
+- docs/project/SCHOOLOS_PHASE_STRUCTURE.md
+- docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md
 - docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
 - docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md
 
@@ -1126,6 +965,8 @@ Task:
 
 Scalability requirements:
 - Keep NestJS modular monolith.
+- Align the change with M0 Platform Core or the correct M1-M10 module.
+- Keep backend folder, API namespace, and frontend route ownership clear.
 - Keep module boundaries strict.
 - Each module must own/define controller, service, data-access/repository boundary, DTOs, permissions, events, and tests where relevant.
 - Modules must communicate through public services, events, queues, or explicit integration boundaries.
@@ -1144,6 +985,7 @@ Scalability requirements:
 Return:
 - Summary
 - Files changed
+- Backend/API/frontend ownership decisions
 - Scalability decisions made
 - Tests run
 - Verification results
@@ -1152,17 +994,17 @@ Return:
 
 ---
 
-## 9. Recommended Immediate Next Implementation Order
+## 11. Recommended Immediate Next Implementation Order
 
 Do next:
 
 ```text
 1. Keep Phase 2A Academics vertical focused.
-2. Add scalability review to Academics: indexes, pagination, report card PDF queue decision, marks-entry tenant tests.
-3. Separate API and worker entrypoint before heavy report/PDF usage.
+2. Apply S1 to Academics: indexes, pagination, report-card PDF queue decision, marks-entry tenant tests.
+3. Add or formalize API/worker entrypoint before heavy report/PDF usage.
 4. Add request/correlation ID logging.
 5. Add queue failure visibility for notifications/reports.
-6. Harden object storage before student photo/activity/homework uploads expand.
+6. Harden File Registry/object storage before student photo/activity/homework uploads expand.
 7. Keep Transport/Canteen production work later until core Phase 2 verticals are stable.
 ```
 
@@ -1179,12 +1021,12 @@ Avoid now:
 
 ---
 
-## 10. Final Rule
+## 12. Final Rule
 
 SchoolOS becomes scalable by making every development phase production-aware.
 
 ```text
-Build feature -> enforce tenant isolation -> keep module boundary -> index queries -> paginate lists -> queue slow work -> audit sensitive actions -> verify with tests -> only then move to next feature.
+Build feature -> identify M0/M1-M10 owner -> align backend/API/frontend route -> enforce tenant isolation -> keep module boundary -> index queries -> paginate lists -> queue slow work -> audit sensitive actions -> verify with tests -> only then move to next feature.
 ```
 
 Scalability is not a separate final task. It is a rule applied during every module implementation from this point onward.
