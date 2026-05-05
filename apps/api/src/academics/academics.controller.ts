@@ -18,6 +18,7 @@ import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { AcademicsFoundationService } from './academics-foundation.service';
 import { AcademicsService } from './academics.service';
 import { AssessmentComponentsService } from './assessment-components.service';
+import { CasRecordsService } from './cas-records.service';
 import { CreateAssessmentComponentDto } from './dto/create-assessment-component.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
 import { CreateExamTermDto } from './dto/create-exam-term.dto';
@@ -28,11 +29,13 @@ import { PromoteStudentDto } from './dto/promote-student.dto';
 import { BatchPromoteDto } from './dto/batch-promote.dto';
 import { BatchEnterMarksDto } from './dto/batch-enter-marks.dto';
 import { BatchGenerateReportCardsDto } from './dto/batch-generate-report-cards.dto';
+import { BatchCasRecordsDto } from './dto/batch-cas-records.dto';
 import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
 import { UpdateExamTermDto } from './dto/update-exam-term.dto';
 import { UpdateAssessmentComponentDto } from './dto/update-assessment-component.dto';
+import { UpdateCasRecordDto } from './dto/update-cas-record.dto';
 
 @Controller('academics')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -41,6 +44,7 @@ export class AcademicsController {
     private readonly academicsService: AcademicsService,
     private readonly academicsFoundationService: AcademicsFoundationService,
     private readonly assessmentComponentsService: AssessmentComponentsService,
+    private readonly casRecordsService: CasRecordsService,
   ) {}
 
   @Get('exams')
@@ -227,14 +231,55 @@ export class AcademicsController {
 
   @Get('cas')
   @Permissions('academics:read')
-  listCas(@CurrentAuth() auth: AuthContext) {
-    return this.academicsService.listCasRecords(auth);
+  listCas(
+    @CurrentAuth() auth: AuthContext,
+    @Query('academicYearId') academicYearId?: string,
+    @Query('classId') classId?: string,
+    @Query('sectionId') sectionId?: string,
+    @Query('subjectId') subjectId?: string,
+    @Query('studentId') studentId?: string,
+  ) {
+    return this.casRecordsService.list(auth, {
+      academicYearId,
+      classId,
+      sectionId,
+      subjectId,
+      studentId,
+    });
   }
 
   @Post('cas')
   @Permissions('academics:enter_marks')
   createCas(@Body() dto: CreateCasRecordDto, @CurrentAuth() auth: AuthContext) {
-    return this.academicsService.createCasRecord(dto, auth);
+    return this.casRecordsService.create(dto, auth);
+  }
+
+  @Post('cas/batch')
+  @Permissions('academics:enter_marks')
+  batchCreateCas(
+    @Body() dto: BatchCasRecordsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.casRecordsService.batchCreate(dto, auth);
+  }
+
+  @Patch('cas/:id')
+  @Permissions('academics:update')
+  updateCas(
+    @Param('id') casRecordId: string,
+    @Body() dto: UpdateCasRecordDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.casRecordsService.update(casRecordId, dto, auth);
+  }
+
+  @Delete('cas/:id')
+  @Permissions('academics:delete')
+  deleteCas(
+    @Param('id') casRecordId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.casRecordsService.delete(casRecordId, auth);
   }
 
   @Get('report-cards')
