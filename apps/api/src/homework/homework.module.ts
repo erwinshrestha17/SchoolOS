@@ -2,12 +2,13 @@ import { Module } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { CommunicationsModule } from '../communications/communications.module';
-import { TimetableController } from './timetable.controller';
-import { TimetableService } from './timetable.service';
+import { HomeworkController } from './homework.controller';
+import { HomeworkService } from './homework.service';
 
 @Module({
   imports: [AuthModule, CommunicationsModule, AuditModule],
-  controllers: [TimetableController],
-  providers: [TimetableService],
+  controllers: [HomeworkController],
+  providers: [HomeworkService],
+  exports: [HomeworkService],
 })
-export class TimetableModule {}
+export class HomeworkModule {}

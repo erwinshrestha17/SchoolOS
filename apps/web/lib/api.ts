@@ -80,7 +80,13 @@ import type {
   SubjectSummary,
   TeacherAssignmentSummary,
   TeacherWorkloadSummary,
+  TeacherAvailabilitySummary,
+  TimetablePeriodSummary,
+  TimetableSubstitutionSummary,
+  TimetableValidationResult,
+  TimetableVersionSummary,
   TimetableSlotSummary,
+  RoomSummary,
   UpdateStudentGuardianPayload,
   UpdateStudentProfilePayload,
   UploadStudentDocumentPayload,
@@ -713,20 +719,178 @@ export const api = {
     request<TeacherWorkloadSummary[]>('/timetable/workload'),
   createTimetableSlot: (body: JsonBody) =>
     request<TimetableSlotSummary>('/timetable', { method: 'POST', json: body }),
-  listHomework: (params?: { studentId?: string; classId?: string; sectionId?: string }) =>
+  listTimetablePeriods: (params?: { academicYearId?: string }) =>
+    request<TimetablePeriodSummary[]>(withQuery('/timetable/periods', params ?? {})),
+  createTimetablePeriod: (body: JsonBody) =>
+    request<TimetablePeriodSummary>('/timetable/periods', { method: 'POST', json: body }),
+  updateTimetablePeriod: (id: string, body: JsonBody) =>
+    request<TimetablePeriodSummary>(`/timetable/periods/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      json: body,
+    }),
+  deleteTimetablePeriod: (id: string) =>
+    request<{ deleted: boolean; id: string }>(`/timetable/periods/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+  listRooms: () => request<RoomSummary[]>('/timetable/rooms'),
+  createRoom: (body: JsonBody) =>
+    request<RoomSummary>('/timetable/rooms', { method: 'POST', json: body }),
+  updateRoom: (id: string, body: JsonBody) =>
+    request<RoomSummary>(`/timetable/rooms/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      json: body,
+    }),
+  deleteRoom: (id: string) =>
+    request<{ deleted: boolean; id: string }>(`/timetable/rooms/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+  listTimetableVersions: (params?: {
+    academicYearId?: string;
+    classId?: string;
+    sectionId?: string;
+    status?: string;
+  }) => request<TimetableVersionSummary[]>(withQuery('/timetable/versions', params ?? {})),
+  createTimetableVersion: (body: JsonBody) =>
+    request<TimetableVersionSummary>('/timetable/versions', { method: 'POST', json: body }),
+  getTimetableVersion: (id: string) =>
+    request<TimetableVersionSummary>(`/timetable/versions/${encodeURIComponent(id)}`),
+  createTimetableVersionSlot: (versionId: string, body: JsonBody) =>
+    request<TimetableSlotSummary>(
+      `/timetable/versions/${encodeURIComponent(versionId)}/slots`,
+      { method: 'POST', json: body },
+    ),
+  updateTimetableSlot: (id: string, body: JsonBody) =>
+    request<TimetableSlotSummary>(`/timetable/slots/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      json: body,
+    }),
+  deleteTimetableSlot: (id: string) =>
+    request<{ deleted: boolean; id: string }>(`/timetable/slots/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+  validateTimetableVersion: (versionId: string) =>
+    request<TimetableValidationResult>(
+      `/timetable/versions/${encodeURIComponent(versionId)}/validate`,
+      { method: 'POST', json: {} },
+    ),
+  publishTimetableVersion: (versionId: string) =>
+    request<TimetableVersionSummary>(
+      `/timetable/versions/${encodeURIComponent(versionId)}/publish`,
+      { method: 'PATCH', json: {} },
+    ),
+  lockTimetableVersion: (versionId: string) =>
+    request<TimetableVersionSummary>(
+      `/timetable/versions/${encodeURIComponent(versionId)}/lock`,
+      { method: 'PATCH', json: {} },
+    ),
+  archiveTimetableVersion: (versionId: string) =>
+    request<TimetableVersionSummary>(
+      `/timetable/versions/${encodeURIComponent(versionId)}/archive`,
+      { method: 'PATCH', json: {} },
+    ),
+  reopenTimetableVersion: (versionId: string) =>
+    request<TimetableVersionSummary>(
+      `/timetable/versions/${encodeURIComponent(versionId)}/reopen-draft`,
+      { method: 'PATCH', json: {} },
+    ),
+  listTeacherAvailability: (teacherId: string) =>
+    request<TeacherAvailabilitySummary>(
+      `/timetable/teachers/${encodeURIComponent(teacherId)}/availability`,
+    ),
+  createTeacherAvailability: (teacherId: string, body: JsonBody) =>
+    request<TeacherAvailabilitySummary>(
+      `/timetable/teachers/${encodeURIComponent(teacherId)}/availability`,
+      { method: 'POST', json: body },
+    ),
+  getTeacherWorkload: (teacherId: string, params?: { academicYearId?: string; versionId?: string }) =>
+    request<unknown>(
+      withQuery(`/timetable/teachers/${encodeURIComponent(teacherId)}/workload`, params ?? {}),
+    ),
+  listSubstitutions: (params?: {
+    date?: string;
+    teacherId?: string;
+    classId?: string;
+    sectionId?: string;
+    status?: string;
+  }) => request<TimetableSubstitutionSummary[]>(withQuery('/timetable/substitutions', params ?? {})),
+  createSubstitution: (body: JsonBody) =>
+    request<TimetableSubstitutionSummary>('/timetable/substitutions', {
+      method: 'POST',
+      json: body,
+    }),
+  assignSubstitution: (id: string, body: JsonBody) =>
+    request<TimetableSubstitutionSummary>(
+      `/timetable/substitutions/${encodeURIComponent(id)}/assign`,
+      { method: 'PATCH', json: body },
+    ),
+  cancelSubstitution: (id: string) =>
+    request<TimetableSubstitutionSummary>(
+      `/timetable/substitutions/${encodeURIComponent(id)}/cancel`,
+      { method: 'PATCH', json: {} },
+    ),
+  completeSubstitution: (id: string) =>
+    request<TimetableSubstitutionSummary>(
+      `/timetable/substitutions/${encodeURIComponent(id)}/complete`,
+      { method: 'PATCH', json: {} },
+    ),
+  listHomework: (params?: {
+    studentId?: string;
+    classId?: string;
+    sectionId?: string;
+    academicYearId?: string;
+    subjectId?: string;
+    teacherId?: string;
+    status?: string;
+  }) =>
     request<HomeworkAssignmentSummary[]>(withQuery('/homework', params ?? {})),
   createHomework: (body: JsonBody) =>
     request<HomeworkAssignmentSummary>('/homework', {
       method: 'POST',
       json: body,
     }),
+  updateHomework: (id: string, body: JsonBody) =>
+    request<HomeworkAssignmentSummary>(`/homework/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      json: body,
+    }),
+  assignHomework: (id: string) =>
+    request<HomeworkAssignmentSummary>(`/homework/${encodeURIComponent(id)}/assign`, {
+      method: 'PATCH',
+      json: {},
+    }),
+  closeHomework: (id: string) =>
+    request<HomeworkAssignmentSummary>(`/homework/${encodeURIComponent(id)}/close`, {
+      method: 'PATCH',
+      json: {},
+    }),
+  previewHomeworkReminders: (id: string) =>
+    request<unknown>(`/homework/${encodeURIComponent(id)}/reminders/preview`),
+  sendHomeworkReminders: (id: string) =>
+    request<unknown>(`/homework/${encodeURIComponent(id)}/reminders/send`, {
+      method: 'POST',
+      json: {},
+    }),
   listHomeworkSubmissions: () =>
     request<HomeworkSubmissionSummary[]>('/homework/submissions'),
+  listHomeworkAssignmentSubmissions: (homeworkId: string) =>
+    request<HomeworkSubmissionSummary[]>(
+      `/homework/${encodeURIComponent(homeworkId)}/submissions`,
+    ),
   reviewHomeworkSubmission: (body: JsonBody) =>
     request<HomeworkSubmissionSummary>('/homework/submissions', {
       method: 'POST',
       json: body,
     }),
+  reviewHomeworkSubmissionById: (submissionId: string, body: JsonBody) =>
+    request<HomeworkSubmissionSummary>(
+      `/homework/submissions/${encodeURIComponent(submissionId)}/review`,
+      { method: 'PATCH', json: body },
+    ),
+  requestHomeworkCorrection: (submissionId: string, body: JsonBody) =>
+    request<HomeworkSubmissionSummary>(
+      `/homework/submissions/${encodeURIComponent(submissionId)}/request-correction`,
+      { method: 'PATCH', json: body },
+    ),
   submitHomework: (body: { submissionId: string; content?: string }) =>
     request<HomeworkSubmissionSummary>('/homework/submit', {
       method: 'POST',

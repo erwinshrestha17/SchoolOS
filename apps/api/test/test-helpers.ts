@@ -19,6 +19,9 @@ export interface MockState {
   otpCodes: Record<string, any>[];
   refreshTokens: Record<string, any>[];
   auditLogs: Record<string, any>[];
+  tenantSettings: Record<string, any>[];
+  fileAssets: Record<string, any>[];
+  studentDocuments: Record<string, any>[];
   [key: string]: Record<string, any>[];
 }
 
@@ -152,7 +155,15 @@ export function createPrismaMock() {
     users: [] as Record<string, any>[],
     userRoles: [] as Record<string, any>[],
     classes: [] as Record<string, any>[],
-    students: [] as Record<string, any>[],
+    students: [
+      {
+        id: 'student-a',
+        tenantId: 'tenant-a',
+        studentSystemId: 'ST-A',
+        firstNameEn: 'Student',
+        lastNameEn: 'A',
+      },
+    ] as Record<string, any>[],
     staff: [] as Record<string, any>[],
     staffLeaveBalances: [] as Record<string, any>[],
     academicYears: [] as Record<string, any>[],
@@ -161,6 +172,9 @@ export function createPrismaMock() {
     otpCodes: [] as Record<string, any>[],
     refreshTokens: [] as Record<string, any>[],
     auditLogs: [] as Record<string, any>[],
+    tenantSettings: [] as Record<string, any>[],
+    fileAssets: [] as Record<string, any>[],
+    studentDocuments: [] as Record<string, any>[],
   };
 
   let idCounter = 1;
@@ -174,6 +188,51 @@ export function createPrismaMock() {
           permission.action as string,
         ) === permissionKey,
     );
+  }
+
+  function attachRolePermissions(
+    stateRef: MockState,
+    role: Record<string, any> | undefined,
+  ) {
+    if (!role) {
+      return role;
+    }
+    return {
+      ...role,
+      rolePermissions: stateRef.rolePermissions
+        .filter((item) => item.roleId === role.id)
+        .map((item) => ({
+          ...item,
+          permission: stateRef.permissions.find(
+            (permission) => permission.id === item.permissionId,
+          ),
+        })),
+    };
+  }
+
+  function attachUserRoles(
+    stateRef: MockState,
+    user: Record<string, any> | undefined,
+  ) {
+    if (!user) {
+      return user;
+    }
+    return {
+      ...user,
+      tenant: stateRef.tenants.find((tenant) => tenant.id === user.tenantId),
+      staff: stateRef.staff.find((staff) => staff.userId === user.id) ?? null,
+      student:
+        stateRef.students.find((student) => student.userId === user.id) ?? null,
+      userRoles: stateRef.userRoles
+        .filter((item) => item.userId === user.id)
+        .map((item) => ({
+          ...item,
+          role: attachRolePermissions(
+            stateRef,
+            stateRef.roles.find((role) => role.id === item.roleId),
+          ),
+        })),
+    };
   }
 
   function ensureTenantDefaults(tenantId: string) {
@@ -200,6 +259,9 @@ export function createPrismaMock() {
       create: jest.fn(async ({ data }: any) => {
         const tenant = {
           id: nextId('tenant'),
+          isActive: true,
+          mode: 'MULTI',
+          plan: 'standard',
           ...data,
           createdAt: new Date(),
         };
@@ -214,35 +276,42 @@ export function createPrismaMock() {
           (user) =>
             (user.tenantId === q.where?.tenantId_email?.tenantId &&
               user.email === q.where?.tenantId_email?.email) ||
-            user.id === q.where?.id,
+            (user.id === q.where?.id &&
+              (!q.where?.tenantId || user.tenantId === q.where.tenantId)),
         );
-        if (!user) return null;
-        return {
-          ...user,
-          userRoles: state.userRoles
-            .filter((item) => item.userId === user.id)
-            .map((item) => ({
-              ...item,
-              role: state.roles.find((r) => r.id === item.roleId),
-            })),
-        };
+        return attachUserRoles(state, user);
       }),
       findFirst: jest.fn(async (q: any) => {
         const user = state.users.find(
           (user) =>
             (user.tenantId === q.where?.tenantId_email?.tenantId &&
               user.email === q.where?.tenantId_email?.email) ||
-            user.id === q.where?.id,
+            (user.id === q.where?.id &&
+              (!q.where?.tenantId || user.tenantId === q.where.tenantId)),
         );
-        return user;
+        return attachUserRoles(state, user);
       }),
+      findMany: jest.fn(async (q: any) =>
+        state.users
+          .filter((user) => user.tenantId === q.where?.tenantId)
+          .map((user) => attachUserRoles(state, user)),
+      ),
       create: jest.fn(async ({ data }: any) => {
+        const nestedRoles = data.userRoles?.create ?? [];
         const user = {
           id: nextId('user'),
           ...data,
+          userRoles: undefined,
           createdAt: new Date(),
         };
         state.users.push(user);
+        for (const role of nestedRoles) {
+          state.userRoles.push({
+            id: nextId('user-role'),
+            userId: user.id,
+            ...role,
+          });
+        }
         return user;
       }),
       update: jest.fn(async (q: any) => {
@@ -250,23 +319,134 @@ export function createPrismaMock() {
         if (user) {
           Object.assign(user, q.data);
         }
-        return user;
+        return attachUserRoles(state, user);
       }),
+      count: jest.fn(
+        async (q: any) =>
+          state.users.filter((item) => item.tenantId === q.where?.tenantId)
+            .length,
+      ),
     },
     role: {
-      findMany: jest.fn(async (q: any) =>
-        state.roles.filter((role) => role.tenantId === q.where?.tenantId),
+      findUnique: jest.fn(async (q: any) =>
+        state.roles.find(
+          (role) =>
+            role.tenantId === q.where?.tenantId_name?.tenantId &&
+            role.name === q.where?.tenantId_name?.name,
+        ),
       ),
+      findMany: jest.fn(async (q: any) =>
+        state.roles.filter(
+          (role) =>
+            role.tenantId === q.where?.tenantId &&
+            (!q.where?.id?.in || q.where.id.in.includes(role.id)),
+        ),
+      ),
+      upsert: jest.fn(async ({ where, update, create }: any) => {
+        const existing = state.roles.find(
+          (role) =>
+            role.tenantId === where.tenantId_name?.tenantId &&
+            role.name === where.tenantId_name?.name,
+        );
+        if (existing) {
+          Object.assign(existing, update);
+          return existing;
+        }
+        const role = {
+          id: nextId('role'),
+          ...create,
+        };
+        state.roles.push(role);
+        return role;
+      }),
+    },
+    permission: {
+      findUnique: jest.fn(async (q: any) =>
+        state.permissions.find(
+          (permission) =>
+            permission.resource === q.where?.resource_action?.resource &&
+            permission.action === q.where?.resource_action?.action,
+        ),
+      ),
+      upsert: jest.fn(async ({ where, update, create }: any) => {
+        const existing = state.permissions.find(
+          (permission) =>
+            permission.resource === where.resource_action?.resource &&
+            permission.action === where.resource_action?.action,
+        );
+        if (existing) {
+          Object.assign(existing, update);
+          return existing;
+        }
+        const permission = {
+          id: nextId('perm'),
+          ...create,
+        };
+        state.permissions.push(permission);
+        return permission;
+      }),
+    },
+    rolePermission: {
+      deleteMany: jest.fn(async (q: any) => {
+        const before = state.rolePermissions.length;
+        state.rolePermissions = state.rolePermissions.filter(
+          (item) => item.roleId !== q.where?.roleId,
+        );
+        return { count: before - state.rolePermissions.length };
+      }),
+      create: jest.fn(async ({ data }: any) => {
+        state.rolePermissions.push(data);
+        return data;
+      }),
     },
     userRole: {
       create: jest.fn(async ({ data }: any) => {
         state.userRoles.push(data);
         return data;
       }),
+      findMany: jest.fn(async (q: any) =>
+        state.userRoles
+          .filter(
+            (item) =>
+              item.userId === q.where?.userId &&
+              item.tenantId === q.where?.tenantId,
+          )
+          .map((item) => ({
+            ...item,
+            role: attachRolePermissions(
+              state,
+              state.roles.find((role) => role.id === item.roleId),
+            ),
+          })),
+      ),
     },
     class: {
+      findFirst: jest.fn(async (q: any) =>
+        state.classes.find(
+          (item) =>
+            item.id === q.where?.id && item.tenantId === q.where?.tenantId,
+        ),
+      ),
+      findUnique: jest.fn(async (q: any) =>
+        state.classes.find(
+          (item) =>
+            item.tenantId === q.where?.tenantId_name?.tenantId &&
+            item.name === q.where?.tenantId_name?.name,
+        ),
+      ),
       findMany: jest.fn(async (q: any) =>
-        state.classes.filter((item) => item.tenantId === q.where?.tenantId),
+        state.classes
+          .filter((item) => item.tenantId === q.where?.tenantId)
+          .map((item) => ({
+            ...item,
+            _count: {
+              students: state.students.filter(
+                (student) => student.classId === item.id,
+              ).length,
+              subjects: 0,
+              sections: 0,
+            },
+          })),
       ),
       create: jest.fn(async ({ data }: any) => {
         const item = {
@@ -277,16 +457,96 @@ export function createPrismaMock() {
         state.classes.push(item);
         return item;
       }),
+      count: jest.fn(
+        async (q: any) =>
+          state.classes.filter((item) => item.tenantId === q.where?.tenantId)
+            .length,
+      ),
     },
     staff: {
+      findUnique: jest.fn(async (q: any) =>
+        state.staff.find((item) => item.employeeId === q.where?.employeeId),
+      ),
       create: jest.fn(async ({ data }: any) => {
         const item = {
           id: nextId('staff'),
           ...data,
+          user: attachUserRoles(
+            state,
+            state.users.find((user) => user.id === data.userId),
+          ),
           createdAt: new Date(),
         };
         state.staff.push(item);
         return item;
+      }),
+      count: jest.fn(
+        async (q: any) =>
+          state.staff.filter((item) => item.tenantId === q.where?.tenantId)
+            .length,
+      ),
+    },
+    staffLeaveBalance: {
+      createMany: jest.fn(async ({ data }: any) => {
+        state.staffLeaveBalances.push(...data);
+        return { count: data.length };
+      }),
+    },
+    academicYear: {
+      upsert: jest.fn(async ({ where, update, create }: any) => {
+        const existing = state.academicYears.find(
+          (year) =>
+            year.tenantId === where.tenantId_name?.tenantId &&
+            year.name === where.tenantId_name?.name,
+        );
+        if (existing) {
+          Object.assign(existing, update);
+          return existing;
+        }
+        const year = {
+          id: nextId('year'),
+          ...create,
+        };
+        state.academicYears.push(year);
+        return year;
+      }),
+    },
+    chartAccount: {
+      upsert: jest.fn(async ({ where, update, create }: any) => {
+        const existing = state.chartAccounts.find(
+          (account) =>
+            account.tenantId === where.tenantId_code?.tenantId &&
+            account.code === where.tenantId_code?.code,
+        );
+        if (existing) {
+          Object.assign(existing, update);
+          return existing;
+        }
+        const account = {
+          id: nextId('account'),
+          ...create,
+        };
+        state.chartAccounts.push(account);
+        return account;
+      }),
+    },
+    feeHead: {
+      upsert: jest.fn(async ({ where, update, create }: any) => {
+        const existing = state.feeHeads.find(
+          (feeHead) =>
+            feeHead.tenantId === where.tenantId_code?.tenantId &&
+            feeHead.code === where.tenantId_code?.code,
+        );
+        if (existing) {
+          Object.assign(existing, update);
+          return existing;
+        }
+        const feeHead = {
+          id: nextId('fee-head'),
+          ...create,
+        };
+        state.feeHeads.push(feeHead);
+        return feeHead;
       }),
     },
     student: {
@@ -294,6 +554,10 @@ export function createPrismaMock() {
         const item = {
           id: nextId('student'),
           ...data,
+          class: state.classes.find(
+            (classroom) => classroom.id === data.classId,
+          ),
+          user: state.users.find((user) => user.id === data.userId),
           createdAt: new Date(),
         };
         state.students.push(item);
@@ -305,9 +569,117 @@ export function createPrismaMock() {
       findFirst: jest.fn(async (q: any) =>
         state.students.find(
           (item) =>
-            item.id === q.where?.id && item.tenantId === q.where?.tenantId,
+            item.tenantId === q.where?.tenantId &&
+            (item.id === q.where?.id || item.userId === q.where?.userId),
         ),
       ),
+      count: jest.fn(
+        async (q: any) =>
+          state.students.filter((item) => item.tenantId === q.where?.tenantId)
+            .length,
+      ),
+    },
+    tenantSetting: {
+      findUnique: jest.fn(async (q: any) =>
+        state.tenantSettings.find(
+          (setting) =>
+            setting.tenantId === q.where?.tenantId_key?.tenantId &&
+            setting.key === q.where?.tenantId_key?.key,
+        ),
+      ),
+      findMany: jest.fn(async (q: any) =>
+        state.tenantSettings.filter((setting) => {
+          const matchesTenant = setting.tenantId === q.where?.tenantId;
+          const allowedKeys = q.where?.key?.in;
+          return (
+            matchesTenant && (!allowedKeys || allowedKeys.includes(setting.key))
+          );
+        }),
+      ),
+      create: jest.fn(async ({ data }: any) => {
+        const item = {
+          id: nextId('setting'),
+          ...data,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        state.tenantSettings.push(item);
+        return item;
+      }),
+      upsert: jest.fn(async ({ where, create, update }: any) => {
+        const existing = state.tenantSettings.find(
+          (setting) =>
+            setting.tenantId === where.tenantId_key?.tenantId &&
+            setting.key === where.tenantId_key?.key,
+        );
+        if (existing) {
+          Object.assign(existing, update, { updatedAt: new Date() });
+          return existing;
+        }
+        const item = {
+          id: nextId('setting'),
+          ...create,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        state.tenantSettings.push(item);
+        return item;
+      }),
+      update: jest.fn(async (q: any) => {
+        const item = state.tenantSettings.find(
+          (setting) => setting.id === q.where?.id,
+        );
+        if (item) Object.assign(item, q.data, { updatedAt: new Date() });
+        return item;
+      }),
+    },
+    studentDocument: {
+      create: jest.fn(async ({ data }: any) => {
+        const item = {
+          id: nextId('student-doc'),
+          ...data,
+          createdAt: new Date(),
+        };
+        state.studentDocuments.push(item);
+        return item;
+      }),
+      findMany: jest.fn(async (q: any) =>
+        state.studentDocuments.filter(
+          (item) =>
+            item.tenantId === q.where?.tenantId &&
+            (!q.where?.studentId || item.studentId === q.where.studentId),
+        ),
+      ),
+    },
+    fileAsset: {
+      create: jest.fn(async ({ data }: any) => {
+        const item = {
+          id: nextId('asset'),
+          ...data,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          softDeletedAt: null,
+        };
+        state.fileAssets.push(item);
+        return item;
+      }),
+      findUnique: jest.fn(async (q: any) =>
+        state.fileAssets.find((item) => item.id === q.where?.id),
+      ),
+      findMany: jest.fn(async (q: any) =>
+        state.fileAssets.filter(
+          (item) =>
+            item.tenantId === q.where?.tenantId &&
+            item.module === q.where?.module &&
+            item.entityId === q.where?.entityId &&
+            item.softDeletedAt === q.where?.softDeletedAt,
+        ),
+      ),
+      update: jest.fn(async (q: any) => {
+        const item = state.fileAssets.find((asset) => asset.id === q.where?.id);
+        if (item) Object.assign(item, q.data, { updatedAt: new Date() });
+        return item;
+      }),
     },
     otpCode: {
       create: jest.fn(async ({ data }: any) => {
@@ -348,6 +720,23 @@ export function createPrismaMock() {
           );
         }).length;
       }),
+      updateMany: jest.fn(async (q: any) => {
+        let count = 0;
+        for (const otp of state.otpCodes) {
+          const matches =
+            otp.userId === q.where?.userId && otp.purpose === q.where?.purpose;
+          if (matches) {
+            Object.assign(otp, q.data);
+            count += 1;
+          }
+        }
+        return { count };
+      }),
+      update: jest.fn(async (q: any) => {
+        const otp = state.otpCodes.find((item) => item.id === q.where?.id);
+        if (otp) Object.assign(otp, q.data);
+        return otp;
+      }),
     },
     auditLog: {
       create: jest.fn(async ({ data }: any) => {
@@ -366,9 +755,41 @@ export function createPrismaMock() {
         return data;
       }),
       deleteMany: jest.fn(async () => ({ count: 1 })),
-      findUnique: jest.fn(async (q: any) =>
-        state.refreshTokens.find((t) => t.token === q.where?.token),
-      ),
+      updateMany: jest.fn(async (q: any) => {
+        let count = 0;
+        for (const token of state.refreshTokens) {
+          if (
+            token.userId === q.where?.userId &&
+            (q.where?.revokedAt === undefined ||
+              token.revokedAt === q.where.revokedAt)
+          ) {
+            Object.assign(token, q.data);
+            count += 1;
+          }
+        }
+        return { count };
+      }),
+      update: jest.fn(async (q: any) => {
+        const token = state.refreshTokens.find(
+          (item) => item.id === q.where?.id,
+        );
+        if (token) Object.assign(token, q.data);
+        return token;
+      }),
+      findUnique: jest.fn(async (q: any) => {
+        const token = state.refreshTokens.find(
+          (t) =>
+            t.token === q.where?.token || t.tokenHash === q.where?.tokenHash,
+        );
+        if (!token) return null;
+        return {
+          ...token,
+          user: attachUserRoles(
+            state,
+            state.users.find((user) => user.id === token.userId),
+          ),
+        };
+      }),
     },
   };
 }
@@ -410,7 +831,7 @@ export function ensureTenantDefaultsWithState(
     );
 
     for (const permissionKey of permissionKeys) {
-      const permission = PERMISSION_CATALOG.find(
+      const permission = state.permissions.find(
         (p) =>
           buildPermissionKey(p.resource as string, p.action as string) ===
           permissionKey,

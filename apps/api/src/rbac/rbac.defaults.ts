@@ -195,12 +195,38 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
   {
     resource: 'timetable',
     action: 'manage',
-    description: 'Create timetable slots and teacher workload schedules',
+    description:
+      'Manage teacher availability, workload limits, and setup workflows',
   },
   {
     resource: 'timetable',
     action: 'read',
     description: 'Read timetable slots and teacher workload schedules',
+  },
+  {
+    resource: 'timetable',
+    action: 'create',
+    description: 'Create timetable periods, rooms, versions, and slots',
+  },
+  {
+    resource: 'timetable',
+    action: 'update',
+    description: 'Update draft timetable setup records and slots',
+  },
+  {
+    resource: 'timetable',
+    action: 'delete',
+    description: 'Delete draft timetable setup records and slots',
+  },
+  {
+    resource: 'timetable',
+    action: 'publish',
+    description: 'Publish, lock, archive, and reopen timetable versions',
+  },
+  {
+    resource: 'timetable',
+    action: 'substitute',
+    description: 'Manage absent-teacher substitution workflows',
   },
   {
     resource: 'homework',
@@ -216,6 +242,21 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     resource: 'homework',
     action: 'review',
     description: 'Review homework submissions and scores',
+  },
+  {
+    resource: 'homework',
+    action: 'update',
+    description: 'Update homework assignments and submission status',
+  },
+  {
+    resource: 'homework',
+    action: 'delete',
+    description: 'Delete or cancel homework assignments',
+  },
+  {
+    resource: 'homework',
+    action: 'notify',
+    description: 'Preview and send homework reminders',
   },
   {
     resource: 'homework',
@@ -516,7 +557,9 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'timetable:read',
     'homework:create',
     'homework:read',
+    'homework:update',
     'homework:review',
+    'homework:notify',
     'messaging:create',
     'messaging:read',
     'activity_feed:create',
@@ -551,7 +594,9 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'timetable:read',
     'homework:create',
     'homework:read',
+    'homework:update',
     'homework:review',
+    'homework:notify',
     'messaging:create',
     'messaging:read',
     'activity_feed:create',

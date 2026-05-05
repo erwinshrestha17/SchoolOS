@@ -1,12 +1,12 @@
-import { HomeworkStatus } from '@prisma/client';
+import { HomeworkSubmissionStatus } from '@prisma/client';
 import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class ReviewHomeworkSubmissionDto {
   @IsString()
   submissionId!: string;
 
-  @IsEnum(HomeworkStatus)
-  status!: HomeworkStatus;
+  @IsEnum(HomeworkSubmissionStatus)
+  status!: HomeworkSubmissionStatus;
 
   @IsOptional()
   @IsNumber()
