@@ -1497,30 +1497,39 @@ export type ReportCardSummary = {
 };
 
 export type PromotionReadiness = {
-  reportCardId: string;
   studentId: string;
   studentName: string;
+  studentSystemId: string;
+  classId: string;
   className: string;
+  sectionId: string | null;
   sectionName: string | null;
-  examTerm: string;
+  reportCardId: string | null;
   percentage: number;
   grade: string;
-  status: string;
-  locked: boolean;
+  gpa: number;
+  status: "READY" | "REVIEW" | "BLOCKED";
+  reasons: string[];
+  recommendedAction: "PROMOTE" | "REVIEW" | "HOLD";
+  lifecycleStatus: string;
+  outstandingBalance: number;
 };
 
 export type PromotionResult = {
-  promotion: {
-    id: string;
-    studentId: string;
-    fromClassId: string;
-    fromSectionId: string | null;
-    toClassId: string | null;
-    toSectionId: string | null;
-    status: string;
-    remarks: string | null;
+  studentId: string;
+  studentName: string;
+  status: "promoted" | "skipped" | "failed";
+  reason?: string;
+};
+
+export type BatchPromotionResult = {
+  summary: {
+    total: number;
+    promoted: number;
+    skipped: number;
+    failed: number;
   };
-  targetEnrollment: EnrollmentRecord;
+  results: PromotionResult[];
 };
 
 export type TimetableSlotSummary = {

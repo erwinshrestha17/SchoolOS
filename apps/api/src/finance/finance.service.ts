@@ -88,7 +88,7 @@ export interface DefaulterAgingReportRow {
   status: InvoiceStatus;
 }
 
-interface CashierCloseMethodBreakdown {
+export interface CashierCloseMethodBreakdown extends Prisma.JsonObject {
   method: PaymentMethod;
   grossCollected: number;
   totalRefunded: number;
@@ -97,7 +97,7 @@ interface CashierCloseMethodBreakdown {
   refundCount: number;
 }
 
-interface CashierCloseSummary {
+export interface CashierCloseSummary {
   openedAt: Date;
   closedAt: Date;
   collectorUserId: string | null;
@@ -116,6 +116,14 @@ interface CashierCloseSummary {
   firstReceiptNumber: string | null;
   lastReceiptNumber: string | null;
 }
+
+type CashierCloseWithUsers = Prisma.CashierCloseGetPayload<{
+  include: {
+    collectorUser: true;
+    closedBy: true;
+  };
+}>;
+
 
 @Injectable()
 export class FinanceService {
@@ -2613,42 +2621,8 @@ export class FinanceService {
       orderBy: [{ closedAt: 'desc' }, { createdAt: 'desc' }],
     });
 
-    return closes.map((close) => ({
-      id: close.id,
-      closeNumber: close.closeNumber,
-      openedAt: close.openedAt,
-      closedAt: close.closedAt,
-      collectorUser: close.collectorUser
-        ? {
-            id: close.collectorUser.id,
-            email: close.collectorUser.email,
-          }
-        : null,
-      paymentMethod: close.paymentMethod,
-      grossCollected: Number(close.grossCollected),
-      totalRefunded: Number(close.totalRefunded),
-      netCollected: Number(close.netCollected),
-      expectedCashAmount: Number(close.expectedCashAmount ?? 0),
-      actualCashAmount:
-        close.actualCashAmount === null ? null : Number(close.actualCashAmount),
-      varianceAmount:
-        close.varianceAmount === null ? null : Number(close.varianceAmount),
-      varianceReason: close.varianceReason,
-      denominationBreakdown: normalizeJsonObject(close.denominationBreakdown),
-      methodBreakdown: parseCashierCloseMethodBreakdown(close.methodBreakdown),
-      paymentCount: close.paymentCount,
-      refundCount: close.refundCount,
-      firstReceiptNumber: close.firstReceiptNumber,
-      lastReceiptNumber: close.lastReceiptNumber,
-      notes: close.notes,
-      closedBy: close.closedBy
-        ? {
-            id: close.closedBy.id,
-            email: close.closedBy.email,
-          }
-        : null,
-      createdAt: close.createdAt,
-    }));
+    return closes.map((close) => this.buildCashierCloseResponse(close));
+
   }
 
   async finalizeCashierClose(dto: CreateCashierCloseDto, actor: AuthContext) {
@@ -2718,7 +2692,8 @@ export class FinanceService {
         denominationBreakdown:
           (dto.denominationBreakdown as Prisma.InputJsonValue | undefined) ??
           Prisma.JsonNull,
-        methodBreakdown: summary.methodBreakdown,
+        methodBreakdown: summary.methodBreakdown as Prisma.InputJsonValue,
+
         paymentCount: summary.paymentCount,
         refundCount: summary.refundCount,
         firstReceiptNumber: summary.firstReceiptNumber,
@@ -2758,40 +2733,8 @@ export class FinanceService {
       },
     });
 
-    return {
-      id: close.id,
-      closeNumber: close.closeNumber,
-      openedAt: close.openedAt,
-      closedAt: close.closedAt,
-      grossCollected: Number(close.grossCollected),
-      totalRefunded: Number(close.totalRefunded),
-      netCollected: Number(close.netCollected),
-      expectedCashAmount: Number(close.expectedCashAmount ?? 0),
-      actualCashAmount:
-        close.actualCashAmount === null ? null : Number(close.actualCashAmount),
-      varianceAmount:
-        close.varianceAmount === null ? null : Number(close.varianceAmount),
-      varianceReason: close.varianceReason,
-      denominationBreakdown: normalizeJsonObject(close.denominationBreakdown),
-      methodBreakdown: parseCashierCloseMethodBreakdown(close.methodBreakdown),
-      paymentCount: close.paymentCount,
-      refundCount: close.refundCount,
-      firstReceiptNumber: close.firstReceiptNumber,
-      lastReceiptNumber: close.lastReceiptNumber,
-      notes: close.notes,
-      collectorUser: close.collectorUser
-        ? {
-            id: close.collectorUser.id,
-            email: close.collectorUser.email,
-          }
-        : null,
-      closedBy: close.closedBy
-        ? {
-            id: close.closedBy.id,
-            email: close.closedBy.email,
-          }
-        : null,
-    };
+    return this.buildCashierCloseResponse(close);
+
   }
 
   async getReconciliationSummary(
@@ -2987,7 +2930,47 @@ export class FinanceService {
     });
   }
 
+  private buildCashierCloseResponse(close: CashierCloseWithUsers) {
+    return {
+      id: close.id,
+      closeNumber: close.closeNumber,
+      openedAt: close.openedAt,
+      closedAt: close.closedAt,
+      collectorUser: close.collectorUser
+        ? {
+            id: close.collectorUser.id,
+            email: close.collectorUser.email,
+          }
+        : null,
+      paymentMethod: close.paymentMethod,
+      grossCollected: Number(close.grossCollected),
+      totalRefunded: Number(close.totalRefunded),
+      netCollected: Number(close.netCollected),
+      expectedCashAmount: Number(close.expectedCashAmount ?? 0),
+      actualCashAmount:
+        close.actualCashAmount === null ? null : Number(close.actualCashAmount),
+      varianceAmount:
+        close.varianceAmount === null ? null : Number(close.varianceAmount),
+      varianceReason: close.varianceReason,
+      denominationBreakdown: normalizeJsonObject(close.denominationBreakdown),
+      methodBreakdown: parseCashierCloseMethodBreakdown(close.methodBreakdown),
+      paymentCount: close.paymentCount,
+      refundCount: close.refundCount,
+      firstReceiptNumber: close.firstReceiptNumber,
+      lastReceiptNumber: close.lastReceiptNumber,
+      notes: close.notes,
+      closedBy: close.closedBy
+        ? {
+            id: close.closedBy.id,
+            email: close.closedBy.email,
+          }
+        : null,
+      createdAt: close.createdAt,
+    };
+  }
+
   private async buildCashierCloseSummary(
+
     input: {
       openedAt: Date;
       closedAt: Date;
@@ -3769,12 +3752,16 @@ function parseCashierCloseMethodBreakdown(
     return [];
   }
 
-  return value.filter(isCashierCloseMethodBreakdown);
+  return value.filter((item): item is CashierCloseMethodBreakdown =>
+    isCashierCloseMethodBreakdown(item),
+  );
+
 }
 
 function isCashierCloseMethodBreakdown(
-  value: Prisma.JsonValue,
+  value: unknown,
 ): value is CashierCloseMethodBreakdown {
+
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return false;
   }
