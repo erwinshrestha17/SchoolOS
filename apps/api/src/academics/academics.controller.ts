@@ -22,6 +22,7 @@ import { CasRecordsService } from './cas-records.service';
 import { MarkLockWorkflowService } from './mark-lock-workflow.service';
 import { ReportCardPdfService } from './report-card-pdf.service';
 import { ReportCardsService } from './report-cards.service';
+import { ResultPublishingService, PublishingReadinessRow } from './result-publishing.service';
 import { CreateAssessmentComponentDto } from './dto/create-assessment-component.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
 import { CreateExamTermDto } from './dto/create-exam-term.dto';
@@ -38,6 +39,9 @@ import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
 import { UpdateExamTermDto } from './dto/update-exam-term.dto';
 import { UpdateAssessmentComponentDto } from './dto/update-assessment-component.dto';
+import { PublishResultsDto } from './dto/publish-results.dto';
+import { UnpublishResultsDto } from './dto/unpublish-results.dto';
+import { NotifyResultsDto } from './dto/notify-results.dto';
 import { UpdateCasRecordDto } from './dto/update-cas-record.dto';
 
 @Controller('academics')
@@ -51,6 +55,7 @@ export class AcademicsController {
     private readonly markLockWorkflowService: MarkLockWorkflowService,
     private readonly reportCardPdfService: ReportCardPdfService,
     private readonly reportCardsService: ReportCardsService,
+    private readonly resultPublishingService: ResultPublishingService,
   ) {}
 
   @Get('exams')
@@ -411,5 +416,51 @@ export class AcademicsController {
   @Permissions('academics:update')
   batchPromote(@Body() dto: BatchPromoteDto, @CurrentAuth() auth: AuthContext) {
     return this.academicsService.batchPromote(dto, auth);
+  }
+
+  @Get('results/publishing')
+  @Permissions('academics:read')
+  listPublishingReadiness(
+    @CurrentAuth() auth: AuthContext,
+    @Query('academicYearId') academicYearId?: string,
+    @Query('examTermId') examTermId?: string,
+    @Query('classId') classId?: string,
+    @Query('sectionId') sectionId?: string,
+    @Query('status') status?: string,
+  ): Promise<PublishingReadinessRow[]> {
+    return this.resultPublishingService.listPublishingReadiness(auth, {
+      academicYearId,
+      examTermId,
+      classId,
+      sectionId,
+      status,
+    });
+  }
+
+  @Post('results/publishing/publish')
+  @Permissions('academics:manage_report_cards')
+  publishResults(
+    @Body() dto: PublishResultsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.resultPublishingService.publishResults(dto, auth);
+  }
+
+  @Post('results/publishing/unpublish')
+  @Permissions('academics:manage_report_cards')
+  unpublishResults(
+    @Body() dto: UnpublishResultsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.resultPublishingService.unpublishResults(dto, auth);
+  }
+
+  @Post('results/publishing/notify')
+  @Permissions('academics:manage_report_cards')
+  notifyResults(
+    @Body() dto: NotifyResultsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.resultPublishingService.notifyResults(dto, auth);
   }
 }

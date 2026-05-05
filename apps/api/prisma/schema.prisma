@@ -480,6 +480,7 @@ model User {
   reviewedStaffLeaveRequests  StaffLeaveRequest[]    @relation("ReviewedStaffLeaveRequests")
   requestedMarkLockRequests   MarkLockRequest[]      @relation("RequestedMarkLock")
   reviewedMarkLockRequests    MarkLockRequest[]      @relation("ReviewedMarkLock")
+  publishedReportCards       ReportCard[]           @relation("PublishedReportCards")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
@@ -1953,6 +1954,10 @@ model ReportCard {
   lockedAt       DateTime?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+  publishedAt    DateTime?
+  publishedById  String?
+  unpublishedAt  DateTime?
+  publishStatus  String?         @default("UNPUBLISHED")
 
   tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
@@ -1960,6 +1965,7 @@ model ReportCard {
   student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
   class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
   section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  publishedBy  User?        @relation("PublishedReportCards", fields: [publishedById], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, academicYearId, examTermId, studentId])
   @@index([tenantId, classId, sectionId])
