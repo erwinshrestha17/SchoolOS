@@ -3,7 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { GradeLockStatus, NotificationChannel, AudienceType, ConsentType } from '@prisma/client';
+import {
+  GradeLockStatus,
+  NotificationChannel,
+  AudienceType,
+  ConsentType,
+} from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
@@ -57,11 +62,13 @@ export class ResultPublishingService {
     const reportCards = await this.prisma.reportCard.findMany({
       where: {
         tenantId: actor.tenantId,
-        ...(filters.academicYearId ? { academicYearId: filters.academicYearId } : {}),
+        ...(filters.academicYearId
+          ? { academicYearId: filters.academicYearId }
+          : {}),
         ...(filters.examTermId ? { examTermId: filters.examTermId } : {}),
         ...(filters.classId ? { classId: filters.classId } : {}),
         ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
-        ...(filters.status ? { publishStatus: filters.status } as any : {}),
+        ...(filters.status ? { publishStatus: filters.status } : {}),
       },
       include: {
         student: true,
@@ -70,7 +77,7 @@ export class ResultPublishingService {
         academicYear: true,
         examTerm: true,
         publishedBy: true,
-      } as any,
+      },
       orderBy: [
         { class: { level: 'asc' } },
         { student: { firstNameEn: 'asc' } },
@@ -80,11 +87,13 @@ export class ResultPublishingService {
 
     const results: PublishingReadinessRow[] = [];
 
-    for (const card of reportCards as any[]) {
+    for (const card of reportCards) {
       const blockedReasons: string[] = [];
-      
+
       if (card.status !== GradeLockStatus.LOCKED) {
-        blockedReasons.push(`Report card is not LOCKED (current: ${card.status})`);
+        blockedReasons.push(
+          `Report card is not LOCKED (current: ${card.status})`,
+        );
       }
 
       results.push({
@@ -106,7 +115,9 @@ export class ResultPublishingService {
         reportStatus: card.status,
         publishStatus: card.publishStatus ?? 'UNPUBLISHED',
         publishedAt: card.publishedAt,
-        publishedBy: card.publishedBy ? `${card.publishedBy.email ?? card.publishedBy.phone}` : null,
+        publishedBy: card.publishedBy
+          ? `${card.publishedBy.email ?? card.publishedBy.phone}`
+          : null,
         blockedReasons,
         notificationEligibility: card.student.lifecycleStatus === 'ACTIVE',
       });
@@ -117,7 +128,7 @@ export class ResultPublishingService {
 
   async publishResults(dto: PublishResultsDto, actor: AuthContext) {
     const reportCardIds = dto.reportCardIds || [];
-    
+
     const cards = await this.prisma.reportCard.findMany({
       where: {
         id: { in: reportCardIds },
@@ -129,13 +140,16 @@ export class ResultPublishingService {
       published: 0,
       skipped: 0,
       failed: [] as { id: string; reason: string }[],
-      rows: [] as any[],
+      rows: [] as { id: string }[],
     };
 
-    for (const card of cards as any[]) {
+    for (const card of cards) {
       if (card.status !== GradeLockStatus.LOCKED) {
         results.skipped++;
-        results.failed.push({ id: card.id, reason: 'Report card is not locked' });
+        results.failed.push({
+          id: card.id,
+          reason: 'Report card is not locked',
+        });
         continue;
       }
 
@@ -150,7 +164,7 @@ export class ResultPublishingService {
           publishStatus: 'PUBLISHED',
           publishedAt: new Date(),
           publishedById: actor.userId,
-        } as any,
+        },
       });
 
       results.published++;
@@ -164,7 +178,7 @@ export class ResultPublishingService {
       userId: actor.userId,
       after: {
         count: results.published,
-        reportCardIds: results.rows.map(r => r.id),
+        reportCardIds: results.rows.map((r) => r.id),
       },
     });
 
@@ -185,7 +199,7 @@ export class ResultPublishingService {
       failed: [] as { id: string; reason: string }[],
     };
 
-    for (const card of cards as any[]) {
+    for (const card of cards) {
       if (card.publishStatus !== 'PUBLISHED') {
         results.skipped++;
         continue;
@@ -196,7 +210,7 @@ export class ResultPublishingService {
         data: {
           publishStatus: 'UNPUBLISHED',
           unpublishedAt: new Date(),
-        } as any,
+        },
       });
 
       results.unpublished++;
@@ -223,12 +237,12 @@ export class ResultPublishingService {
         id: { in: dto.reportCardIds },
         tenantId: actor.tenantId,
         publishStatus: 'PUBLISHED',
-      } as any,
+      },
       include: {
         student: true,
         examTerm: true,
         tenant: true,
-      } as any,
+      },
     });
 
     const results = {
@@ -236,11 +250,11 @@ export class ResultPublishingService {
       skipped: 0,
     };
 
-    for (const card of cards as any[]) {
+    for (const card of cards) {
       // Use existing notification infrastructure
       const schoolName = card.tenant.name;
       const termName = card.examTerm.name;
-      
+
       await this.communicationsService.recordDeliveryRecords({
         actor,
         sourceType: 'report_card_published',
@@ -263,7 +277,7 @@ export class ResultPublishingService {
       userId: actor.userId,
       after: {
         count: results.notified,
-        reportCardIds: cards.map(c => c.id),
+        reportCardIds: cards.map((c) => c.id),
       },
     });
 

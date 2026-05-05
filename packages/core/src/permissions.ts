@@ -171,6 +171,21 @@ export const permissionCatalog = [
     description: "Generate, lock, and publish academic report cards",
   },
   {
+    resource: "academics",
+    action: "create",
+    description: "Create academic entities like terms and assessment components",
+  },
+  {
+    resource: "academics",
+    action: "update",
+    description: "Update academic setup and assessment configurations",
+  },
+  {
+    resource: "academics",
+    action: "delete",
+    description: "Delete academic setup records",
+  },
+  {
     resource: "timetable",
     action: "manage",
     description: "Create timetable slots and teacher workload schedules",

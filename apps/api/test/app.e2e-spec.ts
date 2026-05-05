@@ -32,7 +32,8 @@ import {
   MockState,
   PrismaMock,
   createRequestMock,
-  createResponseMock, createQueueMock,
+  createResponseMock,
+  createQueueMock,
   applyMockUpdate,
   buildCookieHeader,
   createAuthContextMock,
@@ -306,7 +307,9 @@ describe('School OS Auth + RBAC integration', () => {
       AuthController.prototype.me as any,
       AuthController as any,
     );
-    const studentProfile = await authController.me(studentPasswordRequest.auth as any);
+    const studentProfile = await authController.me(
+      studentPasswordRequest.auth as any,
+    );
     expect(studentProfile.profileType).toBe('student');
 
     await authController.requestMfaSetup(studentPasswordRequest.auth as any);
@@ -356,7 +359,9 @@ describe('School OS Auth + RBAC integration', () => {
     );
     expect(studentOtpLogin.accessToken).toBeTruthy();
 
-    const listedUsers = await usersController.listUsers(adminRequest.auth as any);
+    const listedUsers = await usersController.listUsers(
+      adminRequest.auth as any,
+    );
     expect(listedUsers).toHaveLength(3);
 
     const teacherUser = listedUsers.find(
@@ -607,9 +612,7 @@ async function authenticateRequest(
     getClass: () => controllerClass,
   } as any;
 
-  const cls = (
-    jwtAuthGuard as any
-  ).cls;
+  const cls = (jwtAuthGuard as any).cls;
 
   return cls.run(async () => {
     await jwtAuthGuard.canActivate(context);
@@ -618,4 +621,3 @@ async function authenticateRequest(
     return request as AuthenticatedRequest;
   });
 }
-

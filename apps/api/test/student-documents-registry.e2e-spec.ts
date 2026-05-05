@@ -8,7 +8,12 @@ import { RedisService } from '../src/redis/redis.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { StudentDocumentKind } from '@prisma/client';
-import { PrismaMock, createQueueMock, createAuthContextMock, createPrismaMock } from './test-helpers';
+import {
+  PrismaMock,
+  createQueueMock,
+  createAuthContextMock,
+  createPrismaMock,
+} from './test-helpers';
 
 describe('Student Documents Registry Integration (E2E)', () => {
   let moduleRef: TestingModule;
@@ -52,8 +57,14 @@ describe('Student Documents Registry Integration (E2E)', () => {
     const studentAId = 'student-a';
     const userAId = 'user-a';
 
-    const actorA = createAuthContextMock({ tenantId: tenantAId, userId: userAId });
-    const actorB = createAuthContextMock({ tenantId: tenantBId, userId: 'user-b' });
+    const actorA = createAuthContextMock({
+      tenantId: tenantAId,
+      userId: userAId,
+    });
+    const actorB = createAuthContextMock({
+      tenantId: tenantBId,
+      userId: 'user-b',
+    });
 
     // 1. Upload a document for Student A
     const doc = await studentRecordsService.uploadDocument(
@@ -92,18 +103,11 @@ describe('Student Documents Registry Integration (E2E)', () => {
 
     // 4. Tenant B CANNOT get signed URL (Tenant Isolation)
     await expect(
-      studentRecordsService.getSignedUrl(
-        actorB,
-        assetId,
-        'preview',
-      ),
+      studentRecordsService.getSignedUrl(actorB, assetId, 'preview'),
     ).rejects.toBeInstanceOf(NotFoundException);
 
     // 5. Deletion removes from registry
-    await studentRecordsService.deleteDocument(
-      actorA,
-      assetId,
-    );
+    await studentRecordsService.deleteDocument(actorA, assetId);
     const registryFilesAfter = await fileRegistryService.listFilesByEntity(
       tenantAId,
       'students',
@@ -130,4 +134,3 @@ describe('Student Documents Registry Integration (E2E)', () => {
     );
   });
 });
-

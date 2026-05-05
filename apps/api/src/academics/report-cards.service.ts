@@ -26,7 +26,9 @@ type ComponentWithSubject = Prisma.AssessmentComponentGetPayload<{
   include: { subject: true };
 }>;
 
-type GeneratedReportCard = Awaited<ReturnType<ReportCardsService['generateReportCard']>>;
+type GeneratedReportCard = Awaited<
+  ReturnType<ReportCardsService['generateReportCard']>
+>;
 
 @Injectable()
 export class ReportCardsService {

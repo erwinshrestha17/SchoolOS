@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -29,7 +33,9 @@ export class MarkLockWorkflowService {
         tenantId: actor.tenantId,
         ...(filters.examTermId ? { examTermId: filters.examTermId } : {}),
         ...(filters.status ? { status: filters.status } : {}),
-        ...(filters.requestedById ? { requestedById: filters.requestedById } : {}),
+        ...(filters.requestedById
+          ? { requestedById: filters.requestedById }
+          : {}),
       },
       include: {
         examTerm: {
@@ -57,7 +63,9 @@ export class MarkLockWorkflowService {
     });
 
     if (existingPending) {
-      throw new ConflictException('A pending lock/unlock review already exists for this exam term');
+      throw new ConflictException(
+        'A pending lock/unlock review already exists for this exam term',
+      );
     }
 
     const request = await this.prisma.markLockRequest.create({
@@ -104,7 +112,9 @@ export class MarkLockWorkflowService {
     }
 
     if (request.status !== 'PENDING') {
-      throw new ConflictException('Only pending mark lock requests can be reviewed');
+      throw new ConflictException(
+        'Only pending mark lock requests can be reviewed',
+      );
     }
 
     const reviewed = await this.prisma.$transaction(async (tx) => {
@@ -163,14 +173,19 @@ export class MarkLockWorkflowService {
     return reviewed;
   }
 
-  async unlockExamTerm(examTermId: string, dto: UnlockExamTermDto, actor: AuthContext) {
+  async unlockExamTerm(
+    examTermId: string,
+    dto: UnlockExamTermDto,
+    actor: AuthContext,
+  ) {
     const term = await this.ensureExamTerm(actor, examTermId);
 
     if (!term.isLocked) {
       throw new ConflictException('Exam term is already unlocked');
     }
 
-    const reason = dto.reason?.trim() || 'Manual unlock requested by authorized user';
+    const reason =
+      dto.reason?.trim() || 'Manual unlock requested by authorized user';
 
     const request = await this.prisma.$transaction(async (tx) => {
       await tx.examTerm.update({

@@ -124,7 +124,6 @@ type CashierCloseWithUsers = Prisma.CashierCloseGetPayload<{
   };
 }>;
 
-
 @Injectable()
 export class FinanceService {
   constructor(
@@ -2622,7 +2621,6 @@ export class FinanceService {
     });
 
     return closes.map((close) => this.buildCashierCloseResponse(close));
-
   }
 
   async finalizeCashierClose(dto: CreateCashierCloseDto, actor: AuthContext) {
@@ -2734,7 +2732,6 @@ export class FinanceService {
     });
 
     return this.buildCashierCloseResponse(close);
-
   }
 
   async getReconciliationSummary(
@@ -2970,7 +2967,6 @@ export class FinanceService {
   }
 
   private async buildCashierCloseSummary(
-
     input: {
       openedAt: Date;
       closedAt: Date;
@@ -3755,13 +3751,11 @@ function parseCashierCloseMethodBreakdown(
   return value.filter((item): item is CashierCloseMethodBreakdown =>
     isCashierCloseMethodBreakdown(item),
   );
-
 }
 
 function isCashierCloseMethodBreakdown(
   value: unknown,
 ): value is CashierCloseMethodBreakdown {
-
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return false;
   }

@@ -123,7 +123,12 @@ export function createAuthContextMock(
 }
 
 import * as bcrypt from 'bcrypt';
-import { PERMISSION_CATALOG, SYSTEM_ROLE_DEFINITIONS, SYSTEM_ROLE_PERMISSIONS, buildPermissionKey } from '../src/rbac/rbac.defaults';
+import {
+  PERMISSION_CATALOG,
+  SYSTEM_ROLE_DEFINITIONS,
+  SYSTEM_ROLE_PERMISSIONS,
+  buildPermissionKey,
+} from '../src/rbac/rbac.defaults';
 
 export function createPrismaMock() {
   const state: MockState = {
@@ -164,8 +169,10 @@ export function createPrismaMock() {
   function permissionByKey(permissionKey: string) {
     return state.permissions.find(
       (permission) =>
-        buildPermissionKey(permission.resource as string, permission.action as string) ===
-        permissionKey,
+        buildPermissionKey(
+          permission.resource as string,
+          permission.action as string,
+        ) === permissionKey,
     );
   }
 
@@ -180,12 +187,14 @@ export function createPrismaMock() {
     tenant: {
       findUnique: jest.fn(async (q: any) =>
         state.tenants.find(
-          (tenant) => tenant.id === q.where?.id || tenant.slug === q.where?.slug,
+          (tenant) =>
+            tenant.id === q.where?.id || tenant.slug === q.where?.slug,
         ),
       ),
       findFirst: jest.fn(async (q: any) =>
         state.tenants.find(
-          (tenant) => tenant.id === q.where?.id || tenant.slug === q.where?.slug,
+          (tenant) =>
+            tenant.id === q.where?.id || tenant.slug === q.where?.slug,
         ),
       ),
       create: jest.fn(async ({ data }: any) => {
@@ -295,7 +304,8 @@ export function createPrismaMock() {
       ),
       findFirst: jest.fn(async (q: any) =>
         state.students.find(
-          (item) => item.id === q.where?.id && item.tenantId === q.where?.tenantId,
+          (item) =>
+            item.id === q.where?.id && item.tenantId === q.where?.tenantId,
         ),
       ),
     },
@@ -363,7 +373,10 @@ export function createPrismaMock() {
   };
 }
 
-export function ensureTenantDefaultsWithState(state: MockState, tenantId: string) {
+export function ensureTenantDefaultsWithState(
+  state: MockState,
+  tenantId: string,
+) {
   for (const roleDefinition of SYSTEM_ROLE_DEFINITIONS) {
     if (
       !state.roles.some(
@@ -398,7 +411,9 @@ export function ensureTenantDefaultsWithState(state: MockState, tenantId: string
 
     for (const permissionKey of permissionKeys) {
       const permission = PERMISSION_CATALOG.find(
-        (p) => buildPermissionKey(p.resource as string, p.action as string) === permissionKey,
+        (p) =>
+          buildPermissionKey(p.resource as string, p.action as string) ===
+          permissionKey,
       );
 
       if (!permission) {

@@ -1475,7 +1475,9 @@ export class AcademicsService {
 
       if (student.lifecycleStatus !== 'ACTIVE') {
         status = 'BLOCKED';
-        reasons.push(`Student is not ACTIVE (current: ${student.lifecycleStatus})`);
+        reasons.push(
+          `Student is not ACTIVE (current: ${student.lifecycleStatus})`,
+        );
       }
 
       const row: PromotionReadinessRow = {
@@ -1493,7 +1495,11 @@ export class AcademicsService {
         status,
         reasons,
         recommendedAction:
-          status === 'READY' ? 'PROMOTE' : status === 'REVIEW' ? 'REVIEW' : 'HOLD',
+          status === 'READY'
+            ? 'PROMOTE'
+            : status === 'REVIEW'
+              ? 'REVIEW'
+              : 'HOLD',
         lifecycleStatus: student.lifecycleStatus,
         outstandingBalance: outstanding,
       };
@@ -1698,7 +1704,9 @@ export class AcademicsService {
           academicYearId: dto.academicYearId,
           classId: mapping.fromClassId,
           status: 'ACTIVE',
-          ...(mapping.studentIds ? { studentId: { in: mapping.studentIds } } : {}),
+          ...(mapping.studentIds
+            ? { studentId: { in: mapping.studentIds } }
+            : {}),
         },
         include: { student: true },
       });

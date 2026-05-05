@@ -111,7 +111,10 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
       createResponseMock() as any,
       { ip: '127.0.0.1', headers: {} } as any,
     );
-    const authA = createAuthContextMock({ tenantId: tenantAId, userId: adminA.id });
+    const authA = createAuthContextMock({
+      tenantId: tenantAId,
+      userId: adminA.id,
+    });
 
     // 4. Admin A updates a setting
     await settingsController.updateSetting(

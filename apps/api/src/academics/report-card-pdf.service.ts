@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -72,7 +76,10 @@ export class ReportCardPdfService {
           subject: true,
           assessmentComponent: true,
         },
-        orderBy: [{ subject: { code: 'asc' } }, { assessmentComponent: { name: 'asc' } }],
+        orderBy: [
+          { subject: { code: 'asc' } },
+          { assessmentComponent: { name: 'asc' } },
+        ],
       }),
       this.prisma.invoice.count({
         where: {
@@ -127,8 +134,14 @@ function buildSubjectRows(marks: MarkWithRelations[]) {
     });
     subject.totalObtained += obtained;
     subject.totalMax += max;
-    subject.percentage = subject.totalMax > 0 ? (subject.totalObtained / subject.totalMax) * 100 : 0;
-    subject.grade = gradeFromPercentage(subject.percentage, subject.components.some((item) => item.status === 'FAIL'));
+    subject.percentage =
+      subject.totalMax > 0
+        ? (subject.totalObtained / subject.totalMax) * 100
+        : 0;
+    subject.grade = gradeFromPercentage(
+      subject.percentage,
+      subject.components.some((item) => item.status === 'FAIL'),
+    );
 
     grouped.set(mark.subjectId, subject);
   }
@@ -155,7 +168,8 @@ function buildPolishedReportCardPdf(input: {
   subjects: ReportPdfSubject[];
 }) {
   const { reportCard } = input;
-  const fallbackName = `${reportCard.student.firstNameEn ?? ''} ${reportCard.student.lastNameEn ?? ''}`.trim();
+  const fallbackName =
+    `${reportCard.student.firstNameEn ?? ''} ${reportCard.student.lastNameEn ?? ''}`.trim();
 
   const studentName =
     fallbackName.length > 0 ? fallbackName : reportCard.student.studentSystemId;
@@ -168,7 +182,13 @@ function buildPolishedReportCardPdf(input: {
     text(input.schoolName, 54, 724, 18, 'F2'),
     input.panNumber ? text(`PAN: ${input.panNumber}`, 54, 708, 8, 'F1') : '',
     text('PROGRESS REPORT CARD', 382, 724, 14, 'F2'),
-    text(`${reportCard.examTerm.name} | ${reportCard.academicYear.name}`, 382, 708, 9, 'F1'),
+    text(
+      `${reportCard.examTerm.name} | ${reportCard.academicYear.name}`,
+      382,
+      708,
+      9,
+      'F1',
+    ),
     text(`Status: ${reportCard.status}`, 382, 692, 8, 'F2'),
     '36 680 m 576 680 l S',
 
@@ -176,8 +196,18 @@ function buildPolishedReportCardPdf(input: {
     labelValue('Student ID', reportCard.student.studentSystemId, 350, 656),
     labelValue('Class', reportCard.class.name, 54, 632),
     labelValue('Section', reportCard.section?.name ?? 'N/A', 184, 632),
-    labelValue('Roll No.', String(reportCard.student.rollNumber ?? '—'), 314, 632),
-    labelValue('Generated', reportCard.updatedAt.toISOString().slice(0, 10), 444, 632),
+    labelValue(
+      'Roll No.',
+      String(reportCard.student.rollNumber ?? '—'),
+      314,
+      632,
+    ),
+    labelValue(
+      'Generated',
+      reportCard.updatedAt.toISOString().slice(0, 10),
+      444,
+      632,
+    ),
     '36 612 m 576 612 l S',
 
     text('SUBJECT', 54, 594, 8, 'F2'),
@@ -191,7 +221,10 @@ function buildPolishedReportCardPdf(input: {
   let y = 566;
   for (const subject of input.subjects.slice(0, 12)) {
     const componentText = subject.components
-      .map((component) => `${component.name} ${component.obtained}/${component.max}`)
+      .map(
+        (component) =>
+          `${component.name} ${component.obtained}/${component.max}`,
+      )
       .join(', ');
 
     parts.push(
@@ -204,14 +237,24 @@ function buildPolishedReportCardPdf(input: {
     y -= 18;
 
     if (y < 290) {
-      parts.push(text('Additional subjects omitted from this one-page preview.', 54, y, 8, 'F1'));
+      parts.push(
+        text(
+          'Additional subjects omitted from this one-page preview.',
+          54,
+          y,
+          8,
+          'F1',
+        ),
+      );
       y -= 18;
       break;
     }
   }
 
   if (input.subjects.length === 0) {
-    parts.push(text('No marks available for this report card.', 54, y, 9, 'F1'));
+    parts.push(
+      text('No marks available for this report card.', 54, y, 9, 'F1'),
+    );
     y -= 20;
   }
 
@@ -219,8 +262,18 @@ function buildPolishedReportCardPdf(input: {
   parts.push(
     '36 ' + (y + 12) + ' m 576 ' + (y + 12) + ' l S',
     text('RESULT SUMMARY', 54, y - 8, 10, 'F2'),
-    labelValue('Total', `${Number(reportCard.totalMarks).toFixed(2)} / ${Number(reportCard.maxMarks).toFixed(2)}`, 54, y - 34),
-    labelValue('Percentage', `${Number(reportCard.percentage).toFixed(2)}%`, 214, y - 34),
+    labelValue(
+      'Total',
+      `${Number(reportCard.totalMarks).toFixed(2)} / ${Number(reportCard.maxMarks).toFixed(2)}`,
+      54,
+      y - 34,
+    ),
+    labelValue(
+      'Percentage',
+      `${Number(reportCard.percentage).toFixed(2)}%`,
+      214,
+      y - 34,
+    ),
     labelValue('Final Grade', reportCard.grade, 374, y - 34),
     labelValue('GPA', Number(reportCard.gpa).toFixed(2), 484, y - 34),
   );
@@ -240,14 +293,31 @@ function buildPolishedReportCardPdf(input: {
     '422 118 m 540 118 l S',
     text('Principal', 460, 102, 9, 'F1'),
     '36 82 m 576 82 l S',
-    text('This report card is generated by SchoolOS. Verify with the school office for official use.', 54, 64, 7, 'F1'),
-    text(`Printed: ${new Date().toISOString().replace('T', ' ').slice(0, 19)}`, 54, 50, 7, 'F1'),
+    text(
+      'This report card is generated by SchoolOS. Verify with the school office for official use.',
+      54,
+      64,
+      7,
+      'F1',
+    ),
+    text(
+      `Printed: ${new Date().toISOString().replace('T', ' ').slice(0, 19)}`,
+      54,
+      50,
+      7,
+      'F1',
+    ),
   );
 
   return buildPdf(parts.filter(Boolean).join('\n'));
 }
 
-function labelValue(label: string, value: string | number | null | undefined, x: number, y: number) {
+function labelValue(
+  label: string,
+  value: string | number | null | undefined,
+  x: number,
+  y: number,
+) {
   return [
     text(label.toUpperCase(), x, y, 6, 'F2'),
     text(value ?? 'N/A', x, y - 12, 9, 'F1'),
@@ -275,7 +345,13 @@ function text(
   return `BT /${font} ${size} Tf ${x} ${y} Td (${escapePdfText(value)}) Tj ET`;
 }
 
-function wrapPdfLine(value: string, x: number, y: number, width: number, size: number) {
+function wrapPdfLine(
+  value: string,
+  x: number,
+  y: number,
+  width: number,
+  size: number,
+) {
   const maxChars = Math.max(32, Math.floor(width / (size * 0.52)));
   const words = value.split(/\s+/);
   const lines: string[] = [];
@@ -292,7 +368,9 @@ function wrapPdfLine(value: string, x: number, y: number, width: number, size: n
   }
 
   if (current) lines.push(current);
-  return lines.slice(0, 4).map((line, index) => text(line, x, y - index * 12, size, 'F1'));
+  return lines
+    .slice(0, 4)
+    .map((line, index) => text(line, x, y - index * 12, size, 'F1'));
 }
 
 function buildPdf(content: string) {

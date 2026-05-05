@@ -11,7 +11,7 @@ class BatchPromotionMapping {
   @IsOptional()
   @IsString()
   toSectionId?: string;
-  
+
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
