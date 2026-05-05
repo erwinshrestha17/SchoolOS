@@ -106,10 +106,15 @@ describe('SchoolOS web production contracts', () => {
       'createStaffContract',
       'createPayrollRun',
       'postPayrollRun',
+      'getPayrollPreview',
       'listAccountingReports',
       'createConversation',
       'createMessage',
       'markMessageRead',
+      'listStaffAttendanceSummary',
+      'listLeaveRequests',
+      'reviewLeaveRequest',
+      'listStaffLeaveBalances',
       'listPlatformTenants',
       'getPlatformTenantDetail',
       'updatePlatformTenantStatus',
@@ -629,6 +634,11 @@ describe('SchoolOS web production contracts', () => {
     assert.match(financeForm, /api\.listCashierCloses/);
     assert.match(financeForm, /api\.finalizeCashierClose/);
     assert.match(financeForm, /Closing records the day-end cash position\. It does not edit payments/);
+    assert.match(financeForm, /Actual cash counted/);
+    assert.match(financeForm, /Expected cash amount/);
+    assert.match(financeForm, /Variance reason/);
+    assert.match(financeForm, /methodBreakdown/);
+    assert.match(financeForm, /actualCashAmount/);
     assert.match(financeForm, /Printable Day-End Summary/);
     assert.match(financeForm, /Finalize day-end close/);
     assert.match(financeForm, /CLOSE/);
@@ -834,5 +844,53 @@ describe('SchoolOS web production contracts', () => {
     assert.doesNotMatch(communicationsForm, /School will remain closed tomorrow/);
     assert.doesNotMatch(communicationsForm, /Parent-teacher meeting/);
     assert.doesNotMatch(communicationsForm, /replace-me/i);
+  });
+
+  it('provides a dedicated HR & Payroll workspace with contract and leave management', () => {
+    const sidebar = read('components/layout/sidebar.tsx');
+    const hrWorkspace = read('components/hr/hr-workspace.tsx');
+    const contractList = read('components/hr/contract-list.tsx');
+    const leaveList = read('components/hr/leave-request-list.tsx');
+    const attendanceSummary = read('components/hr/staff-attendance-summary.tsx');
+    const page = read('app/dashboard/payroll/page.tsx');
+
+    assert.match(sidebar, /label: 'HR & Payroll'/);
+    assert.match(sidebar, /href: '\/dashboard\/payroll'/);
+    assert.match(sidebar, /permissions: \['hr:read', 'payroll:read', 'payroll:manage'\]/);
+    assert.match(page, /<HRWorkspace/);
+    assert.match(hrWorkspace, /'Staff Directory'|'Contracts'|'Leave Requests'|'Attendance Summary'|'Leave Balances'|'Payroll Preview'/);
+    
+    assert.match(contractList, /api\.listStaffContracts/);
+    assert.match(contractList, /api\.createStaffContract/);
+    assert.match(contractList, /Base Salary/);
+    assert.match(contractList, /Allowances/);
+    
+    assert.match(leaveList, /api\.listLeaveRequests/);
+    assert.match(leaveList, /api\.reviewLeaveRequest/);
+    assert.match(leaveList, /PENDING|APPROVED|REJECTED/);
+
+    const leaveBalanceList = read('components/hr/leave-balance-list.tsx');
+    assert.match(leaveBalanceList, /api\.listStaffLeaveBalances/);
+    assert.match(leaveBalanceList, /Entitlement|Used|Pending|Remaining/);
+    
+    assert.match(attendanceSummary, /api\.listStaffAttendanceSummary/);
+    assert.match(attendanceSummary, /Present|Late|Absent|Leave/);
+
+    const payrollPreview = read('components/hr/payroll-preview.tsx');
+    assert.match(payrollPreview, /api\.getPayrollPreview/);
+    assert.match(payrollPreview, /Preview Only/);
+    assert.match(payrollPreview, /No accounting entries/);
+    assert.match(payrollPreview, /payroll runs/);
+    assert.match(payrollPreview, /created from this screen/);
+    assert.match(payrollPreview, /Gross Pay|Net Pay|Deductions/);
+    
+    // Negative checks: Payroll preview should be read-only and isolated from direct accounting writes in Phase 2C
+    assert.doesNotMatch(payrollPreview, /api\.approvePayroll|api\.createPayrollRun|api\.postPayrollRun/);
+    assert.doesNotMatch(payrollPreview, /api\.createJournalEntry|api\.getPayslipPdf/);
+    assert.doesNotMatch(payrollPreview, /\/accounting\/journal-entries|\/accounting\/ledger/i);
+
+    assert.doesNotMatch(hrWorkspace, /replace-me|demo-staff|fake-contract/i);
+    // Note: Payroll processing, salary slips, and M9 accounting auto-posting are deferred to future Phase 2 HR/Accounting work.
+    assert.doesNotMatch(contractList, /api\.createAccountingEntry|api\.postLedger/i);
   });
 });

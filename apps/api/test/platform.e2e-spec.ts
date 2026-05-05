@@ -115,7 +115,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
     } as any;
 
     await jwtAuthGuard.canActivate(mockContext);
-    await expect(platformGuard.canActivate(mockContext)).rejects.toBeInstanceOf(
+    expect(() => platformGuard.canActivate(mockContext)).toThrow(
       ForbiddenException,
     );
 
@@ -241,9 +241,9 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       getClass: () => PlatformController,
     } as any;
     await jwtAuthGuard.canActivate(sUpdateContext);
-    await expect(
-      platformGuard.canActivate(sUpdateContext),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(() => platformGuard.canActivate(sUpdateContext)).toThrow(
+      ForbiddenException,
+    );
 
     // 12. Setup platform billing admin (Read-only)
     const billingRole = prisma.__state.roles.find(
@@ -299,9 +299,9 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       getClass: () => PlatformController,
     } as any;
     await jwtAuthGuard.canActivate(bUpdateContext);
-    await expect(
-      platformGuard.canActivate(bUpdateContext),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(() => platformGuard.canActivate(bUpdateContext)).toThrow(
+      ForbiddenException,
+    );
   });
 });
 
@@ -372,6 +372,10 @@ async function createPrismaMock() {
         }
         return u;
       }),
+      count: jest.fn(
+        async (q) =>
+          state.users.filter((u) => u.tenantId === q.where.tenantId).length,
+      ),
     },
     role: { findMany: jest.fn(async () => state.roles) },
     userRole: { findMany: jest.fn(async () => state.userRoles) },

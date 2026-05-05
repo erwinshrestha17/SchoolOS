@@ -265,7 +265,11 @@ async function createPrismaMock() {
     },
     tenantSetting: {
       findMany: jest.fn(async (q) =>
-        state.tenantSettings.filter((s) => s.tenantId === q.where.tenantId),
+        state.tenantSettings.filter((s) => {
+          if (s.tenantId !== q.where.tenantId) return false;
+          const keys = q.where.key?.in as string[] | undefined;
+          return keys ? keys.includes(s.key) : true;
+        }),
       ),
       findUnique: jest.fn(async (q) =>
         state.tenantSettings.find(
@@ -342,6 +346,7 @@ async function createPrismaMock() {
         return log;
       }),
     },
+    refreshToken: { create: jest.fn() },
   };
 }
 

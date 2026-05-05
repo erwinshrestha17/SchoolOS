@@ -139,6 +139,35 @@ export class StaffService {
     };
   }
 
+  async getStaffProfile(actor: AuthContext) {
+    const staff = await this.prisma.staff.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+      },
+      include: {
+        user: {
+          include: {
+            userRoles: {
+              include: {
+                role: true,
+              },
+            },
+          },
+        },
+        staffContracts: {
+          orderBy: { startDate: 'desc' },
+        },
+      },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff profile not found');
+    }
+
+    return staff;
+  }
+
   async listStaff(actor: AuthContext) {
     const staff = await this.prisma.staff.findMany({
       where: { tenantId: actor.tenantId },

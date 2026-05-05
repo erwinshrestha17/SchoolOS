@@ -914,6 +914,7 @@ describe('finance production controls', () => {
       }),
       buildCashierPayment({
         id: 'payment-2',
+        method: PaymentMethod.BANK,
         amount: new Prisma.Decimal(300),
         receipt: { receiptNumber: 'REC-2026-00002' },
       }),
@@ -924,6 +925,7 @@ describe('finance production controls', () => {
         amount: new Prisma.Decimal(100),
         refundDate: new Date('2026-04-27T10:30:00.000Z'),
         payment: {
+          method: PaymentMethod.CASH,
           receipt: { receiptNumber: 'REC-2026-00001' },
         },
       },
@@ -936,6 +938,29 @@ describe('finance production controls', () => {
       grossCollected: new Prisma.Decimal(800),
       totalRefunded: new Prisma.Decimal(100),
       netCollected: new Prisma.Decimal(700),
+      expectedCashAmount: new Prisma.Decimal(400),
+      actualCashAmount: new Prisma.Decimal(390),
+      varianceAmount: new Prisma.Decimal(-10),
+      varianceReason: 'Cash drawer short by Rs 10 after recount',
+      denominationBreakdown: { '100': 3, '50': 1, '20': 2 },
+      methodBreakdown: [
+        {
+          method: PaymentMethod.CASH,
+          grossCollected: 500,
+          totalRefunded: 100,
+          netCollected: 400,
+          paymentCount: 1,
+          refundCount: 1,
+        },
+        {
+          method: PaymentMethod.BANK,
+          grossCollected: 300,
+          totalRefunded: 0,
+          netCollected: 300,
+          paymentCount: 1,
+          refundCount: 0,
+        },
+      ],
       paymentCount: 2,
       refundCount: 1,
       firstReceiptNumber: 'REC-2026-00001',
@@ -964,6 +989,9 @@ describe('finance production controls', () => {
       {
         openedAt: '2026-04-27T09:00:00.000Z',
         closedAt: '2026-04-27T17:00:00.000Z',
+        actualCashAmount: 390,
+        varianceReason: 'Cash drawer short by Rs 10 after recount',
+        denominationBreakdown: { '100': 3, '50': 1, '20': 2 },
         notes: 'Day close',
       },
       actor,
@@ -976,6 +1004,20 @@ describe('finance production controls', () => {
         netCollected: 700,
         paymentCount: 2,
         refundCount: 1,
+        expectedCashAmount: 400,
+        methodBreakdown: expect.arrayContaining([
+          expect.objectContaining({
+            method: PaymentMethod.CASH,
+            grossCollected: 500,
+            totalRefunded: 100,
+            netCollected: 400,
+          }),
+          expect.objectContaining({
+            method: PaymentMethod.BANK,
+            grossCollected: 300,
+            netCollected: 300,
+          }),
+        ]),
       }),
     );
     expect(prisma.cashierClose.create).toHaveBeenCalledWith({
@@ -984,6 +1026,20 @@ describe('finance production controls', () => {
         grossCollected: new Prisma.Decimal(800),
         totalRefunded: new Prisma.Decimal(100),
         netCollected: new Prisma.Decimal(700),
+        expectedCashAmount: new Prisma.Decimal(400),
+        actualCashAmount: new Prisma.Decimal(390),
+        varianceAmount: new Prisma.Decimal(-10),
+        varianceReason: 'Cash drawer short by Rs 10 after recount',
+        methodBreakdown: expect.arrayContaining([
+          expect.objectContaining({
+            method: PaymentMethod.CASH,
+            netCollected: 400,
+          }),
+          expect.objectContaining({
+            method: PaymentMethod.BANK,
+            netCollected: 300,
+          }),
+        ]),
       }),
       include: {
         collectorUser: true,
@@ -991,6 +1047,30 @@ describe('finance production controls', () => {
       },
     });
     expect(finalized.closeNumber).toBe('CLS-2026-00001');
+    expect(finalized.actualCashAmount).toBe(390);
+    expect(finalized.varianceAmount).toBe(-10);
+  });
+
+  it('requires a variance reason when actual cash differs from expected cash', async () => {
+    const { service } = buildService({
+      invoice: null,
+      feeHead: null,
+      cashierPayments: [
+        buildCashierPayment({ amount: new Prisma.Decimal(500) }),
+      ],
+      cashierRefunds: [],
+    });
+
+    await expect(
+      service.finalizeCashierClose(
+        {
+          openedAt: '2026-04-27T09:00:00.000Z',
+          closedAt: '2026-04-27T17:00:00.000Z',
+          actualCashAmount: 450,
+        },
+        actor,
+      ),
+    ).rejects.toThrow('A variance reason is required');
   });
 
   it('blocks duplicate cashier close windows', async () => {
@@ -1008,7 +1088,7 @@ describe('finance production controls', () => {
         },
         actor,
       ),
-    ).rejects.toThrow('Cashier close CLS-2026-00001 already exists');
+    ).rejects.toThrow('Cashier close CLS-2026-00001 already overlaps');
   });
 
   it('builds reconciliation rows and csv export from the same payments', async () => {
@@ -1223,6 +1303,7 @@ function buildPaymentJournal(overrides: Record<string, unknown> = {}) {
 function buildCashierPayment(overrides: Record<string, unknown> = {}) {
   return {
     id: 'payment-1',
+    method: PaymentMethod.CASH,
     amount: new Prisma.Decimal(0),
     receipt: null,
     ...overrides,

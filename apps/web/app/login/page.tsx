@@ -50,7 +50,7 @@ export default function LoginPage() {
               </div>
               <div>
                 <p className="text-sm font-bold text-white">School Data Isolation</p>
-                <p className="text-xs text-slate-400 mt-1">Every request is scoped to your school workspace so each school's data remains strictly isolated.</p>
+                <p className="text-xs text-slate-400 mt-1">Every request is scoped to your school workspace so each school&apos;s data remains strictly isolated.</p>
               </div>
             </li>
             <li className="flex gap-4">

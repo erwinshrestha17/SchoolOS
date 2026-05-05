@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { ReviewHomeworkSubmissionDto } from './dto/review-homework-submission.dto';
+import { SubmitHomeworkDto } from './dto/submit-homework.dto';
 import { TimetableService } from './timetable.service';
 
 @Controller('homework')
@@ -56,5 +57,14 @@ export class HomeworkController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.timetableService.reviewHomeworkSubmission(dto, auth);
+  }
+
+  @Post('submit')
+  @Permissions('homework:submit')
+  submitHomework(
+    @Body() dto: SubmitHomeworkDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.submitHomework(dto, auth);
   }
 }

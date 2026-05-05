@@ -218,6 +218,118 @@ export function buildReceiptPdf(input: {
   return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
 }
 
+export function buildSalarySlipPdf(input: {
+  schoolName: string;
+  panNumber?: string | null;
+  payslipNumber: string;
+  period: string;
+  staff: {
+    name: string;
+    id: string;
+    designation?: string | null;
+    bankAccount?: string | null;
+    panNumber?: string | null;
+  };
+  earnings: Array<{ name: string; amount: number }>;
+  deductions: Array<{ name: string; amount: number }>;
+  grossSalary: number;
+  totalDeductions: number;
+  netSalary: number;
+  attendance: {
+    present: number;
+    working: number;
+  };
+}) {
+  const contentParts = [
+    '0.5 w',
+    '36 36 540 720 re S',
+    text(input.schoolName, 48, 726, 16, 'F2'),
+    input.panNumber ? text(`PAN: ${input.panNumber}`, 48, 712, 10, 'F1') : '',
+    text('SALARY SLIP', 460, 726, 14, 'F2'),
+    text(input.period, 460, 710, 10, 'F1'),
+    '36 696 m 576 696 l S',
+
+    // Staff Info
+    text('Employee Name:', 48, 670, 10, 'F2'),
+    text(input.staff.name, 140, 670, 10, 'F1'),
+    text('Employee ID:', 380, 670, 10, 'F2'),
+    text(input.staff.id, 460, 670, 10, 'F1'),
+    text('Designation:', 48, 650, 10, 'F2'),
+    text(input.staff.designation ?? 'N/A', 140, 650, 10, 'F1'),
+    text('Bank A/C:', 380, 650, 10, 'F2'),
+    text(input.staff.bankAccount ?? 'N/A', 460, 650, 10, 'F1'),
+    text('PAN:', 48, 630, 10, 'F2'),
+    text(input.staff.panNumber ?? 'N/A', 140, 630, 10, 'F1'),
+    text('Payslip No:', 380, 630, 10, 'F2'),
+    text(input.payslipNumber, 460, 630, 10, 'F1'),
+
+    '36 610 m 576 610 l S',
+
+    // Earnings vs Deductions Table
+    text('EARNINGS', 48, 590, 10, 'F2'),
+    text('AMOUNT', 220, 590, 10, 'F2'),
+    text('DEDUCTIONS', 310, 590, 10, 'F2'),
+    text('AMOUNT', 500, 590, 10, 'F2'),
+    '36 580 m 576 580 l S',
+    '300 580 m 300 300 l S', // Vertical line
+  ];
+
+  let y = 560;
+  const maxRows = Math.max(input.earnings.length, input.deductions.length);
+  for (let i = 0; i < maxRows; i++) {
+    const earning = input.earnings[i];
+    const deduction = input.deductions[i];
+
+    if (earning) {
+      contentParts.push(
+        text(earning.name, 48, y, 10, 'F1'),
+        text(earning.amount.toFixed(2), 220, y, 10, 'F1'),
+      );
+    }
+    if (deduction) {
+      contentParts.push(
+        text(deduction.name, 310, y, 10, 'F1'),
+        text(deduction.amount.toFixed(2), 500, y, 10, 'F1'),
+      );
+    }
+    y -= 20;
+    if (y < 320) break;
+  }
+
+  contentParts.push(
+    '36 300 m 576 300 l S',
+    text('Gross Earnings:', 48, 280, 10, 'F2'),
+    text(input.grossSalary.toFixed(2), 220, 280, 10, 'F2'),
+    text('Total Deductions:', 310, 280, 10, 'F2'),
+    text(input.totalDeductions.toFixed(2), 500, 280, 10, 'F2'),
+
+    '36 260 m 576 260 l S',
+    text('NET SALARY:', 310, 240, 12, 'F2'),
+    text(`Rs. ${input.netSalary.toFixed(2)}`, 500, 240, 12, 'F2'),
+
+    text(
+      `Attendance: ${input.attendance.present} / ${input.attendance.working} Days`,
+      48,
+      240,
+      10,
+      'F1',
+    ),
+
+    '36 120 m 576 120 l S',
+    text('Employer Signature', 48, 80, 10, 'F1'),
+    text('Employee Signature', 400, 80, 10, 'F1'),
+    text(
+      'This is a computer generated document and does not require a physical signature.',
+      120,
+      40,
+      8,
+      'F1',
+    ),
+  );
+
+  return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
+}
+
 export function buildIdCardPdf(input: {
   schoolName: string;
   studentName: string;
@@ -276,6 +388,128 @@ export function buildIdCardPdf(input: {
       ? [text(`Valid for: ${input.academicYear}`, 210, 455, 7, 'F1')]
       : []),
   ];
+
+  return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
+}
+
+export function buildReportCardPdf(input: {
+  schoolName: string;
+  panNumber?: string | null;
+  examName: string;
+  academicYear: string;
+  student: {
+    name: string;
+    id: string;
+    className: string;
+    sectionName?: string | null;
+    rollNumber?: number | null;
+  };
+  subjects: Array<{
+    name: string;
+    theory?: { max: number; obtained: number; grade: string };
+    practical?: { max: number; obtained: number; grade: string };
+    totalGrade: string;
+    gradePoint: number;
+  }>;
+  summary: {
+    totalMarks: number;
+    maxMarks: number;
+    percentage: number;
+    finalGrade: string;
+    finalGpa: number;
+    remarks?: string | null;
+  };
+}) {
+  const contentParts = [
+    '0.5 w',
+    '36 36 540 720 re S', // Outer border
+    text(input.schoolName, 48, 726, 18, 'F2'),
+    input.panNumber ? text(`PAN: ${input.panNumber}`, 48, 710, 10, 'F1') : '',
+    text('PROGRESS REPORT', 420, 726, 14, 'F2'),
+    text(`${input.examName} — ${input.academicYear}`, 420, 710, 10, 'F1'),
+    '36 696 m 576 696 l S',
+
+    // Student Info
+    text('Student Name:', 48, 670, 10, 'F2'),
+    text(input.student.name, 140, 670, 10, 'F1'),
+    text('Student ID:', 380, 670, 10, 'F2'),
+    text(input.student.id, 460, 670, 10, 'F1'),
+    text('Class:', 48, 650, 10, 'F2'),
+    text(input.student.className, 140, 650, 10, 'F1'),
+    text('Section:', 240, 650, 10, 'F2'),
+    text(input.student.sectionName ?? 'N/A', 300, 650, 10, 'F1'),
+    text('Roll No:', 380, 650, 10, 'F2'),
+    text(String(input.student.rollNumber ?? '—'), 460, 650, 10, 'F1'),
+
+    '36 630 m 576 630 l S',
+
+    // Table Header
+    text('SUBJECT', 48, 610, 10, 'F2'),
+    text('THEORY', 200, 610, 10, 'F2'),
+    text('PRAC', 300, 610, 10, 'F2'),
+    text('GRADE', 420, 610, 10, 'F2'),
+    text('GP', 500, 610, 10, 'F2'),
+    '36 600 m 576 600 l S',
+  ];
+
+  let y = 580;
+  for (const sub of input.subjects) {
+    contentParts.push(
+      text(sub.name, 48, y, 10, 'F1'),
+      sub.theory
+        ? text(`${sub.theory.obtained}/${sub.theory.max}`, 200, y, 9, 'F1')
+        : text('—', 200, y, 9, 'F1'),
+      sub.practical
+        ? text(
+            `${sub.practical.obtained}/${sub.practical.max}`,
+            300,
+            y,
+            9,
+            'F1',
+          )
+        : text('—', 300, y, 9, 'F1'),
+      text(sub.totalGrade, 420, y, 10, 'F2'),
+      text(sub.gradePoint.toFixed(2), 500, y, 10, 'F1'),
+    );
+    y -= 22;
+
+    if (y < 120) break; // Simple page break prevention for now
+  }
+
+  y -= 10;
+  contentParts.push('36 ' + (y + 12) + ' m 576 ' + (y + 12) + ' l S');
+
+  // Summary
+  contentParts.push(
+    text('Percentage:', 380, y - 10, 10, 'F2'),
+    text(`${input.summary.percentage.toFixed(2)}%`, 500, y - 10, 10, 'F1'),
+    text('Final Grade:', 380, y - 30, 10, 'F2'),
+    text(input.summary.finalGrade, 500, y - 30, 12, 'F2'),
+    text('GPA:', 380, y - 50, 10, 'F2'),
+    text(input.summary.finalGpa.toFixed(2), 500, y - 50, 12, 'F2'),
+  );
+
+  if (input.summary.remarks) {
+    contentParts.push(
+      text('Remarks:', 48, y - 10, 10, 'F2'),
+      ...wrapPdfLine(input.summary.remarks, 48, y - 28, 280, 10),
+    );
+  }
+
+  // Footer Signatures
+  contentParts.push(
+    '72 80 m 200 80 l S',
+    text('Class Teacher', 90, 65, 10, 'F1'),
+    '380 80 m 508 80 l S',
+    text('Principal', 420, 65, 10, 'F1'),
+    text(
+      `Printed on: ${new Date().toISOString().slice(0, 10)}`,
+      240,
+      20,
+      8,
+      'F1',
+    ),
+  );
 
   return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
 }

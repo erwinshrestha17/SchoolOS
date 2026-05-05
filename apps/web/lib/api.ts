@@ -37,12 +37,14 @@ import type {
   InvoiceSummary,
   JournalEntryView,
   MarkEntrySummary,
+  MarkLockRequestSummary,
   MessageReadReceiptSummary,
   MessageSummary,
   MoodLog,
   NotificationDelivery,
   NoticeSummary,
   PayrollRunSummary,
+  PayrollPreviewResult,
   PaymentRefundPayload,
   PaymentRefundSummary,
   PlatformTenantSummary,
@@ -57,6 +59,10 @@ import type {
   SectionSummary,
   StaffSummary,
   StaffContractSummary,
+  StaffLeaveRequestSummary,
+  StaffLeaveBalanceSummary,
+  StaffLeaveReviewResult,
+  StaffAttendanceMonthlySummary,
   RevokeGeneratedStudentDocumentPayload,
   StudentAttendanceHistory,
   StudentAttendanceHistoryFilters,
@@ -382,7 +388,8 @@ export const api = {
   createStaff: (body: JsonBody) =>
     request<StaffSummary>('/staff', { method: 'POST', json: body }),
   listRoles: () => request<RoleSummary[]>('/roles'),
-  listSubjects: () => request<SubjectSummary[]>('/subjects'),
+  listSubjects: (params?: { classId?: string | null }) =>
+    request<SubjectSummary[]>(withQuery('/subjects', params ?? {})),
   createSubject: (body: JsonBody) =>
     request<SubjectSummary>('/subjects', { method: 'POST', json: body }),
   listTeacherAssignments: () =>
@@ -400,21 +407,54 @@ export const api = {
       method: 'POST',
       json: body,
     }),
-  listMarks: () => request<MarkEntrySummary[]>('/academics/marks'),
+  listMarks: (params?: {
+    examTermId?: string | null;
+    assessmentComponentId?: string | null;
+    classId?: string | null;
+    sectionId?: string | null;
+    subjectId?: string | null;
+  }) => request<MarkEntrySummary[]>(withQuery('/academics/marks', params ?? {})),
   enterMark: (body: JsonBody) =>
     request<MarkEntrySummary>('/academics/marks', { method: 'POST', json: body }),
+  batchEnterMarks: (body: JsonBody) =>
+    request<{ saved: number; entries: MarkEntrySummary[] }>('/academics/marks/batch', {
+      method: 'POST',
+      json: body,
+    }),
+  listComponentsByExamTerm: (examTermId: string, params?: { subjectId?: string | null }) =>
+    request<AssessmentComponentSummary[]>(
+      withQuery(`/academics/exams/${encodeURIComponent(examTermId)}/components`, params ?? {}),
+    ),
   listCasRecords: () => request<CasRecordSummary[]>('/academics/cas'),
   createCasRecord: (body: JsonBody) =>
     request<CasRecordSummary>('/academics/cas', { method: 'POST', json: body }),
   listReportCards: () => request<ReportCardSummary[]>('/academics/report-cards'),
+  listMarkLockRequests: () => request<MarkLockRequestSummary[]>('/academics/marks/lock-requests'),
+  requestMarkLock: (body: JsonBody) =>
+    request<MarkLockRequestSummary>('/academics/marks/lock-requests', {
+      method: 'POST',
+      json: body,
+    }),
+  reviewMarkLockRequest: (id: string, body: JsonBody) =>
+    request<MarkLockRequestSummary>(`/academics/marks/lock-requests/${encodeURIComponent(id)}/review`, {
+      method: 'PATCH',
+      json: body,
+    }),
   generateReportCard: (body: JsonBody) =>
-    request('/academics/report-cards', { method: 'POST', json: body }),
+    request<ReportCardSummary>('/academics/report-cards', { method: 'POST', json: body }),
+  batchGenerateReportCards: (body: JsonBody) =>
+    request<ReportCardSummary[]>('/academics/report-cards/batch', { method: 'POST', json: body }),
   listPromotionReadiness: (params?: {
     academicYearId?: string | null;
     classId?: string | null;
   }) => request<PromotionReadiness[]>(withQuery('/academics/promotions', params ?? {})),
   promoteStudent: (body: JsonBody) =>
     request<PromotionResult>('/academics/promotions', {
+      method: 'POST',
+      json: body,
+    }),
+  batchPromote: (body: JsonBody) =>
+    request<PromotionResult[]>('/academics/promotions/batch', {
       method: 'POST',
       json: body,
     }),
@@ -433,6 +473,32 @@ export const api = {
     }),
   listStudentDocuments: (studentId: string) =>
     request(withQuery('/student-documents', { studentId })),
+  uploadFile: async (file: File, module: string) => {
+    const reader = new FileReader();
+    const base64Promise = new Promise<string>((resolve) => {
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1];
+        resolve(base64);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    const base64Content = await base64Promise;
+
+    return request<{ id: string; fileName: string; publicUrl: string | null }>(
+      '/files/upload',
+      {
+        method: 'POST',
+        json: {
+          fileName: file.name,
+          contentType: file.type,
+          base64Content,
+          module,
+        },
+      },
+    );
+  },
+
   uploadStudentDocument: (body: UploadStudentDocumentPayload) =>
     request('/student-documents', {
       method: 'POST',
@@ -590,6 +656,9 @@ export const api = {
     closedAt: string;
     collectorUserId?: string | null;
     paymentMethod?: string | null;
+    actualCashAmount?: number | null;
+    varianceReason?: string | null;
+    denominationBreakdown?: Record<string, unknown> | null;
     notes?: string | null;
   }) =>
     request<CashierCloseSummary>('/payments/cashier-close', {
@@ -608,12 +677,14 @@ export const api = {
     await openPdfBlob(response);
   },
   listLedgerEntries: () => request<JournalEntryView[]>('/ledger/entries'),
-  listTimetable: () => request<TimetableSlotSummary[]>('/timetable'),
+  listTimetable: (params?: { classId?: string | null }) =>
+    request<TimetableSlotSummary[]>(withQuery('/timetable', params ?? {})),
   listTeacherWorkload: () =>
     request<TeacherWorkloadSummary[]>('/timetable/workload'),
   createTimetableSlot: (body: JsonBody) =>
     request<TimetableSlotSummary>('/timetable', { method: 'POST', json: body }),
-  listHomework: () => request<HomeworkAssignmentSummary[]>('/homework'),
+  listHomework: (params?: { studentId?: string; classId?: string; sectionId?: string }) =>
+    request<HomeworkAssignmentSummary[]>(withQuery('/homework', params ?? {})),
   createHomework: (body: JsonBody) =>
     request<HomeworkAssignmentSummary>('/homework', {
       method: 'POST',
@@ -623,6 +694,11 @@ export const api = {
     request<HomeworkSubmissionSummary[]>('/homework/submissions'),
   reviewHomeworkSubmission: (body: JsonBody) =>
     request<HomeworkSubmissionSummary>('/homework/submissions', {
+      method: 'POST',
+      json: body,
+    }),
+  submitHomework: (body: { submissionId: string; content?: string }) =>
+    request<HomeworkSubmissionSummary>('/homework/submit', {
       method: 'POST',
       json: body,
     }),
@@ -648,6 +724,39 @@ export const api = {
       json: {},
     }),
   listPayslips: () => request<PayslipSummary[]>('/payroll/payslips'),
+  listStaffAttendanceSummary: (params: { month?: number; year?: number }) =>
+    request<StaffAttendanceMonthlySummary>(
+      withQuery('/attendance/staff/summary', {
+        month: params.month ? String(params.month) : undefined,
+        year: params.year ? String(params.year) : undefined,
+      }),
+    ),
+  listLeaveRequests: () =>
+    request<StaffLeaveRequestSummary[]>('/attendance/staff/leave-requests'),
+  createLeaveRequest: (body: JsonBody) =>
+    request<StaffLeaveRequestSummary>('/attendance/staff/leave-requests', {
+      method: 'POST',
+      json: body,
+    }),
+  reviewLeaveRequest: (id: string, body: JsonBody) =>
+    request<StaffLeaveReviewResult>(`/attendance/staff/leave-requests/${id}/review`, {
+      method: 'PATCH',
+      json: body,
+    }),
+  listStaffLeaveBalances: () =>
+    request<StaffLeaveBalanceSummary[]>('/hr/leave-balances'),
+  getPayrollPreview: (params: {
+    year: number;
+    month: number;
+    workingDays?: number;
+  }) =>
+    request<PayrollPreviewResult[]>(
+      withQuery('/payroll/preview', {
+        year: String(params.year),
+        month: String(params.month),
+        workingDays: params.workingDays ? String(params.workingDays) : undefined,
+      }),
+    ),
   listAccountingPeriods: () =>
     request<AccountingPeriodSummary[]>('/accounting/periods'),
   createAccountingPeriod: (body: JsonBody) =>
@@ -696,25 +805,21 @@ export const api = {
   downloadActivityAttachment: async (attachmentId: string, fileName: string) => {
     const response = await fetch(
       `${API_BASE_URL}/activity-feed/attachments/${encodeURIComponent(attachmentId)}/download`,
-      { credentials: 'include' }
+      { credentials: 'include' },
     );
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(parseApiErrorMessage(text) || `Download failed with status ${response.status}`);
+      throw new Error(
+        parseApiErrorMessage(text) ||
+          `Download failed with status ${response.status}`,
+      );
     }
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     
-    const contentDisposition = response.headers.get('content-disposition');
-    let finalFileName = fileName;
-    if (contentDisposition) {
-      const match = contentDisposition.match(/filename="([^"]+)"/);
-      if (match) finalFileName = match[1];
-    }
-    
-    a.download = finalFileName;
+    a.download = fileName;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);
@@ -783,4 +888,24 @@ export const api = {
   listReports: () => request<ReportDefinition[]>('/reports'),
   exportReport: (reportKey: string, payload: ReportExportRequest) =>
     downloadReport(reportKey, payload),
+
+  // Staff Self-Service
+  getMyProfile: () => request<any>('/staff/me'),
+  listMyPayslips: () => request<any[]>('/payroll/me/payslips'),
+  listMyAttendance: () => request<any[]>('/attendance/me/attendance'),
+  listMyLeaveRequests: () => request<any[]>('/attendance/me/leave-requests'),
+  openPayslipPdf: async (payslipNumber: string) => {
+    const response = await fetch(
+      `${API_BASE_URL}/payroll/payslips/${encodeURIComponent(payslipNumber)}.pdf`,
+      {
+        credentials: 'include',
+      },
+    );
+
+    await openPdfBlob(response);
+  },
+
+  // Accounting Verification
+  getJournalEntry: (id: string) =>
+    request<JournalEntryView>(`/accounting/journals/${encodeURIComponent(id)}`),
 };

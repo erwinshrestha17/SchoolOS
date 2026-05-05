@@ -173,6 +173,23 @@ export class AccountingService {
     return entry;
   }
 
+  async getJournalEntry(id: string, actor: AuthContext) {
+    const entry = await this.prisma.journalEntry.findFirst({
+      where: { id, tenantId: actor.tenantId },
+      include: {
+        lines: {
+          include: { chartAccount: true },
+        },
+      },
+    });
+
+    if (!entry) {
+      throw new NotFoundException('Journal entry not found in this tenant');
+    }
+
+    return entry;
+  }
+
   async reverseJournalEntry(
     journalEntryId: string,
     dto: ReverseJournalEntryDto,

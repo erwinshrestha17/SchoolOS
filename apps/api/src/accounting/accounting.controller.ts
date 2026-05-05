@@ -92,6 +92,12 @@ export class AccountingController {
     return this.accountingService.createManualJournal(dto, auth);
   }
 
+  @Get('journals/:id')
+  @Permissions('accounting:read')
+  getJournalEntry(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+    return this.accountingService.getJournalEntry(id, auth);
+  }
+
   @Post('journals/:id/reverse')
   @Permissions('accounting:reverse')
   reverseJournalEntry(

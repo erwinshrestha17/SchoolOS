@@ -25,9 +25,11 @@ import { EnterMarkDto } from './dto/enter-mark.dto';
 import { GenerateReportCardDto } from './dto/generate-report-card.dto';
 import { PromoteStudentDto } from './dto/promote-student.dto';
 import { BatchPromoteDto } from './dto/batch-promote.dto';
+import { BatchEnterMarksDto } from './dto/batch-enter-marks.dto';
+import { BatchGenerateReportCardsDto } from './dto/batch-generate-report-cards.dto';
 import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
-import { UpdateExamTermDto } from './dto/update-exam-term.dto';
+import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
 
 @Controller('academics')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -76,6 +78,16 @@ export class AcademicsController {
     return this.academicsFoundationService.deleteExamTerm(examTermId, auth);
   }
 
+  @Patch('exams/:id/unlock')
+  @Permissions('academics:manage')
+  unlockExamTerm(
+    @Param('id') examTermId: string,
+    @Body() dto: UnlockExamTermDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsService.unlockExamTerm(examTermId, dto, auth);
+  }
+
   @Post('exams/components')
   @Permissions('academics:create')
   createComponent(
@@ -83,6 +95,20 @@ export class AcademicsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.academicsService.createAssessmentComponent(dto, auth);
+  }
+
+  @Get('exams/:id/components')
+  @Permissions('academics:read')
+  listComponentsByExamTerm(
+    @Param('id') examTermId: string,
+    @Query('subjectId') subjectId: string | undefined,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsService.listComponentsByExamTerm(
+      auth,
+      examTermId,
+      subjectId,
+    );
   }
 
   @Get('exams/timetable')
@@ -111,7 +137,24 @@ export class AcademicsController {
 
   @Get('marks')
   @Permissions('academics:read')
-  listMarks(@CurrentAuth() auth: AuthContext) {
+  listMarks(
+    @CurrentAuth() auth: AuthContext,
+    @Query('examTermId') examTermId?: string,
+    @Query('assessmentComponentId') assessmentComponentId?: string,
+    @Query('classId') classId?: string,
+    @Query('sectionId') sectionId?: string,
+    @Query('subjectId') subjectId?: string,
+  ) {
+    if (examTermId || assessmentComponentId || classId || subjectId) {
+      return this.academicsService.listMarksByFilters(auth, {
+        examTermId,
+        assessmentComponentId,
+        classId,
+        sectionId,
+        subjectId,
+      });
+    }
+
     return this.academicsService.listMarks(auth);
   }
 
@@ -119,6 +162,15 @@ export class AcademicsController {
   @Permissions('academics:enter_marks')
   enterMark(@Body() dto: EnterMarkDto, @CurrentAuth() auth: AuthContext) {
     return this.academicsService.enterMark(dto, auth);
+  }
+
+  @Post('marks/batch')
+  @Permissions('academics:enter_marks')
+  batchEnterMarks(
+    @Body() dto: BatchEnterMarksDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsService.batchEnterMarks(dto, auth);
   }
 
   @Get('marks/lock-requests')
@@ -171,6 +223,15 @@ export class AcademicsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.academicsService.generateReportCard(dto, auth);
+  }
+
+  @Post('report-cards/batch')
+  @Permissions('academics:manage_report_cards')
+  batchGenerateReportCards(
+    @Body() dto: BatchGenerateReportCardsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsService.batchGenerateReportCards(dto, auth);
   }
 
   @Get('subjects/:id/syllabus')

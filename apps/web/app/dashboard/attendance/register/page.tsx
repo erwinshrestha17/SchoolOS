@@ -6,6 +6,22 @@ import { api } from '../../../../lib/api';
 
 const today = new Date();
 
+interface AttendanceRegisterDay {
+  date: string;
+  isWorkingDay: boolean;
+  label: string | null;
+}
+
+interface AttendanceRegisterStudent {
+  studentId: string;
+  fullName: string;
+  rollNumber: string | null;
+  statuses: (string | null)[];
+  totalPresent: number;
+  totalAbsent: number;
+  totalLeave: number;
+}
+
 export default function AttendanceRegisterPage() {
   const [academicYearId, setAcademicYearId] = useState('');
   const [classId, setClassId] = useState('');
@@ -206,7 +222,7 @@ export default function AttendanceRegisterPage() {
                   <th className="border-b border-gray-200 py-3 px-2 font-semibold text-gray-900 sticky left-0 bg-white shadow-[1px_0_0_0_#e5e7eb] z-10">
                     Student
                   </th>
-                  {registerQuery.data.days.map((day: any) => (
+                  {registerQuery.data.days.map((day: AttendanceRegisterDay) => (
                     <th
                       key={day.date}
                       className={`border-b border-gray-200 py-3 px-2 text-center text-xs font-semibold ${
@@ -223,7 +239,7 @@ export default function AttendanceRegisterPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {registerQuery.data.students.map((student: any) => (
+                {registerQuery.data.students.map((student: AttendanceRegisterStudent) => (
                   <tr key={student.studentId} className="hover:bg-gray-50">
                     <td className="py-2 px-2 sticky left-0 bg-inherit shadow-[1px_0_0_0_#e5e7eb] whitespace-nowrap">
                       <div className="flex flex-col">

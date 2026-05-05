@@ -14,9 +14,10 @@ import {
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
-import { buildSimplePdf } from '../common/pdf/simple-pdf';
+import { buildReportCardPdf, buildSimplePdf } from '../common/pdf/simple-pdf';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssignTeacherDto } from './dto/assign-teacher.dto';
+import { BatchGenerateReportCardsDto } from './dto/batch-generate-report-cards.dto';
 import { CreateAssessmentComponentDto } from './dto/create-assessment-component.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
 import { CreateExamTermDto } from './dto/create-exam-term.dto';
@@ -26,8 +27,39 @@ import { EnterMarkDto } from './dto/enter-mark.dto';
 import { GenerateReportCardDto } from './dto/generate-report-card.dto';
 import { PromoteStudentDto } from './dto/promote-student.dto';
 import { BatchPromoteDto } from './dto/batch-promote.dto';
+import { BatchEnterMarksDto } from './dto/batch-enter-marks.dto';
 import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
+import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
+
+type ReportCardPdfComponent = {
+  max: number;
+  obtained: number;
+  grade: string;
+};
+
+type ReportCardPdfSubject = {
+  name: string;
+  theory: ReportCardPdfComponent | null;
+  practical: ReportCardPdfComponent | null;
+  totalObtained: number;
+  totalMax: number;
+};
+
+type PromotionReadinessRow = {
+  reportCardId: string;
+  studentId: string;
+  studentName: string;
+  className: string;
+  sectionName: string | null;
+  examTerm: string;
+  percentage: number;
+  grade: string;
+  status: string;
+  locked: boolean;
+  outstandingBalance: number;
+  reviewReason: string | null;
+};
 
 @Injectable()
 export class AcademicsService {
@@ -52,6 +84,23 @@ export class AcademicsService {
         },
       },
       orderBy: [{ class: { level: 'asc' } }, { code: 'asc' }],
+    });
+  }
+
+  async listSubjectsByClass(actor: AuthContext, classId: string) {
+    return this.prisma.subject.findMany({
+      where: { tenantId: actor.tenantId, classId },
+      include: {
+        class: true,
+        teacherAssignments: {
+          include: {
+            staff: true,
+            section: true,
+            academicYear: true,
+          },
+        },
+      },
+      orderBy: [{ code: 'asc' }],
     });
   }
 
@@ -180,14 +229,35 @@ export class AcademicsService {
   async createExamTerm(dto: CreateExamTermDto, actor: AuthContext) {
     await this.ensureAcademicYear(actor, dto.academicYearId);
 
+    const startsOn = this.parseIsoDateOrThrow(dto.startsOn, 'startsOn');
+    const endsOn = this.parseIsoDateOrThrow(dto.endsOn, 'endsOn');
+    if (startsOn > endsOn) {
+      throw new ConflictException('Exam term startsOn cannot be after endsOn');
+    }
+
+    const requestedWeight = new Prisma.Decimal(dto.weightPercent ?? 100);
+    const aggregate = await this.prisma.examTerm.aggregate({
+      where: {
+        tenantId: actor.tenantId,
+        academicYearId: dto.academicYearId,
+      },
+      _sum: { weightPercent: true },
+    });
+    const existingWeight = Number(aggregate._sum.weightPercent ?? 0);
+    if (existingWeight + Number(requestedWeight) > 100) {
+      throw new ConflictException(
+        'Total exam term weight for the academic year cannot exceed 100%',
+      );
+    }
+
     const term = await this.prisma.examTerm.create({
       data: {
         tenantId: actor.tenantId,
         academicYearId: dto.academicYearId,
         name: dto.name,
-        startsOn: new Date(dto.startsOn),
-        endsOn: new Date(dto.endsOn),
-        weightPercent: new Prisma.Decimal(dto.weightPercent ?? 100),
+        startsOn,
+        endsOn,
+        weightPercent: requestedWeight,
       },
       include: {
         academicYear: true,
@@ -234,6 +304,26 @@ export class AcademicsService {
       throw new ConflictException('Exam term is locked');
     }
 
+    if (dto.passMarks !== undefined && dto.passMarks > dto.maxMarks) {
+      throw new ConflictException('passMarks cannot exceed maxMarks');
+    }
+
+    const requestedWeight = new Prisma.Decimal(dto.weightPercent ?? 100);
+    const subjectWeights = await this.prisma.assessmentComponent.aggregate({
+      where: {
+        tenantId: actor.tenantId,
+        examTermId: dto.examTermId,
+        subjectId: dto.subjectId,
+      },
+      _sum: { weightPercent: true },
+    });
+    const existingWeight = Number(subjectWeights._sum.weightPercent ?? 0);
+    if (existingWeight + Number(requestedWeight) > 100) {
+      throw new ConflictException(
+        'Total component weight per subject in an exam term cannot exceed 100%',
+      );
+    }
+
     return this.prisma.assessmentComponent.create({
       data: {
         tenantId: actor.tenantId,
@@ -242,7 +332,7 @@ export class AcademicsService {
         name: dto.name,
         type: dto.type,
         maxMarks: new Prisma.Decimal(dto.maxMarks),
-        weightPercent: new Prisma.Decimal(dto.weightPercent ?? 100),
+        weightPercent: requestedWeight,
         passMarks:
           dto.passMarks === undefined
             ? null
@@ -295,6 +385,15 @@ export class AcademicsService {
       await this.ensureSection(actor, dto.sectionId, dto.classId);
     }
 
+    const startsAt = this.parseIsoDateOrThrow(dto.startsAt, 'startsAt');
+    const endsAt = this.parseIsoDateOrThrow(dto.endsAt, 'endsAt');
+    if (startsAt >= endsAt) {
+      throw new ConflictException('startsAt must be earlier than endsAt');
+    }
+    if (startsAt < term.startsOn || endsAt > term.endsOn) {
+      throw new ConflictException('Exam slot must fall within exam term dates');
+    }
+
     const slot = await this.prisma.examTimetableSlot.create({
       data: {
         tenantId: actor.tenantId,
@@ -303,8 +402,8 @@ export class AcademicsService {
         subjectId: dto.subjectId,
         classId: dto.classId,
         sectionId: dto.sectionId ?? null,
-        startsAt: new Date(dto.startsAt),
-        endsAt: new Date(dto.endsAt),
+        startsAt,
+        endsAt,
         room: dto.room ?? null,
       },
       include: {
@@ -388,6 +487,25 @@ export class AcademicsService {
     return { examTermId, publishedSlots: slots.length };
   }
 
+  async listComponentsByExamTerm(
+    actor: AuthContext,
+    examTermId: string,
+    subjectId?: string,
+  ) {
+    return this.prisma.assessmentComponent.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        examTermId,
+        ...(subjectId ? { subjectId } : {}),
+      },
+      include: {
+        subject: true,
+        examTerm: true,
+      },
+      orderBy: [{ subject: { code: 'asc' } }, { name: 'asc' }],
+    });
+  }
+
   async listMarks(actor: AuthContext) {
     return this.prisma.markEntry.findMany({
       where: { tenantId: actor.tenantId },
@@ -399,6 +517,43 @@ export class AcademicsService {
       },
       orderBy: [{ updatedAt: 'desc' }],
       take: 100,
+    });
+  }
+
+  async listMarksByFilters(
+    actor: AuthContext,
+    filters: {
+      examTermId?: string;
+      assessmentComponentId?: string;
+      classId?: string;
+      sectionId?: string;
+      subjectId?: string;
+    },
+  ) {
+    return this.prisma.markEntry.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        ...(filters.examTermId ? { examTermId: filters.examTermId } : {}),
+        ...(filters.assessmentComponentId
+          ? { assessmentComponentId: filters.assessmentComponentId }
+          : {}),
+        ...(filters.subjectId ? { subjectId: filters.subjectId } : {}),
+        ...(filters.classId
+          ? {
+              student: {
+                classId: filters.classId,
+                ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+              },
+            }
+          : {}),
+      },
+      include: {
+        student: true,
+        subject: true,
+        assessmentComponent: true,
+        examTerm: true,
+      },
+      orderBy: [{ student: { rollNumber: 'asc' } }, { updatedAt: 'desc' }],
     });
   }
 
@@ -479,6 +634,107 @@ export class AcademicsService {
     });
 
     return mark;
+  }
+
+  async batchEnterMarks(dto: BatchEnterMarksDto, actor: AuthContext) {
+    const component = await this.prisma.assessmentComponent.findFirst({
+      where: {
+        id: dto.assessmentComponentId,
+        tenantId: actor.tenantId,
+        examTermId: dto.examTermId,
+      },
+      include: {
+        examTerm: true,
+        subject: true,
+      },
+    });
+
+    if (!component) {
+      throw new NotFoundException('Assessment component not found');
+    }
+
+    if (component.examTerm.isLocked) {
+      throw new ConflictException('Exam term is locked');
+    }
+
+    const studentIds = dto.entries.map((entry) => entry.studentId);
+    const students = await this.prisma.student.findMany({
+      where: {
+        id: { in: studentIds },
+        tenantId: actor.tenantId,
+      },
+      select: { id: true },
+    });
+
+    const foundIds = new Set(students.map((s) => s.id));
+    const missing = studentIds.filter((id) => !foundIds.has(id));
+
+    if (missing.length > 0) {
+      throw new NotFoundException(
+        `Students not found: ${missing.slice(0, 5).join(', ')}`,
+      );
+    }
+
+    const overMax = dto.entries.filter(
+      (entry) => entry.marksObtained > Number(component.maxMarks),
+    );
+
+    if (overMax.length > 0) {
+      throw new ConflictException(
+        `${overMax.length} entries exceed max marks (${component.maxMarks})`,
+      );
+    }
+
+    const results = await this.prisma.$transaction(
+      dto.entries.map((entry) =>
+        this.prisma.markEntry.upsert({
+          where: {
+            tenantId_assessmentComponentId_studentId: {
+              tenantId: actor.tenantId,
+              assessmentComponentId: dto.assessmentComponentId,
+              studentId: entry.studentId,
+            },
+          },
+          update: {
+            marksObtained: new Prisma.Decimal(entry.marksObtained),
+            remarks: entry.remarks ?? null,
+            enteredById: actor.userId,
+          },
+          create: {
+            tenantId: actor.tenantId,
+            examTermId: dto.examTermId,
+            assessmentComponentId: dto.assessmentComponentId,
+            subjectId: component.subjectId,
+            studentId: entry.studentId,
+            enteredById: actor.userId,
+            marksObtained: new Prisma.Decimal(entry.marksObtained),
+            remarks: entry.remarks ?? null,
+          },
+          include: {
+            student: true,
+            subject: true,
+            assessmentComponent: true,
+          },
+        }),
+      ),
+    );
+
+    await this.auditService.record({
+      action: 'batch_upsert',
+      resource: 'mark_entry',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        examTermId: dto.examTermId,
+        componentId: dto.assessmentComponentId,
+        count: results.length,
+      },
+    });
+
+    return {
+      saved: results.length,
+      entries: results,
+    };
   }
 
   async listMarkLockRequests(actor: AuthContext) {
@@ -579,6 +835,65 @@ export class AcademicsService {
     return reviewed;
   }
 
+  async unlockExamTerm(
+    examTermId: string,
+    dto: UnlockExamTermDto,
+    actor: AuthContext,
+  ) {
+    const term = await this.prisma.examTerm.findFirst({
+      where: { id: examTermId, tenantId: actor.tenantId },
+    });
+
+    if (!term) {
+      throw new NotFoundException('Exam term not found in this tenant');
+    }
+
+    if (!term.isLocked) {
+      throw new ConflictException('Exam term is already unlocked');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.examTerm.update({
+        where: { id: term.id },
+        data: { isLocked: false },
+      });
+
+      await tx.markEntry.updateMany({
+        where: {
+          tenantId: actor.tenantId,
+          examTermId: term.id,
+        },
+        data: { isLocked: false },
+      });
+
+      await tx.markLockRequest.create({
+        data: {
+          tenantId: actor.tenantId,
+          examTermId: term.id,
+          requestedById: actor.userId,
+          reviewedById: actor.userId,
+          status: 'UNLOCKED',
+          reason: dto.reason ?? 'Manual unlock requested by authorized user',
+          reviewNote: dto.reason ?? null,
+          reviewedAt: new Date(),
+        },
+      });
+    });
+
+    await this.auditService.record({
+      action: 'unlock',
+      resource: 'exam_term',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: term.id,
+      after: {
+        reason: dto.reason ?? null,
+      },
+    });
+
+    return { examTermId: term.id, unlocked: true };
+  }
+
   async listCasRecords(actor: AuthContext) {
     return this.prisma.casRecord.findMany({
       where: { tenantId: actor.tenantId },
@@ -664,12 +979,30 @@ export class AcademicsService {
         class: true,
         section: true,
         examTerm: true,
+        academicYear: true,
       },
     });
 
     if (!reportCard) {
       throw new NotFoundException('Report card not found in this tenant');
     }
+
+    const [tenant, marks] = await Promise.all([
+      this.prisma.tenant.findUnique({
+        where: { id: actor.tenantId },
+      }),
+      this.prisma.markEntry.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          examTermId: reportCard.examTermId,
+          studentId: reportCard.studentId,
+        },
+        include: {
+          subject: true,
+          assessmentComponent: true,
+        },
+      }),
+    ]);
 
     const unpaid = await this.prisma.invoice.count({
       where: {
@@ -684,19 +1017,92 @@ export class AcademicsService {
       throw new ConflictException('Report card is blocked by unpaid fees');
     }
 
-    return buildSimplePdf([
-      'SchoolOS Report Card',
-      `Exam: ${reportCard.examTerm.name}`,
-      `Student: ${reportCard.student.firstNameEn} ${reportCard.student.lastNameEn}`,
-      `Class: ${reportCard.class.name}`,
-      `Section: ${reportCard.section?.name ?? 'N/A'}`,
-      `Percentage: ${Number(reportCard.percentage).toFixed(2)}%`,
-      `Grade: ${reportCard.grade}`,
-      `GPA: ${Number(reportCard.gpa).toFixed(2)}`,
-      `Status: ${reportCard.status}`,
-      `Remarks: ${reportCard.remarks ?? 'N/A'}`,
-      'SEE-format metadata: tenant-scoped school record, marks locked before issue where applicable.',
-    ]);
+    // Group marks by subject
+    const subjectMap = new Map<string, ReportCardPdfSubject>();
+
+    for (const mark of marks) {
+      if (!subjectMap.has(mark.subjectId)) {
+        subjectMap.set(mark.subjectId, {
+          name: mark.subject.name,
+          theory: null,
+          practical: null,
+          totalObtained: 0,
+          totalMax: 0,
+        });
+      }
+
+      const sub = subjectMap.get(mark.subjectId);
+      if (!sub) {
+        continue;
+      }
+      const componentType = mark.assessmentComponent.type.toUpperCase();
+
+      if (componentType === 'THEORY' || componentType === 'TH') {
+        sub.theory = {
+          max: Number(mark.assessmentComponent.maxMarks),
+          obtained: Number(mark.marksObtained),
+          grade: calculateMoestGrade(
+            (Number(mark.marksObtained) /
+              Number(mark.assessmentComponent.maxMarks)) *
+              100,
+          ).grade,
+        };
+      } else if (
+        componentType === 'PRACTICAL' ||
+        componentType === 'PR' ||
+        componentType === 'CAS'
+      ) {
+        sub.practical = {
+          max: Number(mark.assessmentComponent.maxMarks),
+          obtained: Number(mark.marksObtained),
+          grade: calculateMoestGrade(
+            (Number(mark.marksObtained) /
+              Number(mark.assessmentComponent.maxMarks)) *
+              100,
+          ).grade,
+        };
+      }
+
+      sub.totalObtained += Number(mark.marksObtained);
+      sub.totalMax += Number(mark.assessmentComponent.maxMarks);
+    }
+
+    const subjects = Array.from(subjectMap.values()).map((sub) => {
+      const percentage =
+        sub.totalMax > 0 ? (sub.totalObtained / sub.totalMax) * 100 : 0;
+      const { grade, gpa } = calculateMoestGrade(percentage);
+
+      return {
+        name: sub.name,
+        theory: sub.theory ?? undefined,
+        practical: sub.practical ?? undefined,
+        totalGrade: grade,
+        gradePoint: gpa,
+      };
+    });
+
+    return buildReportCardPdf({
+      schoolName: tenant?.name ?? 'SchoolOS',
+      panNumber: tenant?.panNumber,
+      examName: reportCard.examTerm.name,
+      academicYear: reportCard.academicYear.name,
+      student: {
+        name: `${reportCard.student.firstNameEn} ${reportCard.student.lastNameEn}`,
+        id: reportCard.student.studentSystemId,
+        className: reportCard.class.name,
+        sectionName: reportCard.section?.name,
+        rollNumber: reportCard.student.rollNumber ?? undefined,
+      },
+      subjects,
+      summary: {
+        totalMarks: Number(reportCard.totalMarks),
+        maxMarks: Number(reportCard.maxMarks),
+        percentage: Number(reportCard.percentage),
+        finalGrade: reportCard.grade,
+        finalGpa: Number(reportCard.gpa),
+        remarks: reportCard.remarks,
+      },
+    });
   }
 
   async generateReportCard(dto: GenerateReportCardDto, actor: AuthContext) {
@@ -838,6 +1244,37 @@ export class AcademicsService {
     return reportCard;
   }
 
+  async batchGenerateReportCards(
+    dto: BatchGenerateReportCardsDto,
+    actor: AuthContext,
+  ) {
+    const results: unknown[] = [];
+
+    for (const studentId of dto.studentIds) {
+      try {
+        const rc = await this.generateReportCard(
+          {
+            academicYearId: dto.academicYearId,
+            examTermId: dto.examTermId,
+            studentId,
+            remarks: dto.remarks,
+            lock: dto.lock,
+          },
+          actor,
+        );
+        results.push(rc);
+      } catch (err) {
+        // Continue for other students if one fails
+        console.error(
+          `Failed to generate report card for student ${studentId}:`,
+          err,
+        );
+      }
+    }
+
+    return results;
+  }
+
   async createSyllabusTopic(
     subjectId: string,
     dto: { title: string; description?: string; orderIndex?: number },
@@ -954,19 +1391,56 @@ export class AcademicsService {
       orderBy: [{ percentage: 'desc' }],
     });
 
-    return reportCards.map((card) => ({
-      reportCardId: card.id,
-      studentId: card.studentId,
-      studentName:
-        `${card.student.firstNameEn} ${card.student.lastNameEn}`.trim(),
-      className: card.class.name,
-      sectionName: card.section?.name ?? null,
-      examTerm: card.examTerm.name,
-      percentage: Number(card.percentage),
-      grade: card.grade,
-      status: getPromotionStatus(Number(card.percentage)),
-      locked: card.status === GradeLockStatus.LOCKED,
-    }));
+    const results: PromotionReadinessRow[] = [];
+
+    for (const card of reportCards) {
+      const invoices = await this.prisma.invoice.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          studentId: card.studentId,
+          status: { in: ['ISSUED', 'PARTIAL'] },
+        },
+        include: {
+          payments: {
+            include: { refunds: true },
+          },
+        },
+      });
+
+      const outstanding = invoices.reduce((acc, inv) => {
+        const paidAmount = inv.payments.reduce(
+          (sum, p) =>
+            sum +
+            Number(p.amount) -
+            p.refunds.reduce((rs, r) => rs + Number(r.amount), 0),
+          0,
+        );
+        return acc + (Number(inv.totalAmount) - paidAmount);
+      }, 0);
+
+      const status = getPromotionStatus(Number(card.percentage));
+
+      results.push({
+        reportCardId: card.id,
+        studentId: card.studentId,
+        studentName:
+          `${card.student.firstNameEn} ${card.student.lastNameEn}`.trim(),
+        className: card.class.name,
+        sectionName: card.section?.name ?? null,
+        examTerm: card.examTerm.name,
+        percentage: Number(card.percentage),
+        grade: card.grade,
+        status: outstanding > 0 ? 'REVIEW' : status,
+        locked: card.status === GradeLockStatus.LOCKED,
+        outstandingBalance: outstanding,
+        reviewReason:
+          outstanding > 0
+            ? `Unpaid dues: Rs ${outstanding.toLocaleString()}`
+            : null,
+      });
+    }
+
+    return results;
   }
 
   async listRemedialStudents(actor: AuthContext, academicYearId?: string) {
@@ -1384,6 +1858,14 @@ export class AcademicsService {
     }
 
     return staff;
+  }
+
+  private parseIsoDateOrThrow(rawValue: string, fieldName: string) {
+    const parsed = new Date(rawValue);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new ConflictException(`${fieldName} must be a valid ISO date`);
+    }
+    return parsed;
   }
 }
 

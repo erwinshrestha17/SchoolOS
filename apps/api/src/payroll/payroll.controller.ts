@@ -5,6 +5,7 @@ import {
   Header,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
@@ -13,12 +14,26 @@ import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
+import { PayrollPreviewQueryDto } from './dto/payroll-preview-query.dto';
+import { PayrollSalarySlipService } from './payroll-salary-slip.service';
 import { PayrollService } from './payroll.service';
 
 @Controller('payroll')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class PayrollController {
-  constructor(private readonly payrollService: PayrollService) {}
+  constructor(
+    private readonly payrollService: PayrollService,
+    private readonly salarySlipService: PayrollSalarySlipService,
+  ) {}
+
+  @Get('preview')
+  @Permissions('payroll:read')
+  getPreview(
+    @Query() query: PayrollPreviewQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.getPayrollPreview(query, auth);
+  }
 
   @Get('runs')
   @Permissions('payroll:read')
@@ -29,6 +44,15 @@ export class PayrollController {
   @Post('runs')
   @Permissions('payroll:manage')
   createRun(
+    @Body() dto: CreatePayrollRunDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.createPayrollRun(dto, auth);
+  }
+
+  @Post('runs/preview-to-draft')
+  @Permissions('payroll:manage')
+  createDraftFromPreview(
     @Body() dto: CreatePayrollRunDto,
     @CurrentAuth() auth: AuthContext,
   ) {
@@ -47,6 +71,17 @@ export class PayrollController {
     return this.payrollService.reviewPayrollRun(id, auth);
   }
 
+  @Get('runs/:runId/lines/:lineId/salary-slip.pdf')
+  @Header('Content-Type', 'application/pdf')
+  @Permissions('payroll:read')
+  getApprovedSalarySlipPdf(
+    @Param('runId') runId: string,
+    @Param('lineId') lineId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.salarySlipService.getApprovedSalarySlipPdf(runId, lineId, auth);
+  }
+
   @Post('runs/:id/post')
   @Permissions('payroll:manage')
   postRun(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
@@ -59,9 +94,15 @@ export class PayrollController {
     return this.payrollService.listPayslips(auth);
   }
 
+  @Get('me/payslips')
+  @Permissions('staff:read')
+  listMyPayslips(@CurrentAuth() auth: AuthContext) {
+    return this.payrollService.listMyPayslips(auth);
+  }
+
   @Get('payslips/:payslipNumber.pdf')
   @Header('Content-Type', 'application/pdf')
-  @Permissions('payroll:read')
+  @Permissions('payroll:read', 'staff:read')
   getPayslipPdf(
     @Param('payslipNumber') payslipNumber: string,
     @CurrentAuth() auth: AuthContext,

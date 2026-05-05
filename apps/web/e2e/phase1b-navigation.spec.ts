@@ -37,6 +37,10 @@ test.describe('Phase 1B navigation smoke', () => {
     await page.goto('/dashboard/attendance/register');
     await expect(page.getByRole('heading', { name: /Monthly Register/i })).toBeVisible();
 
+    // Academics
+    await page.goto('/dashboard/academics');
+    await expect(page.getByRole('heading', { name: /Academics/i })).toBeVisible();
+
     // Finance
     await page.goto('/dashboard/finance');
     await expect(page.getByRole('heading', { name: /Fee Collection/i })).toBeVisible();
@@ -44,10 +48,18 @@ test.describe('Phase 1B navigation smoke', () => {
     // Notices
     await page.goto('/dashboard/notices');
     await expect(page.getByRole('heading', { name: /^Notices$/i })).toBeVisible();
+
+    // Settings
+    await page.goto('/dashboard/settings');
+    await expect(page.getByRole('heading', { name: /School Settings/i })).toBeVisible();
     
-    // Header components: Notifications & Global Search
+    // Header components: Notifications, Global Search, and User Profile
     await expect(page.getByPlaceholder(/Search students/i)).toBeVisible();
     await expect(page.getByLabel(/Notifications/i)).toBeVisible();
+    
+    // Click user profile to ensure it works
+    await page.getByRole('button', { name: /User profile|Avatar/i }).click();
+    await expect(page.getByRole('menuitem', { name: /Log out/i })).toBeVisible();
   });
 });
 

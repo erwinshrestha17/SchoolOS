@@ -28,14 +28,14 @@ type SeedUser = {
 
 const seedUsers: SeedUser[] = [
   {
-    roleName: 'admin',
-    email: 'admin@schoolos.com',
-    password: 'admin123',
-  },
-  {
     roleName: 'super_admin',
     email: 'superadmin@schoolos.com',
     password: 'superadmin123',
+  },
+  {
+    roleName: 'admin',
+    email: 'admin@schoolos.com',
+    password: 'admin123',
   },
   {
     roleName: 'principal',
@@ -69,48 +69,114 @@ const seedUsers: SeedUser[] = [
   },
 ];
 
-async function main() {
-  console.log('Seeding database...');
+const classDefinitions = [
+  { name: 'Nursery', level: 0 },
+  { name: 'LKG', level: 1 },
+  { name: 'UKG', level: 2 },
+  { name: 'Class 1', level: 3 },
+  { name: 'Class 2', level: 4 },
+  { name: 'Class 3', level: 5 },
+  { name: 'Class 4', level: 6 },
+  { name: 'Class 5', level: 7 },
+  { name: 'Class 6', level: 8 },
+  { name: 'Class 7', level: 9 },
+  { name: 'Class 8', level: 10 },
+  { name: 'Class 9', level: 11 },
+  { name: 'Class 10', level: 12 },
+];
 
-  // 1. Create the default School Tenant
-  const tenant = await prisma.tenant.upsert({
+const sectionNames = ['A', 'B'];
+
+async function main() {
+  console.log('🌱 Seeding SchoolOS database...');
+
+  const tenant = await seedTenant();
+  const academicYear = await seedAcademicYear(tenant.id);
+
+  await seedRoles(tenant.id);
+  await seedPermissions();
+  await seedRolePermissions(tenant.id);
+
+  await seedChartAccounts(tenant.id);
+  await seedFeeHeads(tenant.id);
+
+  await seedUsersWithRoles(tenant.id);
+  await seedClassesAndSections(tenant.id);
+
+  console.log('');
+  console.log('✅ SchoolOS seed completed successfully.');
+  console.log('');
+  console.log('Demo tenant:');
+  console.log(`- Name: ${tenant.name}`);
+  console.log(`- Slug: ${tenant.slug}`);
+  console.log(`- Academic Year: ${academicYear.name}`);
+  console.log('');
+  console.log('Local/dev test logins:');
+
+  for (const seedUser of seedUsers) {
+    console.log(
+      `- ${seedUser.roleName}: ${seedUser.email} / ${seedUser.password}`,
+    );
+  }
+
+  console.log('');
+  console.log('Next recommended seed upgrade:');
+  console.log(
+    '- Add real demo students, guardians, admissions, invoices, attendance records, and payments once the exact Prisma model fields are confirmed.',
+  );
+}
+
+async function seedTenant() {
+  return prisma.tenant.upsert({
     where: { slug: 'default-school' },
-    update: {},
+    update: {
+      name: 'Everest Academy Secondary School',
+      mode: Mode.SINGLE,
+      plan: 'Standard',
+    },
     create: {
-      name: 'Everest Academy (Main Branch)',
+      name: 'Everest Academy Secondary School',
       slug: 'default-school',
       mode: Mode.SINGLE,
       plan: 'Standard',
     },
   });
+}
 
-  const currentYear = new Date().getUTCFullYear();
+async function seedAcademicYear(tenantId: string) {
+  const now = new Date();
+  const currentYear = now.getUTCFullYear();
 
-  const academicYear = await prisma.academicYear.upsert({
+  return prisma.academicYear.upsert({
     where: {
       tenantId_name: {
-        tenantId: tenant.id,
+        tenantId,
         name: `${currentYear}-${currentYear + 1}`,
       },
     },
     update: {
+      startsOn: new Date(`${currentYear}-04-01T00:00:00.000Z`),
+      endsOn: new Date(`${currentYear + 1}-03-31T23:59:59.999Z`),
       isCurrent: true,
     },
     create: {
-      tenantId: tenant.id,
+      tenantId,
       name: `${currentYear}-${currentYear + 1}`,
       startsOn: new Date(`${currentYear}-04-01T00:00:00.000Z`),
       endsOn: new Date(`${currentYear + 1}-03-31T23:59:59.999Z`),
       isCurrent: true,
     },
   });
+}
 
-  // 2. Define SchoolOS Role Presets
+async function seedRoles(tenantId: string) {
+  console.log('Seeding system roles...');
+
   for (const role of SYSTEM_ROLE_DEFINITIONS) {
     await prisma.role.upsert({
       where: {
         tenantId_name: {
-          tenantId: tenant.id,
+          tenantId,
           name: role.name,
         },
       },
@@ -119,13 +185,17 @@ async function main() {
         isSystem: true,
       },
       create: {
-        tenantId: tenant.id,
+        tenantId,
         name: role.name,
         isSystem: true,
         description: role.description,
       },
     });
   }
+}
+
+async function seedPermissions() {
+  console.log('Seeding permissions...');
 
   for (const permission of PERMISSION_CATALOG) {
     await prisma.permission.upsert({
@@ -141,6 +211,10 @@ async function main() {
       create: permission,
     });
   }
+}
+
+async function seedRolePermissions(tenantId: string) {
+  console.log('Seeding role permissions...');
 
   for (const [roleName, permissionKeys] of Object.entries(
     SYSTEM_ROLE_PERMISSIONS,
@@ -148,7 +222,7 @@ async function main() {
     const role = await prisma.role.findUnique({
       where: {
         tenantId_name: {
-          tenantId: tenant.id,
+          tenantId,
           name: roleName,
         },
       },
@@ -192,12 +266,16 @@ async function main() {
       });
     }
   }
+}
+
+async function seedChartAccounts(tenantId: string) {
+  console.log('Seeding default chart of accounts...');
 
   for (const account of DEFAULT_CHART_ACCOUNTS) {
     await prisma.chartAccount.upsert({
       where: {
         tenantId_code: {
-          tenantId: tenant.id,
+          tenantId,
           code: account.code,
         },
       },
@@ -206,19 +284,23 @@ async function main() {
         type: account.type,
       },
       create: {
-        tenantId: tenant.id,
+        tenantId,
         code: account.code,
         name: account.name,
         type: account.type,
       },
     });
   }
+}
+
+async function seedFeeHeads(tenantId: string) {
+  console.log('Seeding default fee heads...');
 
   for (const feeHead of DEFAULT_FEE_HEADS) {
     await prisma.feeHead.upsert({
       where: {
         tenantId_code: {
-          tenantId: tenant.id,
+          tenantId,
           code: feeHead.code,
         },
       },
@@ -229,7 +311,7 @@ async function main() {
         vatApplicable: feeHead.vatApplicable,
       },
       create: {
-        tenantId: tenant.id,
+        tenantId,
         code: feeHead.code,
         name: feeHead.name,
         frequency: feeHead.frequency,
@@ -238,15 +320,16 @@ async function main() {
       },
     });
   }
+}
 
-  // 3. Create Local/Development Test Users
+async function seedUsersWithRoles(tenantId: string) {
   console.log('Seeding local/dev test users...');
 
   for (const seedUser of seedUsers) {
     const role = await prisma.role.findUnique({
       where: {
         tenantId_name: {
-          tenantId: tenant.id,
+          tenantId,
           name: seedUser.roleName,
         },
       },
@@ -257,44 +340,32 @@ async function main() {
     }
 
     await ensureSeedUserWithRole({
-      tenantId: tenant.id,
+      tenantId,
       email: seedUser.email,
       password: seedUser.password,
       roleId: role.id,
     });
   }
+}
 
-  // 4. Create Classes
+async function seedClassesAndSections(tenantId: string) {
   console.log('Seeding classes and sections...');
-
-  const classDefinitions = [
-    { name: 'Nursery', level: 0 },
-    { name: 'LKG', level: 1 },
-    { name: 'UKG', level: 2 },
-    { name: 'Class 1', level: 3 },
-    { name: 'Class 2', level: 4 },
-    { name: 'Class 3', level: 5 },
-    { name: 'Class 4', level: 6 },
-    { name: 'Class 5', level: 7 },
-    { name: 'Class 6', level: 8 },
-    { name: 'Class 7', level: 9 },
-    { name: 'Class 8', level: 10 },
-    { name: 'Class 9', level: 11 },
-    { name: 'Class 10', level: 12 },
-  ];
 
   const createdClasses: { id: string; name: string }[] = [];
 
   for (const classDef of classDefinitions) {
     const cls = await prisma.class.upsert({
       where: {
-        tenantId_name: { tenantId: tenant.id, name: classDef.name },
+        tenantId_name: {
+          tenantId,
+          name: classDef.name,
+        },
       },
       update: {
         level: classDef.level,
       },
       create: {
-        tenantId: tenant.id,
+        tenantId,
         name: classDef.name,
         level: classDef.level,
       },
@@ -303,22 +374,19 @@ async function main() {
     createdClasses.push(cls);
   }
 
-  // 5. Create Sections A and B for each class
-  const sectionNames = ['A', 'B'];
-
   for (const cls of createdClasses) {
     for (const sectionName of sectionNames) {
       await prisma.section.upsert({
         where: {
           tenantId_classId_name: {
-            tenantId: tenant.id,
+            tenantId,
             classId: cls.id,
             name: sectionName,
           },
         },
         update: {},
         create: {
-          tenantId: tenant.id,
+          tenantId,
           classId: cls.id,
           name: sectionName,
         },
@@ -327,23 +395,7 @@ async function main() {
   }
 
   console.log(
-    `✅ Created ${createdClasses.length} classes with sections A & B each.`,
-  );
-  console.log('✅ Seeding complete!');
-  console.log('');
-  console.log('Local/dev test logins:');
-
-  for (const seedUser of seedUsers) {
-    console.log(
-      `${seedUser.roleName}: ${seedUser.email} / ${seedUser.password}`,
-    );
-  }
-
-  console.log('');
-  console.log(`Academic year ready: ${academicYear.name}`);
-  console.log('');
-  console.log(
-    'Note: parent/student users can log in, but scoped child/student pages may be empty until they are linked to actual guardian/student records.',
+    `✅ Created ${createdClasses.length} classes with ${sectionNames.length} sections each.`,
   );
 }
 
@@ -362,7 +414,10 @@ async function ensureSeedUserWithRole({
 
   const user = await prisma.user.upsert({
     where: {
-      tenantId_email: { tenantId, email },
+      tenantId_email: {
+        tenantId,
+        email,
+      },
     },
     update: {
       passwordHash,
@@ -378,7 +433,7 @@ async function ensureSeedUserWithRole({
     },
   });
 
-  const existingRole = await prisma.userRole.findFirst({
+  await prisma.userRole.deleteMany({
     where: {
       tenantId,
       userId: user.id,
@@ -387,20 +442,19 @@ async function ensureSeedUserWithRole({
     },
   });
 
-  if (!existingRole) {
-    await prisma.userRole.create({
-      data: {
-        tenantId,
-        userId: user.id,
-        roleId,
-      },
-    });
-  }
+  await prisma.userRole.create({
+    data: {
+      tenantId,
+      userId: user.id,
+      roleId,
+      scopeId: null,
+    },
+  });
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
+  .catch((error) => {
+    console.error('❌ Seed failed:', error);
     process.exit(1);
   })
   .finally(async () => {

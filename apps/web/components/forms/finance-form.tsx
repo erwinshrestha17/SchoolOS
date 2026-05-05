@@ -213,6 +213,8 @@ export function FinanceForm() {
     paymentMethod: '',
   }));
   const [cashierCloseNotes, setCashierCloseNotes] = useState('');
+  const [cashierActualCashAmount, setCashierActualCashAmount] = useState('');
+  const [cashierVarianceReason, setCashierVarianceReason] = useState('');
   const [cashierCloseConfirmation, setCashierCloseConfirmation] = useState('');
   const [cashierCloseMessage, setCashierCloseMessage] = useState('');
 
@@ -394,11 +396,16 @@ export function FinanceForm() {
     mutationFn: () =>
       api.finalizeCashierClose({
         ...cashierCloseQueryParams(cashierClose),
+        actualCashAmount:
+          cashierActualCashAmount.trim() === '' ? null : Number(cashierActualCashAmount),
+        varianceReason: cashierVarianceReason.trim() || null,
         notes: cashierCloseNotes.trim() || null,
       }),
     onSuccess: async (close) => {
       setCashierCloseMessage(`Cashier close ${close.closeNumber} finalized.`);
       setCashierCloseConfirmation('');
+      setCashierActualCashAmount('');
+      setCashierVarianceReason('');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['cashier-closes'] }),
         queryClient.invalidateQueries({ queryKey: ['cashier-close-preview'] }),
@@ -640,6 +647,10 @@ export function FinanceForm() {
           setFilters={setCashierClose}
           notes={cashierCloseNotes}
           setNotes={setCashierCloseNotes}
+          actualCashAmount={cashierActualCashAmount}
+          setActualCashAmount={setCashierActualCashAmount}
+          varianceReason={cashierVarianceReason}
+          setVarianceReason={setCashierVarianceReason}
           confirmation={cashierCloseConfirmation}
           setConfirmation={setCashierCloseConfirmation}
           message={cashierCloseMessage}
@@ -2131,15 +2142,20 @@ function DefaultersSection({
 function CashierCloseSection({
   closeMutation,
   closesQuery,
+  actualCashAmount,
   confirmation,
   filters,
   message,
   notes,
   previewQuery,
+  setActualCashAmount,
   setConfirmation,
   setFilters,
   setNotes,
+  setVarianceReason,
+  varianceReason,
 }: {
+  actualCashAmount: string;
   closeMutation: UseMutationResult<CashierCloseSummary, Error, void, unknown>;
   closesQuery: UseQueryResult<CashierCloseSummary[], Error>;
   confirmation: string;
@@ -2147,30 +2163,37 @@ function CashierCloseSection({
   message: string;
   notes: string;
   previewQuery: UseQueryResult<CashierClosePreview, Error>;
+  setActualCashAmount: (value: string) => void;
   setConfirmation: (value: string) => void;
   setFilters: React.Dispatch<React.SetStateAction<CashierCloseFilters>>;
   setNotes: (value: string) => void;
+  setVarianceReason: (value: string) => void;
+  varianceReason: string;
 }) {
   const preview = previewQuery.data;
-  const groupedTotals = preview
-    ? {
-        cash: filters.paymentMethod === '' || filters.paymentMethod === 'CASH' ? preview.netCollected : 0,
-        bank: filters.paymentMethod === '' || filters.paymentMethod === 'BANK' ? preview.netCollected : 0,
-        cheque: filters.paymentMethod === '' || filters.paymentMethod === 'CHEQUE' ? preview.netCollected : 0,
-        digital:
-          filters.paymentMethod === '' || filters.paymentMethod === 'TRANSFER' || filters.paymentMethod === 'MOBILE'
-            ? preview.netCollected
-            : 0,
-      }
-    : null;
-  const canClose =
-    Boolean(preview) &&
-    confirmation === 'CLOSE' &&
-    !previewQuery.isError &&
-    !closeMutation.isPending;
+  const methodNetTotal = (methods: string[]) =>
+    preview?.methodBreakdown
+      .filter((row) => methods.includes(row.method))
+      .reduce((sum, row) => sum + row.netCollected, 0) ?? 0;
+  const parsedActualCash = actualCashAmount.trim() === '' ? null : Number(actualCashAmount);
+  const variancePreview =
+    preview && parsedActualCash !== null && Number.isFinite(parsedActualCash)
+      ? parsedActualCash - preview.expectedCashAmount
+      : null;
+  const needsVarianceReason = Boolean(variancePreview && Math.abs(variancePreview) > 0.004);
+  const closeDisabled =
+    !preview ||
+    confirmation !== 'CLOSE' ||
+    previewQuery.isError ||
+    closeMutation.isPending ||
+    (needsVarianceReason && !varianceReason.trim()) ||
+    (parsedActualCash !== null && (!Number.isFinite(parsedActualCash) || parsedActualCash < 0));
 
   return (
-    <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]">
+    <section
+      className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.75fr)]"
+      data-testid="cashier-close-panel"
+    >
       <div className="space-y-6">
         <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -2254,6 +2277,7 @@ function CashierCloseSection({
                 <Fact label="Gross collected" value={formatCurrency(preview.grossCollected)} />
                 <Fact label="Refund / reversal total" value={formatCurrency(preview.totalRefunded)} />
                 <Fact label="Net collection" value={formatCurrency(preview.netCollected)} highlight />
+                <Fact label="Expected cash" value={formatCurrency(preview.expectedCashAmount)} />
                 <Fact label="Receipt count" value={String(preview.paymentCount)} />
                 <Fact label="Refund count" value={String(preview.refundCount)} />
                 <Fact label="First receipt" value={preview.firstReceiptNumber ?? 'None'} />
@@ -2264,16 +2288,48 @@ function CashierCloseSection({
               <div className="rounded-2xl border border-[var(--line)] bg-white p-4">
                 <p className="label mb-3">Printable Day-End Summary</p>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  <Fact label="Cash total" value={formatCurrency(groupedTotals?.cash ?? 0)} />
-                  <Fact label="Bank total" value={formatCurrency(groupedTotals?.bank ?? 0)} />
-                  <Fact label="Cheque total" value={formatCurrency(groupedTotals?.cheque ?? 0)} />
-                  <Fact label="Digital total" value={formatCurrency(groupedTotals?.digital ?? 0)} />
+                  <Fact label="Cash total" value={formatCurrency(methodNetTotal(['CASH']))} />
+                  <Fact label="Bank / transfer total" value={formatCurrency(methodNetTotal(['BANK', 'TRANSFER']))} />
+                  <Fact label="Cheque total" value={formatCurrency(methodNetTotal(['CHEQUE']))} />
+                  <Fact label="Wallet / mobile total" value={formatCurrency(methodNetTotal(['MOBILE']))} />
                 </div>
                 <p className="mt-3 text-sm text-[var(--muted)]">
-                  Method-level totals use the selected backend filter. Select each payment method for an official
-                  method-specific close preview; PDF export is intentionally not generated in this slice.
+                  Method-wise totals are calculated by the backend from the selected close window; PDF export is intentionally
+                  not generated in this slice.
                 </p>
               </div>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                <Fact label="Expected cash amount" value={formatCurrency(preview.expectedCashAmount)} />
+                <label>
+                  <span className="label mb-2 block">Actual cash counted</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={actualCashAmount}
+                    onChange={(event) => setActualCashAmount(event.target.value)}
+                    placeholder="Optional cash drawer count"
+                    className="min-h-11"
+                  />
+                </label>
+                <Fact
+                  label="Cash variance"
+                  value={variancePreview === null ? 'Not counted' : formatCurrency(variancePreview)}
+                />
+              </div>
+
+              {needsVarianceReason ? (
+                <label className="block">
+                  <span className="label mb-2 block">Variance reason</span>
+                  <input
+                    value={varianceReason}
+                    onChange={(event) => setVarianceReason(event.target.value)}
+                    placeholder="Required when actual cash differs from expected cash"
+                    className="min-h-11"
+                  />
+                </label>
+              ) : null}
 
               <label className="block">
                 <span className="label mb-2 block">Close notes</span>
@@ -2304,7 +2360,7 @@ function CashierCloseSection({
               <button
                 type="button"
                 className="min-h-12 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={!canClose}
+                disabled={closeDisabled}
                 onClick={() => closeMutation.mutate()}
               >
                 {closeMutation.isPending ? 'Finalizing close...' : 'Finalize day-end close'}
@@ -2343,6 +2399,13 @@ function CashierCloseSection({
                 <div className="mt-3 grid gap-2 text-sm text-[var(--muted)]">
                   <span>Gross: {formatCurrency(close.grossCollected)}</span>
                   <span>Refunds: {formatCurrency(close.totalRefunded)}</span>
+                  <span>Expected cash: {formatCurrency(close.expectedCashAmount)}</span>
+                  {close.actualCashAmount !== null && close.actualCashAmount !== undefined ? (
+                    <span>Actual cash: {formatCurrency(close.actualCashAmount)}</span>
+                  ) : null}
+                  {close.varianceAmount !== null && close.varianceAmount !== undefined ? (
+                    <span>Variance: {formatCurrency(close.varianceAmount)}</span>
+                  ) : null}
                   <span>Payments: {close.paymentCount} / Refunds: {close.refundCount}</span>
                   {close.notes ? <span>Notes: {close.notes}</span> : null}
                 </div>

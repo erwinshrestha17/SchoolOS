@@ -38,29 +38,27 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check tracked generated artifacts
-        run: pnpm verify:tracked-artifacts
+      - name: Detect web-impacting changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            web:
+              - 'apps/web/**'
+              - 'packages/core/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'tsconfig.base.json'
+              - '.github/workflows/ci.yml'
 
-      - name: Generate Prisma client
-        run: pnpm db:generate
+      - name: Install Playwright Chromium
+        if: steps.changes.outputs.web == 'true'
+        run: pnpm --filter @schoolos/web exec playwright install chromium
 
-      - name: Validate Prisma schema
-        run: pnpm db:validate
+      - name: Verify deploy gate
+        run: pnpm verify:deploy:core
 
-      - name: Check OpenAPI gate
-        run: pnpm verify:openapi
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Test
-        run: pnpm test
-
-      - name: API e2e
-        run: pnpm test:e2e
-
-      - name: Build
-        run: pnpm build
+      - name: Web e2e smoke
+        if: steps.changes.outputs.web == 'true'
+        run: pnpm test:web:e2e

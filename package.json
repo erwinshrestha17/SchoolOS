@@ -14,9 +14,13 @@
     "db:validate": "pnpm --filter @schoolos/api exec prisma validate --schema prisma/schema.prisma",
     "db:migrate": "pnpm --filter @schoolos/api db:migrate",
     "db:seed": "pnpm --filter @schoolos/api db:seed",
+    "test:web:e2e": "pnpm --filter @schoolos/web test:e2e",
+    "verify:env:deploy": "node scripts/check-deploy-env.mjs",
     "verify:tracked-artifacts": "node scripts/check-tracked-artifacts.mjs",
     "verify:openapi": "node scripts/check-openapi-gate.mjs",
-    "verify:production": "pnpm verify:tracked-artifacts && pnpm db:generate && pnpm db:validate && pnpm verify:openapi && pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build",
+    "verify:deploy:core": "pnpm verify:env:deploy && pnpm verify:tracked-artifacts && pnpm db:generate && pnpm db:validate && pnpm verify:openapi && pnpm lint && pnpm typecheck && pnpm test && pnpm test:e2e && pnpm build",
+    "verify:deploy": "pnpm verify:deploy:core && pnpm test:web:e2e",
+    "verify:production": "pnpm verify:deploy",
     "smoke:phase1": "node scripts/smoke-phase1-local.mjs"
   }
 }

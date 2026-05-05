@@ -24,12 +24,12 @@ export default function TenantSettingsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const getSettingValue = (key: string, defaultValue: any) => {
+  const getSettingValue = (key: string, defaultValue: unknown) => {
     const setting = settings.find(s => s.key === key);
     return setting ? setting.value : defaultValue;
   };
 
-  const updateSetting = async (key: string, value: any) => {
+  const updateSetting = async (key: string, value: unknown) => {
     setSaving(key);
     setMessage(null);
     try {
@@ -50,7 +50,7 @@ export default function TenantSettingsPage() {
     <div className="max-w-4xl space-y-8 p-8">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">School Settings</h1>
-        <p className="text-slate-500">Configure your school's branding, localization, and operational preferences.</p>
+        <p className="text-slate-500">Configure your school&apos;s branding, localization, and operational preferences.</p>
       </div>
 
       {message && (

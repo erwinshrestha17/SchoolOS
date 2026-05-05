@@ -18,6 +18,12 @@ export class StaffController {
     return this.staffService.listStaff(auth);
   }
 
+  @Get('me')
+  @Permissions('staff:read')
+  getMe(@CurrentAuth() auth: AuthContext) {
+    return this.staffService.getStaffProfile(auth);
+  }
+
   @Post()
   @Permissions('staff:create')
   createStaff(@Body() dto: CreateStaffDto, @CurrentAuth() auth: AuthContext) {

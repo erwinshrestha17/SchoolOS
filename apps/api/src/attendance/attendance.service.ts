@@ -767,6 +767,49 @@ export class AttendanceService {
     return day;
   }
 
+  async listMyAttendance(actor: AuthContext) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff record not found');
+    }
+
+    return this.prisma.staffAttendance.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        staffId: staff.id,
+      },
+      include: {
+        approvedBy: true,
+      },
+      orderBy: { attendanceDate: 'desc' },
+      take: 100,
+    });
+  }
+
+  async listMyLeaveRequests(actor: AuthContext) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff record not found');
+    }
+
+    return this.prisma.staffLeaveRequest.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        staffId: staff.id,
+      },
+      include: {
+        reviewedBy: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async listStaffAttendance(actor: AuthContext) {
     return this.prisma.staffAttendance.findMany({
       where: { tenantId: actor.tenantId },

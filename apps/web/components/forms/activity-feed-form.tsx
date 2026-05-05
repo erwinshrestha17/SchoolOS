@@ -900,6 +900,8 @@ function PostCard({
             >
               {attachment.previewUrl ? (
                 <div className="aspect-[16/10] w-full overflow-hidden">
+                  {/* Private signed media previews are dynamic URLs; keep native img for this viewer. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={attachment.previewUrl}
                     alt={attachment.fileName}
