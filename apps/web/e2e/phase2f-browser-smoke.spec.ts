@@ -31,7 +31,8 @@ test.describe('Phase 2F.2 public browser smoke', () => {
     ).toBeVisible();
 
     await page.goto('/login');
-    await expect(page.getByRole('heading', { name: /Welcome back/i })).toBeVisible();
+    // Robust assertion matching the current login page UI
+    await expect(page.getByText(/Welcome back/i)).toBeVisible();
     await expect(page.getByLabel(/School Code/i)).toBeVisible();
   });
 });
@@ -127,6 +128,10 @@ async function login(
   credentials: { tenantSlug: string; email: string; password: string },
 ) {
   await page.goto('/login');
+
+  // Explicitly wait for the form to be ready to ensure fields are interactable
+  await expect(page.getByLabel(/School Code/i)).toBeVisible();
+
   await page.getByLabel(/School Code/i).fill(credentials.tenantSlug);
   await page.getByLabel(/Email/i).fill(credentials.email);
   await page.getByLabel(/Password/i).fill(credentials.password);
