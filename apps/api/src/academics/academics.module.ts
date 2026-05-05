@@ -8,6 +8,7 @@ import { AcademicsService } from './academics.service';
 import { AssessmentComponentsService } from './assessment-components.service';
 import { CasRecordsService } from './cas-records.service';
 import { GradeCalculatorService } from './grade-calculator.service';
+import { ReportCardsService } from './report-cards.service';
 import {
   SubjectsController,
   TeacherAssignmentsController,
@@ -26,6 +27,7 @@ import {
     AssessmentComponentsService,
     CasRecordsService,
     GradeCalculatorService,
+    ReportCardsService,
   ],
   exports: [
     AcademicsService,
@@ -33,6 +35,7 @@ import {
     AssessmentComponentsService,
     CasRecordsService,
     GradeCalculatorService,
+    ReportCardsService,
   ],
 })
 export class AcademicsModule {}
