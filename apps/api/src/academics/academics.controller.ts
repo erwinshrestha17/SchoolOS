@@ -20,6 +20,7 @@ import { AcademicsService } from './academics.service';
 import { AssessmentComponentsService } from './assessment-components.service';
 import { CasRecordsService } from './cas-records.service';
 import { MarkLockWorkflowService } from './mark-lock-workflow.service';
+import { ReportCardPdfService } from './report-card-pdf.service';
 import { ReportCardsService } from './report-cards.service';
 import { CreateAssessmentComponentDto } from './dto/create-assessment-component.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
@@ -48,6 +49,7 @@ export class AcademicsController {
     private readonly assessmentComponentsService: AssessmentComponentsService,
     private readonly casRecordsService: CasRecordsService,
     private readonly markLockWorkflowService: MarkLockWorkflowService,
+    private readonly reportCardPdfService: ReportCardPdfService,
     private readonly reportCardsService: ReportCardsService,
   ) {}
 
@@ -367,7 +369,7 @@ export class AcademicsController {
     @Param('id') reportCardId: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.academicsService.getReportCardPdf(reportCardId, auth);
+    return this.reportCardPdfService.getReportCardPdf(reportCardId, auth);
   }
 
   @Get('remedial')
