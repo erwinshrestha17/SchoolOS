@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { GradeLockStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -169,7 +173,10 @@ export class ReportCardsService {
     };
   }
 
-  async batchGenerateReportCards(dto: BatchGenerateReportCardsDto, actor: AuthContext) {
+  async batchGenerateReportCards(
+    dto: BatchGenerateReportCardsDto,
+    actor: AuthContext,
+  ) {
     const reports = [];
 
     for (const studentId of dto.studentIds) {
@@ -208,29 +215,34 @@ export class ReportCardsService {
       componentsBySubject.set(component.subjectId, existing);
     }
 
-    return Array.from(componentsBySubject.entries()).map(([subjectId, subjectComponents]) => {
-      const componentInputs: ComponentScoreInput[] = subjectComponents.map((component) => {
-        const mark = marksByComponent.get(component.id);
+    return Array.from(componentsBySubject.entries()).map(
+      ([subjectId, subjectComponents]) => {
+        const componentInputs: ComponentScoreInput[] = subjectComponents.map(
+          (component) => {
+            const mark = marksByComponent.get(component.id);
 
-        return {
-          componentId: component.id,
+            return {
+              componentId: component.id,
+              subjectId,
+              maxMarks: Number(component.maxMarks),
+              marksObtained: mark ? Number(mark.marksObtained) : null,
+              passMarks:
+                component.passMarks === null ||
+                component.passMarks === undefined
+                  ? null
+                  : Number(component.passMarks),
+              weightPercent: Number(component.weightPercent),
+              isMissing: !mark,
+            };
+          },
+        );
+
+        return this.gradeCalculator.calculateWeightedSubjectGrade({
           subjectId,
-          maxMarks: Number(component.maxMarks),
-          marksObtained: mark ? Number(mark.marksObtained) : null,
-          passMarks:
-            component.passMarks === null || component.passMarks === undefined
-              ? null
-              : Number(component.passMarks),
-          weightPercent: Number(component.weightPercent),
-          isMissing: !mark,
-        };
-      });
-
-      return this.gradeCalculator.calculateWeightedSubjectGrade({
-        subjectId,
-        components: componentInputs,
-      });
-    });
+          components: componentInputs,
+        });
+      },
+    );
   }
 
   private buildRemarks(
@@ -239,8 +251,12 @@ export class ReportCardsService {
     overallStatus: string,
   ) {
     const trimmedRemarks = remarks?.trim();
-    const incompleteCount = subjects.filter((subject) => subject.status === 'INCOMPLETE').length;
-    const failedCount = subjects.filter((subject) => subject.status === 'FAIL').length;
+    const incompleteCount = subjects.filter(
+      (subject) => subject.status === 'INCOMPLETE',
+    ).length;
+    const failedCount = subjects.filter(
+      (subject) => subject.status === 'FAIL',
+    ).length;
     const systemRemarks: string[] = [];
 
     if (incompleteCount > 0) {
