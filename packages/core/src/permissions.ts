@@ -459,6 +459,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     "classes:read",
     "sections:read",
     "students:read",
+    "staff:read",
     "academics:read",
     "academics:enter_marks",
     "timetable:read",

@@ -18,6 +18,7 @@ import { useMemo, useState } from 'react';
 import { useSession } from '../session-provider';
 import { api } from '../../lib/api';
 import { openApprovedSalarySlipPdf } from '../../lib/payroll-pdf';
+import { JournalEntryDialog } from '../accounting/journal-entry-dialog';
 
 type PayrollLineView = {
   id?: string;
@@ -139,6 +140,8 @@ export function PayrollRuns() {
   const [workingDays, setWorkingDays] = useState(30);
   const [showDraftWorkflow, setShowDraftWorkflow] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [selectedJournalId, setSelectedJournalId] = useState<string | null>(null);
+  const [isJournalDialogOpen, setIsJournalDialogOpen] = useState(false);
   const [salarySlipError, setSalarySlipError] = useState<string | null>(null);
 
   const runsQuery = useQuery({
@@ -552,9 +555,22 @@ export function PayrollRuns() {
               )}
 
               {selectedRun.status === 'POSTED' && selectedRun.journalEntryId && (
-                <p className="rounded-xl bg-purple-50 px-4 py-3 text-xs font-semibold text-purple-700">
-                  Posted to M9 Accounting. Journal entry is recorded by the backend accounting boundary.
-                </p>
+                <div className="rounded-xl bg-purple-50 px-4 py-3 flex items-center justify-between">
+                  <p className="text-xs font-semibold text-purple-700">
+                    Posted to M9 Accounting. Journal entry is recorded.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 border-purple-200 text-purple-700 hover:bg-purple-100"
+                    onClick={() => {
+                      setSelectedJournalId(selectedRun.journalEntryId!);
+                      setIsJournalDialogOpen(true);
+                    }}
+                  >
+                    View Journal
+                  </Button>
+                </div>
               )}
 
               <div className="space-y-2">
@@ -611,6 +627,11 @@ export function PayrollRuns() {
           )}
         </div>
       </div>
+      <JournalEntryDialog 
+        id={selectedJournalId} 
+        open={isJournalDialogOpen} 
+        onOpenChange={setIsJournalDialogOpen} 
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,7 +9,7 @@ import type { PayrollPreviewResult } from '@schoolos/core';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
-import { buildSimplePdf } from '../common/pdf/simple-pdf';
+import { buildSalarySlipPdf, buildSimplePdf } from '../common/pdf/simple-pdf';
 import { CreateStaffContractDto } from '../hr/dto/create-staff-contract.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
@@ -485,7 +486,7 @@ export class PayrollService {
       resourceId: run.id,
       after: {
         journalEntryId: posted.journalEntryId,
-        grossAmount: Number(posted.grossAmount),
+      grossAmount: Number(posted.grossAmount),
         netAmount: Number(posted.netAmount),
       },
     });
@@ -493,15 +494,24 @@ export class PayrollService {
     return posted;
   }
 
-  async listPayslips(actor: AuthContext) {
+  async listMyPayslips(actor: AuthContext) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff record not found');
+    }
+
     return this.prisma.payslip.findMany({
-      where: { tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        staffId: staff.id,
+      },
       include: {
-        staff: true,
         payrollRun: true,
       },
-      orderBy: [{ createdAt: 'desc' }],
-      take: 100,
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -513,7 +523,10 @@ export class PayrollService {
       },
       include: {
         staff: true,
-        payrollRun: true,
+        payrollRun: {
+          include: { tenant: true },
+        },
+        payrollLine: true,
       },
     });
 
@@ -521,17 +534,60 @@ export class PayrollService {
       throw new NotFoundException('Payslip not found in this tenant');
     }
 
-    return buildSimplePdf([
-      'SchoolOS Payslip',
-      `Payslip: ${payslip.payslipNumber}`,
-      `Employee: ${payslip.staff.firstName} ${payslip.staff.lastName}`,
-      `Employee ID: ${payslip.staff.employeeId}`,
-      `Period: ${payslip.payrollRun.periodMonth}/${payslip.payrollRun.periodYear}`,
-      `Gross Salary: Rs ${Number(payslip.grossSalary).toFixed(2)}`,
-      `Deductions: Rs ${Number(payslip.deductionAmount).toFixed(2)}`,
-      `Net Salary: Rs ${Number(payslip.netSalary).toFixed(2)}`,
-      `Status: ${payslip.status}`,
-    ]);
+    if (
+      payslip.staff.userId !== actor.userId &&
+      !actor.permissions.includes('payroll:read')
+    ) {
+      throw new ForbiddenException(
+        'You do not have permission to view this payslip',
+      );
+    }
+
+    const monthLabels = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+
+    return buildSalarySlipPdf({
+      schoolName: payslip.payrollRun.tenant.name,
+      payslipNumber: payslip.payslipNumber,
+      period: `${monthLabels[payslip.payrollRun.periodMonth - 1]} ${payslip.payrollRun.periodYear}`,
+      staff: {
+        name: `${payslip.staff.firstName} ${payslip.staff.lastName}`,
+        id: payslip.staff.employeeId,
+        bankAccount: payslip.staff.bankAccount,
+        panNumber: payslip.staff.panNumber,
+      },
+      earnings: [
+        {
+          name: 'Basic Salary',
+          amount:
+            Number(payslip.payrollLine.grossSalary) -
+            Number(payslip.payrollLine.allowances),
+        },
+        { name: 'Allowances', amount: Number(payslip.payrollLine.allowances) },
+      ],
+      deductions: [
+        { name: 'Statutory Deductions', amount: Number(payslip.deductionAmount) },
+      ],
+      grossSalary: Number(payslip.grossSalary),
+      totalDeductions: Number(payslip.deductionAmount),
+      netSalary: Number(payslip.netSalary),
+      attendance: {
+        present: payslip.payrollLine.attendanceDays,
+        working: payslip.payrollLine.workingDays,
+      },
+    });
   }
 
   listStatutoryDeductions() {

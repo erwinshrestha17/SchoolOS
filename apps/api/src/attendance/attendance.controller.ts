@@ -129,6 +129,18 @@ export class AttendanceController {
     return this.attendanceService.listStaffAttendanceSummary(query, auth);
   }
 
+  @Get('me/attendance')
+  @Permissions('staff:read')
+  listMyAttendance(@CurrentAuth() auth: AuthContext) {
+    return this.attendanceService.listMyAttendance(auth);
+  }
+
+  @Get('me/leave-requests')
+  @Permissions('staff:read')
+  listMyLeaveRequests(@CurrentAuth() auth: AuthContext) {
+    return this.attendanceService.listMyLeaveRequests(auth);
+  }
+
   @Post('staff')
   @Permissions('attendance:mark')
   submitStaffAttendance(

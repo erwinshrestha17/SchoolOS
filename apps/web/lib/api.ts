@@ -799,25 +799,21 @@ export const api = {
   downloadActivityAttachment: async (attachmentId: string, fileName: string) => {
     const response = await fetch(
       `${API_BASE_URL}/activity-feed/attachments/${encodeURIComponent(attachmentId)}/download`,
-      { credentials: 'include' }
+      { credentials: 'include' },
     );
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(parseApiErrorMessage(text) || `Download failed with status ${response.status}`);
+      throw new Error(
+        parseApiErrorMessage(text) ||
+          `Download failed with status ${response.status}`,
+      );
     }
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     
-    const contentDisposition = response.headers.get('content-disposition');
-    let finalFileName = fileName;
-    if (contentDisposition) {
-      const match = contentDisposition.match(/filename="([^"]+)"/);
-      if (match) finalFileName = match[1];
-    }
-    
-    a.download = finalFileName;
+    a.download = fileName;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);
@@ -886,4 +882,24 @@ export const api = {
   listReports: () => request<ReportDefinition[]>('/reports'),
   exportReport: (reportKey: string, payload: ReportExportRequest) =>
     downloadReport(reportKey, payload),
+
+  // Staff Self-Service
+  getMyProfile: () => request<any>('/staff/me'),
+  listMyPayslips: () => request<any[]>('/payroll/me/payslips'),
+  listMyAttendance: () => request<any[]>('/attendance/me/attendance'),
+  listMyLeaveRequests: () => request<any[]>('/attendance/me/leave-requests'),
+  openPayslipPdf: async (payslipNumber: string) => {
+    const response = await fetch(
+      `${API_BASE_URL}/payroll/payslips/${encodeURIComponent(payslipNumber)}.pdf`,
+      {
+        credentials: 'include',
+      },
+    );
+
+    await openPdfBlob(response);
+  },
+
+  // Accounting Verification
+  getJournalEntry: (id: string) =>
+    request<JournalEntryView>(`/accounting/journals/${encodeURIComponent(id)}`),
 };

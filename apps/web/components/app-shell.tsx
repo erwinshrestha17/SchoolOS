@@ -13,6 +13,11 @@ const navItems: Array<{
 }> = [
   { href: '/dashboard', label: 'Overview', permission: 'tenants:read' },
   {
+    href: '/dashboard/my-profile',
+    label: 'My Profile',
+    permission: 'staff:read',
+  },
+  {
     href: '/dashboard/admissions',
     label: 'Admissions',
     permission: 'students:create',
