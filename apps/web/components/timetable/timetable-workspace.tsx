@@ -8,6 +8,7 @@ import { TimetableBuilderTab } from './tabs/timetable-builder-tab';
 import { TeacherWorkloadTab } from './tabs/teacher-workload-tab';
 import { HomeworkTab } from './tabs/homework-tab';
 import { StudentHomeworkTab } from './tabs/student-homework-tab';
+import { StudentTimetableTab } from './tabs/student-timetable-tab';
 
 const adminSections = [
   'Timetable Builder',
@@ -17,7 +18,7 @@ const adminSections = [
 
 const studentSections = [
   'My Homework',
-  // 'My Timetable', // Future
+  'My Timetable',
 ] as const;
 
 type Section = (typeof adminSections)[number] | (typeof studentSections)[number];
@@ -41,6 +42,11 @@ const sectionMeta: Record<Section, { title: string; description: string; badge: 
   'My Homework': {
     title: 'My Homework Portal',
     description: 'View your assigned homework, submit your work, and check teacher feedback and scores.',
+    badge: 'Student',
+  },
+  'My Timetable': {
+    title: 'My Weekly Schedule',
+    description: 'View your personalized weekly class schedule, subjects, and teachers.',
     badge: 'Student',
   },
 };
@@ -166,6 +172,10 @@ export function TimetableWorkspace() {
 
       {activeSection === 'My Homework' && (
         <StudentHomeworkTab />
+      )}
+
+      {activeSection === 'My Timetable' && (
+        <StudentTimetableTab />
       )}
     </div>
   );

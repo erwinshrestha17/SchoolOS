@@ -30,10 +30,33 @@ export class TimetableService {
   ) {}
 
   async listTimetable(actor: AuthContext, classId?: string) {
+    let effectiveClassId = classId;
+
+    if (!effectiveClassId && actor.roles.includes('student')) {
+      const student = await this.prisma.student.findFirst({
+        where: { tenantId: actor.tenantId, userId: actor.userId },
+        select: { classId: true },
+      });
+      effectiveClassId = student?.classId;
+    }
+
+    if (!effectiveClassId && actor.roles.includes('parent')) {
+      // For parents, we might need a studentId filter or default to the first student
+      // For now, let's just use the first student linked to this parent
+      const studentGuardian = await this.prisma.studentGuardian.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          guardian: { userId: actor.userId },
+        },
+        include: { student: true },
+      });
+      effectiveClassId = studentGuardian?.student.classId;
+    }
+
     return this.prisma.timetableSlot.findMany({
       where: {
         tenantId: actor.tenantId,
-        ...(classId ? { classId } : {}),
+        ...(effectiveClassId ? { classId: effectiveClassId } : {}),
       },
       include: {
         academicYear: true,
@@ -363,6 +386,11 @@ export class TimetableService {
           },
         },
         student: true,
+        attachments: {
+          include: {
+            fileAsset: true,
+          },
+        },
       },
       orderBy: [{ updatedAt: 'desc' }],
       take: 100,
@@ -446,20 +474,34 @@ export class TimetableService {
       throw new ConflictException('Homework already submitted or reviewed');
     }
 
-    const updated = await this.prisma.homeworkSubmission.update({
-      where: { id: submission.id },
-      data: {
-        status: HomeworkStatus.SUBMITTED,
-        submissionContent: dto.content ?? null,
-        submittedAt: new Date(),
-      },
-      include: {
-        homework: {
-          include: {
-            subject: true,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const submissionUpdate = await tx.homeworkSubmission.update({
+        where: { id: submission.id },
+        data: {
+          status: HomeworkStatus.SUBMITTED,
+          submissionContent: dto.content ?? null,
+          submittedAt: new Date(),
+        },
+        include: {
+          homework: {
+            include: {
+              subject: true,
+            },
           },
         },
-      },
+      });
+
+      if (dto.attachmentIds && dto.attachmentIds.length > 0) {
+        await tx.homeworkAttachment.createMany({
+          data: dto.attachmentIds.map((fileAssetId) => ({
+            tenantId: actor.tenantId,
+            submissionId: submission.id,
+            fileAssetId,
+          })),
+        });
+      }
+
+      return submissionUpdate;
     });
 
     await this.auditService.record({
@@ -471,6 +513,7 @@ export class TimetableService {
       after: {
         homeworkId: updated.homeworkId,
         studentId: updated.studentId,
+        attachmentCount: dto.attachmentIds?.length ?? 0,
       },
     });
 

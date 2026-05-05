@@ -11,7 +11,9 @@ import {
   ChevronRight,
   Send,
   MessageSquare,
-  Trophy
+  Trophy,
+  Paperclip,
+  X
 } from 'lucide-react';
 import type { HomeworkSubmissionSummary } from '@schoolos/core';
 
@@ -139,6 +141,26 @@ export function StudentHomeworkTab() {
                   </div>
                 </div>
 
+                {selectedSubmission.attachments && selectedSubmission.attachments.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-bold uppercase tracking-wider text-[var(--muted)]">Attachments</h4>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {selectedSubmission.attachments.map((a: any) => (
+                        <a
+                          key={a.id}
+                          href={a.fileAsset?.publicUrl || '#'}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-3 rounded-xl border border-[var(--line)] bg-white p-3 text-sm transition hover:bg-gray-50"
+                        >
+                          <Paperclip size={14} className="text-primary-600" />
+                          <span className="truncate flex-1 font-medium">{a.fileAsset?.originalFilename}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {selectedSubmission.feedback && (
                   <div className="space-y-3">
                     <h4 className="text-sm font-bold uppercase tracking-wider text-[var(--muted)]">Teacher Feedback</h4>
@@ -202,8 +224,11 @@ function SubmissionForm({ submissionId, onSuccess }: { submissionId: string, onS
   const [content, setContent] = useState('');
   const [error, setError] = useState<string | null>(null);
   
+  const [attachments, setAttachments] = useState<{ id: string; fileName: string }[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  
   const mutation = useMutation({
-    mutationFn: (data: { submissionId: string; content: string }) => api.submitHomework(data),
+    mutationFn: (data: { submissionId: string; content: string; attachmentIds?: string[] }) => api.submitHomework(data),
     onSuccess: () => {
       onSuccess();
     },
@@ -212,6 +237,25 @@ function SubmissionForm({ submissionId, onSuccess }: { submissionId: string, onS
     }
   });
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const result = await api.uploadFile(file, 'homework-submission');
+      setAttachments([...attachments, { id: result.id, fileName: result.fileName }]);
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload file');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments(attachments.filter((a) => a.id !== id));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -219,7 +263,11 @@ function SubmissionForm({ submissionId, onSuccess }: { submissionId: string, onS
       setError('Please enter your submission text');
       return;
     }
-    mutation.mutate({ submissionId, content });
+    mutation.mutate({ 
+      submissionId, 
+      content, 
+      attachmentIds: attachments.map(a => a.id) 
+    });
   };
 
   return (
@@ -231,8 +279,45 @@ function SubmissionForm({ submissionId, onSuccess }: { submissionId: string, onS
           placeholder="Type your response here..."
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || isUploading}
         />
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-bold uppercase tracking-wider text-[var(--muted)]">Attachments</label>
+          <label className="cursor-pointer text-xs font-bold text-indigo-600 hover:text-indigo-700 transition flex items-center gap-1">
+            <Paperclip size={12} />
+            Add File
+            <input 
+              type="file" 
+              className="hidden" 
+              onChange={handleFileChange} 
+              disabled={mutation.isPending || isUploading}
+            />
+          </label>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {attachments.map((a) => (
+            <div key={a.id} className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium border border-gray-200">
+              <span className="truncate max-w-[120px]">{a.fileName}</span>
+              <button 
+                type="button" 
+                onClick={() => removeAttachment(a.id)}
+                className="text-gray-400 hover:text-danger-600 transition"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+          {isUploading && (
+            <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-1.5 text-xs font-medium border border-dashed border-gray-300">
+              <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
+              <span className="text-gray-400 italic">Uploading...</span>
+            </div>
+          )}
+        </div>
       </div>
       {error && (
         <div className="flex items-center gap-2 text-xs font-medium text-danger-600 bg-danger-50 p-3 rounded-xl border border-danger-100">

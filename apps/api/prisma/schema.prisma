@@ -606,6 +606,7 @@ model FileAsset {
   tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   uploadedBy User?  @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
   activityAttachments ActivityAttachment[]
+  homeworkAttachments HomeworkAttachment[]
 
   @@index([tenantId, module, entityId])
 }
@@ -2094,9 +2095,24 @@ model HomeworkSubmission {
   tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   homework HomeworkAssignment @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
   student  Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  attachments HomeworkAttachment[]
 
   @@unique([tenantId, homeworkId, studentId])
   @@index([tenantId, studentId, status])
+}
+
+model HomeworkAttachment {
+  id           String   @id @default(uuid())
+  tenantId     String
+  submissionId String
+  fileAssetId  String
+  createdAt    DateTime @default(now())
+
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  submission HomeworkSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  fileAsset  FileAsset          @relation(fields: [fileAssetId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, submissionId])
 }
 
 model SyllabusTopic {

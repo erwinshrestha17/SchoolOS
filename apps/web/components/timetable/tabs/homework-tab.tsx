@@ -189,6 +189,28 @@ export function HomeworkTab({
                           </div>
                         </div>
 
+                        {s.submissionContent && (
+                          <div className="mt-3 rounded-xl bg-gray-50 p-3 text-sm text-gray-700 whitespace-pre-wrap">
+                            {s.submissionContent}
+                          </div>
+                        )}
+
+                        {s.attachments && s.attachments.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {s.attachments.map((a: any) => (
+                              <a
+                                key={a.id}
+                                href={a.fileAsset?.publicUrl || '#'}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex items-center gap-2 rounded-lg border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium transition hover:bg-gray-50"
+                              >
+                                <span className="truncate max-w-[150px]">{a.fileAsset?.originalFilename}</span>
+                              </a>
+                            ))}
+                          </div>
+                        )}
+
                         {s.status === 'SUBMITTED' && (
                           <div className="mt-4 border-t border-[var(--line)] pt-4">
                             <GradingForm
@@ -273,13 +295,12 @@ function GradingForm({
           />
         </div>
         <div className="flex-[2]">
-          <label className="mb-1 block text-xs font-semibold text-gray-600">Feedback</label>
-          <input
-            type="text"
+          <label className="mb-1 block text-xs font-semibold text-gray-600">Correction Remarks</label>
+          <textarea
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
-            className="w-full"
-            placeholder="Good work!"
+            className="w-full min-h-[80px] resize-none"
+            placeholder="Provide detailed feedback..."
           />
         </div>
       </div>

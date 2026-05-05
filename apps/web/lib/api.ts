@@ -473,6 +473,29 @@ export const api = {
     }),
   listStudentDocuments: (studentId: string) =>
     request(withQuery('/student-documents', { studentId })),
+  uploadFile: async (file: File, module: string) => {
+    const reader = new FileReader();
+    const base64Promise = new Promise<string>((resolve) => {
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1];
+        resolve(base64);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    const base64Content = await base64Promise;
+
+    return post<{ id: string; fileName: string; publicUrl: string | null }>(
+      '/files/upload',
+      {
+        fileName: file.name,
+        contentType: file.type,
+        base64Content,
+        module,
+      },
+    );
+  },
+
   uploadStudentDocument: (body: UploadStudentDocumentPayload) =>
     request('/student-documents', {
       method: 'POST',
