@@ -1,17 +1,21 @@
 import { IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
-export class CreateExamTermDto {
+export class UpdateExamTermDto {
+  @IsOptional()
   @IsString()
-  academicYearId!: string;
+  academicYearId?: string;
 
+  @IsOptional()
   @IsString()
-  name!: string;
+  name?: string;
 
+  @IsOptional()
   @IsString()
-  startsOn!: string;
+  startsOn?: string;
 
+  @IsOptional()
   @IsString()
-  endsOn!: string;
+  endsOn?: string;
 
   @IsOptional()
   @IsNumber()

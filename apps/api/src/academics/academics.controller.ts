@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Param,
@@ -14,6 +15,7 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { AcademicsFoundationService } from './academics-foundation.service';
 import { AcademicsService } from './academics.service';
 import { CreateAssessmentComponentDto } from './dto/create-assessment-component.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
@@ -32,21 +34,48 @@ import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
 @Controller('academics')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class AcademicsController {
-  constructor(private readonly academicsService: AcademicsService) {}
+  constructor(
+    private readonly academicsService: AcademicsService,
+    private readonly academicsFoundationService: AcademicsFoundationService,
+  ) {}
 
   @Get('exams')
   @Permissions('academics:read')
-  listExamTerms(@CurrentAuth() auth: AuthContext) {
-    return this.academicsService.listExamTerms(auth);
+  listExamTerms(
+    @CurrentAuth() auth: AuthContext,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.academicsFoundationService.listExamTerms(auth, {
+      academicYearId,
+    });
   }
 
   @Post('exams')
-  @Permissions('academics:manage')
+  @Permissions('academics:create')
   createExamTerm(
     @Body() dto: CreateExamTermDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.academicsService.createExamTerm(dto, auth);
+    return this.academicsFoundationService.createExamTerm(dto, auth);
+  }
+
+  @Patch('exams/:id')
+  @Permissions('academics:update')
+  updateExamTerm(
+    @Param('id') examTermId: string,
+    @Body() dto: UpdateExamTermDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsFoundationService.updateExamTerm(examTermId, dto, auth);
+  }
+
+  @Delete('exams/:id')
+  @Permissions('academics:delete')
+  deleteExamTerm(
+    @Param('id') examTermId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsFoundationService.deleteExamTerm(examTermId, auth);
   }
 
   @Patch('exams/:id/unlock')
@@ -60,7 +89,7 @@ export class AcademicsController {
   }
 
   @Post('exams/components')
-  @Permissions('academics:manage')
+  @Permissions('academics:create')
   createComponent(
     @Body() dto: CreateAssessmentComponentDto,
     @CurrentAuth() auth: AuthContext,
@@ -89,7 +118,7 @@ export class AcademicsController {
   }
 
   @Post('exams/timetable')
-  @Permissions('academics:manage')
+  @Permissions('academics:create')
   createExamTimetableSlot(
     @Body() dto: CreateExamTimetableSlotDto,
     @CurrentAuth() auth: AuthContext,
@@ -98,7 +127,7 @@ export class AcademicsController {
   }
 
   @Post('exams/:id/timetable/publish')
-  @Permissions('academics:manage')
+  @Permissions('academics:update')
   publishExamTimetable(
     @Param('id') examTermId: string,
     @CurrentAuth() auth: AuthContext,
@@ -160,7 +189,7 @@ export class AcademicsController {
   }
 
   @Patch('marks/lock-requests/:id/review')
-  @Permissions('academics:manage')
+  @Permissions('academics:update')
   reviewMarkLockRequest(
     @Param('id') requestId: string,
     @Body() dto: ReviewMarkLockDto,
@@ -215,7 +244,7 @@ export class AcademicsController {
   }
 
   @Post('subjects/:id/syllabus')
-  @Permissions('academics:manage')
+  @Permissions('academics:create')
   createSyllabusTopic(
     @Param('id') subjectId: string,
     @Body() dto: { title: string; description?: string; orderIndex?: number },
@@ -225,7 +254,7 @@ export class AcademicsController {
   }
 
   @Patch('syllabus/:id/complete')
-  @Permissions('academics:manage')
+  @Permissions('academics:update')
   markTopicComplete(
     @Param('id') topicId: string,
     @CurrentAuth() auth: AuthContext,
@@ -276,7 +305,7 @@ export class AcademicsController {
   }
 
   @Post('promotions')
-  @Permissions('academics:manage')
+  @Permissions('academics:update')
   promoteStudent(
     @Body() dto: PromoteStudentDto,
     @CurrentAuth() auth: AuthContext,
@@ -285,7 +314,7 @@ export class AcademicsController {
   }
 
   @Post('promotions/batch')
-  @Permissions('academics:manage')
+  @Permissions('academics:update')
   batchPromote(@Body() dto: BatchPromoteDto, @CurrentAuth() auth: AuthContext) {
     return this.academicsService.batchPromote(dto, auth);
   }

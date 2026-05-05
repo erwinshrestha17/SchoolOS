@@ -3,6 +3,7 @@ import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { CommunicationsModule } from '../communications/communications.module';
 import { AcademicsController } from './academics.controller';
+import { AcademicsFoundationService } from './academics-foundation.service';
 import { AcademicsService } from './academics.service';
 import {
   SubjectsController,
@@ -16,7 +17,7 @@ import {
     TeacherAssignmentsController,
     AcademicsController,
   ],
-  providers: [AcademicsService],
-  exports: [AcademicsService],
+  providers: [AcademicsService, AcademicsFoundationService],
+  exports: [AcademicsService, AcademicsFoundationService],
 })
 export class AcademicsModule {}
