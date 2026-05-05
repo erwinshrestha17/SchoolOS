@@ -70,7 +70,9 @@ function roundTwo(value: number) {
 
 function assertFiniteNonNegative(value: number, fieldName: string) {
   if (!Number.isFinite(value) || value < 0) {
-    throw new ConflictException(`${fieldName} must be a finite non-negative number`);
+    throw new ConflictException(
+      `${fieldName} must be a finite non-negative number`,
+    );
   }
 }
 
@@ -80,7 +82,9 @@ export class GradeCalculatorService {
     assertFiniteNonNegative(percentage, 'percentage');
 
     const normalized = Math.min(roundTwo(percentage), 100);
-    const matched = GRADE_SCALE.find((grade) => normalized >= grade.minInclusive);
+    const matched = GRADE_SCALE.find(
+      (grade) => normalized >= grade.minInclusive,
+    );
 
     if (!matched) {
       return {
@@ -107,7 +111,9 @@ export class GradeCalculatorService {
 
   calculateWeightedSubjectGrade(input: SubjectGradeInput): SubjectGradeResult {
     if (input.components.length === 0) {
-      throw new ConflictException('At least one assessment component is required');
+      throw new ConflictException(
+        'At least one assessment component is required',
+      );
     }
 
     let weightedScore = 0;
@@ -129,7 +135,9 @@ export class GradeCalculatorService {
         ? 0
         : Number(component.marksObtained ?? 0);
       const componentPercentage =
-        component.maxMarks === 0 ? 0 : (marksObtained / component.maxMarks) * 100;
+        component.maxMarks === 0
+          ? 0
+          : (marksObtained / component.maxMarks) * 100;
 
       weightedScore += componentPercentage * (component.weightPercent / 100);
       weightUsed += component.weightPercent;
@@ -149,7 +157,8 @@ export class GradeCalculatorService {
       );
     }
 
-    const normalizedPercentage = weightUsed > 0 ? (weightedScore / weightUsed) * 100 : 0;
+    const normalizedPercentage =
+      weightUsed > 0 ? (weightedScore / weightUsed) * 100 : 0;
     const grade = this.getMoestGrade(normalizedPercentage);
     const status: GradeStatus =
       missingComponentCount > 0 && !input.includeIncomplete
@@ -192,13 +201,17 @@ export class GradeCalculatorService {
       };
     }
 
-    const failedSubjectCount = subjects.filter((subject) => subject.status === 'FAIL').length;
+    const failedSubjectCount = subjects.filter(
+      (subject) => subject.status === 'FAIL',
+    ).length;
     const incompleteSubjectCount = subjects.filter(
       (subject) => subject.status === 'INCOMPLETE',
     ).length;
     const averagePercentage =
-      subjects.reduce((sum, subject) => sum + subject.percentage, 0) / subjects.length;
-    const averageGpa = subjects.reduce((sum, subject) => sum + subject.gpa, 0) / subjects.length;
+      subjects.reduce((sum, subject) => sum + subject.percentage, 0) /
+      subjects.length;
+    const averageGpa =
+      subjects.reduce((sum, subject) => sum + subject.gpa, 0) / subjects.length;
     const grade = this.getMoestGrade(averagePercentage);
     const status: GradeStatus =
       incompleteSubjectCount > 0
@@ -239,7 +252,9 @@ export class GradeCalculatorService {
     }
 
     if (component.weightPercent === 0 || component.weightPercent > 100) {
-      throw new ConflictException('weightPercent must be greater than 0 and <= 100');
+      throw new ConflictException(
+        'weightPercent must be greater than 0 and <= 100',
+      );
     }
 
     if (
