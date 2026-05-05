@@ -387,7 +387,7 @@ export class AcademicsController {
     @CurrentAuth() auth: AuthContext,
     @Query('academicYearId') academicYearId?: string,
     @Query('classId') classId?: string,
-  ) {
+  ): Promise<unknown> {
     return this.academicsService.listPromotionReadiness(
       auth,
       academicYearId,
