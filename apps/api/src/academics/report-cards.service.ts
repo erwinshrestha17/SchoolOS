@@ -26,6 +26,8 @@ type ComponentWithSubject = Prisma.AssessmentComponentGetPayload<{
   include: { subject: true };
 }>;
 
+type GeneratedReportCard = Awaited<ReturnType<ReportCardsService['generateReportCard']>>;
+
 @Injectable()
 export class ReportCardsService {
   constructor(
@@ -177,7 +179,7 @@ export class ReportCardsService {
     dto: BatchGenerateReportCardsDto,
     actor: AuthContext,
   ) {
-    const reports = [];
+    const reports: GeneratedReportCard[] = [];
 
     for (const studentId of dto.studentIds) {
       reports.push(

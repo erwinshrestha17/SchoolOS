@@ -9,6 +9,7 @@ import { AssessmentComponentsService } from './assessment-components.service';
 import { CasRecordsService } from './cas-records.service';
 import { GradeCalculatorService } from './grade-calculator.service';
 import { MarkLockWorkflowService } from './mark-lock-workflow.service';
+import { ReportCardPdfService } from './report-card-pdf.service';
 import { ReportCardsService } from './report-cards.service';
 import {
   SubjectsController,
@@ -29,6 +30,7 @@ import {
     CasRecordsService,
     GradeCalculatorService,
     MarkLockWorkflowService,
+    ReportCardPdfService,
     ReportCardsService,
   ],
   exports: [
@@ -38,6 +40,7 @@ import {
     CasRecordsService,
     GradeCalculatorService,
     MarkLockWorkflowService,
+    ReportCardPdfService,
     ReportCardsService,
   ],
 })
