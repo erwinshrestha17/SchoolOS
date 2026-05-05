@@ -36,7 +36,7 @@ type CasFormState = {
 
 type BatchDraft = Record<string, string>;
 
-type StudentRosterRow = StudentProfile & {
+type StudentRosterRow = Omit<StudentProfile, 'section'> & {
   section?: { id: string; name?: string | null } | string | null;
 };
 
@@ -59,12 +59,9 @@ function getCurrentYear(academicYears: AcademicYearSummary[]) {
   return academicYears.find((year) => year.isCurrent) ?? academicYears[0];
 }
 
-function getStudentName(student: StudentProfile) {
-  return (
-    student.fullNameEn ??
-    `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''}`.trim() ||
-    student.studentSystemId
-  );
+function getStudentName(student: { firstNameEn?: string; lastNameEn?: string; studentSystemId: string }) {
+  const fallbackName = `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''}`.trim();
+  return fallbackName || student.studentSystemId;
 }
 
 function getStudentSectionId(student: StudentRosterRow) {
@@ -210,7 +207,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
           note: batchNotes[student.id]?.trim() || undefined,
         };
       })
-      .filter((entry): entry is { studentId: string; score: number; note?: string } => Boolean(entry));
+      .filter((entry): entry is { studentId: string; score: number; note: string | undefined } => !!entry);
   }, [formStudentsForClass, batchDraft, batchNotes]);
   const invalidBatchEntries = batchEntries.filter((entry) => entry.score < 0 || entry.score > cas.maxScore);
 

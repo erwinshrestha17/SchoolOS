@@ -99,7 +99,8 @@ export function MarksLockTab({ exams }: Props) {
   });
 
   const unlockMutation = useMutation({
-    mutationFn: markLockApi.unlockExamTerm,
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      markLockApi.unlockExamTerm(id, { reason }),
     onSuccess: () => {
       invalidate();
       setUnlockForm((current) => ({ ...current, reason: '' }));
@@ -246,7 +247,12 @@ export function MarksLockTab({ exams }: Props) {
               type="button"
               className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-3 font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
               disabled={!unlockForm.examTermId || unlockMutation.isPending}
-              onClick={() => unlockMutation.mutate(unlockForm.examTermId, { reason: unlockForm.reason || undefined })}
+              onClick={() =>
+                unlockMutation.mutate({
+                  id: unlockForm.examTermId,
+                  reason: unlockForm.reason || undefined,
+                })
+              }
             >
               {unlockMutation.isPending ? 'Unlocking…' : 'Unlock exam term'}
             </button>

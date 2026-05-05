@@ -1449,6 +1449,7 @@ export type AssessmentComponentSummary = {
   weightPercent: number;
   passMarks: number | null;
   subject?: SubjectSummary;
+  examTerm?: { id: string; name: string; isLocked: boolean };
 };
 
 export type MarkEntrySummary = {
@@ -1477,6 +1478,10 @@ export type CasRecordSummary = {
   maxScore: number;
   observedOn: string;
   note: string | null;
+  student?: { firstNameEn: string; lastNameEn: string; studentSystemId: string };
+  subject?: { code: string; name: string };
+  class?: { name: string };
+  section?: { name: string | null };
 };
 
 export type ReportCardSummary = {

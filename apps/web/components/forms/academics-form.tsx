@@ -123,9 +123,10 @@ export function AcademicsForm() {
     queryKey: ['promotion-readiness', report.academicYearId, cas.classId],
     queryFn: () =>
       api.listPromotionReadiness({
-        academicYearId: report.academicYearId || null,
+        academicYearId: report.academicYearId,
         classId: cas.classId || null,
       }),
+    enabled: Boolean(report.academicYearId),
   });
 
   useEffect(() => {
@@ -646,7 +647,7 @@ export function AcademicsForm() {
       <div className="grid gap-6 xl:grid-cols-3">
         <SummaryList title="Teacher Assignments" items={(assignmentsQuery.data ?? []).slice(0, 5).map((item) => ({ id: item.id, primary: item.subject?.name ?? 'Subject', secondary: `${item.staff?.firstName ?? 'Teacher'} ${item.staff?.lastName ?? ''}` }))} />
         <SummaryList title="CAS" items={(casQuery.data ?? []).slice(0, 5).map((item) => ({ id: item.id, primary: `${item.category} / ${item.score} of ${item.maxScore}`, secondary: item.note ?? 'No note' }))} />
-        <SummaryList title="Promotion Readiness" items={(promotionsQuery.data ?? []).slice(0, 5).map((item) => ({ id: item.reportCardId, primary: `${item.studentName} / ${item.status}`, secondary: `${item.grade} / ${item.percentage}%` }))} />
+        <SummaryList title="Promotion Readiness" items={(promotionsQuery.data ?? []).slice(0, 5).map((item) => ({ id: item.reportCardId ?? item.studentId, primary: `${item.studentName} / ${item.status}`, secondary: `${item.grade} / ${item.percentage}%` }))} />
       </div>
 
       <MutationErrors

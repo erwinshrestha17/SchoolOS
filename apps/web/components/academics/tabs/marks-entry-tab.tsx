@@ -23,17 +23,14 @@ type Props = {
 
 type MarksDraft = Record<string, string>;
 
-type StudentRosterRow = StudentProfile & {
+type StudentRosterRow = Omit<StudentProfile, 'section'> & {
   section?: { id: string; name?: string | null } | string | null;
   rollNumber?: number | null;
 };
 
-function getStudentName(student: StudentProfile) {
-  return (
-    student.fullNameEn ??
-    `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''}`.trim() ??
-    student.studentSystemId
-  );
+function getStudentName(student: { firstNameEn?: string; lastNameEn?: string; studentSystemId: string }) {
+  const fallbackName = `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''}`.trim();
+  return fallbackName || student.studentSystemId;
 }
 
 function getStudentSectionId(student: StudentRosterRow) {
@@ -177,9 +174,7 @@ export function MarksEntryTab({ classes, allSections, students, exams }: Props) 
           remarks: remarks[student.id]?.trim() || undefined,
         };
       })
-      .filter((entry): entry is { studentId: string; marksObtained: number; remarks?: string } =>
-        Boolean(entry),
-      );
+      .filter((entry): entry is { studentId: string; marksObtained: number; remarks: string | undefined } => !!entry);
   }, [studentsForClass, marks, remarks]);
 
   const batchMut = useMutation({

@@ -155,10 +155,10 @@ function buildPolishedReportCardPdf(input: {
   subjects: ReportPdfSubject[];
 }) {
   const { reportCard } = input;
+  const fallbackName = `${reportCard.student.firstNameEn ?? ''} ${reportCard.student.lastNameEn ?? ''}`.trim();
+
   const studentName =
-    reportCard.student.fullNameEn ??
-    `${reportCard.student.firstNameEn ?? ''} ${reportCard.student.lastNameEn ?? ''}`.trim() ||
-    reportCard.student.studentSystemId;
+    fallbackName.length > 0 ? fallbackName : reportCard.student.studentSystemId;
 
   const parts: string[] = [
     '0.7 w',

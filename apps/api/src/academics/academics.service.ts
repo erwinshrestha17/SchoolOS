@@ -1637,7 +1637,7 @@ export class AcademicsService {
       });
 
       // Create promotion record
-      return tx.promotionRecord.create({
+      const createdPromotion = await tx.promotionRecord.create({
         data: {
           tenantId: actor.tenantId,
           academicYearId: dto.academicYearId,
