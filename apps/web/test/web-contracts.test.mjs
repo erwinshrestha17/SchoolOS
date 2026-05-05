@@ -101,7 +101,29 @@ describe('SchoolOS web production contracts', () => {
       'enterMark',
       'generateReportCard',
       'createTimetableSlot',
+      'listTimetablePeriods',
+      'createTimetablePeriod',
+      'listRooms',
+      'createRoom',
+      'listTimetableVersions',
+      'createTimetableVersion',
+      'validateTimetableVersion',
+      'publishTimetableVersion',
+      'lockTimetableVersion',
+      'archiveTimetableVersion',
+      'listTeacherAvailability',
+      'createTeacherAvailability',
+      'listSubstitutions',
+      'createSubstitution',
+      'assignSubstitution',
       'createHomework',
+      'assignHomework',
+      'closeHomework',
+      'previewHomeworkReminders',
+      'sendHomeworkReminders',
+      'listHomeworkAssignmentSubmissions',
+      'reviewHomeworkSubmissionById',
+      'requestHomeworkCorrection',
       'reviewHomeworkSubmission',
       'createStaffContract',
       'createPayrollRun',
@@ -126,6 +148,21 @@ describe('SchoolOS web production contracts', () => {
     for (const helper of requiredHelpers) {
       assert.match(apiClient, new RegExp(`${helper}:`), `Missing API helper: ${helper}`);
     }
+  });
+
+  it('exposes Phase 2B homework and timetable workflow controls without fake production data', () => {
+    const timetableBuilder = read('components/timetable/tabs/timetable-builder-tab.tsx');
+    const homeworkTab = read('components/timetable/tabs/homework-tab.tsx');
+
+    for (const label of ['Periods', 'Rooms', 'Validate', 'Publish', 'Lock', 'Archive', 'Substitution Management']) {
+      assert.match(timetableBuilder, new RegExp(label));
+    }
+
+    for (const label of ['Send Reminder', 'Assign', 'Close', 'All Statuses']) {
+      assert.match(homeworkTab, new RegExp(label));
+    }
+
+    assert.doesNotMatch(`${timetableBuilder}\n${homeworkTab}`, /demo-|fake-|placeholderId/i);
   });
 
   it('keeps platform administration routes present and secure', () => {

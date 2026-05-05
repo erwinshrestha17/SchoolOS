@@ -31,6 +31,7 @@ import { APP_RATE_LIMIT, APP_RATE_TTL_MS } from './auth/auth.constants';
 import { FinanceModule } from './finance/finance.module';
 import { CommunicationsModule } from './communications/communications.module';
 import { TimetableModule } from './timetable/timetable.module';
+import { HomeworkModule } from './homework/homework.module';
 import { PayrollModule } from './payroll/payroll.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { LibraryModule } from './library/library.module';
@@ -86,6 +87,7 @@ import { ReportsModule } from './reports/reports.module';
     ActivityFeedModule,
     CommunicationsModule,
     AcademicsModule,
+    HomeworkModule,
     TimetableModule,
     PayrollModule,
     AccountingModule,

@@ -311,11 +311,39 @@ export const GradeLockStatus = {
   LOCKED: 'LOCKED',
 } as const;
 
-export const HomeworkStatus = {
+export const HomeworkAssignmentStatus = {
+  DRAFT: 'DRAFT',
   ASSIGNED: 'ASSIGNED',
+  CLOSED: 'CLOSED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export const HomeworkSubmissionStatus = {
+  NOT_SUBMITTED: 'NOT_SUBMITTED',
   SUBMITTED: 'SUBMITTED',
-  REVIEWED: 'REVIEWED',
   LATE: 'LATE',
+  REVIEWED: 'REVIEWED',
+  NEEDS_CORRECTION: 'NEEDS_CORRECTION',
+  EXCUSED: 'EXCUSED',
+} as const;
+
+export const TimetableVersionStatus = {
+  DRAFT: 'DRAFT',
+  PUBLISHED: 'PUBLISHED',
+  LOCKED: 'LOCKED',
+  ARCHIVED: 'ARCHIVED',
+} as const;
+
+export const TeacherAvailabilityType = {
+  AVAILABLE: 'AVAILABLE',
+  UNAVAILABLE: 'UNAVAILABLE',
+} as const;
+
+export const TimetableSubstitutionStatus = {
+  DRAFT: 'DRAFT',
+  ASSIGNED: 'ASSIGNED',
+  CANCELLED: 'CANCELLED',
+  COMPLETED: 'COMPLETED',
 } as const;
 
 export const PayrollRunStatus = {

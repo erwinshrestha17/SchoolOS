@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -181,10 +185,18 @@ export class StudentRecordsService {
     );
 
     // 2. Get the signed URL
-    const url = await this.fileRegistryService.getSignedUrl(
-      actor.tenantId,
-      assetId,
-    );
+    let url: string;
+    try {
+      url = await this.fileRegistryService.getSignedUrl(
+        actor.tenantId,
+        assetId,
+      );
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        throw new NotFoundException('File not found');
+      }
+      throw error;
+    }
 
     return { url };
   }

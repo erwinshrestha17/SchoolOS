@@ -247,11 +247,39 @@ enum GradeLockStatus {
   LOCKED
 }
 
-enum HomeworkStatus {
+enum HomeworkAssignmentStatus {
+  DRAFT
   ASSIGNED
+  CLOSED
+  CANCELLED
+}
+
+enum HomeworkSubmissionStatus {
+  NOT_SUBMITTED
   SUBMITTED
-  REVIEWED
   LATE
+  REVIEWED
+  NEEDS_CORRECTION
+  EXCUSED
+}
+
+enum TimetableVersionStatus {
+  DRAFT
+  PUBLISHED
+  LOCKED
+  ARCHIVED
+}
+
+enum TeacherAvailabilityType {
+  AVAILABLE
+  UNAVAILABLE
+}
+
+enum TimetableSubstitutionStatus {
+  DRAFT
+  ASSIGNED
+  CANCELLED
+  COMPLETED
 }
 
 enum PayrollRunStatus {
@@ -413,9 +441,16 @@ model Tenant {
   reportCards                   ReportCard[]
   promotionRecords              PromotionRecord[]
   timetableSlots                TimetableSlot[]
+  timetablePeriods              TimetablePeriod[]
+  timetableRooms                Room[]
+  timetableVersions             TimetableVersion[]
+  teacherAvailabilities         TeacherAvailability[]
+  teacherWorkloadLimits         TeacherWorkloadLimit[]
+  timetableSubstitutions        TimetableSubstitution[]
   homeworkAssignments           HomeworkAssignment[]
   homeworkSubmissions           HomeworkSubmission[]
   homeworkAttachments           HomeworkAttachment[]
+  homeworkReminderBatches       HomeworkReminderBatch[]
   staffContracts                StaffContract[]
   payrollRuns                   PayrollRun[]
   payrollLines                  PayrollLine[]
@@ -638,6 +673,8 @@ model AcademicYear {
   examTimetableSlots    ExamTimetableSlot[]
   promotionRecords      PromotionRecord[]
   timetableSlots        TimetableSlot[]
+  timetablePeriods      TimetablePeriod[]
+  timetableVersions     TimetableVersion[]
   homeworkAssignments   HomeworkAssignment[]
 
   @@unique([tenantId, name])
@@ -668,6 +705,7 @@ model Class {
   promotionRecordsFrom    PromotionRecord[]          @relation("PromotionFromClass")
   promotionRecordsTo      PromotionRecord[]          @relation("PromotionToClass")
   timetableSlots          TimetableSlot[]
+  timetableVersions       TimetableVersion[]
   homeworkAssignments     HomeworkAssignment[]
   conversations           Conversation[]
   examTimetableSlots      ExamTimetableSlot[]
@@ -700,6 +738,7 @@ model Section {
   promotionRecordsFrom    PromotionRecord[]          @relation("PromotionFromSection")
   promotionRecordsTo      PromotionRecord[]          @relation("PromotionToSection")
   timetableSlots          TimetableSlot[]
+  timetableVersions       TimetableVersion[]
   homeworkAssignments     HomeworkAssignment[]
   conversations           Conversation[]
   examTimetableSlots      ExamTimetableSlot[]
@@ -949,6 +988,10 @@ model Staff {
   attendanceRecords          StaffAttendance[]
   teacherAssignments         SubjectTeacherAssignment[]
   timetableSlots             TimetableSlot[]
+  teacherAvailabilities      TeacherAvailability[]
+  teacherWorkloadLimits      TeacherWorkloadLimit[]
+  timetableSubstitutionsAway TimetableSubstitution[]      @relation("AbsentTeacherSubstitutions")
+  timetableSubstitutionsFor  TimetableSubstitution[]      @relation("SubstituteTeacherSubstitutions")
   homeworkAssignments        HomeworkAssignment[]
   staffContracts             StaffContract[]
   payrollLines               PayrollLine[]
@@ -2040,14 +2083,84 @@ model PromotionRecord {
   @@index([tenantId, academicYearId, studentId])
 }
 
+model TimetablePeriod {
+  id             String   @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  name           String
+  dayOfWeek      Int?
+  startsAt       String
+  endsAt         String
+  sortOrder      Int      @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant       Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear    @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  slots        TimetableSlot[]
+
+  @@unique([tenantId, academicYearId, name])
+  @@index([tenantId, academicYearId, dayOfWeek, sortOrder])
+}
+
+model Room {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  code      String?
+  capacity  Int?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  slots  TimetableSlot[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+}
+
+model TimetableVersion {
+  id             String                 @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  classId        String?
+  sectionId      String?
+  versionName    String
+  effectiveFrom  DateTime
+  effectiveTo    DateTime?
+  status         TimetableVersionStatus @default(DRAFT)
+  publishedAt    DateTime?
+  publishedById  String?
+  lockedAt       DateTime?
+  lockedById     String?
+  archivedAt     DateTime?
+  archivedById   String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  tenant       Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear    @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class        Class?          @relation(fields: [classId], references: [id], onDelete: SetNull)
+  section      Section?        @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  slots        TimetableSlot[]
+
+  @@index([tenantId, academicYearId, classId, sectionId, status])
+  @@index([tenantId, status, effectiveFrom, effectiveTo])
+}
+
 model TimetableSlot {
   id             String   @id @default(uuid())
   tenantId       String
+  versionId      String?
   academicYearId String
   classId        String
   sectionId      String?
   subjectId      String
   staffId        String
+  periodId       String?
+  roomId         String?
   dayOfWeek      Int
   startsAt       String
   endsAt         String
@@ -2055,55 +2168,157 @@ model TimetableSlot {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
-  class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
-  section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
-  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
-  staff        Staff        @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  version      TimetableVersion? @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear      @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class        Class             @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section?          @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subject      Subject           @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  staff        Staff             @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  period       TimetablePeriod?  @relation(fields: [periodId], references: [id], onDelete: SetNull)
+  roomRef      Room?             @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  substitutions TimetableSubstitution[]
 
   @@index([tenantId, academicYearId, classId, sectionId, dayOfWeek])
   @@index([tenantId, staffId, dayOfWeek])
+  @@index([tenantId, roomId, dayOfWeek])
+  @@index([tenantId, versionId])
 }
 
-model HomeworkAssignment {
+model TeacherAvailability {
+  id             String                  @id @default(uuid())
+  tenantId       String
+  academicYearId String?
+  staffId        String
+  dayOfWeek      Int
+  startsAt       String
+  endsAt         String
+  type           TeacherAvailabilityType @default(AVAILABLE)
+  note           String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, staffId, dayOfWeek])
+  @@index([tenantId, academicYearId, staffId])
+}
+
+model TeacherWorkloadLimit {
   id                String   @id @default(uuid())
   tenantId          String
-  academicYearId    String
-  classId           String
-  sectionId         String?
-  subjectId         String
-  assignedByStaffId String?
-  title             String
-  instructions      String
-  dueAt             DateTime
-  maxScore          Decimal? @db.Decimal(8, 2)
+  academicYearId    String?
+  staffId           String
+  maxPeriodsPerDay  Int?
+  maxPeriodsPerWeek Int?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  academicYear    AcademicYear         @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
-  class           Class                @relation(fields: [classId], references: [id], onDelete: Restrict)
-  section         Section?             @relation(fields: [sectionId], references: [id], onDelete: SetNull)
-  subject         Subject              @relation(fields: [subjectId], references: [id], onDelete: Restrict)
-  assignedByStaff Staff?               @relation(fields: [assignedByStaffId], references: [id], onDelete: SetNull)
-  submissions     HomeworkSubmission[]
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
 
-  @@index([tenantId, academicYearId, classId, sectionId])
+  @@unique([tenantId, academicYearId, staffId])
+  @@index([tenantId, staffId])
+}
+
+model TimetableSubstitution {
+  id                  String                      @id @default(uuid())
+  tenantId            String
+  timetableSlotId     String
+  absentTeacherId     String
+  substituteTeacherId String?
+  date                DateTime
+  reason              String
+  status              TimetableSubstitutionStatus @default(DRAFT)
+  createdById         String
+  approvedById        String?
+  assignedAt          DateTime?
+  cancelledAt         DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  timetableSlot     TimetableSlot @relation(fields: [timetableSlotId], references: [id], onDelete: Restrict)
+  absentTeacher     Staff         @relation("AbsentTeacherSubstitutions", fields: [absentTeacherId], references: [id], onDelete: Restrict)
+  substituteTeacher Staff?        @relation("SubstituteTeacherSubstitutions", fields: [substituteTeacherId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, date, status])
+  @@index([tenantId, absentTeacherId, date])
+  @@index([tenantId, substituteTeacherId, date])
+}
+
+model HomeworkReminderBatch {
+  id              String   @id @default(uuid())
+  tenantId        String
+  homeworkId      String
+  createdById     String
+  targetCount     Int      @default(0)
+  deliveryCount   Int      @default(0)
+  skippedCount    Int      @default(0)
+  dueSoonCount    Int      @default(0)
+  overdueCount    Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  homework HomeworkAssignment @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, homeworkId, createdAt])
+}
+
+model HomeworkAssignment {
+  id                 String                   @id @default(uuid())
+  tenantId           String
+  academicYearId     String
+  classId            String
+  sectionId          String?
+  subjectId          String
+  assignedByStaffId  String?
+  title              String
+  instructions       String
+  assignedDate       DateTime                 @default(now())
+  dueDate            DateTime
+  dueAt              DateTime
+  status             HomeworkAssignmentStatus @default(DRAFT)
+  attachmentMetadata Json?
+  maxScore           Decimal?                 @db.Decimal(8, 2)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  tenant           Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear     AcademicYear            @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class            Class                   @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section          Section?                @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subject          Subject                 @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  assignedByStaff  Staff?                  @relation(fields: [assignedByStaffId], references: [id], onDelete: SetNull)
+  submissions      HomeworkSubmission[]
+  reminderBatches  HomeworkReminderBatch[]
+
+  @@index([tenantId, academicYearId, classId, sectionId, status])
+  @@index([tenantId, subjectId, assignedByStaffId, status])
+  @@index([tenantId, dueDate, status])
 }
 
 model HomeworkSubmission {
-  id                String         @id @default(uuid())
-  tenantId          String
-  homeworkId        String
-  studentId         String
-  status            HomeworkStatus @default(ASSIGNED)
-  submittedAt       DateTime?
-  submissionContent String?
-  score             Decimal?       @db.Decimal(8, 2)
-  feedback          String?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  id                 String                   @id @default(uuid())
+  tenantId           String
+  homeworkId         String
+  studentId          String
+  status             HomeworkSubmissionStatus @default(NOT_SUBMITTED)
+  submittedAt        DateTime?
+  submissionText     String?
+  submissionContent  String?
+  score              Decimal?                 @db.Decimal(8, 2)
+  feedback           String?
+  teacherRemarks     String?
+  correctionRemarks  String?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  returnedAt         DateTime?
+  attachmentMetadata Json?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
 
   tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   homework    HomeworkAssignment   @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
@@ -2111,6 +2326,7 @@ model HomeworkSubmission {
   attachments HomeworkAttachment[]
 
   @@unique([tenantId, homeworkId, studentId])
+  @@index([tenantId, homeworkId, status])
   @@index([tenantId, studentId, status])
 }
 

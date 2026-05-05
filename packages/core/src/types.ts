@@ -1569,11 +1569,14 @@ export type PublishingResult = {
 
 export type TimetableSlotSummary = {
   id: string;
+  versionId?: string | null;
   academicYearId: string;
   classId: string;
   sectionId: string | null;
   subjectId: string;
   staffId: string;
+  periodId?: string | null;
+  roomId?: string | null;
   dayOfWeek: number;
   startsAt: string;
   endsAt: string;
@@ -1587,6 +1590,98 @@ export type TimetableSlotSummary = {
     lastName: string;
     employeeId: string;
   };
+  period?: TimetablePeriodSummary | null;
+  roomRef?: RoomSummary | null;
+  version?: TimetableVersionSummary | null;
+};
+
+export type TimetablePeriodSummary = {
+  id: string;
+  academicYearId: string;
+  name: string;
+  dayOfWeek: number | null;
+  startsAt: string;
+  endsAt: string;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+export type RoomSummary = {
+  id: string;
+  name: string;
+  code: string | null;
+  capacity: number | null;
+  isActive: boolean;
+};
+
+export type TimetableVersionStatus = 'DRAFT' | 'PUBLISHED' | 'LOCKED' | 'ARCHIVED';
+
+export type TimetableVersionSummary = {
+  id: string;
+  academicYearId: string;
+  classId: string | null;
+  sectionId: string | null;
+  versionName: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  status: TimetableVersionStatus;
+  publishedAt?: string | null;
+  lockedAt?: string | null;
+  archivedAt?: string | null;
+  class?: ClassSummary | null;
+  section?: SectionSummary | null;
+  slots?: TimetableSlotSummary[];
+};
+
+export type TimetableValidationIssue = {
+  type: string;
+  message: string;
+  slotId?: string;
+  conflictingSlotId?: string;
+  classId?: string | null;
+  sectionId?: string | null;
+  subjectId?: string | null;
+  staffId?: string | null;
+  roomId?: string | null;
+  versionId?: string | null;
+  dayOfWeek?: number;
+  startsAt?: string;
+  endsAt?: string;
+};
+
+export type TimetableValidationResult = {
+  valid: boolean;
+  errors: TimetableValidationIssue[];
+  warnings: TimetableValidationIssue[];
+};
+
+export type TeacherAvailabilitySummary = {
+  availability: Array<{
+    id: string;
+    academicYearId: string | null;
+    staffId: string;
+    dayOfWeek: number;
+    startsAt: string;
+    endsAt: string;
+    type: 'AVAILABLE' | 'UNAVAILABLE';
+    note: string | null;
+  }>;
+  limit: {
+    id: string;
+    maxPeriodsPerDay: number | null;
+    maxPeriodsPerWeek: number | null;
+  } | null;
+};
+
+export type TimetableSubstitutionSummary = {
+  id: string;
+  timetableSlotId: string;
+  absentTeacherId: string;
+  substituteTeacherId: string | null;
+  date: string;
+  reason: string;
+  status: 'DRAFT' | 'ASSIGNED' | 'CANCELLED' | 'COMPLETED';
+  timetableSlot?: TimetableSlotSummary;
 };
 
 export type TeacherWorkloadSummary = {
@@ -1606,11 +1701,18 @@ export type HomeworkAssignmentSummary = {
   classId: string;
   sectionId: string | null;
   subjectId: string;
+  assignedByStaffId?: string | null;
   title: string;
   instructions: string;
+  assignedDate?: string;
+  dueDate?: string;
   dueAt: string;
+  status?: 'DRAFT' | 'ASSIGNED' | 'CLOSED' | 'CANCELLED';
+  attachmentMetadata?: Record<string, unknown> | null;
   maxScore: number | null;
   submissions?: HomeworkSubmissionSummary[];
+  class?: ClassSummary;
+  section?: SectionSummary | null;
   subject?: SubjectSummary;
   assignedByStaff?: {
     id: string;
@@ -1625,12 +1727,29 @@ export type HomeworkSubmissionSummary = {
   studentId: string;
   status: string;
   submittedAt: string | null;
+  submissionText?: string | null;
   submissionContent: string | null;
   score: number | null;
   feedback: string | null;
+  teacherRemarks?: string | null;
+  correctionRemarks?: string | null;
+  reviewedById?: string | null;
+  reviewedAt?: string | null;
+  returnedAt?: string | null;
   student?: StudentProfile;
   homework?: HomeworkAssignmentSummary;
-  attachments?: any[];
+  attachments?: Array<{
+    id: string;
+    fileAsset?: {
+      id: string;
+      originalFilename: string;
+      publicUrl?: string | null;
+      mimeType: string;
+      sizeBytes: string | number;
+      module?: string | null;
+      entityId?: string | null;
+    } | null;
+  }>;
 };
 
 export type StaffContractSummary = {

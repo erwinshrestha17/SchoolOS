@@ -108,7 +108,7 @@ export const dashboardNavItems: NavItem[] = [
     label: 'Timetable & Homework',
     icon: CalendarCheck,
     permissions: ['timetable:read', 'homework:read'],
-    phase: 'phase1',
+    phase: 'phase2',
   },
   {
     href: '/dashboard/accounting',

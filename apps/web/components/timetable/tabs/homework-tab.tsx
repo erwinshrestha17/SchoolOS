@@ -3,13 +3,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../../../lib/api';
+import type {
+  AcademicYearSummary,
+  ClassSummary,
+  HomeworkAssignmentSummary,
+  HomeworkSubmissionSummary,
+  SectionSummary,
+  StaffSummary,
+  SubjectSummary,
+} from '@schoolos/core';
 
 type Props = {
-  academicYears: any[];
-  classes: any[];
-  allSections: any[];
-  subjects: any[];
-  staff: any[];
+  academicYears: AcademicYearSummary[];
+  classes: ClassSummary[];
+  allSections: SectionSummary[];
+  subjects: SubjectSummary[];
+  staff: StaffSummary[];
   classId: string;
   setClassId: (id: string) => void;
 };
@@ -28,7 +37,7 @@ type HomeworkPayload = {
   subjectId: string;
   title: string;
   instructions: string;
-  dueAt: string;
+  dueDate: string;
   maxScore: number;
 };
 
@@ -44,10 +53,11 @@ export function HomeworkTab({
   const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState('');
 
   const homeworkQuery = useQuery({
-    queryKey: ['homework', classId],
-    queryFn: () => api.listHomework({ classId }),
+    queryKey: ['homework', classId, statusFilter],
+    queryFn: () => api.listHomework({ classId, status: statusFilter || undefined }),
   });
 
   const submissionsQuery = useQuery({
@@ -71,8 +81,23 @@ export function HomeworkTab({
     },
   });
 
-  const selectedAssignment = homeworkQuery.data?.find((h: any) => h.id === selectedAssignmentId);
-  const assignmentSubmissions = submissionsQuery.data?.filter((s: any) => s.homeworkId === selectedAssignmentId) ?? [];
+  const assignMutation = useMutation({
+    mutationFn: api.assignHomework,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['homework'] }),
+  });
+
+  const closeMutation = useMutation({
+    mutationFn: api.closeHomework,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['homework'] }),
+  });
+
+  const reminderMutation = useMutation({
+    mutationFn: api.sendHomeworkReminders,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['homework'] }),
+  });
+
+  const selectedAssignment = homeworkQuery.data?.find((homework) => homework.id === selectedAssignmentId);
+  const assignmentSubmissions = submissionsQuery.data?.filter((submission) => submission.homeworkId === selectedAssignmentId) ?? [];
 
   return (
     <div className="space-y-6">
@@ -84,9 +109,20 @@ export function HomeworkTab({
             className="rounded-xl border-[var(--line)] bg-white/50 text-sm font-medium backdrop-blur-sm"
           >
             <option value="">All Classes</option>
-            {classes.map((c: any) => (
+            {classes.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-xl border-[var(--line)] bg-white/50 text-sm font-medium backdrop-blur-sm"
+          >
+            <option value="">All Statuses</option>
+            <option value="DRAFT">Draft</option>
+            <option value="ASSIGNED">Assigned</option>
+            <option value="CLOSED">Closed</option>
+            <option value="CANCELLED">Cancelled</option>
           </select>
         </div>
 
@@ -112,7 +148,7 @@ export function HomeworkTab({
             </div>
           ) : (
             <div className="space-y-3">
-              {homeworkQuery.data?.map((h: any) => (
+              {homeworkQuery.data?.map((h) => (
                 <div
                   key={h.id}
                   onClick={() => setSelectedAssignmentId(h.id)}
@@ -132,14 +168,14 @@ export function HomeworkTab({
                     <div className="text-right">
                       <p className="text-xs text-gray-500">Due Date</p>
                       <p className="text-sm font-semibold text-gray-700">
-                        {new Date(h.dueAt).toLocaleDateString()}
+                        {new Date(h.dueDate ?? h.dueAt).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
                   <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                     <span>{h.submissions?.length ?? 0} Students</span>
                     <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-medium text-indigo-700">
-                      {h.submissions?.filter((s: any) => s.status === 'SUBMITTED' || s.status === 'REVIEWED').length ?? 0} / {h.submissions?.length ?? 0} Submitted
+                      {h.submissions?.filter((submission) => submission.status === 'SUBMITTED' || submission.status === 'REVIEWED').length ?? 0} / {h.submissions?.length ?? 0} Submitted
                     </span>
                   </div>
                 </div>
@@ -159,20 +195,46 @@ export function HomeworkTab({
 
               <div className="border-t border-[var(--line)] pt-6">
                 <h3 className="mb-4 font-bold text-gray-950">Student Submissions</h3>
+                <div className="mb-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="rounded-xl bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700"
+                    onClick={() => assignMutation.mutate(selectedAssignment.id)}
+                    disabled={selectedAssignment.status !== 'DRAFT' || assignMutation.isPending}
+                  >
+                    Assign
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700"
+                    onClick={() => reminderMutation.mutate(selectedAssignment.id)}
+                    disabled={selectedAssignment.status !== 'ASSIGNED' || reminderMutation.isPending}
+                  >
+                    Send Reminder
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-xl bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700"
+                    onClick={() => closeMutation.mutate(selectedAssignment.id)}
+                    disabled={selectedAssignment.status === 'CLOSED' || closeMutation.isPending}
+                  >
+                    Close
+                  </button>
+                </div>
                 {assignmentSubmissions.length === 0 ? (
                   <p className="text-sm text-gray-500">No submissions yet.</p>
                 ) : (
                   <div className="space-y-3">
-                    {assignmentSubmissions.map((s: any) => (
+                    {assignmentSubmissions.map((s) => (
                       <div key={s.id} className="rounded-2xl border border-[var(--line)] p-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 font-bold text-gray-600 uppercase">
-                              {s.student?.firstName[0]}{s.student?.lastName[0]}
+                              {studentInitials(s)}
                             </div>
                             <div>
                               <p className="font-bold text-gray-950">
-                                {s.student?.firstName} {s.student?.lastName}
+                                {studentName(s)}
                               </p>
                               <p className="text-xs text-gray-500">
                                 {s.submittedAt ? `Submitted on ${new Date(s.submittedAt).toLocaleString()}` : 'Not submitted'}
@@ -197,7 +259,7 @@ export function HomeworkTab({
 
                         {s.attachments && s.attachments.length > 0 && (
                           <div className="mt-3 flex flex-wrap gap-2">
-                            {s.attachments.map((a: any) => (
+                            {s.attachments.map((a) => (
                               <a
                                 key={a.id}
                                 href={a.fileAsset?.publicUrl || '#'}
@@ -257,12 +319,35 @@ function StatusBadge({ status }: { status: string }) {
     SUBMITTED: 'bg-indigo-100 text-indigo-700',
     REVIEWED: 'bg-emerald-100 text-emerald-700',
     LATE: 'bg-amber-100 text-amber-700',
+    NOT_SUBMITTED: 'bg-gray-100 text-gray-600',
+    NEEDS_CORRECTION: 'bg-red-100 text-red-700',
+    EXCUSED: 'bg-sky-100 text-sky-700',
+    DRAFT: 'bg-gray-100 text-gray-600',
+    CLOSED: 'bg-slate-100 text-slate-700',
+    CANCELLED: 'bg-red-100 text-red-700',
   };
   return (
     <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${colors[status] || 'bg-gray-100'}`}>
       {status}
     </span>
   );
+}
+
+function studentName(submission: HomeworkSubmissionSummary) {
+  const student = submission.student;
+  if (!student) return 'Student';
+  const firstName = student.firstNameEn ?? '';
+  const lastName = student.lastNameEn ?? '';
+  return `${firstName} ${lastName}`.trim() || student.studentSystemId || 'Student';
+}
+
+function studentInitials(submission: HomeworkSubmissionSummary) {
+  return studentName(submission)
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 }
 
 function GradingForm({
@@ -327,28 +412,28 @@ function CreateHomeworkModal({
   onSave,
   isPending,
 }: {
-  academicYears: any[];
-  classes: any[];
-  allSections: any[];
-  subjects: any[];
-  staff: any[];
+  academicYears: AcademicYearSummary[];
+  classes: ClassSummary[];
+  allSections: SectionSummary[];
+  subjects: SubjectSummary[];
+  staff: StaffSummary[];
   onClose: () => void;
   onSave: (data: HomeworkPayload) => void;
   isPending: boolean;
 }) {
   const [formData, setFormData] = useState({
-    academicYearId: academicYears.find((y: any) => y.isCurrent)?.id ?? '',
+    academicYearId: academicYears.find((y) => y.isCurrent)?.id ?? '',
     classId: '',
     sectionId: '',
     subjectId: '',
     title: '',
     instructions: '',
-    dueAt: '',
+    dueDate: '',
     maxScore: 100,
   });
 
-  const sectionsForClass = allSections.filter((s: any) => s.classId === formData.classId);
-  const subjectsForClass = subjects.filter((s: any) => s.classId === formData.classId);
+  const sectionsForClass = allSections.filter((s) => s.classId === formData.classId);
+  const subjectsForClass = subjects.filter((s) => s.classId === formData.classId);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
@@ -367,7 +452,7 @@ function CreateHomeworkModal({
                  onChange={(e) => setFormData({ ...formData, academicYearId: e.target.value })}
                >
                  <option value="">Select Year</option>
-                 {academicYears.map((y: any) => (
+                 {academicYears.map((y) => (
                    <option key={y.id} value={y.id}>{y.name}</option>
                  ))}
                </select>
@@ -380,7 +465,7 @@ function CreateHomeworkModal({
                  onChange={(e) => setFormData({ ...formData, classId: e.target.value, sectionId: '', subjectId: '' })}
                >
                  <option value="">Select Class</option>
-                 {classes.map((c: any) => (
+                 {classes.map((c) => (
                    <option key={c.id} value={c.id}>{c.name}</option>
                  ))}
                </select>
@@ -394,7 +479,7 @@ function CreateHomeworkModal({
                  disabled={!formData.classId}
                >
                  <option value="">Whole Class</option>
-                 {sectionsForClass.map((s: any) => (
+                 {sectionsForClass.map((s) => (
                    <option key={s.id} value={s.id}>{s.name}</option>
                  ))}
                </select>
@@ -408,7 +493,7 @@ function CreateHomeworkModal({
                  disabled={!formData.classId}
                >
                  <option value="">Select Subject</option>
-                 {subjectsForClass.map((s: any) => (
+                 {subjectsForClass.map((s) => (
                    <option key={s.id} value={s.id}>{s.name}</option>
                  ))}
                </select>
@@ -438,8 +523,8 @@ function CreateHomeworkModal({
                <label className="text-xs font-semibold text-gray-600">Due Date</label>
                <input
                  type="datetime-local"
-                 value={formData.dueAt}
-                 onChange={(e) => setFormData({ ...formData, dueAt: e.target.value })}
+                 value={formData.dueDate}
+                 onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                />
              </div>
 
@@ -463,7 +548,7 @@ function CreateHomeworkModal({
           </button>
           <button
             onClick={() => onSave(formData)}
-            disabled={isPending || !formData.classId || !formData.subjectId || !formData.title || !formData.dueAt}
+            disabled={isPending || !formData.classId || !formData.subjectId || !formData.title || !formData.dueDate}
             className="rounded-xl bg-indigo-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
           >
             {isPending ? 'Assigning...' : 'Assign Homework'}
