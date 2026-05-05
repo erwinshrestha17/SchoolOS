@@ -131,37 +131,89 @@ export function MarksEntryTab({ classes, allSections, students, exams }: Props) 
 
           {batchMut.isError && <p className="mb-4 text-sm text-red-600">{batchMut.error.message}</p>}
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--line)]">
-                  <th className="py-3 text-left font-semibold text-gray-500 w-16">#</th>
-                  <th className="py-3 text-left font-semibold text-gray-500">Student</th>
-                  <th className="py-3 text-left font-semibold text-gray-500 w-20">Roll</th>
-                  <th className="py-3 text-left font-semibold text-gray-500 w-32">Existing</th>
-                  <th className="py-3 text-left font-semibold text-gray-500 w-40">Marks</th>
+        <div className="overflow-x-auto">
+          <div className="mb-4 flex items-center gap-3">
+            <button
+              type="button"
+              className="rounded-xl border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+              onClick={() => {
+                const newMarks: Record<string, number> = {};
+                studentsForClass.forEach((s: any) => {
+                  newMarks[s.id] = 0;
+                });
+                setMarks((prev) => ({ ...prev, ...newMarks }));
+              }}
+              disabled={selectedExam?.isLocked}
+            >
+              Set All to 0
+            </button>
+            <button
+              type="button"
+              className="rounded-xl border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+              onClick={() => {
+                const newMarks: Record<string, number> = {};
+                studentsForClass.forEach((s: any) => {
+                  newMarks[s.id] = maxMarks;
+                });
+                setMarks((prev) => ({ ...prev, ...newMarks }));
+              }}
+              disabled={selectedExam?.isLocked}
+            >
+              Set All to Max ({maxMarks})
+            </button>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[var(--line)]">
+                <th className="py-3 text-left font-semibold text-gray-500 w-16">#</th>
+                <th className="py-3 text-left font-semibold text-gray-500">Student</th>
+                <th className="py-3 text-left font-semibold text-gray-500 w-20">Roll</th>
+                <th className="py-3 text-left font-semibold text-gray-500 w-32">Existing</th>
+                <th className="py-3 text-left font-semibold text-gray-500 w-40">Marks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {studentsForClass.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-gray-400">
+                    No students found for this class/section.
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {studentsForClass.length === 0 ? (
-                  <tr><td colSpan={5} className="py-8 text-center text-gray-400">No students found for this class/section.</td></tr>
-                ) : studentsForClass.map((student: any, idx: number) => {
+              ) : (
+                studentsForClass.map((student: any, idx: number) => {
                   const existing = existingMap.get(student.id);
                   const currentValue = marks[student.id] ?? existing ?? '';
+                  const isInvalid = currentValue !== '' && Number(currentValue) > maxMarks;
+
                   return (
-                    <tr key={student.id} className="border-b border-[var(--line)] hover:bg-indigo-50/30 transition">
+                    <tr
+                      key={student.id}
+                      className="border-b border-[var(--line)] hover:bg-indigo-50/30 transition"
+                    >
                       <td className="py-2 text-gray-400">{idx + 1}</td>
                       <td className="py-2">
-                        <span className="font-medium text-gray-950">{student.firstNameEn} {student.lastNameEn}</span>
-                        <span className="ml-2 text-xs text-gray-400">{student.studentSystemId}</span>
+                        <span className="font-medium text-gray-950">
+                          {student.firstNameEn} {student.lastNameEn}
+                        </span>
+                        <span className="ml-2 text-xs text-gray-400">
+                          {student.studentSystemId}
+                        </span>
                       </td>
                       <td className="py-2 text-gray-500">{student.rollNumber ?? '—'}</td>
                       <td className="py-2">
                         {existing !== undefined ? (
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${existing >= (selectedComponent?.passMarks ? Number(selectedComponent.passMarks) : 35) ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                              existing >= (selectedComponent?.passMarks ? Number(selectedComponent.passMarks) : 35)
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'bg-red-50 text-red-700'
+                            }`}
+                          >
                             {existing}/{maxMarks}
                           </span>
-                        ) : <span className="text-xs text-gray-300">—</span>}
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
+                        )}
                       </td>
                       <td className="py-2">
                         <input
@@ -170,22 +222,42 @@ export function MarksEntryTab({ classes, allSections, students, exams }: Props) 
                           max={maxMarks}
                           value={currentValue}
                           disabled={selectedExam?.isLocked}
-                          className="w-28 rounded-xl border border-[var(--line)] px-3 py-1.5 text-sm focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 disabled:opacity-50"
+                          id={`mark-input-${idx}`}
+                          className={`w-28 rounded-xl border px-3 py-1.5 text-sm focus:ring-1 disabled:opacity-50 transition-colors ${
+                            isInvalid
+                              ? 'border-red-500 bg-red-50 focus:border-red-600 focus:ring-red-200'
+                              : 'border-[var(--line)] focus:border-indigo-400 focus:ring-indigo-200'
+                          }`}
                           onChange={(e) => {
                             const val = e.target.value === '' ? undefined : Number(e.target.value);
                             setMarks((prev) => {
-                              if (val === undefined) { const { [student.id]: _, ...rest } = prev; return rest; }
+                              if (val === undefined) {
+                                const { [student.id]: _, ...rest } = prev;
+                                return rest;
+                              }
                               return { ...prev, [student.id]: val };
                             });
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === 'ArrowDown') {
+                              e.preventDefault();
+                              const next = document.getElementById(`mark-input-${idx + 1}`);
+                              if (next) (next as HTMLInputElement).focus();
+                            } else if (e.key === 'ArrowUp') {
+                              e.preventDefault();
+                              const prev = document.getElementById(`mark-input-${idx - 1}`);
+                              if (prev) (prev as HTMLInputElement).focus();
+                            }
                           }}
                         />
                       </td>
                     </tr>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
         </section>
       ) : (
         <section className="rounded-[28px] border border-dashed border-[var(--line)] bg-gray-50/50 p-12 text-center">

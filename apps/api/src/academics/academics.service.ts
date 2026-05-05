@@ -14,9 +14,10 @@ import {
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
-import { buildSimplePdf } from '../common/pdf/simple-pdf';
+import { buildReportCardPdf, buildSimplePdf } from '../common/pdf/simple-pdf';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssignTeacherDto } from './dto/assign-teacher.dto';
+import { BatchGenerateReportCardsDto } from './dto/batch-generate-report-cards.dto';
 import { CreateAssessmentComponentDto } from './dto/create-assessment-component.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
 import { CreateExamTermDto } from './dto/create-exam-term.dto';
@@ -949,12 +950,30 @@ export class AcademicsService {
         class: true,
         section: true,
         examTerm: true,
+        academicYear: true,
       },
     });
 
     if (!reportCard) {
       throw new NotFoundException('Report card not found in this tenant');
     }
+
+    const [tenant, marks] = await Promise.all([
+      this.prisma.tenant.findUnique({
+        where: { id: actor.tenantId },
+      }),
+      this.prisma.markEntry.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          examTermId: reportCard.examTermId,
+          studentId: reportCard.studentId,
+        },
+        include: {
+          subject: true,
+          assessmentComponent: true,
+        },
+      }),
+    ]);
 
     const unpaid = await this.prisma.invoice.count({
       where: {
@@ -969,19 +988,80 @@ export class AcademicsService {
       throw new ConflictException('Report card is blocked by unpaid fees');
     }
 
-    return buildSimplePdf([
-      'SchoolOS Report Card',
-      `Exam: ${reportCard.examTerm.name}`,
-      `Student: ${reportCard.student.firstNameEn} ${reportCard.student.lastNameEn}`,
-      `Class: ${reportCard.class.name}`,
-      `Section: ${reportCard.section?.name ?? 'N/A'}`,
-      `Percentage: ${Number(reportCard.percentage).toFixed(2)}%`,
-      `Grade: ${reportCard.grade}`,
-      `GPA: ${Number(reportCard.gpa).toFixed(2)}`,
-      `Status: ${reportCard.status}`,
-      `Remarks: ${reportCard.remarks ?? 'N/A'}`,
-      'SEE-format metadata: tenant-scoped school record, marks locked before issue where applicable.',
-    ]);
+    // Group marks by subject
+    const subjectMap = new Map<string, any>();
+
+    for (const mark of marks) {
+      if (!subjectMap.has(mark.subjectId)) {
+        subjectMap.set(mark.subjectId, {
+          name: mark.subject.name,
+          theory: null,
+          practical: null,
+          totalObtained: 0,
+          totalMax: 0,
+        });
+      }
+
+      const sub = subjectMap.get(mark.subjectId);
+      const componentType = mark.assessmentComponent.type.toUpperCase();
+
+      if (componentType === 'THEORY' || componentType === 'TH') {
+        sub.theory = {
+          max: Number(mark.assessmentComponent.maxMarks),
+          obtained: Number(mark.marksObtained),
+          grade: calculateMoestGrade(
+            (Number(mark.marksObtained) / Number(mark.assessmentComponent.maxMarks)) * 100,
+          ).grade,
+        };
+      } else if (componentType === 'PRACTICAL' || componentType === 'PR' || componentType === 'CAS') {
+        sub.practical = {
+          max: Number(mark.assessmentComponent.maxMarks),
+          obtained: Number(mark.marksObtained),
+          grade: calculateMoestGrade(
+            (Number(mark.marksObtained) / Number(mark.assessmentComponent.maxMarks)) * 100,
+          ).grade,
+        };
+      }
+
+      sub.totalObtained += Number(mark.marksObtained);
+      sub.totalMax += Number(mark.assessmentComponent.maxMarks);
+    }
+
+    const subjects = Array.from(subjectMap.values()).map((sub) => {
+      const percentage = sub.totalMax > 0 ? (sub.totalObtained / sub.totalMax) * 100 : 0;
+      const { grade, gpa } = calculateMoestGrade(percentage);
+
+      return {
+        name: sub.name,
+        theory: sub.theory,
+        practical: sub.practical,
+        totalGrade: grade,
+        gradePoint: gpa,
+      };
+    });
+
+    return buildReportCardPdf({
+      schoolName: tenant?.name ?? 'SchoolOS',
+      panNumber: tenant?.panNumber,
+      examName: reportCard.examTerm.name,
+      academicYear: reportCard.academicYear.name,
+      student: {
+        name: `${reportCard.student.firstNameEn} ${reportCard.student.lastNameEn}`,
+        id: reportCard.student.studentSystemId,
+        className: reportCard.class.name,
+        sectionName: reportCard.section?.name,
+        rollNumber: reportCard.student.rollNumber ?? undefined,
+      },
+      subjects,
+      summary: {
+        totalMarks: Number(reportCard.totalMarks),
+        maxMarks: Number(reportCard.maxMarks),
+        percentage: Number(reportCard.percentage),
+        finalGrade: reportCard.grade,
+        finalGpa: Number(reportCard.gpa),
+        remarks: reportCard.remarks,
+      },
+    });
   }
 
   async generateReportCard(dto: GenerateReportCardDto, actor: AuthContext) {
@@ -1123,6 +1203,31 @@ export class AcademicsService {
     return reportCard;
   }
 
+  async batchGenerateReportCards(dto: BatchGenerateReportCardsDto, actor: AuthContext) {
+    const results = [];
+
+    for (const studentId of dto.studentIds) {
+      try {
+        const rc = await this.generateReportCard(
+          {
+            academicYearId: dto.academicYearId,
+            examTermId: dto.examTermId,
+            studentId,
+            remarks: dto.remarks,
+            lock: dto.lock,
+          },
+          actor,
+        );
+        results.push(rc);
+      } catch (err) {
+        // Continue for other students if one fails
+        console.error(`Failed to generate report card for student ${studentId}:`, err);
+      }
+    }
+
+    return results;
+  }
+
   async createSyllabusTopic(
     subjectId: string,
     dto: { title: string; description?: string; orderIndex?: number },
@@ -1239,19 +1344,42 @@ export class AcademicsService {
       orderBy: [{ percentage: 'desc' }],
     });
 
-    return reportCards.map((card) => ({
-      reportCardId: card.id,
-      studentId: card.studentId,
-      studentName:
-        `${card.student.firstNameEn} ${card.student.lastNameEn}`.trim(),
-      className: card.class.name,
-      sectionName: card.section?.name ?? null,
-      examTerm: card.examTerm.name,
-      percentage: Number(card.percentage),
-      grade: card.grade,
-      status: getPromotionStatus(Number(card.percentage)),
-      locked: card.status === GradeLockStatus.LOCKED,
-    }));
+    const results = [];
+
+    for (const card of reportCards) {
+      const invoices = await this.prisma.invoice.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          studentId: card.studentId,
+          status: { in: ['ISSUED', 'PARTIAL'] },
+        },
+        select: { totalAmount: true, paidAmount: true },
+      });
+
+      const outstanding = invoices.reduce(
+        (acc, inv) => acc + (Number(inv.totalAmount) - Number(inv.paidAmount)),
+        0,
+      );
+
+      const status = getPromotionStatus(Number(card.percentage));
+
+      results.push({
+        reportCardId: card.id,
+        studentId: card.studentId,
+        studentName: `${card.student.firstNameEn} ${card.student.lastNameEn}`.trim(),
+        className: card.class.name,
+        sectionName: card.section?.name ?? null,
+        examTerm: card.examTerm.name,
+        percentage: Number(card.percentage),
+        grade: card.grade,
+        status: outstanding > 0 ? 'REVIEW' : status,
+        locked: card.status === GradeLockStatus.LOCKED,
+        outstandingBalance: outstanding,
+        reviewReason: outstanding > 0 ? `Unpaid dues: Rs ${outstanding.toLocaleString()}` : null,
+      });
+    }
+
+    return results;
   }
 
   async listRemedialStudents(actor: AuthContext, academicYearId?: string) {

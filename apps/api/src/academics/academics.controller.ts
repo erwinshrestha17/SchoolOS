@@ -24,6 +24,7 @@ import { GenerateReportCardDto } from './dto/generate-report-card.dto';
 import { PromoteStudentDto } from './dto/promote-student.dto';
 import { BatchPromoteDto } from './dto/batch-promote.dto';
 import { BatchEnterMarksDto } from './dto/batch-enter-marks.dto';
+import { BatchGenerateReportCardsDto } from './dto/batch-generate-report-cards.dto';
 import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
@@ -193,6 +194,15 @@ export class AcademicsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.academicsService.generateReportCard(dto, auth);
+  }
+
+  @Post('report-cards/batch')
+  @Permissions('academics:manage_report_cards')
+  batchGenerateReportCards(
+    @Body() dto: BatchGenerateReportCardsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.academicsService.batchGenerateReportCards(dto, auth);
   }
 
   @Get('subjects/:id/syllabus')

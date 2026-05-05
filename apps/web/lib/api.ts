@@ -37,6 +37,7 @@ import type {
   InvoiceSummary,
   JournalEntryView,
   MarkEntrySummary,
+  MarkLockRequestSummary,
   MessageReadReceiptSummary,
   MessageSummary,
   MoodLog,
@@ -428,8 +429,21 @@ export const api = {
   createCasRecord: (body: JsonBody) =>
     request<CasRecordSummary>('/academics/cas', { method: 'POST', json: body }),
   listReportCards: () => request<ReportCardSummary[]>('/academics/report-cards'),
+  listMarkLockRequests: () => request<MarkLockRequestSummary[]>('/academics/marks/lock-requests'),
+  requestMarkLock: (body: JsonBody) =>
+    request<MarkLockRequestSummary>('/academics/marks/lock-requests', {
+      method: 'POST',
+      json: body,
+    }),
+  reviewMarkLockRequest: (id: string, body: JsonBody) =>
+    request<MarkLockRequestSummary>(`/academics/marks/lock-requests/${encodeURIComponent(id)}/review`, {
+      method: 'PATCH',
+      json: body,
+    }),
   generateReportCard: (body: JsonBody) =>
-    request('/academics/report-cards', { method: 'POST', json: body }),
+    request<ReportCardSummary>('/academics/report-cards', { method: 'POST', json: body }),
+  batchGenerateReportCards: (body: JsonBody) =>
+    request<ReportCardSummary[]>('/academics/report-cards/batch', { method: 'POST', json: body }),
   listPromotionReadiness: (params?: {
     academicYearId?: string | null;
     classId?: string | null;

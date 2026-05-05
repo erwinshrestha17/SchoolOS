@@ -280,6 +280,122 @@ export function buildIdCardPdf(input: {
   return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
 }
 
+export function buildReportCardPdf(input: {
+  schoolName: string;
+  panNumber?: string | null;
+  examName: string;
+  academicYear: string;
+  student: {
+    name: string;
+    id: string;
+    className: string;
+    sectionName?: string | null;
+    rollNumber?: number | null;
+  };
+  subjects: Array<{
+    name: string;
+    theory?: { max: number; obtained: number; grade: string };
+    practical?: { max: number; obtained: number; grade: string };
+    totalGrade: string;
+    gradePoint: number;
+  }>;
+  summary: {
+    totalMarks: number;
+    maxMarks: number;
+    percentage: number;
+    finalGrade: string;
+    finalGpa: number;
+    remarks?: string | null;
+  };
+}) {
+  const contentParts = [
+    '0.5 w',
+    '36 36 540 720 re S', // Outer border
+    text(input.schoolName, 48, 726, 18, 'F2'),
+    input.panNumber ? text(`PAN: ${input.panNumber}`, 48, 710, 10, 'F1') : '',
+    text('PROGRESS REPORT', 420, 726, 14, 'F2'),
+    text(`${input.examName} — ${input.academicYear}`, 420, 710, 10, 'F1'),
+    '36 696 m 576 696 l S',
+
+    // Student Info
+    text('Student Name:', 48, 670, 10, 'F2'),
+    text(input.student.name, 140, 670, 10, 'F1'),
+    text('Student ID:', 380, 670, 10, 'F2'),
+    text(input.student.id, 460, 670, 10, 'F1'),
+    text('Class:', 48, 650, 10, 'F2'),
+    text(input.student.className, 140, 650, 10, 'F1'),
+    text('Section:', 240, 650, 10, 'F2'),
+    text(input.student.sectionName ?? 'N/A', 300, 650, 10, 'F1'),
+    text('Roll No:', 380, 650, 10, 'F2'),
+    text(String(input.student.rollNumber ?? '—'), 460, 650, 10, 'F1'),
+
+    '36 630 m 576 630 l S',
+
+    // Table Header
+    text('SUBJECT', 48, 610, 10, 'F2'),
+    text('THEORY', 200, 610, 10, 'F2'),
+    text('PRAC', 300, 610, 10, 'F2'),
+    text('GRADE', 420, 610, 10, 'F2'),
+    text('GP', 500, 610, 10, 'F2'),
+    '36 600 m 576 600 l S',
+  ];
+
+  let y = 580;
+  for (const sub of input.subjects) {
+    contentParts.push(
+      text(sub.name, 48, y, 10, 'F1'),
+      sub.theory
+        ? text(`${sub.theory.obtained}/${sub.theory.max}`, 200, y, 9, 'F1')
+        : text('—', 200, y, 9, 'F1'),
+      sub.practical
+        ? text(`${sub.practical.obtained}/${sub.practical.max}`, 300, y, 9, 'F1')
+        : text('—', 300, y, 9, 'F1'),
+      text(sub.totalGrade, 420, y, 10, 'F2'),
+      text(sub.gradePoint.toFixed(2), 500, y, 10, 'F1'),
+    );
+    y -= 22;
+
+    if (y < 120) break; // Simple page break prevention for now
+  }
+
+  y -= 10;
+  contentParts.push('36 ' + (y + 12) + ' m 576 ' + (y + 12) + ' l S');
+
+  // Summary
+  contentParts.push(
+    text('Percentage:', 380, y - 10, 10, 'F2'),
+    text(`${input.summary.percentage.toFixed(2)}%`, 500, y - 10, 10, 'F1'),
+    text('Final Grade:', 380, y - 30, 10, 'F2'),
+    text(input.summary.finalGrade, 500, y - 30, 12, 'F2'),
+    text('GPA:', 380, y - 50, 10, 'F2'),
+    text(input.summary.finalGpa.toFixed(2), 500, y - 50, 12, 'F2'),
+  );
+
+  if (input.summary.remarks) {
+    contentParts.push(
+      text('Remarks:', 48, y - 10, 10, 'F2'),
+      ...wrapPdfLine(input.summary.remarks, 48, y - 28, 280, 10),
+    );
+  }
+
+  // Footer Signatures
+  contentParts.push(
+    '72 80 m 200 80 l S',
+    text('Class Teacher', 90, 65, 10, 'F1'),
+    '380 80 m 508 80 l S',
+    text('Principal', 420, 65, 10, 'F1'),
+    text(
+      `Printed on: ${new Date().toISOString().slice(0, 10)}`,
+      240,
+      20,
+      8,
+      'F1',
+    ),
+  );
+
+  return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
+}
+
 function escapePdfText(text: string | number | null | undefined) {
   const safeText = String(text ?? 'N/A');
   return safeText

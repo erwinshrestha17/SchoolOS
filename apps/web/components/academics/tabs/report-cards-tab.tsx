@@ -37,7 +37,20 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
     void queryClient.invalidateQueries({ queryKey: ['promotion-readiness'] });
   };
 
-  const generateMut = useMutation({ mutationFn: api.generateReportCard, onSuccess: invalidate });
+  const batchGenerateMut = useMutation({ mutationFn: api.batchGenerateReportCards, onSuccess: invalidate });
+
+  const handleBatchGenerate = () => {
+    if (!report.academicYearId || !report.examTermId || studentsForClass.length === 0) return;
+    if (!confirm(`Are you sure you want to generate report cards for all ${studentsForClass.length} students?`)) return;
+
+    batchGenerateMut.mutate({
+      academicYearId: report.academicYearId,
+      examTermId: report.examTermId,
+      studentIds: studentsForClass.map((s: any) => s.id),
+      remarks: report.remarks,
+      lock: report.lock,
+    });
+  };
 
   const openPdf = async (reportCardId: string) => {
     try {
@@ -45,9 +58,15 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
         `${process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1'}/academics/report-cards/${encodeURIComponent(reportCardId)}.pdf`,
         { credentials: 'include' },
       );
-      if (!response.ok) throw new Error('Failed to load PDF');
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || 'Failed to load PDF');
+      }
+
       const blob = await response.blob();
-      window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer');
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
     } catch (err: any) {
       alert(err.message ?? 'Could not load report card PDF');
     }
@@ -57,47 +76,120 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
     <div className="space-y-6">
       {/* Generate report card */}
       <section className="rounded-[28px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-        <div className="mb-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Generate</p>
-          <h2 className="mt-1 text-lg font-bold text-gray-950">Generate Report Card</h2>
-          <p className="mt-1 text-sm text-gray-500">Report cards are generated from marks and CAS records using Nepal MoEST grading.</p>
+        <div className="mb-5 flex items-start justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Generate</p>
+            <h2 className="mt-1 text-lg font-bold text-gray-950">Generate Report Card</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Report cards are generated from marks and CAS records using Nepal MoEST grading.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="rounded-2xl border border-[var(--line)] bg-white px-6 py-3 font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
+              disabled={!report.academicYearId || !report.examTermId || studentsForClass.length === 0 || batchGenerateMut.isPending}
+              onClick={handleBatchGenerate}
+            >
+              {batchGenerateMut.isPending ? 'Generating Batch…' : `Batch Generate (${studentsForClass.length})`}
+            </button>
+            <button
+              type="button"
+              className="rounded-2xl bg-indigo-950 px-6 py-3 font-semibold text-white transition hover:bg-indigo-900 disabled:opacity-50"
+              disabled={!report.academicYearId || !report.examTermId || !report.studentId || generateMut.isPending}
+              onClick={() => generateMut.mutate(report)}
+            >
+              {generateMut.isPending ? 'Generating…' : 'Generate Single'}
+            </button>
+          </div>
         </div>
+
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <select value={report.academicYearId} onChange={(e) => setReport((c) => ({ ...c, academicYearId: e.target.value }))}>
+          <select
+            value={report.academicYearId}
+            onChange={(e) => setReport((c) => ({ ...c, academicYearId: e.target.value }))}
+          >
             <option value="">Academic year</option>
-            {academicYears.map((y: any) => <option key={y.id} value={y.id}>{y.name}</option>)}
+            {academicYears.map((y: any) => (
+              <option key={y.id} value={y.id}>
+                {y.name}
+              </option>
+            ))}
           </select>
-          <select value={report.examTermId} onChange={(e) => setReport((c) => ({ ...c, examTermId: e.target.value }))}>
+          <select
+            value={report.examTermId}
+            onChange={(e) => setReport((c) => ({ ...c, examTermId: e.target.value }))}
+          >
             <option value="">Exam term</option>
-            {exams.map((e: any) => <option key={e.id} value={e.id}>{e.name}</option>)}
+            {exams.map((e: any) => (
+              <option key={e.id} value={e.id}>
+                {e.name}
+              </option>
+            ))}
           </select>
         </div>
-        <div className="grid mt-3 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <select value={report.classId} onChange={(e) => setReport((c) => ({ ...c, classId: e.target.value, sectionId: '', studentId: '' }))}>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <select
+            value={report.classId}
+            onChange={(e) => setReport((c) => ({ ...c, classId: e.target.value, sectionId: '', studentId: '' }))}
+          >
             <option value="">Class</option>
-            {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {classes.map((c: any) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
           </select>
-          <select value={report.sectionId} onChange={(e) => setReport((c) => ({ ...c, sectionId: e.target.value, studentId: '' }))}>
+          <select
+            value={report.sectionId}
+            onChange={(e) => setReport((c) => ({ ...c, sectionId: e.target.value, studentId: '' }))}
+          >
             <option value="">All sections</option>
-            {sectionsForClass.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {sectionsForClass.map((s: any) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
           </select>
-          <select value={report.studentId} onChange={(e) => setReport((c) => ({ ...c, studentId: e.target.value }))}>
-            <option value="">Student</option>
-            {studentsForClass.map((s: any) => <option key={s.id} value={s.id}>{s.studentSystemId} — {s.firstNameEn} {s.lastNameEn}</option>)}
+          <select
+            value={report.studentId}
+            onChange={(e) => setReport((c) => ({ ...c, studentId: e.target.value }))}
+          >
+            <option value="">Student (Optional for batch)</option>
+            {studentsForClass.map((s: any) => (
+              <option key={s.id} value={s.id}>
+                {s.studentSystemId} — {s.firstNameEn} {s.lastNameEn}
+              </option>
+            ))}
           </select>
           <div className="flex items-center gap-4">
             <label className="flex items-center gap-2 text-sm text-gray-600">
-              <input type="checkbox" checked={report.lock} onChange={(e) => setReport((c) => ({ ...c, lock: e.target.checked }))} className="rounded" />
+              <input
+                type="checkbox"
+                checked={report.lock}
+                onChange={(e) => setReport((c) => ({ ...c, lock: e.target.checked }))}
+                className="rounded"
+              />
               Lock marks
             </label>
           </div>
         </div>
-        <textarea rows={2} className="mt-3 w-full" value={report.remarks} onChange={(e) => setReport((c) => ({ ...c, remarks: e.target.value }))} placeholder="Remarks (optional)" />
-        <button type="button" className="mt-3 rounded-2xl bg-indigo-950 px-6 py-3 font-semibold text-white transition hover:bg-indigo-900 disabled:opacity-50" disabled={!report.academicYearId || !report.examTermId || !report.studentId || generateMut.isPending} onClick={() => generateMut.mutate(report)}>
-          {generateMut.isPending ? 'Generating…' : 'Generate Report Card'}
-        </button>
-        {generateMut.isError && <p className="mt-2 text-sm text-red-600">{generateMut.error.message}</p>}
-        {generateMut.isSuccess && <p className="mt-2 text-sm text-emerald-600">Report card generated successfully.</p>}
+        <textarea
+          rows={2}
+          className="mt-3 w-full rounded-2xl border border-[var(--line)] px-4 py-3 text-sm focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+          value={report.remarks}
+          onChange={(e) => setReport((c) => ({ ...c, remarks: e.target.value }))}
+          placeholder="Remarks (optional)"
+        />
+
+        {(generateMut.isError || batchGenerateMut.isError) && (
+          <p className="mt-2 text-sm text-red-600">
+            {generateMut.error?.message || batchGenerateMut.error?.message}
+          </p>
+        )}
+        {(generateMut.isSuccess || batchGenerateMut.isSuccess) && (
+          <p className="mt-2 text-sm text-emerald-600">Report card(s) generated successfully.</p>
+        )}
       </section>
 
       {/* Report cards list */}
