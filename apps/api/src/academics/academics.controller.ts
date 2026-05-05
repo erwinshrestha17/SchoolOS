@@ -16,7 +16,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { AcademicsFoundationService } from './academics-foundation.service';
-import { AcademicsService } from './academics.service';
+import { AcademicsService, PromotionReadinessRow } from './academics.service';
 import { AssessmentComponentsService } from './assessment-components.service';
 import { CasRecordsService } from './cas-records.service';
 import { MarkLockWorkflowService } from './mark-lock-workflow.service';
@@ -385,14 +385,17 @@ export class AcademicsController {
   @Permissions('academics:read')
   listPromotions(
     @CurrentAuth() auth: AuthContext,
-    @Query('academicYearId') academicYearId?: string,
+    @Query('academicYearId') academicYearId: string,
     @Query('classId') classId?: string,
-  ): Promise<unknown> {
-    return this.academicsService.listPromotionReadiness(
-      auth,
+    @Query('sectionId') sectionId?: string,
+    @Query('status') status?: string,
+  ): Promise<PromotionReadinessRow[]> {
+    return this.academicsService.listPromotionReadiness(auth, {
       academicYearId,
       classId,
-    );
+      sectionId,
+      status,
+    });
   }
 
   @Post('promotions')

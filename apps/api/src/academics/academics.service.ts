@@ -46,19 +46,23 @@ interface ReportCardPdfSubject {
   totalMax: number;
 }
 
-interface PromotionReadinessRow {
-  reportCardId: string;
+export interface PromotionReadinessRow {
   studentId: string;
   studentName: string;
+  studentSystemId: string;
+  classId: string;
   className: string;
+  sectionId: string | null;
   sectionName: string | null;
-  examTerm: string;
+  reportCardId: string | null;
   percentage: number;
   grade: string;
-  status: string;
-  locked: boolean;
+  gpa: number;
+  status: 'READY' | 'REVIEW' | 'BLOCKED';
+  reasons: string[];
+  recommendedAction: 'PROMOTE' | 'REVIEW' | 'HOLD';
+  lifecycleStatus: string;
   outstandingBalance: number;
-  reviewReason: string | null;
 }
 
 @Injectable()
@@ -1373,31 +1377,59 @@ export class AcademicsService {
 
   async listPromotionReadiness(
     actor: AuthContext,
-    academicYearId?: string,
-    classId?: string,
+    filters: {
+      academicYearId: string;
+      classId?: string;
+      sectionId?: string;
+      status?: string;
+    },
   ) {
-    const reportCards = await this.prisma.reportCard.findMany({
+    const enrollments = await this.prisma.enrollment.findMany({
       where: {
         tenantId: actor.tenantId,
-        ...(academicYearId ? { academicYearId } : {}),
-        ...(classId ? { classId } : {}),
+        academicYearId: filters.academicYearId,
+        ...(filters.classId ? { classId: filters.classId } : {}),
+        ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+        status: { in: ['ACTIVE', 'PROMOTED'] },
       },
       include: {
-        student: true,
-        class: true,
-        section: true,
-        examTerm: true,
+        student: {
+          include: {
+            class: true,
+            sectionRef: true,
+          },
+        },
       },
-      orderBy: [{ percentage: 'desc' }],
+      orderBy: [
+        { student: { firstNameEn: 'asc' } },
+        { student: { lastNameEn: 'asc' } },
+      ],
     });
 
     const results: PromotionReadinessRow[] = [];
 
-    for (const card of reportCards) {
+    // Get report cards for this year to avoid N+1 if possible, but students might have multiple cards
+    // Usually we want the 'Final' or latest term. For now, let's look for any locked card in that year.
+    for (const enrollment of enrollments) {
+      const student = enrollment.student;
+
+      // Find the most relevant report card for promotion (e.g., from the final term)
+      const reportCards = await this.prisma.reportCard.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          academicYearId: filters.academicYearId,
+          studentId: student.id,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const latestCard = reportCards[0];
+
+      // Financial check
       const invoices = await this.prisma.invoice.findMany({
         where: {
           tenantId: actor.tenantId,
-          studentId: card.studentId,
+          studentId: student.id,
           status: { in: ['ISSUED', 'PARTIAL'] },
         },
         include: {
@@ -1418,26 +1450,57 @@ export class AcademicsService {
         return acc + (Number(inv.totalAmount) - paidAmount);
       }, 0);
 
-      const status = getPromotionStatus(Number(card.percentage));
+      const reasons: string[] = [];
+      let status: 'READY' | 'REVIEW' | 'BLOCKED' = 'READY';
 
-      results.push({
-        reportCardId: card.id,
-        studentId: card.studentId,
-        studentName:
-          `${card.student.firstNameEn} ${card.student.lastNameEn}`.trim(),
-        className: card.class.name,
-        sectionName: card.section?.name ?? null,
-        examTerm: card.examTerm.name,
-        percentage: Number(card.percentage),
-        grade: card.grade,
-        status: outstanding > 0 ? 'REVIEW' : status,
-        locked: card.status === GradeLockStatus.LOCKED,
+      if (!latestCard) {
+        status = 'BLOCKED';
+        reasons.push('No report card found for this academic year');
+      } else if (latestCard.status === GradeLockStatus.DRAFT) {
+        status = 'REVIEW';
+        reasons.push('Report card is still in DRAFT status');
+      }
+
+      if (latestCard && Number(latestCard.percentage) < 35) {
+        status = 'REVIEW';
+        reasons.push(
+          `Low academic performance (${Number(latestCard.percentage).toFixed(1)}%)`,
+        );
+      }
+
+      if (outstanding > 0) {
+        status = 'REVIEW';
+        reasons.push(`Unpaid dues: Rs ${outstanding.toLocaleString()}`);
+      }
+
+      if (student.lifecycleStatus !== 'ACTIVE') {
+        status = 'BLOCKED';
+        reasons.push(`Student is not ACTIVE (current: ${student.lifecycleStatus})`);
+      }
+
+      const row: PromotionReadinessRow = {
+        studentId: student.id,
+        studentName: `${student.firstNameEn} ${student.lastNameEn}`,
+        studentSystemId: student.studentSystemId,
+        classId: student.classId,
+        className: student.class.name,
+        sectionId: student.sectionId,
+        sectionName: student.sectionRef?.name ?? null,
+        reportCardId: latestCard?.id ?? null,
+        percentage: latestCard ? Number(latestCard.percentage) : 0,
+        grade: latestCard?.grade ?? 'N/A',
+        gpa: latestCard ? Number(latestCard.gpa) : 0,
+        status,
+        reasons,
+        recommendedAction:
+          status === 'READY' ? 'PROMOTE' : status === 'REVIEW' ? 'REVIEW' : 'HOLD',
+        lifecycleStatus: student.lifecycleStatus,
         outstandingBalance: outstanding,
-        reviewReason:
-          outstanding > 0
-            ? `Unpaid dues: Rs ${outstanding.toLocaleString()}`
-            : null,
-      });
+      };
+
+      if (!filters.status || row.status === filters.status) {
+        results.push(row);
+      }
     }
 
     return results;
@@ -1525,6 +1588,7 @@ export class AcademicsService {
     }
 
     const promotion = await this.prisma.$transaction(async (tx) => {
+      // Deactivate current enrollment
       await tx.enrollment.updateMany({
         where: {
           tenantId: actor.tenantId,
@@ -1535,6 +1599,7 @@ export class AcademicsService {
         data: { status: 'PROMOTED' },
       });
 
+      // Create or update target enrollment
       const targetEnrollment = await tx.enrollment.upsert({
         where: {
           tenantId_studentId_academicYearId: {
@@ -1562,33 +1627,26 @@ export class AcademicsService {
         },
       });
 
+      // Update student current class/section
       await tx.student.update({
-        where: { id: student.id },
+        where: { id: dto.studentId },
         data: {
           classId: dto.toClassId,
           sectionId: dto.toSectionId ?? null,
-          section: null,
         },
       });
 
-      const createdPromotion = await tx.promotionRecord.create({
+      // Create promotion record
+      return tx.promotionRecord.create({
         data: {
           tenantId: actor.tenantId,
           academicYearId: dto.academicYearId,
           studentId: dto.studentId,
           fromClassId: student.classId,
-          fromSectionId: student.sectionId ?? null,
+          fromSectionId: student.sectionId,
           toClassId: dto.toClassId,
           toSectionId: dto.toSectionId ?? null,
           status: 'PROMOTED',
-          remarks: dto.remarks ?? null,
-        },
-        include: {
-          student: true,
-          fromClass: true,
-          fromSection: true,
-          toClass: true,
-          toSection: true,
         },
       });
 
@@ -1629,67 +1687,61 @@ export class AcademicsService {
     const results: Array<{
       studentId: string;
       studentName: string;
-      fromClassId: string;
-      toClassId: string;
       status: 'promoted' | 'skipped' | 'failed';
       reason?: string;
     }> = [];
 
     for (const mapping of dto.classMappings) {
-      const eligibleEnrollments = await this.prisma.enrollment.findMany({
+      const enrollments = await this.prisma.enrollment.findMany({
         where: {
           tenantId: actor.tenantId,
           academicYearId: dto.academicYearId,
           classId: mapping.fromClassId,
           status: 'ACTIVE',
+          ...(mapping.studentIds ? { studentId: { in: mapping.studentIds } } : {}),
         },
         include: { student: true },
       });
 
-      for (const enrollment of eligibleEnrollments) {
+      for (const enrollment of enrollments) {
         const student = enrollment.student;
 
-        // Check for locked report cards
-        const lockedReportCards = await this.prisma.reportCard.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            academicYearId: dto.academicYearId,
-            studentId: student.id,
-            status: GradeLockStatus.LOCKED,
-          },
-        });
-
-        if (lockedReportCards.length === 0) {
-          results.push({
-            studentId: student.id,
-            studentName: `${student.firstNameEn} ${student.lastNameEn}`,
-            fromClassId: mapping.fromClassId,
-            toClassId: mapping.toClassId,
-            status: 'skipped',
-            reason: 'No locked report card found',
-          });
-          continue;
-        }
-
-        const averagePercentage =
-          lockedReportCards.reduce(
-            (sum, card) => sum + Number(card.percentage),
-            0,
-          ) / lockedReportCards.length;
-
-        if (getPromotionStatus(averagePercentage) !== 'READY') {
-          results.push({
-            studentId: student.id,
-            studentName: `${student.firstNameEn} ${student.lastNameEn}`,
-            fromClassId: mapping.fromClassId,
-            toClassId: mapping.toClassId,
-            status: 'skipped',
-            reason: `Academic review required (avg: ${averagePercentage.toFixed(1)}%)`,
-          });
-          continue;
-        }
-
         try {
+          // Readiness Check
+          const reportCards = await this.prisma.reportCard.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              academicYearId: dto.academicYearId,
+              studentId: student.id,
+              status: GradeLockStatus.LOCKED,
+            },
+          });
+
+          if (reportCards.length === 0) {
+            results.push({
+              studentId: student.id,
+              studentName: `${student.firstNameEn} ${student.lastNameEn}`,
+              status: 'skipped',
+              reason: 'No locked report card found',
+            });
+            continue;
+          }
+
+          const avgPerc =
+            reportCards.reduce((s, c) => s + Number(c.percentage), 0) /
+            reportCards.length;
+
+          if (avgPerc < 35) {
+            results.push({
+              studentId: student.id,
+              studentName: `${student.firstNameEn} ${student.lastNameEn}`,
+              status: 'skipped',
+              reason: `Academic review required (avg: ${avgPerc.toFixed(1)}%)`,
+            });
+            continue;
+          }
+
+          // Promote
           await this.prisma.$transaction(async (tx) => {
             await tx.enrollment.update({
               where: { id: enrollment.id },
@@ -1728,7 +1780,6 @@ export class AcademicsService {
               data: {
                 classId: mapping.toClassId,
                 sectionId: mapping.toSectionId ?? null,
-                section: null,
               },
             });
 
@@ -1738,11 +1789,11 @@ export class AcademicsService {
                 academicYearId: dto.academicYearId,
                 studentId: student.id,
                 fromClassId: mapping.fromClassId,
-                fromSectionId: enrollment.sectionId ?? null,
+                fromSectionId: enrollment.sectionId,
                 toClassId: mapping.toClassId,
                 toSectionId: mapping.toSectionId ?? null,
                 status: 'PROMOTED',
-                remarks: dto.remarks ?? null,
+                remarks: dto.remarks ?? 'Batch promoted',
               },
             });
           });
@@ -1750,16 +1801,12 @@ export class AcademicsService {
           results.push({
             studentId: student.id,
             studentName: `${student.firstNameEn} ${student.lastNameEn}`,
-            fromClassId: mapping.fromClassId,
-            toClassId: mapping.toClassId,
             status: 'promoted',
           });
         } catch (error) {
           results.push({
             studentId: student.id,
             studentName: `${student.firstNameEn} ${student.lastNameEn}`,
-            fromClassId: mapping.fromClassId,
-            toClassId: mapping.toClassId,
             status: 'failed',
             reason: error instanceof Error ? error.message : 'Unknown error',
           });

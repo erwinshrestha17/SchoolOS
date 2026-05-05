@@ -53,6 +53,7 @@ import type {
   PayslipSummary,
   PromotionReadiness,
   PromotionResult,
+  BatchPromotionResult,
   ReceiptView,
   ReportCardSummary,
   RoleSummary,
@@ -444,17 +445,19 @@ export const api = {
     request<ReportCardSummary>('/academics/report-cards', { method: 'POST', json: body }),
   batchGenerateReportCards: (body: JsonBody) =>
     request<ReportCardSummary[]>('/academics/report-cards/batch', { method: 'POST', json: body }),
-  listPromotionReadiness: (params?: {
-    academicYearId?: string | null;
+  listPromotionReadiness: (params: {
+    academicYearId: string;
     classId?: string | null;
-  }) => request<PromotionReadiness[]>(withQuery('/academics/promotions', params ?? {})),
+    sectionId?: string | null;
+    status?: string | null;
+  }) => request<PromotionReadiness[]>(withQuery('/academics/promotions', params)),
   promoteStudent: (body: JsonBody) =>
-    request<PromotionResult>('/academics/promotions', {
+    request<any>('/academics/promotions', {
       method: 'POST',
       json: body,
     }),
   batchPromote: (body: JsonBody) =>
-    request<PromotionResult[]>('/academics/promotions/batch', {
+    request<BatchPromotionResult>('/academics/promotions/batch', {
       method: 'POST',
       json: body,
     }),
