@@ -19,6 +19,7 @@ import { AcademicsFoundationService } from './academics-foundation.service';
 import { AcademicsService } from './academics.service';
 import { AssessmentComponentsService } from './assessment-components.service';
 import { CasRecordsService } from './cas-records.service';
+import { ReportCardsService } from './report-cards.service';
 import { CreateAssessmentComponentDto } from './dto/create-assessment-component.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
 import { CreateExamTermDto } from './dto/create-exam-term.dto';
@@ -45,6 +46,7 @@ export class AcademicsController {
     private readonly academicsFoundationService: AcademicsFoundationService,
     private readonly assessmentComponentsService: AssessmentComponentsService,
     private readonly casRecordsService: CasRecordsService,
+    private readonly reportCardsService: ReportCardsService,
   ) {}
 
   @Get('exams')
@@ -298,7 +300,7 @@ export class AcademicsController {
     @Body() dto: GenerateReportCardDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.academicsService.generateReportCard(dto, auth);
+    return this.reportCardsService.generateReportCard(dto, auth);
   }
 
   @Post('report-cards/batch')
@@ -307,7 +309,7 @@ export class AcademicsController {
     @Body() dto: BatchGenerateReportCardsDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.academicsService.batchGenerateReportCards(dto, auth);
+    return this.reportCardsService.batchGenerateReportCards(dto, auth);
   }
 
   @Get('subjects/:id/syllabus')
