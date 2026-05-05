@@ -11,6 +11,25 @@ import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { AuthenticatedRequest } from '../auth-request.interface';
 
+const permissionAliases: Record<string, string[]> = {
+  'academics:create': ['academics:manage'],
+  'academics:update': ['academics:manage'],
+  'academics:delete': ['academics:manage'],
+};
+
+function hasRequiredPermission(
+  actualPermissions: string[] | undefined,
+  requiredPermission: string,
+) {
+  const permissions = actualPermissions ?? [];
+  return (
+    permissions.includes(requiredPermission) ||
+    (permissionAliases[requiredPermission] ?? []).some((alias) =>
+      permissions.includes(alias),
+    )
+  );
+}
+
 @Injectable()
 export class RolesPermissionsGuard implements CanActivate {
   constructor(
@@ -88,7 +107,7 @@ export class RolesPermissionsGuard implements CanActivate {
     const hasPermission =
       requiredPermissions.length === 0 ||
       requiredPermissions.every((permission) =>
-        request.auth?.permissions.includes(permission),
+        hasRequiredPermission(request.auth?.permissions, permission),
       );
 
     if (!hasRole || !hasPermission) {
