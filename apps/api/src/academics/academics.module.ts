@@ -5,6 +5,7 @@ import { CommunicationsModule } from '../communications/communications.module';
 import { AcademicsController } from './academics.controller';
 import { AcademicsFoundationService } from './academics-foundation.service';
 import { AcademicsService } from './academics.service';
+import { AssessmentComponentsService } from './assessment-components.service';
 import {
   SubjectsController,
   TeacherAssignmentsController,
@@ -17,7 +18,15 @@ import {
     TeacherAssignmentsController,
     AcademicsController,
   ],
-  providers: [AcademicsService, AcademicsFoundationService],
-  exports: [AcademicsService, AcademicsFoundationService],
+  providers: [
+    AcademicsService,
+    AcademicsFoundationService,
+    AssessmentComponentsService,
+  ],
+  exports: [
+    AcademicsService,
+    AcademicsFoundationService,
+    AssessmentComponentsService,
+  ],
 })
 export class AcademicsModule {}
