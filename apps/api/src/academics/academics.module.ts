@@ -8,6 +8,7 @@ import { AcademicsService } from './academics.service';
 import { AssessmentComponentsService } from './assessment-components.service';
 import { CasRecordsService } from './cas-records.service';
 import { GradeCalculatorService } from './grade-calculator.service';
+import { MarkLockWorkflowService } from './mark-lock-workflow.service';
 import { ReportCardsService } from './report-cards.service';
 import {
   SubjectsController,
@@ -27,6 +28,7 @@ import {
     AssessmentComponentsService,
     CasRecordsService,
     GradeCalculatorService,
+    MarkLockWorkflowService,
     ReportCardsService,
   ],
   exports: [
@@ -35,6 +37,7 @@ import {
     AssessmentComponentsService,
     CasRecordsService,
     GradeCalculatorService,
+    MarkLockWorkflowService,
     ReportCardsService,
   ],
 })
