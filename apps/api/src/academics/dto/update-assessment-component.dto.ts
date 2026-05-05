@@ -1,5 +1,12 @@
 import { AssessmentType } from '@prisma/client';
-import { IsEnum, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class UpdateAssessmentComponentDto {
   @IsOptional()

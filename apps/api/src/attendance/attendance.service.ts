@@ -178,7 +178,7 @@ export class AttendanceService {
               studentId: record.studentId,
               status: record.status,
               remark: record.remark,
-            })) as unknown as Prisma.InputJsonValue,
+            })),
             incomingPayload: buildAttendanceIncomingPayload(
               dto,
               submissionContext,
@@ -644,7 +644,7 @@ export class AttendanceService {
             studentId: record.studentId,
             status: record.status,
             remark: record.remark,
-          })) as Prisma.InputJsonValue,
+          })),
           incomingPayload: {
             override: dto.exceptions,
             reason: dto.reason ?? null,
@@ -2306,14 +2306,14 @@ function summarizeAttendance(records: Array<{ status: AttendanceStatus }>) {
   };
 }
 
-type AttendanceSubmissionContext = {
+interface AttendanceSubmissionContext {
   source: 'sync_submission';
   clientSubmissionId: string;
   deviceId: string | null;
   deviceLabel: string | null;
   sessionFingerprint: string | null;
   trustMetadata: Record<string, unknown>;
-};
+}
 
 function buildAttendanceIncomingPayload(
   dto: SubmitAttendanceDto,

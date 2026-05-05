@@ -8,7 +8,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { buildSimplePdf } from '../common/pdf/simple-pdf';
 import { PrismaService } from '../prisma/prisma.service';
 
-export type SalarySlipPdfInput = {
+export interface SalarySlipPdfInput {
   schoolName: string;
   staffName: string;
   employeeId: string;
@@ -22,7 +22,7 @@ export type SalarySlipPdfInput = {
   workingDays: number;
   approvedAt: Date | null;
   status: string;
-};
+}
 
 @Injectable()
 export class PayrollSalarySlipService {

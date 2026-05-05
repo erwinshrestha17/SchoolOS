@@ -9,7 +9,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
-type RetryableDelivery = {
+interface RetryableDelivery {
   id: string;
   tenantId: string;
   channel: NotificationChannel;
@@ -19,20 +19,20 @@ type RetryableDelivery = {
   destination: string | null;
   title: string;
   body: string;
-};
+}
 
-export type DeliveryRetryResult = {
+export interface DeliveryRetryResult {
   deliveryId: string;
   status: NotificationStatus;
   errorMessage: string | null;
   retriedAt: string;
-};
+}
 
-export type BulkDeliveryRetryResult = {
+export interface BulkDeliveryRetryResult {
   requested: number;
   retried: number;
   results: DeliveryRetryResult[];
-};
+}
 
 @Injectable()
 export class DeliveryRetryService {

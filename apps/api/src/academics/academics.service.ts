@@ -32,21 +32,21 @@ import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
 
-type ReportCardPdfComponent = {
+interface ReportCardPdfComponent {
   max: number;
   obtained: number;
   grade: string;
-};
+}
 
-type ReportCardPdfSubject = {
+interface ReportCardPdfSubject {
   name: string;
   theory: ReportCardPdfComponent | null;
   practical: ReportCardPdfComponent | null;
   totalObtained: number;
   totalMax: number;
-};
+}
 
-type PromotionReadinessRow = {
+interface PromotionReadinessRow {
   reportCardId: string;
   studentId: string;
   studentName: string;
@@ -59,7 +59,7 @@ type PromotionReadinessRow = {
   locked: boolean;
   outstandingBalance: number;
   reviewReason: string | null;
-};
+}
 
 @Injectable()
 export class AcademicsService {

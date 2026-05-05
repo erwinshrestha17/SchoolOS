@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 
-type UnreadRecipientRow = {
+interface UnreadRecipientRow {
   deliveryId: string;
   channel: string;
   status: string;
@@ -23,9 +23,9 @@ type UnreadRecipientRow = {
   studentLastName: string | null;
   className: string | null;
   sectionName: string | null;
-};
+}
 
-export type UnreadNoticeRecipient = {
+export interface UnreadNoticeRecipient {
   deliveryId: string;
   channel: string;
   status: string;
@@ -48,15 +48,15 @@ export type UnreadNoticeRecipient = {
     className: string | null;
     sectionName: string | null;
   } | null;
-};
+}
 
-export type NoticeUnreadRecipientsResult = {
+export interface NoticeUnreadRecipientsResult {
   noticeId: string;
   totalDeliveries: number;
   readCount: number;
   unreadCount: number;
   recipients: UnreadNoticeRecipient[];
-};
+}
 
 @Injectable()
 export class NoticeUnreadRecipientsService {

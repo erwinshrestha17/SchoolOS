@@ -11,7 +11,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 type PostingClient = Prisma.TransactionClient | PrismaService;
 
-export type PayrollPostingInput = {
+export interface PayrollPostingInput {
   tenantId: string;
   payrollRunId: string;
   periodMonth: number;
@@ -20,7 +20,7 @@ export type PayrollPostingInput = {
   deductionAmount: Prisma.Decimal;
   netAmount: Prisma.Decimal;
   entryDate?: Date;
-};
+}
 
 @Injectable()
 export class AccountingPostingService {

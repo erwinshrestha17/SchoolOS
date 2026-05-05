@@ -604,12 +604,7 @@ export class StudentsService {
     dto: UpdateStudentDto,
     actor: AuthContext,
   ) {
-    if (
-      Object.prototype.hasOwnProperty.call(
-        dto as Record<string, unknown>,
-        'studentSystemId',
-      )
-    ) {
+    if (Object.prototype.hasOwnProperty.call(dto, 'studentSystemId')) {
       throw new BadRequestException('studentSystemId is immutable');
     }
 
@@ -757,7 +752,7 @@ export class StudentsService {
         metadata: {
           kind: 'PHOTO',
           title: 'Student Photo',
-        } as Prisma.JsonObject,
+        },
       });
 
       studentData.photoUrl = asset.id; // Store asset ID as the photoUrl
@@ -1500,7 +1495,7 @@ export class StudentsService {
             mergedIntoStudentId: targetStudent.id,
             mergedIntoStudentSystemId: targetStudent.studentSystemId,
             mergedAt: mergedAt.toISOString(),
-          } as Prisma.InputJsonValue,
+          },
         },
       });
 
@@ -1992,7 +1987,7 @@ export class StudentsService {
             signerName: actor.email ?? actor.userId,
             signerRole: actor.roles[0] ?? 'school_official',
             layoutVersion: 'certificate-v2',
-          } as Prisma.InputJsonValue,
+          },
           version,
           retentionUntil: resolveDocumentRetentionUntil(
             normalizedKind,
@@ -2004,7 +1999,7 @@ export class StudentsService {
             sectionName: student.sectionRef?.name ?? student.section ?? null,
             storageProvider: stored.provider,
             layoutVersion: 'certificate-v2',
-          } as Prisma.InputJsonValue,
+          },
         },
       });
 
@@ -2080,7 +2075,7 @@ export class StudentsService {
         metadata: {
           ...(document.metadata as Record<string, unknown> | null),
           revokeReason: dto.reason,
-        } as Prisma.InputJsonValue,
+        },
       },
     });
 
@@ -2119,7 +2114,7 @@ export class StudentsService {
           document.metadata &&
           typeof document.metadata === 'object' &&
           !Array.isArray(document.metadata) &&
-          document.metadata['retentionStatus'] === 'eligible_for_purge'
+          document.metadata.retentionStatus === 'eligible_for_purge'
         ),
     );
 
@@ -2138,7 +2133,7 @@ export class StudentsService {
             ...metadata,
             retentionStatus: 'eligible_for_purge',
             retentionReviewedAt: now.toISOString(),
-          } as Prisma.InputJsonValue,
+          },
         },
       });
 
@@ -2459,7 +2454,7 @@ function buildStudentDocumentPdf(input: {
       studentName: fullName,
       studentId: student.studentSystemId,
       className: student.class.name,
-      sectionName: sectionName,
+      sectionName,
       rollNumber: student.rollNumber ?? latestEnrollment?.rollNumber,
       bloodGroup: student.bloodGroup,
       guardianName: primaryGuardian?.fullName,

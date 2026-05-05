@@ -50,7 +50,7 @@ function createPostingClient(overrides?: {
 }
 
 function sumLines(
-  lines: Array<{ side: JournalLineSide; amount: Prisma.Decimal }>,
+  lines: { side: JournalLineSide; amount: Prisma.Decimal }[],
   side: JournalLineSide,
 ) {
   return lines

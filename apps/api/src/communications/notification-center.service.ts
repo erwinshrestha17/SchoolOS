@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 
-type NotificationCenterRow = {
+interface NotificationCenterRow {
   id: string;
   tenantId: string;
   channel: string;
@@ -23,9 +23,9 @@ type NotificationCenterRow = {
   sentAt: Date | null;
   createdAt: Date;
   readAt: Date | null;
-};
+}
 
-export type NotificationCenterItem = {
+export interface NotificationCenterItem {
   id: string;
   channel: string;
   status: string;
@@ -38,12 +38,12 @@ export type NotificationCenterItem = {
   readAt: string | null;
   isRead: boolean;
   linkHref: string;
-};
+}
 
-export type NotificationCenterSummary = {
+export interface NotificationCenterSummary {
   unreadCount: number;
   items: NotificationCenterItem[];
-};
+}
 
 @Injectable()
 export class NotificationCenterService {

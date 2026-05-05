@@ -69,7 +69,7 @@ function sanitizeSegment(value: string) {
 }
 
 function getExtension(fileName: string) {
-  const match = fileName.match(/\.[a-zA-Z0-9]+$/);
+  const match = /\.[a-zA-Z0-9]+$/.exec(fileName);
 
   return match?.[0]?.toLowerCase() ?? '';
 }

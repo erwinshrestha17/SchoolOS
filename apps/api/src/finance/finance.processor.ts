@@ -11,7 +11,7 @@ export class FinanceProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<{ tenantId: string }, void, string>): Promise<void> {
+  async process(job: Job<{ tenantId: string }, void>): Promise<void> {
     switch (job.name) {
       case 'calculateLateFees':
         return this.handleCalculateLateFees(job.data);

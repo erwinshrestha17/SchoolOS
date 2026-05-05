@@ -163,7 +163,7 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
       tenantId: tenantAId,
       userId: teacherA.id,
       roles: ['teacher'],
-      permissions: SYSTEM_ROLE_PERMISSIONS['teacher'],
+      permissions: SYSTEM_ROLE_PERMISSIONS.teacher,
     };
 
     // Teacher can read
@@ -194,7 +194,7 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
       tenantId: tenantAId,
       userId: parentA.id,
       roles: ['parent'],
-      permissions: SYSTEM_ROLE_PERMISSIONS['parent'],
+      permissions: SYSTEM_ROLE_PERMISSIONS.parent,
     };
 
     // Parent CANNOT read private settings

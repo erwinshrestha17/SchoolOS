@@ -35,7 +35,7 @@ function sortedRolePermissions(rolePermissions: Record<string, string[]>) {
 
 function readSourceFiles(
   dir = sourceRoot,
-): Array<{ path: string; content: string }> {
+): { path: string; content: string }[] {
   return readdirSync(dir).flatMap((entry) => {
     const fullPath = join(dir, entry);
     const stat = statSync(fullPath);

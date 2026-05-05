@@ -32,11 +32,11 @@ import { CheckAdmissionDuplicateDto } from './dto/check-admission-duplicate.dto'
 import { CreateAdmissionDto } from './dto/create-admission.dto';
 import { TransferStudentDto } from './dto/transfer-student.dto';
 
-type AdmissionReferenceContext = {
+interface AdmissionReferenceContext {
   academicYear: { id: string; startsOn: Date };
   classroom: { id: string; name: string };
   section: { id: string; name: string; classId: string } | null;
-};
+}
 
 type AdmissionGuardianInput = CreateAdmissionDto['guardians'][number];
 type AdmissionPersistenceClient = Prisma.TransactionClient | PrismaService;
@@ -387,7 +387,7 @@ export class AdmissionsService {
               classId: dto.classId,
               sectionId: dto.sectionId ?? null,
               guardianCount: guardianLinks.length,
-            } as Prisma.InputJsonValue,
+            },
           },
         });
 
@@ -835,7 +835,7 @@ export class AdmissionsService {
         destinationSchool: dto.destinationSchool,
         exitedAt: dto.transferDate,
         waiveFeeClearance: dto.waiveFeeCheck,
-      } as RequestStudentTransferDto,
+      },
       actor,
     );
   }
@@ -849,7 +849,7 @@ export class AdmissionsService {
       studentId,
       {
         reason: 'Deleted via admissions compatibility route',
-      } as DeleteStudentDto,
+      },
       actor,
     );
   }
@@ -859,7 +859,7 @@ export class AdmissionsService {
       studentId,
       {
         reason: 'Archived via admissions compatibility route',
-      } as ArchiveStudentDto,
+      },
       actor,
     );
   }

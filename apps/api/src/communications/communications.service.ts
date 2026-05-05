@@ -813,7 +813,7 @@ export class CommunicationsService {
   }
 }
 
-type DeliveryRecordInput = {
+interface DeliveryRecordInput {
   actor: AuthContext;
   sourceType: string;
   sourceId: string;
@@ -830,17 +830,17 @@ type DeliveryRecordInput = {
   body: string;
   channels: NotificationChannel[];
   requiredConsentTypes?: ConsentType[];
-};
+}
 
-type DeliveryRecipient = {
+interface DeliveryRecipient {
   studentId: string;
   guardianId: string | null;
   userId: string | null;
   email: string | null;
   phone: string | null;
-};
+}
 
-type DeliveryRow = {
+interface DeliveryRow {
   id: string;
   tenantId: string;
   channel: NotificationChannel;
@@ -860,12 +860,12 @@ type DeliveryRow = {
   errorMessage: string | null;
   sentAt: Date | null;
   createdAt: Date;
-};
+}
 
-type TenantDomainEvent = {
+interface TenantDomainEvent {
   tenantId: string;
   actor?: AuthContext;
-};
+}
 
 type StudentAdmittedEvent = TenantDomainEvent & {
   classId: string;

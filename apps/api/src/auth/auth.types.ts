@@ -1,4 +1,4 @@
-import { AuthMethod, OtpPurpose } from '@prisma/client';
+import { type AuthMethod, type OtpPurpose } from '@prisma/client';
 
 export interface AuthContext {
   userId: string;

@@ -117,7 +117,9 @@ export class AssessmentComponentsService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Assessment component not found in this tenant');
+      throw new NotFoundException(
+        'Assessment component not found in this tenant',
+      );
     }
 
     this.ensureUnlockedTerm(existing.examTerm.isLocked);
@@ -183,7 +185,8 @@ export class AssessmentComponentsService {
         name: existing.name,
         type: existing.type,
         maxMarks: Number(existing.maxMarks),
-        passMarks: existing.passMarks === null ? null : Number(existing.passMarks),
+        passMarks:
+          existing.passMarks === null ? null : Number(existing.passMarks),
         weightPercent: Number(existing.weightPercent),
       },
       after: {
@@ -192,7 +195,8 @@ export class AssessmentComponentsService {
         name: updated.name,
         type: updated.type,
         maxMarks: Number(updated.maxMarks),
-        passMarks: updated.passMarks === null ? null : Number(updated.passMarks),
+        passMarks:
+          updated.passMarks === null ? null : Number(updated.passMarks),
         weightPercent: Number(updated.weightPercent),
       },
     });
@@ -207,7 +211,9 @@ export class AssessmentComponentsService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Assessment component not found in this tenant');
+      throw new NotFoundException(
+        'Assessment component not found in this tenant',
+      );
     }
 
     this.ensureUnlockedTerm(existing.examTerm.isLocked);
@@ -241,7 +247,8 @@ export class AssessmentComponentsService {
         name: existing.name,
         type: existing.type,
         maxMarks: Number(existing.maxMarks),
-        passMarks: existing.passMarks === null ? null : Number(existing.passMarks),
+        passMarks:
+          existing.passMarks === null ? null : Number(existing.passMarks),
         weightPercent: Number(existing.weightPercent),
       },
     });

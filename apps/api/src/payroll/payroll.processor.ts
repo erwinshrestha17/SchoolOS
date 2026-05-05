@@ -12,7 +12,7 @@ export class PayrollProcessor extends WorkerHost {
   }
 
   async process(
-    job: Job<{ tenantId: string; month: string }, void, string>,
+    job: Job<{ tenantId: string; month: string }, void>,
   ): Promise<void> {
     switch (job.name) {
       case 'generatePayslips':

@@ -4,10 +4,10 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { ClsService } from 'nestjs-cls';
 
 export const TENANT_ID_KEY = 'tenantId';
-type TenantScopedArgs = {
+interface TenantScopedArgs {
   where?: Record<string, unknown>;
   data?: Record<string, unknown> | Array<Record<string, unknown>>;
-};
+}
 
 const TENANT_SCOPE_EXCLUDED_MODELS = [
   'Tenant',

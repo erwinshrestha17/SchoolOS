@@ -1233,7 +1233,7 @@ function buildStudent(
     section: string | null;
     sectionRef: { id: string; name: string } | null;
     rollNumber: number | null;
-    guardianLinks: Array<{
+    guardianLinks: {
       guardianId?: string;
       guardian: {
         id?: string;
@@ -1246,8 +1246,8 @@ function buildStudent(
       relation: string;
       isPrimary: boolean;
       appLoginLinked?: boolean;
-    }>;
-    enrollments: Array<{
+    }[];
+    enrollments: {
       id?: string;
       academicYearId?: string;
       academicYear: { name: string };
@@ -1258,7 +1258,7 @@ function buildStudent(
       class?: { name: string };
       section: { name: string } | null;
       status: EnrollmentStatus;
-    }>;
+    }[];
     tenant: { name: string };
     documents: unknown[];
     generatedDocuments: unknown[];

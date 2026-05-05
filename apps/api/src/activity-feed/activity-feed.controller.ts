@@ -25,7 +25,9 @@ import { CreateActivityReactionDto } from './dto/create-activity-reaction.dto';
 import { CreateDevelopmentalMilestoneDto } from './dto/create-developmental-milestone.dto';
 import { CreateMoodLogDto } from './dto/create-mood-log.dto';
 
-type FeedPostEvent = { tenantId: string };
+interface FeedPostEvent {
+  tenantId: string;
+}
 
 @Controller('activity-feed')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -150,7 +152,8 @@ export class ActivityFeedController {
     );
 
     if (media.redirectUrl) {
-      return res.redirect(media.redirectUrl);
+      res.redirect(media.redirectUrl);
+      return;
     }
 
     res.setHeader('Content-Type', media.contentType);
@@ -179,7 +182,8 @@ export class ActivityFeedController {
     );
 
     if (media.redirectUrl) {
-      return res.redirect(media.redirectUrl);
+      res.redirect(media.redirectUrl);
+      return;
     }
 
     res.setHeader('Content-Type', media.contentType);

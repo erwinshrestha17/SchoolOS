@@ -26,7 +26,7 @@ export interface ReportExecutor {
     actor: AuthContext,
     filters: Record<string, unknown>,
     format: string,
-  ) => Promise<Record<string, unknown>[]>;
+  ) => Promise<Array<Record<string, unknown>>>;
 }
 
 @Injectable()
@@ -767,7 +767,7 @@ export class ReportsService {
     throw new ForbiddenException('Unsupported format');
   }
 
-  private convertToCsv(data: Record<string, unknown>[]): string {
+  private convertToCsv(data: Array<Record<string, unknown>>): string {
     if (data.length === 0) return '';
 
     const headers = Object.keys(data[0]);

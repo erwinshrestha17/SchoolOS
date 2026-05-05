@@ -199,8 +199,7 @@ export class AuthService {
     });
 
     if (
-      !user ||
-      user.status !== UserStatus.ACTIVE ||
+      user?.status !== UserStatus.ACTIVE ||
       !user.email ||
       user.authMethod === AuthMethod.OTP
     ) {
@@ -488,7 +487,7 @@ export class AuthService {
       },
     });
 
-    if (!user || user.tenantId !== auth.tenantId) {
+    if (user?.tenantId !== auth.tenantId) {
       throw new NotFoundException('Authenticated user was not found');
     }
 
@@ -747,7 +746,7 @@ export class AuthService {
       },
     });
 
-    if (!otpCode || otpCode.codeHash !== hashOtpCode(code)) {
+    if (otpCode?.codeHash !== hashOtpCode(code)) {
       throw new UnauthorizedException('Invalid or expired verification code');
     }
 
@@ -905,8 +904,7 @@ export class AuthService {
   ) {
     const decoded =
       typeof this.jwtService.decode === 'function'
-        ? ((this.jwtService.decode(accessToken) as { exp?: number } | null) ??
-          null)
+        ? (this.jwtService.decode(accessToken) ?? null)
         : null;
 
     return {
@@ -1004,10 +1002,10 @@ function resolveAccessTokenMaxAge(ttl: string) {
   return value * multiplier;
 }
 
-type RequestMeta = {
+interface RequestMeta {
   ipAddress?: string | null;
   userAgent?: string | null;
-};
+}
 
 type UserWithRoles = User & {
   userRoles: Array<{
@@ -1023,7 +1021,7 @@ type UserWithRoles = User & {
   }>;
 };
 
-type IssueOtpInput = {
+interface IssueOtpInput {
   user: {
     id: string;
     email: string | null;
@@ -1033,4 +1031,4 @@ type IssueOtpInput = {
   ttlMinutes: number;
   emailPurpose: 'login' | 'password_recovery' | 'mfa_setup';
   resetUrl?: string;
-};
+}

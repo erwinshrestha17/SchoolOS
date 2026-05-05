@@ -18,7 +18,9 @@ describe('ConfigService production validation', () => {
     delete process.env.JWT_CHALLENGE_SECRET;
     delete process.env.MEDICAL_ENCRYPTION_KEY;
 
-    expect(() => new ConfigService().validateForRuntime()).not.toThrow();
+    expect(() => {
+      new ConfigService().validateForRuntime();
+    }).not.toThrow();
   });
 
   it('fails fast in production when required secrets are missing', () => {
@@ -32,9 +34,9 @@ describe('ConfigService production validation', () => {
     delete process.env.FRONTEND_ORIGINS;
     delete process.env.REDIS_HOST;
 
-    expect(() => new ConfigService().validateForRuntime()).toThrow(
-      /DATABASE_URL is required in production/,
-    );
+    expect(() => {
+      new ConfigService().validateForRuntime();
+    }).toThrow(/DATABASE_URL is required in production/);
   });
 
   it('accepts a complete production baseline', () => {
@@ -51,7 +53,9 @@ describe('ConfigService production validation', () => {
     process.env.EMAIL_DELIVERY_MODE = 'log';
     process.env.STORAGE_PROVIDER = 'local';
 
-    expect(() => new ConfigService().validateForRuntime()).not.toThrow();
+    expect(() => {
+      new ConfigService().validateForRuntime();
+    }).not.toThrow();
   });
 
   it('requires explicit production boot opt-in', () => {
@@ -65,9 +69,9 @@ describe('ConfigService production validation', () => {
     process.env.MEDICAL_ENCRYPTION_KEY = 'z'.repeat(40);
     process.env.FRONTEND_ORIGIN = 'https://schoolos.example.com';
 
-    expect(() => new ConfigService().validateForRuntime()).toThrow(
-      /ALLOW_PROD_BOOT=true is required/,
-    );
+    expect(() => {
+      new ConfigService().validateForRuntime();
+    }).toThrow(/ALLOW_PROD_BOOT=true is required/);
   });
 
   it('requires https frontend origins in production', () => {
@@ -81,8 +85,8 @@ describe('ConfigService production validation', () => {
     process.env.MEDICAL_ENCRYPTION_KEY = 'z'.repeat(40);
     process.env.FRONTEND_ORIGIN = 'http://schoolos.example.com';
 
-    expect(() => new ConfigService().validateForRuntime()).toThrow(
-      /must use https in production/,
-    );
+    expect(() => {
+      new ConfigService().validateForRuntime();
+    }).toThrow(/must use https in production/);
   });
 });
