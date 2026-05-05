@@ -11,6 +11,7 @@ import { GradeCalculatorService } from './grade-calculator.service';
 import { MarkLockWorkflowService } from './mark-lock-workflow.service';
 import { ReportCardPdfService } from './report-card-pdf.service';
 import { ReportCardsService } from './report-cards.service';
+import { ResultPublishingService } from './result-publishing.service';
 import {
   SubjectsController,
   TeacherAssignmentsController,
@@ -32,6 +33,7 @@ import {
     MarkLockWorkflowService,
     ReportCardPdfService,
     ReportCardsService,
+    ResultPublishingService,
   ],
   exports: [
     AcademicsService,
@@ -42,6 +44,7 @@ import {
     MarkLockWorkflowService,
     ReportCardPdfService,
     ReportCardsService,
+    ResultPublishingService,
   ],
 })
 export class AcademicsModule {}

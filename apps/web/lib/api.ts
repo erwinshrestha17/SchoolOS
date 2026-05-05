@@ -54,6 +54,8 @@ import type {
   PromotionReadiness,
   PromotionResult,
   BatchPromotionResult,
+  ResultPublishingReadiness,
+  PublishingResult,
   ReceiptView,
   ReportCardSummary,
   RoleSummary,
@@ -458,6 +460,31 @@ export const api = {
     }),
   batchPromote: (body: JsonBody) =>
     request<BatchPromotionResult>('/academics/promotions/batch', {
+      method: 'POST',
+      json: body,
+    }),
+  listResultPublishingReadiness: (params: {
+    academicYearId?: string;
+    examTermId?: string;
+    classId?: string;
+    sectionId?: string;
+    status?: string;
+  }) =>
+    request<ResultPublishingReadiness[]>(
+      withQuery('/academics/results/publishing', params),
+    ),
+  publishResults: (body: JsonBody) =>
+    request<PublishingResult>('/academics/results/publishing/publish', {
+      method: 'POST',
+      json: body,
+    }),
+  unpublishResults: (body: JsonBody) =>
+    request<any>('/academics/results/publishing/unpublish', {
+      method: 'POST',
+      json: body,
+    }),
+  notifyResults: (body: JsonBody) =>
+    request<any>('/academics/results/publishing/notify', {
       method: 'POST',
       json: body,
     }),

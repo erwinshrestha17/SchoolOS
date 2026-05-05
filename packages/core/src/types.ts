@@ -1532,6 +1532,36 @@ export type BatchPromotionResult = {
   results: PromotionResult[];
 };
 
+export type ResultPublishingReadiness = {
+  reportCardId: string;
+  studentId: string;
+  studentName: string;
+  studentSystemId: string;
+  classId: string;
+  className: string;
+  sectionId: string | null;
+  sectionName: string | null;
+  academicYearId: string;
+  academicYearName: string;
+  examTermId: string;
+  examTermName: string;
+  percentage: number;
+  grade: string;
+  gpa: number;
+  reportStatus: string;
+  publishStatus: string;
+  publishedAt: string | null;
+  publishedBy: string | null;
+  blockedReasons: string[];
+  notificationEligibility: boolean;
+};
+
+export type PublishingResult = {
+  published: number;
+  skipped: number;
+  failed: Array<{ id: string; reason: string }>;
+};
+
 export type TimetableSlotSummary = {
   id: string;
   academicYearId: string;

@@ -10,6 +10,7 @@ import { MarksLockTab } from './tabs/marks-lock-tab';
 import { ReportCardsTab } from './tabs/report-cards-tab';
 import { CasRecordsTab } from './tabs/cas-records-tab';
 import { PromotionTab } from './tabs/promotion-tab';
+import { ResultPublishingTab } from './tabs/result-publishing-tab';
 
 const sections = [
   'Subjects',
@@ -19,6 +20,7 @@ const sections = [
   'CAS Records',
   'Report Cards',
   'Promotion',
+  'Result Publishing',
 ] as const;
 
 type Section = (typeof sections)[number];
@@ -58,6 +60,11 @@ const sectionMeta: Record<Section, { title: string; description: string; badge: 
     title: 'Batch Promotion',
     description: 'Review readiness and batch promote students to the next academic year.',
     badge: 'Transition',
+  },
+  'Result Publishing': {
+    title: 'Result Publishing',
+    description: 'Control the release of report cards and notify guardians of published results.',
+    badge: 'Publishing',
   },
 };
 
@@ -193,6 +200,14 @@ export function AcademicsWorkspace() {
           academicYears={academicYearsQuery.data ?? []}
           classes={classesQuery.data ?? []}
           allSections={sectionsQuery.data ?? []}
+        />
+      )}
+      {activeSection === 'Result Publishing' && (
+        <ResultPublishingTab
+          academicYears={academicYearsQuery.data ?? []}
+          classes={classesQuery.data ?? []}
+          allSections={sectionsQuery.data ?? []}
+          exams={examsQuery.data ?? []}
         />
       )}
     </div>
