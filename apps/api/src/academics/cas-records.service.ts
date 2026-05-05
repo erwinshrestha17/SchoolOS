@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -7,13 +11,13 @@ import { BatchCasRecordsDto } from './dto/batch-cas-records.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
 import { UpdateCasRecordDto } from './dto/update-cas-record.dto';
 
-type CasFilters = {
+interface CasFilters {
   academicYearId?: string;
   classId?: string;
   sectionId?: string;
   subjectId?: string;
   studentId?: string;
-};
+}
 
 @Injectable()
 export class CasRecordsService {
@@ -28,7 +32,9 @@ export class CasRecordsService {
     return this.prisma.casRecord.findMany({
       where: {
         tenantId: actor.tenantId,
-        ...(filters.academicYearId ? { academicYearId: filters.academicYearId } : {}),
+        ...(filters.academicYearId
+          ? { academicYearId: filters.academicYearId }
+          : {}),
         ...(filters.classId ? { classId: filters.classId } : {}),
         ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
         ...(filters.subjectId ? { subjectId: filters.subjectId } : {}),
@@ -104,7 +110,8 @@ export class CasRecordsService {
 
     const academicYearId = dto.academicYearId ?? existing.academicYearId;
     const classId = dto.classId ?? existing.classId;
-    const sectionId = dto.sectionId === undefined ? existing.sectionId : dto.sectionId;
+    const sectionId =
+      dto.sectionId === undefined ? existing.sectionId : dto.sectionId;
     const subjectId = dto.subjectId ?? existing.subjectId;
     const studentId = dto.studentId ?? existing.studentId;
     const score = dto.score ?? Number(existing.score);
@@ -127,11 +134,18 @@ export class CasRecordsService {
         sectionId: sectionId ?? null,
         subjectId,
         studentId,
-        ...(dto.category !== undefined ? { category: dto.category.trim() } : {}),
+        ...(dto.category !== undefined
+          ? { category: dto.category.trim() }
+          : {}),
         score: new Prisma.Decimal(score),
         maxScore: new Prisma.Decimal(maxScore),
         ...(dto.observedOn !== undefined
-          ? { observedOn: this.parseIsoDateOrThrow(dto.observedOn, 'observedOn') }
+          ? {
+              observedOn: this.parseIsoDateOrThrow(
+                dto.observedOn,
+                'observedOn',
+              ),
+            }
           : {}),
         ...(dto.note !== undefined ? { note: dto.note?.trim() || null } : {}),
       },
@@ -275,7 +289,12 @@ export class CasRecordsService {
       await this.ensureSubject(actor, filters.subjectId, filters.classId);
     }
     if (filters.studentId) {
-      await this.ensureStudent(actor, filters.studentId, filters.classId, filters.sectionId);
+      await this.ensureStudent(
+        actor,
+        filters.studentId,
+        filters.classId,
+        filters.sectionId,
+      );
     }
   }
 
@@ -300,7 +319,12 @@ export class CasRecordsService {
     }
 
     if (scope.studentId) {
-      await this.ensureStudent(actor, scope.studentId, scope.classId, scope.sectionId);
+      await this.ensureStudent(
+        actor,
+        scope.studentId,
+        scope.classId,
+        scope.sectionId,
+      );
     }
   }
 

@@ -806,10 +806,7 @@ function createPrismaMock() {
       .map((membership) => ({
         ...membership,
         role: roleWithRelations(
-          state.roles.find((role) => role.id === membership.roleId) as Record<
-            string,
-            unknown
-          >,
+          state.roles.find((role) => role.id === membership.roleId)!,
         ),
       })),
   });
