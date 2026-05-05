@@ -19,6 +19,7 @@ import { AcademicsFoundationService } from './academics-foundation.service';
 import { AcademicsService } from './academics.service';
 import { AssessmentComponentsService } from './assessment-components.service';
 import { CasRecordsService } from './cas-records.service';
+import { MarkLockWorkflowService } from './mark-lock-workflow.service';
 import { ReportCardsService } from './report-cards.service';
 import { CreateAssessmentComponentDto } from './dto/create-assessment-component.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
@@ -46,6 +47,7 @@ export class AcademicsController {
     private readonly academicsFoundationService: AcademicsFoundationService,
     private readonly assessmentComponentsService: AssessmentComponentsService,
     private readonly casRecordsService: CasRecordsService,
+    private readonly markLockWorkflowService: MarkLockWorkflowService,
     private readonly reportCardsService: ReportCardsService,
   ) {}
 
@@ -99,7 +101,7 @@ export class AcademicsController {
     @Body() dto: UnlockExamTermDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.academicsService.unlockExamTerm(examTermId, dto, auth);
+    return this.markLockWorkflowService.unlockExamTerm(examTermId, dto, auth);
   }
 
   @Post('exams/components')
@@ -212,8 +214,17 @@ export class AcademicsController {
 
   @Get('marks/lock-requests')
   @Permissions('academics:read')
-  listMarkLockRequests(@CurrentAuth() auth: AuthContext) {
-    return this.academicsService.listMarkLockRequests(auth);
+  listMarkLockRequests(
+    @CurrentAuth() auth: AuthContext,
+    @Query('examTermId') examTermId?: string,
+    @Query('status') status?: string,
+    @Query('requestedById') requestedById?: string,
+  ) {
+    return this.markLockWorkflowService.list(auth, {
+      examTermId,
+      status,
+      requestedById,
+    });
   }
 
   @Post('marks/lock-requests')
@@ -222,7 +233,7 @@ export class AcademicsController {
     @Body() dto: RequestMarkLockDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.academicsService.requestMarkLock(dto, auth);
+    return this.markLockWorkflowService.request(dto, auth);
   }
 
   @Patch('marks/lock-requests/:id/review')
@@ -232,7 +243,7 @@ export class AcademicsController {
     @Body() dto: ReviewMarkLockDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.academicsService.reviewMarkLockRequest(requestId, dto, auth);
+    return this.markLockWorkflowService.review(requestId, dto, auth);
   }
 
   @Get('cas')
