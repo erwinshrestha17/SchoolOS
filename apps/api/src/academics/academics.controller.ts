@@ -30,6 +30,7 @@ import { BatchGenerateReportCardsDto } from './dto/batch-generate-report-cards.d
 import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
+import { UpdateExamTermDto } from './dto/update-exam-term.dto';
 
 @Controller('academics')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
