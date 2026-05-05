@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class CreateExamTermDto {
   @IsString()
@@ -16,5 +16,6 @@ export class CreateExamTermDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(100)
   weightPercent?: number;
 }
