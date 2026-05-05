@@ -53,16 +53,16 @@ export function ResultPublishingTab({
     enabled: Boolean(selection.academicYearId && selection.examTermId),
   });
 
-  const allRecords = publishingQuery.data ?? [];
   const records = useMemo(() => {
-    if (!selection.search) return allRecords;
+    const data = publishingQuery.data ?? [];
+    if (!selection.search) return data;
     const s = selection.search.toLowerCase();
-    return allRecords.filter(
+    return data.filter(
       (r) =>
         r.studentName.toLowerCase().includes(s) ||
         r.studentSystemId.toLowerCase().includes(s),
     );
-  }, [allRecords, selection.search]);
+  }, [publishingQuery.data, selection.search]);
 
   const sectionsForClass = allSections.filter(
     (s: any) => s.classId === selection.classId,

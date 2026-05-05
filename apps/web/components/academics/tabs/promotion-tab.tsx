@@ -57,16 +57,16 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
     enabled: Boolean(promo.academicYearId && promo.fromClassId),
   });
 
-  const allStudents = readinessQuery.data ?? [];
   const students = useMemo(() => {
-    if (!filters.search) return allStudents;
+    const data = readinessQuery.data ?? [];
+    if (!filters.search) return data;
     const s = filters.search.toLowerCase();
-    return allStudents.filter(
+    return data.filter(
       (st) =>
         st.studentName.toLowerCase().includes(s) ||
         st.studentSystemId.toLowerCase().includes(s),
     );
-  }, [allStudents, filters.search]);
+  }, [readinessQuery.data, filters.search]);
 
   const fromSections = allSections.filter(
     (s: any) => s.classId === promo.fromClassId,

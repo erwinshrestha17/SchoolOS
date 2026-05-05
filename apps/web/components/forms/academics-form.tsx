@@ -249,7 +249,10 @@ export function AcademicsForm() {
     }
   }, [studentsQuery.data]);
 
-  const selectedComponents = componentListQuery.data ?? [];
+  const selectedComponents = useMemo(
+    () => componentListQuery.data ?? [],
+    [componentListQuery.data],
+  );
   const availableComponents = selectedComponents.length
     ? selectedComponents
     : (examsQuery.data ?? []).flatMap((item) => item.components ?? []);
