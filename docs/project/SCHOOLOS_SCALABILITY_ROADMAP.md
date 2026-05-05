@@ -93,9 +93,69 @@ SchoolOS should scale first to several pilot schools using the same modular mono
 
 ## 3.1 Modular Monolith First
 
-Every feature must stay inside a clear business module.
+SchoolOS must use one backend application for now, but it must be split clearly by business modules.
 
-Good:
+Expected backend shape:
+
+```text
+apps/api/src
+  auth/
+  tenants/
+  platform/
+  settings/
+  admissions/
+  students/
+  student-records/
+  attendance/
+  finance/
+  academics/
+  timetable/
+  payroll/
+  library/
+  transport/
+  canteen/              future module when implemented
+  accounting/
+  activity-feed/
+  communications/
+  messaging/
+  notifications/
+  reports/
+  file-registry/
+  audit/
+  shared/               shared utilities only, not business dumping ground
+```
+
+Mapping note:
+
+```text
+fees/receipts          -> current finance module
+exams/CAS/report cards -> current academics module
+homework-timetable     -> current timetable module
+hr-payroll             -> current staff + payroll modules
+notices                -> current communications + notifications modules
+```
+
+Each production module should own or clearly define:
+
+```text
+controller(s)
+service(s)
+repository/data-access boundary where useful
+dto/validation contracts
+entities/schema ownership or Prisma model ownership notes
+permissions/RBAC keys
+domain events/integration events where needed
+tests: unit, integration, e2e/contract where relevant
+```
+
+Module communication rule:
+
+```text
+Modules communicate through public services, domain events, queues, or explicit integration boundaries.
+Modules must not directly bypass another module's business rules by writing its internal tables.
+```
+
+Examples:
 
 ```text
 finance -> AccountingPostingService -> journal entries
@@ -111,7 +171,10 @@ Any module writes another module's internal tables directly.
 Frontend calculates business-critical totals.
 Long-running PDF/report generation happens inside request-response.
 TenantId comes from frontend input instead of authenticated context.
+shared/ becomes a dumping ground for business logic.
 ```
+
+This keeps SchoolOS simple now and easier to split later if one module proves it needs independent scaling.
 
 ## 3.2 Tenant Isolation Is the First Scaling Rule
 
@@ -211,6 +274,9 @@ Implementation tasks:
 
 ```text
 ✅ Keep modular monolith.
+✅ Keep module boundaries strict.
+✅ Keep module communication through public services/events/queues, not direct database hacks.
+✅ Keep each module responsible for controller/service/repository-or-data-access/dto/permissions/events/tests.
 ✅ Keep Next.js dashboard for now.
 ✅ Keep tenantId as the tenant boundary.
 ✅ Keep PostgreSQL + Prisma.
@@ -234,6 +300,7 @@ Exit criteria:
 - PROJECT_CONTEXT.md points to this roadmap.
 - Codex/AI-agent prompts mention this roadmap for every major feature.
 - No module starts Phase 2 work without tenant/pagination/index/audit/queue review.
+- No module bypasses another module's public service/event/queue boundary for business-critical writes.
 ```
 
 ---
@@ -1059,6 +1126,9 @@ Task:
 
 Scalability requirements:
 - Keep NestJS modular monolith.
+- Keep module boundaries strict.
+- Each module must own/define controller, service, data-access/repository boundary, DTOs, permissions, events, and tests where relevant.
+- Modules must communicate through public services, events, queues, or explicit integration boundaries.
 - Do not introduce microservices unless explicitly requested.
 - Keep tenantId as the tenant/school boundary.
 - All tenant-owned reads/writes must be tenant-scoped.
@@ -1114,7 +1184,7 @@ Avoid now:
 SchoolOS becomes scalable by making every development phase production-aware.
 
 ```text
-Build feature -> enforce tenant isolation -> index queries -> paginate lists -> queue slow work -> audit sensitive actions -> verify with tests -> only then move to next feature.
+Build feature -> enforce tenant isolation -> keep module boundary -> index queries -> paginate lists -> queue slow work -> audit sensitive actions -> verify with tests -> only then move to next feature.
 ```
 
 Scalability is not a separate final task. It is a rule applied during every module implementation from this point onward.
