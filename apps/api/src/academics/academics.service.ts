@@ -1010,15 +1010,23 @@ export class AcademicsService {
           max: Number(mark.assessmentComponent.maxMarks),
           obtained: Number(mark.marksObtained),
           grade: calculateMoestGrade(
-            (Number(mark.marksObtained) / Number(mark.assessmentComponent.maxMarks)) * 100,
+            (Number(mark.marksObtained) /
+              Number(mark.assessmentComponent.maxMarks)) *
+              100,
           ).grade,
         };
-      } else if (componentType === 'PRACTICAL' || componentType === 'PR' || componentType === 'CAS') {
+      } else if (
+        componentType === 'PRACTICAL' ||
+        componentType === 'PR' ||
+        componentType === 'CAS'
+      ) {
         sub.practical = {
           max: Number(mark.assessmentComponent.maxMarks),
           obtained: Number(mark.marksObtained),
           grade: calculateMoestGrade(
-            (Number(mark.marksObtained) / Number(mark.assessmentComponent.maxMarks)) * 100,
+            (Number(mark.marksObtained) /
+              Number(mark.assessmentComponent.maxMarks)) *
+              100,
           ).grade,
         };
       }
@@ -1028,7 +1036,8 @@ export class AcademicsService {
     }
 
     const subjects = Array.from(subjectMap.values()).map((sub) => {
-      const percentage = sub.totalMax > 0 ? (sub.totalObtained / sub.totalMax) * 100 : 0;
+      const percentage =
+        sub.totalMax > 0 ? (sub.totalObtained / sub.totalMax) * 100 : 0;
       const { grade, gpa } = calculateMoestGrade(percentage);
 
       return {
@@ -1203,8 +1212,11 @@ export class AcademicsService {
     return reportCard;
   }
 
-  async batchGenerateReportCards(dto: BatchGenerateReportCardsDto, actor: AuthContext) {
-    const results = [];
+  async batchGenerateReportCards(
+    dto: BatchGenerateReportCardsDto,
+    actor: AuthContext,
+  ) {
+    const results: any[] = [];
 
     for (const studentId of dto.studentIds) {
       try {
@@ -1221,7 +1233,10 @@ export class AcademicsService {
         results.push(rc);
       } catch (err) {
         // Continue for other students if one fails
-        console.error(`Failed to generate report card for student ${studentId}:`, err);
+        console.error(
+          `Failed to generate report card for student ${studentId}:`,
+          err,
+        );
       }
     }
 
@@ -1344,7 +1359,7 @@ export class AcademicsService {
       orderBy: [{ percentage: 'desc' }],
     });
 
-    const results = [];
+    const results: any[] = [];
 
     for (const card of reportCards) {
       const invoices = await this.prisma.invoice.findMany({
@@ -1353,20 +1368,31 @@ export class AcademicsService {
           studentId: card.studentId,
           status: { in: ['ISSUED', 'PARTIAL'] },
         },
-        select: { totalAmount: true, paidAmount: true },
+        include: {
+          payments: {
+            include: { refunds: true },
+          },
+        },
       });
 
-      const outstanding = invoices.reduce(
-        (acc, inv) => acc + (Number(inv.totalAmount) - Number(inv.paidAmount)),
-        0,
-      );
+      const outstanding = invoices.reduce((acc, inv) => {
+        const paidAmount = inv.payments.reduce(
+          (sum, p) =>
+            sum +
+            Number(p.amount) -
+            p.refunds.reduce((rs, r) => rs + Number(r.amount), 0),
+          0,
+        );
+        return acc + (Number(inv.totalAmount) - paidAmount);
+      }, 0);
 
       const status = getPromotionStatus(Number(card.percentage));
 
       results.push({
         reportCardId: card.id,
         studentId: card.studentId,
-        studentName: `${card.student.firstNameEn} ${card.student.lastNameEn}`.trim(),
+        studentName:
+          `${card.student.firstNameEn} ${card.student.lastNameEn}`.trim(),
         className: card.class.name,
         sectionName: card.section?.name ?? null,
         examTerm: card.examTerm.name,
@@ -1375,7 +1401,10 @@ export class AcademicsService {
         status: outstanding > 0 ? 'REVIEW' : status,
         locked: card.status === GradeLockStatus.LOCKED,
         outstandingBalance: outstanding,
-        reviewReason: outstanding > 0 ? `Unpaid dues: Rs ${outstanding.toLocaleString()}` : null,
+        reviewReason:
+          outstanding > 0
+            ? `Unpaid dues: Rs ${outstanding.toLocaleString()}`
+            : null,
       });
     }
 

@@ -485,13 +485,16 @@ export const api = {
 
     const base64Content = await base64Promise;
 
-    return post<{ id: string; fileName: string; publicUrl: string | null }>(
+    return request<{ id: string; fileName: string; publicUrl: string | null }>(
       '/files/upload',
       {
-        fileName: file.name,
-        contentType: file.type,
-        base64Content,
-        module,
+        method: 'POST',
+        json: {
+          fileName: file.name,
+          contentType: file.type,
+          base64Content,
+          module,
+        },
       },
     );
   },

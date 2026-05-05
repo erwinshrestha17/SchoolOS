@@ -460,7 +460,13 @@ export function buildReportCardPdf(input: {
         ? text(`${sub.theory.obtained}/${sub.theory.max}`, 200, y, 9, 'F1')
         : text('—', 200, y, 9, 'F1'),
       sub.practical
-        ? text(`${sub.practical.obtained}/${sub.practical.max}`, 300, y, 9, 'F1')
+        ? text(
+            `${sub.practical.obtained}/${sub.practical.max}`,
+            300,
+            y,
+            9,
+            'F1',
+          )
         : text('—', 300, y, 9, 'F1'),
       text(sub.totalGrade, 420, y, 10, 'F2'),
       text(sub.gradePoint.toFixed(2), 500, y, 10, 'F1'),

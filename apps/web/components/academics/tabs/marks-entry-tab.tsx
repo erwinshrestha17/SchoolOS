@@ -183,7 +183,7 @@ export function MarksEntryTab({ classes, allSections, students, exams }: Props) 
                 studentsForClass.map((student: any, idx: number) => {
                   const existing = existingMap.get(student.id);
                   const currentValue = marks[student.id] ?? existing ?? '';
-                  const isInvalid = currentValue !== '' && Number(currentValue) > maxMarks;
+                  const isInvalid = (currentValue as any) !== '' && Number(currentValue) > maxMarks;
 
                   return (
                     <tr

@@ -122,7 +122,7 @@ export function SubjectsTab({ academicYears, classes, allSections, staff, subjec
               </div>
               {(s.teacherAssignments?.length ?? 0) > 0 && (
                 <div className="mt-3 flex flex-wrap gap-1">
-                  {s.teacherAssignments.slice(0, 3).map((a: TeacherAssignmentSummary) => (
+                  {s.teacherAssignments?.slice(0, 3).map((a: TeacherAssignmentSummary) => (
                     <span key={a.id} className="rounded-full bg-violet-50 px-2 py-0.5 text-xs text-violet-700">
                       {a.staff?.firstName} {a.staff?.lastName}
                     </span>

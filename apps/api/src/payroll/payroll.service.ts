@@ -486,12 +486,24 @@ export class PayrollService {
       resourceId: run.id,
       after: {
         journalEntryId: posted.journalEntryId,
-      grossAmount: Number(posted.grossAmount),
+        grossAmount: Number(posted.grossAmount),
         netAmount: Number(posted.netAmount),
       },
     });
 
     return posted;
+  }
+
+  async listPayslips(actor: AuthContext) {
+    return this.prisma.payslip.findMany({
+      where: { tenantId: actor.tenantId },
+      include: {
+        staff: true,
+        payrollRun: true,
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      take: 100,
+    });
   }
 
   async listMyPayslips(actor: AuthContext) {
@@ -578,7 +590,10 @@ export class PayrollService {
         { name: 'Allowances', amount: Number(payslip.payrollLine.allowances) },
       ],
       deductions: [
-        { name: 'Statutory Deductions', amount: Number(payslip.deductionAmount) },
+        {
+          name: 'Statutory Deductions',
+          amount: Number(payslip.deductionAmount),
+        },
       ],
       grossSalary: Number(payslip.grossSalary),
       totalDeductions: Number(payslip.deductionAmount),

@@ -734,6 +734,7 @@ export type JournalEntryView = {
   entryDate: string;
   narration: string;
   sourceType: string;
+  sourceId?: string | null;
   totalDebit?: number;
   totalCredit?: number;
   lines?: Array<{
@@ -814,6 +815,15 @@ export type StaffSummary = {
   roles: string[];
   joiningDate: string;
   contractType: string;
+  address?: string;
+  bankName?: string;
+  bankAccount?: string;
+  photoUrl?: string | null;
+  user?: {
+    email: string;
+    userRoles: Array<{ role: { name: string } }>;
+  };
+  staffContracts?: StaffContractSummary[];
 };
 
 export type RoleSummary = {
@@ -1355,6 +1365,7 @@ export type SubjectSummary = {
   practicalMarks: number | null;
   passMarks: number | null;
   class?: ClassSummary;
+  teacherAssignments?: TeacherAssignmentSummary[];
 };
 
 export type TeacherAssignmentSummary = {
@@ -1554,6 +1565,7 @@ export type HomeworkSubmissionSummary = {
   feedback: string | null;
   student?: StudentProfile;
   homework?: HomeworkAssignmentSummary;
+  attachments?: any[];
 };
 
 export type StaffContractSummary = {

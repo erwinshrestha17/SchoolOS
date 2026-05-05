@@ -38,6 +38,7 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
   };
 
   const batchGenerateMut = useMutation({ mutationFn: api.batchGenerateReportCards, onSuccess: invalidate });
+  const generateMut = useMutation({ mutationFn: api.generateReportCard, onSuccess: invalidate });
 
   const handleBatchGenerate = () => {
     if (!report.academicYearId || !report.examTermId || studentsForClass.length === 0) return;

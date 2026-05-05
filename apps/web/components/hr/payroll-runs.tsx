@@ -559,17 +559,15 @@ export function PayrollRuns() {
                   <p className="text-xs font-semibold text-purple-700">
                     Posted to M9 Accounting. Journal entry is recorded.
                   </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 border-purple-200 text-purple-700 hover:bg-purple-100"
+                  <button
+                    className="h-7 px-3 border border-purple-200 text-purple-700 hover:bg-purple-100 rounded-full text-xs font-semibold transition-colors"
                     onClick={() => {
                       setSelectedJournalId(selectedRun.journalEntryId!);
                       setIsJournalDialogOpen(true);
                     }}
                   >
                     View Journal
-                  </Button>
+                  </button>
                 </div>
               )}
 
