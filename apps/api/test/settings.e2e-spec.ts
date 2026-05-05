@@ -18,6 +18,9 @@ import {
   PrismaMock,
   createResponseMock,
   createQueueMock,
+  createAuthContextMock,
+  createPrismaMock,
+  ensureTenantDefaultsWithState,
 } from './test-helpers';
 
 describe('SchoolOS Tenant Settings (E2E)', () => {
@@ -68,7 +71,7 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
       isActive: true,
       plan: 'standard',
     });
-    ensureTenantDefaults(prisma.__state, tenantAId);
+    ensureTenantDefaultsWithState(prisma.__state, tenantAId);
 
     const adminRoleA = prisma.__state.roles.find(
       (r) => r.tenantId === tenantAId && r.name === 'admin',
@@ -83,7 +86,7 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     prisma.__state.users.push(adminA);
     prisma.__state.userRoles.push({
       userId: adminA.id,
-      roleId: adminRoleA.id,
+      roleId: adminRoleA!.id,
       tenantId: tenantAId,
     });
 
@@ -96,30 +99,30 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
       isActive: true,
       plan: 'standard',
     });
-    ensureTenantDefaults(prisma.__state, tenantBId);
+    ensureTenantDefaultsWithState(prisma.__state, tenantBId);
 
     // 3. Login as Admin A
-    const adminLogin = await authController.login(
+    await authController.login(
       {
         tenantSlug: 'school-a',
         email: 'admin@school-a.com',
         password: 'pass123',
       },
-      createResponseMock() as unknown,
-      { ip: '127.0.0.1', headers: {} } as unknown,
+      createResponseMock() as any,
+      { ip: '127.0.0.1', headers: {} } as any,
     );
-    const authA = { tenantId: tenantAId, userId: adminA.id };
+    const authA = createAuthContextMock({ tenantId: tenantAId, userId: adminA.id });
 
     // 4. Admin A updates a setting
     await settingsController.updateSetting(
       'branding_primary_color',
       { value: '#ff0000' },
-      { auth: authA } as unknown,
+      { auth: authA } as any,
     );
 
     const settingsA = await settingsController.getSettings({
       auth: authA,
-    } as unknown);
+    } as any);
     expect(
       settingsA.find((s) => s.key === 'branding_primary_color')?.value,
     ).toBe('#ff0000');
@@ -135,7 +138,7 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
       settingsController.updateSetting(
         'branding_primary_color',
         { value: 'not-a-color' },
-        { auth: authA } as unknown,
+        { auth: authA } as any,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
 
@@ -143,7 +146,7 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     await expect(
       settingsController.updateSetting('timezone', { value: 123 }, {
         auth: authA,
-      } as unknown),
+      } as any),
     ).rejects.toBeInstanceOf(BadRequestException);
 
     // 8. Test Permissions - Teacher (Read only)
@@ -160,21 +163,21 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     prisma.__state.users.push(teacherA);
     prisma.__state.userRoles.push({
       userId: teacherA.id,
-      roleId: teacherRoleA.id,
+      roleId: teacherRoleA!.id,
       tenantId: tenantAId,
     });
 
-    const authTeacher = {
+    const authTeacher = createAuthContextMock({
       tenantId: tenantAId,
       userId: teacherA.id,
       roles: ['teacher'],
-      permissions: SYSTEM_ROLE_PERMISSIONS.teacher,
-    };
+      permissions: SYSTEM_ROLE_PERMISSIONS.teacher as string[],
+    });
 
     // Teacher can read
     const tSettings = await settingsController.getSettings({
       auth: authTeacher,
-    } as unknown);
+    } as any);
     expect(tSettings).toBeDefined();
 
     // 9. Test Exposure - Parent Role
@@ -191,16 +194,16 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     prisma.__state.users.push(parentA);
     prisma.__state.userRoles.push({
       userId: parentA.id,
-      roleId: parentRoleA.id,
+      roleId: parentRoleA!.id,
       tenantId: tenantAId,
     });
 
-    const authParent = {
+    const authParent = createAuthContextMock({
       tenantId: tenantAId,
       userId: parentA.id,
       roles: ['parent'],
-      permissions: SYSTEM_ROLE_PERMISSIONS.parent,
-    };
+      permissions: SYSTEM_ROLE_PERMISSIONS.parent as string[],
+    });
 
     // Parent CANNOT read private settings
     // In a real request, RolesPermissionsGuard would block this because 'parent' lacks 'settings:read'
@@ -215,12 +218,12 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     await settingsController.updateSetting(
       'sms_provider',
       { value: 'twilio' },
-      { auth: authA } as unknown,
+      { auth: authA } as any,
     );
 
     const publicSettings = await settingsController.getPublicSettings({
       auth: authParent,
-    } as unknown);
+    } as any);
 
     // Branding should be there
     expect(
@@ -235,150 +238,3 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     ).toBeUndefined();
   });
 });
-
-async function createPrismaMock() {
-  const state: MockState & { tenantSettings: Record<string, unknown>[] } = {
-    tenants: [],
-    tenantSettings: [],
-    permissions: SYSTEM_ROLE_DEFINITIONS.map((d, i) => ({
-      id: `perm-${i + 1}`,
-      ...d,
-    })),
-    roles: [],
-    rolePermissions: [],
-    users: [],
-    userRoles: [],
-    classes: [],
-    students: [],
-    staff: [],
-    staffLeaveBalances: [],
-    academicYears: [],
-    chartAccounts: [],
-    feeHeads: [],
-    otpCodes: [],
-    refreshTokens: [],
-    auditLogs: [],
-  };
-  return {
-    __state: state,
-    tenant: {
-      findUnique: jest.fn(async (q: Record<string, unknown>) =>
-        state.tenants.find(
-          (t) => t.id === q.where.id || t.slug === q.where.slug,
-        ),
-      ),
-    },
-    tenantSetting: {
-      findMany: jest.fn(async (q: Record<string, unknown>) =>
-        state.tenantSettings.filter((s) => {
-          if (s.tenantId !== q.where.tenantId) return false;
-          const keys = q.where.key?.in as string[] | undefined;
-          return keys ? keys.includes(s.key) : true;
-        }),
-      ),
-      findUnique: jest.fn(async (q: Record<string, unknown>) =>
-        state.tenantSettings.find(
-          (s) =>
-            s.tenantId === q.where.tenantId_key.tenantId &&
-            s.key === q.where.tenantId_key.key,
-        ),
-      ),
-      upsert: jest.fn(async (q: Record<string, unknown>) => {
-        const existing = state.tenantSettings.find(
-          (s) =>
-            s.tenantId === q.where.tenantId_key.tenantId &&
-            s.key === q.where.tenantId_key.key,
-        );
-        if (existing) {
-          Object.assign(existing, q.update, { updatedAt: new Date() });
-          return existing;
-        }
-        const created = {
-          id: `s-${String(state.tenantSettings.length)}`,
-          ...q.create,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        state.tenantSettings.push(created);
-        return created;
-      }),
-    },
-    user: {
-      findUnique: jest.fn(async (q: Record<string, unknown>) => {
-        const u = state.users.find(
-          (u) =>
-            (u.tenantId === q.where?.tenantId_email?.tenantId &&
-              u.email === q.where?.tenantId_email?.email) ||
-            u.id === q.where.id,
-        );
-        if (!u) return null;
-        return {
-          ...u,
-          userRoles: state.userRoles
-            .filter((ur) => ur.userId === u.id)
-            .map((ur) => ({
-              ...ur,
-              role: {
-                ...state.roles.find((r) => r.id === ur.roleId),
-                rolePermissions: state.rolePermissions
-                  .filter((rp) => rp.roleId === ur.roleId)
-                  .map((rp) => ({
-                    ...rp,
-                    permission: state.permissions.find(
-                      (p) => p.id === rp.permissionId,
-                    ),
-                  })),
-              },
-            })),
-        };
-      }),
-      update: jest.fn(async (q: Record<string, unknown>) => {
-        const u = state.users.find((u) => u.id === q.where.id);
-        if (u) {
-          Object.assign(u, q.data);
-        }
-        return u;
-      }),
-    },
-    auditLog: {
-      create: jest.fn(async (q: Record<string, unknown>) => {
-        const log = {
-          id: `log-${String(state.auditLogs.length)}`,
-          ...q.data,
-          createdAt: new Date(),
-        };
-        state.auditLogs.push(log);
-        return log;
-      }),
-    },
-    refreshToken: { create: jest.fn() },
-  };
-}
-
-function ensureTenantDefaults(state: MockState, tenantId: string) {
-  for (const def of SYSTEM_ROLE_DEFINITIONS) {
-    const role = {
-      id: `role-${tenantId}-${def.name}`,
-      tenantId,
-      name: def.name,
-      isSystem: true,
-    };
-    state.roles.push(role);
-    const perms = SYSTEM_ROLE_PERMISSIONS[def.name] || [];
-    for (const pk of perms) {
-      const p = state.permissions.find(
-        (p) => buildPermissionKey(p.resource, p.action) === pk,
-      );
-      if (p)
-        state.rolePermissions.push({ roleId: role.id, permissionId: p.id });
-    }
-  }
-}
-
-function createResponseMock() {
-  return { cookie: jest.fn(), clearCookie: jest.fn() };
-}
-
-function createQueueMock() {
-  return { add: jest.fn(), close: jest.fn(), on: jest.fn() };
-}

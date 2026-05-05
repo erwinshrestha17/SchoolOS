@@ -8,7 +8,7 @@ import { RedisService } from '../src/redis/redis.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { StudentDocumentKind } from '@prisma/client';
-import { PrismaMock, createQueueMock } from './test-helpers';
+import { PrismaMock, createQueueMock, createAuthContextMock, createPrismaMock } from './test-helpers';
 
 describe('Student Documents Registry Integration (E2E)', () => {
   let moduleRef: TestingModule;
@@ -52,8 +52,8 @@ describe('Student Documents Registry Integration (E2E)', () => {
     const studentAId = 'student-a';
     const userAId = 'user-a';
 
-    const actorA = { tenantId: tenantAId, userId: userAId } as unknown;
-    const actorB = { tenantId: tenantBId, userId: 'user-b' } as unknown;
+    const actorA = createAuthContextMock({ tenantId: tenantAId, userId: userAId });
+    const actorB = createAuthContextMock({ tenantId: tenantBId, userId: 'user-b' });
 
     // 1. Upload a document for Student A
     const doc = await studentRecordsService.uploadDocument(
@@ -65,7 +65,7 @@ describe('Student Documents Registry Integration (E2E)', () => {
         base64Content: 'base64data',
         title: 'Birth Certificate',
       },
-      actorA as { tenantId: string; userId: string },
+      actorA,
     );
 
     // 2. Verify it's in the FileRegistry
@@ -84,7 +84,7 @@ describe('Student Documents Registry Integration (E2E)', () => {
 
     // 3. Tenant A can get signed URL (preview)
     const preview = await studentRecordsService.getSignedUrl(
-      actorA as { tenantId: string; userId: string },
+      actorA,
       assetId,
       'preview',
     );
@@ -93,7 +93,7 @@ describe('Student Documents Registry Integration (E2E)', () => {
     // 4. Tenant B CANNOT get signed URL (Tenant Isolation)
     await expect(
       studentRecordsService.getSignedUrl(
-        actorB as { tenantId: string; userId: string },
+        actorB,
         assetId,
         'preview',
       ),
@@ -101,7 +101,7 @@ describe('Student Documents Registry Integration (E2E)', () => {
 
     // 5. Deletion removes from registry
     await studentRecordsService.deleteDocument(
-      actorA as { tenantId: string; userId: string },
+      actorA,
       assetId,
     );
     const registryFilesAfter = await fileRegistryService.listFilesByEntity(
@@ -131,82 +131,3 @@ describe('Student Documents Registry Integration (E2E)', () => {
   });
 });
 
-function createPrismaMock() {
-  const state: {
-    fileAssets: Record<string, unknown>[];
-    auditLogs: Record<string, unknown>[];
-    studentDocuments: Record<string, unknown>[];
-    students: Record<string, unknown>[];
-  } = {
-    fileAssets: [],
-    auditLogs: [],
-    studentDocuments: [],
-    students: [{ id: 'student-a', tenantId: 'tenant-a' }],
-  };
-  return {
-    __state: state,
-    student: {
-      findFirst: jest.fn(async (q: Record<string, unknown>) =>
-        state.students.find(
-          (s) => s.id === q.where.id && s.tenantId === q.where.tenantId,
-        ),
-      ),
-    },
-    studentDocument: {
-      create: jest.fn(async (q: Record<string, unknown>) => {
-        const doc = {
-          id: `doc-${String(state.studentDocuments.length)}`,
-          ...q.data,
-          createdAt: new Date(),
-        };
-        state.studentDocuments.push(doc);
-        return doc;
-      }),
-    },
-    fileAsset: {
-      create: jest.fn(async (q: Record<string, unknown>) => {
-        const asset = {
-          id: `asset-${String(state.fileAssets.length + 1)}`,
-          ...q.data,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          softDeletedAt: null,
-        };
-        state.fileAssets.push(asset);
-        return asset;
-      }),
-      findUnique: jest.fn(async (q: Record<string, unknown>) =>
-        state.fileAssets.find((a) => a.id === q.where.id),
-      ),
-      findMany: jest.fn(async (q: Record<string, unknown>) => {
-        return state.fileAssets.filter((a) => {
-          let match = true;
-          if (q.where.tenantId)
-            match = match && a.tenantId === q.where.tenantId;
-          if (q.where.module) match = match && a.module === q.where.module;
-          if (q.where.entityId)
-            match = match && a.entityId === q.where.entityId;
-          if (q.where.softDeletedAt === null)
-            match = match && a.softDeletedAt === null;
-          return match;
-        });
-      }),
-      update: jest.fn(async (q: Record<string, unknown>) => {
-        const asset = state.fileAssets.find((a) => a.id === q.where.id);
-        if (asset) Object.assign(asset, q.data);
-        return asset;
-      }),
-    },
-    auditLog: {
-      create: jest.fn(async (q: Record<string, unknown>) => {
-        const log = {
-          id: `log-${String(state.auditLogs.length)}`,
-          ...q.data,
-          createdAt: new Date(),
-        };
-        state.auditLogs.push(log);
-        return log;
-      }),
-    },
-  };
-}
