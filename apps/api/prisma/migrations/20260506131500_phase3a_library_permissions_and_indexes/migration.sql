@@ -4,16 +4,16 @@
 -- Granular Library RBAC permissions
 INSERT INTO "Permission" ("id", "resource", "action", "description")
 VALUES
-  (gen_random_uuid()::text, 'library:books', 'create', 'Create library book catalog records'),
-  (gen_random_uuid()::text, 'library:books', 'read', 'Read library book catalog records'),
-  (gen_random_uuid()::text, 'library:books', 'update', 'Update library book catalog records'),
-  (gen_random_uuid()::text, 'library:copies', 'create', 'Create library book copy records'),
-  (gen_random_uuid()::text, 'library:copies', 'read', 'Read library book copy records'),
-  (gen_random_uuid()::text, 'library:copies', 'update', 'Update library book copy records and status'),
-  (gen_random_uuid()::text, 'library:issues', 'create', 'Issue library book copies'),
-  (gen_random_uuid()::text, 'library:issues', 'read', 'Read library circulation records'),
-  (gen_random_uuid()::text, 'library:issues', 'return', 'Return issued library book copies'),
-  (gen_random_uuid()::text, 'library:reports', 'read', 'Read library overdue and circulation reports')
+  ('perm-library-books-create', 'library:books', 'create', 'Create library book catalog records'),
+  ('perm-library-books-read', 'library:books', 'read', 'Read library book catalog records'),
+  ('perm-library-books-update', 'library:books', 'update', 'Update library book catalog records'),
+  ('perm-library-copies-create', 'library:copies', 'create', 'Create library book copy records'),
+  ('perm-library-copies-read', 'library:copies', 'read', 'Read library book copy records'),
+  ('perm-library-copies-update', 'library:copies', 'update', 'Update library book copy records and status'),
+  ('perm-library-issues-create', 'library:issues', 'create', 'Issue library book copies'),
+  ('perm-library-issues-read', 'library:issues', 'read', 'Read library circulation records'),
+  ('perm-library-issues-return', 'library:issues', 'return', 'Return issued library book copies'),
+  ('perm-library-reports-read', 'library:reports', 'read', 'Read library overdue and circulation reports')
 ON CONFLICT ("resource", "action") DO UPDATE
 SET "description" = EXCLUDED."description";
 
