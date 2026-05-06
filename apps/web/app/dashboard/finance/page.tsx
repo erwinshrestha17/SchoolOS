@@ -8,6 +8,8 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Wallet, Receipt, Settings, BarChart3 } from 'lucide-react';
 import { StatCard } from '@/components/ui/stat-card';
+import { DuesAnalysisSection } from '@/components/finance/dues-analysis-section';
+import { DefaulterAgingSummary } from '@/components/finance/defaulter-aging-summary';
 
 export default function FinancePage() {
   const invoicesQuery = useQuery({
@@ -86,10 +88,13 @@ export default function FinancePage() {
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-6 animate-in fade-in-50 duration-500">
+          <DefaulterAgingSummary />
+          <DuesAnalysisSection />
+          
           <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[2rem] border border-dashed border-slate-200">
              <BarChart3 size={48} className="text-slate-300 mb-4" />
-             <p className="text-sm font-bold text-slate-900">Financial Reports</p>
-             <p className="text-xs text-slate-500 mt-1">Advanced reporting is currently being polished.</p>
+             <p className="text-sm font-bold text-slate-900">Collection Reports</p>
+             <p className="text-xs text-slate-500 mt-1">Exportable collection reports are available in the Ledger tab.</p>
           </div>
         </TabsContent>
 

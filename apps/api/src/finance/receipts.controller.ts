@@ -2,8 +2,10 @@ import {
   Controller,
   Get,
   Param,
+  Post,
   StreamableFile,
   UseGuards,
+  Body,
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
@@ -11,6 +13,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { FinanceService } from './finance.service';
+import { ReprintReceiptDto } from './dto/reprint-receipt.dto';
 
 @Controller('receipts')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -34,6 +37,25 @@ export class ReceiptsController {
     return new StreamableFile(pdf, {
       type: 'application/pdf',
       disposition: `inline; filename="${safePdfFileName(`${receiptNumber}.pdf`)}"`,
+    });
+  }
+
+  @Post(':id/reprint')
+  @Permissions('receipts:manage')
+  async reprintReceipt(
+    @Param('id') receiptId: string,
+    @Body() dto: ReprintReceiptDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    const { pdf, fileName } = await this.financeService.reprintReceipt(
+      receiptId,
+      dto,
+      auth,
+    );
+
+    return new StreamableFile(pdf, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${safePdfFileName(fileName)}"`,
     });
   }
 }

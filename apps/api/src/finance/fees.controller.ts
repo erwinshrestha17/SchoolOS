@@ -22,6 +22,7 @@ import { GenerateBillingRunDto } from './dto/generate-billing-run.dto';
 import { ProcessFeeDueScheduleDto } from './dto/process-fee-due-schedule.dto';
 import { SendDefaulterRemindersDto } from './dto/send-defaulter-reminders.dto';
 import { VoidInvoiceDto } from './dto/void-invoice.dto';
+import { DuesQueryDto } from './dto/dues-query.dto';
 import { FinanceService } from './finance.service';
 
 @Controller('fees')
@@ -157,6 +158,15 @@ export class FeesController {
   @Permissions('fees:manage')
   getCollectionReport(@CurrentAuth() auth: AuthContext) {
     return this.financeService.getCollectionReport(auth);
+  }
+
+  @Get('reports/dues')
+  @Permissions('fees:manage')
+  getDuesTableReport(
+    @Query() query: DuesQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.getDuesTableReport(query, auth);
   }
 
   @Post('discounts/recalculate')

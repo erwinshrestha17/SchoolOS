@@ -3,8 +3,10 @@
 import React from 'react';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
-import { Download, Receipt } from 'lucide-react';
+import { Download, Receipt, Printer } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ReprintDialog } from './reprint-dialog';
+import { useState } from 'react';
 
 interface Invoice {
   id: string;
@@ -14,6 +16,8 @@ interface Invoice {
   totalAmount: number;
   outstandingAmount: number;
   status: string;
+  receiptId?: string | null;
+  receiptNumber?: string | null;
 }
 
 interface FeeLedgerProps {
@@ -37,6 +41,8 @@ const formatDate = (value: string) =>
   }).format(new Date(value));
 
 export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
+  const [selectedReceipt, setSelectedReceipt] = useState<{ id: string; number: string } | null>(null);
+
   const columns = [
     {
       header: 'Invoice #',
@@ -87,9 +93,15 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
       header: 'Actions',
       cell: (inv: Invoice) => (
         <div className="flex items-center gap-2">
-          <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-colors" title="Print Receipt">
-            <Receipt size={16} />
-          </button>
+          {inv.receiptNumber && (
+            <button 
+              className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-colors" 
+              title="Print Receipt"
+              onClick={() => setSelectedReceipt({ id: inv.receiptId!, number: inv.receiptNumber! })}
+            >
+              <Printer size={16} />
+            </button>
+          )}
           <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-colors" title="Download PDF">
             <Download size={16} />
           </button>
@@ -104,8 +116,17 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
         columns={columns}
         data={invoices}
         isLoading={isLoading}
-        emptyMessage="No financial records found for this student."
+        emptyMessage="No financial records found."
       />
+
+      {selectedReceipt && (
+        <ReprintDialog
+          receiptId={selectedReceipt.id}
+          receiptNumber={selectedReceipt.number}
+          isOpen={!!selectedReceipt}
+          onClose={() => setSelectedReceipt(null)}
+        />
+      )}
     </div>
   );
 }

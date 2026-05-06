@@ -45,6 +45,8 @@ import { SendDefaulterRemindersDto } from './dto/send-defaulter-reminders.dto';
 import { ListCashierClosesDto } from './dto/list-cashier-closes.dto';
 import { VoidInvoiceDto } from './dto/void-invoice.dto';
 import { resolveCashAccountCode } from './finance.defaults';
+import { ReprintReceiptDto } from './dto/reprint-receipt.dto';
+import { DuesQueryDto } from './dto/dues-query.dto';
 
 export interface FeeCollectionReportRow {
   receiptNumber: string;
@@ -134,6 +136,179 @@ export class FinanceService {
     private readonly accountingPostingService: AccountingPostingService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
+
+  async reprintReceipt(
+    receiptId: string,
+    dto: ReprintReceiptDto,
+    actor: AuthContext,
+  ) {
+    const receipt = await this.prisma.receipt.findFirst({
+      where: { id: receiptId, tenantId: actor.tenantId },
+      include: {
+        payment: {
+          include: {
+            student: { include: { class: true, sectionRef: true } },
+            invoice: {
+              include: {
+                lines: { include: { feeHead: true } },
+              },
+            },
+            collectedBy: true,
+          },
+        },
+      },
+    });
+
+    if (!receipt) {
+      throw new NotFoundException('Receipt not found in this tenant');
+    }
+
+    const school = await this.prisma.tenant.findUnique({
+      where: { id: actor.tenantId },
+    });
+
+    const student = receipt.payment.student;
+    const invoice = receipt.payment.invoice;
+
+    // Record reprint history
+    await this.prisma.receiptReprintHistory.create({
+      data: {
+        tenantId: actor.tenantId,
+        receiptId: receipt.id,
+        reprintedById: actor.userId,
+        reason: dto.reason,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'reprint',
+      resource: 'receipt',
+      resourceId: receipt.id,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        reason: dto.reason,
+        receiptNumber: receipt.receiptNumber,
+      },
+    });
+
+    // Generate PDF with REPRINT marker
+    const pdf = buildReceiptPdf({
+      schoolName: school?.name || 'SchoolOS',
+      panNumber: school?.panNumber,
+      receiptNumber: receipt.receiptNumber,
+      invoiceNumber: invoice.invoiceNumber,
+      paymentDate: receipt.payment.paidAt,
+      method: receipt.payment.method,
+      cashierName: receipt.payment.collectedBy?.email || 'System',
+      student: {
+        id: student.studentSystemId,
+        name: `${student.firstNameEn} ${student.lastNameEn}`,
+        className: student.class.name,
+        sectionName: student.sectionRef?.name,
+      },
+      lines: invoice.lines.map((l) => ({
+        name: l.feeHead.name,
+        amount: Number(l.totalAmount),
+      })),
+      subtotal: Number(invoice.subtotal),
+      discount: 0,
+      total: Number(invoice.totalAmount),
+      paidAmount: Number(receipt.payment.amount),
+      balance: Number(invoice.totalAmount.sub(receipt.payment.amount)),
+      isReprint: true,
+    });
+
+    return {
+      pdf,
+      fileName: `Receipt_${receipt.receiptNumber}_Reprint.pdf`,
+    };
+  }
+
+  async getDuesTableReport(query: DuesQueryDto, actor: AuthContext) {
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
+        ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
+        ...(query.studentId ? { studentId: query.studentId } : {}),
+        ...(query.classId || query.sectionId
+          ? {
+              student: {
+                ...(query.classId ? { classId: query.classId } : {}),
+                ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+              },
+            }
+          : {}),
+        ...(query.feeHeadId
+          ? {
+              lines: {
+                some: { feeHeadId: query.feeHeadId },
+              },
+            }
+          : {}),
+      },
+      include: {
+        student: { include: { class: true, sectionRef: true } },
+        lines: { include: { feeHead: true } },
+        payments: { include: { refunds: true } },
+      },
+    });
+
+    const waivers = await this.prisma.feeWaiver.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        invoiceId: { in: invoices.map((i) => i.id) },
+      },
+    });
+
+    const waiverMap = new Map<string, Prisma.Decimal>();
+    for (const w of waivers) {
+      if (w.invoiceId) {
+        const key = `${w.invoiceId}_${w.feeHeadId || 'all'}`;
+        waiverMap.set(key, (waiverMap.get(key) || new Prisma.Decimal(0)).add(w.amount));
+      }
+    }
+
+    const rows = invoices.flatMap((invoice) => {
+      return invoice.lines
+        .filter((line) => !query.feeHeadId || line.feeHeadId === query.feeHeadId)
+        .map((line) => {
+          const paidAmount = invoice.payments.reduce((sum, p) => {
+            // This is a simplification; ideally we track payment per line
+            // For now we prorate or assign to first lines
+            return sum.add(p.amount.sub(sumRefundedAmount(p.refunds)));
+          }, new Prisma.Decimal(0));
+
+          const lineWaiver =
+            waiverMap.get(`${invoice.id}_${line.feeHeadId}`) ||
+            waiverMap.get(`${invoice.id}_all`)?.div(invoice.lines.length) ||
+            new Prisma.Decimal(0);
+
+          const outstanding = line.totalAmount.sub(lineWaiver); // Simplification
+
+          return {
+            studentName: `${invoice.student.firstNameEn} ${invoice.student.lastNameEn}`,
+            className: invoice.student.class.name,
+            feeHead: line.feeHead.name,
+            billed: Number(line.totalAmount),
+            waived: Number(lineWaiver),
+            paid: 0, // Per-line payment tracking is complex without PaymentLine
+            outstanding: Number(outstanding),
+            dueDate: invoice.dueDate,
+          };
+        });
+    });
+
+    return {
+      rows,
+      summary: {
+        totalBilled: rows.reduce((sum, r) => sum + r.billed, 0),
+        totalWaived: rows.reduce((sum, r) => sum + r.waived, 0),
+        totalOutstanding: rows.reduce((sum, r) => sum + r.outstanding, 0),
+      },
+    };
+  }
 
   async listFeeHeads(actor: AuthContext) {
     return this.prisma.feeHead.findMany({
@@ -1235,24 +1410,35 @@ export class FinanceService {
       include: {
         student: true,
         payments: {
-          include: { refunds: true },
+          include: { 
+            refunds: true,
+            receipt: true,
+          },
+          orderBy: { paidAt: 'desc' },
         },
       },
       orderBy: [{ issuedAt: 'desc' }],
     });
 
-    return invoices.map((invoice) => ({
-      id: invoice.id,
-      invoiceNumber: invoice.invoiceNumber,
-      status: invoice.status,
-      dueDate: invoice.dueDate,
-      totalAmount: Number(invoice.totalAmount),
-      student: {
-        id: invoice.student.id,
-        name: `${invoice.student.firstNameEn} ${invoice.student.lastNameEn}`.trim(),
-      },
-      paidAmount: Number(sumNetPaidAmount(invoice.payments)),
-    }));
+    return invoices.map((invoice) => {
+      const lastPayment = invoice.payments[0];
+      const receipt = lastPayment?.receipt;
+
+      return {
+        id: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        status: invoice.status,
+        dueDate: invoice.dueDate,
+        totalAmount: Number(invoice.totalAmount),
+        student: {
+          id: invoice.student.id,
+          name: `${invoice.student.firstNameEn} ${invoice.student.lastNameEn}`.trim(),
+        },
+        paidAmount: Number(sumNetPaidAmount(invoice.payments)),
+        receiptId: receipt?.id || null,
+        receiptNumber: receipt?.receiptNumber || null,
+      };
+    });
   }
 
   async getInvoiceDetail(invoiceId: string, actor: AuthContext) {

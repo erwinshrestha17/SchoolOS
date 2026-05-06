@@ -676,6 +676,71 @@ export class ReportsService {
         return [...rows, ...summaryRows];
       },
     });
+
+    this.register({
+      definition: {
+        key: 'dues-table-report',
+        name: 'Dues Analysis Report',
+        description: 'Detailed breakdown of outstanding fees across all students',
+        category: 'finance',
+        module: 'finance',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'academicYearId', label: 'Academic Year', type: 'select' },
+          { key: 'classId', label: 'Class', type: 'class' },
+          { key: 'sectionId', label: 'Section', type: 'section' },
+          { key: 'feeHeadId', label: 'Fee Head', type: 'select' },
+          { key: 'studentId', label: 'Student', type: 'student' },
+        ],
+        requiredPermissions: ['reports:export', 'ledger:read'],
+      },
+      execute: async (actor, filters) => {
+        const report = await this.financeService.getDuesTableReport(
+          {
+            academicYearId: filters.academicYearId ? String(filters.academicYearId) : undefined,
+            classId: filters.classId ? String(filters.classId) : undefined,
+            sectionId: filters.sectionId ? String(filters.sectionId) : undefined,
+            feeHeadId: filters.feeHeadId ? String(filters.feeHeadId) : undefined,
+            studentId: filters.studentId ? String(filters.studentId) : undefined,
+          },
+          actor,
+        );
+
+        const rows = report.rows.map((row) => ({
+          Student: row.studentName,
+          Class: row.className,
+          'Fee Head': row.feeHead,
+          Billed: row.billed,
+          Waived: row.waived,
+          Paid: row.paid,
+          Outstanding: row.outstanding,
+          'Due Date': new Date(row.dueDate).toISOString().split('T')[0],
+        }));
+
+        if (rows.length === 0) return [];
+
+        const divider = Object.keys(rows[0]).reduce(
+          (acc, key) => ({ ...acc, [key]: '---' }),
+          {},
+        );
+
+        const summaryRows = [
+          divider,
+          {
+            Student: 'SUMMARY',
+            Class: '',
+            'Fee Head': '',
+            Billed: report.summary.totalBilled,
+            Waived: report.summary.totalWaived,
+            Paid: report.summary.totalPaid,
+            Outstanding: report.summary.totalOutstanding,
+            'Due Date': '',
+          },
+        ];
+
+        return [...rows, ...summaryRows];
+      },
+    });
   }
 
   register(executor: ReportExecutor) {

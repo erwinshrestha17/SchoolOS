@@ -295,12 +295,12 @@ async function refreshAccessCookie() {
   return refreshPromise;
 }
 
-function withQuery(path: string, params: Record<string, string | undefined | null>) {
+function withQuery(path: string, params: Record<string, any>) {
   const searchParams = new URLSearchParams();
 
   for (const [key, value] of Object.entries(params)) {
-    if (value) {
-      searchParams.set(key, value);
+    if (value !== undefined && value !== null) {
+      searchParams.set(key, String(value));
     }
   }
 
@@ -682,6 +682,24 @@ export const api = {
       method: 'POST',
       json: body,
     }),
+  downloadReport: (reportKey: string, payload: ReportExportRequest) =>
+    downloadReport(reportKey, payload),
+  getDuesTableReport: (params?: {
+    academicYearId?: string;
+    classId?: string;
+    sectionId?: string;
+    feeHeadId?: string;
+    studentId?: string;
+    month?: number;
+    year?: number;
+  }) =>
+    request<{ rows: any[]; summary: any }>(
+      withQuery('/fees/reports/dues', {
+        ...params,
+        month: params?.month ? String(params.month) : undefined,
+        year: params?.year ? String(params.year) : undefined,
+      }),
+    ),
   listDiscounts: () => request<DiscountRule[]>('/fees/discounts'),
   listWaivers: () => request<WaiverRecord[]>('/fees/waivers'),
   createDiscount: (body: JsonBody) =>
@@ -737,6 +755,21 @@ export const api = {
       `${API_BASE_URL}/receipts/${encodeURIComponent(receiptNumber)}.pdf`,
       {
         credentials: 'include',
+      },
+    );
+
+    await openPdfBlob(response);
+  },
+  reprintReceipt: async (receiptId: string, reason: string) => {
+    const response = await fetch(
+      `${API_BASE_URL}/receipts/${encodeURIComponent(receiptId)}/reprint`,
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason }),
       },
     );
 

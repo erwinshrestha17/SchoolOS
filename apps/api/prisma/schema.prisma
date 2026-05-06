@@ -585,6 +585,7 @@ model Tenant {
   paymentRefunds                PaymentRefund[]
   cashierCloses                 CashierClose[]
   receipts                      Receipt[]
+  receiptReprintHistory         ReceiptReprintHistory[]
   chartAccounts                 ChartAccount[]
   journalEntries                JournalEntry[]
   journalLines                  JournalLine[]
@@ -720,6 +721,7 @@ model User {
   canteenMealServingsServed   CanteenMealServing[]         @relation("CanteenMealServedBy")
   canteenWalletTransactions   CanteenWalletTransaction[]   @relation("CanteenWalletTransactionCreatedBy")
   canteenPosSalesCreated      CanteenPosSale[]             @relation("CanteenPosSaleCreatedBy")
+  reprintedReceipts           ReceiptReprintHistory[]      @relation("ReceiptReprinter")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
@@ -1616,10 +1618,27 @@ model Receipt {
   pdfUrl        String?
   issuedAt      DateTime @default(now())
 
-  tenant  Tenant  @relation(fields: [tenantId], references: [id])
-  payment Payment @relation(fields: [paymentId], references: [id])
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id])
+  payment        Payment                @relation(fields: [paymentId], references: [id])
+  reprintHistory ReceiptReprintHistory[]
 
   @@unique([tenantId, receiptNumber])
+}
+
+model ReceiptReprintHistory {
+  id            String   @id @default(uuid())
+  tenantId      String
+  receiptId     String
+  reprintedById String?
+  reprintedAt   DateTime @default(now())
+  reason        String
+  metadata      Json?
+
+  tenant      Tenant  @relation(fields: [tenantId], references: [id])
+  receipt     Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  reprintedBy User?   @relation("ReceiptReprinter", fields: [reprintedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, receiptId])
 }
 
 model FeeDueSchedule {

@@ -121,6 +121,7 @@ export function buildReceiptPdf(input: {
   total: number;
   paidAmount: number;
   balance: number;
+  isReprint?: boolean;
 }) {
   const contentParts = [
     '0.5 w',
@@ -128,6 +129,7 @@ export function buildReceiptPdf(input: {
     text(input.schoolName, 48, 726, 16, 'F2'),
     input.panNumber ? text(`PAN: ${input.panNumber}`, 48, 712, 10, 'F1') : '',
     text('FEE RECEIPT', 460, 726, 14, 'F2'),
+    input.isReprint ? text('*** REPRINT ***', 460, 710, 10, 'F2') : '',
     '36 696 m 576 696 l S',
 
     // Receipt Info
