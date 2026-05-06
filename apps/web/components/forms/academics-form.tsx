@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import type { AssessmentComponentSummary } from '@schoolos/core';
 import { api } from '../../lib/api';
-import { academicsApi } from '../../lib/academics-api';
+import { useSession } from '../session-provider';
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -29,6 +29,7 @@ const defaultComponent: ComponentFormState = {
 };
 
 export function AcademicsForm() {
+  const { status } = useSession();
   const queryClient = useQueryClient();
   const [subject, setSubject] = useState({
     classId: '',
@@ -94,31 +95,66 @@ export function AcademicsForm() {
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years'],
     queryFn: api.listAcademicYears,
+    enabled: status === 'authenticated',
   });
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
-  const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
-  const studentsQuery = useQuery({ queryKey: ['students'], queryFn: api.listStudents });
-  const staffQuery = useQuery({ queryKey: ['staff'], queryFn: api.listStaff });
+  const classesQuery = useQuery({
+    queryKey: ['classes'],
+    queryFn: api.listClasses,
+    enabled: status === 'authenticated',
+  });
+  const sectionsQuery = useQuery({
+    queryKey: ['sections'],
+    queryFn: api.listSections,
+    enabled: status === 'authenticated',
+  });
+  const studentsQuery = useQuery({
+    queryKey: ['students'],
+    queryFn: api.listStudents,
+    enabled: status === 'authenticated',
+  });
+  const staffQuery = useQuery({
+    queryKey: ['staff'],
+    queryFn: api.listStaff,
+    enabled: status === 'authenticated',
+  });
   const subjectsQuery = useQuery({
     queryKey: ['subjects'],
     queryFn: () => api.listSubjects(),
+    enabled: status === 'authenticated',
   });
   const assignmentsQuery = useQuery({
     queryKey: ['teacher-assignments'],
     queryFn: api.listTeacherAssignments,
+    enabled: status === 'authenticated',
   });
-  const examsQuery = useQuery({ queryKey: ['exam-terms'], queryFn: api.listExamTerms });
+  const examsQuery = useQuery({
+    queryKey: ['exam-terms'],
+    queryFn: api.listExamTerms,
+    enabled: status === 'authenticated',
+  });
   const componentListQuery = useQuery({
     queryKey: ['assessment-components', component.examTermId, component.subjectId || 'all'],
     queryFn: () =>
-      academicsApi.listAssessmentComponents(component.examTermId, {
+      api.listAssessmentComponents(component.examTermId, {
         subjectId: component.subjectId || null,
       }),
-    enabled: Boolean(component.examTermId),
+    enabled: status === 'authenticated' && Boolean(component.examTermId),
   });
-  const marksQuery = useQuery({ queryKey: ['marks'], queryFn: () => api.listMarks() });
-  const casQuery = useQuery({ queryKey: ['cas-records'], queryFn: api.listCasRecords });
-  const reportsQuery = useQuery({ queryKey: ['report-cards'], queryFn: api.listReportCards });
+  const marksQuery = useQuery({
+    queryKey: ['marks'],
+    queryFn: () => api.listMarks(),
+    enabled: status === 'authenticated',
+  });
+  const casQuery = useQuery({
+    queryKey: ['cas-records'],
+    queryFn: () => api.listCasRecords(),
+    enabled: status === 'authenticated',
+  });
+  const reportsQuery = useQuery({
+    queryKey: ['report-cards'],
+    queryFn: api.listReportCards,
+    enabled: status === 'authenticated',
+  });
   const promotionsQuery = useQuery({
     queryKey: ['promotion-readiness', report.academicYearId, cas.classId],
     queryFn: () =>
@@ -126,7 +162,7 @@ export function AcademicsForm() {
         academicYearId: report.academicYearId,
         classId: cas.classId || null,
       }),
-    enabled: Boolean(report.academicYearId),
+    enabled: status === 'authenticated' && Boolean(report.academicYearId),
   });
 
   useEffect(() => {
@@ -310,14 +346,14 @@ export function AcademicsForm() {
   });
   const componentUpdateMutation = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
-      academicsApi.updateAssessmentComponent(id, body),
+      api.updateAssessmentComponent(id, body),
     onSuccess: () => {
       invalidateAcademics();
       resetComponentForm();
     },
   });
   const componentDeleteMutation = useMutation({
-    mutationFn: (id: string) => academicsApi.deleteAssessmentComponent(id),
+    mutationFn: (id: string) => api.deleteAssessmentComponent(id),
     onError: (_error, id) => {
       setBlockedComponentDeletes((current) => new Set(current).add(id));
     },

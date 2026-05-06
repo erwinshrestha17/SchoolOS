@@ -195,23 +195,51 @@ Weekend/holiday rules
 
 ### H. Communication Settings
 
-School-level communication preferences.
+SchoolOS Communication Settings now represent parent-teacher chat availability with structured time selectors in the School Settings UI instead of free-text hour ranges.
 
-Fields/configuration:
+Current UI behavior:
 
 ```text
-Notice delivery channels
-School SMS/email/push preferences
-Email sender display name
-Parent notification preferences
-Consent templates
-Delivery retry rules
-Parent-teacher chat availability
-Quiet hours
-Emergency override rules
+Sunday–Thursday Start Time: 16:00
+Sunday–Thursday End Time:   19:00
+Friday Start Time:          14:00
+Friday End Time:            17:00
+Saturday Chat:              Disabled by default
+Timezone:                   Asia/Kathmandu
 ```
 
-For Nepal schools, parent-teacher chat must have controlled school-configured hours. Teachers should not be expected to respond 24/7.
+The settings screen also shows a read-only availability preview for school admins:
+
+```text
+Sunday–Thursday: 4:00 PM – 7:00 PM
+Friday: 2:00 PM – 5:00 PM
+Saturday: Closed or Enabled by school policy
+```
+
+Rules:
+
+* Chat hours must be configured using time selectors, not free-text values.
+* Start time must be before end time.
+* Saturday chat remains controlled by school policy.
+* Messages outside configured chat hours should be accepted as queued unless marked as emergency by an authorized admin.
+* Teachers should not be shown as instantly available outside configured school chat hours.
+* Parent-facing wording should use expectations such as `Usually replies within 1 school day`.
+
+Current implementation note:
+
+* The frontend maps structured start/end time fields back to existing tenant setting key/value strings.
+* Backend schema normalization is deferred.
+
+Future backend normalization target:
+
+```text
+chat_sun_thu_start_time
+chat_sun_thu_end_time
+chat_friday_start_time
+chat_friday_end_time
+chat_saturday_enabled
+chat_timezone = Asia/Kathmandu
+```
 
 ### I. Security and Access Settings
 

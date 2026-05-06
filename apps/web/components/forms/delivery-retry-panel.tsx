@@ -5,8 +5,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { RefreshCcw } from 'lucide-react';
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
+import { api } from '../../lib/api';
+import { useSession } from '../session-provider';
 
 const retryableStatuses = new Set(['FAILED', 'RETRYING', 'QUEUED']);
 
@@ -51,14 +51,16 @@ type BulkDeliveryRetryResult = {
 };
 
 export function DeliveryRetryPanel() {
+  const { status } = useSession();
   const queryClient = useQueryClient();
   const deliveriesQuery = useQuery({
     queryKey: ['notification-deliveries'],
-    queryFn: listNotificationDeliveries,
+    queryFn: async () => (await api.listNotificationDeliveries()) as DeliveryRecord[],
+    enabled: status === 'authenticated',
   });
 
   const retryMutation = useMutation({
-    mutationFn: retryDelivery,
+    mutationFn: api.retryNotificationDelivery,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
       void queryClient.invalidateQueries({ queryKey: ['notification-center'] });
@@ -66,7 +68,7 @@ export function DeliveryRetryPanel() {
   });
 
   const retryAllMutation = useMutation({
-    mutationFn: retryFailedDeliveries,
+    mutationFn: api.retryFailedNotificationDeliveries,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
       void queryClient.invalidateQueries({ queryKey: ['notification-center'] });
@@ -278,54 +280,3 @@ function resolveRecipientLabel(delivery: DeliveryRecord) {
   return guardianName || studentName || delivery.destination || 'Recipient unavailable';
 }
 
-async function listNotificationDeliveries() {
-  return requestEnvelope<DeliveryRecord[]>('/communications/deliveries');
-}
-
-async function retryDelivery(deliveryId: string) {
-  return requestEnvelope<DeliveryRetryResult>(
-    `/communications/deliveries/${encodeURIComponent(deliveryId)}/retry`,
-    { method: 'POST' },
-  );
-}
-
-async function retryFailedDeliveries() {
-  return requestEnvelope<BulkDeliveryRetryResult>(
-    '/communications/deliveries/retry-failed',
-    { method: 'POST' },
-  );
-}
-
-async function requestEnvelope<T>(path: string, init?: RequestInit) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(parseApiErrorMessage(text) || `Request failed with status ${response.status}`);
-  }
-
-  const payload = (await response.json()) as ApiResponse<T>;
-  return payload.data;
-}
-
-function parseApiErrorMessage(text: string) {
-  if (!text) {
-    return '';
-  }
-
-  try {
-    const payload = JSON.parse(text) as { message?: string | string[]; error?: string };
-    return Array.isArray(payload.message)
-      ? payload.message.join(', ')
-      : payload.message || payload.error || text;
-  } catch {
-    return text;
-  }
-}

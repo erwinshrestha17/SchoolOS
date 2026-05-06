@@ -23,6 +23,11 @@ import { LoadingState } from '../../components/ui/loading-state';
 import { Badge } from '../../components/ui/badge';
 import { cn } from '../../lib/utils';
 import { useSession } from '../../components/session-provider';
+import { 
+  formatAdDate, 
+  formatSchoolDate, 
+  normalizeActivityDate 
+} from '../../lib/date-utils';
 
 const formatMoney = (amount: number) => {
   return new Intl.NumberFormat('en-NP', {
@@ -32,62 +37,68 @@ const formatMoney = (amount: number) => {
   }).format(amount);
 };
 
-const formatDate = (date: string | Date) => {
-  return new Intl.DateTimeFormat('en-NP', {
-    dateStyle: 'medium',
-  }).format(new Date(date));
-};
-
 export default function DashboardPage() {
-  const { session } = useSession();
+  const { session, status } = useSession();
   
   const academicYearsQuery = useQuery({
     queryKey: ['dashboard-academic-years'],
     queryFn: api.listAcademicYears,
+    enabled: status === 'authenticated',
   });
   const classesQuery = useQuery({
     queryKey: ['dashboard-classes'],
     queryFn: api.listClasses,
+    enabled: status === 'authenticated',
   });
   const feePlansQuery = useQuery({
     queryKey: ['dashboard-fee-plans'],
     queryFn: api.listFeePlans,
+    enabled: status === 'authenticated',
   });
   const studentsQuery = useQuery({
     queryKey: ['dashboard-students'],
     queryFn: api.listStudents,
+    enabled: status === 'authenticated',
   });
   const admissionsQuery = useQuery({
     queryKey: ['dashboard-admissions'],
     queryFn: api.listAdmissions,
+    enabled: status === 'authenticated',
   });
   const attendanceQuery = useQuery({
     queryKey: ['dashboard-attendance-analytics'],
     queryFn: api.listAttendanceAnalytics,
+    enabled: status === 'authenticated',
   });
   const invoicesQuery = useQuery({
     queryKey: ['dashboard-invoices'],
     queryFn: api.listInvoices,
+    enabled: status === 'authenticated',
   });
   const defaultersQuery = useQuery({
     queryKey: ['dashboard-defaulters'],
     queryFn: () => api.listDefaulters(),
+    enabled: status === 'authenticated',
   });
   const receiptsQuery = useQuery({
     queryKey: ['dashboard-receipts'],
     queryFn: api.listReceipts,
+    enabled: status === 'authenticated',
   });
   const activityPostsQuery = useQuery({
     queryKey: ['dashboard-activity-posts'],
     queryFn: api.listActivityPosts,
+    enabled: status === 'authenticated',
   });
   const noticesQuery = useQuery({
     queryKey: ['dashboard-notices'],
     queryFn: api.listNotices,
+    enabled: status === 'authenticated',
   });
   const deliveriesQuery = useQuery({
     queryKey: ['dashboard-notification-deliveries'],
     queryFn: api.listNotificationDeliveries,
+    enabled: status === 'authenticated',
   });
 
   const currentAcademicYear =
@@ -498,39 +509,45 @@ function HealthRow({ label, count, total, color }: { label: string; count: numbe
 
 function RecentActivityList({ admissions, receipts, activityPosts, notices }: any) {
   const items = [
-    ...admissions.slice(0, 3).map((a: any) => ({
+    ...(admissions || []).slice(0, 3).map((a: any) => ({
       title: `New Admission: ${a.student?.firstName} ${a.student?.lastName}`,
       body: `Class ${a.class?.name}`,
-      date: a.createdAt,
+      date: normalizeActivityDate(a),
       icon: UserPlus,
       color: 'text-primary-500',
-      bg: 'bg-primary-50'
+      bg: 'bg-primary-50',
     })),
-    ...receipts.slice(0, 3).map((r: any) => ({
+    ...(receipts || []).slice(0, 3).map((r: any) => ({
       title: `Fee Collected: ${formatMoney(r.amount)}`,
       body: `Receipt #${r.receiptNumber}`,
-      date: r.issuedAt,
+      date: normalizeActivityDate(r),
       icon: Wallet,
       color: 'text-success-500',
-      bg: 'bg-success-50'
+      bg: 'bg-success-50',
     })),
-    ...activityPosts.slice(0, 3).map((p: any) => ({
+    ...(activityPosts || []).slice(0, 3).map((p: any) => ({
       title: `Activity: ${p.title}`,
       body: p.category,
-      date: p.publishedAt,
+      date: normalizeActivityDate(p),
       icon: Images,
       color: 'text-secondary-500',
-      bg: 'bg-secondary-50'
+      bg: 'bg-secondary-50',
     })),
-    ...notices.slice(0, 3).map((n: any) => ({
+    ...(notices || []).slice(0, 3).map((n: any) => ({
       title: `Notice: ${n.title}`,
       body: n.priority,
-      date: n.createdAt,
+      date: normalizeActivityDate(n),
       icon: Megaphone,
       color: 'text-warning-500',
-      bg: 'bg-warning-50'
-    }))
-  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 6);
+      bg: 'bg-warning-50',
+    })),
+  ]
+    .sort((a, b) => {
+      const da = new Date(a.date).getTime() || 0;
+      const db = new Date(b.date).getTime() || 0;
+      return db - da;
+    })
+    .slice(0, 6);
 
   if (items.length === 0) {
     return <EmptyState title="No recent operations yet" description="Activity from all modules will appear here once you start using the system." />;
@@ -549,7 +566,7 @@ function RecentActivityList({ admissions, receipts, activityPosts, notices }: an
           </div>
           <div className="text-right">
             <p className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">
-              {formatDate(item.date)}
+              {formatSchoolDate(item.date, 'BOTH')}
             </p>
           </div>
         </div>

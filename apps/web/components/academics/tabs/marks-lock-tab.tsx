@@ -3,10 +3,8 @@
 import type { ExamTermSummary } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import {
-  markLockApi,
-  type MarkLockRequestSummary,
-} from '../../../lib/mark-lock-api';
+import { api, type MarkLockRequestSummary } from '../../../lib/api';
+import { useSession } from '../../session-provider';
 
 type Props = {
   exams: ExamTermSummary[];
@@ -40,6 +38,7 @@ function statusClass(status: string) {
 }
 
 export function MarksLockTab({ exams }: Props) {
+  const { status } = useSession();
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState({ examTermId: '', status: '' });
   const [requestForm, setRequestForm] = useState({ examTermId: '', reason: '' });
@@ -50,10 +49,11 @@ export function MarksLockTab({ exams }: Props) {
   const requestsQuery = useQuery({
     queryKey: ['mark-lock-requests', filters],
     queryFn: () =>
-      markLockApi.listRequests({
+      api.listMarkLockRequests({
         examTermId: filters.examTermId || null,
         status: filters.status || null,
       }),
+    enabled: status === 'authenticated',
   });
 
   const selectedRequestExam = useMemo(
@@ -78,7 +78,7 @@ export function MarksLockTab({ exams }: Props) {
   };
 
   const createMutation = useMutation({
-    mutationFn: markLockApi.createRequest,
+    mutationFn: api.createMarkLockRequest,
     onSuccess: () => {
       invalidate();
       setRequestForm((current) => ({ ...current, reason: '' }));
@@ -88,7 +88,7 @@ export function MarksLockTab({ exams }: Props) {
 
   const reviewMutation = useMutation({
     mutationFn: ({ id, status }: ReviewAction) =>
-      markLockApi.reviewRequest(id, {
+      api.reviewMarkLockRequest(id, {
         status,
         reviewNote: reviewNote[id]?.trim() || undefined,
       }),
@@ -100,7 +100,7 @@ export function MarksLockTab({ exams }: Props) {
 
   const unlockMutation = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
-      markLockApi.unlockExamTerm(id, { reason }),
+      api.unlockExamTerm(id, { reason }),
     onSuccess: () => {
       invalidate();
       setUnlockForm((current) => ({ ...current, reason: '' }));

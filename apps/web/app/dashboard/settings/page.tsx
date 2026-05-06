@@ -26,6 +26,84 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Button } from '../../../components/ui/button';
 import Link from 'next/link';
 
+// --- Helpers ---
+
+/**
+ * Parses a time range string like "4:00 PM–7:00 PM" or "16:00–19:00" into [start, end] in 24h format.
+ */
+function parseTimeRange(range: string | undefined | null, defaultStart: string, defaultEnd: string): [string, string] {
+  if (!range || typeof range !== 'string') return [defaultStart, defaultEnd];
+  const parts = range.split(/[–-]/); // Split by en-dash or hyphen
+  if (parts.length !== 2) return [defaultStart, defaultEnd];
+  
+  const clean = (p: string, fallback: string) => {
+    let time = p.trim();
+    // 12h to 24h conversion
+    if (time.toLowerCase().includes('pm') || time.toLowerCase().includes('am')) {
+       const match = time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+       if (match) {
+         let hours = parseInt(match[1]);
+         const minutes = match[2];
+         const ampm = match[3].toUpperCase();
+         if (ampm === 'PM' && hours < 12) hours += 12;
+         if (ampm === 'AM' && hours === 12) hours = 0;
+         return `${hours.toString().padStart(2, '0')}:${minutes}`;
+       }
+    }
+    // Already HH:mm?
+    const hhmm = time.match(/^(\d{1,2}):(\d{2})$/);
+    if (hhmm) {
+      return `${hhmm[1].padStart(2, '0')}:${hhmm[2]}`;
+    }
+    return fallback;
+  };
+
+  return [clean(parts[0], defaultStart), clean(parts[1], defaultEnd)];
+}
+
+function formatTimeRange(start: string, end: string): string {
+  if (!start || !end) return '';
+  return `${start}–${end}`; // Project uses en-dash
+}
+
+const formatTimeForPreview = (time?: string | null) => {
+  if (!time || !/^\d{2}:\d{2}$/.test(time)) {
+    return 'Not configured';
+  }
+
+  const [hourValue, minute] = time.split(':').map(Number);
+
+  if (
+    Number.isNaN(hourValue) ||
+    Number.isNaN(minute) ||
+    hourValue < 0 ||
+    hourValue > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return 'Not configured';
+  }
+
+  const period = hourValue >= 12 ? 'PM' : 'AM';
+  const hour12 = hourValue % 12 || 12;
+
+  return `${hour12}:${String(minute).padStart(2, '0')} ${period}`;
+};
+
+const formatTimeRangeForPreview = (
+  start?: string | null,
+  end?: string | null,
+) => {
+  const startLabel = formatTimeForPreview(start);
+  const endLabel = formatTimeForPreview(end);
+
+  if (startLabel === 'Not configured' || endLabel === 'Not configured') {
+    return 'Not configured';
+  }
+
+  return `${startLabel} – ${endLabel}`;
+};
+
 // --- Constants ---
 
 const SCHOOL_PROFILE_SETTING_KEYS: TenantSettingKey[] = [
@@ -647,7 +725,25 @@ function SectionAccounting({ initialValues, onUpdate }: { initialValues: TenantS
 }
 
 function SectionCommunication({ initialValues, onUpdate }: { initialValues: TenantSettingSummary[], onUpdate: () => void }) {
-  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, COMMUNICATION_SETTING_KEYS, onUpdate);
+  const { form, setFieldValue, save, isSaving, alert: formAlert } = useSettingsForm(initialValues, COMMUNICATION_SETTING_KEYS, onUpdate);
+
+  // TODO: Backend schema normalization - separate these into distinct database columns (chat_start, chat_end)
+  // for better reporting and filtering in future phases.
+  const [sunThuStart, sunThuEnd] = parseTimeRange(form.chat_sunday_to_thursday_hours, '16:00', '19:00');
+  const [friStart, friEnd] = parseTimeRange(form.chat_friday_hours, '14:00', '17:00');
+
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  const handleTimeChange = (key: 'chat_sunday_to_thursday_hours' | 'chat_friday_hours', start: string, end: string) => {
+    if (start && end && start >= end) {
+      setValidationError(`${key.includes('friday') ? 'Friday' : 'Sun–Thu'}: Start time must be before end time.`);
+    } else {
+      setValidationError(null);
+    }
+    setFieldValue(key, formatTimeRange(start, end));
+  };
+
+  const alert = validationError ? { type: 'error' as const, text: validationError } : formAlert;
 
   return (
     <SectionWrapper 
@@ -662,10 +758,69 @@ function SectionCommunication({ initialValues, onUpdate }: { initialValues: Tena
         <option value="SMS">SMS</option>
         <option value="APP">Mobile App Push</option>
       </Select></SettingField>
-      <SettingField label="Sun–Thu Chat Hours"><Input value={form.chat_sunday_to_thursday_hours || '4:00 PM–7:00 PM'} onChange={e => setFieldValue('chat_sunday_to_thursday_hours', e.target.value)} /></SettingField>
-      <SettingField label="Friday Chat Hours"><Input value={form.chat_friday_hours || '2:00 PM–5:00 PM'} onChange={e => setFieldValue('chat_friday_hours', e.target.value)} /></SettingField>
       
-      <div className="col-span-full space-y-4 pt-2">
+      <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+        <div className="space-y-4">
+          <label className="text-sm font-bold text-slate-700">Sunday–Thursday Chat Hours</label>
+          <div className="grid grid-cols-2 gap-4">
+            <SettingField label="Sun–Thu Start">
+              <Input type="time" value={sunThuStart} onChange={e => handleTimeChange('chat_sunday_to_thursday_hours', e.target.value, sunThuEnd)} />
+            </SettingField>
+            <SettingField label="Sun–Thu End">
+              <Input type="time" value={sunThuEnd} onChange={e => handleTimeChange('chat_sunday_to_thursday_hours', sunThuStart, e.target.value)} />
+            </SettingField>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <label className="text-sm font-bold text-slate-700">Friday Chat Hours</label>
+          <div className="grid grid-cols-2 gap-4">
+            <SettingField label="Friday Start">
+              <Input type="time" value={friStart} onChange={e => handleTimeChange('chat_friday_hours', e.target.value, friEnd)} />
+            </SettingField>
+            <SettingField label="Friday End">
+              <Input type="time" value={friEnd} onChange={e => handleTimeChange('chat_friday_hours', friStart, e.target.value)} />
+            </SettingField>
+          </div>
+        </div>
+
+        <p className="col-span-full text-xs text-slate-500">
+          Messages outside these hours are queued unless marked as emergency by an admin.
+        </p>
+
+        <div className="col-span-full mt-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-sm font-semibold text-slate-900">
+            Current availability
+          </p>
+
+          <dl className="mt-3 grid gap-4 text-sm text-slate-600 sm:grid-cols-3">
+            <div>
+              <dt className="font-medium text-slate-700">Sunday–Thursday</dt>
+              <dd className="mt-1">
+                {formatTimeRangeForPreview(sunThuStart, sunThuEnd)}
+              </dd>
+            </div>
+
+            <div>
+              <dt className="font-medium text-slate-700">Friday</dt>
+              <dd className="mt-1">
+                {formatTimeRangeForPreview(friStart, friEnd)}
+              </dd>
+            </div>
+
+            <div>
+              <dt className="font-medium text-slate-700">Saturday</dt>
+              <dd className="mt-1">
+                {form.chat_saturday_enabled
+                  ? 'Enabled by school policy'
+                  : 'Closed'}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+      
+      <div className="col-span-full space-y-4 pt-2 border-t border-slate-100 mt-2">
         <Checkbox label="Enable Parent Push Notifications" checked={!!form.parent_notification_enabled} onChange={v => setFieldValue('parent_notification_enabled', v)} />
         <Checkbox label="Media Consent Required (Photos/Videos)" checked={!!form.consent_required_for_media} onChange={v => setFieldValue('consent_required_for_media', v)} />
         <Checkbox label="Enable Quiet Hours (No Notifications)" checked={!!form.quiet_hours_enabled} onChange={v => setFieldValue('quiet_hours_enabled', v)} />

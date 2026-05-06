@@ -24,7 +24,7 @@ type HeaderProps = {
 };
 
 export function Header({ onMobileMenuToggle }: HeaderProps) {
-  const { hasPermissions, session, logout } = useSession();
+  const { hasPermissions, session, status, logout } = useSession();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [yearMenuOpen, setYearMenuOpen] = useState(false);
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState<
@@ -39,13 +39,13 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
   const academicYearsQuery = useQuery({
     queryKey: ['layout-academic-years'],
     queryFn: api.listAcademicYears,
-    enabled: canReadAcademicYears,
+    enabled: status === 'authenticated' && canReadAcademicYears,
   });
 
   const deliveriesQuery = useQuery({
     queryKey: ['header-notification-deliveries'],
     queryFn: api.listNotificationDeliveries,
-    enabled: canReadNotifications,
+    enabled: status === 'authenticated' && canReadNotifications,
   });
 
   const academicYears = academicYearsQuery.data ?? [];

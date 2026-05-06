@@ -40,7 +40,7 @@ import type {
   InvoiceSummary,
   JournalEntryView,
   MarkEntrySummary,
-  MarkLockRequestSummary,
+  MarkLockRequestSummary as MarkLockRequestCore,
   MessageReadReceiptSummary,
   MessageSummary,
   ChatAvailabilityRuleSummary,
@@ -111,6 +111,8 @@ import { clearStoredSession } from './session';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
+
+let refreshPromise: Promise<boolean> | null = null;
 
 type JsonBody = Record<string, unknown>;
 
@@ -265,16 +267,31 @@ async function downloadReport(reportKey: string, payload: ReportExportRequest) {
 }
 
 async function refreshAccessCookie() {
-  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({}),
-  });
+  if (refreshPromise) {
+    return refreshPromise;
+  }
 
-  return response.ok;
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('Failed to refresh access cookie:', error);
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 }
 
 function withQuery(path: string, params: Record<string, string | undefined | null>) {
@@ -458,21 +475,9 @@ export const api = {
     request<AssessmentComponentSummary[]>(
       withQuery(`/academics/exams/${encodeURIComponent(examTermId)}/components`, params ?? {}),
     ),
-  listCasRecords: () => request<CasRecordSummary[]>('/academics/cas'),
   createCasRecord: (body: JsonBody) =>
     request<CasRecordSummary>('/academics/cas', { method: 'POST', json: body }),
   listReportCards: () => request<ReportCardSummary[]>('/academics/report-cards'),
-  listMarkLockRequests: () => request<MarkLockRequestSummary[]>('/academics/marks/lock-requests'),
-  requestMarkLock: (body: JsonBody) =>
-    request<MarkLockRequestSummary>('/academics/marks/lock-requests', {
-      method: 'POST',
-      json: body,
-    }),
-  reviewMarkLockRequest: (id: string, body: JsonBody) =>
-    request<MarkLockRequestSummary>(`/academics/marks/lock-requests/${encodeURIComponent(id)}/review`, {
-      method: 'PATCH',
-      json: body,
-    }),
   generateReportCard: (body: JsonBody) =>
     request<ReportCardSummary>('/academics/report-cards', { method: 'POST', json: body }),
   batchGenerateReportCards: (body: JsonBody) =>
@@ -1350,4 +1355,180 @@ export const api = {
   // Accounting Verification
   getJournalEntry: (id: string) =>
     request<JournalEntryView>(`/accounting/journals/${encodeURIComponent(id)}`),
+
+  // Notification Center
+  getNotificationCenter: () =>
+    request<NotificationCenterSummary>('/communications/notifications'),
+  markNotificationRead: (id: string) =>
+    request<{ success: true }>(
+      `/communications/notifications/${encodeURIComponent(id)}/read`,
+      { method: 'POST' },
+    ),
+  markAllNotificationsRead: () =>
+    request<{ success: true; markedCount: number }>(
+      '/communications/notifications/mark-all-read',
+      { method: 'POST' },
+    ),
+
+  // Academics - Assessment Components
+  listAssessmentComponents: (
+    examTermId: string,
+    params?: { subjectId?: string | null },
+  ) =>
+    request<AssessmentComponentSummary[]>(
+      withQuery(
+        `/academics/exams/${encodeURIComponent(examTermId)}/components`,
+        params ?? {},
+      ),
+    ),
+  updateAssessmentComponent: (id: string, body: JsonBody) =>
+    request<AssessmentComponentSummary>(
+      `/academics/exams/components/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
+  deleteAssessmentComponent: (id: string) =>
+    request<{ deleted: true; assessmentComponentId: string }>(
+      `/academics/exams/components/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+      },
+    ),
+
+  // Academics - Mark Lock Requests
+  listMarkLockRequests: (filters?: MarkLockFilters) =>
+    request<MarkLockRequestSummary[]>(
+      withQuery('/academics/marks/lock-requests', filters ?? {}),
+    ),
+  createMarkLockRequest: (body: { examTermId: string; reason: string }) =>
+    request<MarkLockRequestSummary>('/academics/marks/lock-requests', {
+      method: 'POST',
+      json: body,
+    }),
+  reviewMarkLockRequest: (
+    id: string,
+    body: { status: 'APPROVED' | 'REJECTED'; reviewNote?: string },
+  ) =>
+    request<MarkLockRequestSummary>(
+      `/academics/marks/lock-requests/${encodeURIComponent(id)}/review`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
+  unlockExamTerm: (id: string, body: { reason?: string }) =>
+    request<{
+      examTermId: string;
+      unlocked: true;
+      request: MarkLockRequestSummary;
+    }>(`/academics/exams/${encodeURIComponent(id)}/unlock`, {
+      method: 'PATCH',
+      json: body,
+    }),
+
+  // Academics - CAS
+  listCasRecords: (filters?: CasListFilters) =>
+    request<CasRecordSummary[]>(withQuery('/academics/cas', filters ?? {})),
+  updateCasRecord: (id: string, body: JsonBody) =>
+    request<CasRecordSummary>(`/academics/cas/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      json: body,
+    }),
+  deleteCasRecord: (id: string) =>
+    request<{ deleted: true; casRecordId: string }>(
+      `/academics/cas/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
+    ),
+  batchCreateCasRecords: (body: JsonBody) =>
+    request<{ created: number; entries: CasRecordSummary[] }>(
+      '/academics/cas/batch',
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
+
+  // Communications - Deliveries
+  retryNotificationDelivery: (deliveryId: string) =>
+    request<any>(`/communications/deliveries/${encodeURIComponent(deliveryId)}/retry`, {
+      method: 'POST',
+    }),
+  retryFailedNotificationDeliveries: () =>
+    request<any>('/communications/deliveries/retry-failed', { method: 'POST' }),
+
+  // Payroll - PDFs
+  openApprovedSalarySlipPdf: async (runId: string, lineId: string) => {
+    const response = await fetch(
+      `${API_BASE_URL}/payroll/runs/${encodeURIComponent(runId)}/lines/${encodeURIComponent(lineId)}/salary-slip.pdf`,
+      { credentials: 'include' },
+    );
+    await openPdfBlob(response);
+  },
+};
+
+export type NotificationCenterItem = {
+  id: string;
+  channel: string;
+  status: string;
+  sourceType: string;
+  sourceId: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  sentAt: string | null;
+  readAt: string | null;
+  isRead: boolean;
+  linkHref: string;
+};
+
+export type NotificationCenterSummary = {
+  unreadCount: number;
+  items: NotificationCenterItem[];
+};
+
+export type MarkLockFilters = {
+  examTermId?: string | null;
+  status?: string | null;
+  requestedById?: string | null;
+};
+
+export type CasListFilters = {
+  academicYearId?: string | null;
+  classId?: string | null;
+  sectionId?: string | null;
+  subjectId?: string | null;
+  studentId?: string | null;
+};
+export type MarkLockRequestSummary = {
+  id: string;
+  tenantId: string;
+  examTermId: string;
+  requestedById: string;
+  reviewedById?: string | null;
+  status: string;
+  reason: string;
+  reviewNote?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  examTerm?: {
+    id: string;
+    name: string;
+    isLocked: boolean;
+    academicYear?: {
+      id: string;
+      name: string;
+    } | null;
+  } | null;
+  requestedBy?: {
+    id: string;
+    email?: string | null;
+    phone?: string | null;
+  } | null;
+  reviewedBy?: {
+    id: string;
+    email?: string | null;
+    phone?: string | null;
+  } | null;
 };

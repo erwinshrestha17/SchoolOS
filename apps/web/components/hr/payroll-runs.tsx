@@ -17,7 +17,6 @@ import {
 import { useMemo, useState } from 'react';
 import { useSession } from '../session-provider';
 import { api } from '../../lib/api';
-import { openApprovedSalarySlipPdf } from '../../lib/payroll-pdf';
 import { JournalEntryDialog } from '../accounting/journal-entry-dialog';
 
 type PayrollLineView = {
@@ -133,7 +132,7 @@ function getStaffName(line: PayrollLineView) {
 
 export function PayrollRuns() {
   const queryClient = useQueryClient();
-  const { hasPermissions } = useSession();
+  const { status, hasPermissions } = useSession();
   const canManagePayroll = hasPermissions(['payroll:manage']);
 
   const currentMonth = new Date().getMonth() + 1;
@@ -151,12 +150,13 @@ export function PayrollRuns() {
   const runsQuery = useQuery({
     queryKey: ['payroll-runs'],
     queryFn: api.listPayrollRuns,
+    enabled: status === 'authenticated',
   });
 
   const previewQuery = useQuery({
     queryKey: ['payroll-preview', year, month, workingDays],
     queryFn: () => api.getPayrollPreview({ year, month, workingDays }),
-    enabled: showDraftWorkflow,
+    enabled: status === 'authenticated' && showDraftWorkflow,
   });
 
   const runs = useMemo(
@@ -221,7 +221,7 @@ export function PayrollRuns() {
         throw new Error('Payroll run line is missing.');
       }
 
-      return openApprovedSalarySlipPdf(selectedRun.id, line.id);
+      return api.openApprovedSalarySlipPdf(selectedRun.id, line.id);
     },
     onMutate: () => setSalarySlipError(null),
     onError: (error) => setSalarySlipError((error as Error).message),

@@ -351,7 +351,7 @@ describe('SchoolOS web production contracts', () => {
   it('uses authenticated session metadata and real shell APIs in the header', () => {
     const header = read('components/layout/header.tsx');
 
-    assert.match(header, /const \{ hasPermissions, session, logout \} = useSession\(\)/);
+    assert.match(header, /const \{.*hasPermissions.*session.*logout.*\} = useSession\(\)/);
     assert.match(header, /session\?\.tenant\.name/);
     assert.match(header, /api\.listAcademicYears/);
     assert.match(header, /api\.listNotificationDeliveries/);

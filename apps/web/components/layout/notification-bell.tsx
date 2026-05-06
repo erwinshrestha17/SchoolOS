@@ -1,34 +1,11 @@
 'use client';
 
-import type { ApiResponse } from '@schoolos/core';
+import { api, type NotificationCenterSummary } from '../../lib/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Bell, CheckCheck, Loader2 } from 'lucide-react';
 import { NotificationBadge } from '../ui/notification-badge';
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
-
-type NotificationCenterItem = {
-  id: string;
-  channel: string;
-  status: string;
-  sourceType: string;
-  sourceId: string;
-  title: string;
-  body: string;
-  createdAt: string;
-  sentAt: string | null;
-  readAt: string | null;
-  isRead: boolean;
-  linkHref: string;
-};
-
-type NotificationCenterSummary = {
-  unreadCount: number;
-  items: NotificationCenterItem[];
-};
 
 type NotificationBellProps = {
   enabled: boolean;
@@ -41,20 +18,20 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
 
   const centerQuery = useQuery({
     queryKey: ['notification-center'],
-    queryFn: fetchNotificationCenter,
+    queryFn: api.getNotificationCenter,
     enabled,
     refetchInterval: 60_000,
   });
 
   const markReadMutation = useMutation({
-    mutationFn: markNotificationRead,
+    mutationFn: api.markNotificationRead,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['notification-center'] });
     },
   });
 
   const markAllReadMutation = useMutation({
-    mutationFn: markAllNotificationsRead,
+    mutationFn: api.markAllNotificationsRead,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['notification-center'] });
     },
@@ -104,8 +81,8 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
               </p>
               <p className="text-xs text-gray-500">
                 {unreadCount > 0
-                  ? `${unreadCount} unread update${unreadCount === 1 ? '' : 's'}`
-                  : 'All caught up'}
+                   ? `${unreadCount} unread update${unreadCount === 1 ? '' : 's'}`
+                   : 'All caught up'}
               </p>
             </div>
             <button
@@ -199,45 +176,6 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
       )}
     </div>
   );
-}
-
-async function fetchNotificationCenter() {
-  const payload = await requestEnvelope<NotificationCenterSummary>(
-    '/communications/notifications',
-  );
-  return payload;
-}
-
-async function markNotificationRead(id: string) {
-  await requestEnvelope<{ success: true }>(
-    `/communications/notifications/${encodeURIComponent(id)}/read`,
-    { method: 'POST' },
-  );
-}
-
-async function markAllNotificationsRead() {
-  await requestEnvelope<{ success: true; markedCount: number }>(
-    '/communications/notifications/mark-all-read',
-    { method: 'POST' },
-  );
-}
-
-async function requestEnvelope<T>(path: string, init?: RequestInit) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
-  }
-
-  const payload = (await response.json()) as ApiResponse<T>;
-  return payload.data;
 }
 
 function formatDateTime(value: string) {

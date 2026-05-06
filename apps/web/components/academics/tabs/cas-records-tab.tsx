@@ -11,7 +11,7 @@ import type {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { api } from '../../../lib/api';
-import { casApi } from '../../../lib/cas-api';
+import { useSession } from '../../session-provider';
 
 type Props = {
   academicYears: AcademicYearSummary[];
@@ -90,6 +90,7 @@ function makeDefaultForm(academicYears: AcademicYearSummary[]): CasFormState {
 }
 
 export function CasRecordsTab({ academicYears, classes, allSections, students, subjects }: Props) {
+  const { status } = useSession();
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState(() => ({
     academicYearId: getCurrentYear(academicYears)?.id ?? '',
@@ -144,7 +145,8 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
 
   const casRecordsQuery = useQuery({
     queryKey: ['cas-records', filters],
-    queryFn: () => casApi.listCasRecords(filters),
+    queryFn: () => api.listCasRecords(filters),
+    enabled: status === 'authenticated',
   });
 
   const invalidate = () => {
@@ -164,7 +166,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
 
   const updateMutation = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
-      casApi.updateCasRecord(id, body),
+      api.updateCasRecord(id, body),
     onSuccess: () => {
       invalidate();
       setEditingId(null);
@@ -174,7 +176,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => casApi.deleteCasRecord(id),
+    mutationFn: (id: string) => api.deleteCasRecord(id),
     onSuccess: () => {
       invalidate();
       setSuccessMessage('CAS record deleted successfully.');
@@ -183,7 +185,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
   });
 
   const batchMutation = useMutation({
-    mutationFn: casApi.batchCreateCasRecords,
+    mutationFn: api.batchCreateCasRecords,
     onSuccess: (data) => {
       invalidate();
       setBatchDraft({});

@@ -240,6 +240,10 @@ Public holidays: Closed
 Outside hours: Emergency-only notifications
 ```
 
+Implementation note:
+
+The School Settings → Communication Rules UI now uses native time selectors for parent-teacher chat availability instead of free-text hour ranges. It provides Nepal-friendly defaults, start/end validation, and a read-only availability preview. Backend storage currently remains tenant setting key/value based, with future normalization planned for separate start/end time fields and `Asia/Kathmandu` timezone.
+
 Reasoning:
 - Teachers should not be interrupted during class hours.
 - After-school windows allow teachers to respond without affecting teaching.
