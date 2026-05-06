@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { CreditCard, ShoppingCart, Soup, Utensils, Wallet, WalletCards } from 'lucide-react';
@@ -102,13 +102,13 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
   const menuMutation = useMutation({ mutationFn: canteenApi.createMenuItem, onSuccess: () => { setMenuForm(emptyMenuForm); setNotice('Menu item created.'); invalidateCanteen(); } });
   const planMutation = useMutation({ mutationFn: canteenApi.createMealPlan, onSuccess: () => { setPlanForm(emptyPlanForm); setNotice('Meal plan created.'); invalidateCanteen(); } });
   const enrollmentMutation = useMutation({ mutationFn: canteenApi.createEnrollment, onSuccess: () => { setEnrollmentForm(emptyEnrollmentForm); setNotice('Student enrolled.'); invalidateCanteen(); } });
-  const cancelEnrollmentMutation = useMutation({ mutationFn: canteenApi.cancelEnrollment, onSuccess: () => { setNotice('Enrollment cancelled.'); invalidateCanteen(); } });
+  const cancelEnrollmentMutation = useMutation({ mutationFn: (enrollmentId: string) => canteenApi.cancelEnrollment(enrollmentId), onSuccess: () => { setNotice('Enrollment cancelled.'); invalidateCanteen(); } });
   const servingMutation = useMutation({ mutationFn: canteenApi.serveMeal, onSuccess: () => { setServingForm(emptyServingForm); setNotice('Meal served.'); invalidateCanteen(); } });
   const createWalletMutation = useMutation({ mutationFn: canteenApi.getOrCreateWallet, onSuccess: () => { setNotice('Wallet ready.'); invalidateCanteen(); } });
   const topUpMutation = useMutation({ mutationFn: ({ studentId, body }: { studentId: string; body: CanteenTopUpPayload }) => canteenApi.topUpWallet(studentId, body), onSuccess: () => { setTopUpForm(emptyTopUpForm); setNotice('Wallet topped up.'); invalidateCanteen(); } });
   const posMutation = useMutation({ mutationFn: canteenApi.createPosSale, onSuccess: () => { setPosForm(emptyPosForm); setNotice('POS sale created. Complete it from the sales list if required.'); invalidateCanteen(); } });
-  const completeSaleMutation = useMutation({ mutationFn: canteenApi.completePosSale, onSuccess: () => { setNotice('POS sale completed.'); invalidateCanteen(); } });
-  const cancelSaleMutation = useMutation({ mutationFn: canteenApi.cancelPosSale, onSuccess: () => { setNotice('POS sale cancelled.'); invalidateCanteen(); } });
+  const completeSaleMutation = useMutation({ mutationFn: (saleId: string) => canteenApi.completePosSale(saleId), onSuccess: () => { setNotice('POS sale completed.'); invalidateCanteen(); } });
+  const cancelSaleMutation = useMutation({ mutationFn: (saleId: string) => canteenApi.cancelPosSale(saleId), onSuccess: () => { setNotice('POS sale cancelled.'); invalidateCanteen(); } });
   const controlMutation = useMutation({ mutationFn: canteenApi.upsertSpendingControl, onSuccess: () => { setNotice('Spending control saved.'); invalidateCanteen(); } });
 
   const menuItems = menuQuery.data ?? [];
@@ -118,14 +118,14 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
   const sales = salesQuery.data ?? [];
   const lowBalanceWallets = lowBalanceQuery.data ?? [];
 
-  const stats = useMemo(() => ({
+  const stats = {
     activeMenuItems: menuItems.filter((item) => item.status === 'ACTIVE').length,
     activeMealPlans: plans.filter((plan) => plan.status === 'ACTIVE').length,
     enrolledStudents: enrollments.filter((enrollment) => enrollment.status === 'ACTIVE').length,
     mealsServedToday: servings.filter((serving) => serving.status === 'SERVED').length,
     posSalesToday: sales.filter((sale) => sale.status === 'COMPLETED').length,
     lowBalanceWallets: lowBalanceWallets.length,
-  }), [enrollments, lowBalanceWallets.length, menuItems, plans, sales, servings]);
+  };
 
   const firstError = menuQuery.error || plansQuery.error || enrollmentsQuery.error || servingsQuery.error || salesQuery.error || lowBalanceQuery.error;
 

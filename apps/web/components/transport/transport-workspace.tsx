@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AlertTriangle, Bus, MapPin, Navigation, Route, Users } from 'lucide-react';
@@ -49,7 +49,7 @@ const emptyRouteForm: TransportRoutePayload = {
   name: '',
   code: '',
   isActive: true,
-  stops: [{ name: 'Main stop', sequence: 1 }],
+  stops: [{ routeId: '', name: 'Main stop', sequence: 1 }],
 };
 
 const emptyStopForm: TransportStopPayload = {
@@ -222,17 +222,16 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
   const trips = tripsQuery.data ?? [];
   const selectedTrip = activeTrips.find((trip) => trip.id === selectedTripId) ?? trips.find((trip) => trip.id === selectedTripId);
 
-  const stats = useMemo(
-    () => ({
-      totalRoutes: reportsQuery.data?.activeAssignments ?? routes.length,
-      activeVehicles: vehicles.filter((vehicle) => vehicle.status === 'ACTIVE').length,
-      activeTrips: reportsQuery.data?.activeTrips ?? activeTrips.length,
-      assignedStudents: studentAssignments.length,
-      logsToday: reportsQuery.data?.logsToday ?? 0,
-      alerts: (reportsQuery.data?.vehicleFitnessAlerts ?? 0) + (reportsQuery.data?.driverLicenseAlerts ?? 0),
-    }),
-    [activeTrips.length, reportsQuery.data, routes.length, studentAssignments.length, vehicles],
-  );
+  const stats = {
+    totalRoutes: reportsQuery.data?.activeAssignments ?? routes.length,
+    activeVehicles: vehicles.filter((vehicle) => vehicle.status === 'ACTIVE').length,
+    activeTrips: reportsQuery.data?.activeTrips ?? activeTrips.length,
+    assignedStudents: studentAssignments.length,
+    logsToday: reportsQuery.data?.logsToday ?? 0,
+    alerts:
+      (reportsQuery.data?.vehicleFitnessAlerts ?? 0) +
+      (reportsQuery.data?.driverLicenseAlerts ?? 0),
+  };
 
   const firstError =
     routesQuery.error ||
