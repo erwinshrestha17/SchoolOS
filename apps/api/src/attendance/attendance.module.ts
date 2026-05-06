@@ -5,10 +5,11 @@ import { CommunicationsModule } from '../communications/communications.module';
 import { AttendanceCron } from './attendance.cron';
 import { AttendanceController } from './attendance.controller';
 import { AttendanceService } from './attendance.service';
+import { HrAttendanceController } from './hr-attendance.controller';
 
 @Module({
   imports: [AuthModule, AuditModule, CommunicationsModule],
-  controllers: [AttendanceController],
+  controllers: [AttendanceController, HrAttendanceController],
   providers: [AttendanceService, AttendanceCron],
 })
 export class AttendanceModule {}

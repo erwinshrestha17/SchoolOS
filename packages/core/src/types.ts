@@ -830,12 +830,16 @@ export type SectionSummary = {
 export type StaffSummary = {
   id: string;
   employeeId: string;
+  staffCode?: string | null;
   firstName: string;
   lastName: string;
   email: string | null;
   roles: string[];
   joiningDate: string;
   contractType: string;
+  status?: string;
+  department?: string | null;
+  designation?: string | null;
   address?: string;
   bankName?: string;
   bankAccount?: string;
@@ -845,6 +849,58 @@ export type StaffSummary = {
     userRoles: Array<{ role: { name: string } }>;
   };
   staffContracts?: StaffContractSummary[];
+};
+
+export type StaffDetail = StaffSummary & {
+  personal?: {
+    dateOfBirth: string;
+    gender: string;
+    address: string;
+    emergencyContact?: {
+      name?: string | null;
+      phone?: string | null;
+      relation?: string | null;
+    };
+  };
+  employment?: {
+    department?: string | null;
+    designation?: string | null;
+    employmentType?: string | null;
+    joiningDate: string;
+    contractStatus?: string | null;
+    teacherRegistryId?: string | null;
+  };
+  salaryStructures?: SalaryStructureSummary[];
+  attendanceRecords?: unknown[];
+  leaveBalances?: StaffLeaveBalanceSummary[];
+  leaveRequests?: StaffLeaveRequestSummary[];
+  payrollLines?: PayrollLineSummary[];
+};
+
+export type SalaryComponentSummary = {
+  id: string;
+  name: string;
+  componentType: string;
+  amount: number;
+  taxable: boolean;
+};
+
+export type SalaryStructureSummary = {
+  id: string;
+  staffId: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  basicSalary: number;
+  allowances: number;
+  deductions: number;
+  pfEnabled: boolean;
+  tdsEnabled: boolean;
+  paymentMethod: string;
+  bankAccount?: string | null;
+  bankName?: string | null;
+  status: string;
+  components?: SalaryComponentSummary[];
+  staff?: StaffSummary;
 };
 
 export type RoleSummary = {
@@ -1773,8 +1829,12 @@ export type PayrollRunSummary = {
   grossAmount: number;
   deductionAmount: number;
   netAmount: number;
+  pfEmployeeAmount?: number;
+  pfEmployerAmount?: number;
+  tdsAmount?: number;
   lineCount?: number;
   journalEntryId: string | null;
+  disbursementJournalEntryId?: string | null;
   lines?: PayrollLineSummary[];
 };
 
@@ -1782,10 +1842,21 @@ export type PayrollLineSummary = {
   id: string;
   staffId: string;
   grossSalary: number;
+  basicSalary?: number;
+  earnings?: number;
+  allowances?: number;
+  leaveDeductions?: number;
+  pfEmployee?: number;
+  pfEmployer?: number;
+  tds?: number;
+  otherDeductions?: number;
   deductions: number;
   netSalary: number;
+  paidDays?: number;
+  unpaidDays?: number;
   attendanceDays: number;
   workingDays: number;
+  paymentStatus?: string;
   status: string;
   staff?: {
     id: string;
@@ -1840,6 +1911,36 @@ export type AccountingPeriodSummary = {
   endsOn: string;
   status: string;
   closedAt: string | null;
+};
+
+export type ChartAccountSummary = {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  isSystem: boolean;
+  isActive?: boolean;
+  parentId?: string | null;
+  children?: ChartAccountSummary[];
+};
+
+export type FiscalYearSummary = {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  periods?: FiscalPeriodSummary[];
+};
+
+export type FiscalPeriodSummary = {
+  id: string;
+  fiscalYearId: string;
+  label: string;
+  periodNumber: number;
+  startDate: string;
+  endDate: string;
+  status: string;
 };
 
 export type AccountingReport = {

@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Search, UserPlus } from 'lucide-react';
+import Link from 'next/link';
 import { useState } from 'react';
 
 export function StaffList() {
@@ -86,7 +87,12 @@ export function StaffList() {
                       {new Date(staff.joiningDate).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button className="text-primary-600 hover:text-primary-700 font-medium text-sm">View</button>
+                      <Link
+                        href={`/dashboard/staff/${staff.id}`}
+                        className="text-sm font-medium text-primary-600 hover:text-primary-700"
+                      >
+                        View
+                      </Link>
                     </td>
                   </tr>
                 ))

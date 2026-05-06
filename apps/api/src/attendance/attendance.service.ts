@@ -20,6 +20,8 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto';
+import { CorrectStaffAttendanceDto } from './dto/correct-staff-attendance.dto';
 import { ReviewAttendanceConflictDto } from './dto/review-attendance-conflict.dto';
 import { CreateStaffLeaveRequestDto } from './dto/create-staff-leave-request.dto';
 import { AttendanceConflictReviewDecision } from './dto/review-attendance-conflict.dto';
@@ -819,6 +821,23 @@ export class AttendanceService {
     });
   }
 
+  async getStaffAttendanceHistory(staffId: string, actor: AuthContext) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { id: staffId, tenantId: actor.tenantId },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff not found in this tenant');
+    }
+
+    return this.prisma.staffAttendance.findMany({
+      where: { tenantId: actor.tenantId, staffId },
+      include: { approvedBy: true },
+      orderBy: { attendanceDate: 'desc' },
+      take: 180,
+    });
+  }
+
   async listStaffAttendanceSummary(
     query: ListStaffAttendanceSummaryDto,
     actor: AuthContext,
@@ -1023,12 +1042,122 @@ export class AttendanceService {
     };
   }
 
+  async correctStaffAttendance(
+    attendanceId: string,
+    dto: CorrectStaffAttendanceDto,
+    actor: AuthContext,
+  ) {
+    const existing = await this.prisma.staffAttendance.findFirst({
+      where: { id: attendanceId, tenantId: actor.tenantId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Staff attendance record not found');
+    }
+
+    const corrected = await this.prisma.staffAttendance.update({
+      where: { id: existing.id },
+      data: {
+        status: dto.status,
+        leaveType: dto.leaveType ?? null,
+        note: dto.note ?? existing.note,
+        checkInAt: dto.checkInAt ? new Date(dto.checkInAt) : existing.checkInAt,
+        approvedById: actor.userId,
+      },
+      include: { staff: true, approvedBy: true },
+    });
+
+    await this.auditService.record({
+      action: 'correct',
+      resource: 'staff_attendance',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: corrected.id,
+      before: {
+        status: existing.status,
+        leaveType: existing.leaveType,
+        note: existing.note,
+      },
+      after: {
+        status: corrected.status,
+        leaveType: corrected.leaveType,
+        note: corrected.note,
+        reason: dto.reason,
+      },
+    });
+
+    return corrected;
+  }
+
   async listLeaveBalances(actor: AuthContext) {
     return this.prisma.staffLeaveBalance.findMany({
       where: { tenantId: actor.tenantId },
       include: { staff: true },
       orderBy: [{ year: 'desc' }, { leaveType: 'asc' }],
     });
+  }
+
+  async getStaffLeaveBalances(staffId: string, actor: AuthContext) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { id: staffId, tenantId: actor.tenantId },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff not found in this tenant');
+    }
+
+    return this.prisma.staffLeaveBalance.findMany({
+      where: { tenantId: actor.tenantId, staffId },
+      orderBy: [{ year: 'desc' }, { leaveType: 'asc' }],
+    });
+  }
+
+  async adjustLeaveBalance(dto: AdjustLeaveBalanceDto, actor: AuthContext) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { id: dto.staffId, tenantId: actor.tenantId },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff not found in this tenant');
+    }
+
+    const adjusted = await this.prisma.staffLeaveBalance.upsert({
+      where: {
+        tenantId_staffId_leaveType_year: {
+          tenantId: actor.tenantId,
+          staffId: dto.staffId,
+          leaveType: dto.leaveType,
+          year: dto.year,
+        },
+      },
+      update: {
+        adjusted: { increment: new Prisma.Decimal(dto.adjustment) },
+      },
+      create: {
+        tenantId: actor.tenantId,
+        staffId: dto.staffId,
+        leaveType: dto.leaveType,
+        year: dto.year,
+        adjusted: new Prisma.Decimal(dto.adjustment),
+      },
+    });
+
+    await this.auditService.record({
+      action: 'adjust',
+      resource: 'staff_leave_balance',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: adjusted.id,
+      after: {
+        staffId: dto.staffId,
+        leaveType: dto.leaveType,
+        year: dto.year,
+        adjustment: dto.adjustment,
+        reason: dto.reason,
+      },
+    });
+
+    return adjusted;
   }
 
   async listLeaveRequests(actor: AuthContext) {
@@ -1038,6 +1167,19 @@ export class AttendanceService {
       orderBy: [{ createdAt: 'desc' }],
       take: 100,
     });
+  }
+
+  async getLeaveRequest(id: string, actor: AuthContext) {
+    const leave = await this.prisma.staffLeaveRequest.findFirst({
+      where: { id, tenantId: actor.tenantId },
+      include: { staff: true, reviewedBy: true },
+    });
+
+    if (!leave) {
+      throw new NotFoundException('Leave request not found in this tenant');
+    }
+
+    return leave;
   }
 
   async createLeaveRequest(
@@ -1064,11 +1206,28 @@ export class AttendanceService {
       );
     }
 
+    const overlappingApproved = await this.prisma.staffLeaveRequest.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        staffId: staff.id,
+        status: 'APPROVED',
+        startsOn: { lte: endsOn },
+        endsOn: { gte: startsOn },
+      },
+    });
+
+    if (overlappingApproved) {
+      throw new ConflictException(
+        'An approved leave request already overlaps this date range',
+      );
+    }
+
     const leave = await this.prisma.staffLeaveRequest.create({
       data: {
         tenantId: actor.tenantId,
         staffId: staff.id,
         leaveType: dto.leaveType,
+        isPaid: dto.leaveType.toUpperCase() !== 'UNPAID',
         startsOn,
         endsOn,
         days: countInclusiveDays(startsOn, endsOn),
@@ -1131,7 +1290,7 @@ export class AttendanceService {
         existingStatus: AttendanceStatus;
       }> = [];
 
-      if (dto.status === 'APPROVED') {
+      if (dto.status === 'APPROVED' && leave.isPaid !== false) {
         const year = reviewed.startsOn.getFullYear();
         const existingBalance = await tx.staffLeaveBalance.findUnique({
           where: {

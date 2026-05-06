@@ -78,7 +78,11 @@ export class PayrollSalarySlipService {
 }
 
 export function canGenerateSalarySlipForRunStatus(status: string) {
-  return status === PayrollRunStatus.APPROVED;
+  return [
+    PayrollRunStatus.APPROVED,
+    PayrollRunStatus.POSTED,
+    PayrollRunStatus.PAID,
+  ].some((allowedStatus) => allowedStatus === status);
 }
 
 export function buildApprovedSalarySlipPdf(input: SalarySlipPdfInput) {

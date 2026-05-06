@@ -3,11 +3,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma, StaffStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { CreateStaffDto } from './dto/create-staff.dto';
+import { StaffLifecycleDto } from './dto/staff-lifecycle.dto';
+import { UpdateStaffDto } from './dto/update-staff.dto';
 
 @Injectable()
 export class StaffService {
@@ -20,8 +23,8 @@ export class StaffService {
   async createStaff(dto: CreateStaffDto, actor: AuthContext) {
     const employeeId = dto.employeeId ?? (await this.generateEmployeeId(actor));
 
-    const existingStaff = await this.prisma.staff.findUnique({
-      where: { employeeId },
+    const existingStaff = await this.prisma.staff.findFirst({
+      where: { tenantId: actor.tenantId, employeeId },
     });
 
     if (existingStaff) {
@@ -168,6 +171,196 @@ export class StaffService {
     return staff;
   }
 
+  async getStaffDetail(staffId: string, actor: AuthContext) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { id: staffId, tenantId: actor.tenantId },
+      include: {
+        user: {
+          include: {
+            userRoles: {
+              include: {
+                role: true,
+              },
+            },
+          },
+        },
+        staffContracts: {
+          orderBy: { startDate: 'desc' },
+        },
+        salaryStructures: {
+          include: {
+            components: true,
+          },
+          orderBy: { effectiveFrom: 'desc' },
+        },
+        attendanceRecords: {
+          orderBy: { attendanceDate: 'desc' },
+          take: 30,
+        },
+        leaveBalances: {
+          orderBy: [{ year: 'desc' }, { leaveType: 'asc' }],
+        },
+        leaveRequests: {
+          orderBy: { createdAt: 'desc' },
+          take: 30,
+        },
+        payrollLines: {
+          include: {
+            payrollRun: true,
+            payslip: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 30,
+        },
+        qualificationsRecords: true,
+        experienceRecords: true,
+        teacherAssignments: {
+          include: {
+            subject: true,
+            class: true,
+            section: true,
+          },
+        },
+      },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff member not found in this tenant');
+    }
+
+    return mapStaffDetail(staff);
+  }
+
+  async updateStaff(staffId: string, dto: UpdateStaffDto, actor: AuthContext) {
+    const existing = await this.prisma.staff.findFirst({
+      where: { id: staffId, tenantId: actor.tenantId },
+      include: { user: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Staff member not found in this tenant');
+    }
+
+    if (dto.employeeId && dto.employeeId !== existing.employeeId) {
+      const duplicate = await this.prisma.staff.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          employeeId: dto.employeeId,
+          id: { not: staffId },
+        },
+      });
+
+      if (duplicate) {
+        throw new ConflictException(
+          'Employee ID already exists in this tenant',
+        );
+      }
+    }
+
+    if (dto.staffCode && dto.staffCode !== existing.staffCode) {
+      const duplicate = await this.prisma.staff.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          staffCode: dto.staffCode,
+          id: { not: staffId },
+        },
+      });
+
+      if (duplicate) {
+        throw new ConflictException('Staff code already exists in this tenant');
+      }
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (dto.email && dto.email !== existing.user.email) {
+        await tx.user.update({
+          where: { id: existing.userId },
+          data: { email: dto.email },
+        });
+      }
+
+      return tx.staff.update({
+        where: { id: existing.id },
+        data: buildStaffUpdateData(dto),
+        include: {
+          user: {
+            include: {
+              userRoles: {
+                include: {
+                  role: true,
+                },
+              },
+            },
+          },
+          staffContracts: true,
+          salaryStructures: {
+            include: { components: true },
+          },
+          attendanceRecords: { take: 0 },
+          leaveBalances: true,
+          leaveRequests: { take: 0 },
+          payrollLines: { take: 0 },
+          qualificationsRecords: true,
+          experienceRecords: true,
+          teacherAssignments: true,
+        },
+      });
+    });
+
+    await this.auditService.record({
+      action: 'update',
+      resource: 'staff',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      before: {
+        employeeId: existing.employeeId,
+        staffCode: existing.staffCode,
+        status: existing.status,
+        email: existing.user.email,
+      },
+      after: {
+        employeeId: updated.employeeId,
+        staffCode: updated.staffCode,
+        status: updated.status,
+        email: updated.user.email,
+      },
+    });
+
+    return mapStaffDetail(updated);
+  }
+
+  async transitionStaffStatus(
+    staffId: string,
+    dto: StaffLifecycleDto,
+    actor: AuthContext,
+  ) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { id: staffId, tenantId: actor.tenantId },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff member not found in this tenant');
+    }
+
+    const updated = await this.prisma.staff.update({
+      where: { id: staff.id },
+      data: { status: dto.status },
+    });
+
+    await this.auditService.record({
+      action: 'lifecycle',
+      resource: 'staff',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: staff.id,
+      before: { status: staff.status },
+      after: { status: updated.status, reason: dto.reason ?? null },
+    });
+
+    return updated;
+  }
+
   async listStaff(actor: AuthContext) {
     const staff = await this.prisma.staff.findMany({
       where: { tenantId: actor.tenantId },
@@ -208,4 +401,102 @@ export class StaffService {
 
 function normalizeSlug(slug: string) {
   return slug.replace(/[^a-z0-9]/gi, '').toUpperCase();
+}
+
+function buildStaffUpdateData(dto: UpdateStaffDto): Prisma.StaffUpdateInput {
+  return {
+    employeeId: dto.employeeId,
+    staffCode: dto.staffCode,
+    firstName: dto.firstName,
+    lastName: dto.lastName,
+    dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
+    gender: dto.gender,
+    address: dto.address,
+    joiningDate: dto.joiningDate ? new Date(dto.joiningDate) : undefined,
+    contractType: dto.contractType,
+    employmentType: dto.employmentType,
+    status: dto.status,
+    department: dto.department,
+    designation: dto.designation,
+    contractStatus: dto.contractStatus,
+    teacherRegistryId: dto.teacherRegistryId,
+    citizenshipNo: dto.citizenshipNo,
+    panNumber: dto.panNumber,
+    bankAccount: dto.bankAccount,
+    bankName: dto.bankName,
+    emergencyContactName: dto.emergencyContactName,
+    emergencyContactPhone: dto.emergencyContactPhone,
+    emergencyContactRelation: dto.emergencyContactRelation,
+    qualifications: dto.qualifications,
+    experience: dto.experience,
+  };
+}
+
+function mapStaffDetail(staff: {
+  id: string;
+  employeeId: string;
+  staffCode?: string | null;
+  firstName: string;
+  lastName: string;
+  firstNameNp?: string | null;
+  lastNameNp?: string | null;
+  photoUrl?: string | null;
+  dateOfBirth: Date;
+  gender: string;
+  address: string;
+  teacherRegistryId?: string | null;
+  citizenshipNo?: string | null;
+  panNumber?: string | null;
+  bankAccount?: string | null;
+  bankName?: string | null;
+  department?: string | null;
+  designation?: string | null;
+  employmentType?: string | null;
+  status?: StaffStatus | string;
+  contractStatus?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  emergencyContactRelation?: string | null;
+  qualifications?: string | null;
+  experience?: string | null;
+  joiningDate: Date;
+  contractType: string;
+  probationEndDate?: Date | null;
+  user?: {
+    email?: string | null;
+    userRoles?: Array<{ role: { name: string } }>;
+  };
+  staffContracts?: unknown[];
+  salaryStructures?: unknown[];
+  attendanceRecords?: unknown[];
+  leaveBalances?: unknown[];
+  leaveRequests?: unknown[];
+  payrollLines?: unknown[];
+  qualificationsRecords?: unknown[];
+  experienceRecords?: unknown[];
+  teacherAssignments?: unknown[];
+}) {
+  return {
+    ...staff,
+    email: staff.user?.email ?? null,
+    roles: staff.user?.userRoles?.map(({ role }) => role.name) ?? [],
+    personal: {
+      dateOfBirth: staff.dateOfBirth,
+      gender: staff.gender,
+      address: staff.address,
+      emergencyContact: {
+        name: staff.emergencyContactName,
+        phone: staff.emergencyContactPhone,
+        relation: staff.emergencyContactRelation,
+      },
+    },
+    employment: {
+      department: staff.department,
+      designation: staff.designation,
+      employmentType: staff.employmentType ?? staff.contractType,
+      joiningDate: staff.joiningDate,
+      contractStatus: staff.contractStatus,
+      teacherRegistryId: staff.teacherRegistryId,
+    },
+  };
 }

@@ -7,6 +7,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import {
   AccountingPeriodStatus,
   ChartAccountType,
+  JournalEntryStatus,
   JournalLineSide,
   JournalSourceType,
   Prisma,
@@ -15,16 +16,20 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAccountingPeriodDto } from './dto/create-accounting-period.dto';
+import { AccountingActionDto } from './dto/accounting-action.dto';
 import { CreateChartAccountDto } from './dto/create-chart-account.dto';
 import { CreateExpenseDto } from './dto/create-expense.dto';
+import { CreateFiscalYearDto } from './dto/create-fiscal-year.dto';
 import { CreateManualJournalDto } from './dto/create-manual-journal.dto';
 import { ReverseJournalEntryDto } from './dto/reverse-journal-entry.dto';
+import { AccountingPostingService } from './accounting-posting.service';
 
 @Injectable()
 export class AccountingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly postingService?: AccountingPostingService,
   ) {}
 
   async listPeriods(actor: AuthContext) {
@@ -64,6 +69,24 @@ export class AccountingService {
       include: { children: true },
       orderBy: [{ code: 'asc' }],
     });
+  }
+
+  async listChartAccountTree(actor: AuthContext) {
+    const accounts = await this.listChartAccounts(actor);
+    const byParent = new Map<string | null, typeof accounts>();
+
+    for (const account of accounts) {
+      const key = account.parentId ?? null;
+      byParent.set(key, [...(byParent.get(key) ?? []), account]);
+    }
+
+    const build = (parentId: string | null): unknown[] =>
+      (byParent.get(parentId) ?? []).map((account) => ({
+        ...account,
+        children: build(account.id),
+      }));
+
+    return build(null);
   }
 
   async createChartAccount(dto: CreateChartAccountDto, actor: AuthContext) {
@@ -109,6 +132,121 @@ export class AccountingService {
     return account;
   }
 
+  async updateChartAccount(
+    id: string,
+    dto: CreateChartAccountDto,
+    actor: AuthContext,
+  ) {
+    const account = await this.prisma.chartAccount.findFirst({
+      where: { id, tenantId: actor.tenantId },
+    });
+
+    if (!account) {
+      throw new NotFoundException('Chart account not found in this tenant');
+    }
+
+    const activityCount = await this.prisma.journalLine.count({
+      where: { tenantId: actor.tenantId, chartAccountId: account.id },
+    });
+
+    if (activityCount > 0 && dto.type !== account.type) {
+      throw new ConflictException(
+        'Account type cannot change after ledger activity exists',
+      );
+    }
+
+    const updated = await this.prisma.chartAccount.update({
+      where: { id: account.id },
+      data: {
+        name: dto.name,
+        type: dto.type,
+        parentId: dto.parentId ?? null,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'update',
+      resource: 'chart_account',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      before: { name: account.name, type: account.type },
+      after: { name: updated.name, type: updated.type },
+    });
+
+    return updated;
+  }
+
+  async archiveChartAccount(id: string, actor: AuthContext) {
+    const account = await this.prisma.chartAccount.findFirst({
+      where: { id, tenantId: actor.tenantId },
+    });
+
+    if (!account) {
+      throw new NotFoundException('Chart account not found in this tenant');
+    }
+
+    if (account.isSystem) {
+      throw new ConflictException('System accounts cannot be archived');
+    }
+
+    const updated = await this.prisma.chartAccount.update({
+      where: { id: account.id },
+      data: { isActive: false, archivedAt: new Date() },
+    });
+
+    await this.auditService.record({
+      action: 'archive',
+      resource: 'chart_account',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      after: { code: updated.code, isActive: updated.isActive },
+    });
+
+    return updated;
+  }
+
+  async seedDefaultChart(actor: AuthContext) {
+    const defaults = getDefaultSchoolChartAccounts();
+    const accounts: Awaited<
+      ReturnType<typeof this.prisma.chartAccount.upsert>
+    >[] = [];
+
+    for (const account of defaults) {
+      accounts.push(
+        await this.prisma.chartAccount.upsert({
+          where: {
+            tenantId_code: { tenantId: actor.tenantId, code: account.code },
+          },
+          update: {
+            name: account.name,
+            type: account.type,
+            isSystem: true,
+            isActive: true,
+          },
+          create: {
+            tenantId: actor.tenantId,
+            code: account.code,
+            name: account.name,
+            type: account.type,
+            isSystem: true,
+          },
+        }),
+      );
+    }
+
+    await this.auditService.record({
+      action: 'seed',
+      resource: 'chart_account',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: { count: accounts.length },
+    });
+
+    return accounts;
+  }
+
   async createManualJournal(dto: CreateManualJournalDto, actor: AuthContext) {
     const accountIds = dto.lines.map((line) => line.chartAccountId);
     const accounts = await this.prisma.chartAccount.findMany({
@@ -136,16 +274,29 @@ export class AccountingService {
         tenantId: actor.tenantId,
         entryNumber: await this.generateJournalEntryNumber(actor.tenantId),
         entryDate: new Date(dto.entryDate),
+        status: JournalEntryStatus.POSTED,
         narration: dto.narration,
+        sourceModule: 'ACCOUNTING',
         sourceType: JournalSourceType.MANUAL,
         sourceId: dto.sourceId ?? null,
+        postingType: 'MANUAL',
         createdById: actor.userId,
+        postedAt: new Date(),
         lines: {
-          create: dto.lines.map((line) => ({
+          create: dto.lines.map((line, index) => ({
             tenantId: actor.tenantId,
             chartAccountId: line.chartAccountId,
             side: line.side,
+            debit:
+              line.side === JournalLineSide.DEBIT
+                ? new Prisma.Decimal(line.amount)
+                : new Prisma.Decimal(0),
+            credit:
+              line.side === JournalLineSide.CREDIT
+                ? new Prisma.Decimal(line.amount)
+                : new Prisma.Decimal(0),
             amount: new Prisma.Decimal(line.amount),
+            lineNumber: index + 1,
             description: line.description ?? dto.narration,
           })),
         },
@@ -238,22 +389,38 @@ export class AccountingService {
         tenantId: actor.tenantId,
         entryNumber: await this.generateJournalEntryNumber(actor.tenantId),
         entryDate: reversalDate,
+        status: JournalEntryStatus.POSTED,
         narration:
           dto.narration ?? `Reversal of journal entry ${original.entryNumber}`,
+        sourceModule: original.sourceModule ?? 'ACCOUNTING',
         sourceType: JournalSourceType.REVERSAL,
         sourceId: original.id,
+        postingType: 'REVERSAL',
         reversalOfId: original.id,
         createdById: actor.userId,
+        postedAt: new Date(),
         lines: {
-          create: original.lines.map((line) => ({
-            tenantId: actor.tenantId,
-            chartAccountId: line.chartAccountId,
-            side: reverseJournalSide(line.side),
-            amount: line.amount,
-            description:
-              line.description ??
-              `Reversal of ${original.entryNumber} line ${line.id}`,
-          })),
+          create: original.lines.map((line, index) => {
+            const side = reverseJournalSide(line.side);
+            return {
+              tenantId: actor.tenantId,
+              chartAccountId: line.chartAccountId,
+              side,
+              debit:
+                side === JournalLineSide.DEBIT
+                  ? line.amount
+                  : new Prisma.Decimal(0),
+              credit:
+                side === JournalLineSide.CREDIT
+                  ? line.amount
+                  : new Prisma.Decimal(0),
+              amount: line.amount,
+              lineNumber: index + 1,
+              description:
+                line.description ??
+                `Reversal of ${original.entryNumber} line ${line.id}`,
+            };
+          }),
         },
       },
       include: {
@@ -322,12 +489,14 @@ export class AccountingService {
     });
 
     const trialBalance = accounts.map((account) => {
-      const debit = account.journalLines
-        .filter((line) => line.side === JournalLineSide.DEBIT)
-        .reduce((sum, line) => sum + Number(line.amount), 0);
-      const credit = account.journalLines
-        .filter((line) => line.side === JournalLineSide.CREDIT)
-        .reduce((sum, line) => sum + Number(line.amount), 0);
+      const debit = account.journalLines.reduce(
+        (sum, line) => sum + Number(line.debit),
+        0,
+      );
+      const credit = account.journalLines.reduce(
+        (sum, line) => sum + Number(line.credit),
+        0,
+      );
 
       return {
         accountId: account.id,
@@ -348,7 +517,7 @@ export class AccountingService {
       { debit: 0, credit: 0 },
     );
     const income = trialBalance
-      .filter((row) => row.type === 'INCOME')
+      .filter((row) => row.type === 'INCOME' || row.type === 'REVENUE')
       .reduce((sum, row) => sum + row.credit - row.debit, 0);
     const expenses = trialBalance
       .filter((row) => row.type === 'EXPENSE')
@@ -408,6 +577,247 @@ export class AccountingService {
     return closed;
   }
 
+  async createFiscalYear(dto: CreateFiscalYearDto, actor: AuthContext) {
+    const startDate = new Date(dto.startDate);
+    const endDate = new Date(dto.endDate);
+    const overlapping = await this.prisma.fiscalYear.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        startDate: { lte: endDate },
+        endDate: { gte: startDate },
+      },
+    });
+
+    if (overlapping) {
+      throw new ConflictException('Fiscal years cannot overlap');
+    }
+
+    const fiscalYear = await this.prisma.fiscalYear.create({
+      data: {
+        tenantId: actor.tenantId,
+        name: dto.name,
+        startDate,
+        endDate,
+        periods: {
+          create: buildFiscalPeriods(actor.tenantId, startDate, endDate),
+        },
+      },
+      include: { periods: true },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'fiscal_year',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: fiscalYear.id,
+      after: { name: fiscalYear.name, periodCount: fiscalYear.periods.length },
+    });
+
+    return fiscalYear;
+  }
+
+  async listFiscalYears(actor: AuthContext) {
+    return this.prisma.fiscalYear.findMany({
+      where: { tenantId: actor.tenantId },
+      include: { periods: true },
+      orderBy: { startDate: 'desc' },
+    });
+  }
+
+  async listFiscalPeriods(fiscalYearId: string, actor: AuthContext) {
+    const fiscalYear = await this.prisma.fiscalYear.findFirst({
+      where: { id: fiscalYearId, tenantId: actor.tenantId },
+    });
+
+    if (!fiscalYear) {
+      throw new NotFoundException('Fiscal year not found in this tenant');
+    }
+
+    return this.prisma.fiscalPeriod.findMany({
+      where: { tenantId: actor.tenantId, fiscalYearId },
+      orderBy: { periodNumber: 'asc' },
+    });
+  }
+
+  async updateFiscalPeriodStatus(
+    id: string,
+    status: AccountingPeriodStatus,
+    dto: AccountingActionDto,
+    actor: AuthContext,
+  ) {
+    const period = await this.prisma.fiscalPeriod.findFirst({
+      where: { id, tenantId: actor.tenantId },
+    });
+
+    if (!period) {
+      throw new NotFoundException('Fiscal period not found in this tenant');
+    }
+
+    const updated = await this.prisma.fiscalPeriod.update({
+      where: { id: period.id },
+      data: {
+        status,
+        lockedAt:
+          status === AccountingPeriodStatus.LOCKED
+            ? new Date()
+            : period.lockedAt,
+        closedAt: status === AccountingPeriodStatus.CLOSED ? new Date() : null,
+      },
+    });
+
+    await this.auditService.record({
+      action: status.toLowerCase(),
+      resource: 'fiscal_period',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      before: { status: period.status },
+      after: { status: updated.status, reason: dto.reason ?? null },
+    });
+
+    return updated;
+  }
+
+  async correctJournalEntry(
+    id: string,
+    dto: ReverseJournalEntryDto,
+    actor: AuthContext,
+  ) {
+    const reversal = await this.reverseJournalEntry(id, dto, actor);
+
+    await this.auditService.record({
+      action: 'correct',
+      resource: 'journal_entry',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: id,
+      after: { reversalId: reversal.id, reason: dto.narration ?? null },
+    });
+
+    return { reversal };
+  }
+
+  async listJournalEntries(actor: AuthContext) {
+    return this.prisma.journalEntry.findMany({
+      where: { tenantId: actor.tenantId },
+      include: { lines: { include: { chartAccount: true } } },
+      orderBy: [{ entryDate: 'desc' }, { createdAt: 'desc' }],
+      take: 200,
+    });
+  }
+
+  async getTrialBalance(actor: AuthContext) {
+    return (await this.buildReports(actor)).trialBalance;
+  }
+
+  async getIncomeStatement(actor: AuthContext) {
+    return (await this.buildReports(actor)).incomeStatement;
+  }
+
+  async getBalanceSheet(actor: AuthContext) {
+    return (await this.buildReports(actor)).balanceSheet;
+  }
+
+  async getGeneralLedger(actor: AuthContext) {
+    const lines = await this.prisma.journalLine.findMany({
+      where: { tenantId: actor.tenantId },
+      include: {
+        chartAccount: true,
+        journalEntry: true,
+      },
+      orderBy: [
+        { journalEntry: { entryDate: 'asc' } },
+        { journalEntry: { entryNumber: 'asc' } },
+        { lineNumber: 'asc' },
+      ],
+    });
+    const running = new Map<string, number>();
+
+    return lines.map((line) => {
+      const debit = Number(line.debit);
+      const credit = Number(line.credit);
+      const balance = (running.get(line.chartAccountId) ?? 0) + debit - credit;
+      running.set(line.chartAccountId, balance);
+
+      return {
+        accountId: line.chartAccountId,
+        accountCode: line.chartAccount.code,
+        accountName: line.chartAccount.name,
+        date: line.journalEntry.entryDate,
+        journalNumber: line.journalEntry.entryNumber,
+        narration: line.journalEntry.narration,
+        source: line.journalEntry.sourceType,
+        debit,
+        credit,
+        runningBalance: balance,
+      };
+    });
+  }
+
+  async getAccountLedger(accountId: string, actor: AuthContext) {
+    const account = await this.prisma.chartAccount.findFirst({
+      where: { id: accountId, tenantId: actor.tenantId },
+    });
+
+    if (!account) {
+      throw new NotFoundException('Account not found in this tenant');
+    }
+
+    return (await this.getGeneralLedger(actor)).filter(
+      (line) => line.accountId === accountId,
+    );
+  }
+
+  async getCashBook(actor: AuthContext) {
+    const ledger = await this.getGeneralLedger(actor);
+    const rows = ledger.filter((line) => /cash|bank/i.test(line.accountName));
+
+    return {
+      openingBalance: 0,
+      receipts: rows.reduce((sum, row) => sum + row.debit, 0),
+      payments: rows.reduce((sum, row) => sum + row.credit, 0),
+      closingBalance: rows.at(-1)?.runningBalance ?? 0,
+      rows,
+    };
+  }
+
+  async getVatSummary(actor: AuthContext) {
+    const ledger = await this.getGeneralLedger(actor);
+    return ledger.filter((line) => /vat/i.test(line.accountName));
+  }
+
+  async getTdsSummary(actor: AuthContext) {
+    const ledger = await this.getGeneralLedger(actor);
+    return ledger.filter((line) => /tds/i.test(line.accountName));
+  }
+
+  async getPfSummary(actor: AuthContext) {
+    const ledger = await this.getGeneralLedger(actor);
+    return ledger.filter((line) => /pf/i.test(line.accountName));
+  }
+
+  async exportCsv(report: string, actor: AuthContext) {
+    const data =
+      report === 'general-ledger'
+        ? await this.getGeneralLedger(actor)
+        : report === 'income-statement'
+          ? await this.getIncomeStatement(actor)
+          : report === 'balance-sheet'
+            ? await this.getBalanceSheet(actor)
+            : await this.getTrialBalance(actor);
+
+    await this.auditService.record({
+      action: 'export',
+      resource: `accounting_${report}`,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: { report },
+    });
+
+    return toCsv(Array.isArray(data) ? data : [data]);
+  }
+
   private async generateJournalEntryNumber(tenantId: string) {
     const count = await this.prisma.journalEntry.count({
       where: { tenantId },
@@ -417,10 +827,26 @@ export class AccountingService {
   }
 
   private async ensurePostingPeriodIsOpen(tenantId: string, entryDate: Date) {
+    const fiscalPeriod = await this.prisma.fiscalPeriod.findFirst({
+      where: {
+        tenantId,
+        startDate: { lte: entryDate },
+        endDate: { gte: entryDate },
+      },
+    });
+
+    if (fiscalPeriod && fiscalPeriod.status !== AccountingPeriodStatus.OPEN) {
+      throw new ConflictException(
+        `Cannot post journal entry to ${fiscalPeriod.status.toLowerCase()} fiscal period "${fiscalPeriod.label}"`,
+      );
+    }
+
     const closedPeriod = await this.prisma.accountingPeriod.findFirst({
       where: {
         tenantId,
-        status: AccountingPeriodStatus.CLOSED,
+        status: {
+          in: [AccountingPeriodStatus.LOCKED, AccountingPeriodStatus.CLOSED],
+        },
         startsOn: { lte: entryDate },
         endsOn: { gte: entryDate },
       },
@@ -459,4 +885,139 @@ export function reverseJournalSide(side: JournalLineSide) {
   return side === JournalLineSide.DEBIT
     ? JournalLineSide.CREDIT
     : JournalLineSide.DEBIT;
+}
+
+function buildFiscalPeriods(tenantId: string, startDate: Date, endDate: Date) {
+  const periods: Array<{
+    tenantId: string;
+    label: string;
+    periodNumber: number;
+    startDate: Date;
+    endDate: Date;
+  }> = [];
+  const current = new Date(
+    Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), 1),
+  );
+  let periodNumber = 1;
+
+  while (current <= endDate && periodNumber <= 12) {
+    const periodStart = new Date(current);
+    const periodEnd = new Date(
+      Date.UTC(current.getUTCFullYear(), current.getUTCMonth() + 1, 0),
+    );
+
+    periods.push({
+      tenantId,
+      label: `${periodStart.getUTCFullYear()}-${String(
+        periodStart.getUTCMonth() + 1,
+      ).padStart(2, '0')}`,
+      periodNumber,
+      startDate: periodStart < startDate ? startDate : periodStart,
+      endDate: periodEnd > endDate ? endDate : periodEnd,
+    });
+
+    current.setUTCMonth(current.getUTCMonth() + 1);
+    periodNumber += 1;
+  }
+
+  return periods;
+}
+
+function getDefaultSchoolChartAccounts() {
+  return [
+    { code: '1000', name: 'Cash in Hand', type: ChartAccountType.ASSET },
+    { code: '1010', name: 'Bank Account', type: ChartAccountType.ASSET },
+    { code: '1100', name: 'Accounts Receivable', type: ChartAccountType.ASSET },
+    { code: '1300', name: 'Library Assets', type: ChartAccountType.ASSET },
+    { code: '1400', name: 'Equipment/Furniture', type: ChartAccountType.ASSET },
+    { code: '2200', name: 'Salary Payable', type: ChartAccountType.LIABILITY },
+    { code: '2210', name: 'PF Payable', type: ChartAccountType.LIABILITY },
+    { code: '2220', name: 'TDS Payable', type: ChartAccountType.LIABILITY },
+    { code: '2230', name: 'VAT Payable', type: ChartAccountType.LIABILITY },
+    {
+      code: '2240',
+      name: 'Advance Fees Liability',
+      type: ChartAccountType.LIABILITY,
+    },
+    {
+      code: '3000',
+      name: 'Opening Balance Equity',
+      type: ChartAccountType.EQUITY,
+    },
+    {
+      code: '3100',
+      name: 'Retained Surplus/Deficit',
+      type: ChartAccountType.EQUITY,
+    },
+    {
+      code: '4010',
+      name: 'Tuition Fee Income',
+      type: ChartAccountType.REVENUE,
+    },
+    {
+      code: '4020',
+      name: 'Admission Fee Income',
+      type: ChartAccountType.REVENUE,
+    },
+    { code: '4030', name: 'Exam Fee Income', type: ChartAccountType.REVENUE },
+    {
+      code: '4040',
+      name: 'Transport Fee Income',
+      type: ChartAccountType.REVENUE,
+    },
+    {
+      code: '4050',
+      name: 'Library Fine Income',
+      type: ChartAccountType.REVENUE,
+    },
+    { code: '4090', name: 'Other Income', type: ChartAccountType.REVENUE },
+    { code: '5010', name: 'Salary Expense', type: ChartAccountType.EXPENSE },
+    {
+      code: '5020',
+      name: 'PF Employer Contribution Expense',
+      type: ChartAccountType.EXPENSE,
+    },
+    {
+      code: '5030',
+      name: 'Staff Allowance Expense',
+      type: ChartAccountType.EXPENSE,
+    },
+    {
+      code: '5040',
+      name: 'Stationery Expense',
+      type: ChartAccountType.EXPENSE,
+    },
+    { code: '5050', name: 'Rent Expense', type: ChartAccountType.EXPENSE },
+    { code: '5060', name: 'Utilities Expense', type: ChartAccountType.EXPENSE },
+    {
+      code: '5070',
+      name: 'Maintenance Expense',
+      type: ChartAccountType.EXPENSE,
+    },
+    {
+      code: '5080',
+      name: 'Academic Expense',
+      type: ChartAccountType.EXPENSE,
+    },
+  ];
+}
+
+function toCsv(rows: Array<Record<string, unknown>>) {
+  if (rows.length === 0) {
+    return '';
+  }
+
+  const headers = Object.keys(rows[0]);
+  return [
+    headers.join(','),
+    ...rows.map((row) =>
+      headers
+        .map((header) =>
+          String(row[header] ?? '')
+            .replaceAll('"', '""')
+            .replace(/^(.+)$/, '"$1"'),
+        )
+        .join(','),
+    ),
+  ].join('\n');
 }

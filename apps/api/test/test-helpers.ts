@@ -467,6 +467,13 @@ export function createPrismaMock() {
       findUnique: jest.fn(async (q: any) =>
         state.staff.find((item) => item.employeeId === q.where?.employeeId),
       ),
+      findFirst: jest.fn(async (q: any) =>
+        state.staff.find(
+          (item) =>
+            item.tenantId === q.where?.tenantId &&
+            (!q.where?.employeeId || item.employeeId === q.where.employeeId),
+        ),
+      ),
       create: jest.fn(async ({ data }: any) => {
         const item = {
           id: nextId('staff'),

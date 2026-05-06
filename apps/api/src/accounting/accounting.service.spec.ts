@@ -185,6 +185,9 @@ function buildService(options: {
     accountingPeriod: {
       findFirst: jest.fn().mockResolvedValue(options.closedPeriod),
     },
+    fiscalPeriod: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
   };
   const auditService = {
     record: jest.fn(),

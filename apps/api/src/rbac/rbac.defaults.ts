@@ -273,6 +273,23 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     action: 'read',
     description: 'Read HR contracts and staff employment records',
   },
+  ...[
+    ['hr:staff', 'read', 'Read staff profile details'],
+    ['hr:staff', 'create', 'Create HR staff profiles'],
+    ['hr:staff', 'update', 'Update HR staff profiles'],
+    ['hr:staff', 'lifecycle', 'Manage staff lifecycle transitions'],
+    ['hr:attendance', 'read', 'Read staff attendance'],
+    ['hr:attendance', 'write', 'Mark staff attendance'],
+    ['hr:attendance', 'correct', 'Correct staff attendance with audit reason'],
+    ['hr:leave', 'read', 'Read staff leave requests and balances'],
+    ['hr:leave', 'request', 'Create staff leave requests'],
+    ['hr:leave', 'approve', 'Approve or reject staff leave requests'],
+    ['hr:leave', 'adjust', 'Adjust staff leave balances'],
+  ].map(([resource, action, description]) => ({
+    resource,
+    action,
+    description,
+  })),
   {
     resource: 'payroll',
     action: 'manage',
@@ -283,6 +300,23 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     action: 'read',
     description: 'Read payroll runs and payslips',
   },
+  ...[
+    ['payroll:salary', 'read', 'Read salary structures'],
+    ['payroll:salary', 'write', 'Create and update salary structures'],
+    ['payroll:run', 'create', 'Create payroll previews and runs'],
+    ['payroll:run', 'read', 'Read payroll runs'],
+    ['payroll:run', 'review', 'Review payroll runs'],
+    ['payroll:run', 'approve', 'Approve payroll runs'],
+    ['payroll:run', 'post', 'Post payroll to accounting'],
+    ['payroll:run', 'pay', 'Mark payroll paid'],
+    ['payroll:payslip', 'read', 'Read payslips'],
+    ['payroll:reports', 'read', 'Read payroll reports'],
+    ['payroll:exports', 'create', 'Create payroll exports'],
+  ].map(([resource, action, description]) => ({
+    resource,
+    action,
+    description,
+  })),
   {
     resource: 'attendance',
     action: 'mark',
@@ -359,6 +393,20 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description:
       'Create reversing journal entries for posted accounting records',
   },
+  ...[
+    ['accounting:accounts', 'read', 'Read chart of accounts'],
+    ['accounting:accounts', 'write', 'Create and update chart accounts'],
+    ['accounting:fiscal', 'manage', 'Manage fiscal years and periods'],
+    ['accounting:journals', 'read', 'Read journal entries'],
+    ['accounting:journals', 'manual', 'Create manual journals'],
+    ['accounting:journals', 'reverse', 'Reverse or correct journals'],
+    ['accounting:reports', 'read', 'Read accounting reports'],
+    ['accounting:exports', 'create', 'Create accounting exports'],
+  ].map(([resource, action, description]) => ({
+    resource,
+    action,
+    description,
+  })),
   {
     resource: 'activity_feed',
     action: 'create',

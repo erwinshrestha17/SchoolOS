@@ -14,10 +14,17 @@ describe('payroll calculations', () => {
         contractDeductions: 1000,
         attendanceDays: 15,
         workingDays: 30,
+        tdsEnabled: true,
       }),
     ).toEqual({
+      earnings: 22500,
       grossSalary: 22500,
       allowances: 5000,
+      leaveDeductions: 22500,
+      pfEmployee: 0,
+      pfEmployer: 0,
+      tds: 225,
+      otherDeductions: 1000,
       deductions: 1225,
       netSalary: 21275,
     });
@@ -33,6 +40,9 @@ describe('payroll calculations', () => {
       grossAmount: 75000,
       deductionAmount: 1750,
       netAmount: 73250,
+      pfEmployeeAmount: 0,
+      pfEmployerAmount: 0,
+      tdsAmount: 0,
     });
   });
 
@@ -42,7 +52,7 @@ describe('payroll calculations', () => {
       canApprove: true,
       canPost: false,
     });
-    expect(getPayrollRunActions('REVIEWED')).toEqual({
+    expect(getPayrollRunActions('UNDER_REVIEW')).toEqual({
       canReview: false,
       canApprove: true,
       canPost: false,

@@ -89,13 +89,17 @@ function formatPeriod(month: number, year: number) {
 function statusClasses(status: string) {
   switch (status) {
     case 'DRAFT':
+    case 'GENERATED':
       return 'border-amber-200 bg-amber-100 text-amber-700';
     case 'REVIEWED':
+    case 'UNDER_REVIEW':
       return 'border-blue-200 bg-blue-100 text-blue-700';
     case 'APPROVED':
       return 'border-success-200 bg-success-100 text-success-700';
     case 'POSTED':
       return 'border-purple-200 bg-purple-100 text-purple-700';
+    case 'PAID':
+      return 'border-emerald-200 bg-emerald-100 text-emerald-700';
     case 'VOID':
     case 'CANCELLED':
       return 'border-gray-200 bg-gray-100 text-gray-600';
@@ -197,6 +201,20 @@ export function PayrollRuns() {
     },
   });
 
+  const markPaidMutation = useMutation({
+    mutationFn: (id: string) =>
+      api.markPayrollRunPaid(id, { reason: 'Salary disbursement confirmed' }),
+    onSuccess: (run) => {
+      const paidRun = normalizeRun(run);
+      void queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
+      setSelectedRunId(paidRun.id);
+    },
+  });
+
+  const exportMutation = useMutation({
+    mutationFn: api.exportPayrollRegisterCsv,
+  });
+
   const salarySlipMutation = useMutation({
     mutationFn: (line: PayrollLineView) => {
       if (!selectedRun?.id || !line.id) {
@@ -227,14 +245,24 @@ export function PayrollRuns() {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowDraftWorkflow((value) => !value)}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-bold text-white shadow-sm shadow-primary-500/20 transition-colors hover:bg-primary-700"
-        >
-          <Plus size={18} />
-          {showDraftWorkflow ? 'Hide Draft Workflow' : 'New Draft Run'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => exportMutation.mutate()}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-200 bg-white px-4 py-2 text-sm font-bold text-amber-800"
+          >
+            <Download size={18} />
+            Export Register
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowDraftWorkflow((value) => !value)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2 text-sm font-bold text-white shadow-sm shadow-primary-500/20 transition-colors hover:bg-primary-700"
+          >
+            <Plus size={18} />
+            {showDraftWorkflow ? 'Hide Draft Workflow' : 'New Draft Run'}
+          </button>
+        </div>
       </div>
 
       {showDraftWorkflow && (
@@ -506,7 +534,7 @@ export function PayrollRuns() {
                 <strong>Posting note:</strong> Approved payroll can be posted once to M9 Accounting. Posting creates the payroll accrual journal through the backend accounting boundary and changes the run to POSTED. It does not disburse salaries, create reversal entries, or enable editing posted runs.
               </div>
 
-              {selectedRun.status === 'DRAFT' && (
+              {['DRAFT', 'GENERATED', 'UNDER_REVIEW', 'REVIEWED'].includes(selectedRun.status) && (
                 <button
                   type="button"
                   disabled={!canManagePayroll || approveMutation.isPending}
@@ -527,6 +555,18 @@ export function PayrollRuns() {
                 >
                   {postMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Landmark size={16} />}
                   Post to M9 Accounting
+                </button>
+              )}
+
+              {selectedRun.status === 'POSTED' && (
+                <button
+                  type="button"
+                  disabled={!canManagePayroll || markPaidMutation.isPending}
+                  onClick={() => markPaidMutation.mutate(selectedRun.id)}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {markPaidMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Landmark size={16} />}
+                  Mark Paid and Post Disbursement
                 </button>
               )}
 

@@ -21,6 +21,7 @@ import type {
   ConversationSummary,
   CashierClosePreview,
   CashierCloseSummary,
+  ChartAccountSummary,
   DefaulterReminderResult,
   DefaulterSummary,
   DiscountRule,
@@ -30,6 +31,8 @@ import type {
   FeeBillingRun,
   FeeHeadSummary,
   FeePlanSummary,
+  FiscalYearSummary,
+  FiscalPeriodSummary,
   GuardianConsentStatus,
   HomeworkAssignmentSummary,
   HomeworkSubmissionSummary,
@@ -61,6 +64,8 @@ import type {
   RoleSummary,
   SectionSummary,
   StaffSummary,
+  StaffDetail,
+  SalaryStructureSummary,
   StaffContractSummary,
   StaffLeaveRequestSummary,
   StaffLeaveBalanceSummary,
@@ -394,6 +399,18 @@ export const api = {
       },
     ),
   listStaff: () => request<StaffSummary[]>('/staff'),
+  getStaffDetail: (staffId: string) =>
+    request<StaffDetail>(`/hr/staff/${encodeURIComponent(staffId)}`),
+  updateStaffDetail: (staffId: string, body: JsonBody) =>
+    request<StaffDetail>(`/hr/staff/${encodeURIComponent(staffId)}`, {
+      method: 'PATCH',
+      json: body,
+    }),
+  updateStaffLifecycle: (staffId: string, body: JsonBody) =>
+    request<StaffDetail>(`/hr/staff/${encodeURIComponent(staffId)}/lifecycle`, {
+      method: 'POST',
+      json: body,
+    }),
   createStaff: (body: JsonBody) =>
     request<StaffSummary>('/staff', { method: 'POST', json: body }),
   listRoles: () => request<RoleSummary[]>('/roles'),
@@ -900,6 +917,13 @@ export const api = {
   createStaffContract: (body: JsonBody) =>
     request<StaffContractSummary>('/hr/contracts', { method: 'POST', json: body }),
   listPayrollRuns: () => request<PayrollRunSummary[]>('/payroll/runs'),
+  getPayrollRun: (id: string) =>
+    request<PayrollRunSummary>(`/payroll/runs/${encodeURIComponent(id)}`),
+  previewPayrollRun: (body: JsonBody) =>
+    request<PayrollPreviewResult[]>('/payroll/runs/preview', {
+      method: 'POST',
+      json: body,
+    }),
   createPayrollRun: (body: JsonBody) =>
     request<PayrollRunSummary>('/payroll/runs', { method: 'POST', json: body }),
   reviewPayrollRun: (id: string) =>
@@ -917,7 +941,69 @@ export const api = {
       method: 'POST',
       json: {},
     }),
+  submitPayrollRunReview: (id: string) =>
+    request<PayrollRunSummary>(`/payroll/runs/${id}/submit-review`, {
+      method: 'POST',
+      json: {},
+    }),
+  rejectPayrollRun: (id: string, body: JsonBody) =>
+    request<PayrollRunSummary>(`/payroll/runs/${id}/reject`, {
+      method: 'POST',
+      json: body,
+    }),
+  markPayrollRunPaid: (id: string, body: JsonBody) =>
+    request<PayrollRunSummary>(`/payroll/runs/${id}/mark-paid`, {
+      method: 'POST',
+      json: body,
+    }),
+  listSalaryStructures: () =>
+    request<SalaryStructureSummary[]>('/payroll/salary-structures'),
+  createSalaryStructure: (body: JsonBody) =>
+    request<SalaryStructureSummary>('/payroll/salary-structures', {
+      method: 'POST',
+      json: body,
+    }),
+  activateSalaryStructure: (id: string) =>
+    request<SalaryStructureSummary>(
+      `/payroll/salary-structures/${encodeURIComponent(id)}/activate`,
+      { method: 'POST', json: {} },
+    ),
+  archiveSalaryStructure: (id: string) =>
+    request<SalaryStructureSummary>(
+      `/payroll/salary-structures/${encodeURIComponent(id)}/archive`,
+      { method: 'POST', json: {} },
+    ),
+  getPayrollRegister: () => request<unknown[]>('/payroll/reports/register'),
+  getPayrollReportSummary: () => request<unknown>('/payroll/reports/summary'),
+  exportPayrollRegisterCsv: async () => {
+    const response = await fetch(`${API_BASE_URL}/payroll/reports/register.csv`, {
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(parseApiErrorMessage(text) || 'Export failed');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `payroll-register-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
   listPayslips: () => request<PayslipSummary[]>('/payroll/payslips'),
+  openPayrollRunStaffPayslipPdf: async (runId: string, staffId: string) => {
+    const response = await fetch(
+      `${API_BASE_URL}/payroll/runs/${encodeURIComponent(runId)}/staff/${encodeURIComponent(staffId)}/payslip.pdf`,
+      { credentials: 'include' },
+    );
+
+    await openPdfBlob(response);
+  },
   listStaffAttendanceSummary: (params: { month?: number; year?: number }) =>
     request<StaffAttendanceMonthlySummary>(
       withQuery('/attendance/staff/summary', {
@@ -953,12 +1039,89 @@ export const api = {
     ),
   listAccountingPeriods: () =>
     request<AccountingPeriodSummary[]>('/accounting/periods'),
+  listChartAccounts: () =>
+    request<ChartAccountSummary[]>('/accounting/accounts'),
+  listChartAccountTree: () =>
+    request<ChartAccountSummary[]>('/accounting/accounts/tree'),
+  createChartAccount: (body: JsonBody) =>
+    request<ChartAccountSummary>('/accounting/accounts', {
+      method: 'POST',
+      json: body,
+    }),
+  archiveChartAccount: (id: string) =>
+    request<ChartAccountSummary>(
+      `/accounting/accounts/${encodeURIComponent(id)}/archive`,
+      { method: 'POST', json: {} },
+    ),
+  seedDefaultChartAccounts: () =>
+    request<ChartAccountSummary[]>('/accounting/accounts/seed-defaults', {
+      method: 'POST',
+      json: {},
+    }),
   createAccountingPeriod: (body: JsonBody) =>
     request<AccountingPeriodSummary>('/accounting/periods', {
       method: 'POST',
       json: body,
     }),
+  createFiscalYear: (body: JsonBody) =>
+    request<FiscalYearSummary>('/accounting/fiscal-years', {
+      method: 'POST',
+      json: body,
+    }),
+  listFiscalYears: () =>
+    request<FiscalYearSummary[]>('/accounting/fiscal-years'),
+  listFiscalPeriods: (id: string) =>
+    request<FiscalPeriodSummary[]>(
+      `/accounting/fiscal-years/${encodeURIComponent(id)}/periods`,
+    ),
+  lockFiscalPeriod: (id: string, body: JsonBody) =>
+    request<FiscalPeriodSummary>(
+      `/accounting/fiscal-periods/${encodeURIComponent(id)}/lock`,
+      { method: 'POST', json: body },
+    ),
+  closeFiscalPeriod: (id: string, body: JsonBody) =>
+    request<FiscalPeriodSummary>(
+      `/accounting/fiscal-periods/${encodeURIComponent(id)}/close`,
+      { method: 'POST', json: body },
+    ),
+  reopenFiscalPeriod: (id: string, body: JsonBody) =>
+    request<FiscalPeriodSummary>(
+      `/accounting/fiscal-periods/${encodeURIComponent(id)}/reopen`,
+      { method: 'POST', json: body },
+    ),
   listAccountingReports: () => request<AccountingReport>('/accounting/reports'),
+  listTrialBalance: () =>
+    request<AccountingReport['trialBalance']>('/accounting/reports/trial-balance'),
+  listGeneralLedger: () =>
+    request<unknown[]>('/accounting/reports/general-ledger'),
+  listIncomeStatement: () =>
+    request<AccountingReport['incomeStatement']>(
+      '/accounting/reports/income-statement',
+    ),
+  listBalanceSheet: () =>
+    request<AccountingReport['balanceSheet']>('/accounting/reports/balance-sheet'),
+  listCashBook: () => request<unknown>('/accounting/reports/cash-book'),
+  exportAccountingCsv: async (report: string) => {
+    const response = await fetch(
+      `${API_BASE_URL}/accounting/exports/${encodeURIComponent(report)}.csv`,
+      { credentials: 'include' },
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(parseApiErrorMessage(text) || 'Export failed');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${report}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
   closeAccountingPeriod: (id: string) =>
     request<AccountingPeriodSummary>(`/accounting/closing/${id}`, {
       method: 'POST',

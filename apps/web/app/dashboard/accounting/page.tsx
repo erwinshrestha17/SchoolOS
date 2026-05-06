@@ -1,6 +1,6 @@
 'use client';
 
-import { AccountingForm } from '../../../components/forms/accounting-form';
+import { AccountingWorkspace } from '../../../components/accounting/accounting-workspace';
 
 export default function AccountingPage() {
   return (
@@ -13,7 +13,7 @@ export default function AccountingPage() {
           Reports and year-end close.
         </p>
       </div>
-      <AccountingForm />
+      <AccountingWorkspace />
     </div>
   );
 }

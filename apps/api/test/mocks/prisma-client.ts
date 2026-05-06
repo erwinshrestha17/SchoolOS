@@ -100,6 +100,22 @@ export const ContractType = {
   PART_TIME: 'PART_TIME',
 } as const;
 
+export const StaffStatus = {
+  ACTIVE: 'ACTIVE',
+  ON_LEAVE: 'ON_LEAVE',
+  SUSPENDED: 'SUSPENDED',
+  TERMINATED: 'TERMINATED',
+  INACTIVE: 'INACTIVE',
+} as const;
+
+export const StaffEmploymentType = {
+  PERMANENT: 'PERMANENT',
+  TEMPORARY: 'TEMPORARY',
+  PART_TIME: 'PART_TIME',
+  CONTRACT: 'CONTRACT',
+  INTERN: 'INTERN',
+} as const;
+
 export const EnrollmentStatus = {
   ACTIVE: 'ACTIVE',
   PROMOTED: 'PROMOTED',
@@ -168,6 +184,23 @@ export const PaymentMethod = {
   MOBILE: 'MOBILE',
 } as const;
 
+export const SalaryStructureStatus = {
+  DRAFT: 'DRAFT',
+  ACTIVE: 'ACTIVE',
+  ARCHIVED: 'ARCHIVED',
+} as const;
+
+export const SalaryComponentType = {
+  EARNING: 'EARNING',
+  DEDUCTION: 'DEDUCTION',
+  EMPLOYER_CONTRIBUTION: 'EMPLOYER_CONTRIBUTION',
+} as const;
+
+export const PayrollPaymentStatus = {
+  UNPAID: 'UNPAID',
+  PAID: 'PAID',
+} as const;
+
 export const StudentLifecycleStatus = {
   ACTIVE: 'ACTIVE',
   TRANSFERRED: 'TRANSFERRED',
@@ -182,9 +215,12 @@ export const JournalSourceType = {
   FEE_PAYMENT: 'FEE_PAYMENT',
   PAYMENT_REFUND: 'PAYMENT_REFUND',
   PAYROLL: 'PAYROLL',
+  PAYROLL_RUN: 'PAYROLL_RUN',
+  PAYROLL_DISBURSEMENT: 'PAYROLL_DISBURSEMENT',
   CLOSING: 'CLOSING',
   ADJUSTMENT: 'ADJUSTMENT',
   REVERSAL: 'REVERSAL',
+  CORRECTION: 'CORRECTION',
 } as const;
 
 export const JournalLineSide = {
@@ -196,8 +232,14 @@ export const ChartAccountType = {
   ASSET: 'ASSET',
   LIABILITY: 'LIABILITY',
   EQUITY: 'EQUITY',
+  REVENUE: 'REVENUE',
   INCOME: 'INCOME',
   EXPENSE: 'EXPENSE',
+} as const;
+
+export const JournalEntryStatus = {
+  POSTED: 'POSTED',
+  REVERSED: 'REVERSED',
 } as const;
 
 export const StorageProvider = {
@@ -348,9 +390,13 @@ export const TimetableSubstitutionStatus = {
 
 export const PayrollRunStatus = {
   DRAFT: 'DRAFT',
+  GENERATED: 'GENERATED',
+  UNDER_REVIEW: 'UNDER_REVIEW',
   REVIEWED: 'REVIEWED',
   APPROVED: 'APPROVED',
   POSTED: 'POSTED',
+  PAID: 'PAID',
+  CANCELLED: 'CANCELLED',
   VOID: 'VOID',
 } as const;
 
@@ -367,6 +413,7 @@ export const PayslipStatus = {
 
 export const AccountingPeriodStatus = {
   OPEN: 'OPEN',
+  LOCKED: 'LOCKED',
   CLOSED: 'CLOSED',
 } as const;
 

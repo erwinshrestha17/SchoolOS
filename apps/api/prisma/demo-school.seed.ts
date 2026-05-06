@@ -105,7 +105,11 @@ async function seedStaff(prisma: PrismaClient, tenantId: string, users: UserMap)
       privacyConsentAt: new Date(),
     };
 
-    await prisma.staff.upsert({ where: { employeeId }, update: data, create: data });
+    await prisma.staff.upsert({
+      where: { tenantId_employeeId: { tenantId, employeeId } },
+      update: data,
+      create: data,
+    });
   }
 }
 

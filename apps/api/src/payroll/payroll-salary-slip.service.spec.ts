@@ -17,7 +17,7 @@ describe('payroll salary slip PDFs', () => {
       true,
     );
     expect(canGenerateSalarySlipForRunStatus(PayrollRunStatus.POSTED)).toBe(
-      false,
+      true,
     );
     expect(canGenerateSalarySlipForRunStatus(PayrollRunStatus.VOID)).toBe(
       false,
