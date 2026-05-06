@@ -607,7 +607,6 @@ function asChallenge(
   return result;
 }
 
-
 async function authenticateRequest(
   jwtAuthGuard: JwtAuthGuard,
   rolesGuard: RolesPermissionsGuard,
