@@ -29,3 +29,4 @@ packages/core/src/*.js.map
 
 *.log
 pnpm-debug.log*
+.pnpm-home/

@@ -10,11 +10,11 @@ import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
 
-type MarkLockFilters = {
+interface MarkLockFilters {
   examTermId?: string;
   status?: string;
   requestedById?: string;
-};
+}
 
 @Injectable()
 export class MarkLockWorkflowService {

@@ -2690,7 +2690,7 @@ export class FinanceService {
         denominationBreakdown:
           (dto.denominationBreakdown as Prisma.InputJsonValue | undefined) ??
           Prisma.JsonNull,
-        methodBreakdown: summary.methodBreakdown as Prisma.InputJsonValue,
+        methodBreakdown: summary.methodBreakdown,
 
         paymentCount: summary.paymentCount,
         refundCount: summary.refundCount,

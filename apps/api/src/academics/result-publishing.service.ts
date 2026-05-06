@@ -139,8 +139,8 @@ export class ResultPublishingService {
     const results = {
       published: 0,
       skipped: 0,
-      failed: [] as { id: string; reason: string }[],
-      rows: [] as { id: string }[],
+      failed: [] as Array<{ id: string; reason: string }>,
+      rows: [] as Array<{ id: string }>,
     };
 
     for (const card of cards) {
@@ -196,7 +196,7 @@ export class ResultPublishingService {
     const results = {
       unpublished: 0,
       skipped: 0,
-      failed: [] as { id: string; reason: string }[],
+      failed: [] as Array<{ id: string; reason: string }>,
     };
 
     for (const card of cards) {

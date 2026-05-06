@@ -24,7 +24,7 @@ type MarkWithRelations = Prisma.MarkEntryGetPayload<{
   };
 }>;
 
-type ReportPdfSubject = {
+interface ReportPdfSubject {
   subject: string;
   components: Array<{
     name: string;
@@ -39,7 +39,7 @@ type ReportPdfSubject = {
   totalMax: number;
   percentage: number;
   grade: string;
-};
+}
 
 @Injectable()
 export class ReportCardPdfService {
