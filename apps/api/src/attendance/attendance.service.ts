@@ -1290,7 +1290,7 @@ export class AttendanceService {
         existingStatus: AttendanceStatus;
       }> = [];
 
-      if (dto.status === 'APPROVED' && leave.isPaid !== false) {
+      if (dto.status === 'APPROVED' && leave.isPaid) {
         const year = reviewed.startsOn.getFullYear();
         const existingBalance = await tx.staffLeaveBalance.findUnique({
           where: {

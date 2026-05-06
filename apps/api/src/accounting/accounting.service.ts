@@ -209,9 +209,9 @@ export class AccountingService {
 
   async seedDefaultChart(actor: AuthContext) {
     const defaults = getDefaultSchoolChartAccounts();
-    const accounts: Awaited<
-      ReturnType<typeof this.prisma.chartAccount.upsert>
-    >[] = [];
+    const accounts: Array<
+      Awaited<ReturnType<typeof this.prisma.chartAccount.upsert>>
+    > = [];
 
     for (const account of defaults) {
       accounts.push(
