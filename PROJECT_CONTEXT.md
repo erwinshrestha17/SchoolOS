@@ -6,6 +6,7 @@ For full project memory, read:
 
 - `docs/project/SCHOOLOS_PROJECT_MEMORY.md`
 - `docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md`
+- `docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md`
 - `docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md`
 - `docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md`
 - `ARCHITECTURE.md`
@@ -149,6 +150,7 @@ Rules:
 - School Operations Plane is for school workflows.
 - Do not mix SchoolOS SaaS billing with school fee collection.
 - Platform support/tenant override must be explicit and audited.
+- For the full school-settings vs platform-settings boundary, read `docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md`.
 
 ## Tenant Boundary
 
@@ -174,6 +176,8 @@ Do not rename `tenantId` to `schoolId` unless a future migration is explicitly p
 ## M0 Platform Core Additions Now Documented
 
 The long-term memory includes a separate `M0 Platform Core` roadmap in `docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md`.
+
+The detailed boundary between school-owned settings and platform-owned SaaS settings is documented in `docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md`.
 
 These features are documented for future implementation and should be added gradually without disrupting Phase 1 pilot hardening or focused Phase 2 vertical work:
 
@@ -229,6 +233,7 @@ Read these files first:
 - DEVELOPMENT_RULES.md
 - docs/project/SCHOOLOS_PROJECT_MEMORY.md
 - docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md
+- docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md
 - docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
 - docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md
 
