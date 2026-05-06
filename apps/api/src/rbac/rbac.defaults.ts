@@ -373,6 +373,11 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Read payment receipts and receipt PDFs',
   },
   {
+    resource: 'receipts',
+    action: 'manage',
+    description: 'Manage receipt reprint history and auditing',
+  },
+  {
     resource: 'ledger',
     action: 'read',
     description: 'Read ledger entries and journal lines',
@@ -943,6 +948,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'payments:refund',
     'payments:close',
     'receipts:read',
+    'receipts:manage',
     'ledger:read',
     'accounting:read',
     'accounting:close',

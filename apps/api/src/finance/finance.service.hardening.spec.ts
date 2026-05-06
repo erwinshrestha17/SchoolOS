@@ -37,7 +37,10 @@ describe('FinanceService - Hardening', () => {
         },
         { provide: AuditService, useValue: { record: jest.fn() } },
         { provide: CommunicationsService, useValue: {} },
-        { provide: AccountingPostingService, useValue: { postPaymentRefund: jest.fn() } },
+        {
+          provide: AccountingPostingService,
+          useValue: { postPaymentRefund: jest.fn() },
+        },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
@@ -52,7 +55,12 @@ describe('FinanceService - Hardening', () => {
         id: 'p1',
         amount: new Prisma.Decimal(1000),
         refunds: [{ amount: new Prisma.Decimal(600) }],
-        invoice: { id: 'i1', status: InvoiceStatus.PAID, totalAmount: new Prisma.Decimal(1000), payments: [] },
+        invoice: {
+          id: 'i1',
+          status: InvoiceStatus.PAID,
+          totalAmount: new Prisma.Decimal(1000),
+          payments: [],
+        },
       };
 
       (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
@@ -73,11 +81,17 @@ describe('FinanceService - Hardening', () => {
 
   describe('finalizeCashierClose', () => {
     it('prevents overlapping cashier close windows', async () => {
-      (prisma.cashierClose.findFirst as jest.Mock).mockResolvedValue({ id: 'c1', closeNumber: 'CC-001' });
+      (prisma.cashierClose.findFirst as jest.Mock).mockResolvedValue({
+        id: 'c1',
+        closeNumber: 'CC-001',
+      });
 
       await expect(
         service.finalizeCashierClose(
-          { openedAt: '2026-05-01T08:00:00Z', closedAt: '2026-05-01T17:00:00Z' },
+          {
+            openedAt: '2026-05-01T08:00:00Z',
+            closedAt: '2026-05-01T17:00:00Z',
+          },
           actor as any,
         ),
       ).rejects.toThrow('CC-001 already overlaps the selected window');

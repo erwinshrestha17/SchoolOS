@@ -179,10 +179,7 @@ export class AccountingController {
 
   @Get('reports')
   @Permissions('accounting:reports:read')
-  reports(
-    @Query() query: ReportsQueryDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  reports(@Query() query: ReportsQueryDto, @CurrentAuth() auth: AuthContext) {
     return this.accountingService.buildReports(auth, query);
   }
 
@@ -233,10 +230,7 @@ export class AccountingController {
 
   @Get('reports/cash-book')
   @Permissions('accounting:reports:read')
-  cashBook(
-    @Query() query: ReportsQueryDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  cashBook(@Query() query: ReportsQueryDto, @CurrentAuth() auth: AuthContext) {
     return this.accountingService.getCashBook(auth, query);
   }
 

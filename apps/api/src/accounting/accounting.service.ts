@@ -3,6 +3,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ReportsQueryDto } from './dto/reports-query.dto';
+
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   AccountingPeriodStatus,
@@ -395,31 +397,24 @@ export class AccountingService {
       tenantId: actor.tenantId,
       journalEntry: {
         status: JournalEntryStatus.POSTED,
-      },
+      } as Prisma.JournalEntryWhereInput,
     };
 
     if (query?.startDate || query?.endDate) {
-      where.journalEntry = {
-        ...where.journalEntry,
-        entryDate: {
-          gte: query.startDate ? new Date(query.startDate) : undefined,
-          lte: query.endDate ? new Date(query.endDate) : undefined,
-        },
+      (where.journalEntry as Prisma.JournalEntryWhereInput).entryDate = {
+        ...(query.startDate ? { gte: new Date(query.startDate) } : {}),
+        ...(query.endDate ? { lte: new Date(query.endDate) } : {}),
       };
     }
 
     if (query?.fiscalYearId) {
-      where.journalEntry = {
-        ...where.journalEntry,
-        fiscalYearId: query.fiscalYearId,
-      };
+      (where.journalEntry as Prisma.JournalEntryWhereInput).fiscalYearId =
+        query.fiscalYearId;
     }
 
     if (query?.fiscalPeriodId) {
-      where.journalEntry = {
-        ...where.journalEntry,
-        fiscalPeriodId: query.fiscalPeriodId,
-      };
+      (where.journalEntry as Prisma.JournalEntryWhereInput).fiscalPeriodId =
+        query.fiscalPeriodId;
     }
 
     const accounts = await this.prisma.chartAccount.findMany({
@@ -479,13 +474,19 @@ export class AccountingService {
         expenses,
         netIncome: income - expenses,
         groups: {
-          revenue: trialBalance.filter((r) => r.type === ChartAccountType.REVENUE),
-          expenses: trialBalance.filter((r) => r.type === ChartAccountType.EXPENSE),
+          revenue: trialBalance.filter(
+            (r) => r.type === ChartAccountType.REVENUE,
+          ),
+          expenses: trialBalance.filter(
+            (r) => r.type === ChartAccountType.EXPENSE,
+          ),
         },
       },
       balanceSheet: {
         assets: trialBalance.filter((r) => r.type === ChartAccountType.ASSET),
-        liabilities: trialBalance.filter((r) => r.type === ChartAccountType.LIABILITY),
+        liabilities: trialBalance.filter(
+          (r) => r.type === ChartAccountType.LIABILITY,
+        ),
         equity: trialBalance.filter((r) => r.type === ChartAccountType.EQUITY),
         totals: {
           assets: sumRows(trialBalance, ChartAccountType.ASSET),
@@ -497,7 +498,8 @@ export class AccountingService {
         netCashMovement: trialBalance
           .filter(
             (row) =>
-              row.type === ChartAccountType.ASSET && /cash|bank/i.test(row.name),
+              row.type === ChartAccountType.ASSET &&
+              /cash|bank/i.test(row.name),
           )
           .reduce((sum, row) => sum + row.balance, 0),
       },
@@ -615,7 +617,9 @@ export class AccountingService {
     }
 
     if (status === AccountingPeriodStatus.OPEN && !dto.reason) {
-      throw new ConflictException('Reason is mandatory for reopening a fiscal period');
+      throw new ConflictException(
+        'Reason is mandatory for reopening a fiscal period',
+      );
     }
 
     const updated = await this.prisma.fiscalPeriod.update({
@@ -631,7 +635,10 @@ export class AccountingService {
     });
 
     await this.auditService.record({
-      action: status === AccountingPeriodStatus.OPEN ? 'reopen' : status.toLowerCase(),
+      action:
+        status === AccountingPeriodStatus.OPEN
+          ? 'reopen'
+          : status.toLowerCase(),
       resource: 'fiscal_period',
       tenantId: actor.tenantId,
       userId: actor.userId,
@@ -688,31 +695,24 @@ export class AccountingService {
       tenantId: actor.tenantId,
       journalEntry: {
         status: JournalEntryStatus.POSTED,
-      },
+      } as Prisma.JournalEntryWhereInput,
     };
 
     if (query?.startDate || query?.endDate) {
-      where.journalEntry = {
-        ...where.journalEntry,
-        entryDate: {
-          gte: query.startDate ? new Date(query.startDate) : undefined,
-          lte: query.endDate ? new Date(query.endDate) : undefined,
-        },
+      (where.journalEntry as Prisma.JournalEntryWhereInput).entryDate = {
+        ...(query.startDate ? { gte: new Date(query.startDate) } : {}),
+        ...(query.endDate ? { lte: new Date(query.endDate) } : {}),
       };
     }
 
     if (query?.fiscalYearId) {
-      where.journalEntry = {
-        ...where.journalEntry,
-        fiscalYearId: query.fiscalYearId,
-      };
+      (where.journalEntry as Prisma.JournalEntryWhereInput).fiscalYearId =
+        query.fiscalYearId;
     }
 
     if (query?.fiscalPeriodId) {
-      where.journalEntry = {
-        ...where.journalEntry,
-        fiscalPeriodId: query.fiscalPeriodId,
-      };
+      (where.journalEntry as Prisma.JournalEntryWhereInput).fiscalPeriodId =
+        query.fiscalPeriodId;
     }
 
     const lines = await this.prisma.journalLine.findMany({

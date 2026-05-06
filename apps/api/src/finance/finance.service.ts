@@ -230,7 +230,9 @@ export class FinanceService {
       where: {
         tenantId: actor.tenantId,
         status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
-        ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
+        ...(query.academicYearId
+          ? { academicYearId: query.academicYearId }
+          : {}),
         ...(query.studentId ? { studentId: query.studentId } : {}),
         ...(query.classId || query.sectionId
           ? {
@@ -266,13 +268,18 @@ export class FinanceService {
     for (const w of waivers) {
       if (w.invoiceId) {
         const key = `${w.invoiceId}_${w.feeHeadId || 'all'}`;
-        waiverMap.set(key, (waiverMap.get(key) || new Prisma.Decimal(0)).add(w.amount));
+        waiverMap.set(
+          key,
+          (waiverMap.get(key) || new Prisma.Decimal(0)).add(w.amount),
+        );
       }
     }
 
     const rows = invoices.flatMap((invoice) => {
       return invoice.lines
-        .filter((line) => !query.feeHeadId || line.feeHeadId === query.feeHeadId)
+        .filter(
+          (line) => !query.feeHeadId || line.feeHeadId === query.feeHeadId,
+        )
         .map((line) => {
           const paidAmount = invoice.payments.reduce((sum, p) => {
             // This is a simplification; ideally we track payment per line
@@ -305,6 +312,7 @@ export class FinanceService {
       summary: {
         totalBilled: rows.reduce((sum, r) => sum + r.billed, 0),
         totalWaived: rows.reduce((sum, r) => sum + r.waived, 0),
+        totalPaid: rows.reduce((sum, r) => sum + r.paid, 0),
         totalOutstanding: rows.reduce((sum, r) => sum + r.outstanding, 0),
       },
     };
@@ -1410,7 +1418,7 @@ export class FinanceService {
       include: {
         student: true,
         payments: {
-          include: { 
+          include: {
             refunds: true,
             receipt: true,
           },

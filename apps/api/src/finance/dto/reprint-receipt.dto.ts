@@ -4,5 +4,5 @@ export class ReprintReceiptDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
-  reason: string;
+  reason!: string;
 }

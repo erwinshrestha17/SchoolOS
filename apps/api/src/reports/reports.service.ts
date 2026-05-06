@@ -681,7 +681,8 @@ export class ReportsService {
       definition: {
         key: 'dues-table-report',
         name: 'Dues Analysis Report',
-        description: 'Detailed breakdown of outstanding fees across all students',
+        description:
+          'Detailed breakdown of outstanding fees across all students',
         category: 'finance',
         module: 'finance',
         formats: ['json', 'csv'],
@@ -697,11 +698,19 @@ export class ReportsService {
       execute: async (actor, filters) => {
         const report = await this.financeService.getDuesTableReport(
           {
-            academicYearId: filters.academicYearId ? String(filters.academicYearId) : undefined,
+            academicYearId: filters.academicYearId
+              ? String(filters.academicYearId)
+              : undefined,
             classId: filters.classId ? String(filters.classId) : undefined,
-            sectionId: filters.sectionId ? String(filters.sectionId) : undefined,
-            feeHeadId: filters.feeHeadId ? String(filters.feeHeadId) : undefined,
-            studentId: filters.studentId ? String(filters.studentId) : undefined,
+            sectionId: filters.sectionId
+              ? String(filters.sectionId)
+              : undefined,
+            feeHeadId: filters.feeHeadId
+              ? String(filters.feeHeadId)
+              : undefined,
+            studentId: filters.studentId
+              ? String(filters.studentId)
+              : undefined,
           },
           actor,
         );

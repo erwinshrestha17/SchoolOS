@@ -27,7 +27,10 @@ describe('FinanceService - Dues & Reprints', () => {
         {
           provide: PrismaService,
           useValue: {
-            receipt: { findFirst: jest.fn(), reprintHistory: { create: jest.fn() } },
+            receipt: {
+              findFirst: jest.fn(),
+              reprintHistory: { create: jest.fn() },
+            },
             tenant: { findUnique: jest.fn() },
             receiptReprintHistory: { create: jest.fn() },
             invoice: { findMany: jest.fn() },
@@ -83,9 +86,15 @@ describe('FinanceService - Dues & Reprints', () => {
       };
 
       (prisma.receipt.findFirst as jest.Mock).mockResolvedValue(mockReceipt);
-      (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({ name: 'School' });
+      (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({
+        name: 'School',
+      });
 
-      const result = await service.reprintReceipt('r1', { reason: 'Lost' }, actor as any);
+      const result = await service.reprintReceipt(
+        'r1',
+        { reason: 'Lost' },
+        actor as any,
+      );
 
       expect(prisma.receiptReprintHistory.create).toHaveBeenCalled();
       expect(result.pdf).toBeDefined();
