@@ -1,4 +1,37 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateLibraryBookDto } from './create-library-book.dto';
+import { IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
-export class UpdateLibraryBookDto extends PartialType(CreateLibraryBookDto) {}
+export class UpdateLibraryBookDto {
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  author?: string;
+
+  @IsOptional()
+  @IsString()
+  isbn?: string;
+
+  @IsOptional()
+  @IsString()
+  publisher?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1000)
+  publishedYear?: number;
+
+  @IsOptional()
+  @IsString()
+  subjectCategory?: string;
+
+  @IsOptional()
+  @IsString()
+  classLevel?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  purchasePrice?: number;
+}
