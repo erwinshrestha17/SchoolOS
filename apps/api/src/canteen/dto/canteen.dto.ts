@@ -1,4 +1,15 @@
-import { ArrayUnique, IsArray, IsBoolean, IsDateString, IsInt, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import {
+  ArrayUnique,
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateCanteenMenuItemDto {
@@ -7,7 +18,11 @@ export class CreateCanteenMenuItemDto {
   @IsOptional() @IsString() description?: string;
   @IsNumber() @Min(0) unitPrice!: number;
   @IsOptional() @IsBoolean() isMealItem?: boolean;
-  @IsOptional() @IsArray() @ArrayUnique() @IsString({ each: true }) allergenTags?: string[];
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  allergenTags?: string[];
 }
 
 export class UpdateCanteenMenuItemDto {
@@ -16,7 +31,11 @@ export class UpdateCanteenMenuItemDto {
   @IsOptional() @IsString() description?: string;
   @IsOptional() @IsNumber() @Min(0) unitPrice?: number;
   @IsOptional() @IsBoolean() isMealItem?: boolean;
-  @IsOptional() @IsArray() @ArrayUnique() @IsString({ each: true }) allergenTags?: string[];
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  allergenTags?: string[];
 }
 
 export class UpdateCanteenStatusDto {
@@ -84,16 +103,29 @@ export class CreateCanteenPosSaleDto {
   @IsOptional() @IsString() staffId?: string;
   @IsString() paymentMethod!: string;
   @IsOptional() @IsString() notes?: string;
-  @IsArray() @ValidateNested({ each: true }) @Type(() => CreateCanteenPosSaleItemDto) items!: CreateCanteenPosSaleItemDto[];
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateCanteenPosSaleItemDto)
+  items!: CreateCanteenPosSaleItemDto[];
 }
 
-export class CompleteCanteenPosSaleDto { @IsOptional() @IsString() note?: string; }
+export class CompleteCanteenPosSaleDto {
+  @IsOptional() @IsString() note?: string;
+}
 
 export class UpsertCanteenSpendingControlDto {
   @IsString() studentId!: string;
   @IsOptional() @IsNumber() @Min(0) dailySpendingLimit?: number;
-  @IsOptional() @IsArray() @ArrayUnique() @IsString({ each: true }) blockedCategories?: string[];
-  @IsOptional() @IsArray() @ArrayUnique() @IsString({ each: true }) blockedMenuItemIds?: string[];
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  blockedCategories?: string[];
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  blockedMenuItemIds?: string[];
   @IsOptional() @IsNumber() @Min(0) lowBalanceThreshold?: number;
   @IsOptional() @IsBoolean() isActive?: boolean;
 }

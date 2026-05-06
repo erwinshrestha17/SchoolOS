@@ -180,3 +180,19 @@ INSERT INTO "Permission" ("id", "resource", "action", "description") VALUES
   (gen_random_uuid()::text, 'canteen:controls', 'update', 'Update canteen spending controls'),
   (gen_random_uuid()::text, 'canteen:reports', 'read', 'Read canteen reports')
 ON CONFLICT ("resource", "action") DO UPDATE SET "description" = EXCLUDED."description";
+
+INSERT INTO "RolePermission" ("roleId", "permissionId")
+SELECT r."id", p."id"
+FROM "Role" r
+JOIN "Permission" p ON p."resource" IN (
+  'canteen:menu',
+  'canteen:plans',
+  'canteen:enrollments',
+  'canteen:serving',
+  'canteen:wallets',
+  'canteen:pos',
+  'canteen:controls',
+  'canteen:reports'
+)
+WHERE r."name" IN ('super_admin', 'admin', 'principal', 'platform_super_admin')
+ON CONFLICT ("roleId", "permissionId") DO NOTHING;

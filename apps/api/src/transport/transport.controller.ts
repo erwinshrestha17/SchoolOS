@@ -61,7 +61,10 @@ export class TransportController {
 
   @Get('stops')
   @Permissions('transport:routes:read')
-  listStops(@CurrentAuth() auth: AuthContext, @Query('routeId') routeId?: string) {
+  listStops(
+    @CurrentAuth() auth: AuthContext,
+    @Query('routeId') routeId?: string,
+  ) {
     return this.transportService.listStops(auth, routeId);
   }
 
@@ -116,7 +119,10 @@ export class TransportController {
     @Query('routeId') routeId?: string,
     @Query('vehicleId') vehicleId?: string,
   ) {
-    return this.transportService.listDriverAssignments(auth, { routeId, vehicleId });
+    return this.transportService.listDriverAssignments(auth, {
+      routeId,
+      vehicleId,
+    });
   }
 
   @Post('assignments/drivers')

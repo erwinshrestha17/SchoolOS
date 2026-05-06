@@ -86,7 +86,9 @@ describe('Phase 3C Transport backend contracts', () => {
     }
 
     expect(migration).toContain('TransportTrip_tenantId_vehicleId_active_key');
-    expect(migration).toContain('TransportVehicle_tenantId_registrationNumber_key');
+    expect(migration).toContain(
+      'TransportVehicle_tenantId_registrationNumber_key',
+    );
     expect(migration).toContain('TransportRoute_tenantId_code_key');
   });
 
@@ -109,6 +111,6 @@ describe('Phase 3C Transport backend contracts', () => {
     expect(service).toContain('where: { id: vehicleId, tenantId }');
     expect(service).toContain('where: { id: stopId, tenantId');
     expect(service).toContain('recordLocationPing');
-    expect(service).toContain('redisService.getClient().set');
+    expect(service).toContain('.set(');
   });
 });

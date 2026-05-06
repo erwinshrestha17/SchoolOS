@@ -87,39 +87,39 @@ CREATE TABLE "TransportLocationPing" (
   CONSTRAINT "TransportLocationPing_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "TransportRoute_tenantId_code_key" ON "TransportRoute"("tenantId", "code");
-CREATE UNIQUE INDEX "TransportRoute_tenantId_name_key" ON "TransportRoute"("tenantId", "name");
-CREATE UNIQUE INDEX "TransportVehicle_tenantId_registrationNumber_key" ON "TransportVehicle"("tenantId", "registrationNumber");
+CREATE UNIQUE INDEX IF NOT EXISTS "TransportRoute_tenantId_code_key" ON "TransportRoute"("tenantId", "code");
+CREATE UNIQUE INDEX IF NOT EXISTS "TransportRoute_tenantId_name_key" ON "TransportRoute"("tenantId", "name");
+CREATE UNIQUE INDEX IF NOT EXISTS "TransportVehicle_tenantId_registrationNumber_key" ON "TransportVehicle"("tenantId", "registrationNumber");
 
-CREATE INDEX "TransportRoute_tenantId_code_idx" ON "TransportRoute"("tenantId", "code");
-CREATE INDEX "TransportRoute_tenantId_name_idx" ON "TransportRoute"("tenantId", "name");
-CREATE INDEX "TransportStop_tenantId_routeId_idx" ON "TransportStop"("tenantId", "routeId");
-CREATE INDEX "TransportVehicle_tenantId_registrationNumber_idx" ON "TransportVehicle"("tenantId", "registrationNumber");
-CREATE INDEX "TransportDriverAssignment_tenantId_staffId_idx" ON "TransportDriverAssignment"("tenantId", "staffId");
-CREATE INDEX "TransportDriverAssignment_tenantId_vehicleId_idx" ON "TransportDriverAssignment"("tenantId", "vehicleId");
-CREATE INDEX "TransportDriverAssignment_tenantId_routeId_idx" ON "TransportDriverAssignment"("tenantId", "routeId");
+CREATE INDEX IF NOT EXISTS "TransportRoute_tenantId_code_idx" ON "TransportRoute"("tenantId", "code");
+CREATE INDEX IF NOT EXISTS "TransportRoute_tenantId_name_idx" ON "TransportRoute"("tenantId", "name");
+CREATE INDEX IF NOT EXISTS "TransportStop_tenantId_routeId_idx" ON "TransportStop"("tenantId", "routeId");
+CREATE INDEX IF NOT EXISTS "TransportVehicle_tenantId_registrationNumber_idx" ON "TransportVehicle"("tenantId", "registrationNumber");
+CREATE INDEX IF NOT EXISTS "TransportDriverAssignment_tenantId_staffId_idx" ON "TransportDriverAssignment"("tenantId", "staffId");
+CREATE INDEX IF NOT EXISTS "TransportDriverAssignment_tenantId_vehicleId_idx" ON "TransportDriverAssignment"("tenantId", "vehicleId");
+CREATE INDEX IF NOT EXISTS "TransportDriverAssignment_tenantId_routeId_idx" ON "TransportDriverAssignment"("tenantId", "routeId");
 
-CREATE INDEX "TransportStudentAssignment_tenantId_studentId_idx" ON "TransportStudentAssignment"("tenantId", "studentId");
-CREATE INDEX "TransportStudentAssignment_tenantId_routeId_idx" ON "TransportStudentAssignment"("tenantId", "routeId");
-CREATE INDEX "TransportStudentAssignment_tenantId_stopId_idx" ON "TransportStudentAssignment"("tenantId", "stopId");
-CREATE UNIQUE INDEX "TransportStudentAssignment_tenantId_studentId_active_key"
+CREATE INDEX IF NOT EXISTS "TransportStudentAssignment_tenantId_studentId_idx" ON "TransportStudentAssignment"("tenantId", "studentId");
+CREATE INDEX IF NOT EXISTS "TransportStudentAssignment_tenantId_routeId_idx" ON "TransportStudentAssignment"("tenantId", "routeId");
+CREATE INDEX IF NOT EXISTS "TransportStudentAssignment_tenantId_stopId_idx" ON "TransportStudentAssignment"("tenantId", "stopId");
+CREATE UNIQUE INDEX IF NOT EXISTS "TransportStudentAssignment_tenantId_studentId_active_key"
   ON "TransportStudentAssignment"("tenantId", "studentId")
   WHERE "status" = 'ACTIVE';
 
-CREATE INDEX "TransportTrip_tenantId_status_idx" ON "TransportTrip"("tenantId", "status");
-CREATE INDEX "TransportTrip_tenantId_routeId_idx" ON "TransportTrip"("tenantId", "routeId");
-CREATE INDEX "TransportTrip_tenantId_vehicleId_idx" ON "TransportTrip"("tenantId", "vehicleId");
-CREATE INDEX "TransportTrip_tenantId_startedAt_idx" ON "TransportTrip"("tenantId", "startedAt");
-CREATE UNIQUE INDEX "TransportTrip_tenantId_vehicleId_active_key"
+CREATE INDEX IF NOT EXISTS "TransportTrip_tenantId_status_idx" ON "TransportTrip"("tenantId", "status");
+CREATE INDEX IF NOT EXISTS "TransportTrip_tenantId_routeId_idx" ON "TransportTrip"("tenantId", "routeId");
+CREATE INDEX IF NOT EXISTS "TransportTrip_tenantId_vehicleId_idx" ON "TransportTrip"("tenantId", "vehicleId");
+CREATE INDEX IF NOT EXISTS "TransportTrip_tenantId_startedAt_idx" ON "TransportTrip"("tenantId", "startedAt");
+CREATE UNIQUE INDEX IF NOT EXISTS "TransportTrip_tenantId_vehicleId_active_key"
   ON "TransportTrip"("tenantId", "vehicleId")
   WHERE "status" = 'ACTIVE';
 
-CREATE INDEX "TransportTripStudentStatus_tenantId_tripId_idx" ON "TransportTripStudentStatus"("tenantId", "tripId");
-CREATE INDEX "TransportTripStudentStatus_tenantId_studentId_idx" ON "TransportTripStudentStatus"("tenantId", "studentId");
-CREATE UNIQUE INDEX "TransportTripStudentStatus_tripId_studentId_key" ON "TransportTripStudentStatus"("tripId", "studentId");
+CREATE INDEX IF NOT EXISTS "TransportTripStudentStatus_tenantId_tripId_idx" ON "TransportTripStudentStatus"("tenantId", "tripId");
+CREATE INDEX IF NOT EXISTS "TransportTripStudentStatus_tenantId_studentId_idx" ON "TransportTripStudentStatus"("tenantId", "studentId");
+CREATE UNIQUE INDEX IF NOT EXISTS "TransportTripStudentStatus_tripId_studentId_key" ON "TransportTripStudentStatus"("tripId", "studentId");
 
-CREATE INDEX "TransportLocationPing_tenantId_tripId_recordedAt_idx" ON "TransportLocationPing"("tenantId", "tripId", "recordedAt");
-CREATE INDEX "TransportLocationPing_tenantId_vehicleId_recordedAt_idx" ON "TransportLocationPing"("tenantId", "vehicleId", "recordedAt");
+CREATE INDEX IF NOT EXISTS "TransportLocationPing_tenantId_tripId_recordedAt_idx" ON "TransportLocationPing"("tenantId", "tripId", "recordedAt");
+CREATE INDEX IF NOT EXISTS "TransportLocationPing_tenantId_vehicleId_recordedAt_idx" ON "TransportLocationPing"("tenantId", "vehicleId", "recordedAt");
 
 ALTER TABLE "TransportDriverAssignment"
   ADD CONSTRAINT "TransportDriverAssignment_routeId_fkey"

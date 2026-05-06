@@ -68,7 +68,7 @@ const permissionAliases: Record<string, string[]> = {
   'transport:trips:read': ['transport:read', 'transport:operate'],
   'transport:trips:update': ['transport:operate', 'transport:manage'],
   'transport:location:read': ['transport:read', 'transport:operate'],
-  'transport:location:update': ['transport:operate'],
+  'transport:location:update': ['transport:operate', 'transport:manage'],
   'transport:reports:read': ['transport:read'],
 };
 

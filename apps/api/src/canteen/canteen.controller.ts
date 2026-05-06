@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -27,67 +36,133 @@ export class CanteenController {
 
   @Post('menu-items')
   @Permissions('canteen:menu:create')
-  createMenuItem(@Body() dto: CreateCanteenMenuItemDto, @CurrentAuth() auth: AuthContext) {
+  createMenuItem(
+    @Body() dto: CreateCanteenMenuItemDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.canteenService.createMenuItem(dto, auth);
   }
 
   @Get('menu-items')
   @Permissions('canteen:menu:read')
-  listMenuItems(@CurrentAuth() auth: AuthContext, @Query('q') query?: string, @Query('category') category?: string, @Query('status') status?: string, @Query('page') page?: string, @Query('limit') limit?: string) {
-    return this.canteenService.listMenuItems(auth, { query, category, status, page, limit });
+  listMenuItems(
+    @CurrentAuth() auth: AuthContext,
+    @Query('q') query?: string,
+    @Query('category') category?: string,
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.canteenService.listMenuItems(auth, {
+      query,
+      category,
+      status,
+      page,
+      limit,
+    });
   }
 
   @Patch('menu-items/:id')
   @Permissions('canteen:menu:update')
-  updateMenuItem(@Param('id') id: string, @Body() dto: UpdateCanteenMenuItemDto, @CurrentAuth() auth: AuthContext) {
+  updateMenuItem(
+    @Param('id') id: string,
+    @Body() dto: UpdateCanteenMenuItemDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.canteenService.updateMenuItem(id, dto, auth);
   }
 
   @Patch('menu-items/:id/status')
   @Permissions('canteen:menu:update')
-  updateMenuItemStatus(@Param('id') id: string, @Body() dto: UpdateCanteenStatusDto, @CurrentAuth() auth: AuthContext) {
+  updateMenuItemStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateCanteenStatusDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.canteenService.updateMenuItemStatus(id, dto, auth);
   }
 
   @Post('meal-plans')
   @Permissions('canteen:plans:create')
-  createMealPlan(@Body() dto: CreateCanteenMealPlanDto, @CurrentAuth() auth: AuthContext) {
+  createMealPlan(
+    @Body() dto: CreateCanteenMealPlanDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.canteenService.createMealPlan(dto, auth);
   }
 
   @Get('meal-plans')
   @Permissions('canteen:plans:read')
-  listMealPlans(@CurrentAuth() auth: AuthContext, @Query('status') status?: string, @Query('mealType') mealType?: string, @Query('page') page?: string, @Query('limit') limit?: string) {
-    return this.canteenService.listMealPlans(auth, { status, mealType, page, limit });
+  listMealPlans(
+    @CurrentAuth() auth: AuthContext,
+    @Query('status') status?: string,
+    @Query('mealType') mealType?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.canteenService.listMealPlans(auth, {
+      status,
+      mealType,
+      page,
+      limit,
+    });
   }
 
   @Patch('meal-plans/:id')
   @Permissions('canteen:plans:update')
-  updateMealPlan(@Param('id') id: string, @Body() dto: UpdateCanteenMealPlanDto, @CurrentAuth() auth: AuthContext) {
+  updateMealPlan(
+    @Param('id') id: string,
+    @Body() dto: UpdateCanteenMealPlanDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.canteenService.updateMealPlan(id, dto, auth);
   }
 
   @Patch('meal-plans/:id/status')
   @Permissions('canteen:plans:update')
-  updateMealPlanStatus(@Param('id') id: string, @Body() dto: UpdateCanteenStatusDto, @CurrentAuth() auth: AuthContext) {
+  updateMealPlanStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateCanteenStatusDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.canteenService.updateMealPlanStatus(id, dto, auth);
   }
 
   @Post('enrollments')
   @Permissions('canteen:enrollments:create')
-  enrollStudent(@Body() dto: EnrollCanteenStudentDto, @CurrentAuth() auth: AuthContext) {
+  enrollStudent(
+    @Body() dto: EnrollCanteenStudentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.canteenService.enrollStudent(dto, auth);
   }
 
   @Get('enrollments')
   @Permissions('canteen:enrollments:read')
-  listEnrollments(@CurrentAuth() auth: AuthContext, @Query('studentId') studentId?: string, @Query('mealPlanId') mealPlanId?: string, @Query('status') status?: string, @Query('page') page?: string, @Query('limit') limit?: string) {
-    return this.canteenService.listEnrollments(auth, { studentId, mealPlanId, status, page, limit });
+  listEnrollments(
+    @CurrentAuth() auth: AuthContext,
+    @Query('studentId') studentId?: string,
+    @Query('mealPlanId') mealPlanId?: string,
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.canteenService.listEnrollments(auth, {
+      studentId,
+      mealPlanId,
+      status,
+      page,
+      limit,
+    });
   }
 
   @Patch('enrollments/:id')
   @Permissions('canteen:enrollments:update')
-  updateEnrollment(@Param('id') id: string, @Body() dto: UpdateCanteenEnrollmentDto, @CurrentAuth() auth: AuthContext) {
+  updateEnrollment(
+    @Param('id') id: string,
+    @Body() dto: UpdateCanteenEnrollmentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.canteenService.updateEnrollment(id, dto, auth);
   }
 
@@ -99,49 +174,88 @@ export class CanteenController {
 
   @Post('servings')
   @Permissions('canteen:serving:create')
-  serveMeal(@Body() dto: ServeCanteenMealDto, @CurrentAuth() auth: AuthContext) {
+  serveMeal(
+    @Body() dto: ServeCanteenMealDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.canteenService.serveMeal(dto, auth);
   }
 
   @Get('servings')
   @Permissions('canteen:serving:read')
-  listDailyServings(@CurrentAuth() auth: AuthContext, @Query('date') date?: string, @Query('mealType') mealType?: string, @Query('page') page?: string, @Query('limit') limit?: string) {
-    return this.canteenService.listDailyServings(auth, { date, mealType, page, limit });
+  listDailyServings(
+    @CurrentAuth() auth: AuthContext,
+    @Query('date') date?: string,
+    @Query('mealType') mealType?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.canteenService.listDailyServings(auth, {
+      date,
+      mealType,
+      page,
+      limit,
+    });
   }
 
   @Post('wallets/student/:studentId')
   @Permissions('canteen:wallets:create')
-  getOrCreateWallet(@Param('studentId') studentId: string, @CurrentAuth() auth: AuthContext) {
+  getOrCreateWallet(
+    @Param('studentId') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.canteenService.getOrCreateWallet(studentId, auth);
   }
 
   @Get('wallets/student/:studentId/balance')
   @Permissions('canteen:wallets:read')
-  walletBalance(@Param('studentId') studentId: string, @CurrentAuth() auth: AuthContext) {
+  walletBalance(
+    @Param('studentId') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.canteenService.walletBalance(studentId, auth);
   }
 
   @Post('wallets/student/:studentId/top-up')
   @Permissions('canteen:wallets:update')
-  topUpWallet(@Param('studentId') studentId: string, @Body() dto: TopUpCanteenWalletDto, @CurrentAuth() auth: AuthContext) {
+  topUpWallet(
+    @Param('studentId') studentId: string,
+    @Body() dto: TopUpCanteenWalletDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.canteenService.topUpWallet(studentId, dto, auth);
   }
 
   @Get('wallets/student/:studentId/transactions')
   @Permissions('canteen:wallets:read')
-  transactionHistory(@Param('studentId') studentId: string, @CurrentAuth() auth: AuthContext, @Query('page') page?: string, @Query('limit') limit?: string) {
-    return this.canteenService.transactionHistory(studentId, auth, { page, limit });
+  transactionHistory(
+    @Param('studentId') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.canteenService.transactionHistory(studentId, auth, {
+      page,
+      limit,
+    });
   }
 
   @Post('pos-sales')
   @Permissions('canteen:pos:create')
-  createPosSale(@Body() dto: CreateCanteenPosSaleDto, @CurrentAuth() auth: AuthContext) {
+  createPosSale(
+    @Body() dto: CreateCanteenPosSaleDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.canteenService.createPosSale(dto, auth);
   }
 
   @Patch('pos-sales/:id/complete')
   @Permissions('canteen:pos:update')
-  completePosSale(@Param('id') id: string, @Body() dto: CompleteCanteenPosSaleDto, @CurrentAuth() auth: AuthContext) {
+  completePosSale(
+    @Param('id') id: string,
+    @Body() dto: CompleteCanteenPosSaleDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.canteenService.completePosSale(id, dto, auth);
   }
 
@@ -153,31 +267,59 @@ export class CanteenController {
 
   @Get('pos-sales')
   @Permissions('canteen:pos:read')
-  listPosSales(@CurrentAuth() auth: AuthContext, @Query('status') status?: string, @Query('studentId') studentId?: string, @Query('from') from?: string, @Query('to') to?: string, @Query('page') page?: string, @Query('limit') limit?: string) {
-    return this.canteenService.listPosSales(auth, { status, studentId, from, to, page, limit });
+  listPosSales(
+    @CurrentAuth() auth: AuthContext,
+    @Query('status') status?: string,
+    @Query('studentId') studentId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.canteenService.listPosSales(auth, {
+      status,
+      studentId,
+      from,
+      to,
+      page,
+      limit,
+    });
   }
 
   @Post('spending-controls')
   @Permissions('canteen:controls:create')
-  upsertSpendingControl(@Body() dto: UpsertCanteenSpendingControlDto, @CurrentAuth() auth: AuthContext) {
+  upsertSpendingControl(
+    @Body() dto: UpsertCanteenSpendingControlDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.canteenService.upsertSpendingControl(dto, auth);
   }
 
   @Get('spending-controls/student/:studentId')
   @Permissions('canteen:controls:read')
-  getSpendingControl(@Param('studentId') studentId: string, @CurrentAuth() auth: AuthContext) {
+  getSpendingControl(
+    @Param('studentId') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.canteenService.getSpendingControl(studentId, auth);
   }
 
   @Get('reports/daily-meal-count')
   @Permissions('canteen:reports:read')
-  dailyMealCountReport(@CurrentAuth() auth: AuthContext, @Query('date') date?: string) {
+  dailyMealCountReport(
+    @CurrentAuth() auth: AuthContext,
+    @Query('date') date?: string,
+  ) {
     return this.canteenService.dailyMealCountReport(auth, date);
   }
 
   @Get('reports/item-wise-sales')
   @Permissions('canteen:reports:read')
-  itemWiseSalesReport(@CurrentAuth() auth: AuthContext, @Query('from') from?: string, @Query('to') to?: string) {
+  itemWiseSalesReport(
+    @CurrentAuth() auth: AuthContext,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
     return this.canteenService.itemWiseSalesReport(auth, { from, to });
   }
 
@@ -189,7 +331,16 @@ export class CanteenController {
 
   @Get('reports/student-spending-summary')
   @Permissions('canteen:reports:read')
-  studentSpendingSummary(@CurrentAuth() auth: AuthContext, @Query('studentId') studentId?: string, @Query('from') from?: string, @Query('to') to?: string) {
-    return this.canteenService.studentSpendingSummary(auth, { studentId, from, to });
+  studentSpendingSummary(
+    @CurrentAuth() auth: AuthContext,
+    @Query('studentId') studentId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.canteenService.studentSpendingSummary(auth, {
+      studentId,
+      from,
+      to,
+    });
   }
 }

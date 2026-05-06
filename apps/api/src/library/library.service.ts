@@ -27,26 +27,26 @@ import { ReturnLibraryCopyDto } from './dto/return-library-copy.dto';
 import { UpdateLibraryBookDto } from './dto/update-library-book.dto';
 import { UpdateLibraryCopyDto } from './dto/update-library-copy.dto';
 
-type PaginationQuery = {
+interface PaginationQuery {
   page?: string;
   limit?: string;
-};
+}
 
-type ListBooksQuery = PaginationQuery & {
+interface ListBooksQuery extends PaginationQuery {
   query?: string;
-};
+}
 
-type ListCopiesQuery = PaginationQuery & {
+interface ListCopiesQuery extends PaginationQuery {
   bookId?: string;
   status?: string;
   barcode?: string;
-};
+}
 
-type ListIssuesQuery = PaginationQuery & {
+interface ListIssuesQuery extends PaginationQuery {
   status?: string;
   studentId?: string;
   staffId?: string;
-};
+}
 
 @Injectable()
 export class LibraryService {
@@ -331,7 +331,10 @@ export class LibraryService {
       throw new NotFoundException('Library copy not found in this tenant');
     }
 
-    if ([LibraryCopyStatus.LOST, LibraryCopyStatus.DAMAGED].includes(status)) {
+    if (
+      status === LibraryCopyStatus.LOST ||
+      status === LibraryCopyStatus.DAMAGED
+    ) {
       const activeIssue = await this.prisma.libraryIssue.findFirst({
         where: {
           tenantId: actor.tenantId,
@@ -402,7 +405,9 @@ export class LibraryService {
     }
 
     if (dto.borrowerStudentId && dto.borrowerStaffId) {
-      throw new BadRequestException('Choose either a student or staff borrower');
+      throw new BadRequestException(
+        'Choose either a student or staff borrower',
+      );
     }
 
     const copy = await this.prisma.libraryCopy.findFirst({
@@ -511,7 +516,7 @@ export class LibraryService {
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const invoiceId =
-        issue.borrowerStudentId && fineAmount.greaterThan(0)
+        issue.borrowerStudentId && fineAmount.gt(0)
           ? await this.createLibraryFineInvoice(tx, {
               actor,
               studentId: issue.borrowerStudentId,
@@ -662,7 +667,9 @@ export class LibraryService {
   }
 
   private parseCopyStatus(status: string) {
-    if (!Object.values(LibraryCopyStatus).includes(status as LibraryCopyStatus)) {
+    if (
+      !Object.values(LibraryCopyStatus).includes(status as LibraryCopyStatus)
+    ) {
       throw new BadRequestException(`Invalid library copy status: ${status}`);
     }
 
@@ -670,7 +677,9 @@ export class LibraryService {
   }
 
   private parseIssueStatus(status: string) {
-    if (!Object.values(LibraryIssueStatus).includes(status as LibraryIssueStatus)) {
+    if (
+      !Object.values(LibraryIssueStatus).includes(status as LibraryIssueStatus)
+    ) {
       throw new BadRequestException(`Invalid library issue status: ${status}`);
     }
 

@@ -465,6 +465,236 @@ export const permissionCatalog = [
     description: 'Record assigned route logs and transport delay updates',
   },
   {
+    resource: 'library:books',
+    action: 'create',
+    description: 'Create library book catalog records',
+  },
+  {
+    resource: 'library:books',
+    action: 'read',
+    description: 'Read library book catalog records',
+  },
+  {
+    resource: 'library:books',
+    action: 'update',
+    description: 'Update library book catalog records',
+  },
+  {
+    resource: 'library:copies',
+    action: 'create',
+    description: 'Create library copy records',
+  },
+  {
+    resource: 'library:copies',
+    action: 'read',
+    description: 'Read library copy records',
+  },
+  {
+    resource: 'library:copies',
+    action: 'update',
+    description: 'Update library copy records and status',
+  },
+  {
+    resource: 'library:issues',
+    action: 'create',
+    description: 'Issue library copies',
+  },
+  {
+    resource: 'library:issues',
+    action: 'read',
+    description: 'Read library circulation records',
+  },
+  {
+    resource: 'library:issues',
+    action: 'return',
+    description: 'Return issued library copies',
+  },
+  {
+    resource: 'library:reports',
+    action: 'read',
+    description: 'Read library overdue and circulation reports',
+  },
+  {
+    resource: 'transport:routes',
+    action: 'create',
+    description: 'Create transport routes',
+  },
+  {
+    resource: 'transport:routes',
+    action: 'read',
+    description: 'Read transport routes',
+  },
+  {
+    resource: 'transport:routes',
+    action: 'update',
+    description: 'Update transport routes',
+  },
+  {
+    resource: 'transport:vehicles',
+    action: 'create',
+    description: 'Create transport vehicles',
+  },
+  {
+    resource: 'transport:vehicles',
+    action: 'read',
+    description: 'Read transport vehicles',
+  },
+  {
+    resource: 'transport:vehicles',
+    action: 'update',
+    description: 'Update transport vehicles',
+  },
+  {
+    resource: 'transport:assignments',
+    action: 'create',
+    description: 'Create transport assignments',
+  },
+  {
+    resource: 'transport:assignments',
+    action: 'read',
+    description: 'Read transport assignments',
+  },
+  {
+    resource: 'transport:assignments',
+    action: 'update',
+    description: 'Update transport assignments',
+  },
+  {
+    resource: 'transport:trips',
+    action: 'create',
+    description: 'Start transport trips',
+  },
+  {
+    resource: 'transport:trips',
+    action: 'read',
+    description: 'Read transport trips',
+  },
+  {
+    resource: 'transport:trips',
+    action: 'update',
+    description: 'Update transport trips',
+  },
+  {
+    resource: 'transport:location',
+    action: 'read',
+    description: 'Read transport latest location',
+  },
+  {
+    resource: 'transport:location',
+    action: 'update',
+    description: 'Update transport latest location',
+  },
+  {
+    resource: 'transport:reports',
+    action: 'read',
+    description: 'Read transport reports',
+  },
+  {
+    resource: 'canteen:menu',
+    action: 'create',
+    description: 'Create canteen menu items',
+  },
+  {
+    resource: 'canteen:menu',
+    action: 'read',
+    description: 'Read canteen menu items',
+  },
+  {
+    resource: 'canteen:menu',
+    action: 'update',
+    description: 'Update canteen menu items',
+  },
+  {
+    resource: 'canteen:plans',
+    action: 'create',
+    description: 'Create canteen meal plans',
+  },
+  {
+    resource: 'canteen:plans',
+    action: 'read',
+    description: 'Read canteen meal plans',
+  },
+  {
+    resource: 'canteen:plans',
+    action: 'update',
+    description: 'Update canteen meal plans',
+  },
+  {
+    resource: 'canteen:enrollments',
+    action: 'create',
+    description: 'Create canteen enrollments',
+  },
+  {
+    resource: 'canteen:enrollments',
+    action: 'read',
+    description: 'Read canteen enrollments',
+  },
+  {
+    resource: 'canteen:enrollments',
+    action: 'update',
+    description: 'Update canteen enrollments',
+  },
+  {
+    resource: 'canteen:serving',
+    action: 'create',
+    description: 'Serve canteen meals',
+  },
+  {
+    resource: 'canteen:serving',
+    action: 'read',
+    description: 'Read canteen servings',
+  },
+  {
+    resource: 'canteen:wallets',
+    action: 'create',
+    description: 'Create canteen wallets',
+  },
+  {
+    resource: 'canteen:wallets',
+    action: 'read',
+    description: 'Read canteen wallets',
+  },
+  {
+    resource: 'canteen:wallets',
+    action: 'update',
+    description: 'Top up canteen wallets',
+  },
+  {
+    resource: 'canteen:pos',
+    action: 'create',
+    description: 'Create canteen POS sales',
+  },
+  {
+    resource: 'canteen:pos',
+    action: 'read',
+    description: 'Read canteen POS sales',
+  },
+  {
+    resource: 'canteen:pos',
+    action: 'update',
+    description: 'Update canteen POS sales',
+  },
+  {
+    resource: 'canteen:controls',
+    action: 'create',
+    description: 'Create canteen spending controls',
+  },
+  {
+    resource: 'canteen:controls',
+    action: 'read',
+    description: 'Read canteen spending controls',
+  },
+  {
+    resource: 'canteen:controls',
+    action: 'update',
+    description: 'Update canteen spending controls',
+  },
+  {
+    resource: 'canteen:reports',
+    action: 'read',
+    description: 'Read canteen reports',
+  },
+  {
     resource: 'consents',
     action: 'manage',
     description: 'Capture and revoke guardian consent records',

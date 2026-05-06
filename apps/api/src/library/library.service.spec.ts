@@ -200,7 +200,9 @@ describe('LibraryService Phase 3A foundation', () => {
   });
 
   it('prevents marking an actively issued copy as lost or damaged directly', async () => {
-    const { service, prisma } = buildService({ activeIssue: { id: 'issue-1' } });
+    const { service, prisma } = buildService({
+      activeIssue: { id: 'issue-1' },
+    });
 
     await expect(
       service.markCopyStatus(
@@ -228,13 +230,15 @@ describe('LibraryService Phase 3A foundation', () => {
   });
 });
 
-function buildService(options: {
-  book?: unknown;
-  copy?: unknown;
-  issue?: unknown;
-  activeIssue?: unknown;
-  issueUpdateCount?: number;
-} = {}) {
+function buildService(
+  options: {
+    book?: unknown;
+    copy?: unknown;
+    issue?: unknown;
+    activeIssue?: unknown;
+    issueUpdateCount?: number;
+  } = {},
+) {
   const book =
     options.book === undefined
       ? {
@@ -246,34 +250,30 @@ function buildService(options: {
         }
       : options.book;
 
-  const copy =
-    options.copy ??
-    {
-      id: 'copy-1',
-      tenantId: actor.tenantId,
-      bookId: 'book-1',
-      barcode: 'LIB-0001',
-      status: LibraryCopyStatus.AVAILABLE,
-      book,
-    };
+  const copy = options.copy ?? {
+    id: 'copy-1',
+    tenantId: actor.tenantId,
+    bookId: 'book-1',
+    barcode: 'LIB-0001',
+    status: LibraryCopyStatus.AVAILABLE,
+    book,
+  };
 
-  const issue =
-    options.issue ??
-    {
-      id: 'issue-1',
-      tenantId: actor.tenantId,
-      copyId: 'copy-1',
-      borrowerStudentId: 'student-1',
-      borrowerStaffId: null,
-      dueAt: new Date('2099-05-30T00:00:00.000Z'),
-      status: LibraryIssueStatus.ISSUED,
-      notes: null,
-      copy: {
-        ...copy,
-        book,
-      },
-      borrowerStudent: { id: 'student-1' },
-    };
+  const issue = options.issue ?? {
+    id: 'issue-1',
+    tenantId: actor.tenantId,
+    copyId: 'copy-1',
+    borrowerStudentId: 'student-1',
+    borrowerStaffId: null,
+    dueAt: new Date('2099-05-30T00:00:00.000Z'),
+    status: LibraryIssueStatus.ISSUED,
+    notes: null,
+    copy: {
+      ...copy,
+      book,
+    },
+    borrowerStudent: { id: 'student-1' },
+  };
 
   const returnedIssue = {
     ...(issue as Record<string, unknown>),

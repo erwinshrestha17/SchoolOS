@@ -59,7 +59,9 @@ function decimalToNumber(value: number | string | Decimal) {
   return value instanceof Decimal ? value.toNumber() : Number(value);
 }
 
-export class PrismaClient {}
+export class PrismaClient {
+  readonly __mock = true;
+}
 
 export const Prisma = {
   Decimal,
@@ -495,4 +497,68 @@ export const TransportBoardingStatus = {
   BOARDED: 'BOARDED',
   DROPPED: 'DROPPED',
   MISSED: 'MISSED',
+} as const;
+
+export const TransportTripStatus = {
+  ACTIVE: 'ACTIVE',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export const TransportStudentTripStatus = {
+  PENDING: 'PENDING',
+  BOARDED: 'BOARDED',
+  DROPPED: 'DROPPED',
+  ABSENT: 'ABSENT',
+} as const;
+
+export const CanteenMenuItemStatus = {
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+} as const;
+
+export const CanteenMealPlanStatus = {
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+} as const;
+
+export const CanteenEnrollmentStatus = {
+  ACTIVE: 'ACTIVE',
+  PAUSED: 'PAUSED',
+  CANCELLED: 'CANCELLED',
+  ENDED: 'ENDED',
+} as const;
+
+export const CanteenMealServingStatus = {
+  SERVED: 'SERVED',
+  NOT_TAKEN: 'NOT_TAKEN',
+  ABSENT: 'ABSENT',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export const CanteenWalletTransactionType = {
+  TOP_UP: 'TOP_UP',
+  DEDUCTION: 'DEDUCTION',
+  REFUND: 'REFUND',
+  ADJUSTMENT: 'ADJUSTMENT',
+} as const;
+
+export const CanteenWalletTransactionSource = {
+  MANUAL: 'MANUAL',
+  POS_SALE: 'POS_SALE',
+  MEAL_PURCHASE: 'MEAL_PURCHASE',
+  FEE_INTEGRATION: 'FEE_INTEGRATION',
+  ACCOUNTING_ADJUSTMENT: 'ACCOUNTING_ADJUSTMENT',
+} as const;
+
+export const CanteenPosSaleStatus = {
+  DRAFT: 'DRAFT',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export const CanteenPaymentMethod = {
+  CASH: 'CASH',
+  WALLET: 'WALLET',
+  STAFF_CREDIT: 'STAFF_CREDIT',
 } as const;
