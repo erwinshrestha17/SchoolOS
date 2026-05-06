@@ -31,7 +31,7 @@ import { PageHeader } from '../ui/page-header';
 import { StatCard } from '../ui/stat-card';
 import { EmptyState } from '../ui/empty-state';
 import { LoadingState } from '../ui/loading-state';
-import { StatusBadge } from '../ui/status-badge';
+import { StatusBadge, type StatusTone } from '../ui/status-badge';
 import { cn } from '../../lib/utils';
 
 const tabs = [
@@ -492,6 +492,18 @@ function OverviewPanel({
           )}
         </div>
       </section>
+
+      <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+        <PanelHeader
+          title="Future library foundations"
+          description="Planned Library UX sections are visible without calling endpoints that do not exist yet."
+        />
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+          <PendingLibraryCard title="Students with borrowed books" />
+          <PendingLibraryCard title="Fine records" />
+          <PendingLibraryCard title="Library reports" />
+        </div>
+      </section>
     </div>
   );
 }
@@ -545,18 +557,32 @@ function BooksPanel(props: {
             <EmptyState title="No books found" description="Add your first library book or adjust the filters." />
           )}
           {visibleBooks.map((book) => {
-            const copyCount = props.copies.filter((copy) => copy.bookId === book.id).length || book.copies?.length || 0;
+            const bookCopies = props.copies.filter((copy) => copy.bookId === book.id);
+            const fallbackCopies = book.copies ?? [];
+            const copiesForBook = bookCopies.length > 0 ? bookCopies : fallbackCopies;
+            const copyCount = copiesForBook.length;
+            const availableCopies = copiesForBook.filter((copy) => copy.status === 'AVAILABLE').length;
             return (
               <div key={book.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
+                  <div className="min-w-0">
                     <h3 className="font-bold text-slate-900">{book.title}</h3>
-                    <p className="text-sm text-slate-500">{book.author} {book.isbn ? `• ISBN ${book.isbn}` : ''}</p>
-                    <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      {book.subjectCategory || 'Uncategorized'} • {book.classLevel || 'All classes'} • {copyCount} copies
-                    </p>
+                    <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
+                      <BookMeta label="Author" value={book.author} />
+                      <BookMeta label="ISBN" value={book.isbn || 'Not set'} />
+                      <BookMeta label="Category" value={book.subjectCategory || 'Uncategorized'} />
+                      <BookMeta label="Total copies" value={String(copyCount)} />
+                      <BookMeta label="Available copies" value={String(availableCopies)} />
+                    </dl>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {availableCopies > 0 ? (
+                      <LibraryStatusBadge status="AVAILABLE" />
+                    ) : copyCount > 0 ? (
+                      <LibraryStatusBadge status="ISSUED" />
+                    ) : (
+                      <StatusBadge status="DRAFT" label="No copies" tone="draft" />
+                    )}
                     <button type="button" onClick={() => props.onEdit(book)} className="btn-secondary">Edit</button>
                     <Link href={`/dashboard/library/copies?bookId=${encodeURIComponent(book.id)}`} className="btn-secondary">Copies</Link>
                   </div>
@@ -634,7 +660,7 @@ function CopiesPanel(props: {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-bold text-slate-900">{copy.book?.title ?? 'Unknown book'}</h3>
-                    <StatusBadge status={copy.status} />
+                    <LibraryStatusBadge status={copy.status} />
                   </div>
                   <p className="mt-1 text-sm text-slate-500">Barcode: {copy.barcode} • Shelf: {copy.shelfLocation || 'Not set'}</p>
                   <p className="mt-2 text-xs text-slate-400">Replacement cost: {money(copy.replacementCost)} • QR: {copy.qrCode || 'Same as barcode'}</p>
@@ -802,7 +828,10 @@ function OverduePanel({
         {overdueIssues.map((issue) => (
           <div key={issue.id} className="rounded-2xl border border-red-100 bg-red-50/60 p-4">
             <IssueRow issue={issue} compact />
-            <p className="mt-2 text-sm font-semibold text-red-700">Overdue by {overdueDays(issue.dueAt)} day(s)</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <LibraryStatusBadge status="OVERDUE" />
+              <p className="text-sm font-semibold text-red-700">Overdue by {overdueDays(issue.dueAt)} day(s)</p>
+            </div>
           </div>
         ))}
       </div>
@@ -816,7 +845,7 @@ function IssueRow({ issue, compact = false }: { issue: LibraryIssue; compact?: b
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="font-bold text-slate-900">{issue.copy?.book?.title ?? 'Unknown book'}</h3>
-          <StatusBadge status={issue.status} />
+          <LibraryStatusBadge status={issue.status} />
         </div>
         <p className="mt-1 text-sm text-slate-500">
           {borrowerName(issue)} • Copy {issue.copy?.barcode ?? issue.copyId}
@@ -832,6 +861,46 @@ function IssueRow({ issue, compact = false }: { issue: LibraryIssue; compact?: b
       </div>
     </div>
   );
+}
+
+function BookMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</dt>
+      <dd className="mt-0.5 truncate font-semibold text-slate-700">{value}</dd>
+    </div>
+  );
+}
+
+function PendingLibraryCard({ title }: { title: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-4">
+      <EmptyState
+        title={title}
+        description="Backend endpoint pending."
+        className="min-h-[180px] border-0 bg-transparent p-0"
+      />
+    </div>
+  );
+}
+
+function LibraryStatusBadge({ status }: { status: string }) {
+  const normalized = status.trim().toUpperCase();
+  const badgeMap: Record<string, { label: string; tone: StatusTone }> = {
+    AVAILABLE: { label: 'Available', tone: 'approved' },
+    ISSUED: { label: 'Issued', tone: 'published' },
+    RESERVED: { label: 'Reserved', tone: 'pending' },
+    LOST: { label: 'Lost', tone: 'conflict' },
+    DAMAGED: { label: 'Damaged', tone: 'conflict' },
+    OVERDUE: { label: 'Overdue', tone: 'overdue' },
+    RETURNED: { label: 'Returned', tone: 'approved' },
+  };
+  const config = badgeMap[normalized] ?? {
+    label: formatStatus(normalized),
+    tone: 'info' as StatusTone,
+  };
+
+  return <StatusBadge status={normalized} label={config.label} tone={config.tone} />;
 }
 
 function PanelHeader({ title, description }: { title: string; description: string }) {
