@@ -457,8 +457,10 @@ function NavEntry({
           {item.disabled ? (
             <Badge variant="later">Later</Badge>
           ) : item.phase === 'phase2' ? (
-            <Badge variant="phase2">P2</Badge>
-          ) : null}
+            <Badge variant="phase2">Phase 2</Badge>
+          ) : (
+            <Badge variant="success">Live</Badge>
+          )}
           
           {item.badge && (
             <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary-600 px-1.5 text-[0.65rem] font-bold text-white">
@@ -471,7 +473,7 @@ function NavEntry({
       {collapsed && (
         <div className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
           {item.label}
-          {item.disabled ? ' · Later' : item.phase === 'phase2' ? ' · Phase 2' : ''}
+          {item.disabled ? ' · Later' : item.phase === 'phase2' ? ' · Phase 2' : ' · Live'}
         </div>
       )}
     </>

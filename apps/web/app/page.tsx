@@ -44,16 +44,19 @@ const modules = [
   {
     icon: '📖',
     title: 'Library Management',
+    phase: 'Later',
     desc: 'Book catalog, QR/barcode copy tracking, issue/return, overdue fines, lost-book charges, and library reports.',
   },
   {
     icon: '🚌',
     title: 'Transport Management',
+    phase: 'Later',
     desc: 'Routes, stops, vehicles, drivers, student transport enrollment, boarding/drop tracking, live GPS, ETA, and trip history.',
   },
   {
     icon: '🍱',
     title: 'Canteen Management',
+    phase: 'Later',
     desc: 'Menus, meal plans, QR meal serving, wallet, POS sales, parent spending controls, allergy warnings, and reports.',
   },
   {
@@ -142,13 +145,13 @@ const phasePlan = [
     sub: 'Admissions, Attendance, Fees, Activity Feed, and Notices working end-to-end.',
   },
   {
-    done: false,
-    active: true,
-    title: 'Phase 1B: Completion Sprint',
-    sub: 'Student detail/edit, fee ledger, attendance reports, notification center, signed media, global search, tests, and PDF polish.',
+    done: true,
+    title: 'Phase 1B: Operational Depth',
+    sub: 'Student detail/edit, fee ledger, attendance reports, notification center, global search, tests, and PDF polish.',
   },
   {
     done: false,
+    active: true,
     title: 'Phase 2: Academics, HR & Accounting',
     sub: 'Exams/CAS/report cards, Homework/Timetable, HR/Payroll, and full M9 Accounting & Finance.',
   },
@@ -159,8 +162,8 @@ const phasePlan = [
   },
   {
     done: false,
-    title: 'Phase 4: AI & Scale',
-    sub: 'AI captions, risk prediction, anomaly detection, smart notifications, and scale optimizations.',
+    title: 'Phase 4: Scale and Enterprise SaaS',
+    sub: 'Enterprise controls, analytics foundations, developer experience, and scale optimizations after core modules are stable.',
   },
 ];
 
@@ -233,11 +236,11 @@ export default function LandingPage() {
           </div>
 
           <h1 className="max-w-4xl text-5xl font-black tracking-tight text-white md:text-7xl leading-[1.05]">
-            One operating system for every school workflow.
+            Run your entire school from one modern platform.
           </h1>
 
           <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-400">
-            SchoolOS brings admissions, attendance, fees, academics, HR, library, transport, canteen, communication, and double-entry accounting into one secure multi-tenant SaaS platform for Nepal.
+            Admissions, attendance, fees, exams, notices, homework, timetable, HR, payroll, and accounting for Nepal-based schools.
           </p>
 
           <div className="mt-10 flex flex-wrap gap-4">
@@ -245,13 +248,13 @@ export default function LandingPage() {
               href="/register"
               className="rounded-full bg-amber-500 px-7 py-3.5 text-base font-bold text-white hover:bg-amber-400 transition-colors"
             >
-              Register your school — it&apos;s free
+              Request demo
             </Link>
             <Link
-              href="/dashboard"
+              href="/login"
               className="rounded-full border border-slate-600 px-7 py-3.5 text-base font-semibold !text-slate-300 hover:border-slate-400 hover:!text-white transition-colors"
             >
-              Open dashboard
+              Login
             </Link>
           </div>
 
@@ -451,7 +454,14 @@ export default function LandingPage() {
                 key={module.title}
                 className="group rounded-2xl border border-slate-100 bg-white p-7 shadow-sm hover:border-amber-200 hover:shadow-md transition-all"
               >
-                <span className="text-3xl">{module.icon}</span>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-3xl">{module.icon}</span>
+                  {'phase' in module && module.phase ? (
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">
+                      {module.phase}
+                    </span>
+                  ) : null}
+                </div>
                 <h3 className="mt-4 text-lg font-bold text-slate-900">{module.title}</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-500">{module.desc}</p>
               </div>

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Bell, CheckCheck, Loader2 } from 'lucide-react';
+import { NotificationBadge } from '../ui/notification-badge';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
@@ -88,11 +89,7 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
         onClick={() => setOpen((value) => !value)}
       >
         <Bell size={20} />
-        {unreadCount > 0 && (
-          <span className="notification-badge">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
+        <NotificationBadge count={unreadCount} className="notification-badge" />
       </button>
 
       {open && (

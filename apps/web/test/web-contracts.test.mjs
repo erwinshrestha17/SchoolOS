@@ -54,6 +54,65 @@ describe('SchoolOS web production contracts', () => {
     assert.doesNotMatch(apiClient, /http:\/\/localhost:3000\/api\/v1/);
   });
 
+  it('implements the shared UI primitives named by the UI/UX plan', () => {
+    const requiredComponents = [
+      'action-menu',
+      'audit-info',
+      'confirm-dialog',
+      'data-table',
+      'empty-state',
+      'export-button',
+      'filter-bar',
+      'loading-state',
+      'locked-record-banner',
+      'money-display',
+      'notification-badge',
+      'page-header',
+      'permission-state',
+      'report-toolbar',
+      'search-input',
+      'section-card',
+      'stat-card',
+      'status-badge',
+      'table-pagination',
+      'tabs',
+      'toast',
+    ];
+
+    for (const component of requiredComponents) {
+      assert.equal(
+        existsSync(join(webRoot, `components/ui/${component}.tsx`)),
+        true,
+        `Missing shared UI primitive: ${component}`,
+      );
+    }
+
+    const statusBadge = read('components/ui/status-badge.tsx');
+    for (const status of [
+      'ACTIVE',
+      'PENDING',
+      'DRAFT',
+      'PUBLISHED',
+      'LOCKED',
+      'PAID',
+      'PARTIAL',
+      'UNPAID',
+      'OVERDUE',
+      'ESCALATED',
+    ]) {
+      assert.match(statusBadge, new RegExp(status));
+    }
+
+    const moneyDisplay = read('components/ui/money-display.tsx');
+    assert.match(moneyDisplay, /currency:\s*'NPR'/);
+
+    const dataTable = read('components/ui/data-table.tsx');
+    assert.match(dataTable, /isLoading/);
+    assert.match(dataTable, /error/);
+    assert.match(dataTable, /EmptyState/);
+    assert.match(dataTable, /getRowKey/);
+  });
+
   it('keeps Phase 1 and Phase 2 admin dashboard routes present', () => {
     const requiredRoutes = [
       'admissions',
