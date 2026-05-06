@@ -4,6 +4,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
+import { Input } from '../ui/input';
 
 type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'SICK_LEAVE' | 'EXCUSED_LEAVE' | 'UNEXCUSED_LEAVE';
 
@@ -101,13 +102,13 @@ export function AttendanceRosterItem({
       </div>
 
       {!isPresent && (
-        <div className="mt-4">
-          <input
+        <div className="mt-4 animate-in slide-in-from-top-2 duration-300">
+          <Input
             type="text"
             value={remark || ''}
             onChange={(e) => onRemarkChange(e.target.value)}
             placeholder="Add a remark..."
-            className="w-full text-xs bg-white border-slate-200 rounded-xl px-4 py-2 focus:ring-1 focus:ring-slate-900"
+            className="text-xs h-10 px-4"
           />
         </div>
       )}

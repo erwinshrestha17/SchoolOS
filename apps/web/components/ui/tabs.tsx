@@ -1,7 +1,28 @@
 import * as React from "react"
 
-const Tabs = ({ children, defaultValue, className }: { children: React.ReactNode, defaultValue: string, className?: string }) => {
-  const [value, setValue] = React.useState(defaultValue);
+const Tabs = ({ 
+  children, 
+  defaultValue, 
+  value: controlledValue, 
+  onValueChange, 
+  className 
+}: { 
+  children: React.ReactNode, 
+  defaultValue?: string, 
+  value?: string, 
+  onValueChange?: (value: string) => void, 
+  className?: string 
+}) => {
+  const [internalValue, setInternalValue] = React.useState(defaultValue || "");
+  const value = controlledValue !== undefined ? controlledValue : internalValue;
+  
+  const setValue = (newValue: string) => {
+    if (controlledValue === undefined) {
+      setInternalValue(newValue);
+    }
+    onValueChange?.(newValue);
+  };
+
   return (
     <div className={className}>
       {React.Children.map(children, (child) => {

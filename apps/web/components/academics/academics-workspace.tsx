@@ -1,8 +1,9 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { BookOpen, GraduationCap, Users, Calendar, Trophy, FileText, Settings } from 'lucide-react';
 import { api } from '../../lib/api';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { SubjectsTab } from './tabs/subjects-tab';
 import { ExamTermsTab } from './tabs/exam-terms-tab';
 import { MarksEntryTab } from './tabs/marks-entry-tab';
@@ -11,67 +12,20 @@ import { ReportCardsTab } from './tabs/report-cards-tab';
 import { CasRecordsTab } from './tabs/cas-records-tab';
 import { PromotionTab } from './tabs/promotion-tab';
 import { ResultPublishingTab } from './tabs/result-publishing-tab';
+import { StatCard } from '../ui/stat-card';
 
 const sections = [
-  'Subjects',
-  'Exam Terms',
-  'Marks Entry',
-  'Marks Lock',
-  'CAS Records',
-  'Report Cards',
-  'Promotion',
-  'Result Publishing',
+  { id: 'Subjects', icon: BookOpen },
+  { id: 'Exam Terms', icon: Calendar },
+  { id: 'Marks Entry', icon: Trophy },
+  { id: 'Marks Lock', icon: Settings },
+  { id: 'CAS Records', icon: Users },
+  { id: 'Report Cards', icon: FileText },
+  { id: 'Promotion', icon: GraduationCap },
+  { id: 'Result Publishing', icon: FileText },
 ] as const;
 
-type Section = (typeof sections)[number];
-
-const sectionMeta: Record<Section, { title: string; description: string; badge: string }> = {
-  Subjects: {
-    title: 'Subjects & Teachers',
-    description: 'Define subjects per class, assign teachers, and manage subject-teacher mappings.',
-    badge: 'Curriculum',
-  },
-  'Exam Terms': {
-    title: 'Exam Terms & Components',
-    description: 'Create exam terms, add assessment components, and configure marks structure.',
-    badge: 'Assessment',
-  },
-  'Marks Entry': {
-    title: 'Marks Entry Grid',
-    description: 'Select class, subject, and exam to enter marks for all students in one view.',
-    badge: 'Grading',
-  },
-  'Marks Lock': {
-    title: 'Marks Lock Workflow',
-    description: 'Request, review, lock, and unlock marks with audit-backed correction controls.',
-    badge: 'Control',
-  },
-  'CAS Records': {
-    title: 'CAS Observations',
-    description: 'Track continuous assessment scores for classwork, projects, and participation.',
-    badge: 'Observation',
-  },
-  'Report Cards': {
-    title: 'Report Cards',
-    description: 'Generate report cards and review final grades for students.',
-    badge: 'Results',
-  },
-  Promotion: {
-    title: 'Batch Promotion',
-    description: 'Review readiness and batch promote students to the next academic year.',
-    badge: 'Transition',
-  },
-  'Result Publishing': {
-    title: 'Result Publishing',
-    description: 'Control the release of report cards and notify guardians of published results.',
-    badge: 'Publishing',
-  },
-};
-
 export function AcademicsWorkspace() {
-  const [activeSection, setActiveSection] = useState<Section>('Subjects');
-  const activeMeta = sectionMeta[activeSection];
-
   const academicYearsQuery = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
   const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
@@ -82,145 +36,138 @@ export function AcademicsWorkspace() {
   const examsQuery = useQuery({ queryKey: ['exam-terms'], queryFn: api.listExamTerms });
   const reportsQuery = useQuery({ queryKey: ['report-cards'], queryFn: api.listReportCards });
 
+  const academicYear = academicYearsQuery.data?.find(y => y.isCurrent);
+
   const subjectCount = subjectsQuery.data?.length ?? 0;
   const examCount = examsQuery.data?.length ?? 0;
-  const reportCount = reportsQuery.data?.length ?? 0;
 
   return (
-    <div className="space-y-6">
-      {/* Hero header */}
-      <section className="relative overflow-hidden rounded-[32px] border border-[var(--line)] bg-gradient-to-br from-indigo-950 via-indigo-900 to-violet-800 p-6 text-white shadow-sm sm:p-8">
-        <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute bottom-0 left-1/3 h-32 w-32 rounded-full bg-violet-400/20 blur-3xl" />
-
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+    <div className="space-y-10">
+      {/* Hero Header */}
+      <section className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-10 text-white shadow-2xl">
+        <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80 ring-1 ring-white/15">
-              {activeMeta.badge}
-            </span>
-            <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-              {activeMeta.title}
+            <div className="mb-3 flex items-center gap-2">
+              <span className="rounded-full bg-primary-500/20 px-4 py-1 text-xs font-bold uppercase tracking-widest text-primary-300 backdrop-blur-sm">
+                Academic Management
+              </span>
+              <span className="rounded-full bg-white/10 px-4 py-1 text-xs font-bold uppercase tracking-widest text-slate-300 backdrop-blur-sm">
+                {academicYear?.name || 'Loading Year...'}
+              </span>
+            </div>
+            <h1 className="text-4xl font-black tracking-tight md:text-5xl">
+              School <span className="text-primary-400">Academics</span>
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
-              {activeMeta.description}
+            <p className="mt-3 max-w-md text-lg font-medium text-slate-300">
+              Manage curriculum, track student progress, and organize school schedules.
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[480px]">
-            <MetricCard label="Subjects" value={String(subjectCount)} tone="info" />
-            <MetricCard label="Exam Terms" value={String(examCount)} tone="warning" />
-            <MetricCard label="Report Cards" value={String(reportCount)} tone="success" />
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center sm:gap-4">
+            <StatCard title="Subjects" value={subjectCount} className="bg-white/5 border-white/10 text-white" />
+            <StatCard title="Exam Terms" value={examCount} className="bg-white/5 border-white/10 text-white" />
           </div>
         </div>
+
+        {/* Decorative elements */}
+        <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-primary-500/10 blur-3xl" />
+        <div className="absolute -bottom-20 left-1/2 h-60 w-60 -translate-x-1/2 rounded-full bg-blue-500/10 blur-3xl" />
       </section>
 
-      {/* Tab navigation */}
-      <section className="sticky top-4 z-20 rounded-[28px] border border-[var(--line)] bg-white/85 p-3 shadow-sm backdrop-blur-xl">
-        <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Academics sections">
-          {sections.map((section) => {
-            const isActive = activeSection === section;
-            return (
-              <button
-                key={section}
-                type="button"
-                className={`group relative min-h-12 whitespace-nowrap rounded-2xl border px-4 text-sm font-semibold transition-all duration-200 ${
-                  isActive
-                    ? 'border-indigo-950 bg-indigo-950 text-white shadow-md shadow-indigo-900/20'
-                    : 'border-transparent bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-950'
-                }`}
-                onClick={() => setActiveSection(section)}
-              >
-                <span className="flex items-center gap-2">
-                  <span className={`h-2 w-2 rounded-full ${isActive ? 'bg-violet-400' : 'bg-gray-300 group-hover:bg-gray-500'}`} />
-                  {section}
-                </span>
-              </button>
-            );
-          })}
+      <Tabs defaultValue="Subjects" className="space-y-8">
+        {/* Navigation Bar */}
+        <section className="sticky top-4 z-20 rounded-[28px] border border-slate-200 bg-white/85 p-3 shadow-sm backdrop-blur-xl">
+          <TabsList className="flex h-auto gap-2 overflow-x-auto pb-1 bg-transparent rounded-none p-0 w-full justify-start border-none">
+            {sections.map((section) => {
+              const Icon = section.icon;
+              return (
+                <TabsTrigger
+                  key={section.id}
+                  value={section.id}
+                  className="flex items-center gap-2.5 rounded-2xl px-5 py-3 text-sm font-bold transition-all data-[state=active]:bg-primary-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-primary-600/20 text-slate-600 hover:bg-slate-100"
+                >
+                  <Icon size={18} />
+                  {section.id}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </section>
+
+        {/* Dynamic Content Sections */}
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <TabsContent value="Subjects" className="mt-0">
+            <SubjectsTab
+              academicYears={academicYearsQuery.data ?? []}
+              classes={classesQuery.data ?? []}
+              allSections={sectionsQuery.data ?? []}
+              staff={staffQuery.data ?? []}
+              subjects={subjectsQuery.data ?? []}
+              assignments={assignmentsQuery.data ?? []}
+            />
+          </TabsContent>
+
+          <TabsContent value="Exam Terms" className="mt-0">
+            <ExamTermsTab
+              academicYears={academicYearsQuery.data ?? []}
+              subjects={subjectsQuery.data ?? []}
+              exams={examsQuery.data ?? []}
+            />
+          </TabsContent>
+
+          <TabsContent value="Marks Entry" className="mt-0">
+            <MarksEntryTab
+              academicYears={academicYearsQuery.data ?? []}
+              classes={classesQuery.data ?? []}
+              allSections={sectionsQuery.data ?? []}
+              students={studentsQuery.data ?? []}
+              exams={examsQuery.data ?? []}
+            />
+          </TabsContent>
+
+          <TabsContent value="Marks Lock" className="mt-0">
+            <MarksLockTab exams={examsQuery.data ?? []} />
+          </TabsContent>
+
+          <TabsContent value="CAS Records" className="mt-0">
+            <CasRecordsTab
+              academicYears={academicYearsQuery.data ?? []}
+              classes={classesQuery.data ?? []}
+              allSections={sectionsQuery.data ?? []}
+              students={studentsQuery.data ?? []}
+              subjects={subjectsQuery.data ?? []}
+            />
+          </TabsContent>
+
+          <TabsContent value="Report Cards" className="mt-0">
+            <ReportCardsTab
+              academicYears={academicYearsQuery.data ?? []}
+              classes={classesQuery.data ?? []}
+              allSections={sectionsQuery.data ?? []}
+              students={studentsQuery.data ?? []}
+              exams={examsQuery.data ?? []}
+              reports={reportsQuery.data ?? []}
+            />
+          </TabsContent>
+
+          <TabsContent value="Promotion" className="mt-0">
+            <PromotionTab
+              academicYears={academicYearsQuery.data ?? []}
+              classes={classesQuery.data ?? []}
+              allSections={sectionsQuery.data ?? []}
+            />
+          </TabsContent>
+
+          <TabsContent value="Result Publishing" className="mt-0">
+            <ResultPublishingTab
+              academicYears={academicYearsQuery.data ?? []}
+              classes={classesQuery.data ?? []}
+              allSections={sectionsQuery.data ?? []}
+              exams={examsQuery.data ?? []}
+            />
+          </TabsContent>
         </div>
-      </section>
-
-      {/* Content */}
-      {activeSection === 'Subjects' && (
-        <SubjectsTab
-          academicYears={academicYearsQuery.data ?? []}
-          classes={classesQuery.data ?? []}
-          allSections={sectionsQuery.data ?? []}
-          staff={staffQuery.data ?? []}
-          subjects={subjectsQuery.data ?? []}
-          assignments={assignmentsQuery.data ?? []}
-        />
-      )}
-
-      {activeSection === 'Exam Terms' && (
-        <ExamTermsTab
-          academicYears={academicYearsQuery.data ?? []}
-          subjects={subjectsQuery.data ?? []}
-          exams={examsQuery.data ?? []}
-        />
-      )}
-
-      {activeSection === 'Marks Entry' && (
-        <MarksEntryTab
-          academicYears={academicYearsQuery.data ?? []}
-          classes={classesQuery.data ?? []}
-          allSections={sectionsQuery.data ?? []}
-          students={studentsQuery.data ?? []}
-          exams={examsQuery.data ?? []}
-        />
-      )}
-
-      {activeSection === 'Marks Lock' && (
-        <MarksLockTab exams={examsQuery.data ?? []} />
-      )}
-
-      {activeSection === 'CAS Records' && (
-        <CasRecordsTab
-          academicYears={academicYearsQuery.data ?? []}
-          classes={classesQuery.data ?? []}
-          allSections={sectionsQuery.data ?? []}
-          students={studentsQuery.data ?? []}
-          subjects={subjectsQuery.data ?? []}
-        />
-      )}
-
-      {activeSection === 'Report Cards' && (
-        <ReportCardsTab
-          academicYears={academicYearsQuery.data ?? []}
-          classes={classesQuery.data ?? []}
-          allSections={sectionsQuery.data ?? []}
-          students={studentsQuery.data ?? []}
-          exams={examsQuery.data ?? []}
-          reports={reportsQuery.data ?? []}
-        />
-      )}
-
-      {activeSection === 'Promotion' && (
-        <PromotionTab
-          academicYears={academicYearsQuery.data ?? []}
-          classes={classesQuery.data ?? []}
-          allSections={sectionsQuery.data ?? []}
-        />
-      )}
-      {activeSection === 'Result Publishing' && (
-        <ResultPublishingTab
-          academicYears={academicYearsQuery.data ?? []}
-          classes={classesQuery.data ?? []}
-          allSections={sectionsQuery.data ?? []}
-          exams={examsQuery.data ?? []}
-        />
-      )}
-    </div>
-  );
-}
-
-function MetricCard({ label, value, tone }: { label: string; value: string; tone: 'info' | 'warning' | 'success' }) {
-  const bg = tone === 'success' ? 'bg-emerald-500/15' : tone === 'warning' ? 'bg-amber-500/15' : 'bg-violet-500/15';
-  const text = tone === 'success' ? 'text-emerald-200' : tone === 'warning' ? 'text-amber-200' : 'text-violet-200';
-  return (
-    <div className={`rounded-2xl ${bg} px-4 py-3 backdrop-blur-sm`}>
-      <p className="text-xs font-medium text-white/60">{label}</p>
-      <p className={`mt-1 text-2xl font-bold ${text}`}>{value}</p>
+      </Tabs>
     </div>
   );
 }

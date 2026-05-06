@@ -11,6 +11,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
+import { Input } from '../ui/input';
+import { Select } from '../ui/select';
+import { FormField } from '../ui/form-field';
+import { LoadingState } from '../ui/loading-state';
+import { EmptyState } from '../ui/empty-state';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
+import { Badge } from '../ui/badge';
+import { cn } from '../../lib/utils';
+import { RefreshCcw, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 
 const communicationSections = [
   'Notices',
@@ -353,133 +362,119 @@ export function CommunicationsForm() {
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[32px] border border-[var(--line)] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 text-white shadow-sm sm:p-8">
-        <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-cyan-400/15 blur-3xl" />
-        <div className="absolute bottom-0 left-1/4 h-40 w-40 rounded-full bg-emerald-400/15 blur-3xl" />
-
-        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80 ring-1 ring-white/15">
+      <section className="relative overflow-hidden rounded-[2.5rem] border border-slate-200 bg-slate-900 p-8 text-white shadow-xl shadow-slate-900/10">
+        <div className="absolute -right-10 -top-10 h-64 w-64 rounded-full bg-primary-500/10 blur-3xl" />
+        <div className="absolute -left-10 -bottom-10 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
+        
+        <div className="relative flex flex-col gap-8 xl:flex-row xl:items-center xl:justify-between">
+          <div className="max-w-xl">
+            <span className="inline-flex rounded-full bg-white/10 px-4 py-1.5 text-[0.65rem] font-black uppercase tracking-widest text-white/60 border border-white/5 backdrop-blur-sm">
               {activeMeta.badge}
             </span>
-            <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
+            <h1 className="mt-6 text-4xl font-black tracking-tight text-white sm:text-5xl">
               {activeMeta.title}
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
+            <p className="mt-4 text-sm font-medium leading-relaxed text-slate-400">
               {activeMeta.description}
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[640px] xl:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:min-w-[500px]">
             <CommunicationMetric label="Notices" value={String(noticesQuery.data?.length ?? 0)} tone="neutral" />
             <CommunicationMetric label="Events" value={String(eventsQuery.data?.length ?? 0)} tone="info" />
-            <CommunicationMetric label="Sent" value={String(deliveryStats.sent)} tone="success" />
-            <CommunicationMetric label="Failed" value={String(deliveryStats.failed)} tone="danger" />
+            <CommunicationMetric label="Sent Successfully" value={String(deliveryStats.sent)} tone="success" />
+            <CommunicationMetric label="Delivery Gaps" value={String(deliveryStats.failed)} tone="danger" />
           </div>
         </div>
       </section>
 
-      <section className="sticky top-4 z-20 rounded-[28px] border border-[var(--line)] bg-white/85 p-3 shadow-sm backdrop-blur-xl">
-        <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Communications sections">
-          {communicationSections.map((section) => {
-            const isActive = activeSection === section;
-
-            return (
-              <button
-                key={section}
-                type="button"
-                className={`group min-h-12 whitespace-nowrap rounded-2xl border px-4 text-sm font-semibold transition-all duration-200 ${
-                  isActive
-                    ? 'border-slate-950 bg-slate-950 text-white shadow-md shadow-slate-900/20'
-                    : 'border-transparent bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-950'
-                }`}
-                onClick={() => setActiveSection(section)}
+      <Tabs value={activeSection} onValueChange={(val) => setActiveSection(val as CommunicationSection)} className="space-y-8">
+        <div className="sticky top-4 z-20 flex justify-center">
+          <TabsList className="bg-white/80 backdrop-blur-xl border border-slate-200 p-1.5 rounded-3xl shadow-lg shadow-slate-900/5">
+            {communicationSections.map((section) => (
+              <TabsTrigger 
+                key={section} 
+                value={section}
+                className="px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest data-[state=active]:bg-slate-900 data-[state=active]:text-white transition-all"
               >
-                <span className="flex items-center gap-2">
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      isActive ? 'bg-emerald-400' : 'bg-gray-300 group-hover:bg-gray-500'
-                    }`}
-                  />
-                  {section}
-                </span>
-              </button>
-            );
-          })}
+                {section}
+              </TabsTrigger>
+            ))}
+          </TabsList>
         </div>
-      </section>
 
-      {deliveryStats.pending > 0 ? (
-        <InlineMessage
-          tone="info"
-          message={`${deliveryStats.pending} delivery record${
-            deliveryStats.pending === 1 ? '' : 's'
-          } are queued, pending, or retrying.`}
-        />
-      ) : null}
+        {deliveryStats.pending > 0 && (
+          <div className="bg-primary-50 border border-primary-100 p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="h-2 w-2 rounded-full bg-primary-500 animate-pulse" />
+            <p className="text-sm font-bold text-primary-900">
+              {deliveryStats.pending} delivery records are currently queued or retrying.
+            </p>
+          </div>
+        )}
 
-      {activeSection === 'Notices' ? (
-        <NoticesSection
-          notice={notice}
-          setNotice={setNotice}
-          classes={classes}
-          sections={noticeSections}
-          notices={noticesQuery.data ?? []}
-          noticesLoading={noticesQuery.isLoading}
-          noticesError={noticesQuery.isError ? noticesQuery.error.message : null}
-          submitNotice={submitNotice}
-          isPending={noticeMutation.isPending}
-          noticeError={noticeError}
-          noticeSuccess={noticeSuccess}
-        />
-      ) : null}
+        <TabsContent value="Notices" className="mt-0">
+          <NoticesSection
+            notice={notice}
+            setNotice={setNotice}
+            classes={classes}
+            sections={noticeSections}
+            notices={noticesQuery.data ?? []}
+            noticesLoading={noticesQuery.isLoading}
+            noticesError={noticesQuery.isError ? noticesQuery.error.message : null}
+            submitNotice={submitNotice}
+            isPending={noticeMutation.isPending}
+            noticeError={noticeError}
+            noticeSuccess={noticeSuccess}
+          />
+        </TabsContent>
 
-      {activeSection === 'Events' ? (
-        <EventsSection
-          event={event}
-          setEvent={setEvent}
-          classes={classes}
-          sections={eventSections}
-          events={eventsQuery.data ?? []}
-          eventsLoading={eventsQuery.isLoading}
-          eventsError={eventsQuery.isError ? eventsQuery.error.message : null}
-          submitEvent={submitEvent}
-          isPending={eventMutation.isPending}
-          eventError={eventError}
-          eventSuccess={eventSuccess}
-        />
-      ) : null}
+        <TabsContent value="Events" className="mt-0">
+          <EventsSection
+            event={event}
+            setEvent={setEvent}
+            classes={classes}
+            sections={eventSections}
+            events={eventsQuery.data ?? []}
+            eventsLoading={eventsQuery.isLoading}
+            eventsError={eventsQuery.isError ? eventsQuery.error.message : null}
+            submitEvent={submitEvent}
+            isPending={eventMutation.isPending}
+            eventError={eventError}
+            eventSuccess={eventSuccess}
+          />
+        </TabsContent>
 
-      {activeSection === 'Delivery Records' ? (
-        <DeliveryRecordsSection
-          deliveries={filteredDeliveries}
-          isLoading={deliveriesQuery.isLoading}
-          error={deliveriesQuery.isError ? deliveriesQuery.error.message : null}
-          filters={deliveryFilters}
-          setFilters={setDeliveryFilters}
-          channels={deliveryChannels}
-          sourceTypes={deliverySourceTypes}
-          totalDeliveries={deliveriesQuery.data?.length ?? 0}
-        />
-      ) : null}
+        <TabsContent value="Delivery Records" className="mt-0">
+          <DeliveryRecordsSection
+            deliveries={filteredDeliveries}
+            isLoading={deliveriesQuery.isLoading}
+            error={deliveriesQuery.isError ? deliveriesQuery.error.message : null}
+            filters={deliveryFilters}
+            setFilters={setDeliveryFilters}
+            channels={deliveryChannels}
+            sourceTypes={deliverySourceTypes}
+            totalDeliveries={deliveriesQuery.data?.length ?? 0}
+          />
+        </TabsContent>
 
-      {activeSection === 'Consent Management' ? (
-        <ConsentManagementSection
-          guardians={guardians}
-          selectedGuardianId={selectedGuardianId}
-          setSelectedGuardianId={setSelectedGuardianId}
-          selectedConsentType={selectedConsentType}
-          setSelectedConsentType={setSelectedConsentType}
-          statuses={guardianConsentStatusQuery.data ?? []}
-          statusesLoading={guardianConsentStatusQuery.isLoading}
-          captureConsent={() => captureConsentMutation.mutate()}
-          revokeConsent={() => revokeConsentMutation.mutate()}
-          capturePending={captureConsentMutation.isPending}
-          revokePending={revokeConsentMutation.isPending}
-          captureError={captureConsentMutation.isError ? captureConsentMutation.error.message : null}
-          revokeError={revokeConsentMutation.isError ? revokeConsentMutation.error.message : null}
-        />
-      ) : null}
+        <TabsContent value="Consent Management" className="mt-0">
+          <ConsentManagementSection
+            guardians={guardians}
+            selectedGuardianId={selectedGuardianId}
+            setSelectedGuardianId={setSelectedGuardianId}
+            selectedConsentType={selectedConsentType}
+            setSelectedConsentType={setSelectedConsentType}
+            statuses={guardianConsentStatusQuery.data ?? []}
+            statusesLoading={guardianConsentStatusQuery.isLoading}
+            captureConsent={() => captureConsentMutation.mutate()}
+            revokeConsent={() => revokeConsentMutation.mutate()}
+            capturePending={captureConsentMutation.isPending}
+            revokePending={revokeConsentMutation.isPending}
+            captureError={captureConsentMutation.isError ? captureConsentMutation.error.message : null}
+            revokeError={revokeConsentMutation.isError ? revokeConsentMutation.error.message : null}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -520,37 +515,32 @@ function NoticesSection({
           description="Create clear, audience-targeted announcements for guardians, students, and staff."
         />
 
-        <div className="mt-6 grid gap-4">
-          <label>
-            <span className="label mb-2 block">Title</span>
-            <input
+        <div className="mt-6 space-y-6">
+          <FormField label="Title" description="Give your notice a clear, actionable title.">
+            <Input
               value={notice.title}
               onChange={(event) => setNotice((current) => ({ ...current, title: event.target.value }))}
-              placeholder="Example: Parent meeting notice"
-              className="min-h-11"
+              placeholder="Example: Parent-Teacher Association Meeting"
+              className="h-12"
             />
-          </label>
+          </FormField>
 
-          <label>
-            <span className="label mb-2 flex items-center justify-between">
-              <span>Body</span>
-              <span className="text-[10px] font-semibold text-[var(--muted)]">
-                {characterCount} characters
-              </span>
-            </span>
+          <FormField 
+            label="Notice Content" 
+            description={`${characterCount} characters`}
+          >
             <textarea
               rows={6}
               value={notice.body}
               onChange={(event) => setNotice((current) => ({ ...current, body: event.target.value }))}
-              placeholder="Write the notice body for guardians, students, or staff."
-              className="min-h-36"
+              placeholder="Write the notice body for guardians, students, or staff..."
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium transition-all focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-primary-500/10 min-h-[160px] resize-none"
             />
-          </label>
+          </FormField>
 
-          <div className="grid gap-3 md:grid-cols-3">
-            <label>
-              <span className="label mb-2 block">Priority</span>
-              <select
+          <div className="grid gap-4 md:grid-cols-3">
+            <FormField label="Priority">
+              <Select
                 value={notice.priority}
                 onChange={(event) =>
                   setNotice((current) => ({
@@ -558,18 +548,16 @@ function NoticesSection({
                     priority: event.target.value as NoticePriority,
                   }))
                 }
-                className="min-h-11"
               >
                 {noticePriorities.map((priority) => (
                   <option key={priority} value={priority}>
                     {formatEnumLabel(priority)}
                   </option>
                 ))}
-              </select>
-            </label>
-            <label>
-              <span className="label mb-2 block">Audience</span>
-              <select
+              </Select>
+            </FormField>
+            <FormField label="Audience">
+              <Select
                 value={notice.audienceType}
                 onChange={(event) =>
                   setNotice((current) => ({
@@ -578,18 +566,16 @@ function NoticesSection({
                     sectionId: '',
                   }))
                 }
-                className="min-h-11"
               >
                 {audienceTypes.map((audienceType) => (
                   <option key={audienceType} value={audienceType}>
                     {formatEnumLabel(audienceType)}
                   </option>
                 ))}
-              </select>
-            </label>
-            <label>
-              <span className="label mb-2 block">Class</span>
-              <select
+              </Select>
+            </FormField>
+            <FormField label="Class">
+              <Select
                 value={notice.classId}
                 onChange={(event) =>
                   setNotice((current) => ({
@@ -599,7 +585,6 @@ function NoticesSection({
                   }))
                 }
                 disabled={notice.audienceType === 'ALL'}
-                className="min-h-11 disabled:bg-gray-100 disabled:text-gray-400"
               >
                 <option value="">Select class</option>
                 {classes.map((classroom) => (
@@ -607,8 +592,8 @@ function NoticesSection({
                     {classroom.name}
                   </option>
                 ))}
-              </select>
-            </label>
+              </Select>
+            </FormField>
           </div>
 
           {notice.audienceType === 'SECTION' ? (
@@ -652,7 +637,7 @@ function NoticesSection({
               />
             </div>
             {notice.scheduleMode === 'LATER' ? (
-              <input
+              <Input
                 type="datetime-local"
                 value={notice.scheduledFor}
                 onChange={(event) =>
@@ -661,7 +646,7 @@ function NoticesSection({
                     scheduledFor: event.target.value,
                   }))
                 }
-                className="mt-3 min-h-11"
+                className="mt-4"
               />
             ) : null}
           </fieldset>
@@ -735,7 +720,7 @@ function NoticeList({
             </article>
           ))
         ) : (
-          <EmptyState title="No notices yet" body="Publish your first notice to start building the communication timeline." />
+          <EmptyState title="No notices yet" description="Publish your first notice to start building the communication timeline." />
         )}
       </div>
     </section>
@@ -776,30 +761,28 @@ function EventsSection({
           description="Add calendar-ready events and notify the correct audience."
         />
 
-        <div className="mt-6 grid gap-4">
-          <label>
-            <span className="label mb-2 block">Event title</span>
-            <input
+        <div className="mt-6 space-y-6">
+          <FormField label="Event Title" description="Keep it short and descriptive.">
+            <Input
               value={event.title}
               onChange={(inputEvent) =>
                 setEvent((current) => ({ ...current, title: inputEvent.target.value }))
               }
-              placeholder="Example: First terminal exam"
-              className="min-h-11"
+              placeholder="Example: First Terminal Examination 2081"
+              className="h-12"
             />
-          </label>
-          <label>
-            <span className="label mb-2 block">Description</span>
+          </FormField>
+          <FormField label="Description" description="Provide full details about the event.">
             <textarea
               rows={5}
               value={event.description}
               onChange={(inputEvent) =>
                 setEvent((current) => ({ ...current, description: inputEvent.target.value }))
               }
-              placeholder="Event details, instructions, or preparation notes."
-              className="min-h-32"
+              placeholder="Event details, instructions, or preparation notes..."
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium transition-all focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-primary-500/10 min-h-[140px] resize-none"
             />
-          </label>
+          </FormField>
           <div className="grid gap-3 md:grid-cols-2">
             <label>
               <span className="label mb-2 block">Starts at</span>
@@ -824,10 +807,9 @@ function EventsSection({
               />
             </label>
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <label>
-              <span className="label mb-2 block">Event type</span>
-              <select
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField label="Event Type">
+              <Select
                 value={event.eventType}
                 onChange={(inputEvent) =>
                   setEvent((current) => ({
@@ -835,18 +817,28 @@ function EventsSection({
                     eventType: inputEvent.target.value as EventType,
                   }))
                 }
-                className="min-h-11"
               >
-                {eventTypes.map((eventType) => (
-                  <option key={eventType} value={eventType}>
-                    {formatEnumLabel(eventType)}
+                {eventTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {formatEnumLabel(type)}
                   </option>
                 ))}
-              </select>
-            </label>
-            <label>
-              <span className="label mb-2 block">Audience</span>
-              <select
+              </Select>
+            </FormField>
+            <FormField label="Starts At">
+              <Input
+                type="datetime-local"
+                value={event.startsAt}
+                onChange={(inputEvent) =>
+                  setEvent((current) => ({ ...current, startsAt: inputEvent.target.value }))
+                }
+              />
+            </FormField>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <FormField label="Audience">
+              <Select
                 value={event.audienceType}
                 onChange={(inputEvent) =>
                   setEvent((current) => ({
@@ -855,18 +847,16 @@ function EventsSection({
                     sectionId: '',
                   }))
                 }
-                className="min-h-11"
               >
-                {audienceTypes.map((audienceType) => (
-                  <option key={audienceType} value={audienceType}>
-                    {formatEnumLabel(audienceType)}
+                {audienceTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {formatEnumLabel(type)}
                   </option>
                 ))}
-              </select>
-            </label>
-            <label>
-              <span className="label mb-2 block">Class</span>
-              <select
+              </Select>
+            </FormField>
+            <FormField label="Class">
+              <Select
                 value={event.classId}
                 onChange={(inputEvent) =>
                   setEvent((current) => ({
@@ -876,45 +866,54 @@ function EventsSection({
                   }))
                 }
                 disabled={event.audienceType === 'ALL'}
-                className="min-h-11 disabled:bg-gray-100 disabled:text-gray-400"
               >
                 <option value="">Select class</option>
-                {classes.map((classroom) => (
-                  <option key={classroom.id} value={classroom.id}>
-                    {classroom.name}
+                {classes.map((cls) => (
+                  <option key={cls.id} value={cls.id}>
+                    {cls.name}
                   </option>
                 ))}
-              </select>
-            </label>
-          </div>
-          {event.audienceType === 'SECTION' ? (
-            <label>
-              <span className="label mb-2 block">Section</span>
-              <select
+              </Select>
+            </FormField>
+            <FormField label="Section">
+              <Select
                 value={event.sectionId}
                 onChange={(inputEvent) =>
                   setEvent((current) => ({ ...current, sectionId: inputEvent.target.value }))
                 }
-                className="min-h-11"
+                disabled={event.audienceType !== 'SECTION'}
               >
                 <option value="">Select section</option>
-                {sections.map((section) => (
-                  <option key={section.id} value={section.id}>
-                    {section.name}
+                {sections.map((sec) => (
+                  <option key={sec.id} value={sec.id}>
+                    {sec.name}
                   </option>
                 ))}
-              </select>
-            </label>
-          ) : null}
+              </Select>
+            </FormField>
+          </div>
+
+          <FormField label="Location" description="Physical room or digital link.">
+            <Input
+              value={event.location}
+              onChange={(inputEvent) =>
+                setEvent((current) => ({ ...current, location: inputEvent.target.value }))
+              }
+              placeholder="Example: School Auditorium or Zoom Link"
+              className="h-12"
+            />
+          </FormField>
+
           {eventError ? <InlineMessage tone="error" message={eventError} /> : null}
           {eventSuccess ? <InlineMessage tone="success" message={eventSuccess} /> : null}
+
           <button
             type="button"
-            className="min-h-12 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-12 rounded-2xl bg-slate-900 px-8 font-black text-xs uppercase tracking-widest text-white transition-all hover:bg-slate-800 shadow-lg shadow-slate-900/10 active:scale-95 disabled:opacity-50"
             disabled={isPending}
             onClick={submitEvent}
           >
-            {isPending ? 'Creating...' : 'Create event'}
+            {isPending ? 'Creating...' : 'Create Event'}
           </button>
         </div>
       </div>
@@ -966,7 +965,7 @@ function EventList({
             </article>
           ))
         ) : (
-          <EmptyState title="No events yet" body="Create your first school event and notify the selected audience." />
+          <EmptyState title="No events yet" description="Create your first school event and notify the selected audience." />
         )}
       </div>
     </section>
@@ -1074,7 +1073,7 @@ function DeliveryRecordsSection({
             </article>
           ))
         ) : (
-          <EmptyState title="No delivery records found" body="No records match the current filter selection." />
+          <EmptyState title="No delivery records found" description="No records match the current filter selection." />
         )}
       </div>
     </section>
@@ -1110,135 +1109,109 @@ function ConsentManagementSection({
   captureError: string | null;
   revokeError: string | null;
 }) {
-  const selectedGuardian = guardians.find((guardian) => guardian.id === selectedGuardianId);
-
   return (
-    <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-      <div className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
+    <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.85fr)]">
+      <div className="shell-card rounded-[30px] border border-slate-200 bg-white/90 p-8 shadow-sm backdrop-blur-sm">
         <SectionHeader
           eyebrow="Consent Management"
-          title="Guardian consent controls"
-          description="Privacy/data processing consent is mandatory for parent app access. Photo usage consent affects Activity Feed visibility."
+          title="Guardian controls"
+          description="Manage and capture legally binding guardian consent for school workflows."
         />
 
-        <div className="mt-6 grid gap-4">
-          <label>
-            <span className="label mb-2 block">Guardian</span>
-            <select
-              value={selectedGuardianId}
-              onChange={(inputEvent) => setSelectedGuardianId(inputEvent.target.value)}
-              className="min-h-11"
-            >
-              <option value="">Select guardian</option>
-              {guardians.map((guardian) => (
-                <option key={`${guardian.id}-${guardian.studentSystemId}`} value={guardian.id}>
-                  {guardian.fullName} / {guardian.studentName}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="mt-8 space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <FormField label="Select Guardian" description="Find guardian by student.">
+              <Select
+                value={selectedGuardianId}
+                onChange={(event) => setSelectedGuardianId(event.target.value)}
+              >
+                {guardians.map((guardian) => (
+                  <option key={guardian.id} value={guardian.id}>
+                    {guardian.fullName} ({guardian.studentName})
+                  </option>
+                ))}
+              </Select>
+            </FormField>
 
-          {selectedGuardian ? (
-            <div className="rounded-3xl border border-[var(--line)] bg-gray-50 p-4">
-              <p className="text-sm font-semibold text-gray-950">{selectedGuardian.fullName}</p>
-              <p className="mt-1 text-sm text-[var(--muted)]">
-                Guardian of {selectedGuardian.studentName} / {selectedGuardian.studentSystemId}
-              </p>
-            </div>
-          ) : null}
+            <FormField label="Consent Type" description="Workflow category.">
+              <Select
+                value={selectedConsentType}
+                onChange={(event) => setSelectedConsentType(event.target.value)}
+              >
+                {consentTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {formatEnumLabel(type)}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          </div>
 
-          <label>
-            <span className="label mb-2 block">Consent type</span>
-            <select
-              value={selectedConsentType}
-              onChange={(inputEvent) => setSelectedConsentType(inputEvent.target.value)}
-              className="min-h-11"
-            >
-              {consentTypes.map((consentType) => (
-                <option key={consentType} value={consentType}>
-                  {formatEnumLabel(consentType)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="grid gap-2 md:grid-cols-2">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end pt-6 border-t border-slate-100">
             <button
               type="button"
-              className="min-h-11 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!selectedGuardianId || capturePending}
-              onClick={captureConsent}
+              className="min-h-12 rounded-2xl border-2 border-rose-100 bg-rose-50 px-6 font-black text-xs uppercase tracking-widest text-rose-600 transition-all hover:bg-rose-100 active:scale-95 disabled:opacity-50"
+              disabled={revokePending || !selectedGuardianId}
+              onClick={revokeConsent}
             >
-              {capturePending ? 'Capturing...' : 'Capture consent'}
+              {revokePending ? 'Revoking...' : 'Revoke Consent'}
             </button>
             <button
               type="button"
-              className="min-h-11 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!selectedGuardianId || revokePending}
-              onClick={revokeConsent}
+              className="min-h-12 rounded-2xl bg-slate-900 px-8 font-black text-xs uppercase tracking-widest text-white transition-all hover:bg-slate-800 shadow-lg shadow-slate-900/10 active:scale-95 disabled:opacity-50"
+              disabled={capturePending || !selectedGuardianId}
+              onClick={captureConsent}
             >
-              {revokePending ? 'Revoking...' : 'Revoke consent'}
+              {capturePending ? 'Capturing...' : 'Capture Consent'}
             </button>
           </div>
 
-          {captureError ? <InlineMessage tone="error" message={captureError} /> : null}
-          {revokeError ? <InlineMessage tone="error" message={revokeError} /> : null}
-          {guardians.length === 0 ? (
-            <EmptyState
-              title="No guardians yet"
-              body="Admit a student with guardian details first."
-            />
+          {captureError || revokeError ? (
+            <InlineMessage tone="error" message={captureError || revokeError || ''} />
           ) : null}
         </div>
       </div>
 
-      <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
+      <div className="shell-card rounded-[30px] border border-slate-200 bg-slate-50/50 p-8 shadow-sm xl:sticky xl:top-28 xl:self-start">
         <SectionHeader
-          eyebrow="Consent Status"
-          title="Current guardian permissions"
-          description="Review which consent types are currently granted or revoked."
+          eyebrow="Active Consents"
+          title="Guardian status"
+          description="Current legal standing for selected guardian."
         />
 
-        <div className="mt-5 grid gap-3">
+        <div className="mt-6 space-y-4">
           {statusesLoading ? (
-            <SkeletonList />
+            <LoadingState variant="spinner" label="Fetching status..." />
           ) : statuses.length > 0 ? (
-            statuses.map((status) => (
-              <article
+            statuses.map((status: any) => (
+              <div
                 key={status.consentType}
-                className="rounded-3xl border border-[var(--line)] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-3 transition-all hover:border-slate-300"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <p className="font-semibold text-gray-950">{formatEnumLabel(status.consentType)}</p>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      status.granted
-                        ? 'bg-emerald-50 text-emerald-700'
-                        : 'bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    {status.granted ? 'Granted' : 'Not granted'}
-                  </span>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-black text-slate-900">{formatEnumLabel(status.consentType)}</p>
+                  <Badge variant={status.granted ? 'success' : 'destructive'} className="font-black uppercase tracking-widest text-[10px]">
+                    {status.granted ? 'Granted' : 'Revoked'}
+                  </Badge>
                 </div>
-                <p className="mt-2 text-sm text-[var(--muted)]">
-                  Version: {status.version ?? 'no version'}
-                </p>
-                <p className="mt-1 text-xs text-[var(--muted)]">
-                  {status.capturedAt ? `Captured ${formatDateTime(status.capturedAt)}` : 'Not captured'}
-                  {status.revokedAt ? ` / Revoked ${formatDateTime(status.revokedAt)}` : ''}
-                </p>
-              </article>
+                <div className="pt-3 border-t border-slate-50 flex items-center justify-between">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Version {status.version ?? 'N/A'}
+                  </p>
+                  <p className="text-[10px] font-black text-slate-400">
+                    {status.capturedAt ? formatDateTime(status.capturedAt) : 'Never captured'}
+                  </p>
+                </div>
+              </div>
             ))
-          ) : selectedGuardianId ? (
-            <EmptyState title="No consent records" body="No consent records have been captured for this guardian yet." />
           ) : (
-            <EmptyState
-              title="Select a guardian"
-              body="Choose a guardian to review consent status."
+            <EmptyState 
+              title={selectedGuardianId ? "No consent records" : "Select a guardian"} 
+              description={selectedGuardianId ? "No consent records have been captured for this guardian yet." : "Choose a guardian to review consent status."} 
             />
           )}
         </div>
-      </section>
+      </div>
     </section>
   );
 }
@@ -1382,14 +1355,7 @@ function InlineMessage({
   return <p className={`rounded-2xl border px-4 py-3 text-sm font-medium ${className}`}>{message}</p>;
 }
 
-function EmptyState({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="rounded-3xl border border-dashed border-[var(--line)] bg-gray-50/70 p-5 text-sm">
-      <p className="font-semibold text-gray-950">{title}</p>
-      <p className="mt-1 leading-6 text-[var(--muted)]">{body}</p>
-    </div>
-  );
-}
+// Removed local EmptyState
 
 function SkeletonList() {
   return (

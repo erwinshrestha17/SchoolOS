@@ -15,12 +15,11 @@ import { StaffAttendanceSummary } from './staff-attendance-summary';
 import { LeaveBalanceList } from './leave-balance-list';
 import { PayrollRuns } from './payroll-runs';
 import { SalaryStructureList } from './salary-structure-list';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 
 type TabId = 'staff' | 'contracts' | 'leave' | 'attendance' | 'balances' | 'salary' | 'payroll';
 
 export function HRWorkspace() {
-  const [activeTab, setActiveTab] = useState<TabId>('staff');
-
   const tabs = [
     { id: 'staff' as TabId, label: 'Staff Directory', icon: Users },
     { id: 'contracts' as TabId, label: 'Contracts', icon: FileText },
@@ -33,40 +32,47 @@ export function HRWorkspace() {
 
   return (
     <div className="space-y-6">
-      {/* Tab Navigation */}
-      <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-px">
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
+      <Tabs defaultValue="staff" className="space-y-6">
+        <TabsList className="flex flex-wrap h-auto gap-2 border-b border-slate-200 bg-transparent rounded-none p-0 pb-px w-full justify-start">
+          {tabs.map((tab) => (
+            <TabsTrigger
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`group flex items-center gap-2.5 border-b-2 px-4 py-3 text-sm font-medium transition-all ${
-                isActive
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-              }`}
+              value={tab.id}
+              className="group flex items-center gap-2.5 border-b-2 border-transparent px-4 py-3 text-sm font-medium transition-all rounded-none data-[state=active]:border-primary-600 data-[state=active]:text-primary-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-slate-700"
             >
               <tab.icon
                 size={18}
-                className={isActive ? 'text-primary-600' : 'text-gray-400 group-hover:text-gray-500'}
+                className="text-slate-400 group-data-[state=active]:text-primary-600 group-hover:text-slate-500"
               />
               {tab.label}
-            </button>
-          );
-        })}
-      </div>
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {/* Tab Content */}
-      <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-        {activeTab === 'staff' && <StaffList />}
-        {activeTab === 'contracts' && <ContractList />}
-        {activeTab === 'leave' && <LeaveRequestList />}
-        {activeTab === 'attendance' && <StaffAttendanceSummary />}
-        {activeTab === 'balances' && <LeaveBalanceList />}
-        {activeTab === 'salary' && <SalaryStructureList />}
-        {activeTab === 'payroll' && <PayrollRuns />}
-      </div>
+        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <TabsContent value="staff" className="mt-0">
+            <StaffList />
+          </TabsContent>
+          <TabsContent value="contracts" className="mt-0">
+            <ContractList />
+          </TabsContent>
+          <TabsContent value="leave" className="mt-0">
+            <LeaveRequestList />
+          </TabsContent>
+          <TabsContent value="attendance" className="mt-0">
+            <StaffAttendanceSummary />
+          </TabsContent>
+          <TabsContent value="balances" className="mt-0">
+            <LeaveBalanceList />
+          </TabsContent>
+          <TabsContent value="salary" className="mt-0">
+            <SalaryStructureList />
+          </TabsContent>
+          <TabsContent value="payroll" className="mt-0">
+            <PayrollRuns />
+          </TabsContent>
+        </div>
+      </Tabs>
     </div>
   );
 }

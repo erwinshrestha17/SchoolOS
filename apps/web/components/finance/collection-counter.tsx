@@ -5,6 +5,9 @@ import { SectionCard } from '@/components/ui/section-card';
 import { Badge } from '@/components/ui/badge';
 import { Wallet, Search, CreditCard, Banknote, History, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Input } from '../ui/input';
+import { LoadingState } from '../ui/loading-state';
+import { EmptyState } from '../ui/empty-state';
 
 interface CollectionCounterProps {
   onSearch: (query: string) => void;
@@ -39,8 +42,8 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading }: 
       <SectionCard title="Search & Select" description="Find student or invoice">
         <div className="space-y-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <input
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <Input
               type="text"
               value={searchQuery}
               onChange={(e) => {
@@ -48,7 +51,7 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading }: 
                 onSearch(e.target.value);
               }}
               placeholder="Student name, ID, or Invoice #"
-              className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50 border-slate-100 rounded-xl focus:ring-1 focus:ring-slate-900"
+              className="pl-11"
             />
           </div>
 
@@ -61,31 +64,37 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading }: 
                   setAmount(inv.outstandingAmount);
                 }}
                 className={cn(
-                  "w-full flex items-start justify-between p-4 rounded-2xl border text-left transition-all",
+                  "w-full flex items-start justify-between p-4 rounded-2xl border text-left transition-all group",
                   selectedInvoice?.id === inv.id
-                    ? "bg-slate-900 border-slate-900 text-white shadow-lg"
-                    : "bg-white border-slate-100 hover:border-slate-200 text-slate-900"
+                    ? "bg-slate-900 border-slate-900 text-white shadow-xl shadow-slate-900/10 scale-[1.02] z-10"
+                    : "bg-white border-slate-100 hover:border-slate-200 text-slate-900 hover:bg-slate-50/50"
                 )}
               >
                 <div>
-                  <p className="text-sm font-bold truncate max-w-[200px]">{inv.student?.name || 'Unknown'}</p>
+                  <p className="text-sm font-black truncate max-w-[200px]">{inv.student?.name || 'Unknown'}</p>
                   <p className={cn(
-                    "text-[0.65rem] font-bold uppercase tracking-wider mt-0.5",
+                    "text-[0.65rem] font-black uppercase tracking-widest mt-1",
                     selectedInvoice?.id === inv.id ? "text-slate-400" : "text-slate-500"
                   )}>
                     {inv.invoiceNumber} • {inv.student?.studentSystemId}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-black">{formatCurrency(inv.outstandingAmount)}</p>
-                  <Badge variant={inv.status === 'PARTIAL' ? 'warning' : 'destructive'} className="mt-1 h-5 text-[0.6rem]">
+                  <p className="text-sm font-black tabular-nums">{formatCurrency(inv.outstandingAmount)}</p>
+                  <Badge variant={inv.status === 'PARTIAL' ? 'warning' : 'destructive'} className="mt-1.5 h-5 text-[0.6rem] font-black uppercase tracking-widest">
                     {inv.status}
                   </Badge>
                 </div>
               </button>
             ))}
+            {isLoading && (
+              <LoadingState variant="spinner" label="Finding invoices..." />
+            )}
             {invoices.length === 0 && !isLoading && (
-              <p className="text-sm text-slate-500 text-center py-8">No outstanding invoices found.</p>
+              <EmptyState 
+                title="No invoices" 
+                description="No outstanding records match."
+              />
             )}
           </div>
         </div>
@@ -119,13 +128,13 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading }: 
             <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-3">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Payment Amount</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-slate-400">NPR</span>
-                  <input
+                <div className="relative group">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400 uppercase tracking-widest pointer-events-none group-focus-within:text-primary-600 transition-colors">NPR</span>
+                  <Input
                     type="number"
                     value={amount}
                     onChange={(e) => setAmount(Number(e.target.value))}
-                    className="w-full pl-16 pr-4 py-4 text-2xl font-black bg-white border-2 border-slate-100 rounded-2xl focus:border-slate-900 transition-all"
+                    className="pl-16 text-2xl font-black h-16 rounded-2xl"
                   />
                 </div>
               </div>

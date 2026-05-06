@@ -3,7 +3,11 @@
 import type { ApiResponse } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { RefreshCcw } from 'lucide-react';
+import { RefreshCcw, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { Badge } from '../ui/badge';
+import { LoadingState } from '../ui/loading-state';
+import { EmptyState } from '../ui/empty-state';
+import { cn } from '../../lib/utils';
 
 import { api } from '../../lib/api';
 import { useSession } from '../session-provider';
@@ -83,38 +87,38 @@ export function DeliveryRetryPanel() {
   );
 
   return (
-    <section className="rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <section className="shell-card rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-sm">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <span className="inline-flex rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-100">
-            Delivery Retry / Resend
+          <span className="inline-flex rounded-full bg-rose-50 px-4 py-1.5 text-[0.65rem] font-black uppercase tracking-widest text-rose-700 border border-rose-100">
+            Delivery Health
           </span>
-          <h2 className="mt-3 text-xl font-bold text-gray-950">
-            Failed and retrying delivery records
+          <h2 className="mt-4 text-2xl font-black text-slate-900">
+            Retry failed records
           </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-500">
-            Retry failed notification deliveries without rebuilding notices. All retry actions use tenant-scoped backend endpoints and are audited.
+          <p className="mt-2 max-w-2xl text-sm font-medium text-slate-500">
+            Manage and resolve delivery gaps. Failed notifications can be retried individually or in batches.
           </p>
         </div>
 
         <button
           type="button"
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-12 items-center justify-center gap-3 rounded-2xl bg-slate-900 px-8 font-black text-xs uppercase tracking-widest text-white transition-all hover:bg-slate-800 shadow-lg shadow-slate-900/10 active:scale-95 disabled:opacity-50"
           disabled={failedDeliveries.length === 0 || retryAllMutation.isPending}
           onClick={() => retryAllMutation.mutate()}
         >
-          <RefreshCcw size={16} className={retryAllMutation.isPending ? 'animate-spin' : ''} />
+          <RefreshCcw size={14} className={cn("stroke-[3]", retryAllMutation.isPending ? 'animate-spin' : '')} />
           {retryAllMutation.isPending
-            ? 'Retrying failed...'
-            : `Retry all failed (${failedDeliveries.length})`}
+            ? 'Retrying Batch...'
+            : `Retry All Failed (${failedDeliveries.length})`}
         </button>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-4">
-        <RetryMetric label="Total" value={String(deliveries.length)} />
-        <RetryMetric label="Failed" value={String(failedDeliveries.length)} tone="danger" />
-        <RetryMetric label="Retrying" value={String(retryingDeliveries.length)} tone="warning" />
-        <RetryMetric label="Retryable" value={String(retryableDeliveries.length)} tone="info" />
+      <div className="mt-8 grid gap-4 sm:grid-cols-4">
+        <RetryMetric label="Total Records" value={String(deliveries.length)} icon={<Clock size={16} />} />
+        <RetryMetric label="Failed" value={String(failedDeliveries.length)} tone="danger" icon={<AlertCircle size={16} />} />
+        <RetryMetric label="Retrying" value={String(retryingDeliveries.length)} tone="warning" icon={<RefreshCcw size={16} />} />
+        <RetryMetric label="Recoverable" value={String(retryableDeliveries.length)} tone="info" icon={<CheckCircle2 size={16} />} />
       </div>
 
       {retryMutation.isError ? (
@@ -136,22 +140,20 @@ export function DeliveryRetryPanel() {
         />
       ) : null}
 
-      <div className="mt-5 overflow-hidden rounded-3xl border border-gray-100">
+      <div className="mt-8 overflow-hidden rounded-[2rem] border border-slate-100 bg-slate-50/50">
         {deliveriesQuery.isLoading ? (
-          <div className="p-6 text-sm text-gray-500">Loading delivery records...</div>
+          <LoadingState variant="spinner" label="Gathering delivery history..." />
         ) : deliveriesQuery.isError ? (
-          <div className="p-6 text-sm text-rose-700">
-            Could not load delivery records: {deliveriesQuery.error.message}
+          <div className="p-8 text-center">
+            <p className="text-sm font-bold text-rose-600">Failed to sync delivery records.</p>
           </div>
         ) : retryableDeliveries.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="text-sm font-semibold text-gray-950">No failed or retrying deliveries</p>
-            <p className="mt-1 text-sm text-gray-500">
-              Delivery records that need manual retry will appear here.
-            </p>
-          </div>
+          <EmptyState 
+            title="All systems clear" 
+            description="No failed or retrying notifications found in recent history." 
+          />
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-slate-100">
             {retryableDeliveries.slice(0, 25).map((delivery) => (
               <article
                 key={delivery.id}
@@ -210,23 +212,28 @@ export function DeliveryRetryPanel() {
 function RetryMetric({
   label,
   value,
+  icon,
   tone = 'neutral',
 }: {
   label: string;
   value: string;
+  icon: React.ReactNode;
   tone?: 'neutral' | 'danger' | 'warning' | 'info';
 }) {
   const toneClass = {
-    neutral: 'bg-gray-50 text-gray-700',
-    danger: 'bg-rose-50 text-rose-700',
-    warning: 'bg-amber-50 text-amber-700',
-    info: 'bg-blue-50 text-blue-700',
+    neutral: 'bg-slate-50 text-slate-700 border-slate-100',
+    danger: 'bg-rose-50 text-rose-700 border-rose-100',
+    warning: 'bg-amber-50 text-amber-700 border-amber-100',
+    info: 'bg-primary-50 text-primary-700 border-primary-100',
   }[tone];
 
   return (
-    <div className={`rounded-2xl p-4 ${toneClass}`}>
-      <p className="text-xs font-semibold uppercase tracking-wide opacity-70">{label}</p>
-      <p className="mt-1 text-2xl font-bold">{value}</p>
+    <div className={cn("rounded-2xl p-5 border transition-all hover:shadow-md hover:shadow-slate-200/50 group", toneClass)}>
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-black uppercase tracking-widest opacity-60">{label}</p>
+        <span className="opacity-40 group-hover:opacity-100 transition-opacity">{icon}</span>
+      </div>
+      <p className="mt-2 text-2xl font-black tabular-nums tracking-tight">{value}</p>
     </div>
   );
 }

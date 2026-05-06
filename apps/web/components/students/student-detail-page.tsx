@@ -8,7 +8,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ProfileHeader } from './profile/profile-header';
 import { LifecyclePanel } from './profile/lifecycle-panel';
 import { StudentEditCard } from './profile/student-edit-card';
-import * as Tabs from './profile/tabs';
+import * as ProfileTabs from './profile/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { 
   UpdateStudentProfilePayload, 
   UpdateStudentGuardianPayload, 
@@ -39,7 +40,6 @@ const detailTabs = [
 type DetailTab = (typeof detailTabs)[number];
 
 export function StudentDetailPage({ studentId }: { studentId: string }) {
-  const [activeTab, setActiveTab] = useState<DetailTab>('Overview');
   const [pdfError, setPdfError] = useState('');
   const [isEditingStudent, setIsEditingStudent] = useState(false);
   const [editingGuardianId, setEditingGuardianId] = useState<string | null>(null);
@@ -144,49 +144,59 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
         message={lifecycleMessage}
       />
 
-      <div className="flex flex-wrap gap-2 rounded-[2rem] border border-slate-200 bg-white/50 p-2 backdrop-blur-sm">
-        {detailTabs.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            className={cn(
-              "flex-1 min-h-[3rem] rounded-[1.5rem] px-6 text-sm font-bold transition-all",
-              activeTab === tab ? "bg-slate-900 text-white shadow-lg" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-            )}
-            onClick={() => setActiveTab(tab)}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
+      <Tabs defaultValue="Overview" className="space-y-8">
+        <TabsList className="flex h-auto flex-wrap gap-2 rounded-[2rem] border border-slate-200 bg-white/50 p-2 backdrop-blur-sm w-full justify-start">
+          {detailTabs.map((tab) => (
+            <TabsTrigger
+              key={tab}
+              value={tab}
+              className="flex-1 min-h-[3rem] rounded-[1.5rem] px-6 text-sm font-bold transition-all data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 bg-transparent shadow-none"
+            >
+              {tab}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      <div className="min-h-[400px]">
-        {activeTab === 'Overview' && <Tabs.OverviewTab profile={profile} />}
-        {activeTab === 'Guardians' && (
-          <Tabs.GuardiansTab 
-            guardians={profile.guardians}
-            editingGuardianId={editingGuardianId}
-            isSaving={guardianUpdateMutation.isPending}
-            error={guardianUpdateMutation.error}
-            onCancelEdit={() => setEditingGuardianId(null)}
-            onEditGuardian={setEditingGuardianId}
-            onSaveGuardian={(id, body) => guardianUpdateMutation.mutate({ guardianId: id, body })}
-          />
-        )}
-        {activeTab === 'Health' && <Tabs.HealthTab profile={profile} />}
-        {activeTab === 'Documents' && (
-          <Tabs.DocumentsTab 
-            studentId={studentId}
-            documents={profile.documents}
-            generatedDocuments={profile.generatedDocuments}
-            onOpenPdf={openStudentPdf}
-          />
-        )}
-        {activeTab === 'Fees' && <Tabs.FeesTab studentId={studentId} invoices={profile.invoices} />}
-        {activeTab === 'Attendance' && <Tabs.AttendanceTab studentId={studentId} />}
-        {activeTab === 'Activity' && <Tabs.ActivityTab posts={profile.activityPosts} />}
-        {activeTab === 'History' && <Tabs.HistoryTab profile={profile} />}
-      </div>
+        <div className="min-h-[400px]">
+          <TabsContent value="Overview" className="mt-0">
+            <ProfileTabs.OverviewTab profile={profile} />
+          </TabsContent>
+          <TabsContent value="Guardians" className="mt-0">
+            <ProfileTabs.GuardiansTab 
+              guardians={profile.guardians}
+              editingGuardianId={editingGuardianId}
+              isSaving={guardianUpdateMutation.isPending}
+              error={guardianUpdateMutation.error}
+              onCancelEdit={() => setEditingGuardianId(null)}
+              onEditGuardian={setEditingGuardianId}
+              onSaveGuardian={(id, body) => guardianUpdateMutation.mutate({ guardianId: id, body })}
+            />
+          </TabsContent>
+          <TabsContent value="Health" className="mt-0">
+            <ProfileTabs.HealthTab profile={profile} />
+          </TabsContent>
+          <TabsContent value="Documents" className="mt-0">
+            <ProfileTabs.DocumentsTab 
+              studentId={studentId}
+              documents={profile.documents}
+              generatedDocuments={profile.generatedDocuments}
+              onOpenPdf={openStudentPdf}
+            />
+          </TabsContent>
+          <TabsContent value="Fees" className="mt-0">
+            <ProfileTabs.FeesTab studentId={studentId} invoices={profile.invoices} />
+          </TabsContent>
+          <TabsContent value="Attendance" className="mt-0">
+            <ProfileTabs.AttendanceTab studentId={studentId} />
+          </TabsContent>
+          <TabsContent value="Activity" className="mt-0">
+            <ProfileTabs.ActivityTab posts={profile.activityPosts} />
+          </TabsContent>
+          <TabsContent value="History" className="mt-0">
+            <ProfileTabs.HistoryTab profile={profile} />
+          </TabsContent>
+        </div>
+      </Tabs>
     </div>
   );
 }
