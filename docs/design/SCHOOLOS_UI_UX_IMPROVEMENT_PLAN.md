@@ -971,6 +971,16 @@ Usually replies within 1 school day.
 
 Transport UX can become one of SchoolOS’s most unique features. It should support admin route control, parent child-specific tracking, and driver trip workflows.
 
+### Current Implementation Snapshot
+
+As of May 6, 2026, the web admin dashboard has a Phase 3 operations polish foundation:
+
+- Overview cards for Active Trips, Delayed Routes, Students Onboard, Students Not Boarded, Vehicles Active, and Drivers Online.
+- Admin trip monitor and trip history sections backed by existing Transport APIs.
+- Readable status badges for ready, arriving, onboard, dropped, delayed, completed, active, and cancelled states where current data supports them.
+- Parent tracking controls placeholder with explicit child-scoped privacy copy.
+- Live map/WebSocket UI and driver app remain later scope.
+
 ### Admin Transport Dashboard
 
 Cards:
@@ -1051,6 +1061,15 @@ End Trip
 
 Library can remain a later/locked module initially, but future UX should support book inventory, issue/return, overdue tracking, and borrowing history.
 
+### Current Implementation Snapshot
+
+As of May 6, 2026, the web admin dashboard has a Library admin foundation:
+
+- Books, copies, issue/return, and overdue views use real Library APIs.
+- Book list rows show title, author, ISBN, category, total copies, available copies, and status/action area.
+- Copy and issue statuses use readable badges, including a clearer overdue badge.
+- Placeholder foundation cards exist for Students with borrowed books, Fine records, and Library reports with “Backend endpoint pending.”
+
 ### Main Screens
 
 ```text
@@ -1090,6 +1109,16 @@ Action
 ### Purpose
 
 Canteen UX should support meal plans, student meal tracking, canteen wallet, daily meal reports, and parent spending controls.
+
+### Current Implementation Snapshot
+
+As of May 6, 2026, the web admin dashboard has a Canteen admin foundation:
+
+- Overview cards for Active Menu Items, Active Meal Plans, Meals Served Today, Wallet Low, Blocked by Limit, and Allergy Warnings.
+- Student ID / QR-style serving panel uses the existing serve meal API and normal student selector.
+- Allergy warning, wallet low, serving, menu, plan, enrollment, POS, and control badges are visible where backend data supports them.
+- Spending controls and AccountingPostingService/backend-controlled copy are visible.
+- Inventory tracking is explicitly marked later after menu, wallet, POS, and reports stabilize.
 
 ### Parent/Student UX
 
@@ -1693,6 +1722,13 @@ Deliverables:
 ## Phase UI-7: Operations UX
 
 Goal: improve school operations modules.
+
+Current status:
+
+```text
+Sprint 1 complete for web admin Library, Transport, and Canteen polish.
+Parent/mobile portal, driver app, live map/WebSocket UI, full canteen inventory/vendor workflows, and AI/ML remain out of scope.
+```
 
 Tasks:
 

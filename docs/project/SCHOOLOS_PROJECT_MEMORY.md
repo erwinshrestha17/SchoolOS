@@ -33,15 +33,15 @@ SchoolOS is organized into these production modules:
 | M1 | Admissions & Student Profiles | Enrollment, guardian records, documents, student photo, student lifecycle, transfers, ID cards, certificates, and iEMIS-ready student data. | Phase 1A/1B |
 | M2 | Smart Attendance | 3-tap attendance, absence/late/leave tracking, correction workflow, monthly attendance history, parent alerts, and attendance reports. | Phase 1A/1B |
 | M3 | Fees & Receipts | Fee setup, billing runs, invoices, dues, discounts, waivers, payments, receipts, defaulter tracking, cashier/day-end reports, and fee ledger foundation. | Phase 1A/1B |
-| M4 | Exams, CAS & Report Cards | Exam setup, marks entry, CAS tracking, grading, report cards, academic reports, promotion support, and parent result notifications. | Phase 2 |
+| M4 | Exams, CAS & Report Cards | Exam setup, marks entry, CAS tracking, grading, report cards, academic reports, promotion support, and parent result notifications. | Phase 2 foundation implemented |
 | M5 | Activity Feed & Milestones | Classroom photos, child-specific posts, daily updates, developmental milestones, signed media preview, parent engagement, and future AI captions after media stability. | Phase 1A/1B |
-| M6 | Homework & Timetable | Homework assignments, reminders, submission tracking, timetable planning, teacher schedule conflict detection, and substitution support. | Phase 2 |
-| M7 | HR & Payroll | Staff profiles, staff attendance, leave, salary structures, payroll processing, salary slips, PF/TDS support, and payroll-to-accounting integration. | Phase 2 |
-| M8A | Library Management | Book catalog, QR/barcode copy tracking, issue/return workflow, overdue fines, lost book charges, book history, and library reports. | Phase 3 |
-| M8B | Transport Management | Routes, stops, vehicles, drivers, student transport enrollment, boarding/drop tracking, parent notifications, live GPS tracking, ETA, and trip history. | Phase 3 |
-| M8C | Canteen Management | Menu management, meal plans, student meal enrollment, QR/student ID meal serving, wallet/POS sales, parent controls, allergy warnings, inventory, vendor purchases, and fee/accounting integration. | Phase 3 |
-| M9 | Accounting & Finance | Double-entry ledger, chart of accounts, journal posting, receipt/payment linkage, reversal/correction workflow, trial balance, day-end reports, audit-ready records, and full Phase 2 accounting expansion. | Phase 2 |
-| M10 | Notices & Communication | Notices, announcements, notification center, read/unread tracking, consent management, delivery records, retry/resend UI, real SMS/FCM/email provider integration later, and Parent–Class Teacher Chat with school-configured chat hours. | Phase 1A/1B + Phase 2/3 chat expansion |
+| M6 | Homework & Timetable | Homework assignments, reminders, submission tracking, timetable planning, teacher schedule conflict detection, and substitution support. | Phase 2 foundation implemented |
+| M7 | HR & Payroll | Staff profiles, staff attendance, leave, salary structures, payroll processing, salary slips, PF/TDS support, and payroll-to-accounting integration. | Phase 2 foundation implemented |
+| M8A | Library Management | Book catalog, QR/barcode copy tracking, issue/return workflow, overdue fines, lost book charges, book history, and library reports. | Phase 3 admin foundation implemented |
+| M8B | Transport Management | Routes, stops, vehicles, drivers, student transport enrollment, boarding/drop tracking, parent notifications, live GPS tracking, ETA, and trip history. | Phase 3 admin foundation implemented; live/parent/driver later |
+| M8C | Canteen Management | Menu management, meal plans, student meal enrollment, QR/student ID meal serving, wallet/POS sales, parent controls, allergy warnings, inventory, vendor purchases, and fee/accounting integration. | Phase 3 admin foundation implemented; inventory/vendor later |
+| M9 | Accounting & Finance | Double-entry ledger, chart of accounts, journal posting, receipt/payment linkage, reversal/correction workflow, trial balance, day-end reports, audit-ready records, and full Phase 2 accounting expansion. | Phase 2 foundation implemented; hardening priority |
+| M10 | Notices & Communication | Notices, announcements, notification center, read/unread tracking, consent management, delivery records, retry/resend UI, real SMS/FCM/email provider integration later, and Parent–Class Teacher Chat with school-configured chat hours. | Phase 1A/1B + chat foundation implemented |
 
 Public website / landing-page module card order:
 
@@ -333,15 +333,15 @@ ChatEscalation
 Current stage:
 
 ```text
-Phase 1A completed → Phase 1B completed → Phase 2 Transition Readiness
+Phase 1A completed → Phase 1B completed → Phase 2 implemented foundations → Phase 3 operations admin foundations
 ```
 
 Phase meaning:
 
 - Phase 1A = core live-school workflows working end-to-end.
 - Phase 1B = complete Phase 1 operational depth, reports, detail pages, management actions, exports, polish, and stronger real-world UX.
-- Phase 2 = Academics, Timetable/Homework, HR/Payroll, full M9 Accounting.
-- Phase 3 = Library, Transport including live GPS tracking, Canteen Management, parent child-specific vehicle tracking, and parent/mobile expansion.
+- Phase 2 = Academics, Timetable/Homework, HR/Payroll, full M9 Accounting, and parent communication expansion. Core foundations now exist and need hardening.
+- Phase 3 = Library, Transport, and Canteen admin foundations now exist. Live GPS tracking UI, driver app, parent child-specific tracking, full inventory/vendor workflows, and parent/mobile expansion remain later.
 - Phase 4 = AI/ML features and scale optimizations.
 
 ## Standard Verification Commands
@@ -370,7 +370,7 @@ pnpm smoke:phase1
 - API supports both httpOnly cookie auth and bearer tokens for future mobile/API clients.
 - CORS/credentials adjusted for browser auth.
 - Docker Postgres/Redis smoke script added.
-- `verify:production` script exists and passes.
+- `verify:production` script exists. Focused web lint/typecheck/build succeeded for recent operations work; full production verification currently needs unrelated web contract-test drift resolved before it can be treated as fully green.
 - PDF response validation added.
 - Student ID card and receipt PDFs open successfully after manual test.
 - API error parsing improved to avoid raw JSON blobs in UI.
@@ -603,11 +603,11 @@ Phase 1B operational depth, reports, detail pages, management actions, exports, 
 - Global academic year context.
 - School branding and settings.
 
-### Known Gaps / Deferred Phase 1B Items
-- **Student Photo Upload:** Deferred to Phase 2 for better storage-backed implementation. Current avatars use student initials.
-- **Logo Upload:** Deferred to Phase 2.
-- **iEMIS Export Format:** Deferred.
-- **Duplicate Merge Workflow:** Deferred.
+### Known Gaps / Hardening Items
+- **Student Photo Upload:** Storage-backed implementation still needs production hardening where enabled.
+- **Logo Upload:** Branding upload needs production storage and tenant boundary review where enabled.
+- **iEMIS Export Format:** Needs final field mapping/validation against live school requirements.
+- **Duplicate Merge Workflow:** Needs careful audit, permission, and rollback review before broader pilot use.
 - **Sprint 5: Student & Attendance UI Modernization** - [x] Completed
 - **Sprint 6: Activity, Homework, and Timetable Modernization** - [x] Completed
   - Refactored Activity Feed with high-density `SectionCard` layouts.
@@ -615,10 +615,10 @@ Phase 1B operational depth, reports, detail pages, management actions, exports, 
   - Refactored Timetable Builder with conflict validation and versioning UI.
   - Standardized student-facing Homework and Timetable views.
   - Adopted shared `FormField`, `Input`, `Select`, and `TextArea` primitives.
-- **Applied (Web Admin)**: ~95% (Shell, Students, Attendance, Finance, Notices, Settings, Activity, Homework, Timetable completed)
-- **Remaining**: ~5% (HR, Payroll, Accounting, Reports)
+- **Applied (Web Admin)**: broad admin foundations now cover Phase 1, Phase 2, and Phase 3 operations modules.
+- **Remaining**: production hardening for accounting, reports/exports, contract-test drift, parent/mobile boundaries, and deeper operation-specific reports.
 
-## Phase 2 — Academic, HR, Timetable, and Accounting Expansion (Next)
+## M8B Transport Management Scope
 
 Transport Management remains inside the NestJS modular monolith. Do not move it to a microservice yet.
 
@@ -871,7 +871,7 @@ Deliverable:
 
 ### Phase 1B — Operational Depth Completion Sprint
 
-Status: Current priority. Do not skip before Phase 2.
+Status: Completed / pilot-ready, with continued hardening during pilot preparation.
 
 Priority order:
 1. Student Management depth.
@@ -888,7 +888,7 @@ Detailed scope:
 - M2: teacher-specific class filtering, monthly register, student attendance history, correction request workflow, CSV/PDF export, parent attendance summary, true offline draft persistence.
 - M3: invoice detail, line items, fee-head dues table, student fee ledger, payment reversal/correction, receipt reprint history, cashier close/day-end, reports, defaulter aging, receipt PDF polish.
 - M5: signed media preview/download, object storage/direct upload, image compression, edit/delete/soft delete, moderation, parent view, teacher gallery, activity detail.
-- M10: notification center, notice detail, read/unread, unread recipient list, retry/resend, consent templates, marketing opt-out. Parent–Class Teacher Chat comes after these basics are stable.
+- M10: notification center, notice detail, read/unread, unread recipient list, retry/resend, consent templates, marketing opt-out, and Parent–Class Teacher Chat foundation.
 - Global UX: student search, academic year context, notification bell, profile page, role switcher, branding/logo settings.
 
 Deliverable:
@@ -896,7 +896,7 @@ Deliverable:
 
 ### Phase 2 — Academics, Timetable, HR/Payroll, Full Accounting
 
-Status: Start only after Phase 1B is completed or explicitly deferred.
+Status: Foundation implemented; production hardening in progress.
 
 Modules:
 - M4 Exams, CAS & Report Cards.
@@ -904,19 +904,24 @@ Modules:
 - M7 HR & Payroll.
 - M9 Accounting & Finance.
 
-Scope:
-- Build exams, CAS, marks entry, report cards, academic reports, promotion workflow.
-- Build homework assignment, submission tracking, reminders, timetable builder, conflict detection, substitution, and Parent–Class Teacher Chat foundation if notification center is stable.
-- Build staff profiles, leave, attendance, salary structures, payroll, salary slips, PF/TDS support.
-- Build M9 chart of accounts, ledger, journals, expense vouchers, bank/cash, reconciliation, trial balance, GL, cash book, income statement, balance sheet, VAT/TDS/PF reports, fiscal period closing.
-- Connect M3 fee payments and M7 payroll to M9 through AccountingPostingService.
+Implemented foundation:
+- M4: subjects, teacher assignments, exam terms, assessment components, marks, CAS, lock/review, report cards, result publishing, promotion, and PDFs.
+- M6: timetable periods/slots/versions, conflict handling, substitutions, homework assignment/submission/review/reminders.
+- M7: staff records, contracts, staff attendance/leave, salary structures, payroll preview/runs/approval/posting, and salary slips.
+- M9: chart of accounts, fiscal years/periods, journal entries/lines, manual journals, expenses, reversals, reconciliation/report surfaces, and `AccountingPostingService` boundary.
+- M10 expansion: parent-class-teacher conversations, messages, participants, read receipts, access rules, and web messaging routes.
+
+Remaining hardening:
+- Prove accounting immutability and posting/reversal correctness under real workflows.
+- Strengthen reports/exports, pagination, indexes, audit depth, and tenant-isolation tests.
+- Resolve contract-test drift and keep production verification green.
 
 Deliverable:
 - Full academic and financial operating system for schools.
 
 ### Phase 3 — Auxiliary Operations and Parent/Mobile Expansion
 
-Status: Future phase after Phase 2 base is stable.
+Status: Admin foundations implemented for Library, Transport, and Canteen. Parent/mobile expansion, driver app, live map/WebSocket UI, full inventory/vendor workflows, and deeper reports remain later.
 
 Modules:
 - M8A Library Management.
@@ -924,11 +929,16 @@ Modules:
 - M8C Canteen Management.
 - Parent/mobile expansion.
 
-Scope:
-- M8A: catalog, copy tracking, QR/barcode issue-return, fines, lost/damaged books, library reports, fee/accounting integration later.
-- M8B: routes, stops, vehicles, drivers, student enrollment, trip start/complete, boarding/drop, parent notifications, live GPS, Redis latest location, WebSocket/SSE, child-specific tracking, ETA, trip history.
-- M8C: menus, meal plans, student meal enrollment, QR meal serving, wallet, POS, parent controls, allergy warnings, inventory, vendors, reports, fee/accounting integration later.
-- Parent/mobile: parent-facing attendance, fees, report cards, activity, transport tracking, canteen wallet/menu, notices, and Parent–Class Teacher Chat with school chat hours.
+Implemented admin foundation:
+- M8A: book catalog, copy tracking, issue/return, overdue list/reminders, readable copy/issue badges, and placeholders for borrowed-student, fine, and report endpoints.
+- M8B: routes/stops, vehicles, driver assignments, student stop assignments, trips, student boarding/drop statuses, logs, location ping/latest-location APIs, reports, admin trip monitor/history, parent-tracking-control placeholder, and safety/privacy copy.
+- M8C: menu items, meal plans, enrollments, meal serving, wallets/top-ups, POS sales, spending controls, reports, allergy/wallet-low badges, QR-style serving foundation, and inventory-later placeholder.
+
+Remaining later scope:
+- Parent/mobile portal and child-scoped transport/canteen/library views.
+- Driver app, live map/WebSocket/SSE tracking UI, ETA, geofence, route deviation, and GPS device integrations.
+- Canteen inventory/vendor purchases and deeper accounting/fee posting integration.
+- Library fine records/reports endpoints and fee/accounting integration.
 
 Deliverable:
 - Complete operational ecosystem beyond core administration, with stronger parent-facing value.
@@ -954,18 +964,14 @@ Deliverable:
 
 ## Next Recommended Work
 
-Do not start Phase 2 yet.
+Do not start broad new scope. Harden the implemented foundations in this order:
 
-Start Phase 1B Completion Sprint with:
-
-1. Student Detail full page + student edit/guardian edit/document manager.
-2. Invoice detail + student fee ledger + payment reversal.
-3. Monthly attendance register + student attendance history.
-4. Notification center + delivery retry/read status.
-5. Signed media preview + activity edit/delete.
-6. Global student search.
-7. Playwright browser smoke tests.
-8. PDF visual polish.
+1. Accounting correctness: immutable journals, reversal/correction flows, posting boundaries, reports, and audit depth.
+2. Production verification: resolve unrelated web contract-test drift and keep `verify:production` fully green.
+3. Reports/exports: pagination, indexing, queue decisions, and backend-generated totals.
+4. Phase 2 admin depth: Academics, Homework/Timetable, HR/Payroll, and Parent–Class Teacher Chat UX and tests.
+5. Phase 3 admin hardening: Library reports/fines, Transport delay/parent-control backend signals, Canteen blocked-limit/inventory/vendor gaps.
+6. Pilot hardening: slow-network UX, realistic school data entry, PDF quality, permission boundaries, and tenant isolation.
 
 ## Development Rules Going Forward
 
@@ -973,7 +979,7 @@ Start Phase 1B Completion Sprint with:
 - UI should consume real APIs, not fake production data.
 - Every tenant-owned table and query must be tenant-scoped.
 - All write operations should be auditable where business-critical.
-- Keep Phase 1B focused before starting Phase 2.
+- Keep existing Phase 2 and Phase 3 admin foundations focused before opening parent/mobile, driver app, live map/WebSocket, inventory/vendor, or AI scope.
 - Do not start AI features until reliable production data exists.
 - Do not migrate to Angular until the product workflow stabilizes.
 - Avoid microservices until operational scale justifies them.

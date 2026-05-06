@@ -545,7 +545,7 @@ Support access tools
 
 ## Near-Term Implementation Recommendation
 
-For the current Phase 2C/2D stage, Settings should evolve in this order:
+For the current implemented-foundations stage, Settings should evolve in this order:
 
 ```text
 1. Keep /dashboard/settings as the school-level settings surface.
@@ -565,7 +565,7 @@ For the current Phase 2C/2D stage, Settings should evolve in this order:
    - System Health
 ```
 
-Do not build all settings at once. Add settings only when they unblock production workflows, pilot onboarding, security hardening, or Phase 2 operational depth.
+Do not build all settings at once. Add settings only when they unblock production workflows, pilot onboarding, security hardening, Phase 2/3 admin hardening, or production verification.
 
 ## Non-Negotiable Rules
 

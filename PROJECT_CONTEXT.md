@@ -40,17 +40,17 @@ SchoolOS is a production-grade, multi-tenant SaaS School Management System for N
 Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
-Current stage: Phase 2 Transition Readiness
+Current stage: Phase 2 implemented foundations + Phase 3 operations admin foundations
 ```
 
-Phase 2 work may continue, but it must stay focused and production-aware. Do not expand every Phase 2/3 module at once.
+Phase 2 is no longer only “next”: the repo now contains real backend and web foundations for Academics, Homework/Timetable, HR/Payroll, Accounting, and Parent–Class Teacher Chat. Phase 3 Library, Transport, and Canteen also have backend models/APIs and web admin workspaces. Treat these areas as implemented foundations that need hardening, coverage, scale review, and UX completion rather than greenfield modules.
 
 Recommended near-term direction:
 
 ```text
-Run Phase 1 pilot hardening while completing one Phase 2 vertical at a time.
-First preferred vertical: Academics / Exams / CAS / Report Cards.
-Alternative vertical: HR / Payroll / Accounting posting hardening.
+Run pilot hardening while deepening one existing vertical at a time.
+Highest priority: accounting correctness, tenant isolation, reports, exports, and production verification.
+Do not add parent/mobile, driver app, live map/WebSocket, AI, or broad new scope until the existing foundations are stable.
 ```
 
 ---
@@ -120,17 +120,23 @@ Do not rename `tenantId` to `schoolId` unless a future migration is explicitly p
 - Production preflight checks
 - `verify:production` gate
 
----
+## Implemented Beyond Phase 1
 
-## Current Phase 2 Focus
+- M4 Academics backend/web foundation: subjects, teacher assignments, exam terms, assessment components, marks, CAS, lock/review, report cards, result publishing, promotion, and PDFs.
+- M6 Homework/Timetable backend/web foundation: timetable periods/slots/versions, conflict handling, substitutions, homework assignment/submission/review/reminders.
+- M7 HR/Payroll backend/web foundation: staff records, contracts, staff attendance/leave, salary structures, payroll preview/runs/approval/posting, salary slips.
+- M9 Accounting backend/web foundation: chart of accounts, fiscal years/periods, journal entries/lines, posting boundary, manual journals, expenses, reversals, reconciliation/report surfaces.
+- M10 parent-teacher messaging foundation: conversations, participants, messages, read receipts, parent-class-teacher access rules, and web messaging routes.
+- M8A Library admin foundation: books, copies, issue/return, overdue reminders, readable status badges, and pending placeholders for borrowed-student/fine/report endpoints.
+- M8B Transport admin foundation: routes/stops, vehicles, driver/student assignments, trips, student trip statuses, logs, location pings/latest location, reports, and Phase 3 UX polish for admin monitoring.
+- M8C Canteen admin foundation: menu items, meal plans, enrollments, serving, wallets/top-ups, POS sales, spending controls, reports, allergy/wallet badges, QR-style serving foundation, and inventory-later placeholder.
 
-Phase 2 should proceed one vertical at a time:
+## Current Focus
 
-1. Preferred: M4 Academics / Exams / CAS / Report Cards.
-2. Alternative: M7 HR / Payroll with M9 posting hardening.
-3. Keep M6 Timetable/Homework focused if started.
-4. Do not start broad Phase 3 production work yet.
-5. Do not start AI/ML features yet.
+1. Stabilize existing Phase 2 and Phase 3 admin foundations instead of starting new broad modules.
+2. Harden M9 accounting correctness, immutable posting/reversal workflows, and module posting boundaries.
+3. Improve production gates and fix unrelated contract-test drift before relying on `verify:production` as fully green.
+4. Keep parent/mobile portal, driver app, live map/WebSocket, full inventory/vendor workflows, and AI/ML out of scope until the admin foundations are reliable.
 
 ---
 

@@ -82,6 +82,13 @@ docs/
   project/  Master memory, plans, and roadmaps
 ```
 
+Current implementation snapshot:
+
+- Phase 1 school operations are pilot-ready in `apps/web` and `apps/api`.
+- Phase 2 foundations now exist for Academics, Homework/Timetable, HR/Payroll, Accounting, and Parent–Class Teacher Chat.
+- Phase 3 admin foundations now exist for Library, Transport, and Canteen.
+- Deferred surfaces remain: parent/mobile portal, driver app, live transport map/WebSocket UI, full canteen inventory/vendor workflows, and AI/ML.
+
 Suggested frontend namespaces inside `apps/web`:
 
 ```text

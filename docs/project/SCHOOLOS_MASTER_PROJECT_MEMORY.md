@@ -1,6 +1,6 @@
 # SchoolOS Master Project Memory
 
-**Status:** Phase 2 Transition Readiness  
+**Status:** Phase 2 implemented foundations + Phase 3 operations admin foundations
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard
 
@@ -16,20 +16,20 @@ For the full locally generated version, use the file already prepared in this co
 Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
-Current stage: Phase 2 Transition Readiness
+Current stage: Phase 2 implemented foundations + Phase 3 operations admin foundations
 ```
 
-SchoolOS is ready for controlled Phase 1 pilot preparation, while Phase 2 should proceed one focused vertical at a time.
+SchoolOS is ready for controlled Phase 1 pilot preparation, and the repo now contains real Phase 2 backend/web foundations plus Phase 3 operations admin foundations. The next work should harden existing modules rather than opening broad new fronts.
 
 Recommended near-term direction:
 
 ```text
-Run Phase 1 pilot hardening while completing one Phase 2 vertical.
-Preferred vertical: Academics / Exams / CAS / Report Cards.
-Alternative vertical: HR / Payroll / Accounting posting hardening.
+Run pilot hardening while deepening one existing vertical at a time.
+Highest priority: M9 accounting correctness, tenant isolation, reports/exports, and production verification.
+Keep parent/mobile portal, driver app, live map/WebSocket, full inventory/vendor workflows, and AI/ML deferred.
 ```
 
-Do not expand Phase 2/3 modules broadly at once.
+Do not expand Phase 2/3 modules broadly at once. Existing Phase 3 admin modules may be polished and hardened, but parent/mobile and driver-facing experiences remain separate future scope.
 
 ---
 
@@ -115,15 +115,15 @@ Purpose:
 | M1 | Admissions & Student Profiles | Phase 1A/1B |
 | M2 | Smart Attendance | Phase 1A/1B |
 | M3 | Fees & Receipts | Phase 1A/1B |
-| M4 | Exams, CAS & Report Cards | Phase 2 |
+| M4 | Exams, CAS & Report Cards | Phase 2 foundation implemented |
 | M5 | Activity Feed & Milestones | Phase 1A/1B |
-| M6 | Homework & Timetable | Phase 2 |
-| M7 | HR & Payroll | Phase 2 |
-| M8A | Library Management | Phase 3 |
-| M8B | Transport Management | Phase 3 |
-| M8C | Canteen Management | Phase 3 |
-| M9 | Accounting & Finance | Phase 2 |
-| M10 | Notices & Communication | Phase 1A/1B + Phase 2/3 chat |
+| M6 | Homework & Timetable | Phase 2 foundation implemented |
+| M7 | HR & Payroll | Phase 2 foundation implemented |
+| M8A | Library Management | Phase 3 admin foundation implemented |
+| M8B | Transport Management | Phase 3 admin foundation implemented |
+| M8C | Canteen Management | Phase 3 admin foundation implemented |
+| M9 | Accounting & Finance | Phase 2 foundation implemented; hardening priority |
+| M10 | Notices & Communication | Phase 1A/1B + parent-teacher chat foundation |
 
 ---
 
@@ -146,7 +146,7 @@ Includes:
 
 ### Phase 2 — Academic, HR, Timetable, and Accounting Expansion
 
-Status: Next / transition readiness.
+Status: Implemented foundation; production hardening in progress.
 
 Sub-phases:
 
@@ -158,7 +158,7 @@ Sub-phases:
 
 ### Phase 3 — Extended School Operations
 
-Later modules:
+Status: Admin foundations implemented for Library, Transport, and Canteen. Parent/mobile, driver app, live tracking UX, full canteen inventory/vendor workflows, and deeper reports remain later.
 
 - Library.
 - Transport.
@@ -281,11 +281,11 @@ Non-negotiable rules:
 
 ## 9. Current Repo Analysis Summary
 
-Repo inspection indicates:
+Repo inspection on May 6, 2026 indicates:
 
 ```text
-Full SchoolOS vision: around 45–55% implemented
-Phase 1 pilot product: around 85–90% implemented
+Full SchoolOS vision: around 60–70% implemented
+Phase 1 pilot product: around 90–95% implemented
 ```
 
 Readiness:
@@ -303,26 +303,27 @@ Module estimates:
 | Module | Estimated Completion |
 |---|---:|
 | Auth/Security/Tenant | 90–95% |
-| Platform Control Plane | 35–45% |
-| M1 Admissions & Student Profiles | 85–90% |
-| M2 Attendance | 80–85% |
+| Platform Control Plane | 45–55% |
+| M1 Admissions & Student Profiles | 90–95% |
+| M2 Attendance | 85–90% |
 | M3 Fees & Receipts | 85–90% |
-| M5 Activity Feed | 70–80% |
-| M10 Notices & Communication | 80–85% |
-| M4 Academics | 35–45% |
-| M6 Homework & Timetable | 25–35% |
-| M7 HR & Payroll | 35–45% |
-| M9 Accounting | 20–30% |
-| M8A Library | 10–15% |
-| M8B Transport | 10–15% |
-| M8C Canteen | 0–5% |
+| M5 Activity Feed | 75–85% |
+| M10 Notices & Communication | 85–90% |
+| M4 Academics | 70–80% |
+| M6 Homework & Timetable | 60–70% |
+| M7 HR & Payroll | 65–75% |
+| M9 Accounting | 55–65% |
+| M8A Library | 45–55% |
+| M8B Transport | 45–55% |
+| M8C Canteen | 45–55% |
 | AI/ML | 0% |
 
 Biggest risks:
 
-- Phase 2 breadth without enough depth.
+- Existing Phase 2/3 breadth without enough depth.
 - Accounting complexity and ledger immutability.
-- Pilot operations exposing real-world data-entry, fee, attendance, guardian-contact, PDF, and slow-network issues.
+- Pilot operations exposing real-world data-entry, fee, attendance, guardian-contact, PDF, slow-network, and contract-test drift issues.
+- Parent/mobile portal, driver app, live map/WebSocket, full canteen inventory/vendor workflows, and AI/ML remain intentionally unbuilt.
 
 ---
 

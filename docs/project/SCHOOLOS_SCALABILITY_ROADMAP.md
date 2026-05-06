@@ -1,7 +1,7 @@
 # SchoolOS Scalability Roadmap
 
 **Repository:** `erwinshrestha17/SchoolOS`  
-**Stage:** Phase 2 Transition Readiness  
+**Stage:** Phase 2 implemented foundations + Phase 3 operations admin foundations
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard  
 **Purpose:** Define how SchoolOS scales phase by phase while development continues across the SaaS starter/platform core and school-domain modules.
 
@@ -48,13 +48,14 @@ docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
 Important findings from those docs:
 
 ```text
-- SchoolOS is in Phase 2 Transition Readiness.
+- SchoolOS has implemented Phase 2 foundations and Phase 3 operations admin foundations.
 - Phase 1A/1B are pilot-ready.
 - M0 Platform Core contains reusable SaaS starter/platform capabilities.
 - M1-M10 define the real school product modules.
 - Current frontend stays in apps/web Next.js for now.
 - Future apps/admin Angular dashboard is deferred.
 - Microservices are deferred until scale/team/deployment/compliance justify them.
+- Parent/mobile portal, driver app, live transport map/WebSocket UI, full canteen inventory/vendor workflows, and AI/ML are deferred.
 ```
 
 ---
@@ -85,15 +86,15 @@ These are the reusable SaaS/starter capabilities already documented in the platf
 | M1 | Admissions & Student Profiles | Phase 1 | `admissions/`, `students/`, `student-records/` | `/api/v1/admissions`, `/api/v1/students`, `/api/v1/student-records` | `/dashboard/admissions`, `/dashboard/students/*` |
 | M2 | Smart Attendance | Phase 1 | `attendance/` | `/api/v1/attendance/*` | `/dashboard/attendance` |
 | M3 | Fees & Receipts | Phase 1 | `finance/` | `/api/v1/finance/*` | `/dashboard/finance` |
-| M4 | Exams, CAS & Report Cards | Phase 2 | `academics/` | `/api/v1/academics/*` | `/dashboard/academics` |
+| M4 | Exams, CAS & Report Cards | Phase 2 foundation implemented | `academics/` | `/api/v1/academics/*` | `/dashboard/academics` |
 | M5 | Activity Feed & Milestones | Phase 1 | `activity-feed/` | `/api/v1/activity-feed/*` | `/dashboard/activity` |
-| M6 | Homework & Timetable | Phase 2 | `timetable/` | `/api/v1/timetable/*`, `/api/v1/homework/*` if split later | `/dashboard/timetable`, `/dashboard/homework` |
-| M7 | HR & Payroll | Phase 2 | `staff/`, `payroll/` | `/api/v1/staff/*`, `/api/v1/payroll/*` | `/dashboard/hr`, `/dashboard/payroll` |
-| M8A | Library Management | Phase 3 | `library/` | `/api/v1/library/*` | `/dashboard/library` |
-| M8B | Transport Management | Phase 3 | `transport/` | `/api/v1/transport/*` | `/dashboard/transport`; parent tracking later |
-| M8C | Canteen Management | Phase 3 | future `canteen/` | `/api/v1/canteen/*` | `/dashboard/canteen` |
-| M9 | Accounting & Finance | Phase 2 | `accounting/` + finance posting boundary | `/api/v1/accounting/*` | `/dashboard/accounting` |
-| M10 | Notices & Communication | Phase 1 + Phase 2/3 chat | `communications/`, `notifications/`, `messaging/` | `/api/v1/communications/*`, `/api/v1/notifications/*`, `/api/v1/messaging/*` | `/dashboard/notices`, notification center, chat later |
+| M6 | Homework & Timetable | Phase 2 foundation implemented | `timetable/`, `homework/` | `/api/v1/timetable/*`, `/api/v1/homework/*` | `/dashboard/timetable`, `/dashboard/homework` |
+| M7 | HR & Payroll | Phase 2 foundation implemented | `staff/`, `hr/`, `payroll/` | `/api/v1/staff/*`, `/api/v1/hr/*`, `/api/v1/payroll/*` | `/dashboard/hr`, `/dashboard/payroll`, `/dashboard/staff/*` |
+| M8A | Library Management | Phase 3 admin foundation implemented | `library/` | `/api/v1/library/*` | `/dashboard/library/*` |
+| M8B | Transport Management | Phase 3 admin foundation implemented | `transport/` | `/api/v1/transport/*` | `/dashboard/transport/*`; parent tracking later |
+| M8C | Canteen Management | Phase 3 admin foundation implemented | `canteen/` | `/api/v1/canteen/*` | `/dashboard/canteen/*`; inventory/vendor later |
+| M9 | Accounting & Finance | Phase 2 foundation implemented; hardening priority | `accounting/` + finance posting boundary | `/api/v1/accounting/*` | `/dashboard/accounting` |
+| M10 | Notices & Communication | Phase 1 + parent-teacher chat foundation | `communications/`, `notifications/`, `messaging/` | `/api/v1/communications/*`, `/api/v1/notifications/*`, `/api/v1/messaging/*` | `/dashboard/notices`, `/dashboard/messages`, notification center |
 
 ## 3.3 Mapping from Generic Names to Current Repo Modules
 
@@ -157,7 +158,7 @@ apps/api/src
   payroll/
   library/
   transport/
-  canteen/              future module when implemented
+  canteen/
   accounting/
   activity-feed/
   communications/
@@ -227,12 +228,12 @@ All external APIs remain versioned under `/api/v1`.
 /api/v1/academics/*                M4
 /api/v1/activity-feed/*            M5
 /api/v1/timetable/*                M6
-/api/v1/homework/*                 M6 later if split from timetable
+/api/v1/homework/*                 M6 homework foundation
 /api/v1/staff/*                    M7
 /api/v1/payroll/*                  M7
 /api/v1/library/*                  M8A
 /api/v1/transport/*                M8B
-/api/v1/canteen/*                  M8C later
+/api/v1/canteen/*                  M8C admin foundation
 /api/v1/accounting/*               M9
 /api/v1/communications/*           M10
 /api/v1/notifications/*            M10
@@ -999,13 +1000,14 @@ Return:
 Do next:
 
 ```text
-1. Keep Phase 2A Academics vertical focused.
-2. Apply S1 to Academics: indexes, pagination, report-card PDF queue decision, marks-entry tenant tests.
-3. Add or formalize API/worker entrypoint before heavy report/PDF usage.
-4. Add request/correlation ID logging.
-5. Add queue failure visibility for notifications/reports.
-6. Harden File Registry/object storage before student photo/activity/homework uploads expand.
-7. Keep Transport/Canteen production work later until core Phase 2 verticals are stable.
+1. Harden one existing vertical at a time instead of opening new scope.
+2. Prioritize M9 accounting correctness, posting/reversal tests, and module posting boundaries.
+3. Apply S1/S2 to Academics, Homework/Timetable, HR/Payroll, Library, Transport, and Canteen: indexes, pagination, tenant tests, and report/PDF/queue decisions.
+4. Add or formalize API/worker entrypoint before heavy report/PDF usage expands.
+5. Add request/correlation ID logging.
+6. Add queue failure visibility for notifications/reports/payroll/PDF work.
+7. Harden File Registry/object storage before student photo/activity/homework uploads expand.
+8. Keep parent/mobile portal, driver app, live transport map/WebSocket UI, full canteen inventory/vendor workflows, and AI/ML deferred.
 ```
 
 Avoid now:
@@ -1013,10 +1015,11 @@ Avoid now:
 ```text
 ❌ Angular migration
 ❌ AI/ML features
-❌ Transport GPS production build before Redis/WebSocket scaling plan
-❌ Canteen wallet before accounting boundaries are hardened
+❌ Parent/mobile portal before admin foundations are stable
+❌ Driver app or live transport map/WebSocket UI before Redis/WebSocket scaling plan
+❌ Full canteen inventory/vendor workflows before menu, wallet, POS, reports, and accounting boundaries are hardened
 ❌ Microservices
-❌ Broad Phase 2 expansion across every module at once
+❌ Broad expansion across every module at once
 ```
 
 ---

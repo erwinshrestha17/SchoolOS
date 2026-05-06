@@ -14,21 +14,22 @@ docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
 Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
-Current stage: Phase 2 Transition Readiness
+Current stage: Phase 2 implemented foundations + Phase 3 operations admin foundations
 ```
 
-Phase 2 work may continue, but it must be focused and production-aware. Do not expand every Phase 2/3 module at once.
+Phase 2 is underway in the repo, and Phase 3 operations admin foundations now exist. Work must focus on hardening, correctness, scale, permissions, tests, and UX polish for the existing modules rather than broad new product expansion.
 
-Preferred next vertical:
+Preferred next work:
 
 ```text
-M4 Academics / Exams / CAS / Report Cards
+Harden one existing vertical at a time.
+Priority areas: M9 Accounting correctness, production verification, reports/exports, tenant isolation, and Phase 2/3 admin UX completeness.
 ```
 
-Alternative vertical:
+Explicitly deferred unless requested:
 
 ```text
-M7 HR / Payroll with M9 accounting posting hardening
+Parent/mobile portal, driver app, live transport map/WebSocket UI, full canteen inventory/vendor workflows, AI/ML.
 ```
 
 ---
@@ -38,7 +39,8 @@ M7 HR / Payroll with M9 accounting posting hardening
 - Prefer small, focused changes.
 - Do not rewrite unrelated files.
 - Do not change architecture without explicit instruction.
-- Do not start broad Phase 3 production work unless explicitly requested.
+- Do not start broad new Phase 3 or Phase 4 scope unless explicitly requested.
+- Treat existing Phase 3 Library/Transport/Canteen admin workspaces as foundations to polish and harden, not as permission to build parent/mobile or driver experiences.
 - Do not start AI/ML features until reliable production data exists.
 - Use `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md` as the long-term source of truth.
 - Keep legacy roadmap files as pointers/summaries only unless explicitly asked to expand them again.
