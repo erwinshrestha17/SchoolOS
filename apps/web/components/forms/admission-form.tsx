@@ -33,7 +33,7 @@ const enrollmentSteps = [
   'Academic Placement',
   'Guardian Contacts',
   'Documents & Review',
-  'Success',
+  'Success / Next Actions',
 ] as const;
 
 const documentKinds = [
@@ -56,6 +56,7 @@ export function AdmissionForm() {
   const [activeStep, setActiveStep] = useState(0);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [documentKind, setDocumentKind] = useState('BIRTH_CERTIFICATE');
+  const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<Awaited<ReturnType<typeof api.checkAdmissionDuplicates>> | null>(null);
   const [disabilityMode, setDisabilityMode] = useState<'' | 'NO_KNOWN_DISABILITY' | 'DISABILITY_PRESENT'>('');
   const [pdfError, setPdfError] = useState('');
@@ -126,6 +127,18 @@ export function AdmissionForm() {
       setDuplicateWarning(null);
       setPdfError('');
       setActiveStep(4);
+    },
+  });
+
+  const bulkImportMutation = useMutation({
+    mutationFn: async (file: File) =>
+      api.bulkImportAdmissions({
+        file: await fileToBase64Payload(file),
+        mode: 'validate-and-create',
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admissions'] });
+      void queryClient.invalidateQueries({ queryKey: ['students'] });
     },
   });
 
@@ -204,6 +217,13 @@ export function AdmissionForm() {
 
       {activeWorkspaceTab === 'enrollment' && (
         <form className="space-y-6" onSubmit={form.handleSubmit((v) => submitAdmission(v))}>
+          {setupIsMissing && !setupIsLoading && (
+            <SectionCard title="Setup required before enrollment" className="border-warning-200 bg-warning-50">
+              <p className="text-sm font-medium text-warning-800">
+                Create an academic year and at least one class before admitting students.
+              </p>
+            </SectionCard>
+          )}
            <div className="flex items-center justify-between px-4">
             {enrollmentSteps.map((step, idx) => (
               <div key={step} className="flex items-center gap-3">
@@ -373,10 +393,10 @@ export function AdmissionForm() {
                          <div className="flex gap-4">
                            <AlertTriangle className="text-warning-500" size={24} />
                            <div>
-                             <p className="font-bold text-warning-900">Potential Duplicate Detected</p>
+                             <p className="font-bold text-warning-900">Possible duplicate found</p>
                              <p className="mt-1 text-sm text-warning-700">A student with the same name and DOB already exists.</p>
                              <button type="button" className="mt-4 rounded-xl bg-warning-500 px-4 py-2 text-xs font-bold text-white shadow-sm" onClick={() => submitAdmission(form.getValues(), true)}>
-                               Confirm & Enroll Anyway
+                               Create anyway
                              </button>
                            </div>
                          </div>
@@ -406,11 +426,17 @@ export function AdmissionForm() {
                 action={
                   <div className="flex flex-wrap justify-center gap-3">
                     <button type="button" className="rounded-xl bg-slate-900 px-6 py-3 text-sm font-bold text-white shadow-lg" onClick={() => window.location.reload()}>
-                      Enroll Another
+                      Add Another Student
                     </button>
                     <Link href="/dashboard/students" className="rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 shadow-sm">
                       Go to Directory
                     </Link>
+                    <Link href="/dashboard/finance" className="rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 shadow-sm">
+                      Collect First Fee
+                    </Link>
+                    <button type="button" className="rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 shadow-sm">
+                      Download ID Card
+                    </button>
                   </div>
                 }
               />
@@ -451,6 +477,80 @@ export function AdmissionForm() {
             </div>
           )}
         </form>
+      )}
+
+      {activeWorkspaceTab === 'bulk' && (
+        <SectionCard title="Bulk Import" description="Upload a school-reviewed CSV for admission import. The backend validates each row before creating records.">
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center">
+              <Upload className="mx-auto mb-4 text-slate-400" size={32} />
+              <p className="text-sm font-bold text-slate-900">Upload admission CSV</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Use real school data only. Disability/iEMIS confirmation columns are required.
+              </p>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="mt-4 text-xs"
+                onChange={(event) => setBulkFile(event.target.files?.[0] ?? null)}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                disabled={!bulkFile || bulkImportMutation.isPending}
+                onClick={() => bulkFile && bulkImportMutation.mutate(bulkFile)}
+                className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {bulkImportMutation.isPending ? 'Importing...' : 'Validate & Import'}
+              </button>
+              {bulkImportMutation.data ? (
+                <Badge variant={bulkImportMutation.data.failed > 0 ? 'warning' : 'success'}>
+                  {bulkImportMutation.data.created} created, {bulkImportMutation.data.failed} failed
+                </Badge>
+              ) : null}
+            </div>
+            {bulkImportMutation.data?.errorReportCsv ? (
+              <div className="rounded-2xl border border-warning-200 bg-warning-50 p-4">
+                <p className="text-sm font-bold text-warning-900">Error report CSV available</p>
+                <p className="mt-1 text-xs text-warning-700">
+                  Review the backend validation errors, correct the CSV, and retry.
+                </p>
+              </div>
+            ) : null}
+            {bulkImportMutation.error ? (
+              <p className="text-sm font-bold text-danger-600">
+                {bulkImportMutation.error instanceof Error ? bulkImportMutation.error.message : 'Bulk import failed.'}
+              </p>
+            ) : null}
+          </div>
+        </SectionCard>
+      )}
+
+      {activeWorkspaceTab === 'recent' && (
+        <SectionCard title="Recent Admissions" description="Latest admission records from the backend.">
+          {(admissionsQuery.data ?? []).length === 0 ? (
+            <EmptyState title="No recent admissions" description="New student admissions will appear here after enrollment." />
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {(admissionsQuery.data ?? []).slice(0, 10).map((admission) => (
+                <div key={admission.id} className="flex flex-wrap items-center justify-between gap-3 py-4">
+                  <div>
+                    <p className="font-bold text-slate-900">
+                      {admission.fullNameEn}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {admission.studentSystemId} / {admission.className ?? 'Class pending'}
+                    </p>
+                  </div>
+                  <Link href={`/dashboard/students/${encodeURIComponent(admission.id)}`} className="text-sm font-bold text-primary-600">
+                    View Profile
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
       )}
     </div>
   );

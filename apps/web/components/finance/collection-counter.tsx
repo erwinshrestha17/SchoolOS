@@ -5,7 +5,6 @@ import { SectionCard } from '@/components/ui/section-card';
 import { Badge } from '@/components/ui/badge';
 import { Wallet, Search, CreditCard, Banknote, History, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
 
 interface CollectionCounterProps {
   onSearch: (query: string) => void;
@@ -21,6 +20,13 @@ const formatCurrency = (amount: number) => {
     maximumFractionDigits: 0,
   }).format(amount);
 };
+
+const formatDate = (value: string) =>
+  new Intl.DateTimeFormat('en-NP', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(value));
 
 export function CollectionCounter({ onSearch, invoices, onCollect, isLoading }: CollectionCounterProps) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -102,7 +108,7 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading }: 
               </div>
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                 <p className="text-[0.6rem] font-bold text-slate-400 uppercase tracking-widest mb-1">Due Date</p>
-                <p className="text-sm font-bold text-slate-900 mt-1">{format(new Date(selectedInvoice.dueDate), 'MMM d, yyyy')}</p>
+                <p className="text-sm font-bold text-slate-900 mt-1">{formatDate(selectedInvoice.dueDate)}</p>
               </div>
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                 <p className="text-[0.6rem] font-bold text-slate-400 uppercase tracking-widest mb-1">Invoice #</p>

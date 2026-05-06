@@ -402,7 +402,44 @@ enum ConversationType {
 
 enum MessageStatus {
   SENT
+  DELIVERED
   READ
+}
+
+enum ParentTeacherThreadStatus {
+  OPEN
+  CLOSED
+  ESCALATED
+}
+
+enum ParentTeacherSenderRole {
+  PARENT
+  TEACHER
+  ADMIN
+}
+
+enum ParentTeacherMessagePriority {
+  NORMAL
+  IMPORTANT
+  EMERGENCY
+}
+
+enum ChatAvailabilityAppliesToRole {
+  TEACHER
+  PARENT
+  BOTH
+}
+
+enum ChatEscalationStatus {
+  OPEN
+  RESOLVED
+}
+
+enum ChatAbuseReportStatus {
+  OPEN
+  REVIEWED
+  DISMISSED
+  ACTION_TAKEN
 }
 
 enum LibraryCopyStatus {
@@ -2838,6 +2875,104 @@ model MessageReadReceipt {
   guardian Guardian? @relation(fields: [guardianId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, messageId])
+}
+
+model ParentTeacherThread {
+  id               String                    @id @default(uuid())
+  tenantId         String
+  academicYearId   String
+  studentId        String
+  guardianId       String
+  classTeacherId   String
+  status           ParentTeacherThreadStatus @default(OPEN)
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  closedAt         DateTime?
+  closedByUserId   String?
+  closeReason      String?
+
+  messages    ParentTeacherMessage[]
+  escalations ChatEscalation[]
+  abuseReports ChatAbuseReport[]
+
+  @@index([tenantId, studentId, academicYearId])
+  @@index([tenantId, guardianId])
+  @@index([tenantId, classTeacherId])
+  @@index([tenantId, status, updatedAt])
+}
+
+model ParentTeacherMessage {
+  id           String                       @id @default(uuid())
+  tenantId     String
+  threadId     String
+  senderUserId String
+  senderRole   ParentTeacherSenderRole
+  message      String
+  priority     ParentTeacherMessagePriority @default(NORMAL)
+  status       MessageStatus                @default(SENT)
+  sentAt       DateTime                     @default(now())
+  deliveredAt  DateTime?
+  readAt       DateTime?
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
+
+  thread       ParentTeacherThread @relation(fields: [threadId], references: [id], onDelete: Restrict)
+  abuseReports ChatAbuseReport[]
+
+  @@index([tenantId, threadId, createdAt])
+  @@index([tenantId, status, updatedAt])
+}
+
+model ChatAvailabilityRule {
+  id            String                        @id @default(uuid())
+  tenantId      String
+  dayOfWeek     Int
+  enabled       Boolean                       @default(true)
+  startTime     String
+  endTime       String
+  appliesToRole ChatAvailabilityAppliesToRole @default(BOTH)
+  createdAt     DateTime                      @default(now())
+  updatedAt     DateTime                      @updatedAt
+
+  @@unique([tenantId, dayOfWeek, appliesToRole])
+  @@index([tenantId, dayOfWeek])
+}
+
+model ChatEscalation {
+  id                 String               @id @default(uuid())
+  tenantId           String
+  threadId           String
+  escalatedByUserId  String
+  escalatedToUserId  String?
+  reason             String
+  status             ChatEscalationStatus @default(OPEN)
+  createdAt          DateTime             @default(now())
+  resolvedAt         DateTime?
+  resolvedByUserId   String?
+
+  thread ParentTeacherThread @relation(fields: [threadId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, threadId, createdAt])
+  @@index([tenantId, status, createdAt])
+}
+
+model ChatAbuseReport {
+  id               String                @id @default(uuid())
+  tenantId         String
+  threadId         String
+  messageId        String?
+  reportedByUserId String
+  reason           String
+  status           ChatAbuseReportStatus @default(OPEN)
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  createdAt        DateTime              @default(now())
+
+  thread  ParentTeacherThread  @relation(fields: [threadId], references: [id], onDelete: Restrict)
+  message ParentTeacherMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, threadId, createdAt])
+  @@index([tenantId, status, createdAt])
 }
 
 model LibraryBook {

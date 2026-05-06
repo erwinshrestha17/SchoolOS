@@ -16,6 +16,7 @@ import {
   BookOpen,
   Bus,
   Megaphone,
+  MessageSquare,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -130,6 +131,13 @@ export const dashboardNavGroups: NavGroup[] = [
         phase: 'phase1',
       },
       {
+        href: '/dashboard/messages',
+        label: 'Messages',
+        icon: MessageSquare,
+        permissions: ['messaging:read'],
+        phase: 'phase2',
+      },
+      {
         href: '/dashboard/activity',
         label: 'Activity Feed',
         icon: Images,
@@ -158,11 +166,18 @@ export const dashboardNavGroups: NavGroup[] = [
     label: 'HR',
     items: [
       {
+        href: '/dashboard/hr',
+        label: 'HR / Staff',
+        icon: UserCog,
+        permissions: ['hr:read'],
+        phase: 'phase2',
+      },
+      {
         href: '/dashboard/payroll',
         label: 'Payroll',
         icon: UserCog,
         permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
-        phase: 'phase1',
+        phase: 'phase2',
       },
     ],
   },
@@ -509,4 +524,3 @@ function canSeeNavItem(
   const permissionSet = new Set(session?.user.permissions ?? []);
   return item.permissions.some((permission) => permissionSet.has(permission));
 }
-

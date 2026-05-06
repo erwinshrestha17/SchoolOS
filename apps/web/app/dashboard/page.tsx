@@ -235,7 +235,7 @@ export default function DashboardPage() {
                 <AlertTriangle size={20} />
               </div>
               <div>
-                <p className="font-bold text-warning-400">Configuration Required</p>
+                <p className="font-bold text-warning-400">Setup needs attention</p>
                 <p className="mt-0.5 text-sm text-slate-300">
                   {setupWarnings.join(' · ')}
                 </p>
@@ -326,7 +326,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <EmptyState
-              title="All systems operational"
+              title="No alerts available yet"
               description="No critical alerts at this time. Your school operations are running smoothly."
               icon={<TrendingUp size={32} />}
             />
@@ -533,7 +533,7 @@ function RecentActivityList({ admissions, receipts, activityPosts, notices }: an
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 6);
 
   if (items.length === 0) {
-    return <EmptyState title="No recent activity" description="Activity from all modules will appear here once you start using the system." />;
+    return <EmptyState title="No recent operations yet" description="Activity from all modules will appear here once you start using the system." />;
   }
 
   return (

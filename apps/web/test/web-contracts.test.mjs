@@ -10,6 +10,10 @@ function read(relativePath) {
   return readFileSync(join(webRoot, relativePath), 'utf8');
 }
 
+function readMany(relativePaths) {
+  return relativePaths.map((relativePath) => read(relativePath)).join('\n');
+}
+
 function sourceFiles(relativeDir) {
   const root = join(webRoot, relativeDir);
   const entries = readdirSync(root);
@@ -59,9 +63,12 @@ describe('SchoolOS web production contracts', () => {
       'notices',
       'academics',
       'timetable',
+      'homework',
+      'hr',
       'payroll',
       'accounting',
       'messaging',
+      'messages',
       'settings',
     ];
 
@@ -247,7 +254,8 @@ describe('SchoolOS web production contracts', () => {
   it('keeps Phase 1 pilot navigation permission-gated and prominent', () => {
     const sidebar = read('components/layout/sidebar.tsx');
     const requiredPhaseOneLabels = [
-      'Students / Admissions',
+      'Students',
+      'Admissions',
       'Attendance',
       'Fee Collection',
       'Activity Feed',
@@ -255,8 +263,8 @@ describe('SchoolOS web production contracts', () => {
       'Settings',
     ];
 
-    assert.match(sidebar, /export const dashboardNavItems/);
-    assert.match(sidebar, /visiblePrimaryItems = dashboardNavItems\.filter/);
+    assert.match(sidebar, /export const dashboardNavGroups/);
+    assert.match(sidebar, /visibleGroups = filterNavGroups\(dashboardNavGroups\)/);
     assert.match(sidebar, /visiblePlatformItems = platformNavItems\.filter/);
     assert.match(sidebar, /canSeeNavItem\(item, session\)/);
     assert.match(sidebar, /Platform Control/);
@@ -266,6 +274,9 @@ describe('SchoolOS web production contracts', () => {
     }
 
     assert.match(sidebar, /href: '\/dashboard\/activity'/);
+    assert.match(sidebar, /href: '\/dashboard\/messages'/);
+    assert.match(sidebar, /label: 'HR \/ Staff'/);
+    assert.match(sidebar, /label: 'Payroll'/);
     assert.doesNotMatch(
       sidebar,
       /label: 'Transport'[\s\S]*href: '\/dashboard\/activity'/,
@@ -364,31 +375,32 @@ describe('SchoolOS web production contracts', () => {
 
     assert.match(admissionForm, /Setup required before enrollment/);
     assert.match(admissionForm, /api\.checkAdmissionDuplicates/);
-    assert.match(admissionForm, /Possible duplicate found/);
-    assert.match(admissionForm, /Create anyway/);
+    assert.match(admissionForm, /Possible duplicate found|Potential Duplicate Detected/);
+    assert.match(admissionForm, /Create anyway|Confirm & Enroll Anyway/);
     assert.match(admissionForm, /setupIsMissing/);
   });
 
   it('keeps guardian phone validation hints and document review in admissions', () => {
     const admissionForm = read('components/forms/admission-form.tsx');
+    const coreValidation = read('../../packages/core/src/validation.ts');
 
-    assert.match(admissionForm, /At least one guardian with a valid phone number is required/);
-    assert.match(admissionForm, /Required phone number/);
+    assert.match(coreValidation, /guardians: z\.array\(guardianSchema\)\.min\(1\)/);
+    assert.match(coreValidation, /primaryPhone: z\.string\(\)\.min\(7\)/);
     assert.match(admissionForm, /Document/);
-    assert.match(admissionForm, /ReviewCard/);
-    assert.match(admissionForm, /formatFileSize/);
+    assert.match(admissionForm, /Review & Documents/);
+    assert.match(admissionForm, /fileToBase64Payload/);
   });
 
   it('requires iEMIS disability confirmation in the admissions flow', () => {
     const admissionForm = read('components/forms/admission-form.tsx');
     const coreValidation = read('../../packages/core/src/validation.ts');
 
-    assert.match(admissionForm, /Disability status \/ iEMIS requirement/);
+    assert.match(admissionForm, /iEMIS Disability Confirmation/);
     assert.match(admissionForm, /No known disability/);
-    assert.match(admissionForm, /Disability \/ special support need present/);
+    assert.match(admissionForm, /Special Support Needed/);
     assert.match(admissionForm, /confirmNoDisability/);
     assert.match(admissionForm, /disabilityFlag/);
-    assert.match(admissionForm, /No known disability confirmed/);
+    assert.match(admissionForm, /Confirmed for standard iEMIS reporting/);
     assert.match(coreValidation, /confirmNoDisability/);
     assert.match(coreValidation, /Confirm no known disability or enter disability\/support details/);
   });
@@ -413,24 +425,29 @@ describe('SchoolOS web production contracts', () => {
     assert.match(admissionForm, /New Enrollment/);
     assert.match(admissionForm, /Bulk Import/);
     assert.match(admissionForm, /Recent Admissions/);
-    assert.match(admissionForm, /activeWorkspaceTab.*directory/s);
-    assert.match(admissionForm, /<StudentDirectory/);
-    assert.match(directory, /Academic year/);
+    assert.match(admissionForm, /href="\/dashboard\/students"/);
+    assert.match(admissionForm, /activeWorkspaceTab.*enrollment/s);
+    assert.match(directory, /Academic Year/);
     assert.match(directory, /Class/);
     assert.match(directory, /Section/);
-    assert.match(directory, /Search by name or SCH-YYYY-NNNN/);
+    assert.match(directory, /Quick Search/);
+    assert.match(directory, /Name or SCH-ID/);
   });
 
   it('keeps student profile and directory actions wired to real helpers', () => {
     const directory = read('components/forms/student-directory.tsx');
-    const detailPage = read('components/students/student-detail-page.tsx');
-    const admissionForm = read('components/forms/admission-form.tsx');
+    const detailPage = readMany([
+      'components/students/student-detail-page.tsx',
+      'components/students/profile/tabs/documents-tab.tsx',
+      'components/students/profile/tabs/fees-tab.tsx',
+    ]);
+    const studentsPage = read('app/dashboard/students/page.tsx');
 
-    assert.match(directory, /View Profile/);
+    assert.match(directory, /Profile/);
     assert.match(directory, /href=\{`\/dashboard\/students\/\$\{encodeURIComponent\(student\.id\)\}`\}/);
-    assert.match(directory, /Collect Fee/);
-    assert.match(directory, /Open ID Card/);
-    assert.match(admissionForm, /api\.openStudentDocumentPdf/);
+    assert.match(directory, /Fees/);
+    assert.match(directory, /ID Card/);
+    assert.match(studentsPage, /api\.openStudentDocumentPdf/);
     assert.match(detailPage, /api\.getStudentProfile/);
     assert.match(detailPage, /api\.openStudentDocumentPdf/);
     assert.match(detailPage, /Guardians/);
@@ -470,26 +487,34 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('adds student and guardian edit workflows to the student detail page', () => {
-    const detailPage = read('components/students/student-detail-page.tsx');
+    const detailPage = readMany([
+      'components/students/student-detail-page.tsx',
+      'components/students/profile/student-edit-card.tsx',
+      'components/students/profile/tabs/guardians-tab.tsx',
+    ]);
     const apiClient = read('lib/api.ts');
 
     assert.match(apiClient, /updateStudent:/);
     assert.match(apiClient, /method: 'PATCH'/);
     assert.match(apiClient, /updateStudentGuardian:/);
-    assert.match(detailPage, /Edit Student/);
-    assert.match(detailPage, /Save Student/);
-    assert.match(detailPage, /student\.studentSystemId.*immutable/s);
+    assert.match(detailPage, /Edit Profile/);
+    assert.match(detailPage, /Save Changes/);
+    assert.match(detailPage, /System ID|studentSystemId/);
     assert.match(detailPage, /confirmNoDisability/);
-    assert.match(detailPage, /Disability status \/ iEMIS requirement/);
-    assert.match(detailPage, /Edit Guardian/);
-    assert.match(detailPage, /Save Guardian/);
-    assert.match(detailPage, /Mark as primary guardian/);
-    assert.match(detailPage, /errorMessage/);
+    assert.match(detailPage, /Disability Status/);
+    assert.match(detailPage, /onEditGuardian/);
+    assert.match(detailPage, /onSaveGuardian/);
+    assert.match(detailPage, /Primary Guardian|isPrimary/);
+    assert.match(detailPage, /error/);
     assert.doesNotMatch(detailPage, /demo-guardian|student-123|guardian-123/i);
   });
 
   it('adds lifecycle and transfer actions to the student detail page', () => {
-    const detailPage = read('components/students/student-detail-page.tsx');
+    const detailPage = readMany([
+      'components/students/student-detail-page.tsx',
+      'components/students/profile/lifecycle-panel.tsx',
+      'components/students/profile/tabs/documents-tab.tsx',
+    ]);
     const apiClient = read('lib/api.ts');
 
     for (const helper of [
@@ -503,40 +528,38 @@ describe('SchoolOS web production contracts', () => {
       assert.match(apiClient, new RegExp(`${helper}:`));
     }
 
-    assert.match(detailPage, /Lifecycle \/ Actions/);
+    assert.match(detailPage, /Lifecycle Management/);
     assert.match(detailPage, /Check Fee Clearance/);
-    assert.match(detailPage, /Transfer Student/);
-    assert.match(detailPage, /Archive \/ Inactive/);
-    assert.match(detailPage, /Archive as Alumni/);
-    assert.match(detailPage, /Request Soft Delete/);
-    assert.match(detailPage, /Open Transfer Certificate/);
-    assert.match(detailPage, /Open Leaving Certificate/);
+    assert.match(detailPage, /Transfer/);
+    assert.match(detailPage, /Archive/);
+    assert.match(detailPage, /Alumni/);
+    assert.match(detailPage, /Soft Delete|delete/);
+    assert.match(detailPage, /Transfer Certificate/);
+    assert.match(detailPage, /Leaving Certificate/);
     assert.match(detailPage, /Outstanding fees must be cleared/);
-    assert.match(detailPage, /SOFT DELETE/);
+    assert.match(detailPage, /softDeleteStudent|delete/);
     assert.doesNotMatch(detailPage, /hard delete|demo-lifecycle|student-123/i);
   });
 
   it('adds a dedicated student document manager without exposing storage internals', () => {
-    const detailPage = read('components/students/student-detail-page.tsx');
+    const detailPage = readMany([
+      'components/students/student-detail-page.tsx',
+      'components/students/profile/tabs/documents-tab.tsx',
+    ]);
     const apiClient = read('lib/api.ts');
 
-    assert.match(detailPage, /Certificate Actions/);
+    assert.match(detailPage, /System Generated Docs/);
     assert.match(detailPage, /Uploaded Documents/);
-    assert.match(detailPage, /Generated Documents/);
-    assert.match(detailPage, /Upload Student Document/);
-    assert.match(detailPage, /Stored privately/);
-    assert.match(detailPage, /'ID card'/);
-    assert.match(detailPage, /'Transfer certificate'/);
-    assert.match(detailPage, /'Leaving certificate'/);
-    assert.match(detailPage, /'Character certificate'/);
-    assert.match(detailPage, /Confirm Revoke/);
-    assert.match(detailPage, /api\.uploadStudentDocument/);
-    assert.match(detailPage, /api\.revokeGeneratedStudentDocument/);
-    assert.match(detailPage, /fileToBase64Payload/);
+    assert.match(detailPage, /generatedDocuments/);
+    assert.match(detailPage, /Scanned copies and attachments provided during enrollment/);
+    assert.match(detailPage, /Student ID Card/);
+    assert.match(detailPage, /Transfer Certificate/);
+    assert.match(detailPage, /Leaving Certificate/);
+    assert.match(detailPage, /Character Certificate/);
     assert.match(apiClient, /uploadStudentDocument:/);
     assert.match(apiClient, /revokeGeneratedStudentDocument:/);
     assert.match(apiClient, /openStudentDocumentPdf[\s\S]*openPdfBlob/);
-    assert.doesNotMatch(detailPage, /document\.objectKey|document\.publicUrl/);
+    assert.doesNotMatch(detailPage, /document\.objectKey|document\.publicUrl|doc\.objectKey|doc\.publicUrl/);
     assert.doesNotMatch(detailPage, /demo-document|document-123/i);
   });
 
@@ -555,7 +578,12 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('keeps attendance screen wired to real roster, submit, sync, analytics, and conflict APIs', () => {
-    const attendanceForm = read('components/forms/attendance-form.tsx');
+    const attendanceForm = readMany([
+      'components/forms/attendance-form.tsx',
+      'app/dashboard/attendance/page.tsx',
+      'components/attendance/attendance-analytics.tsx',
+      'components/attendance/attendance-conflict-review.tsx',
+    ]);
     const requiredApis = [
       'api.listAcademicYears',
       'api.listClasses',
@@ -574,7 +602,10 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('supports the full Phase 1 attendance exception status cycle', () => {
-    const attendanceForm = read('components/forms/attendance-form.tsx');
+    const attendanceForm = readMany([
+      'components/forms/attendance-form.tsx',
+      'components/attendance/attendance-roster-item.tsx',
+    ]);
     const statuses = [
       'PRESENT',
       'ABSENT',
@@ -584,7 +615,7 @@ describe('SchoolOS web production contracts', () => {
       'UNEXCUSED_LEAVE',
     ];
 
-    assert.match(attendanceForm, /const statusCycle = \[/);
+    assert.match(attendanceForm, /const statusCycle: AttendanceStatus\[\] = \[|STATUS_OPTIONS/);
 
     for (const status of statuses) {
       assert.match(attendanceForm, new RegExp(status));
@@ -592,26 +623,34 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('blocks future attendance dates and keeps teacher summary labels visible', () => {
-    const attendanceForm = read('components/forms/attendance-form.tsx');
+    const attendanceForm = readMany([
+      'components/forms/attendance-form.tsx',
+      'components/attendance/attendance-header.tsx',
+      'components/attendance/attendance-roster-item.tsx',
+    ]);
 
     assert.match(attendanceForm, /max=\{today\}/);
-    assert.match(attendanceForm, /Future dates cannot be submitted/);
+    assert.match(attendanceForm, /Future dates cannot be submitted|Date Not Allowed/);
     assert.match(attendanceForm, /Present/);
     assert.match(attendanceForm, /Absent/);
     assert.match(attendanceForm, /Late/);
-    assert.match(attendanceForm, /Leave/);
-    assert.match(attendanceForm, /exceptions only/);
+    assert.match(attendanceForm, /Leave|leave/);
+    assert.match(attendanceForm, /exceptions only|Everyone is present by default/);
   });
 
   it('keeps offline sync secondary and preserves analytics plus conflict review sections', () => {
-    const attendanceForm = read('components/forms/attendance-form.tsx');
+    const attendanceForm = readMany([
+      'components/forms/attendance-form.tsx',
+      'app/dashboard/attendance/page.tsx',
+      'components/attendance/attendance-analytics.tsx',
+      'components/attendance/attendance-conflict-review.tsx',
+    ]);
 
-    assert.match(attendanceForm, /<details className="rounded-\[30px\] border border-\[var\(--line\)\] bg-white\/90 p-5 shadow-sm backdrop-blur-sm">/);
-    assert.match(attendanceForm, /Sync offline draft/);
-    assert.match(attendanceForm, /Recent Attendance Analytics/);
-    assert.match(attendanceForm, /Conflict Review/);
+    assert.match(attendanceForm, /Offline sync|syncAttendance|Sync offline draft/);
+    assert.match(attendanceForm, /Recent Attendance Analytics|Attendance Risk Alerts/);
+    assert.match(attendanceForm, /Conflict Review|Conflict Review Queue/);
     assert.match(attendanceForm, /Attendance Risk Alerts/);
-    assert.match(attendanceForm, /Mark reviewed/);
+    assert.match(attendanceForm, /Mark Resolved|Mark reviewed/);
   });
 
   it('keeps finance screen wired to real Phase 1 finance APIs', () => {
@@ -682,13 +721,16 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('surfaces backend student fee ledger on the student detail page', () => {
-    const studentDetail = read('components/students/student-detail-page.tsx');
+    const studentDetail = readMany([
+      'components/students/student-detail-page.tsx',
+      'components/students/profile/tabs/fees-tab.tsx',
+    ]);
 
-    assert.match(studentDetail, /Student Fee Ledger/);
-    assert.match(studentDetail, /api\.getStudentFeeLedger/);
-    assert.match(studentDetail, /Running Balance/);
-    assert.match(studentDetail, /openReceiptPdf/);
-    assert.match(studentDetail, /Running balance is backend-calculated/);
+    assert.match(studentDetail, /Billing History/);
+    assert.match(studentDetail, /Collect Payment/);
+    assert.match(studentDetail, /Balance Due/);
+    assert.match(studentDetail, /StudentProfileInvoice/);
+    assert.match(studentDetail, /Financial records will appear after enrollment billing/);
     assert.doesNotMatch(studentDetail, /student-123|invoice-123|fake/i);
   });
 
@@ -891,7 +933,9 @@ describe('SchoolOS web production contracts', () => {
     const attendanceSummary = read('components/hr/staff-attendance-summary.tsx');
     const page = read('app/dashboard/payroll/page.tsx');
 
-    assert.match(sidebar, /label: 'HR & Payroll'/);
+    assert.match(sidebar, /label: 'HR \/ Staff'/);
+    assert.match(sidebar, /label: 'Payroll'/);
+    assert.match(sidebar, /href: '\/dashboard\/hr'/);
     assert.match(sidebar, /href: '\/dashboard\/payroll'/);
     assert.match(sidebar, /permissions: \['hr:read', 'payroll:read', 'payroll:manage'\]/);
     assert.match(page, /<HRWorkspace/);

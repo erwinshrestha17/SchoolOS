@@ -453,6 +453,11 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Read parent-teacher conversations and message status',
   },
   {
+    resource: 'messaging',
+    action: 'manage',
+    description: 'Moderate parent-teacher conversations and chat settings',
+  },
+  {
     resource: 'library',
     action: 'read',
     description: 'Read library catalog, circulation, and overdue records',

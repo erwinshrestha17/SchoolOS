@@ -49,6 +49,12 @@ export function AttendanceRosterItem({
   onRemarkChange,
 }: AttendanceRosterItemProps) {
   const isPresent = status === 'PRESENT';
+  const initials = student.fullNameEn
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
 
   return (
     <div className={cn(
@@ -58,7 +64,11 @@ export function AttendanceRosterItem({
         : "bg-slate-50 border-slate-200 shadow-sm"
     )}>
       <div className="flex items-center gap-4">
-        <Avatar name={student.fullNameEn} className="h-10 w-10 text-sm font-bold" />
+        <Avatar
+          alt={student.fullNameEn}
+          initials={initials || 'S'}
+          className="h-10 w-10 text-sm font-bold"
+        />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h4 className="font-bold text-slate-900 truncate">{student.fullNameEn}</h4>

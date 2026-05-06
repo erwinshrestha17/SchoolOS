@@ -19,6 +19,7 @@ const segmentLabels: Record<string, string> = {
   activity: 'Activity Feed',
   notices: 'Notices',
   messaging: 'Messaging',
+  messages: 'Messages',
   settings: 'Settings',
 };
 

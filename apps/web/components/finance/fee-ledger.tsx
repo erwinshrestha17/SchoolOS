@@ -3,7 +3,6 @@
 import React from 'react';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
 import { Download, Receipt } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +29,13 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
+const formatDate = (value: string) =>
+  new Intl.DateTimeFormat('en-NP', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(value));
+
 export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
   const columns = [
     {
@@ -38,7 +44,7 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
         <div className="flex flex-col">
           <span className="font-bold text-slate-900">{inv.invoiceNumber}</span>
           <span className="text-[0.65rem] text-slate-400 font-bold uppercase tracking-wider">
-            Issued {format(new Date(inv.issuedAt), 'MMM d, yyyy')}
+            Issued {formatDate(inv.issuedAt)}
           </span>
         </div>
       )
@@ -50,7 +56,7 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
           "font-medium",
           new Date(inv.dueDate) < new Date() && inv.outstandingAmount > 0 ? "text-destructive" : "text-slate-600"
         )}>
-          {format(new Date(inv.dueDate), 'MMM d, yyyy')}
+          {formatDate(inv.dueDate)}
         </span>
       )
     },

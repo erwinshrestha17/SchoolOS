@@ -425,7 +425,44 @@ export const ConversationType = {
 
 export const MessageStatus = {
   SENT: 'SENT',
+  DELIVERED: 'DELIVERED',
   READ: 'READ',
+} as const;
+
+export const ParentTeacherThreadStatus = {
+  OPEN: 'OPEN',
+  CLOSED: 'CLOSED',
+  ESCALATED: 'ESCALATED',
+} as const;
+
+export const ParentTeacherSenderRole = {
+  PARENT: 'PARENT',
+  TEACHER: 'TEACHER',
+  ADMIN: 'ADMIN',
+} as const;
+
+export const ParentTeacherMessagePriority = {
+  NORMAL: 'NORMAL',
+  IMPORTANT: 'IMPORTANT',
+  EMERGENCY: 'EMERGENCY',
+} as const;
+
+export const ChatAvailabilityAppliesToRole = {
+  TEACHER: 'TEACHER',
+  PARENT: 'PARENT',
+  BOTH: 'BOTH',
+} as const;
+
+export const ChatEscalationStatus = {
+  OPEN: 'OPEN',
+  RESOLVED: 'RESOLVED',
+} as const;
+
+export const ChatAbuseReportStatus = {
+  OPEN: 'OPEN',
+  REVIEWED: 'REVIEWED',
+  DISMISSED: 'DISMISSED',
+  ACTION_TAKEN: 'ACTION_TAKEN',
 } as const;
 
 export const LibraryCopyStatus = {

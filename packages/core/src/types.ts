@@ -2003,6 +2003,110 @@ export type MessageReadReceiptSummary = {
   readAt: string;
 };
 
+export type ParentTeacherThreadStatus = 'OPEN' | 'CLOSED' | 'ESCALATED';
+export type ParentTeacherMessagePriority = 'NORMAL' | 'IMPORTANT' | 'EMERGENCY';
+export type ParentTeacherMessageStatus = 'SENT' | 'DELIVERED' | 'READ';
+export type ParentTeacherSenderRole = 'PARENT' | 'TEACHER' | 'ADMIN';
+export type ChatAvailabilityAppliesToRole = 'TEACHER' | 'PARENT' | 'BOTH';
+
+export type ParentTeacherMessageSummary = {
+  id: string;
+  threadId: string;
+  senderUserId: string;
+  senderRole: ParentTeacherSenderRole;
+  message: string;
+  priority: ParentTeacherMessagePriority;
+  status: ParentTeacherMessageStatus;
+  sentAt: string;
+  deliveredAt: string | null;
+  readAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ParentTeacherThreadSummary = {
+  id: string;
+  tenantId: string;
+  academicYearId: string;
+  studentId: string;
+  guardianId: string;
+  classTeacherId: string;
+  status: ParentTeacherThreadStatus;
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+  closedByUserId: string | null;
+  closeReason: string | null;
+  student?: {
+    id: string;
+    firstNameEn: string;
+    lastNameEn: string;
+    studentSystemId: string;
+    class?: { name: string } | null;
+    sectionRef?: { name: string } | null;
+  } | null;
+  guardian?: {
+    id: string;
+    fullName: string;
+    relation: string;
+    userId: string | null;
+  } | null;
+  classTeacher?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    userId: string;
+  } | null;
+  academicYear?: {
+    id: string;
+    name: string;
+  } | null;
+  latestMessages?: ParentTeacherMessageSummary[];
+  sla?: string;
+};
+
+export type PaginatedResult<T> = {
+  items: T[];
+  page: number;
+  limit: number;
+  total: number;
+  hasNextPage: boolean;
+};
+
+export type ParentTeacherThreadCreateResult = {
+  thread: ParentTeacherThreadSummary;
+  created: boolean;
+};
+
+export type ChatAvailabilityRuleSummary = {
+  id: string;
+  tenantId: string;
+  dayOfWeek: number;
+  enabled: boolean;
+  startTime: string;
+  endTime: string;
+  appliesToRole: ChatAvailabilityAppliesToRole;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ChatAvailabilityStatus = {
+  isAvailable: boolean;
+  timezone: string;
+  currentDayOfWeek: number;
+  currentTime: string;
+  notice: string;
+  sla: string;
+  nextWindow: string | null;
+};
+
+export type SendParentTeacherMessageResult = {
+  message: ParentTeacherMessageSummary;
+  availability: ChatAvailabilityStatus;
+  queuedNotice: string | null;
+  sla: string;
+};
+
 export type LibraryBookSummary = {
   id: string;
   title: string;

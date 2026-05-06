@@ -17,6 +17,15 @@ const today = new Date().toISOString().slice(0, 10);
 
 type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'SICK_LEAVE' | 'EXCUSED_LEAVE' | 'UNEXCUSED_LEAVE';
 
+const statusCycle: AttendanceStatus[] = [
+  'PRESENT',
+  'ABSENT',
+  'LATE',
+  'SICK_LEAVE',
+  'EXCUSED_LEAVE',
+  'UNEXCUSED_LEAVE',
+];
+
 export function AttendanceForm() {
   const queryClient = useQueryClient();
   const [academicYearId, setAcademicYearId] = useState('');
@@ -82,6 +91,14 @@ export function AttendanceForm() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['attendance-roster'] });
       setSubmitMessage(`Attendance submitted successfully at ${new Date().toLocaleTimeString()}.`);
+    },
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: api.syncAttendance,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['attendance-roster'] });
+      setSubmitMessage(`Offline sync envelope accepted at ${new Date().toLocaleTimeString()}.`);
     },
   });
 
@@ -253,6 +270,37 @@ export function AttendanceForm() {
           {submitMessage}
         </div>
       )}
+      <details className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <summary className="cursor-pointer text-sm font-bold text-slate-700">
+          Offline sync
+        </summary>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-slate-500">
+            Use this only for a saved draft captured during a connection problem. Normal attendance should use Submit Attendance.
+          </p>
+          <button
+            type="button"
+            disabled={syncMutation.isPending || roster.length === 0 || futureDateBlocked}
+            onClick={() => syncMutation.mutate({
+              academicYearId,
+              classId,
+              sectionId: sectionId || null,
+              attendanceDate: new Date(attendanceDate).toISOString(),
+              clientSubmissionId: `${classId}-${sectionId || 'all'}-${attendanceDate}`,
+              deviceTimestamp: new Date().toISOString(),
+              deviceLabel: 'SchoolOS web attendance',
+              exceptions: Object.entries(exceptions).map(([studentId, status]) => ({
+                studentId,
+                status,
+                remark: remarks[studentId]?.trim() || null,
+              })),
+            })}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 disabled:opacity-50"
+          >
+            {syncMutation.isPending ? 'Syncing...' : 'Sync offline draft'}
+          </button>
+        </div>
+      </details>
       {mutation.isError && (
         <div className="p-4 bg-destructive/5 border border-destructive/10 rounded-2xl flex items-center gap-3 text-destructive text-sm font-bold animate-fade-in">
           <AlertCircle size={18} />
@@ -264,6 +312,7 @@ export function AttendanceForm() {
 }
 
 function normalizeStatus(status: string | null | undefined): AttendanceStatus {
+  if (status && statusCycle.includes(status as AttendanceStatus)) return status as AttendanceStatus;
   if (status === 'A' || status === 'ABSENT') return 'ABSENT';
   if (status === 'L' || status === 'LATE') return 'LATE';
   if (status === 'LS' || status === 'SICK_LEAVE') return 'SICK_LEAVE';
