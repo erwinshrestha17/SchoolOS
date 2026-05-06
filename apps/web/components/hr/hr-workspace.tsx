@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import {
@@ -10,7 +9,7 @@ import {
   ClipboardCheck,
   Calculator,
   Briefcase,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react';
 import { StaffList } from './staff-list';
 import { ContractList } from './contract-list';
@@ -21,13 +20,15 @@ import { PayrollRuns } from './payroll-runs';
 import { SalaryStructureList } from './salary-structure-list';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { StatCard } from '../ui/stat-card';
-import { LoadingState } from '../ui/loading-state';
 
 type TabId = 'staff' | 'contracts' | 'leave' | 'attendance' | 'balances' | 'salary' | 'payroll';
 
 export function HRWorkspace() {
   const staffQuery = useQuery({ queryKey: ['staff'], queryFn: api.listStaff });
-  const contractsQuery = useQuery({ queryKey: ['contracts'], queryFn: api.listContracts });
+  const contractsQuery = useQuery({
+    queryKey: ['staff-contracts'],
+    queryFn: api.listStaffContracts,
+  });
   const leaveRequestsQuery = useQuery({ queryKey: ['leave-requests'], queryFn: api.listLeaveRequests });
 
   const tabs = [
@@ -52,13 +53,16 @@ export function HRWorkspace() {
         />
         <StatCard
           title="Active Contracts"
-          value={contractsQuery.data?.filter(c => c.status === 'ACTIVE').length ?? 0}
+          value={
+            contractsQuery.data?.filter((contract) => contract.status === 'ACTIVE')
+              .length ?? 0
+          }
           icon={<Briefcase className="h-5 w-5" />}
           loading={contractsQuery.isLoading}
         />
         <StatCard
           title="Pending Leave"
-          value={leaveRequestsQuery.data?.filter(l => l.status === 'PENDING').length ?? 0}
+          value={leaveRequestsQuery.data?.filter((leave) => leave.status === 'PENDING').length ?? 0}
           icon={<AlertCircle className="h-5 w-5" />}
           loading={leaveRequestsQuery.isLoading}
         />
