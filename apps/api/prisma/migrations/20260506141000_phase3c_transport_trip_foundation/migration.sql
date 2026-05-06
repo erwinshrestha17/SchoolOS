@@ -1,5 +1,7 @@
 -- Phase 3C: M8B Transport Management trip and live-location foundation
 
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
 CREATE TYPE "TransportTripStatus" AS ENUM ('ACTIVE', 'COMPLETED', 'CANCELLED');
 CREATE TYPE "TransportTripDirection" AS ENUM ('PICKUP', 'DROP');
 CREATE TYPE "TransportStudentTripStatus" AS ENUM ('PENDING', 'BOARDED', 'DROPPED', 'ABSENT');
