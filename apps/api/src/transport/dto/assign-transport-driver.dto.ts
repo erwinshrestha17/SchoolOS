@@ -4,6 +4,10 @@ export class AssignTransportDriverDto {
   @IsString()
   vehicleId!: string;
 
+  @IsOptional()
+  @IsString()
+  routeId?: string;
+
   @IsString()
   staffId!: string;
 

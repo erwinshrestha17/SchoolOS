@@ -6,17 +6,19 @@ import {
   Min,
 } from 'class-validator';
 
-export class CreateTransportVehicleDto {
+export class UpdateTransportVehicleDto {
+  @IsOptional()
   @IsString()
-  registrationNumber!: string;
+  registrationNumber?: string;
 
   @IsOptional()
   @IsString()
   model?: string;
 
+  @IsOptional()
   @IsInt()
   @Min(1)
-  capacity!: number;
+  capacity?: number;
 
   @IsOptional()
   @IsDateString()
@@ -25,4 +27,8 @@ export class CreateTransportVehicleDto {
   @IsOptional()
   @IsDateString()
   documentExpiry?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
 }

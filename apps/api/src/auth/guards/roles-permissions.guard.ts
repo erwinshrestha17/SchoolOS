@@ -55,6 +55,21 @@ const permissionAliases: Record<string, string[]> = {
   'library:issues:read': ['library:read'],
   'library:issues:return': ['library:manage'],
   'library:reports:read': ['library:read'],
+  'transport:routes:create': ['transport:manage'],
+  'transport:routes:read': ['transport:read'],
+  'transport:routes:update': ['transport:manage'],
+  'transport:vehicles:create': ['transport:manage'],
+  'transport:vehicles:read': ['transport:read'],
+  'transport:vehicles:update': ['transport:manage'],
+  'transport:assignments:create': ['transport:manage'],
+  'transport:assignments:read': ['transport:read'],
+  'transport:assignments:update': ['transport:manage'],
+  'transport:trips:create': ['transport:operate', 'transport:manage'],
+  'transport:trips:read': ['transport:read', 'transport:operate'],
+  'transport:trips:update': ['transport:operate', 'transport:manage'],
+  'transport:location:read': ['transport:read', 'transport:operate'],
+  'transport:location:update': ['transport:operate'],
+  'transport:reports:read': ['transport:read'],
 };
 
 function hasRequiredPermission(
