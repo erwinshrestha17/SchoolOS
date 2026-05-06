@@ -928,30 +928,6 @@ export function createPrismaMock() {
         return Promise.resolve(otp);
       }),
     },
-    auditLog: {
-      create: jest.fn((q: PrismaQuery) => {
-        const data = q.data ?? {};
-        const log = {
-          id: nextId('log'),
-          ...data,
-          createdAt: new Date(),
-        };
-        state.auditLogs.push(log as Record<string, unknown>);
-        return Promise.resolve(log);
-      }),
-      findFirst: jest.fn((q: PrismaQuery) =>
-        Promise.resolve(
-          [...state.auditLogs]
-            .reverse()
-            .find((log) => log.tenantId === q.where?.tenantId),
-        ),
-      ),
-      findMany: jest.fn((q: PrismaQuery) =>
-        Promise.resolve(
-          state.auditLogs.filter((log) => log.tenantId === q.where?.tenantId),
-        ),
-      ),
-    },
     refreshToken: {
       create: jest.fn((q: PrismaQuery) => {
         state.refreshTokens.push((q.data ?? {}) as Record<string, unknown>);

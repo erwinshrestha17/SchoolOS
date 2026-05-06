@@ -68,7 +68,11 @@ function sumLines(
 describe('AccountingPostingService payroll posting', () => {
   it('creates a balanced immutable payroll accrual journal', async () => {
     const client = createPostingClient();
-    const service = new AccountingPostingService(client as never);
+    const auditService = { record: jest.fn() };
+    const service = new AccountingPostingService(
+      client as never,
+      auditService as never,
+    );
 
     const entry = await service.postPayrollAccrual(
       {
@@ -100,7 +104,11 @@ describe('AccountingPostingService payroll posting', () => {
     const client = createPostingClient({
       existingJournal: { entryNumber: 'JE-2026-00005' },
     });
-    const service = new AccountingPostingService(client as never);
+    const auditService = { record: jest.fn() };
+    const service = new AccountingPostingService(
+      client as never,
+      auditService as never,
+    );
 
     await expect(
       service.postPayrollAccrual(
@@ -123,7 +131,11 @@ describe('AccountingPostingService payroll posting', () => {
     const client = createPostingClient({
       closedPeriod: { name: 'FY 2026 Closed' },
     });
-    const service = new AccountingPostingService(client as never);
+    const auditService = { record: jest.fn() };
+    const service = new AccountingPostingService(
+      client as never,
+      auditService as never,
+    );
 
     await expect(
       service.postPayrollAccrual(

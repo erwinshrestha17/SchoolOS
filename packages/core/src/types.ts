@@ -20,6 +20,9 @@ export type AuthSession = {
 export type PaginatedResponse<T> = {
   items: T[];
   total: number;
+  page?: number;
+  limit?: number;
+  hasNextPage?: boolean;
 };
 
 export type ApiResponse<T> = {

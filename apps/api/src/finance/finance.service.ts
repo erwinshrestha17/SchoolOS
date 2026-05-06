@@ -2478,7 +2478,7 @@ export class FinanceService {
           lines: reversedDebitLines.map((line) => ({
             chartAccountId: line.chartAccountId,
             amount: line.amount,
-            description: line.description,
+            description: line.description ?? 'Payment refund reversal',
           })),
         },
         actor,
