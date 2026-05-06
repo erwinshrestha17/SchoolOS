@@ -328,3 +328,13 @@ button {
   margin: 0 2px;
   user-select: none;
 }
+
+/* ─── Scrollbar Hide utility ─── */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

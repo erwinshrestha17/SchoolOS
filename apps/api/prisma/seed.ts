@@ -102,6 +102,7 @@ async function main() {
 
   await seedUsersWithRoles(tenant.id);
   await seedClassesAndSections(tenant.id);
+  await seedTenantSettings(tenant.id);
 
   console.log('');
   console.log('✅ SchoolOS seed completed successfully.');
@@ -124,6 +125,51 @@ async function main() {
   console.log(
     '- Add real demo students, guardians, admissions, invoices, attendance records, and payments once the exact Prisma model fields are confirmed.',
   );
+}
+
+async function seedTenantSettings(tenantId: string) {
+  console.log('Seeding default tenant settings...');
+
+  const defaults: Array<{ key: string; value: any }> = [
+    { key: 'school_name', value: 'Everest Academy Secondary School' },
+    { key: 'school_address', value: 'Bakhundole, Lalitpur, Nepal' },
+    { key: 'school_phone', value: '+977-1-5555555' },
+    { key: 'school_email', value: 'info@everest.edu.np' },
+    { key: 'school_pan_number', value: '601234567' },
+    { key: 'branding_primary_color', value: '#6366f1' },
+    { key: 'timezone', value: 'Asia/Kathmandu' },
+    { key: 'currency', value: 'NPR' },
+    { key: 'date_format', value: 'YYYY-MM-DD' },
+    { key: 'attendance_lock_hours', value: 24 },
+    { key: 'payroll_month_day', value: 25 },
+    { key: 'default_working_days_per_month', value: 26 },
+    { key: 'pf_enabled', value: true },
+    { key: 'tds_enabled', value: true },
+    { key: 'active_academic_year_label', value: '2081/82' },
+    { key: 'active_fiscal_year_label', value: 'FY 2081/82' },
+    { key: 'chat_sunday_to_thursday_hours', value: '4:00 PM–7:00 PM' },
+    { key: 'chat_friday_hours', value: '2:00 PM–5:00 PM' },
+    { key: 'chat_saturday_enabled', value: false },
+  ];
+
+  for (const item of defaults) {
+    await prisma.tenantSetting.upsert({
+      where: {
+        tenantId_key: {
+          tenantId,
+          key: item.key,
+        },
+      },
+      update: {
+        value: item.value,
+      },
+      create: {
+        tenantId,
+        key: item.key,
+        value: item.value,
+      },
+    });
+  }
 }
 
 async function seedTenant() {

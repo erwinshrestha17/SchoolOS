@@ -6,7 +6,7 @@ const Tabs = ({ children, defaultValue, className }: { children: React.ReactNode
     <div className={className}>
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child)) {
-          return React.cloneElement(child as React.ReactElement<any>, { value, setValue });
+          return React.cloneElement(child as React.ReactElement<any>, { activeValue: value, setValue });
         }
         return child;
       })}
@@ -14,11 +14,11 @@ const Tabs = ({ children, defaultValue, className }: { children: React.ReactNode
   );
 };
 
-const TabsList = ({ children, className, value, setValue }: any) => (
+const TabsList = ({ children, className, activeValue, setValue }: any) => (
   <div className={`inline-flex h-10 items-center justify-center rounded-lg bg-gray-100 p-1 text-gray-500 ${className}`}>
     {React.Children.map(children, (child) => {
       if (React.isValidElement(child)) {
-        return React.cloneElement(child as React.ReactElement<any>, { activeValue: value, setValue });
+        return React.cloneElement(child as React.ReactElement<any>, { activeValue, setValue });
       }
       return child;
     })}

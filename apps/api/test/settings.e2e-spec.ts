@@ -236,5 +236,27 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     expect(
       publicSettings.find((s) => s.key === 'feature_toggles'),
     ).toBeUndefined();
+
+    // 11. New Keys Verification
+    await settingsController.updateSetting(
+      'school_name',
+      { value: 'Everest Academy' },
+      { auth: authA } as unknown as AuthenticatedRequest,
+    );
+    await settingsController.updateSetting(
+      'active_fiscal_year_label',
+      { value: 'FY 2081/82' },
+      { auth: authA } as unknown as AuthenticatedRequest,
+    );
+
+    const updatedSettings = await settingsController.getSettings({
+      auth: authA,
+    } as unknown as AuthenticatedRequest);
+    expect(updatedSettings.find((s) => s.key === 'school_name')?.value).toBe(
+      'Everest Academy',
+    );
+    expect(
+      updatedSettings.find((s) => s.key === 'active_fiscal_year_label')?.value,
+    ).toBe('FY 2081/82');
   });
 });
