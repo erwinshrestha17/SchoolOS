@@ -1,30 +1,168 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Landmark, Lock, RefreshCcw } from 'lucide-react';
+import { Download, Landmark, RefreshCcw, FileText, BarChart3, PieChart, History, Wallet } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../../lib/api';
 import { SectionCard } from '../ui/section-card';
 import { StatCard } from '../ui/stat-card';
 import { cn } from '../../lib/utils';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
+import { ReportFilters } from './report-filters';
+import { ReportTable } from './report-table';
+import { FiscalPeriodActions } from './fiscal-period-actions';
+
+type ReportType = 'trial-balance' | 'income-statement' | 'balance-sheet' | 'general-ledger' | 'cash-book';
 
 export function AccountingWorkspace() {
   const queryClient = useQueryClient();
+  const [activeReport, setActiveReport] = useState<ReportType>('trial-balance');
+  const [filters, setFilters] = useState<{
+    startDate?: string;
+    endDate?: string;
+    fiscalYearId?: string;
+    fiscalPeriodId?: string;
+  }>({});
+
   const accountsQuery = useQuery({ queryKey: ['chart-accounts'], queryFn: api.listChartAccounts });
-  const journalsQuery = useQuery({ queryKey: ['general-ledger'], queryFn: api.listGeneralLedger });
   const fiscalYearsQuery = useQuery({ queryKey: ['fiscal-years'], queryFn: api.listFiscalYears });
-  const reportQuery = useQuery({ queryKey: ['accounting-reports'], queryFn: api.listAccountingReports });
+  
+  const reportQuery = useQuery({ 
+    queryKey: ['accounting-report', activeReport, filters], 
+    queryFn: () => {
+      if (activeReport === 'trial-balance') return api.listTrialBalance(filters);
+      if (activeReport === 'income-statement') return api.listIncomeStatement(filters);
+      if (activeReport === 'balance-sheet') return api.listBalanceSheet(filters);
+      if (activeReport === 'general-ledger') return api.listGeneralLedger(filters);
+      return api.listCashBook(filters);
+    }
+  });
 
   const seedMutation = useMutation({
     mutationFn: api.seedDefaultChartAccounts,
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['chart-accounts'] }),
   });
+  
   const exportMutation = useMutation({ mutationFn: api.exportAccountingCsv });
+
+  const renderReportContent = () => {
+    if (reportQuery.isLoading) return <div className="py-20 text-center text-slate-400">Loading report data...</div>;
+    if (reportQuery.isError) return <div className="py-20 text-center text-rose-500">Failed to load report.</div>;
+
+    const data = reportQuery.data;
+
+    if (activeReport === 'trial-balance') {
+      return (
+        <ReportTable
+          headers={['Code', 'Account', 'Type', 'Debit', 'Credit', 'Balance']}
+          rows={(data as any[] ?? []).map((row) => ({
+            id: row.accountId,
+            cells: [
+              { value: row.code, bold: true },
+              { value: row.name },
+              { value: row.type },
+              { value: row.debit, type: 'currency' },
+              { value: row.credit, type: 'currency' },
+              { value: row.balance, type: 'currency', bold: true },
+            ],
+          }))}
+        />
+      );
+    }
+
+    if (activeReport === 'income-statement') {
+      const pnl = data as any;
+      const groups = pnl?.groups ?? {};
+      
+      const rows: any[] = [];
+      
+      rows.push({ id: 'rev-header', isHeader: true, cells: [{ value: 'REVENUE', bold: true }] });
+      (groups.revenue ?? []).forEach((r: any) => {
+        rows.push({ id: r.accountId, cells: [{ value: r.name, indent: 1 }, { value: '' }, { value: '' }, { value: r.balance * -1, type: 'currency' }] });
+      });
+      rows.push({ id: 'rev-total', isFooter: true, cells: [{ value: 'Total Revenue' }, { value: '' }, { value: '' }, { value: pnl?.income ?? 0, type: 'currency' }] });
+
+      rows.push({ id: 'exp-header', isHeader: true, className: 'mt-4', cells: [{ value: 'EXPENSES', bold: true }] });
+      (groups.expenses ?? []).forEach((e: any) => {
+        rows.push({ id: e.accountId, cells: [{ value: e.name, indent: 1 }, { value: '' }, { value: '' }, { value: e.balance, type: 'currency' }] });
+      });
+      rows.push({ id: 'exp-total', isFooter: true, cells: [{ value: 'Total Expenses' }, { value: '' }, { value: '' }, { value: pnl?.expenses ?? 0, type: 'currency' }] });
+
+      rows.push({ id: 'net-total', isFooter: true, className: 'bg-slate-900 text-white hover:bg-slate-900', cells: [{ value: 'NET INCOME', bold: true }, { value: '' }, { value: '' }, { value: pnl?.netIncome ?? 0, type: 'currency' }] });
+
+      return <ReportTable headers={['Classification', '', '', 'Amount']} rows={rows} />;
+    }
+
+    if (activeReport === 'balance-sheet') {
+      const bs = data as any;
+      const rows: any[] = [];
+
+      rows.push({ id: 'ast-header', isHeader: true, cells: [{ value: 'ASSETS', bold: true }] });
+      (bs.assets ?? []).forEach((a: any) => {
+        rows.push({ id: a.accountId, cells: [{ value: a.name, indent: 1 }, { value: a.balance, type: 'currency' }] });
+      });
+      rows.push({ id: 'ast-total', isFooter: true, cells: [{ value: 'Total Assets' }, { value: bs.totals?.assets ?? 0, type: 'currency' }] });
+
+      rows.push({ id: 'liab-header', isHeader: true, cells: [{ value: 'LIABILITIES', bold: true }] });
+      (bs.liabilities ?? []).forEach((l: any) => {
+        rows.push({ id: l.accountId, cells: [{ value: l.name, indent: 1 }, { value: l.balance * -1, type: 'currency' }] });
+      });
+      rows.push({ id: 'liab-total', isFooter: true, cells: [{ value: 'Total Liabilities' }, { value: bs.totals?.liabilities ?? 0, type: 'currency' }] });
+
+      rows.push({ id: 'eq-header', isHeader: true, cells: [{ value: 'EQUITY', bold: true }] });
+      (bs.equity ?? []).forEach((e: any) => {
+        rows.push({ id: e.accountId, cells: [{ value: e.name, indent: 1 }, { value: e.balance * -1, type: 'currency' }] });
+      });
+      rows.push({ id: 'eq-total', isFooter: true, cells: [{ value: 'Total Equity' }, { value: bs.totals?.equity ?? 0, type: 'currency' }] });
+
+      return <ReportTable headers={['Account', 'Balance']} rows={rows} />;
+    }
+
+    if (activeReport === 'general-ledger') {
+      return (
+        <ReportTable
+          headers={['Date', 'Journal', 'Account', 'Debit', 'Credit', 'Balance']}
+          rows={(data as any[] ?? []).map((row, index) => ({
+            id: `${row.journalNumber}-${index}`,
+            cells: [
+              { value: row.date, type: 'date' },
+              { value: row.journalNumber, bold: true },
+              { value: row.accountName },
+              { value: row.debit, type: 'currency' },
+              { value: row.credit, type: 'currency' },
+              { value: row.runningBalance, type: 'currency', bold: true },
+            ],
+          }))}
+        />
+      );
+    }
+
+    if (activeReport === 'cash-book') {
+      const cb = data as any;
+      return (
+        <ReportTable
+          headers={['Date', 'Journal', 'Narration', 'Receipt', 'Payment', 'Balance']}
+          rows={(cb.rows as any[] ?? []).map((row, index) => ({
+            id: `${row.journalNumber}-${index}`,
+            cells: [
+              { value: row.date, type: 'date' },
+              { value: row.journalNumber },
+              { value: row.narration },
+              { value: row.debit, type: 'currency' },
+              { value: row.credit, type: 'currency' },
+              { value: row.runningBalance, type: 'currency', bold: true },
+            ],
+          }))}
+        />
+      );
+    }
+
+    return null;
+  };
 
   return (
     <div className="space-y-5">
-      <Tabs defaultValue="accounts" className="space-y-5">
+      <Tabs defaultValue="reports" className="space-y-5">
         <TabsList className="flex flex-wrap h-auto gap-2 border-b border-slate-200 bg-transparent rounded-none p-0 pb-px w-full justify-start">
           {(['accounts', 'journals', 'periods', 'reports'] as const).map((item) => (
             <TabsTrigger
@@ -52,37 +190,39 @@ export function AccountingWorkspace() {
               </button>
             }
           >
-            <Table
+            <ReportTable
+              headers={['Code', 'Name', 'Group', 'Kind']}
               rows={(accountsQuery.data ?? []).map((account) => ({
                 id: account.id,
-                cells: [account.code, account.name, account.type, account.isSystem ? 'System' : 'Custom'],
+                cells: [
+                  { value: account.code, bold: true },
+                  { value: account.name },
+                  { value: account.type },
+                  { value: account.isSystem ? 'System' : 'Custom' }
+                ],
               }))}
-              headers={['Code', 'Name', 'Group', 'Kind']}
             />
           </SectionCard>
         </TabsContent>
 
         <TabsContent value="journals" className="mt-0">
           <SectionCard
-            title="General Ledger"
-            description="Chronological record of all financial transactions across the school."
-            headerAction={
-              <button
-                type="button"
-                onClick={() => exportMutation.mutate('general-ledger')}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-              >
-                <Download size={16} />
-                CSV
-              </button>
-            }
+            title="All Journal Entries"
+            description="Complete list of all financial postings in chronological order."
           >
-            <Table
-              rows={(journalsQuery.data ?? []).slice(0, 80).map((row: any, index) => ({
-                id: `${row.journalNumber}-${index}`,
-                cells: [row.date?.slice?.(0, 10) ?? '', row.journalNumber, row.accountName, row.debit, row.credit, row.runningBalance],
+            <ReportTable
+              headers={['Date', 'Number', 'Narration', 'Module', 'Type', 'Amount']}
+              rows={(reportQuery.data as any[] ?? []).map((entry) => ({
+                id: entry.id,
+                cells: [
+                  { value: entry.entryDate, type: 'date' },
+                  { value: entry.entryNumber, bold: true },
+                  { value: entry.narration },
+                  { value: entry.sourceModule },
+                  { value: entry.postingType },
+                  { value: entry.lines?.[0]?.amount ?? 0, type: 'currency' }
+                ],
               }))}
-              headers={['Date', 'Journal', 'Account', 'Debit', 'Credit', 'Balance']}
             />
           </SectionCard>
         </TabsContent>
@@ -109,12 +249,21 @@ export function AccountingWorkspace() {
                       {year.status}
                     </span>
                   </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {(year.periods ?? []).map((period) => (
-                      <span key={period.id} className="inline-flex items-center gap-1.5 rounded-full bg-white border border-slate-100 px-3 py-1 text-xs font-bold text-slate-600 shadow-sm">
-                        <Lock size={12} className="text-slate-400" />
-                        {period.label}: {period.status}
-                      </span>
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                    {(year.periods ?? []).map((period: any) => (
+                      <div key={period.id} className="flex flex-col gap-1 rounded-2xl bg-white border border-slate-100 p-3 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{period.label}</span>
+                          <span className={cn(
+                            "h-2 w-2 rounded-full",
+                            period.status === 'OPEN' ? "bg-emerald-500" : period.status === 'LOCKED' ? "bg-amber-500" : "bg-slate-400"
+                          )} />
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-xs font-bold text-slate-700">{period.status}</span>
+                          <FiscalPeriodActions periodId={period.id} status={period.status} label={period.label} />
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -124,59 +273,51 @@ export function AccountingWorkspace() {
         </TabsContent>
 
         <TabsContent value="reports" className="mt-0">
-          <SectionCard
-            title="Financial Reports"
-            description="High-level financial summaries and net income tracking."
-            headerAction={
-              <button
-                type="button"
-                onClick={() => void reportQuery.refetch()}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-              >
-                <RefreshCcw size={16} />
-                Refresh
-              </button>
-            }
-          >
-            <div className="grid gap-4 md:grid-cols-4">
-              <StatCard title="Debit" value={reportQuery.data?.totals.debit ?? 0} />
-              <StatCard title="Credit" value={reportQuery.data?.totals.credit ?? 0} />
-              <StatCard title="Net Income" value={reportQuery.data?.incomeStatement.netIncome ?? 0} />
-              <StatCard title="Balanced" value={reportQuery.data?.balanced ? 'Yes' : 'No'} />
-            </div>
-          </SectionCard>
+          <div className="space-y-4">
+            <SectionCard>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { id: 'trial-balance', label: 'Trial Balance', icon: BarChart3 },
+                    { id: 'income-statement', label: 'P&L / Income', icon: FileText },
+                    { id: 'balance-sheet', label: 'Balance Sheet', icon: PieChart },
+                    { id: 'general-ledger', label: 'General Ledger', icon: History },
+                    { id: 'cash-book', label: 'Cash Book', icon: Wallet },
+                  ].map((report) => (
+                    <button
+                      key={report.id}
+                      onClick={() => setActiveReport(report.id as ReportType)}
+                      className={cn(
+                        "inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all",
+                        activeReport === report.id
+                          ? "bg-primary-600 text-white shadow-lg shadow-primary-600/20"
+                          : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                      )}
+                    >
+                      <report.icon size={16} />
+                      {report.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => exportMutation.mutate(activeReport)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  <Download size={16} />
+                  Export CSV
+                </button>
+              </div>
+              <div className="mt-6 border-t border-slate-100 pt-6">
+                <ReportFilters onFilterChange={(f) => setFilters(prev => ({ ...prev, ...f }))} />
+              </div>
+            </SectionCard>
+
+            <SectionCard>
+              {renderReportContent()}
+            </SectionCard>
+          </div>
         </TabsContent>
       </Tabs>
-    </div>
-  );
-}
-
-function Table({ headers, rows }: { headers: string[]; rows: Array<{ id: string; cells: unknown[] }> }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-slate-100 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">
-            {headers.map((header) => <th key={header} className="px-4 py-3">{header}</th>)}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-50">
-          {rows.map((row) => (
-            <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
-              {row.cells.map((cell, index) => (
-                <td key={index} className="px-4 py-4 text-slate-600 font-medium">
-                  {String(cell ?? '')}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {rows.length === 0 ? (
-        <div className="py-12 text-center text-sm text-slate-400 font-medium">
-          No records found.
-        </div>
-      ) : null}
     </div>
   );
 }

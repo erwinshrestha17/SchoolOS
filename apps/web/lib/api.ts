@@ -1102,18 +1102,24 @@ export const api = {
       `/accounting/fiscal-periods/${encodeURIComponent(id)}/reopen`,
       { method: 'POST', json: body },
     ),
-  listAccountingReports: () => request<AccountingReport>('/accounting/reports'),
-  listTrialBalance: () =>
-    request<AccountingReport['trialBalance']>('/accounting/reports/trial-balance'),
-  listGeneralLedger: () =>
-    request<unknown[]>('/accounting/reports/general-ledger'),
-  listIncomeStatement: () =>
-    request<AccountingReport['incomeStatement']>(
-      '/accounting/reports/income-statement',
+  listAccountingReports: (params?: JsonBody) =>
+    request<AccountingReport>(withQuery('/accounting/reports', params ?? {})),
+  listTrialBalance: (params?: JsonBody) =>
+    request<AccountingReport['trialBalance']>(
+      withQuery('/accounting/reports/trial-balance', params ?? {}),
     ),
-  listBalanceSheet: () =>
-    request<AccountingReport['balanceSheet']>('/accounting/reports/balance-sheet'),
-  listCashBook: () => request<unknown>('/accounting/reports/cash-book'),
+  listGeneralLedger: (params?: JsonBody) =>
+    request<unknown[]>(withQuery('/accounting/reports/general-ledger', params ?? {})),
+  listIncomeStatement: (params?: JsonBody) =>
+    request<AccountingReport['incomeStatement']>(
+      withQuery('/accounting/reports/income-statement', params ?? {}),
+    ),
+  listBalanceSheet: (params?: JsonBody) =>
+    request<AccountingReport['balanceSheet']>(
+      withQuery('/accounting/reports/balance-sheet', params ?? {}),
+    ),
+  listCashBook: (params?: JsonBody) =>
+    request<unknown>(withQuery('/accounting/reports/cash-book', params ?? {})),
   exportAccountingCsv: async (report: string) => {
     const response = await fetch(
       `${API_BASE_URL}/accounting/exports/${encodeURIComponent(report)}.csv`,

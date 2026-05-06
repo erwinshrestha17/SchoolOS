@@ -126,6 +126,59 @@ describe('accounting reversals', () => {
   });
 });
 
+describe('fiscal period status updates', () => {
+  it('allows locking a period without a reason', async () => {
+    const period = { id: 'p1', status: 'OPEN', label: '2026-04' };
+    const { service, prisma } = buildService({
+      fiscalPeriod: period,
+    });
+
+    await service.updateFiscalPeriodStatus(
+      'p1',
+      'LOCKED' as any,
+      {},
+      actor as any,
+    );
+
+    expect(prisma.fiscalPeriod.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'LOCKED' }),
+      }),
+    );
+  });
+
+  it('enforces a mandatory reason when reopening a period', async () => {
+    const period = { id: 'p1', status: 'LOCKED', label: '2026-04' };
+    const { service } = buildService({
+      fiscalPeriod: period,
+    });
+
+    await expect(
+      service.updateFiscalPeriodStatus('p1', 'OPEN' as any, {}, actor as any),
+    ).rejects.toThrow('Reason is mandatory for reopening a fiscal period');
+  });
+
+  it('allows reopening with a reason', async () => {
+    const period = { id: 'p1', status: 'LOCKED', label: '2026-04' };
+    const { service, prisma } = buildService({
+      fiscalPeriod: period,
+    });
+
+    await service.updateFiscalPeriodStatus(
+      'p1',
+      'OPEN' as any,
+      { reason: 'Correction needed' },
+      actor as any,
+    );
+
+    expect(prisma.fiscalPeriod.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'OPEN' }),
+      }),
+    );
+  });
+});
+
 function buildOriginalJournal() {
   return {
     id: 'journal-original',
@@ -151,11 +204,12 @@ function buildOriginalJournal() {
 }
 
 function buildService(options: {
-  original: unknown;
-  existingReversal: unknown;
-  closedPeriod: unknown;
-  createdReversal: unknown;
-  journalCount: number;
+  original?: unknown;
+  existingReversal?: unknown;
+  closedPeriod?: unknown;
+  createdReversal?: unknown;
+  journalCount?: number;
+  fiscalPeriod?: unknown;
 }) {
   const prisma = {
     journalEntry: {
@@ -163,14 +217,15 @@ function buildService(options: {
         .fn()
         .mockResolvedValueOnce(options.original)
         .mockResolvedValueOnce(options.existingReversal),
-      count: jest.fn().mockResolvedValue(options.journalCount),
+      count: jest.fn().mockResolvedValue(options.journalCount ?? 0),
       create: jest.fn().mockResolvedValue(options.createdReversal),
     },
     accountingPeriod: {
       findFirst: jest.fn().mockResolvedValue(options.closedPeriod),
     },
     fiscalPeriod: {
-      findFirst: jest.fn().mockResolvedValue(null),
+      findFirst: jest.fn().mockResolvedValue(options.fiscalPeriod),
+      update: jest.fn().mockResolvedValue(options.fiscalPeriod),
     },
   };
   const auditService = {

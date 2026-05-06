@@ -24,6 +24,7 @@ import { CreateExpenseDto } from './dto/create-expense.dto';
 import { CreateFiscalYearDto } from './dto/create-fiscal-year.dto';
 import { CreateManualJournalDto } from './dto/create-manual-journal.dto';
 import { ReconciliationQueryDto } from './dto/reconciliation-query.dto';
+import { ReportsQueryDto } from './dto/reports-query.dto';
 import { ReverseJournalEntryDto } from './dto/reverse-journal-entry.dto';
 
 @Controller('accounting')
@@ -178,20 +179,29 @@ export class AccountingController {
 
   @Get('reports')
   @Permissions('accounting:reports:read')
-  reports(@CurrentAuth() auth: AuthContext) {
-    return this.accountingService.buildReports(auth);
+  reports(
+    @Query() query: ReportsQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.buildReports(auth, query);
   }
 
   @Get('reports/trial-balance')
   @Permissions('accounting:reports:read')
-  trialBalance(@CurrentAuth() auth: AuthContext) {
-    return this.accountingService.getTrialBalance(auth);
+  trialBalance(
+    @Query() query: ReportsQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.getTrialBalance(auth, query);
   }
 
   @Get('reports/general-ledger')
   @Permissions('accounting:reports:read')
-  generalLedger(@CurrentAuth() auth: AuthContext) {
-    return this.accountingService.getGeneralLedger(auth);
+  generalLedger(
+    @Query() query: ReportsQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.getGeneralLedger(auth, query);
   }
 
   @Get('accounts/:accountId/ledger')
@@ -205,20 +215,29 @@ export class AccountingController {
 
   @Get('reports/income-statement')
   @Permissions('accounting:reports:read')
-  incomeStatement(@CurrentAuth() auth: AuthContext) {
-    return this.accountingService.getIncomeStatement(auth);
+  incomeStatement(
+    @Query() query: ReportsQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.getIncomeStatement(auth, query);
   }
 
   @Get('reports/balance-sheet')
   @Permissions('accounting:reports:read')
-  balanceSheet(@CurrentAuth() auth: AuthContext) {
-    return this.accountingService.getBalanceSheet(auth);
+  balanceSheet(
+    @Query() query: ReportsQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.getBalanceSheet(auth, query);
   }
 
   @Get('reports/cash-book')
   @Permissions('accounting:reports:read')
-  cashBook(@CurrentAuth() auth: AuthContext) {
-    return this.accountingService.getCashBook(auth);
+  cashBook(
+    @Query() query: ReportsQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.getCashBook(auth, query);
   }
 
   @Get('reports/vat-summary')

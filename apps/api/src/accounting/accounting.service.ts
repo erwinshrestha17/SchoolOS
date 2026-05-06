@@ -390,11 +390,43 @@ export class AccountingService {
     );
   }
 
-  async buildReports(actor: AuthContext) {
+  async buildReports(actor: AuthContext, query?: ReportsQueryDto) {
+    const where: Prisma.JournalLineWhereInput = {
+      tenantId: actor.tenantId,
+      journalEntry: {
+        status: JournalEntryStatus.POSTED,
+      },
+    };
+
+    if (query?.startDate || query?.endDate) {
+      where.journalEntry = {
+        ...where.journalEntry,
+        entryDate: {
+          gte: query.startDate ? new Date(query.startDate) : undefined,
+          lte: query.endDate ? new Date(query.endDate) : undefined,
+        },
+      };
+    }
+
+    if (query?.fiscalYearId) {
+      where.journalEntry = {
+        ...where.journalEntry,
+        fiscalYearId: query.fiscalYearId,
+      };
+    }
+
+    if (query?.fiscalPeriodId) {
+      where.journalEntry = {
+        ...where.journalEntry,
+        fiscalPeriodId: query.fiscalPeriodId,
+      };
+    }
+
     const accounts = await this.prisma.chartAccount.findMany({
       where: { tenantId: actor.tenantId },
       include: {
         journalLines: {
+          where,
           include: {
             journalEntry: true,
           },
@@ -431,11 +463,12 @@ export class AccountingService {
       }),
       { debit: 0, credit: 0 },
     );
+
     const income = trialBalance
-      .filter((row) => row.type === 'INCOME' || row.type === 'REVENUE')
+      .filter((row) => row.type === ChartAccountType.REVENUE)
       .reduce((sum, row) => sum + row.credit - row.debit, 0);
     const expenses = trialBalance
-      .filter((row) => row.type === 'EXPENSE')
+      .filter((row) => row.type === ChartAccountType.EXPENSE)
       .reduce((sum, row) => sum + row.debit - row.credit, 0);
 
     return {
@@ -445,15 +478,27 @@ export class AccountingService {
         income,
         expenses,
         netIncome: income - expenses,
+        groups: {
+          revenue: trialBalance.filter((r) => r.type === ChartAccountType.REVENUE),
+          expenses: trialBalance.filter((r) => r.type === ChartAccountType.EXPENSE),
+        },
       },
       balanceSheet: {
-        assets: sumRows(trialBalance, 'ASSET'),
-        liabilities: sumRows(trialBalance, 'LIABILITY'),
-        equity: sumRows(trialBalance, 'EQUITY'),
+        assets: trialBalance.filter((r) => r.type === ChartAccountType.ASSET),
+        liabilities: trialBalance.filter((r) => r.type === ChartAccountType.LIABILITY),
+        equity: trialBalance.filter((r) => r.type === ChartAccountType.EQUITY),
+        totals: {
+          assets: sumRows(trialBalance, ChartAccountType.ASSET),
+          liabilities: sumRows(trialBalance, ChartAccountType.LIABILITY),
+          equity: sumRows(trialBalance, ChartAccountType.EQUITY),
+        },
       },
       cashFlow: {
         netCashMovement: trialBalance
-          .filter((row) => row.type === 'ASSET' && /cash|bank/i.test(row.name))
+          .filter(
+            (row) =>
+              row.type === ChartAccountType.ASSET && /cash|bank/i.test(row.name),
+          )
           .reduce((sum, row) => sum + row.balance, 0),
       },
       balanced: Math.abs(totals.debit - totals.credit) < 0.01,
@@ -569,6 +614,10 @@ export class AccountingService {
       throw new NotFoundException('Fiscal period not found in this tenant');
     }
 
+    if (status === AccountingPeriodStatus.OPEN && !dto.reason) {
+      throw new ConflictException('Reason is mandatory for reopening a fiscal period');
+    }
+
     const updated = await this.prisma.fiscalPeriod.update({
       where: { id: period.id },
       data: {
@@ -582,7 +631,7 @@ export class AccountingService {
     });
 
     await this.auditService.record({
-      action: status.toLowerCase(),
+      action: status === AccountingPeriodStatus.OPEN ? 'reopen' : status.toLowerCase(),
       resource: 'fiscal_period',
       tenantId: actor.tenantId,
       userId: actor.userId,
@@ -622,21 +671,52 @@ export class AccountingService {
     });
   }
 
-  async getTrialBalance(actor: AuthContext) {
-    return (await this.buildReports(actor)).trialBalance;
+  async getTrialBalance(actor: AuthContext, query?: ReportsQueryDto) {
+    return (await this.buildReports(actor, query)).trialBalance;
   }
 
-  async getIncomeStatement(actor: AuthContext) {
-    return (await this.buildReports(actor)).incomeStatement;
+  async getIncomeStatement(actor: AuthContext, query?: ReportsQueryDto) {
+    return (await this.buildReports(actor, query)).incomeStatement;
   }
 
-  async getBalanceSheet(actor: AuthContext) {
-    return (await this.buildReports(actor)).balanceSheet;
+  async getBalanceSheet(actor: AuthContext, query?: ReportsQueryDto) {
+    return (await this.buildReports(actor, query)).balanceSheet;
   }
 
-  async getGeneralLedger(actor: AuthContext) {
+  async getGeneralLedger(actor: AuthContext, query?: ReportsQueryDto) {
+    const where: Prisma.JournalLineWhereInput = {
+      tenantId: actor.tenantId,
+      journalEntry: {
+        status: JournalEntryStatus.POSTED,
+      },
+    };
+
+    if (query?.startDate || query?.endDate) {
+      where.journalEntry = {
+        ...where.journalEntry,
+        entryDate: {
+          gte: query.startDate ? new Date(query.startDate) : undefined,
+          lte: query.endDate ? new Date(query.endDate) : undefined,
+        },
+      };
+    }
+
+    if (query?.fiscalYearId) {
+      where.journalEntry = {
+        ...where.journalEntry,
+        fiscalYearId: query.fiscalYearId,
+      };
+    }
+
+    if (query?.fiscalPeriodId) {
+      where.journalEntry = {
+        ...where.journalEntry,
+        fiscalPeriodId: query.fiscalPeriodId,
+      };
+    }
+
     const lines = await this.prisma.journalLine.findMany({
-      where: { tenantId: actor.tenantId },
+      where,
       include: {
         chartAccount: true,
         journalEntry: true,
@@ -646,6 +726,8 @@ export class AccountingService {
         { journalEntry: { entryNumber: 'asc' } },
         { lineNumber: 'asc' },
       ],
+      skip: query?.page && query?.limit ? (query.page - 1) * query.limit : 0,
+      take: query?.limit ?? 1000,
     });
     const running = new Map<string, number>();
 
@@ -684,8 +766,8 @@ export class AccountingService {
     );
   }
 
-  async getCashBook(actor: AuthContext) {
-    const ledger = await this.getGeneralLedger(actor);
+  async getCashBook(actor: AuthContext, query?: ReportsQueryDto) {
+    const ledger = await this.getGeneralLedger(actor, query);
     const rows = ledger.filter((line) => /cash|bank/i.test(line.accountName));
 
     return {
