@@ -172,9 +172,7 @@ describe('production data integrity contracts', () => {
   });
 
   it('enforces ledger write-boundary for journal entries', () => {
-    const authorizedServices = [
-      'accounting/accounting-posting.service.ts',
-    ];
+    const authorizedServices = ['accounting/accounting-posting.service.ts'];
 
     const offenders = readSourceFiles()
       .filter(({ path, content }) => {

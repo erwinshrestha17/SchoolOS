@@ -12,11 +12,14 @@ import { BullModule } from '@nestjs/bullmq';
 import { FinanceProcessor } from './finance.processor';
 import { FinanceCron } from './finance.cron';
 
+import { AccountingPostingModule } from '../accounting/accounting-posting.module';
+
 @Module({
   imports: [
     AuthModule,
     AuditModule,
     CommunicationsModule,
+    AccountingPostingModule,
     BullModule.registerQueue({
       name: 'finance',
     }),

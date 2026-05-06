@@ -257,6 +257,24 @@ export function TimetableBuilderTab({
                     <CheckCircle2 className="h-3 w-3" />
                     Publish
                   </button>
+                  <button
+                    type="button"
+                    className="h-9 px-4 rounded-full bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-colors flex items-center gap-2"
+                    onClick={() => activeVersionId && lockVersionMut.mutate(activeVersionId)}
+                    disabled={!activeVersionId || lockVersionMut.isPending}
+                  >
+                    <Lock className="h-3 w-3" />
+                    Lock
+                  </button>
+                  <button
+                    type="button"
+                    className="h-9 px-4 rounded-full bg-red-50 text-red-700 text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-colors flex items-center gap-2"
+                    onClick={() => activeVersionId && archiveVersionMut.mutate(activeVersionId)}
+                    disabled={!activeVersionId || archiveVersionMut.isPending}
+                  >
+                    <Archive className="h-3 w-3" />
+                    Archive
+                  </button>
                 </div>
               </div>
             </SectionCard>
@@ -292,7 +310,7 @@ export function TimetableBuilderTab({
           )}
 
           <SectionCard 
-            title="Absent Teacher Substitutions" 
+            title="Absent Teacher Substitution Management" 
             description="Manage substitutions for missing teachers."
             headerAction={
               <Badge variant="secondary" className="font-black uppercase tracking-widest text-[10px]">

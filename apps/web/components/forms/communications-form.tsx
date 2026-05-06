@@ -913,7 +913,7 @@ function EventsSection({
             disabled={isPending}
             onClick={submitEvent}
           >
-            {isPending ? 'Creating...' : 'Create Event'}
+            {isPending ? 'Creating...' : 'Create event'}
           </button>
         </div>
       </div>
@@ -1115,7 +1115,7 @@ function ConsentManagementSection({
         <SectionHeader
           eyebrow="Consent Management"
           title="Guardian controls"
-          description="Manage and capture legally binding guardian consent for school workflows."
+          description="Manage and capture legally binding guardian consent for school workflows. Photo usage consent affects Activity Feed visibility."
         />
 
         <div className="mt-8 space-y-6">
@@ -1154,7 +1154,7 @@ function ConsentManagementSection({
               disabled={revokePending || !selectedGuardianId}
               onClick={revokeConsent}
             >
-              {revokePending ? 'Revoking...' : 'Revoke Consent'}
+              {revokePending ? 'Revoking...' : 'Revoke consent'}
             </button>
             <button
               type="button"
@@ -1162,7 +1162,7 @@ function ConsentManagementSection({
               disabled={capturePending || !selectedGuardianId}
               onClick={captureConsent}
             >
-              {capturePending ? 'Capturing...' : 'Capture Consent'}
+              {capturePending ? 'Capturing...' : 'Capture consent'}
             </button>
           </div>
 

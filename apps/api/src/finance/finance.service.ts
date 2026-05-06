@@ -2465,25 +2465,26 @@ export class FinanceService {
         },
       });
 
-      const journalEntry = await this.accountingPostingService.postPaymentRefund(
-        {
-          tenantId: actor.tenantId,
-          refundId: refund.id,
-          paymentId: payment.id,
-          amount: refundAmount,
-          reason,
-          paymentMethod: payment.method,
-          paymentAccountCode: resolveCashAccountCode(payment.method),
-          entryDate: refundDate,
-          lines: reversedDebitLines.map((line) => ({
-            chartAccountId: line.chartAccountId,
-            amount: line.amount,
-            description: line.description ?? 'Payment refund reversal',
-          })),
-        },
-        actor,
-        tx,
-      );
+      const journalEntry =
+        await this.accountingPostingService.postPaymentRefund(
+          {
+            tenantId: actor.tenantId,
+            refundId: refund.id,
+            paymentId: payment.id,
+            amount: refundAmount,
+            reason,
+            paymentMethod: payment.method,
+            paymentAccountCode: resolveCashAccountCode(payment.method),
+            entryDate: refundDate,
+            lines: reversedDebitLines.map((line) => ({
+              chartAccountId: line.chartAccountId,
+              amount: line.amount,
+              description: line.description ?? 'Payment refund reversal',
+            })),
+          },
+          actor,
+          tx,
+        );
 
       const netPaidAmount = sumNetPaidAmount(
         payment.invoice.payments.map((invoicePayment) =>

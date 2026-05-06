@@ -156,6 +156,7 @@ export const dashboardNavGroups: NavGroup[] = [
         href: '/dashboard/transport',
         label: 'Transport',
         icon: Bus,
+        disabled: true,
         permissions: [
           'transport:read',
           'transport:manage',
@@ -171,6 +172,7 @@ export const dashboardNavGroups: NavGroup[] = [
         href: '/dashboard/canteen',
         label: 'Canteen',
         icon: Utensils,
+        disabled: true,
         permissions: [
           'canteen:menu:read',
           'canteen:plans:read',

@@ -249,6 +249,13 @@ export const StorageProvider = {
   R2: 'R2',
 } as const;
 
+export const FileStatus = {
+  PENDING: 'PENDING',
+  UPLOADED: 'UPLOADED',
+  FAILED: 'FAILED',
+  DELETED: 'DELETED',
+} as const;
+
 export const StudentDocumentKind = {
   BIRTH_CERTIFICATE: 'BIRTH_CERTIFICATE',
   TRANSFER_CERTIFICATE: 'TRANSFER_CERTIFICATE',

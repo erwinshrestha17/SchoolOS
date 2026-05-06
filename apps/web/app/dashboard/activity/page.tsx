@@ -8,7 +8,7 @@ export default function ActivityPage() {
     <div className="space-y-6">
       <PageHeader
         title="Activity Feed"
-        description="Share classroom updates, milestones, and media with the right audience."
+        description="Photo posts, student tags, mood logs, milestones, and media sharing."
       />
       <ActivityFeedForm />
     </div>

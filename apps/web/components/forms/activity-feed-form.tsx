@@ -78,7 +78,7 @@ const activitySectionMeta: Record<
     icon: Smile,
   },
   Milestones: {
-    title: 'Development Milestones',
+    title: 'Montessori / ECE Milestones',
     description: 'Track Montessori and ECE observations with clear child-level progress evidence.',
     icon: Target,
   },
@@ -714,9 +714,14 @@ function CreatePostSection({
                 onChange={(event) => updateFiles(event.target.files)}
                 className="file:bg-slate-100 file:border-0 file:rounded-full file:px-4 file:text-[10px] file:font-black file:uppercase file:tracking-widest"
               />
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                Attach 1 to 5 images. Private media stay encrypted.
-              </p>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  Attach 1 to 5 images. Private media stay encrypted.
+                </p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-medium">
+                  Secure previews use signed access; permanent public URLs are not shown.
+                </p>
+              </div>
               
               {selectedFiles.length > 0 && (
                 <div className="grid gap-2">
@@ -860,7 +865,7 @@ function FeedPreviewSection({
           <div className="lg:col-span-2 xl:col-span-3">
             <EmptyState
               title="No activity posts yet"
-              description="Capture the first classroom moment to see it here."
+              description="No activity posts yet. Create the first classroom moment."
             />
           </div>
         )}
