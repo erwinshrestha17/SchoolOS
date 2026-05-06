@@ -16,6 +16,8 @@ For the full locally generated version, use the file already prepared in this co
 Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
+M0 Platform Core Foundation Depth: Completed
+M9 Accounting Ledger Hardening: Completed
 Current stage: Phase 2 implemented foundations + Phase 3 operations admin foundations
 ```
 
@@ -303,7 +305,7 @@ Module estimates:
 | Module | Estimated Completion |
 |---|---:|
 | Auth/Security/Tenant | 90–95% |
-| Platform Control Plane | 45–55% |
+| Platform Control Plane | 65–75% |
 | M1 Admissions & Student Profiles | 90–95% |
 | M2 Attendance | 85–90% |
 | M3 Fees & Receipts | 85–90% |
@@ -312,7 +314,7 @@ Module estimates:
 | M4 Academics | 70–80% |
 | M6 Homework & Timetable | 60–70% |
 | M7 HR & Payroll | 65–75% |
-| M9 Accounting | 55–65% |
+| M9 Accounting | 75–85% |
 | M8A Library | 45–55% |
 | M8B Transport | 45–55% |
 | M8C Canteen | 45–55% |

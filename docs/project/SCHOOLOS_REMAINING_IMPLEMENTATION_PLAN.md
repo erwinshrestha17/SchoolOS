@@ -13,6 +13,8 @@
 Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
+M0 Platform Core Foundation Depth: Completed
+M9 Accounting Ledger Hardening: Completed
 Phase 2: Foundations implemented; production hardening in progress
 Phase 3: Operations admin foundations implemented; parent/mobile/driver/live UX deferred
 Phase 4: Not started
@@ -64,7 +66,7 @@ Microservices
 | Module | Current Status | Estimated Completion |
 |---|---|---:|
 | Auth / Security / Tenant Isolation | Strong foundation | 90–95% |
-| M0 Platform Core | Started | 45–55% |
+| M0 Platform Core | Completed Foundation Depth | 65–75% |
 | M1 Admissions & Student Profiles | Pilot-ready | 90–95% |
 | M2 Smart Attendance | Pilot-ready | 85–90% |
 | M3 Fees & Receipts | Pilot-ready | 85–90% |
@@ -75,7 +77,7 @@ Microservices
 | M8A Library Management | Phase 3 admin foundation implemented | 45–55% |
 | M8B Transport Management | Phase 3 admin foundation implemented | 45–55% |
 | M8C Canteen Management | Phase 3 admin foundation implemented | 45–55% |
-| M9 Accounting & Finance | Foundation implemented; hardening priority | 55–65% |
+| M9 Accounting & Finance | Completed Ledger Hardening | 75–85% |
 | M10 Notices & Communication | Strong Phase 1 + chat foundation | 85–90% |
 | Parent / Mobile Portal | Mostly deferred | 5–10% |
 | Driver App | Deferred | 0–5% |
@@ -268,39 +270,29 @@ Remaining:
 
 ### 5.4 Phase 2D — M9 Accounting and Finance
 
-Current estimate: 55–65% implemented.
+Current estimate: 75–85% implemented.
 
 This is the highest-priority remaining module because accounting correctness affects fees, payroll, canteen, library fines, expenses, audit, and future commercial rollout.
 
-Remaining:
+**Completed:**
+- AccountingPostingModule added
+- AccountingPostingService centralized as ledger write boundary
+- FinanceModule and AccountingModule wired through AccountingPostingModule
+- FinanceService delegates ledger postings to AccountingPostingService
+- ledger boundary production contracts added/updated
+- audit logging required for ledger mutations
 
-- AccountingPostingService hard boundary.
-- Double-entry enforcement tests.
-- Immutable ledger enforcement.
-- Fiscal year/fiscal period close/lock/reopen workflow.
-- No posting into closed period enforcement.
-- Journal/voucher numbering per tenant/fiscal year.
-- Source document linkage hardening.
-- Manual journal approval workflow.
-- Expense voucher approval workflow.
-- Bank/cash account management polish.
-- Bank reconciliation depth.
-- Trial balance report.
-- General ledger report.
-- Cash book report.
-- Income statement.
-- Balance sheet.
-- VAT summary.
-- TDS/PF reports.
-- Budget vs actual.
-- Audit-ready accounting exports.
-- Reversal/correction workflow polish.
-- M3 fee posting integration hardening.
-- M7 payroll posting integration hardening.
-- M8C canteen accounting integration later.
-- M8A library fine accounting integration later.
-- Backend-generated reports only.
-- Accounting Playwright/admin UI polish.
+**Remaining:**
+- Trial balance polish
+- General ledger polish
+- Cash book polish
+- Income statement
+- Balance sheet
+- Fiscal period close/lock/reopen UI
+- Bank reconciliation depth
+- VAT/TDS/PF reports
+- Audit-ready accounting exports
+- Accounting Playwright/admin UI polish
 
 Non-negotiable M9 rules:
 
@@ -543,27 +535,28 @@ Remaining:
 
 M0 cuts across all phases.
 
-Current estimate: 45–55% implemented.
+Current estimate: 65–75% implemented.
 
-Remaining:
+**Completed:**
+- platform tenant server-side pagination
+- tenant status reason workflow
+- platform audit log UI
+- centralized usage service
+- plans/limits foundation
+- tenant settings validation depth
+- file registry lifecycle hardening
+- reports foundation hardening
 
-- Platform Control Plane depth.
-- Tenant/school management polish.
-- Tenant activation/suspension workflow.
-- Plan/subscription management.
-- Usage limits and plan rules.
-- Tenant Settings depth.
-- Generic File Registry full adoption.
-- Global API response envelope.
-- Generic Reports Foundation.
-- Safe Activity Logs.
-- API Key Management.
-- Webhook System.
-- SaaS Subscription and Billing.
-- Platform health dashboard.
-- Queue failure dashboard.
-- Support access audit UI.
-- Provider configuration UI.
+**Remaining:**
+- SaaS subscription billing
+- API key management
+- Webhook system
+- Advanced provider configuration
+- Full platform health dashboard
+- Queue failure dashboard
+- Full usage enforcement
+- Full file registry migration across all modules
+- Full report migration across all modules
 
 Important boundary:
 
