@@ -146,11 +146,10 @@ export const dashboardNavGroups: NavGroup[] = [
         permissions: ['activity_feed:read', 'activity_feed:create'],
       },
       {
-        href: '#library-coming-soon',
+        href: '/dashboard/library',
         label: 'Library',
         icon: BookOpen,
         permissions: ['library:read', 'library:manage'],
-        disabled: true,
       },
       {
         href: '#transport-coming-soon',
