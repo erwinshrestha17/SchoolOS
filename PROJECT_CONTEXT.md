@@ -1,28 +1,45 @@
 # SchoolOS Project Context
 
-This file gives Codex and other coding assistants a short, stable context file so repeated prompts can stay small.
+This is the short context file for Codex and AI assistants. It keeps repeated prompts small.
 
 For full project memory, read:
 
-- `docs/project/SCHOOLOS_PROJECT_MEMORY.md`
-- `docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md`
-- `docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md`
-- `docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md`
-- `docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md`
-- `ARCHITECTURE.md`
-- `DEVELOPMENT_RULES.md`
+```text
+docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
+```
+
+Supporting focused references:
+
+```text
+ARCHITECTURE.md
+DEVELOPMENT_RULES.md
+docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md
+```
+
+Legacy long roadmap files have been consolidated into the master memory:
+
+```text
+docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
+docs/project/SCHOOLOS_PHASE_STRUCTURE.md
+docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md
+docs/project/SCHOOLOS_PROJECT_MEMORY.md
+docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md
+```
+
+---
 
 ## Product
 
 SchoolOS is a production-grade, multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10.
 
+---
+
 ## Current Stage
 
-Current delivery stage:
-
 ```text
-Phase 1A completed
-Phase 1B completed / pilot-ready
+Phase 0: Completed
+Phase 1A: Completed / Pilot-Ready
+Phase 1B: Completed / Pilot-Ready
 Current stage: Phase 2 Transition Readiness
 ```
 
@@ -36,6 +53,8 @@ First preferred vertical: Academics / Exams / CAS / Report Cards.
 Alternative vertical: HR / Payroll / Accounting posting hardening.
 ```
 
+---
+
 ## Stack
 
 - Monorepo: `pnpm`
@@ -48,100 +67,23 @@ Alternative vertical: HR / Payroll / Accounting posting hardening.
   - `apps/web` = public website, SEO/admissions/public pages
   - `apps/admin` = Angular internal dashboard later
 
-Do not migrate to Angular yet.
-Do not introduce microservices unless clearly justified.
+Rules:
 
-## Scalability Rule
+- Do not migrate to Angular yet.
+- Do not introduce microservices unless clearly justified.
+- Do not rename `tenantId` to `schoolId` without a deliberate migration.
 
-SchoolOS scalability must be implemented as development continues, not postponed to the end.
-
-Before every meaningful feature/module change, read:
-
-```text
-docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md
-```
-
-Every new feature must answer:
-
-```text
-1. Which tenant owns this data?
-2. Which role/permission can access it?
-3. Is the list paginated?
-4. Which index supports the main query?
-5. Does the write need a transaction?
-6. Is the operation idempotent?
-7. Should this be sync or queued?
-8. Does it require audit logging?
-9. Does it affect accounting/ledger?
-10. What tests prove tenant isolation and permissions?
-```
-
-Scalability implementation order:
-
-```text
-Feature -> tenant isolation -> indexes -> pagination -> queue slow work -> audit sensitive actions -> tests -> verification.
-```
+---
 
 ## Three-Plane SaaS Architecture
 
 SchoolOS has three logical planes inside the same modular monolith.
 
-### Layer 1: Platform Control Plane
-
-For the SchoolOS company owner/internal platform team.
-
-Purpose:
-
-- Manage all schools/tenants.
-- Manage plans, subscriptions, SaaS billing, limits, support access, and platform audit.
-
-Recommended namespace:
-
-```text
-Frontend: /platform/*
-Backend:  /platform/*
-```
-
-Typical roles:
-
-- `PLATFORM_SUPER_ADMIN`
-- `PLATFORM_SUPPORT`
-- `PLATFORM_BILLING_ADMIN`
-
-### Layer 2: Tenant Configuration Plane
-
-For each school principal/admin.
-
-Purpose:
-
-- Manage school logo, branding, settings, academic year, receipt preferences, attendance lock time, fee reminder rules, notification rules, and future chat availability hours.
-
-Recommended namespace:
-
-```text
-Frontend: /dashboard/settings/*
-Backend:  /tenant-settings/* or /settings/*
-```
-
-Typical roles:
-
-- `TENANT_PRINCIPAL`
-- `TENANT_ADMIN`
-
-### Layer 3: School Operations Plane
-
-For school staff and day-to-day operations.
-
-Purpose:
-
-- Manage students, attendance, fees, notices, activity feed, reports, and later academic/HR/library/transport/canteen/accounting workflows.
-
-Recommended namespace:
-
-```text
-Frontend: /dashboard/*
-Backend:  module APIs such as /students, /attendance, /finance, /notices
-```
+| Plane | Audience | Frontend Namespace | Backend Namespace |
+|---|---|---|---|
+| Platform Control Plane | SchoolOS owner/operator | `/platform/*` | `/platform/*` |
+| Tenant Configuration Plane | School principal/admin | `/dashboard/settings/*` | `/settings/*` or `/tenant-settings/*` |
+| School Operations Plane | School staff/parents/students | `/dashboard/*` | Module APIs such as `/students`, `/attendance`, `/finance`, `/notices` |
 
 Rules:
 
@@ -152,10 +94,15 @@ Rules:
 - Platform support/tenant override must be explicit and audited.
 - For the full school-settings vs platform-settings boundary, read `docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md`.
 
+---
+
 ## Tenant Boundary
 
 `tenantId` is the current database and Prisma tenant/school boundary.
+
 Do not rename `tenantId` to `schoolId` unless a future migration is explicitly planned.
+
+---
 
 ## Completed Phase 1A / 1B Areas
 
@@ -173,40 +120,48 @@ Do not rename `tenantId` to `schoolId` unless a future migration is explicitly p
 - Production preflight checks
 - `verify:production` gate
 
-## M0 Platform Core Additions Now Documented
+---
 
-The long-term memory includes a separate `M0 Platform Core` roadmap in `docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md`.
+## Current Phase 2 Focus
 
-The detailed boundary between school-owned settings and platform-owned SaaS settings is documented in `docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md`.
+Phase 2 should proceed one vertical at a time:
 
-These features are documented for future implementation and should be added gradually without disrupting Phase 1 pilot hardening or focused Phase 2 vertical work:
+1. Preferred: M4 Academics / Exams / CAS / Report Cards.
+2. Alternative: M7 HR / Payroll with M9 posting hardening.
+3. Keep M6 Timetable/Homework focused if started.
+4. Do not start broad Phase 3 production work yet.
+5. Do not start AI/ML features yet.
 
-1. Tenant Settings Module
-2. Generic File Registry
-3. Global API Response Envelope
-4. Generic Reports Foundation
-5. Safe Activity Logs Module
-6. Usage Limits and Plan Rules
-7. API Key Management
-8. Webhook System
-9. SaaS Subscription and Billing Module
+---
 
-Important distinction:
+## Scalability Rule
+
+SchoolOS scalability must be implemented as development continues, not postponed to the end.
+
+Every new feature must answer:
 
 ```text
-SchoolOS Finance/M3/M9 = school collects money from students/parents.
-SaaS Billing = SchoolOS company charges schools for using the platform.
+1. Which module owns this feature: M0 or M1-M10?
+2. Which backend folder/API namespace/frontend route owns it?
+3. Which tenant owns this data?
+4. Which role/permission can access it?
+5. Is the list paginated?
+6. Which index supports the main query?
+7. Does the write need a transaction?
+8. Is the operation idempotent?
+9. Should this be sync or queued?
+10. Does it require audit logging?
+11. Does it affect accounting/ledger?
+12. What tests prove tenant isolation and permissions?
 ```
 
-Recommended near-term platform sequence:
+Scalability implementation order:
 
-1. Platform Control Plane depth for school/tenant management and operational health
-2. Tenant Settings foundation
-3. Generic File Registry hardening
-4. Global API response envelope with safe binary/PDF/CSV exceptions
-5. Reports foundation for Phase 1/2 reports
-6. Safe Activity Logs projection
-7. Usage limits and plan rules
+```text
+Feature -> tenant isolation -> indexes -> pagination -> queue slow work -> audit sensitive actions -> tests -> verification
+```
+
+---
 
 ## Core Rules
 
@@ -224,6 +179,8 @@ Recommended near-term platform sequence:
 - Do not start AI features until reliable production data exists.
 - Do not copy generic SaaS-template modules blindly; adapt reusable platform pieces into SchoolOS only when they strengthen production readiness.
 
+---
+
 ## Recommended Codex Prompt Format
 
 ```text
@@ -231,11 +188,8 @@ Read these files first:
 - PROJECT_CONTEXT.md
 - ARCHITECTURE.md
 - DEVELOPMENT_RULES.md
-- docs/project/SCHOOLOS_PROJECT_MEMORY.md
-- docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md
+- docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
 - docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md
-- docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
-- docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md
 
 Task:
 [Exact feature/change]
