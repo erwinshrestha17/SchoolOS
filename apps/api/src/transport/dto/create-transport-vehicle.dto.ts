@@ -10,6 +10,10 @@ export class CreateTransportVehicleDto {
   @IsString()
   registrationNumber!: string;
 
+  @IsOptional()
+  @IsString()
+  model?: string;
+
   @IsInt()
   @Min(1)
   capacity!: number;
@@ -17,4 +21,8 @@ export class CreateTransportVehicleDto {
   @IsOptional()
   @IsDateString()
   fitnessCertificateExp?: string;
+
+  @IsOptional()
+  @IsDateString()
+  documentExpiry?: string;
 }
