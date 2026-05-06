@@ -2,6 +2,7 @@
 
 ## Purpose
 
+
 This document is the complete UI/UX direction for SchoolOS across web, platform, developer, parent, teacher, student, and driver experiences. It includes every UI/UX item discussed and finalized so far.
 
 SchoolOS should become a modern, production-ready, Nepal-friendly school management SaaS. It should not feel like a basic CRUD dashboard. It should feel like a trustworthy education operating system that is simple for schools, safe for children, useful for parents, efficient for teachers, and powerful for administrators.
