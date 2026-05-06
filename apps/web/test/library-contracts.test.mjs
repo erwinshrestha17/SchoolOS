@@ -1,0 +1,109 @@
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+function read(relativePath) {
+  return readFileSync(join(webRoot, relativePath), 'utf8');
+}
+
+describe('Phase 3B Library frontend contracts', () => {
+  it('adds the Library dashboard routes', () => {
+    for (const route of [
+      'app/dashboard/library/page.tsx',
+      'app/dashboard/library/books/page.tsx',
+      'app/dashboard/library/copies/page.tsx',
+      'app/dashboard/library/issues/page.tsx',
+      'app/dashboard/library/overdue/page.tsx',
+    ]) {
+      assert.equal(existsSync(join(webRoot, route)), true, `Missing ${route}`);
+    }
+  });
+
+  it('enables Library in the dashboard sidebar while keeping Transport locked', () => {
+    const sidebar = read('components/layout/sidebar.tsx');
+
+    assert.match(sidebar, /label: 'Library'/);
+    assert.match(sidebar, /href: '\/dashboard\/library'/);
+    assert.doesNotMatch(sidebar, /#library-coming-soon/);
+    assert.match(sidebar, /label: 'Transport'[\s\S]*disabled: true/);
+  });
+
+  it('adds Library API client methods for the Phase 3A backend endpoints', () => {
+    const libraryApi = read('lib/library-api.ts');
+
+    for (const helper of [
+      'listBooks',
+      'createBook',
+      'updateBook',
+      'listCopies',
+      'createCopy',
+      'updateCopy',
+      'updateCopyStatus',
+      'listIssues',
+      'issueCopy',
+      'returnIssue',
+      'listOverdue',
+      'sendOverdueReminders',
+    ]) {
+      assert.match(libraryApi, new RegExp(`${helper}:`), `Missing ${helper}`);
+    }
+
+    for (const endpoint of [
+      '/library/books',
+      '/library/copies',
+      '/library/issues',
+      '/library/overdue',
+      '/library/overdue/reminders',
+    ]) {
+      assert.match(libraryApi, new RegExp(endpoint.replaceAll('/', '\\/')));
+    }
+
+    assert.match(libraryApi, /credentials:\s*'include'/);
+    assert.doesNotMatch(libraryApi, /Authorization:\s*`Bearer/);
+  });
+
+  it('builds Library UI sections with real API calls and production states', () => {
+    const workspace = read('components/library/library-workspace.tsx');
+
+    for (const section of [
+      'Total books',
+      'Total copies',
+      'Available copies',
+      'Issued copies',
+      'Overdue issues',
+      'Lost / damaged',
+      'Book Catalogue',
+      'Copy Management',
+      'Issue / Return',
+      'Overdue Issues',
+    ]) {
+      assert.match(workspace, new RegExp(section.replace('/', '\\/')));
+    }
+
+    for (const apiCall of [
+      'libraryApi.listBooks',
+      'libraryApi.createBook',
+      'libraryApi.updateBook',
+      'libraryApi.listCopies',
+      'libraryApi.createCopy',
+      'libraryApi.updateCopy',
+      'libraryApi.updateCopyStatus',
+      'libraryApi.listIssues',
+      'libraryApi.issueCopy',
+      'libraryApi.returnIssue',
+      'libraryApi.listOverdue',
+      'libraryApi.sendOverdueReminders',
+    ]) {
+      assert.match(workspace, new RegExp(apiCall.replace('.', '\\.')));
+    }
+
+    assert.match(workspace, /LoadingState/);
+    assert.match(workspace, /EmptyState/);
+    assert.match(workspace, /ErrorNotice/);
+    assert.doesNotMatch(workspace, /demo-|fake-|placeholderId/i);
+  });
+});
