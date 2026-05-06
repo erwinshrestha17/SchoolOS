@@ -4,17 +4,34 @@ import { ReactNode, useState } from 'react';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { Breadcrumbs } from './breadcrumbs';
+import { useSession } from '../session-provider';
+import { cn } from '../../lib/utils';
+import { LoadingState } from '../ui/loading-state';
+import { ErrorBoundary } from '../ui/error-boundary';
 
 export function DashboardShell({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { session, status } = useSession();
 
   function closeMobileNavigation() {
     setMobileOpen(false);
   }
 
+  if (status === 'loading') {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-slate-50">
+        <LoadingState variant="page" label="Syncing workspace..." />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return null; // DashboardLayout handles redirect
+  }
+
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <div className="flex h-screen overflow-hidden bg-slate-50">
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -27,15 +44,22 @@ export function DashboardShell({ children }: { children: ReactNode }) {
 
         <main
           id="dashboard-main"
-          className="flex-1 overflow-y-auto bg-gray-50"
+          className="flex-1 overflow-y-auto scroll-smooth focus:outline-none"
           tabIndex={-1}
         >
-          <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:py-6 lg:px-8">
-            <Breadcrumbs />
-            <div className="animate-fade-in">{children}</div>
+          <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-10">
+            <div className="mb-6">
+              <Breadcrumbs />
+            </div>
+            <div className="animate-fade-in transition-all duration-300">
+              <ErrorBoundary>
+                {children}
+              </ErrorBoundary>
+            </div>
           </div>
         </main>
       </div>
     </div>
   );
 }
+
