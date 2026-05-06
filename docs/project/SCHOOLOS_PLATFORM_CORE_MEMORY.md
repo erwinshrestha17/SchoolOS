@@ -8,6 +8,7 @@ Read this together with:
 - `ARCHITECTURE.md`
 - `DEVELOPMENT_RULES.md`
 - `docs/project/SCHOOLOS_PROJECT_MEMORY.md`
+- `docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md`
 
 ## Current Approved Direction
 
@@ -37,6 +38,7 @@ Rationale:
 - Student Management depth is the immediate Phase 1B priority and should not be delayed by platform overbuilding.
 - Platform Control Plane foundation is needed when SchoolOS company owner workflows require managing schools/tenants, plans, limits, support access, and platform audit.
 - Tenant Settings should come early because branding, receipt format, attendance lock time, fiscal/academic behavior, fee reminders, and future chat hours need centralized tenant configuration.
+- The detailed boundary between school-owned settings and platform-owned SaaS settings is documented in `docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md`.
 - Generic File Registry should come before more document/photo/media work because Phase 1B needs student photos, student documents, activity media previews, receipt PDFs, ID cards, and certificates.
 - Global API Response Envelope is valuable but risky, so it must be rolled out carefully with contract tests and raw binary/PDF/file response exceptions.
 - Reports Foundation should come before building many separate exports/reports for students, attendance, fees, defaulters, and cashier close.
@@ -107,6 +109,8 @@ Backend:  /tenant-settings/* or /settings/*
 
 Core rule: tenant configuration is tenant-owned data and must always be scoped by `tenantId`.
 
+For the detailed school settings vs platform settings split, use `docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md` as the source of truth.
+
 ### Layer 3: School Operations Plane
 
 For day-to-day school staff operations.
@@ -145,6 +149,7 @@ Core rule: school operations must consume real tenant-scoped APIs. Frontend visi
 - Platform Control Plane manages SaaS/customer administration.
 - Tenant Configuration Plane manages a school's own settings.
 - School Operations Plane manages day-to-day school workflows.
+- Use `docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md` for the complete school-settings vs platform-settings boundary.
 - Do not mix SchoolOS SaaS billing with school fee collection.
 - Do not allow school users to access `/platform/*` routes.
 - Do not allow platform support to enter a tenant silently; support/tenant override must require an explicit reason and audit log.
@@ -225,6 +230,8 @@ Scope:
 - Nepali/English naming preferences.
 - Date format, timezone, and currency.
 - Feature toggles by tenant and plan.
+
+For the full school-level settings categories, route structure, and non-negotiable boundary against platform settings, read `docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md`.
 
 Implementation notes:
 
