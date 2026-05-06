@@ -1,69 +1,133 @@
 # SchoolOS
 
-SchoolOS is a production-grade, multi-tenant school management SaaS for Nepal, targeting Montessori to Class 10.
+SchoolOS is a production-grade, multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10.
 
-The project is structured as a `pnpm` monorepo centered on a NestJS modular-monolith backend, PostgreSQL/Prisma data layer, Redis/BullMQ background processing, shared core contracts, and a Next.js dashboard for current admin/staff workflows.
+It is designed as a modular school operating system covering admissions, student records, attendance, fees, notices, activity feed, academics, homework, timetable, HR/payroll, accounting, library, transport, canteen, and future AI/analytics.
+
+---
+
+## Source of Truth
+
+The consolidated project memory is:
+
+```text
+docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
+```
+
+Short companion files:
+
+```text
+PROJECT_CONTEXT.md
+ARCHITECTURE.md
+DEVELOPMENT_RULES.md
+docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md
+```
+
+Legacy long planning files have been merged into the master memory and should stay as redirects/summaries:
+
+```text
+docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
+docs/project/SCHOOLOS_PHASE_STRUCTURE.md
+docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md
+docs/project/SCHOOLOS_PROJECT_MEMORY.md
+docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md
+```
+
+---
 
 ## Current Stage
 
-SchoolOS is currently in **Phase 2 Transition Readiness**.
+```text
+Phase 0: Completed
+Phase 1A: Completed / Pilot-Ready
+Phase 1B: Completed / Pilot-Ready
+Current stage: Phase 2 Transition Readiness
+```
 
-- Phase 1A and 1B core workflows are completed and pilot-ready.
-- Phase 2 modules (Academics, HR/Payroll, Timetable, Accounting) are scheduled next.
+Phase 1 pilot product is ready for controlled staging/pilot preparation. Phase 2 should proceed one focused vertical at a time.
 
-Source of truth:
+Preferred next vertical:
 
-- [`docs/project/SCHOOLOS_PROJECT_MEMORY.md`](docs/project/SCHOOLOS_PROJECT_MEMORY.md)
+```text
+Academics / Exams / CAS / Report Cards
+```
+
+Alternative vertical:
+
+```text
+HR / Payroll / Accounting posting hardening
+```
+
+---
+
+## Stack
+
+```text
+Monorepo: pnpm
+Backend: NestJS modular monolith
+Database: PostgreSQL + Prisma
+Cache/queues: Redis + BullMQ
+Shared package: packages/core
+Current frontend: Next.js dashboard in apps/web
+Future frontend target: apps/web public site + apps/admin Angular dashboard later
+```
+
+Do not migrate to Angular yet. Do not introduce microservices unless scale, team ownership, deployment isolation, or compliance isolation clearly justify the cost.
+
+---
 
 ## Workspace Layout
 
-- `apps/api`
-  - NestJS + Prisma backend
-  - auth, RBAC, platform control, admissions, attendance, finance, academics, payroll, accounting, library, transport, notices, and messaging foundations
-- `apps/web`
-  - Next.js App Router dashboard
-  - tenant registration, login, school admin dashboard, platform control plane, students/admissions, attendance, finance, activity, communications, and settings flows
-- `packages/core`
-  - shared validation schemas, permission keys, report contracts, and DTO-style TypeScript types
+```text
+apps/
+  api/      NestJS backend
+  web/      Current Next.js dashboard and later public website
+  admin/    Future Angular internal dashboard, not now
+packages/
+  core/     Shared validation, types, contracts, permissions
+docs/
+  project/  Master memory, plans, and roadmaps
+```
 
-## Core Platform Decisions
+---
 
-- Multi-tenant SaaS remains the primary deployment model.
+## Product Planes
+
+| Plane | Audience | Frontend | Backend |
+|---|---|---|---|
+| Platform Control Plane | SchoolOS owner/operator | `/platform/*` | `/platform/*` |
+| Tenant Configuration Plane | School principal/admin | `/dashboard/settings/*` | `/settings/*` or `/tenant-settings/*` |
+| School Operations Plane | School staff/parents/students | `/dashboard/*` | Module APIs such as `/students`, `/attendance`, `/finance`, `/notices` |
+
+Rules:
+
+- Platform Control Plane is for SchoolOS company administration.
+- Tenant Configuration Plane is for one school's settings.
+- School Operations Plane is for school workflows.
+- Do not mix SchoolOS SaaS billing with school fee collection.
 - `tenantId` is the current database tenant/school boundary.
-- Do not rename `tenantId` to `schoolId` without a deliberate migration.
-- Current internal dashboard remains in Next.js for now.
-- Future target:
-  - `apps/web` = public website, SEO pages, admissions/public pages
-  - `apps/admin` = Angular internal dashboard later
-- Do not migrate to Angular yet.
-- API routes are versioned under `/api/v1`.
-- Swagger docs are exposed from the API at `/api/v1/docs`.
-- Fee payments post journal entries into the finance/accounting ledger foundation automatically.
-- Full M9 Accounting remains Phase 2, but Finance ledger foundations continue in Phase 1B.
-- Do not introduce microservices unless scale, team size, deployment needs, or compliance isolation justify it.
 
-## UI Shell Separation
+---
 
-SchoolOS currently keeps both school admin and platform operator screens inside `apps/web`, but the UI shells are visually separated.
+## Production Module Map
 
-### School Admin UI
+| Module | Name | Phase |
+|---|---|---|
+| M0 | Platform Core / SaaS Starter | Foundation + gradual rollout |
+| M1 | Admissions & Student Profiles | Phase 1A/1B |
+| M2 | Smart Attendance | Phase 1A/1B |
+| M3 | Fees & Receipts | Phase 1A/1B |
+| M4 | Exams, CAS & Report Cards | Phase 2 |
+| M5 | Activity Feed & Milestones | Phase 1A/1B |
+| M6 | Homework & Timetable | Phase 2 |
+| M7 | HR & Payroll | Phase 2 |
+| M8A | Library Management | Phase 3 |
+| M8B | Transport Management | Phase 3 |
+| M8C | Canteen Management | Phase 3 |
+| M9 | Accounting & Finance | Phase 2 |
+| M10 | Notices & Communication | Phase 1A/1B + Phase 2/3 chat |
 
-- Route scope: `/dashboard/*`
-- Audience: school admins, principals, teachers, accountants, staff, parents/students where applicable
-- Boundary: tenant-scoped school operations only
-- Main areas: students/admissions, attendance, fees, notices, activity feed, school settings, and Phase 1 school workflows
-- Shell: `DashboardShell` with the normal school workspace sidebar/header
-
-### Platform Control Plane
-
-- Route scope: `/platform/*`
-- Audience: SchoolOS owner/operator roles only
-- Boundary: cross-tenant SaaS operations
-- Main areas: platform overview, tenant/school management, tenant status, subscriptions/plans, usage, health, onboarding, and audit logs
-- Shell: `PlatformShell` with separate dark operator-console branding and platform-only navigation
-- Access: requires a platform role such as `platform_super_admin`, `platform_support`, or `platform_billing_admin`
-
-School settings under `/dashboard/settings` are tenant-scoped school settings. They are not Platform Control Plane settings.
+---
 
 ## Completed Phase 1A / 1B Highlights
 
@@ -74,11 +138,11 @@ School settings under `/dashboard/settings` are tenant-scoped school settings. T
 - Browser dashboard no longer stores raw tokens.
 - API still supports bearer tokens for future mobile/API clients.
 - Docker Postgres/Redis smoke script added.
-- `verify:production` passes.
+- `verify:production` gate exists.
 - PDF response validation added.
 - Student ID card and receipt PDFs manually tested and open.
 - Dashboard shell and Admin Dashboard.
-- Dedicated Platform Control Plane shell and tenant-management UI foundation.
+- Platform Control Plane shell and tenant-management foundation.
 - Students/Admissions workspace.
 - Student Directory and full Student Detail page.
 - Student edit/update and guardian edit/update.
@@ -89,40 +153,38 @@ School settings under `/dashboard/settings` are tenant-scoped school settings. T
 - Student Attendance History in profile.
 - Fee Collection Counter.
 - Invoice detail and student fee ledger.
-- Student Fee Ledger export.
-- Fee Collection report.
-- Defaulter Aging report.
+- Fee Collection and Defaulter Aging reports.
 - Payment reversal/refund workflow.
 - Cashier close/day-end UI.
-- Activity Feed with file registry/media preview foundation.
+- Activity Feed with media preview foundation.
 - Notices/Communications.
 - Consent Management and Delivery Records.
 - Global API response envelope.
 - Generic Reports Foundation.
 
+---
+
 ## Local Development
 
-1. Install workspace dependencies.
+Install dependencies:
 
 ```bash
 pnpm install
 ```
 
-2. Copy the API env file if needed.
+Copy the API env file if needed:
 
 ```bash
 cp apps/api/.env.example apps/api/.env
 ```
 
-3. Start local Postgres and Redis.
+Start local Postgres and Redis:
 
 ```bash
 docker compose up -d postgres redis
 ```
 
-The default API env file targets Docker Postgres on `localhost:5433` and Redis on `localhost:6379`.
-
-4. Generate the Prisma client, validate schema, apply migrations, and seed local school data.
+Generate Prisma client, validate schema, migrate, and seed:
 
 ```bash
 pnpm db:generate
@@ -131,7 +193,7 @@ pnpm db:migrate
 pnpm db:seed
 ```
 
-5. Optionally seed a local Platform Control Plane operator.
+Optionally seed a local Platform Control Plane operator:
 
 ```bash
 PLATFORM_SEED_EMAIL=<platform-operator-email> \
@@ -139,17 +201,7 @@ PLATFORM_SEED_PASSWORD=<platform-operator-password> \
 pnpm --filter @schoolos/api db:seed:platform
 ```
 
-For local manual testing, a common convention is:
-
-```text
-tenantSlug: default-school
-email: platform@schoolos.com
-password: platform123
-```
-
-Use this account for `/platform/*`. Use school admin accounts for `/dashboard/*`.
-
-6. Start the API and web app together.
+Start API and web app together:
 
 ```bash
 pnpm dev
@@ -167,37 +219,27 @@ Expected local URLs:
 | School Admin UI | `http://localhost:3000/dashboard` |
 | Platform Control Plane | `http://localhost:3000/platform/dashboard` |
 
-If either server reports `EADDRINUSE`, another process is already listening on that port.
-
-```bash
-lsof -nP -iTCP:3000 -sTCP:LISTEN
-lsof -nP -iTCP:4000 -sTCP:LISTEN
-```
-
-Stop the stale process, then run:
-
-```bash
-unset PORT
-pnpm dev
-```
-
-Sensitive medical/compliance fields are encrypted at the app layer before storage. Local development uses a safe fallback key, but production must set `MEDICAL_ENCRYPTION_KEY` to a stable 32-byte hex/base64 value, or a long secret passphrase, before admitting students with medical data.
+---
 
 ## Workspace Commands
 
-- `pnpm dev`
-- `pnpm build`
-- `pnpm lint`
-- `pnpm typecheck`
-- `pnpm test`
-- `pnpm test:e2e`
-- `pnpm db:generate`
-- `pnpm db:validate`
-- `pnpm db:migrate`
-- `pnpm db:seed`
-- `pnpm --filter @schoolos/api db:seed:platform`
-- `pnpm smoke:phase1`
-- `pnpm verify:production`
+```bash
+pnpm dev
+pnpm build
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:e2e
+pnpm db:generate
+pnpm db:validate
+pnpm db:migrate
+pnpm db:seed
+pnpm --filter @schoolos/api db:seed:platform
+pnpm smoke:phase1
+pnpm verify:production
+```
+
+---
 
 ## Production Operations
 
@@ -208,114 +250,7 @@ Sensitive medical/compliance fields are encrypted at the app layer before storag
 
 Production API startup validates required secrets, CORS origins, Redis, database, cookie, encryption, and provider settings before listening.
 
-The Next.js dashboard authenticates browser API calls with `httpOnly` access and refresh cookies. The backend still returns access tokens in JSON for direct API/mobile compatibility, but the dashboard persists only non-sensitive session metadata in browser storage.
-
-## Local Test Login Credentials
-
-After running `pnpm db:seed`, the following **local/dev-only** demo accounts are available.
-
-| Role | Tenant Slug | Email | Password | Primary UI |
-|---|---|---|---|---|
-| Super Admin | `default-school` | `superadmin@schoolos.com` | `superadmin123` | `/dashboard/*` |
-| Admin | `default-school` | `admin@schoolos.com` | `admin123` | `/dashboard/*` |
-| Principal | `default-school` | `principal@schoolos.com` | `principal123` | `/dashboard/*` |
-| Accountant | `default-school` | `accountant@schoolos.com` | `accountant123` | `/dashboard/*` |
-| Class Teacher | `default-school` | `classteacher@schoolos.com` | `classteacher123` | `/dashboard/*` |
-| Subject Teacher | `default-school` | `subjectteacher@schoolos.com` | `subjectteacher123` | `/dashboard/*` |
-| Parent/Guardian | `default-school` | `guardian@schoolos.com` | `guardian123` | portal/dashboard later |
-| Student | `default-school` | `student@schoolos.com` | `student123` | portal/dashboard later |
-
-After running `pnpm --filter @schoolos/api db:seed:platform` with `PLATFORM_SEED_EMAIL` and `PLATFORM_SEED_PASSWORD`, a local platform operator account is available.
-
-| Role | Tenant Slug | Email | Password | Primary UI |
-|---|---|---|---|---|
-| Platform Super Admin | `default-school` | value of `PLATFORM_SEED_EMAIL` | value of `PLATFORM_SEED_PASSWORD` | `/platform/*` |
-
-Notes:
-
-- These credentials are for local development and manual testing only.
-- Never use these credentials in staging or production.
-- `superadmin@schoolos.com` is a school admin/super-admin account for tenant-scoped workflows, not the Platform Control Plane.
-- Platform Control Plane access requires a platform role such as `platform_super_admin`.
-- Parent and student users can authenticate, but child/student-scoped pages may be empty until those users are linked to actual guardian/student records.
-
-## Current Backend Surface Area
-
-- Platform/auth/RBAC with tenant onboarding, users, roles, super-admin support, platform roles, refresh sessions, audit records, and provider-neutral adapters.
-- Phase 1 core:
-  - admissions
-  - student documents/certificates
-  - student lifecycle
-  - attendance
-  - monthly attendance register export
-  - student attendance history
-  - fees
-  - invoice detail
-  - student fee ledger
-  - student fee ledger export
-  - fee collection report
-  - defaulter aging report
-  - payment reversal/refund
-  - cashier close
-  - generic reports foundation
-  - activity feed
-  - file registry/media preview foundation
-  - notices
-  - consent
-  - deliveries
-  - receipts
-  - immutable finance-ledger posting foundation
-- Phase 2 foundations/scaffolding:
-  - academics
-  - timetable/homework
-  - HR/payroll
-  - accounting reports
-  - messaging
-- Phase 3 foundations/scaffolding:
-  - library
-  - transport
-
-## Current Frontend Surface Area
-
-- Public/root app shell and login.
-- School Admin UI under `/dashboard/*`.
-- Dedicated Platform Control Plane shell under `/platform/*`.
-- Admin Dashboard.
-- Students/Admissions workspace.
-- Student Directory.
-- Student Detail page.
-- Student edit and guardian edit.
-- Student lifecycle/transfer actions.
-- Student document manager.
-- Multi-step enrollment.
-- Attendance 3-tap screen.
-- Student Attendance History tab.
-- Monthly Attendance Register CSV export.
-- Fee Collection Counter.
-- Invoice Detail panel.
-- Student Fee Ledger.
-- Student Fee Ledger CSV export.
-- Fee Collection Report CSV export.
-- Defaulter Aging Report CSV export.
-- Payment refund/reversal flow.
-- Cashier Close / Day-End panel.
-- Activity Feed.
-- Notices/Communications.
-- Consent Management.
-- Delivery Records.
-- School Settings/setup screens.
-- Platform Overview and Manage Schools screens.
-
-## Phase 1B Readiness
-
-Phase 1B has reached pilot-readiness. Remaining polish items and deferred features:
-
-1. **Student Photo Upload:** Deferred to Phase 2 for storage-backed implementation.
-2. **Logo Upload:** Deferred.
-3. **iEMIS Export UI:** Deferred.
-4. **Duplicate Merge Workflow:** Deferred.
-5. **Platform Control Plane Depth:** Continued expansion for multi-tenant monitoring.
-6. **Playwright Smoke Tests:** Stabilization of automated browser flows.
+---
 
 ## M9 Accounting Direction
 
@@ -343,6 +278,8 @@ Strict M9 Accounting rules:
 9. Reports come from backend ledger, not frontend calculations.
 10. Audit all posting, approval, reversal, closing, reopening, and exports.
 
+---
+
 ## Deferred / Later
 
 - Angular internal dashboard migration.
@@ -351,5 +288,5 @@ Strict M9 Accounting rules:
 - Payment gateways such as eSewa/Khalti until manual/bank/cash reconciliation is production-ready.
 - Full M9 Accounting.
 - Academics, timetable/homework, HR/payroll production hardening.
-- Library and transport production hardening.
+- Library, transport, and canteen production hardening.
 - AI integrations until consent, moderation, storage, messaging, and reliable production data are stable.
