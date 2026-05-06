@@ -8,13 +8,10 @@ import { RedisService } from '../src/redis/redis.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import * as bcrypt from 'bcrypt';
+import { SYSTEM_ROLE_PERMISSIONS } from '../src/rbac/rbac.defaults';
+import { Response } from 'express';
+import { AuthenticatedRequest } from '../src/auth/auth-request.interface';
 import {
-  SYSTEM_ROLE_DEFINITIONS,
-  SYSTEM_ROLE_PERMISSIONS,
-  buildPermissionKey,
-} from '../src/rbac/rbac.defaults';
-import {
-  MockState,
   PrismaMock,
   createResponseMock,
   createQueueMock,
@@ -38,7 +35,7 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
       .useValue(prisma)
       .overrideProvider(RedisService)
       .useValue({
-        ping: jest.fn(async () => 'PONG'),
+        ping: jest.fn(() => Promise.resolve('PONG')),
         onModuleDestroy: jest.fn(),
       })
       .overrideProvider(getQueueToken('finance'))
@@ -86,7 +83,7 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     prisma.__state.users.push(adminA);
     prisma.__state.userRoles.push({
       userId: adminA.id,
-      roleId: adminRoleA!.id,
+      roleId: adminRoleA?.id ?? '',
       tenantId: tenantAId,
     });
 
@@ -108,8 +105,8 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
         email: 'admin@school-a.com',
         password: 'pass123',
       },
-      createResponseMock() as any,
-      { ip: '127.0.0.1', headers: {} } as any,
+      createResponseMock() as unknown as Response,
+      { ip: '127.0.0.1', headers: {} } as unknown as AuthenticatedRequest,
     );
     const authA = createAuthContextMock({
       tenantId: tenantAId,
@@ -120,12 +117,12 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     await settingsController.updateSetting(
       'branding_primary_color',
       { value: '#ff0000' },
-      { auth: authA } as any,
+      { auth: authA } as unknown as AuthenticatedRequest,
     );
 
     const settingsA = await settingsController.getSettings({
       auth: authA,
-    } as any);
+    } as unknown as AuthenticatedRequest);
     expect(
       settingsA.find((s) => s.key === 'branding_primary_color')?.value,
     ).toBe('#ff0000');
@@ -141,7 +138,7 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
       settingsController.updateSetting(
         'branding_primary_color',
         { value: 'not-a-color' },
-        { auth: authA } as any,
+        { auth: authA } as unknown as AuthenticatedRequest,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
 
@@ -149,7 +146,7 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     await expect(
       settingsController.updateSetting('timezone', { value: 123 }, {
         auth: authA,
-      } as any),
+      } as unknown as AuthenticatedRequest),
     ).rejects.toBeInstanceOf(BadRequestException);
 
     // 8. Test Permissions - Teacher (Read only)
@@ -166,7 +163,7 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     prisma.__state.users.push(teacherA);
     prisma.__state.userRoles.push({
       userId: teacherA.id,
-      roleId: teacherRoleA!.id,
+      roleId: teacherRoleA?.id ?? '',
       tenantId: tenantAId,
     });
 
@@ -180,7 +177,7 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     // Teacher can read
     const tSettings = await settingsController.getSettings({
       auth: authTeacher,
-    } as any);
+    } as unknown as AuthenticatedRequest);
     expect(tSettings).toBeDefined();
 
     // 9. Test Exposure - Parent Role
@@ -197,7 +194,7 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     prisma.__state.users.push(parentA);
     prisma.__state.userRoles.push({
       userId: parentA.id,
-      roleId: parentRoleA!.id,
+      roleId: parentRoleA?.id ?? '',
       tenantId: tenantAId,
     });
 
@@ -221,12 +218,12 @@ describe('SchoolOS Tenant Settings (E2E)', () => {
     await settingsController.updateSetting(
       'sms_provider',
       { value: 'twilio' },
-      { auth: authA } as any,
+      { auth: authA } as unknown as AuthenticatedRequest,
     );
 
     const publicSettings = await settingsController.getPublicSettings({
       auth: authParent,
-    } as any);
+    } as unknown as AuthenticatedRequest);
 
     // Branding should be there
     expect(

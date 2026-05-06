@@ -3,31 +3,40 @@
  */
 
 export interface MockState {
-  tenants: Record<string, any>[];
-  permissions: Record<string, any>[];
-  roles: Record<string, any>[];
-  rolePermissions: Record<string, any>[];
-  users: Record<string, any>[];
-  userRoles: Record<string, any>[];
-  classes: Record<string, any>[];
-  students: Record<string, any>[];
-  staff: Record<string, any>[];
-  staffLeaveBalances: Record<string, any>[];
-  academicYears: Record<string, any>[];
-  chartAccounts: Record<string, any>[];
-  feeHeads: Record<string, any>[];
-  otpCodes: Record<string, any>[];
-  refreshTokens: Record<string, any>[];
-  auditLogs: Record<string, any>[];
-  tenantSettings: Record<string, any>[];
-  fileAssets: Record<string, any>[];
-  studentDocuments: Record<string, any>[];
-  [key: string]: Record<string, any>[];
+  tenants: Record<string, unknown>[];
+  permissions: Record<string, unknown>[];
+  roles: Record<string, unknown>[];
+  rolePermissions: Record<string, unknown>[];
+  users: Record<string, unknown>[];
+  userRoles: Record<string, unknown>[];
+  classes: Record<string, unknown>[];
+  students: Record<string, unknown>[];
+  staff: Record<string, unknown>[];
+  staffLeaveBalances: Record<string, unknown>[];
+  academicYears: Record<string, unknown>[];
+  chartAccounts: Record<string, unknown>[];
+  feeHeads: Record<string, unknown>[];
+  otpCodes: Record<string, unknown>[];
+  refreshTokens: Record<string, unknown>[];
+  auditLogs: Record<string, unknown>[];
+  tenantSettings: Record<string, unknown>[];
+  fileAssets: Record<string, unknown>[];
+  studentDocuments: Record<string, unknown>[];
+  [key: string]: Record<string, unknown>[];
 }
 
 export interface PrismaMock {
   __state: MockState;
   [key: string]: unknown;
+}
+
+export interface PrismaQuery {
+  where?: Record<string, unknown>;
+  data?: Record<string, unknown>;
+  include?: Record<string, unknown>;
+  orderBy?: unknown;
+  take?: number;
+  skip?: number;
 }
 
 export interface RequestMock {
@@ -78,9 +87,12 @@ export function buildCookieHeader(
 
 export function createQueueMock(): Record<string, unknown> {
   return {
-    add: jest.fn(async () => ({ id: 'job-1' })),
-    close: jest.fn(async () => undefined),
-    disconnect: jest.fn(async () => undefined),
+    add: jest.fn(() => Promise.resolve({ id: 'job-1' })),
+    ping: jest.fn(() => Promise.resolve('PONG')),
+    onModuleDestroy: jest.fn(() => Promise.resolve()),
+    onApplicationShutdown: jest.fn(() => Promise.resolve()),
+    close: jest.fn(() => Promise.resolve(undefined)),
+    disconnect: jest.fn(() => Promise.resolve(undefined)),
     on: jest.fn(),
     once: jest.fn(),
     off: jest.fn(),
@@ -125,7 +137,6 @@ export function createAuthContextMock(
   };
 }
 
-import * as bcrypt from 'bcrypt';
 import {
   PERMISSION_CATALOG,
   SYSTEM_ROLE_DEFINITIONS,
@@ -147,14 +158,14 @@ export function createPrismaMock() {
       },
     ],
     permissions: PERMISSION_CATALOG.map((permission, index) => ({
-      id: `perm-${index + 1}`,
+      id: `perm-${String(index + 1)}`,
       ...permission,
     })),
-    roles: [] as Record<string, any>[],
-    rolePermissions: [] as Record<string, any>[],
-    users: [] as Record<string, any>[],
-    userRoles: [] as Record<string, any>[],
-    classes: [] as Record<string, any>[],
+    roles: [] as Record<string, unknown>[],
+    rolePermissions: [] as Record<string, unknown>[],
+    users: [] as Record<string, unknown>[],
+    userRoles: [] as Record<string, unknown>[],
+    classes: [] as Record<string, unknown>[],
     students: [
       {
         id: 'student-a',
@@ -163,36 +174,26 @@ export function createPrismaMock() {
         firstNameEn: 'Student',
         lastNameEn: 'A',
       },
-    ] as Record<string, any>[],
-    staff: [] as Record<string, any>[],
-    staffLeaveBalances: [] as Record<string, any>[],
-    academicYears: [] as Record<string, any>[],
-    chartAccounts: [] as Record<string, any>[],
-    feeHeads: [] as Record<string, any>[],
-    otpCodes: [] as Record<string, any>[],
-    refreshTokens: [] as Record<string, any>[],
-    auditLogs: [] as Record<string, any>[],
-    tenantSettings: [] as Record<string, any>[],
-    fileAssets: [] as Record<string, any>[],
-    studentDocuments: [] as Record<string, any>[],
+    ] as Record<string, unknown>[],
+    staff: [] as Record<string, unknown>[],
+    staffLeaveBalances: [] as Record<string, unknown>[],
+    academicYears: [] as Record<string, unknown>[],
+    chartAccounts: [] as Record<string, unknown>[],
+    feeHeads: [] as Record<string, unknown>[],
+    otpCodes: [] as Record<string, unknown>[],
+    refreshTokens: [] as Record<string, unknown>[],
+    auditLogs: [] as Record<string, unknown>[],
+    tenantSettings: [] as Record<string, unknown>[],
+    fileAssets: [] as Record<string, unknown>[],
+    studentDocuments: [] as Record<string, unknown>[],
   };
 
-  let idCounter = 1;
-  const nextId = (prefix: string) => `${prefix}-${String(idCounter++)}`;
-
-  function permissionByKey(permissionKey: string) {
-    return state.permissions.find(
-      (permission) =>
-        buildPermissionKey(
-          permission.resource as string,
-          permission.action as string,
-        ) === permissionKey,
-    );
-  }
+  const nextId = (prefix: string) =>
+    `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 
   function attachRolePermissions(
     stateRef: MockState,
-    role: Record<string, any> | undefined,
+    role: Record<string, unknown> | undefined,
   ) {
     if (!role) {
       return role;
@@ -212,7 +213,7 @@ export function createPrismaMock() {
 
   function attachUserRoles(
     stateRef: MockState,
-    user: Record<string, any> | undefined,
+    user: Record<string, unknown> | undefined,
   ) {
     if (!user) {
       return user;
@@ -244,19 +245,32 @@ export function createPrismaMock() {
   return {
     __state: state,
     tenant: {
-      findUnique: jest.fn(async (q: any) =>
-        state.tenants.find(
-          (tenant) =>
-            tenant.id === q.where?.id || tenant.slug === q.where?.slug,
+      findUnique: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.tenants.find(
+            (tenant) =>
+              tenant.id === q.where?.id || tenant.slug === q.where?.slug,
+          ),
         ),
       ),
-      findFirst: jest.fn(async (q: any) =>
-        state.tenants.find(
-          (tenant) =>
-            tenant.id === q.where?.id || tenant.slug === q.where?.slug,
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.tenants.find(
+            (tenant) =>
+              tenant.id === q.where?.id || tenant.slug === q.where?.slug,
+          ),
         ),
       ),
-      create: jest.fn(async ({ data }: any) => {
+      findMany: jest.fn(() => Promise.resolve(state.tenants)),
+      update: jest.fn((q: PrismaQuery) => {
+        const tenant = state.tenants.find((t) => t.id === q.where?.id);
+        if (tenant) {
+          Object.assign(tenant, q.data ?? {});
+        }
+        return Promise.resolve(tenant);
+      }),
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
         const tenant = {
           id: nextId('tenant'),
           isActive: true,
@@ -271,395 +285,489 @@ export function createPrismaMock() {
       }),
     },
     user: {
-      findUnique: jest.fn(async (q: any) => {
+      findUnique: jest.fn((q: PrismaQuery) => {
+        const tenantIdEmail = q.where?.tenantId_email as
+          | { tenantId?: string; email?: string }
+          | undefined;
         const user = state.users.find(
           (user) =>
-            (user.tenantId === q.where?.tenantId_email?.tenantId &&
-              user.email === q.where?.tenantId_email?.email) ||
+            (user.tenantId === tenantIdEmail?.tenantId &&
+              user.email === tenantIdEmail?.email) ||
             (user.id === q.where?.id &&
               (!q.where?.tenantId || user.tenantId === q.where.tenantId)),
         );
-        return attachUserRoles(state, user);
+        return Promise.resolve(attachUserRoles(state, user));
       }),
-      findFirst: jest.fn(async (q: any) => {
+      findFirst: jest.fn((q: PrismaQuery) => {
+        const tenantIdEmail = q.where?.tenantId_email as
+          | { tenantId?: string; email?: string }
+          | undefined;
         const user = state.users.find(
           (user) =>
-            (user.tenantId === q.where?.tenantId_email?.tenantId &&
-              user.email === q.where?.tenantId_email?.email) ||
+            (user.tenantId === tenantIdEmail?.tenantId &&
+              user.email === tenantIdEmail?.email) ||
             (user.id === q.where?.id &&
               (!q.where?.tenantId || user.tenantId === q.where.tenantId)),
         );
-        return attachUserRoles(state, user);
+        return Promise.resolve(attachUserRoles(state, user));
       }),
-      findMany: jest.fn(async (q: any) =>
-        state.users
-          .filter((user) => user.tenantId === q.where?.tenantId)
-          .map((user) => attachUserRoles(state, user)),
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.users
+            .filter((user) => user.tenantId === q.where?.tenantId)
+            .map((user) => attachUserRoles(state, user)),
+        ),
       ),
-      create: jest.fn(async ({ data }: any) => {
-        const nestedRoles = data.userRoles?.create ?? [];
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
+        const nestedRoles =
+          (data?.userRoles as { create?: Record<string, unknown>[] })?.create ??
+          [];
         const user = {
           id: nextId('user'),
           ...data,
           userRoles: undefined,
           createdAt: new Date(),
         };
-        state.users.push(user);
-        for (const role of nestedRoles) {
+        state.users.push(user as Record<string, unknown>);
+        for (const r of nestedRoles) {
           state.userRoles.push({
-            id: nextId('user-role'),
+            ...r,
             userId: user.id,
-            ...role,
-          });
+          } as Record<string, unknown>);
         }
-        return user;
+        return Promise.resolve(attachUserRoles(state, user));
       }),
-      update: jest.fn(async (q: any) => {
+      update: jest.fn((q: PrismaQuery) => {
         const user = state.users.find((u) => u.id === q.where?.id);
         if (user) {
           Object.assign(user, q.data);
         }
-        return attachUserRoles(state, user);
+        return Promise.resolve(attachUserRoles(state, user));
       }),
-      count: jest.fn(
-        async (q: any) =>
+      count: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
           state.users.filter((item) => item.tenantId === q.where?.tenantId)
             .length,
+        ),
       ),
     },
     role: {
-      findUnique: jest.fn(async (q: any) =>
-        state.roles.find(
-          (role) =>
-            role.tenantId === q.where?.tenantId_name?.tenantId &&
-            role.name === q.where?.tenantId_name?.name,
-        ),
-      ),
-      findMany: jest.fn(async (q: any) =>
-        state.roles.filter(
-          (role) =>
-            role.tenantId === q.where?.tenantId &&
-            (!q.where?.id?.in || q.where.id.in.includes(role.id)),
-        ),
-      ),
-      upsert: jest.fn(async ({ where, update, create }: any) => {
+      findUnique: jest.fn((q: PrismaQuery) => {
+        const tenantIdName = q.where?.tenantId_name as
+          | { tenantId?: string; name?: string }
+          | undefined;
+        return Promise.resolve(
+          state.roles.find(
+            (role) =>
+              role.tenantId === tenantIdName?.tenantId &&
+              role.name === tenantIdName?.name,
+          ),
+        );
+      }),
+      findMany: jest.fn((q: PrismaQuery) => {
+        const idIn = (q.where?.id as { in?: string[] } | undefined)?.in;
+        return Promise.resolve(
+          state.roles.filter(
+            (role) =>
+              role.tenantId === q.where?.tenantId &&
+              (!idIn || idIn.includes(role.id as string)),
+          ),
+        );
+      }),
+      upsert: jest.fn((q: PrismaQuery) => {
+        const { where, update, create } = q;
+        const tenantIdName = where?.tenantId_name as
+          | { tenantId?: string; name?: string }
+          | undefined;
         const existing = state.roles.find(
           (role) =>
-            role.tenantId === where.tenantId_name?.tenantId &&
-            role.name === where.tenantId_name?.name,
+            role.tenantId === tenantIdName?.tenantId &&
+            role.name === tenantIdName?.name,
         );
         if (existing) {
           Object.assign(existing, update);
-          return existing;
+          return Promise.resolve(existing);
         }
         const role = {
           id: nextId('role'),
-          ...create,
+          ...(create as Record<string, unknown>),
         };
-        state.roles.push(role);
-        return role;
+        state.roles.push(role as Record<string, unknown>);
+        return Promise.resolve(role);
       }),
     },
     permission: {
-      findUnique: jest.fn(async (q: any) =>
-        state.permissions.find(
-          (permission) =>
-            permission.resource === q.where?.resource_action?.resource &&
-            permission.action === q.where?.resource_action?.action,
-        ),
-      ),
-      upsert: jest.fn(async ({ where, update, create }: any) => {
+      findUnique: jest.fn((q: PrismaQuery) => {
+        const resAct = q.where?.resource_action as
+          | { resource?: string; action?: string }
+          | undefined;
+        return Promise.resolve(
+          state.permissions.find(
+            (permission) =>
+              permission.resource === resAct?.resource &&
+              permission.action === resAct?.action,
+          ),
+        );
+      }),
+      upsert: jest.fn((q: PrismaQuery) => {
+        const { where, update, create } = q;
+        const resAct = where?.resource_action as
+          | { resource?: string; action?: string }
+          | undefined;
         const existing = state.permissions.find(
           (permission) =>
-            permission.resource === where.resource_action?.resource &&
-            permission.action === where.resource_action?.action,
+            permission.resource === resAct?.resource &&
+            permission.action === resAct?.action,
         );
         if (existing) {
-          Object.assign(existing, update);
-          return existing;
+          Object.assign(existing, update ?? {});
+          return Promise.resolve(existing);
         }
         const permission = {
           id: nextId('perm'),
-          ...create,
+          ...(create as Record<string, unknown>),
         };
-        state.permissions.push(permission);
-        return permission;
+        state.permissions.push(permission as Record<string, unknown>);
+        return Promise.resolve(permission);
       }),
     },
     rolePermission: {
-      deleteMany: jest.fn(async (q: any) => {
+      deleteMany: jest.fn((q: PrismaQuery) => {
         const before = state.rolePermissions.length;
         state.rolePermissions = state.rolePermissions.filter(
           (item) => item.roleId !== q.where?.roleId,
         );
-        return { count: before - state.rolePermissions.length };
+        return Promise.resolve({
+          count: before - state.rolePermissions.length,
+        });
       }),
-      create: jest.fn(async ({ data }: any) => {
-        state.rolePermissions.push(data);
-        return data;
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
+        state.rolePermissions.push(data as Record<string, unknown>);
+        return Promise.resolve(data);
       }),
     },
     userRole: {
-      create: jest.fn(async ({ data }: any) => {
-        state.userRoles.push(data);
-        return data;
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
+        state.userRoles.push(data as Record<string, unknown>);
+        return Promise.resolve(data);
       }),
-      findMany: jest.fn(async (q: any) =>
-        state.userRoles
-          .filter(
-            (item) =>
-              item.userId === q.where?.userId &&
-              item.tenantId === q.where?.tenantId,
-          )
-          .map((item) => ({
-            ...item,
-            role: attachRolePermissions(
-              state,
-              state.roles.find((role) => role.id === item.roleId),
-            ),
-          })),
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.userRoles
+            .filter(
+              (item) =>
+                item.userId === q.where?.userId &&
+                item.tenantId === q.where?.tenantId,
+            )
+            .map((item) => ({
+              ...item,
+              role: attachRolePermissions(
+                state,
+                state.roles.find((role) => role.id === item.roleId),
+              ),
+            })),
+        ),
       ),
     },
     class: {
-      findFirst: jest.fn(async (q: any) =>
-        state.classes.find(
-          (item) =>
-            item.id === q.where?.id && item.tenantId === q.where?.tenantId,
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.classes.find(
+            (item) =>
+              item.id === q.where?.id && item.tenantId === q.where?.tenantId,
+          ),
         ),
       ),
-      findUnique: jest.fn(async (q: any) =>
-        state.classes.find(
-          (item) =>
-            item.tenantId === q.where?.tenantId_name?.tenantId &&
-            item.name === q.where?.tenantId_name?.name,
+      findUnique: jest.fn((q: PrismaQuery) => {
+        const tenantIdName = q.where?.tenantId_name as
+          | { tenantId?: string; name?: string }
+          | undefined;
+        return Promise.resolve(
+          state.classes.find(
+            (item) =>
+              item.tenantId === tenantIdName?.tenantId &&
+              item.name === tenantIdName?.name,
+          ),
+        );
+      }),
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.classes
+            .filter((item) => item.tenantId === q.where?.tenantId)
+            .map((item) => ({
+              ...item,
+              _count: {
+                students: state.students.filter(
+                  (student) => student.classId === item.id,
+                ).length,
+                subjects: 0,
+                sections: 0,
+              },
+            })),
         ),
       ),
-      findMany: jest.fn(async (q: any) =>
-        state.classes
-          .filter((item) => item.tenantId === q.where?.tenantId)
-          .map((item) => ({
-            ...item,
-            _count: {
-              students: state.students.filter(
-                (student) => student.classId === item.id,
-              ).length,
-              subjects: 0,
-              sections: 0,
-            },
-          })),
-      ),
-      create: jest.fn(async ({ data }: any) => {
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
         const item = {
           id: nextId('class'),
           ...data,
           createdAt: new Date(),
         };
-        state.classes.push(item);
-        return item;
+        state.classes.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
       }),
-      count: jest.fn(
-        async (q: any) =>
+      count: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
           state.classes.filter((item) => item.tenantId === q.where?.tenantId)
             .length,
+        ),
       ),
     },
     staff: {
-      findUnique: jest.fn(async (q: any) =>
-        state.staff.find((item) => item.employeeId === q.where?.employeeId),
-      ),
-      findFirst: jest.fn(async (q: any) =>
-        state.staff.find(
-          (item) =>
-            item.tenantId === q.where?.tenantId &&
-            (!q.where?.employeeId || item.employeeId === q.where.employeeId),
+      findUnique: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.staff.find((item) => item.employeeId === q.where?.employeeId),
         ),
       ),
-      create: jest.fn(async ({ data }: any) => {
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.staff.find(
+            (item) =>
+              item.tenantId === q.where?.tenantId &&
+              (!q.where?.employeeId || item.employeeId === q.where.employeeId),
+          ),
+        ),
+      ),
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
         const item = {
           id: nextId('staff'),
           ...data,
           user: attachUserRoles(
             state,
-            state.users.find((user) => user.id === data.userId),
+            state.users.find((user) => user.id === data?.userId),
           ),
           createdAt: new Date(),
         };
-        state.staff.push(item);
-        return item;
+        state.staff.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
       }),
-      count: jest.fn(
-        async (q: any) =>
+      count: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
           state.staff.filter((item) => item.tenantId === q.where?.tenantId)
             .length,
+        ),
       ),
     },
     staffLeaveBalance: {
-      createMany: jest.fn(async ({ data }: any) => {
-        state.staffLeaveBalances.push(...data);
-        return { count: data.length };
+      createMany: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? [];
+        state.staffLeaveBalances.push(
+          ...(data as unknown as Record<string, unknown>[]),
+        );
+        return Promise.resolve({
+          count: Array.isArray(data) ? data.length : 0,
+        });
       }),
     },
     academicYear: {
-      upsert: jest.fn(async ({ where, update, create }: any) => {
+      upsert: jest.fn((q: PrismaQuery) => {
+        const { where, update, create } = q;
+        const tenantIdName = where?.tenantId_name as
+          | { tenantId?: string; name?: string }
+          | undefined;
         const existing = state.academicYears.find(
           (year) =>
-            year.tenantId === where.tenantId_name?.tenantId &&
-            year.name === where.tenantId_name?.name,
+            year.tenantId === tenantIdName?.tenantId &&
+            year.name === tenantIdName?.name,
         );
         if (existing) {
-          Object.assign(existing, update);
-          return existing;
+          Object.assign(existing, update ?? {});
+          return Promise.resolve(existing);
         }
         const year = {
           id: nextId('year'),
-          ...create,
+          ...(create as Record<string, unknown>),
         };
-        state.academicYears.push(year);
-        return year;
+        state.academicYears.push(year as Record<string, unknown>);
+        return Promise.resolve(year);
       }),
     },
     chartAccount: {
-      upsert: jest.fn(async ({ where, update, create }: any) => {
+      upsert: jest.fn((q: PrismaQuery) => {
+        const { where, update, create } = q;
+        const tenantIdCode = where?.tenantId_code as
+          | { tenantId?: string; code?: string }
+          | undefined;
         const existing = state.chartAccounts.find(
           (account) =>
-            account.tenantId === where.tenantId_code?.tenantId &&
-            account.code === where.tenantId_code?.code,
+            account.tenantId === tenantIdCode?.tenantId &&
+            account.code === tenantIdCode?.code,
         );
         if (existing) {
-          Object.assign(existing, update);
-          return existing;
+          Object.assign(existing, update ?? {});
+          return Promise.resolve(existing);
         }
         const account = {
           id: nextId('account'),
-          ...create,
+          ...(create as Record<string, unknown>),
         };
-        state.chartAccounts.push(account);
-        return account;
+        state.chartAccounts.push(account as Record<string, unknown>);
+        return Promise.resolve(account);
       }),
     },
     feeHead: {
-      upsert: jest.fn(async ({ where, update, create }: any) => {
+      upsert: jest.fn((q: PrismaQuery) => {
+        const { where, update, create } = q;
+        const tenantIdCode = where?.tenantId_code as
+          | { tenantId?: string; code?: string }
+          | undefined;
         const existing = state.feeHeads.find(
           (feeHead) =>
-            feeHead.tenantId === where.tenantId_code?.tenantId &&
-            feeHead.code === where.tenantId_code?.code,
+            feeHead.tenantId === tenantIdCode?.tenantId &&
+            feeHead.code === tenantIdCode?.code,
         );
         if (existing) {
-          Object.assign(existing, update);
-          return existing;
+          Object.assign(existing, update ?? {});
+          return Promise.resolve(existing);
         }
         const feeHead = {
           id: nextId('fee-head'),
-          ...create,
+          ...(create as Record<string, unknown>),
         };
-        state.feeHeads.push(feeHead);
-        return feeHead;
+        state.feeHeads.push(feeHead as Record<string, unknown>);
+        return Promise.resolve(feeHead);
       }),
     },
     student: {
-      create: jest.fn(async ({ data }: any) => {
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
         const item = {
           id: nextId('student'),
           ...data,
           class: state.classes.find(
-            (classroom) => classroom.id === data.classId,
+            (classroom) => classroom.id === data?.classId,
           ),
-          user: state.users.find((user) => user.id === data.userId),
+          user: state.users.find((user) => user.id === data?.userId),
           createdAt: new Date(),
         };
-        state.students.push(item);
-        return item;
+        state.students.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
       }),
-      findMany: jest.fn(async (q: any) =>
-        state.students.filter((item) => item.tenantId === q.where?.tenantId),
-      ),
-      findFirst: jest.fn(async (q: any) =>
-        state.students.find(
-          (item) =>
-            item.tenantId === q.where?.tenantId &&
-            (item.id === q.where?.id || item.userId === q.where?.userId),
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.students.filter((item) => item.tenantId === q.where?.tenantId),
         ),
       ),
-      count: jest.fn(
-        async (q: any) =>
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.students.find(
+            (item) =>
+              item.tenantId === q.where?.tenantId &&
+              (item.id === q.where?.id || item.userId === q.where?.userId),
+          ),
+        ),
+      ),
+      count: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
           state.students.filter((item) => item.tenantId === q.where?.tenantId)
             .length,
+        ),
       ),
     },
     tenantSetting: {
-      findUnique: jest.fn(async (q: any) =>
-        state.tenantSettings.find(
-          (setting) =>
-            setting.tenantId === q.where?.tenantId_key?.tenantId &&
-            setting.key === q.where?.tenantId_key?.key,
-        ),
-      ),
-      findMany: jest.fn(async (q: any) =>
-        state.tenantSettings.filter((setting) => {
-          const matchesTenant = setting.tenantId === q.where?.tenantId;
-          const allowedKeys = q.where?.key?.in;
-          return (
-            matchesTenant && (!allowedKeys || allowedKeys.includes(setting.key))
-          );
-        }),
-      ),
-      create: jest.fn(async ({ data }: any) => {
+      findUnique: jest.fn((q: PrismaQuery) => {
+        const tenantIdKey = q.where?.tenantId_key as
+          | { tenantId?: string; key?: string }
+          | undefined;
+        return Promise.resolve(
+          state.tenantSettings.find(
+            (setting) =>
+              setting.tenantId === tenantIdKey?.tenantId &&
+              setting.key === tenantIdKey?.key,
+          ),
+        );
+      }),
+      findMany: jest.fn((q: PrismaQuery) => {
+        const keyIn = (q.where?.key as { in?: string[] } | undefined)?.in;
+        return Promise.resolve(
+          state.tenantSettings.filter((setting) => {
+            const matchesTenant = setting.tenantId === q.where?.tenantId;
+            return (
+              matchesTenant && (!keyIn || keyIn.includes(setting.key as string))
+            );
+          }),
+        );
+      }),
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
         const item = {
           id: nextId('setting'),
           ...data,
           createdAt: new Date(),
           updatedAt: new Date(),
         };
-        state.tenantSettings.push(item);
-        return item;
+        state.tenantSettings.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
       }),
-      upsert: jest.fn(async ({ where, create, update }: any) => {
+      upsert: jest.fn((q: PrismaQuery) => {
+        const { where, create, update } = q;
+        const tenantIdKey = where?.tenantId_key as
+          | { tenantId?: string; key?: string }
+          | undefined;
         const existing = state.tenantSettings.find(
           (setting) =>
-            setting.tenantId === where.tenantId_key?.tenantId &&
-            setting.key === where.tenantId_key?.key,
+            setting.tenantId === tenantIdKey?.tenantId &&
+            setting.key === tenantIdKey?.key,
         );
         if (existing) {
-          Object.assign(existing, update, { updatedAt: new Date() });
-          return existing;
+          Object.assign(existing, update ?? {}, { updatedAt: new Date() });
+          return Promise.resolve(existing);
         }
         const item = {
           id: nextId('setting'),
-          ...create,
+          ...(create as Record<string, unknown>),
           createdAt: new Date(),
           updatedAt: new Date(),
         };
-        state.tenantSettings.push(item);
-        return item;
+        state.tenantSettings.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
       }),
-      update: jest.fn(async (q: any) => {
+      update: jest.fn((q: PrismaQuery) => {
         const item = state.tenantSettings.find(
           (setting) => setting.id === q.where?.id,
         );
-        if (item) Object.assign(item, q.data, { updatedAt: new Date() });
-        return item;
+        if (item) Object.assign(item, q.data ?? {}, { updatedAt: new Date() });
+        return Promise.resolve(item);
       }),
     },
     studentDocument: {
-      create: jest.fn(async ({ data }: any) => {
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
         const item = {
           id: nextId('student-doc'),
           ...data,
           createdAt: new Date(),
         };
-        state.studentDocuments.push(item);
-        return item;
+        state.studentDocuments.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
       }),
-      findMany: jest.fn(async (q: any) =>
-        state.studentDocuments.filter(
-          (item) =>
-            item.tenantId === q.where?.tenantId &&
-            (!q.where?.studentId || item.studentId === q.where.studentId),
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.studentDocuments.filter(
+            (item) =>
+              item.tenantId === q.where?.tenantId &&
+              (!q.where?.studentId || item.studentId === q.where.studentId),
+          ),
         ),
       ),
     },
     fileAsset: {
-      create: jest.fn(async ({ data }: any) => {
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
         const item = {
           id: nextId('asset'),
           ...data,
@@ -667,102 +775,128 @@ export function createPrismaMock() {
           updatedAt: new Date(),
           softDeletedAt: null,
         };
-        state.fileAssets.push(item);
-        return item;
+        state.fileAssets.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
       }),
-      findUnique: jest.fn(async (q: any) =>
-        state.fileAssets.find((item) => item.id === q.where?.id),
-      ),
-      findMany: jest.fn(async (q: any) =>
-        state.fileAssets.filter(
-          (item) =>
-            item.tenantId === q.where?.tenantId &&
-            item.module === q.where?.module &&
-            item.entityId === q.where?.entityId &&
-            item.softDeletedAt === q.where?.softDeletedAt,
+      findUnique: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.fileAssets.find((item) => item.id === q.where?.id),
         ),
       ),
-      update: jest.fn(async (q: any) => {
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.fileAssets.filter(
+            (item) =>
+              item.tenantId === q.where?.tenantId &&
+              item.module === q.where?.module &&
+              item.entityId === q.where?.entityId &&
+              item.softDeletedAt === q.where?.softDeletedAt,
+          ),
+        ),
+      ),
+      update: jest.fn((q: PrismaQuery) => {
         const item = state.fileAssets.find((asset) => asset.id === q.where?.id);
-        if (item) Object.assign(item, q.data, { updatedAt: new Date() });
-        return item;
+        if (item) Object.assign(item, q.data ?? {}, { updatedAt: new Date() });
+        return Promise.resolve(item);
       }),
     },
     otpCode: {
-      create: jest.fn(async ({ data }: any) => {
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
         const item = {
           id: nextId('otp'),
           ...data,
           createdAt: new Date(),
         };
-        state.otpCodes.push(item);
-        return item;
+        state.otpCodes.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
       }),
-      findFirst: jest.fn(async (q: any) => {
+      findFirst: jest.fn((q: PrismaQuery) => {
         const { where } = q;
-        return state.otpCodes
-          .slice()
-          .reverse()
-          .find((otp) => {
+        const createdAtGte = (where?.createdAt as { gte?: Date } | undefined)
+          ?.gte;
+        return Promise.resolve(
+          state.otpCodes
+            .slice()
+            .reverse()
+            .find((otp) => {
+              const matchesCreatedAt =
+                createdAtGte === undefined ||
+                (otp.createdAt as Date) >= createdAtGte;
+              return (
+                otp.userId === where?.userId &&
+                otp.purpose === where?.purpose &&
+                matchesCreatedAt
+              );
+            }),
+        );
+      }),
+      count: jest.fn((q: PrismaQuery) => {
+        const { where } = q;
+        const createdAtGte = (where?.createdAt as { gte?: Date } | undefined)
+          ?.gte;
+        return Promise.resolve(
+          state.otpCodes.filter((otp) => {
             const matchesCreatedAt =
-              where.createdAt?.gte === undefined ||
-              (otp.createdAt as any) >= where.createdAt.gte;
+              createdAtGte === undefined ||
+              (otp.createdAt as Date) >= createdAtGte;
             return (
-              otp.userId === where.userId &&
-              otp.purpose === where.purpose &&
+              otp.userId === where?.userId &&
+              otp.purpose === where?.purpose &&
               matchesCreatedAt
             );
-          });
+          }).length,
+        );
       }),
-      count: jest.fn(async (q: any) => {
-        const { where } = q;
-        return state.otpCodes.filter((otp: any) => {
-          const matchesCreatedAt =
-            where.createdAt?.gte === undefined ||
-            otp.createdAt >= where.createdAt.gte;
-          return (
-            otp.userId === where.userId &&
-            otp.purpose === where.purpose &&
-            matchesCreatedAt
-          );
-        }).length;
-      }),
-      updateMany: jest.fn(async (q: any) => {
+      updateMany: jest.fn((q: PrismaQuery) => {
         let count = 0;
         for (const otp of state.otpCodes) {
           const matches =
             otp.userId === q.where?.userId && otp.purpose === q.where?.purpose;
           if (matches) {
-            Object.assign(otp, q.data);
+            Object.assign(otp, q.data ?? {});
             count += 1;
           }
         }
-        return { count };
+        return Promise.resolve({ count });
       }),
-      update: jest.fn(async (q: any) => {
+      update: jest.fn((q: PrismaQuery) => {
         const otp = state.otpCodes.find((item) => item.id === q.where?.id);
-        if (otp) Object.assign(otp, q.data);
-        return otp;
+        if (otp) Object.assign(otp, q.data ?? {});
+        return Promise.resolve(otp);
       }),
     },
     auditLog: {
-      create: jest.fn(async ({ data }: any) => {
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
         const log = {
           id: nextId('log'),
           ...data,
           createdAt: new Date(),
         };
-        state.auditLogs.push(log);
-        return log;
+        state.auditLogs.push(log as Record<string, unknown>);
+        return Promise.resolve(log);
       }),
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          [...state.auditLogs]
+            .reverse()
+            .find((log) => log.tenantId === q.where?.tenantId),
+        ),
+      ),
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.auditLogs.filter((log) => log.tenantId === q.where?.tenantId),
+        ),
+      ),
     },
     refreshToken: {
-      create: jest.fn(async ({ data }: any) => {
-        state.refreshTokens.push(data);
-        return data;
+      create: jest.fn((q: PrismaQuery) => {
+        state.refreshTokens.push((q.data ?? {}) as Record<string, unknown>);
+        return Promise.resolve(q.data);
       }),
-      deleteMany: jest.fn(async () => ({ count: 1 })),
-      updateMany: jest.fn(async (q: any) => {
+      deleteMany: jest.fn(() => Promise.resolve({ count: 1 })),
+      updateMany: jest.fn((q: PrismaQuery) => {
         let count = 0;
         for (const token of state.refreshTokens) {
           if (
@@ -770,32 +904,32 @@ export function createPrismaMock() {
             (q.where?.revokedAt === undefined ||
               token.revokedAt === q.where.revokedAt)
           ) {
-            Object.assign(token, q.data);
+            Object.assign(token, q.data ?? {});
             count += 1;
           }
         }
-        return { count };
+        return Promise.resolve({ count });
       }),
-      update: jest.fn(async (q: any) => {
+      update: jest.fn((q: PrismaQuery) => {
         const token = state.refreshTokens.find(
           (item) => item.id === q.where?.id,
         );
-        if (token) Object.assign(token, q.data);
-        return token;
+        if (token) Object.assign(token, q.data ?? {});
+        return Promise.resolve(token);
       }),
-      findUnique: jest.fn(async (q: any) => {
+      findUnique: jest.fn((q: PrismaQuery) => {
         const token = state.refreshTokens.find(
           (t) =>
             t.token === q.where?.token || t.tokenHash === q.where?.tokenHash,
         );
-        if (!token) return null;
-        return {
+        if (!token) return Promise.resolve(null);
+        return Promise.resolve({
           ...token,
           user: attachUserRoles(
             state,
             state.users.find((user) => user.id === token.userId),
           ),
-        };
+        });
       }),
     },
   };
@@ -849,8 +983,8 @@ export function ensureTenantDefaultsWithState(
       }
 
       state.rolePermissions.push({
-        roleId: role.id,
-        permissionId: (permission as any).id,
+        roleId: role.id as string,
+        permissionId: permission.id as string,
       });
     }
   }

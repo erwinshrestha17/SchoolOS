@@ -510,6 +510,7 @@ describe('attendance production hardening', () => {
       tenantId: adminActor.tenantId,
       staffId: 'staff-1',
       leaveType: 'SICK',
+      isPaid: true,
       startsOn: new Date('2026-04-28T00:00:00.000Z'),
       endsOn: new Date('2026-04-29T00:00:00.000Z'),
       days: new Prisma.Decimal(2),
@@ -541,6 +542,126 @@ describe('attendance production hardening', () => {
         adminActor,
       ),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('allows paid leave approval with sufficient balance', async () => {
+    const leaveRequest = {
+      id: 'leave-1',
+      tenantId: adminActor.tenantId,
+      staffId: 'staff-1',
+      leaveType: 'SICK',
+      isPaid: true,
+      startsOn: new Date('2026-04-28T00:00:00.000Z'),
+      endsOn: new Date('2026-04-29T00:00:00.000Z'),
+      days: new Prisma.Decimal(2),
+      status: 'PENDING',
+    };
+    const reviewedLeave = {
+      ...leaveRequest,
+      status: 'APPROVED',
+      reviewedById: adminActor.userId,
+      reviewedAt: new Date('2026-04-28T09:00:00.000Z'),
+      reviewNote: null,
+    };
+    const { service, tx } = buildService({
+      leaveRequest,
+      reviewedLeave,
+      leaveBalance: {
+        allocated: new Prisma.Decimal(10),
+        carried: new Prisma.Decimal(0),
+        used: new Prisma.Decimal(0),
+      },
+    });
+
+    const result = await service.reviewLeaveRequest(
+      'leave-1',
+      {
+        status: 'APPROVED',
+      },
+      adminActor,
+    );
+
+    expect(result.status).toBe('APPROVED');
+    expect(tx.staffLeaveBalance.upsert).toHaveBeenCalled();
+  });
+
+  it('allows unpaid leave approval without balance checks', async () => {
+    const leaveRequest = {
+      id: 'leave-1',
+      tenantId: adminActor.tenantId,
+      staffId: 'staff-1',
+      leaveType: 'UNPAID',
+      isPaid: false,
+      startsOn: new Date('2026-04-28T00:00:00.000Z'),
+      endsOn: new Date('2026-04-29T00:00:00.000Z'),
+      days: new Prisma.Decimal(2),
+      status: 'PENDING',
+    };
+    const reviewedLeave = {
+      ...leaveRequest,
+      status: 'APPROVED',
+      reviewedById: adminActor.userId,
+      reviewedAt: new Date('2026-04-28T09:00:00.000Z'),
+      reviewNote: null,
+    };
+    const { service, tx } = buildService({
+      leaveRequest,
+      reviewedLeave,
+      leaveBalance: null, // No balance record
+    });
+
+    const result = await service.reviewLeaveRequest(
+      'leave-1',
+      {
+        status: 'APPROVED',
+      },
+      adminActor,
+    );
+
+    expect(result.status).toBe('APPROVED');
+    expect(tx.staffLeaveBalance.upsert).not.toHaveBeenCalled();
+  });
+
+  it('does not deduct balance for rejected leave requests', async () => {
+    const leaveRequest = {
+      id: 'leave-1',
+      tenantId: adminActor.tenantId,
+      staffId: 'staff-1',
+      leaveType: 'SICK',
+      isPaid: true,
+      startsOn: new Date('2026-04-28T00:00:00.000Z'),
+      endsOn: new Date('2026-04-29T00:00:00.000Z'),
+      days: new Prisma.Decimal(2),
+      status: 'PENDING',
+    };
+    const reviewedLeave = {
+      ...leaveRequest,
+      status: 'REJECTED',
+      reviewedById: adminActor.userId,
+      reviewedAt: new Date('2026-04-28T09:00:00.000Z'),
+      reviewNote: 'Rejected',
+    };
+    const { service, tx } = buildService({
+      leaveRequest,
+      reviewedLeave,
+      leaveBalance: {
+        allocated: new Prisma.Decimal(10),
+        carried: new Prisma.Decimal(0),
+        used: new Prisma.Decimal(0),
+      },
+    });
+
+    const result = await service.reviewLeaveRequest(
+      'leave-1',
+      {
+        status: 'REJECTED',
+        reviewNote: 'Rejected',
+      },
+      adminActor,
+    );
+
+    expect(result.status).toBe('REJECTED');
+    expect(tx.staffLeaveBalance.upsert).not.toHaveBeenCalled();
   });
 
   it('deduplicates daily escalation warnings by source type and source id', async () => {

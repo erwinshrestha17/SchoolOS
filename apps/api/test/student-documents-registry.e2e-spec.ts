@@ -30,7 +30,7 @@ describe('Student Documents Registry Integration (E2E)', () => {
       .useValue(prisma)
       .overrideProvider(RedisService)
       .useValue({
-        ping: jest.fn(async () => 'PONG'),
+        ping: jest.fn(() => Promise.resolve('PONG')),
         onModuleDestroy: jest.fn(),
       })
       .overrideProvider(getQueueToken('finance'))
@@ -67,7 +67,7 @@ describe('Student Documents Registry Integration (E2E)', () => {
     });
 
     // 1. Upload a document for Student A
-    const doc = await studentRecordsService.uploadDocument(
+    await studentRecordsService.uploadDocument(
       {
         studentId: studentAId,
         kind: StudentDocumentKind.BIRTH_CERTIFICATE,

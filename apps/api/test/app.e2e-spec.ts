@@ -2,10 +2,12 @@ import {
   ForbiddenException,
   NotFoundException,
   UnauthorizedException,
+  ExecutionContext,
 } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Test, TestingModule } from '@nestjs/testing';
-import * as bcrypt from 'bcrypt';
+import { Response } from 'express';
+import { AuthenticatedRequest } from '../src/auth/auth-request.interface';
 import { AppModule } from '../src/app.module';
 import { AuthController } from '../src/auth/auth.controller';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
@@ -13,30 +15,21 @@ import { RolesPermissionsGuard } from '../src/auth/guards/roles-permissions.guar
 import { ClassesController } from '../src/classes/classes.controller';
 import { FinanceProcessor } from '../src/finance/finance.processor';
 import { NotificationsService } from '../src/notifications/notifications.service';
+import { AuthContext } from '../src/auth/auth.types';
 import { NotificationsProcessor } from '../src/notifications/notifications.processor';
 import { PayrollProcessor } from '../src/payroll/payroll.processor';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.service';
-import { RolesController } from '../src/roles/roles.controller';
 import { StaffController } from '../src/staff/staff.controller';
 import { StudentsController } from '../src/students/students.controller';
 import { TenantsController } from '../src/tenants/tenants.controller';
 import { UsersController } from '../src/users/users.controller';
 import {
-  PERMISSION_CATALOG,
-  SYSTEM_ROLE_DEFINITIONS,
-  SYSTEM_ROLE_PERMISSIONS,
-  buildPermissionKey,
-} from '../src/rbac/rbac.defaults';
-import {
-  MockState,
   PrismaMock,
   createRequestMock,
   createResponseMock,
   createQueueMock,
-  applyMockUpdate,
   buildCookieHeader,
-  createAuthContextMock,
   createPrismaMock,
 } from './test-helpers';
 
@@ -49,7 +42,6 @@ describe('School OS Auth + RBAC integration', () => {
   let studentsController: StudentsController;
   let tenantsController: TenantsController;
   let usersController: UsersController;
-  let rolesController: RolesController;
   let jwtAuthGuard: JwtAuthGuard;
   let rolesGuard: RolesPermissionsGuard;
   let sentCodes: {
@@ -69,8 +61,8 @@ describe('School OS Auth + RBAC integration', () => {
       .useValue(prisma)
       .overrideProvider(RedisService)
       .useValue({
-        ping: jest.fn(async () => 'PONG'),
-        onModuleDestroy: jest.fn(async () => undefined),
+        ping: jest.fn(() => Promise.resolve('PONG')),
+        onModuleDestroy: jest.fn(() => Promise.resolve(undefined)),
       })
       .overrideProvider(getQueueToken('finance'))
       .useValue(createQueueMock())
@@ -86,13 +78,20 @@ describe('School OS Auth + RBAC integration', () => {
       .useValue({ process: jest.fn() })
       .overrideProvider(NotificationsService)
       .useValue({
-        sendAuthCodeEmail: jest.fn(async (payload) => {
-          sentCodes.push({
-            to: payload.to,
-            code: payload.code,
-            purpose: payload.purpose,
-          });
-        }),
+        sendAuthCodeEmail: jest.fn(
+          (payload: {
+            to: string;
+            code: string;
+            purpose: 'login' | 'password_recovery' | 'mfa_setup';
+          }) => {
+            sentCodes.push({
+              to: payload.to,
+              code: payload.code,
+              purpose: payload.purpose,
+            });
+            return Promise.resolve();
+          },
+        ),
         sendEmail: jest.fn(),
       })
       .compile();
@@ -103,7 +102,6 @@ describe('School OS Auth + RBAC integration', () => {
     studentsController = moduleRef.get(StudentsController);
     tenantsController = moduleRef.get(TenantsController);
     usersController = moduleRef.get(UsersController);
-    rolesController = moduleRef.get(RolesController);
     jwtAuthGuard = moduleRef.get(JwtAuthGuard);
     rolesGuard = moduleRef.get(RolesPermissionsGuard);
   });
@@ -124,32 +122,38 @@ describe('School OS Auth + RBAC integration', () => {
 
     const adminResponse = createResponseMock();
     const adminLogin = asSession(
-      await authController.login(
+      (await authController.login(
         {
           tenantSlug: 'green-valley',
           email: 'admin@greenvalley.com',
           password: 'admin12345',
         },
-        adminResponse as any,
-        createRequestMock() as any,
-      ),
+        adminResponse as unknown as Response,
+        createRequestMock() as unknown as AuthenticatedRequest,
+      )) as { accessToken: string; user: unknown },
     );
 
-    expect((adminLogin as any).user.roles).toContain('admin');
+    expect((adminLogin as { user: { roles: string[] } }).user.roles).toContain(
+      'admin',
+    );
 
     const adminRequest = await authenticateRequest(
       jwtAuthGuard,
       rolesGuard,
       adminLogin.accessToken,
-      TenantsController.prototype.getCurrentTenant as any,
-      TenantsController as any,
+      TenantsController.prototype.getCurrentTenant as unknown as (
+        ...args: unknown[]
+      ) => unknown,
+      TenantsController as unknown as new (...args: unknown[]) => unknown,
     );
 
-    const adminProfile = await authController.me(adminRequest.auth as any);
+    const adminProfile = await authController.me(
+      adminRequest.auth as unknown as AuthContext,
+    );
     expect(adminProfile.tenant.slug).toBe('green-valley');
 
     const tenantSummary = await tenantsController.getCurrentTenant(
-      adminRequest.auth as any,
+      adminRequest.auth as unknown as AuthContext,
     );
     expect(tenantSummary.counts.users).toBe(1);
 
@@ -158,7 +162,7 @@ describe('School OS Auth + RBAC integration', () => {
         name: 'Class 6',
         level: 6,
       },
-      adminRequest.auth as any,
+      adminRequest.auth as unknown as AuthContext,
     );
     expect(createdClass.name).toBe('Class 6');
 
@@ -179,36 +183,36 @@ describe('School OS Auth + RBAC integration', () => {
         contractType: 'PERMANENT',
         email: 'teacher@greenvalley.com',
         password: 'teacher12345',
-        roleIds: [teacherRole!.id],
+        roleIds: [teacherRole?.id ?? ''],
       },
-      adminRequest.auth as any,
+      adminRequest.auth as unknown as AuthContext,
     );
 
     expect(createdStaff.email).toBe('teacher@greenvalley.com');
 
     const teacherResponse = createResponseMock();
     const teacherLogin = asSession(
-      await authController.login(
+      (await authController.login(
         {
           tenantSlug: 'green-valley',
           email: 'teacher@greenvalley.com',
           password: 'teacher12345',
         },
-        teacherResponse as any,
-        createRequestMock() as any,
-      ),
+        teacherResponse as unknown as Response,
+        createRequestMock() as unknown as AuthenticatedRequest,
+      )) as { accessToken: string; user: unknown },
     );
 
     const teacherPasswordRequest = await authenticateRequest(
       jwtAuthGuard,
       rolesGuard,
       teacherLogin.accessToken,
-      AuthController.prototype.me as any,
-      AuthController as any,
+      AuthController.prototype.me as unknown as (...args: unknown[]) => unknown,
+      AuthController as unknown as new (...args: unknown[]) => unknown,
     );
 
     const mfaSetupRequest = await authController.requestMfaSetup(
-      teacherPasswordRequest.auth as any,
+      teacherPasswordRequest.auth as unknown as AuthContext,
     );
     expect(mfaSetupRequest).toEqual({ success: true });
 
@@ -219,7 +223,7 @@ describe('School OS Auth + RBAC integration', () => {
     );
 
     const mfaSetupConfirmation = await authController.confirmMfaSetup(
-      teacherPasswordRequest.auth as any,
+      teacherPasswordRequest.auth as unknown as AuthContext,
       {
         code: teacherSetupCode,
         authMethod: 'BOTH',
@@ -228,15 +232,15 @@ describe('School OS Auth + RBAC integration', () => {
     expect(mfaSetupConfirmation.authMethod).toBe('BOTH');
 
     const teacherMfaChallenge = asChallenge(
-      await authController.login(
+      (await authController.login(
         {
           tenantSlug: 'green-valley',
           email: 'teacher@greenvalley.com',
           password: 'teacher12345',
         },
-        createResponseMock() as any,
-        createRequestMock() as any,
-      ),
+        createResponseMock() as unknown as Response,
+        createRequestMock() as unknown as AuthenticatedRequest,
+      )) as { requiresMfa: boolean; challengeToken: string },
     );
     expect(teacherMfaChallenge.requiresMfa).toBe(true);
 
@@ -251,8 +255,8 @@ describe('School OS Auth + RBAC integration', () => {
         challengeToken: teacherMfaChallenge.challengeToken,
         code: teacherLoginCode,
       },
-      teacherVerifiedResponse as any,
-      createRequestMock() as any,
+      teacherVerifiedResponse as unknown as Response,
+      createRequestMock() as unknown as AuthenticatedRequest,
     );
     expect(teacherVerifiedLogin.accessToken).toBeTruthy();
 
@@ -260,11 +264,13 @@ describe('School OS Auth + RBAC integration', () => {
       jwtAuthGuard,
       rolesGuard,
       teacherVerifiedLogin.accessToken,
-      ClassesController.prototype.listClasses as any,
-      ClassesController as any,
+      ClassesController.prototype.listClasses as unknown as (
+        ...args: unknown[]
+      ) => unknown,
+      ClassesController as unknown as new (...args: unknown[]) => unknown,
     );
     const teacherClasses = await classesController.listClasses(
-      teacherRequest.auth as any,
+      teacherRequest.auth as unknown as AuthContext,
     );
     expect(teacherClasses).toHaveLength(1);
 
@@ -280,46 +286,50 @@ describe('School OS Auth + RBAC integration', () => {
         email: 'student@greenvalley.com',
         password: 'student12345',
       },
-      adminRequest.auth as any,
+      adminRequest.auth as unknown as AuthContext,
     );
 
     expect(createdStudent.hasLogin).toBe(true);
 
     const studentResponse = createResponseMock();
     const studentLogin = asSession(
-      await authController.login(
+      (await authController.login(
         {
           tenantSlug: 'green-valley',
           email: 'student@greenvalley.com',
           password: 'student12345',
         },
-        studentResponse as any,
-        createRequestMock() as any,
-      ),
+        studentResponse as unknown as Response,
+        createRequestMock() as unknown as AuthenticatedRequest,
+      )) as { accessToken: string; user: unknown },
     );
 
-    expect((studentLogin as any).user.roles).toContain('student');
+    expect(
+      (studentLogin as { user: { roles: string[] } }).user.roles,
+    ).toContain('student');
 
     const studentPasswordRequest = await authenticateRequest(
       jwtAuthGuard,
       rolesGuard,
       studentLogin.accessToken,
-      AuthController.prototype.me as any,
-      AuthController as any,
+      AuthController.prototype.me as unknown as (...args: unknown[]) => unknown,
+      AuthController as unknown as new (...args: unknown[]) => unknown,
     );
     const studentProfile = await authController.me(
-      studentPasswordRequest.auth as any,
+      studentPasswordRequest.auth as unknown as AuthContext,
     );
     expect(studentProfile.profileType).toBe('student');
 
-    await authController.requestMfaSetup(studentPasswordRequest.auth as any);
+    await authController.requestMfaSetup(
+      studentPasswordRequest.auth as unknown as AuthContext,
+    );
     const studentSetupCode = getLatestCode(
       sentCodes,
       'student@greenvalley.com',
       'mfa_setup',
     );
     const studentMfaConfirmation = await authController.confirmMfaSetup(
-      studentPasswordRequest.auth as any,
+      studentPasswordRequest.auth as unknown as AuthContext,
       {
         code: studentSetupCode,
         authMethod: 'OTP',
@@ -334,8 +344,8 @@ describe('School OS Auth + RBAC integration', () => {
           email: 'student@greenvalley.com',
           password: 'student12345',
         },
-        createResponseMock() as any,
-        createRequestMock() as any,
+        createResponseMock() as unknown as Response,
+        createRequestMock() as unknown as AuthenticatedRequest,
       ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
@@ -354,13 +364,13 @@ describe('School OS Auth + RBAC integration', () => {
         challengeToken: studentOtpChallenge.challengeToken,
         code: studentLoginCode,
       },
-      studentOtpResponse as any,
-      createRequestMock() as any,
+      studentOtpResponse as unknown as Response,
+      createRequestMock() as unknown as AuthenticatedRequest,
     );
     expect(studentOtpLogin.accessToken).toBeTruthy();
 
     const listedUsers = await usersController.listUsers(
-      adminRequest.auth as any,
+      adminRequest.auth as unknown as AuthContext,
     );
     expect(listedUsers).toHaveLength(3);
 
@@ -370,11 +380,11 @@ describe('School OS Auth + RBAC integration', () => {
     expect(teacherUser).toBeDefined();
 
     const suspendedTeacher = await usersController.updateStatus(
-      teacherUser!.id,
+      teacherUser?.id ?? '',
       {
         status: 'SUSPENDED',
       },
-      adminRequest.auth as any,
+      adminRequest.auth as unknown as AuthContext,
     );
     expect(suspendedTeacher.status).toBe('SUSPENDED');
 
@@ -385,17 +395,17 @@ describe('School OS Auth + RBAC integration', () => {
           email: 'teacher@greenvalley.com',
           password: 'teacher12345',
         },
-        createResponseMock() as any,
-        createRequestMock() as any,
+        createResponseMock() as unknown as Response,
+        createRequestMock() as unknown as AuthenticatedRequest,
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
 
     const reactivatedTeacher = await usersController.updateStatus(
-      teacherUser!.id,
+      teacherUser?.id ?? '',
       {
         status: 'ACTIVE',
       },
-      adminRequest.auth as any,
+      adminRequest.auth as unknown as AuthContext,
     );
     expect(reactivatedTeacher.status).toBe('ACTIVE');
 
@@ -424,21 +434,21 @@ describe('School OS Auth + RBAC integration', () => {
           email: 'teacher@greenvalley.com',
           password: 'teacher12345',
         },
-        createResponseMock() as any,
-        createRequestMock() as any,
+        createResponseMock() as unknown as Response,
+        createRequestMock() as unknown as AuthenticatedRequest,
       ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
     const teacherPostRecoveryChallenge = asChallenge(
-      await authController.login(
+      (await authController.login(
         {
           tenantSlug: 'green-valley',
           email: 'teacher@greenvalley.com',
           password: 'teacher99999',
         },
-        createResponseMock() as any,
-        createRequestMock() as any,
-      ),
+        createResponseMock() as unknown as Response,
+        createRequestMock() as unknown as AuthenticatedRequest,
+      )) as { requiresMfa: boolean; challengeToken: string },
     );
     expect(teacherPostRecoveryChallenge.requiresMfa).toBe(true);
 
@@ -456,23 +466,25 @@ describe('School OS Auth + RBAC integration', () => {
 
     const secondTenantResponse = createResponseMock();
     const secondTenantLogin = asSession(
-      await authController.login(
+      (await authController.login(
         {
           tenantSlug: 'blue-ridge',
           email: 'admin@blueridge.com',
           password: 'admin12345',
         },
-        secondTenantResponse as any,
-        createRequestMock() as any,
-      ),
+        secondTenantResponse as unknown as Response,
+        createRequestMock() as unknown as AuthenticatedRequest,
+      )) as { accessToken: string; user: unknown },
     );
 
     const secondTenantRequest = await authenticateRequest(
       jwtAuthGuard,
       rolesGuard,
       secondTenantLogin.accessToken,
-      UsersController.prototype.updateStatus as any,
-      UsersController as any,
+      UsersController.prototype.updateStatus as unknown as (
+        ...args: unknown[]
+      ) => unknown,
+      UsersController as unknown as new (...args: unknown[]) => unknown,
     );
 
     await expect(
@@ -486,32 +498,36 @@ describe('School OS Auth + RBAC integration', () => {
           classId: createdClass.id,
           createLogin: false,
         },
-        secondTenantRequest.auth as any,
+        secondTenantRequest.auth as unknown as AuthContext,
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
 
     await expect(
-      classesController.listClasses(secondTenantRequest.auth as any),
+      classesController.listClasses(
+        secondTenantRequest.auth as unknown as AuthContext,
+      ),
     ).resolves.toHaveLength(0);
 
     await expect(
-      studentsController.listStudents(secondTenantRequest.auth as any),
+      studentsController.listStudents(
+        secondTenantRequest.auth as unknown as AuthContext,
+      ),
     ).resolves.toHaveLength(0);
 
     await expect(
       usersController.updateStatus(
-        teacherUser!.id,
+        teacherUser?.id ?? '',
         { status: 'ACTIVE' },
-        secondTenantRequest.auth as any,
+        secondTenantRequest.auth as unknown as AuthContext,
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
 
     const refreshResponse = createResponseMock();
     const refreshed = await authController.refresh(
       {},
-      refreshResponse as any,
+      refreshResponse as unknown as Response,
       buildCookieHeader(adminResponse.cookieCalls, 'school_os_refresh_token'),
-      createRequestMock() as any,
+      createRequestMock() as unknown as AuthenticatedRequest,
     );
 
     expect(refreshed.accessToken).toBeTruthy();
@@ -525,9 +541,9 @@ describe('School OS Auth + RBAC integration', () => {
     const logoutResponse = createResponseMock();
     const logoutResult = await authController.logout(
       {},
-      logoutResponse as any,
+      logoutResponse as unknown as Response,
       rotatedCookie,
-      createRequestMock() as any,
+      createRequestMock() as unknown as AuthenticatedRequest,
     );
 
     expect(logoutResult).toEqual({ success: true });
@@ -535,9 +551,9 @@ describe('School OS Auth + RBAC integration', () => {
     await expect(
       authController.refresh(
         {},
-        createResponseMock() as any,
+        createResponseMock() as unknown as Response,
         rotatedCookie,
-        createRequestMock() as any,
+        createRequestMock() as unknown as AuthenticatedRequest,
       ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
@@ -602,7 +618,7 @@ async function authenticateRequest(
     headers: {
       authorization: `Bearer ${accessToken}`,
     },
-  } as any;
+  } as unknown as AuthenticatedRequest;
 
   const context = {
     switchToHttp: () => ({
@@ -610,14 +626,22 @@ async function authenticateRequest(
     }),
     getHandler: () => handler,
     getClass: () => controllerClass,
-  } as any;
+  } as unknown as ExecutionContext;
 
-  const cls = (jwtAuthGuard as any).cls;
+  const cls = (
+    jwtAuthGuard as unknown as {
+      cls: {
+        run: (
+          fn: () => Promise<AuthenticatedRequest>,
+        ) => Promise<AuthenticatedRequest>;
+      };
+    }
+  ).cls;
 
   return cls.run(async () => {
     await jwtAuthGuard.canActivate(context);
     await rolesGuard.canActivate(context);
 
-    return request as AuthenticatedRequest;
+    return request;
   });
 }

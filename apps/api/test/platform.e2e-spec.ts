@@ -1,4 +1,4 @@
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '../src/app.module';
 import { AuthController } from '../src/auth/auth.controller';
@@ -9,22 +9,26 @@ import { RedisService } from '../src/redis/redis.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import * as bcrypt from 'bcrypt';
+import { Response } from 'express';
+import { AuthenticatedRequest } from '../src/auth/auth-request.interface';
 import {
-  PERMISSION_CATALOG,
-  SYSTEM_ROLE_DEFINITIONS,
-  SYSTEM_ROLE_PERMISSIONS,
-  buildPermissionKey,
-} from '../src/rbac/rbac.defaults';
+  PrismaMock,
+  createPrismaMock,
+  createQueueMock,
+  createResponseMock,
+  ensureTenantDefaultsWithState,
+} from './test-helpers';
+import { ExecutionContext } from '@nestjs/common';
 
 describe('SchoolOS Platform Control Plane (E2E)', () => {
   let moduleRef: TestingModule;
-  let prisma: any;
+  let prisma: PrismaMock;
   let authController: AuthController;
   let platformController: PlatformController;
   let jwtAuthGuard: JwtAuthGuard;
 
   beforeEach(async () => {
-    prisma = await createPrismaMock();
+    prisma = createPrismaMock();
     moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -32,7 +36,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       .useValue(prisma)
       .overrideProvider(RedisService)
       .useValue({
-        ping: jest.fn(async () => 'PONG'),
+        ping: jest.fn(() => Promise.resolve('PONG')),
         onModuleDestroy: jest.fn(),
       })
       .overrideProvider(getQueueToken('finance'))
@@ -65,8 +69,8 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       isActive: true,
       plan: 'standard',
       createdAt: new Date(),
-    });
-    ensureTenantDefaults(prisma.__state, tenantId);
+    } as Record<string, unknown>);
+    ensureTenantDefaultsWithState(prisma.__state, tenantId);
 
     const adminRole = prisma.__state.roles.find(
       (r) => r.tenantId === tenantId && r.name === 'admin',
@@ -81,38 +85,39 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       lastLoginAt: new Date(),
       failedLoginCount: 0,
     };
-    prisma.__state.users.push(schoolAdmin);
+    prisma.__state.users.push(schoolAdmin as Record<string, unknown>);
     prisma.__state.userRoles.push({
       id: 'ur-1',
       userId: schoolAdmin.id,
-      roleId: adminRole.id,
+      roleId: adminRole?.id ?? '',
       tenantId,
-    });
+    } as Record<string, unknown>);
 
     // 2. Login as school admin
-    const loginRes = await authController.login(
+    const loginRes = (await authController.login(
       {
         tenantSlug: 'school-1',
         email: 'admin@school1.com',
         password: 'school123',
       },
-      createResponseMock() as any,
-      { ip: '127.0.0.1', headers: {} } as any,
-    );
-    const accessToken = (loginRes as any).accessToken;
+      createResponseMock() as unknown as Response,
+      { ip: '127.0.0.1', headers: {} } as unknown as AuthenticatedRequest,
+    )) as { accessToken: string };
+    const accessToken = loginRes.accessToken;
 
     // 3. Try to access platform API - should fail
     const platformGuard = moduleRef.get(
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       require('../src/auth/guards/platform.guard').PlatformGuard,
     );
     const mockReq = {
       headers: { authorization: `Bearer ${accessToken}` },
-    } as any;
+    } as unknown as AuthenticatedRequest;
     const mockContext = {
       switchToHttp: () => ({ getRequest: () => mockReq }),
-      getHandler: () => {},
-      getClass: () => {},
-    } as any;
+      getHandler: jest.fn(),
+      getClass: jest.fn(),
+    } as unknown as ExecutionContext;
 
     await jwtAuthGuard.canActivate(mockContext);
     expect(() => platformGuard.canActivate(mockContext)).toThrow(
@@ -128,8 +133,8 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       isActive: true,
       plan: 'platform',
       createdAt: new Date(),
-    });
-    ensureTenantDefaults(prisma.__state, platformId);
+    } as Record<string, unknown>);
+    ensureTenantDefaultsWithState(prisma.__state, platformId);
 
     const platformRole = prisma.__state.roles.find(
       (r) => r.tenantId === platformId && r.name === 'platform_super_admin',
@@ -144,25 +149,25 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       lastLoginAt: new Date(),
       failedLoginCount: 0,
     };
-    prisma.__state.users.push(platformAdmin);
+    prisma.__state.users.push(platformAdmin as Record<string, unknown>);
     prisma.__state.userRoles.push({
       id: 'ur-p',
       userId: platformAdmin.id,
-      roleId: platformRole.id,
+      roleId: platformRole?.id ?? '',
       tenantId: platformId,
-    });
+    } as Record<string, unknown>);
 
     // 5. Login as platform admin
-    const pLoginRes = await authController.login(
+    const pLoginRes = (await authController.login(
       {
         tenantSlug: 'platform',
         email: 'super@schoolos.com',
         password: 'school123',
       },
-      createResponseMock() as any,
-      { ip: '127.0.0.1', headers: {} } as any,
-    );
-    const pAccessToken = (pLoginRes as any).accessToken;
+      createResponseMock() as unknown as Response,
+      { ip: '127.0.0.1', headers: {} } as unknown as AuthenticatedRequest,
+    )) as { accessToken: string };
+    const pAccessToken = pLoginRes.accessToken;
     mockReq.headers.authorization = `Bearer ${pAccessToken}`;
 
     // 6. Access platform API - should succeed
@@ -170,13 +175,13 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
     expect(platformGuard.canActivate(mockContext)).toBe(true);
 
     const tenants = await platformController.listTenants();
-    expect(tenants).toHaveLength(2); // school-1 and platform
+    expect(tenants).toHaveLength(3); // school-1, platform, and default-school
     expect(tenants.find((t) => t.slug === 'school-1')).toBeDefined();
 
     // 7. Suspend school-1
     await platformController.updateTenantStatus(tenantId, false, {
       auth: { userId: platformAdmin.id },
-    } as any);
+    } as unknown as AuthenticatedRequest);
     const detail = await platformController.getTenantDetail(tenantId);
     expect(detail.isActive).toBe(false);
 
@@ -201,32 +206,32 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       lastLoginAt: new Date(),
       failedLoginCount: 0,
     };
-    prisma.__state.users.push(platformSupport);
+    prisma.__state.users.push(platformSupport as Record<string, unknown>);
     prisma.__state.userRoles.push({
       id: 'ur-s',
       userId: platformSupport.id,
-      roleId: supportRole.id,
+      roleId: supportRole?.id ?? '',
       tenantId: platformId,
-    });
+    } as Record<string, unknown>);
 
-    const sLoginRes = await authController.login(
+    const sLoginRes = (await authController.login(
       {
         tenantSlug: 'platform',
         email: 'support@schoolos.com',
         password: 'school123',
       },
-      createResponseMock() as any,
-      { ip: '127.0.0.1', headers: {} } as any,
-    );
-    const sAccessToken = (sLoginRes as any).accessToken;
+      createResponseMock() as unknown as Response,
+      { ip: '127.0.0.1', headers: {} } as unknown as AuthenticatedRequest,
+    )) as { accessToken: string };
+    const sAccessToken = sLoginRes.accessToken;
     const sMockReq = {
       headers: { authorization: `Bearer ${sAccessToken}` },
-    } as any;
+    } as unknown as AuthenticatedRequest;
     const sMockContext = {
       switchToHttp: () => ({ getRequest: () => sMockReq }),
       getHandler: () => platformController.listTenants,
       getClass: () => PlatformController,
-    } as any;
+    } as unknown as ExecutionContext;
 
     // 10. Support can read tenants
     await jwtAuthGuard.canActivate(sMockContext);
@@ -239,7 +244,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       switchToHttp: () => ({ getRequest: () => sMockReq }),
       getHandler: () => platformController.updateTenantStatus,
       getClass: () => PlatformController,
-    } as any;
+    } as unknown as ExecutionContext;
     await jwtAuthGuard.canActivate(sUpdateContext);
     expect(() => platformGuard.canActivate(sUpdateContext)).toThrow(
       ForbiddenException,
@@ -259,32 +264,32 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       lastLoginAt: new Date(),
       failedLoginCount: 0,
     };
-    prisma.__state.users.push(platformBilling);
+    prisma.__state.users.push(platformBilling as Record<string, unknown>);
     prisma.__state.userRoles.push({
       id: 'ur-b',
       userId: platformBilling.id,
-      roleId: billingRole.id,
+      roleId: billingRole?.id ?? '',
       tenantId: platformId,
-    });
+    } as Record<string, unknown>);
 
-    const bLoginRes = await authController.login(
+    const bLoginRes = (await authController.login(
       {
         tenantSlug: 'platform',
         email: 'billing@schoolos.com',
         password: 'school123',
       },
-      createResponseMock() as any,
-      { ip: '127.0.0.1', headers: {} } as any,
-    );
-    const bAccessToken = (bLoginRes as any).accessToken;
+      createResponseMock() as unknown as Response,
+      { ip: '127.0.0.1', headers: {} } as unknown as AuthenticatedRequest,
+    )) as { accessToken: string };
+    const bAccessToken = bLoginRes.accessToken;
     const bMockReq = {
       headers: { authorization: `Bearer ${bAccessToken}` },
-    } as any;
+    } as unknown as AuthenticatedRequest;
     const bMockContext = {
       switchToHttp: () => ({ getRequest: () => bMockReq }),
       getHandler: () => platformController.getTenantUsage,
       getClass: () => PlatformController,
-    } as any;
+    } as unknown as ExecutionContext;
 
     // 13. Billing can read usage
     await jwtAuthGuard.canActivate(bMockContext);
@@ -297,158 +302,10 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       switchToHttp: () => ({ getRequest: () => bMockReq }),
       getHandler: () => platformController.updateTenantStatus,
       getClass: () => PlatformController,
-    } as any;
+    } as unknown as ExecutionContext;
     await jwtAuthGuard.canActivate(bUpdateContext);
     expect(() => platformGuard.canActivate(bUpdateContext)).toThrow(
       ForbiddenException,
     );
   });
 });
-
-async function createPrismaMock() {
-  const state: {
-    tenants: any[];
-    permissions: any[];
-    roles: any[];
-    rolePermissions: any[];
-    users: any[];
-    userRoles: any[];
-    students: any[];
-    staff: any[];
-    auditLogs: any[];
-    refreshTokens: any[];
-    otpCodes: any[];
-  } = {
-    tenants: [],
-    permissions: PERMISSION_CATALOG.map((p, i) => ({
-      id: `perm-${i + 1}`,
-      ...p,
-    })),
-    roles: [],
-    rolePermissions: [],
-    users: [],
-    userRoles: [],
-    students: [],
-    staff: [],
-    auditLogs: [],
-    refreshTokens: [],
-    otpCodes: [],
-  };
-  return {
-    __state: state,
-    tenant: {
-      findMany: jest.fn(async () => state.tenants),
-      findUnique: jest.fn(async (q) =>
-        state.tenants.find(
-          (t) => t.id === q.where.id || t.slug === q.where.slug,
-        ),
-      ),
-      update: jest.fn(async (q) => {
-        const t = state.tenants.find((t) => t.id === q.where.id);
-        Object.assign(t, q.data);
-        return t;
-      }),
-    },
-    user: {
-      findUnique: jest.fn(async (q) => {
-        if (q.where.tenantId_email) {
-          const u = state.users.find(
-            (u) =>
-              u.tenantId === q.where.tenantId_email.tenantId &&
-              u.email === q.where.tenantId_email.email,
-          );
-          if (!u) return null;
-          return userWithRelations(state, u);
-        }
-        return userWithRelations(
-          state,
-          state.users.find((u) => u.id === q.where.id),
-        );
-      }),
-      update: jest.fn(async (q) => {
-        const u = state.users.find((u) => u.id === q.where.id);
-        if (u) {
-          Object.assign(u, q.data);
-        }
-        return u;
-      }),
-      count: jest.fn(
-        async (q) =>
-          state.users.filter((u) => u.tenantId === q.where.tenantId).length,
-      ),
-    },
-    role: { findMany: jest.fn(async () => state.roles) },
-    userRole: { findMany: jest.fn(async () => state.userRoles) },
-    student: { count: jest.fn(async () => 0) },
-    staff: { count: jest.fn(async () => 0) },
-    auditLog: {
-      create: jest.fn(async (q) => {
-        const log = {
-          id: `log-${state.auditLogs.length + 1}`,
-          ...q.data,
-          createdAt: new Date(),
-        };
-        state.auditLogs.push(log);
-        return log;
-      }),
-      findFirst: jest.fn(async () => null),
-    },
-    refreshToken: { create: jest.fn() },
-  };
-}
-
-function userWithRelations(state: any, user: any) {
-  if (!user) return null;
-  return {
-    ...user,
-    userRoles: state.userRoles
-      .filter((ur) => ur.userId === user.id)
-      .map((ur) => ({
-        ...ur,
-        role: {
-          ...state.roles.find((r) => r.id === ur.roleId),
-          rolePermissions: state.rolePermissions
-            .filter((rp) => rp.roleId === ur.roleId)
-            .map((rp) => ({
-              ...rp,
-              permission: state.permissions.find(
-                (p) => p.id === rp.permissionId,
-              ),
-            })),
-        },
-      })),
-  };
-}
-
-function ensureTenantDefaults(state: any, tenantId: string) {
-  for (const def of SYSTEM_ROLE_DEFINITIONS) {
-    const role = {
-      id: `role-${tenantId}-${def.name}`,
-      tenantId,
-      name: def.name,
-      description: def.description,
-    };
-    state.roles.push(role);
-    const perms = SYSTEM_ROLE_PERMISSIONS[def.name] || [];
-    for (const pk of perms) {
-      const p = state.permissions.find(
-        (p) => buildPermissionKey(p.resource, p.action) === pk,
-      );
-      if (p)
-        state.rolePermissions.push({ roleId: role.id, permissionId: p.id });
-    }
-  }
-}
-
-function createResponseMock() {
-  return { cookie: jest.fn(), clearCookie: jest.fn() };
-}
-
-function createQueueMock() {
-  return {
-    add: jest.fn(),
-    close: jest.fn(),
-    disconnect: jest.fn(),
-    on: jest.fn(),
-  };
-}

@@ -6,14 +6,15 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { getQueueToken } from '@nestjs/bullmq';
+import { PrismaMock, createPrismaMock, createQueueMock } from './test-helpers';
 
 describe('SchoolOS File Registry (E2E)', () => {
   let moduleRef: TestingModule;
-  let prisma: any;
+  let prisma: PrismaMock;
   let fileRegistryService: FileRegistryService;
 
   beforeEach(async () => {
-    prisma = await createPrismaMock();
+    prisma = createPrismaMock();
     moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -21,7 +22,7 @@ describe('SchoolOS File Registry (E2E)', () => {
       .useValue(prisma)
       .overrideProvider(RedisService)
       .useValue({
-        ping: jest.fn(async () => 'PONG'),
+        ping: jest.fn(() => Promise.resolve('PONG')),
         onModuleDestroy: jest.fn(),
       })
       .overrideProvider(getQueueToken('finance'))
@@ -114,65 +115,3 @@ describe('SchoolOS File Registry (E2E)', () => {
     );
   });
 });
-
-async function createPrismaMock() {
-  const state: {
-    fileAssets: any[];
-    auditLogs: any[];
-  } = {
-    fileAssets: [],
-    auditLogs: [],
-  };
-  return {
-    __state: state,
-    fileAsset: {
-      create: jest.fn(async (q) => {
-        const asset = {
-          id: `asset-${state.fileAssets.length + 1}`,
-          ...q.data,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          softDeletedAt: null,
-        };
-        state.fileAssets.push(asset);
-        return asset;
-      }),
-      findUnique: jest.fn(async (q) =>
-        state.fileAssets.find((a) => a.id === q.where.id),
-      ),
-      findMany: jest.fn(async (q) => {
-        return state.fileAssets.filter((a) => {
-          let match = true;
-          if (q.where.tenantId)
-            match = match && a.tenantId === q.where.tenantId;
-          if (q.where.module) match = match && a.module === q.where.module;
-          if (q.where.entityId)
-            match = match && a.entityId === q.where.entityId;
-          if (q.where.softDeletedAt === null)
-            match = match && a.softDeletedAt === null;
-          return match;
-        });
-      }),
-      update: jest.fn(async (q) => {
-        const asset = state.fileAssets.find((a) => a.id === q.where.id);
-        if (asset) Object.assign(asset, q.data);
-        return asset;
-      }),
-    },
-    auditLog: {
-      create: jest.fn(async (q) => {
-        const log = {
-          id: `log-${state.auditLogs.length}`,
-          ...q.data,
-          createdAt: new Date(),
-        };
-        state.auditLogs.push(log);
-        return log;
-      }),
-    },
-  };
-}
-
-function createQueueMock() {
-  return { add: jest.fn(), close: jest.fn(), on: jest.fn() };
-}
