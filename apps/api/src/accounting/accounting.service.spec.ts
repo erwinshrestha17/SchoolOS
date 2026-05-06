@@ -26,7 +26,7 @@ describe('accounting reversals', () => {
       reversalOfId: original.id,
       lines: [],
     };
-    const { service, prisma, auditService } = buildService({
+    const { service, prisma, postingService, auditService } = buildService({
       original,
       existingReversal: null,
       closedPeriod: null,
@@ -44,44 +44,28 @@ describe('accounting reversals', () => {
     );
 
     expect(result).toBe(reversal);
-    expect(prisma.journalEntry.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        tenantId: actor.tenantId,
-        entryNumber: 'JE-2026-00002',
-        sourceType: JournalSourceType.REVERSAL,
-        sourceId: original.id,
-        reversalOfId: original.id,
-        narration: 'Correction for duplicate posting',
-        lines: {
-          create: [
-            expect.objectContaining({
-              chartAccountId: 'cash',
-              side: JournalLineSide.CREDIT,
-              amount: original.lines[0].amount,
-            }),
-            expect.objectContaining({
-              chartAccountId: 'income',
-              side: JournalLineSide.DEBIT,
-              amount: original.lines[1].amount,
-            }),
-          ],
-        },
-      }),
-      include: {
-        reversalOf: true,
-        lines: {
-          include: { chartAccount: true },
-        },
-      },
-    });
-    expect('update' in prisma.journalEntry).toBe(false);
-    expect(auditService.record).toHaveBeenCalledWith(
+    expect(postingService.postReversal).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: 'reverse',
-        resource: 'journal_entry',
-        resourceId: reversal.id,
+        tenantId: actor.tenantId,
+        originalEntryId: original.id,
+        reversalDate: new Date('2026-04-27'),
+        narration: 'Correction for duplicate posting',
+        lines: [
+          expect.objectContaining({
+            chartAccountId: 'cash',
+            side: JournalLineSide.CREDIT,
+            amount: original.lines[0].amount,
+          }),
+          expect.objectContaining({
+            chartAccountId: 'income',
+            side: JournalLineSide.DEBIT,
+            amount: original.lines[1].amount,
+          }),
+        ],
       }),
+      actor,
     );
+    expect('update' in prisma.journalEntry).toBe(false);
   });
 
   it('blocks reversals posted into a closed accounting period', async () => {
@@ -192,10 +176,19 @@ function buildService(options: {
   const auditService = {
     record: jest.fn(),
   };
+  const postingService = {
+    postManualJournal: jest.fn().mockResolvedValue(options.createdReversal),
+    postReversal: jest.fn().mockResolvedValue(options.createdReversal),
+  };
 
   return {
-    service: new AccountingService(prisma as never, auditService as never),
+    service: new AccountingService(
+      prisma as never,
+      auditService as never,
+      postingService as never,
+    ),
     prisma,
     auditService,
+    postingService,
   };
 }

@@ -17,6 +17,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
+import { AccountingPostingService } from '../accounting/accounting-posting.service';
 import type { AuthContext } from '../auth/auth.types';
 import {
   ReconciliationExportFormat,
@@ -130,6 +131,7 @@ export class FinanceService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly communicationsService: CommunicationsService,
+    private readonly accountingPostingService: AccountingPostingService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -555,6 +557,19 @@ export class FinanceService {
           },
         });
       }
+
+      await this.accountingPostingService.postFeeWaiver(
+        {
+          tenantId: actor.tenantId,
+          waiverId: created.id,
+          studentId: dto.studentId,
+          invoiceId: dto.invoiceId,
+          amount,
+          reason: dto.reason,
+        },
+        actor,
+        tx,
+      );
 
       return created;
     });
@@ -2208,9 +2223,6 @@ export class FinanceService {
       actor.tenantId,
       fiscalYear,
     );
-    const journalEntryNumber = await this.generateJournalEntryNumber(
-      actor.tenantId,
-    );
     const tenant = await this.prisma.tenant.findUniqueOrThrow({
       where: { id: actor.tenantId },
     });
@@ -2268,15 +2280,6 @@ export class FinanceService {
         },
       });
 
-      const debitAccount = await tx.chartAccount.findUniqueOrThrow({
-        where: {
-          tenantId_code: {
-            tenantId: actor.tenantId,
-            code: resolveCashAccountCode(dto.method),
-          },
-        },
-      });
-
       const allocatedLines = allocatePaymentAcrossLines(
         invoice.lines.map((line) => ({
           id: line.id,
@@ -2307,36 +2310,21 @@ export class FinanceService {
         }),
       );
 
-      await tx.journalEntry.create({
-        data: {
+      await this.accountingPostingService.postFeePayment(
+        {
           tenantId: actor.tenantId,
-          entryNumber: journalEntryNumber,
-          entryDate: new Date(),
-          narration:
-            dto.narration ?? `Fee payment for invoice ${invoice.invoiceNumber}`,
-          sourceType: JournalSourceType.FEE_PAYMENT,
-          sourceId: payment.id,
-          createdById: actor.userId,
-          lines: {
-            create: [
-              {
-                tenantId: actor.tenantId,
-                chartAccountId: debitAccount.id,
-                side: JournalLineSide.DEBIT,
-                amount: paymentAmount,
-                description: `Payment receipt ${receiptNumber}`,
-              },
-              ...creditLines.map((line) => ({
-                tenantId: actor.tenantId,
-                chartAccountId: line.chartAccountId,
-                side: JournalLineSide.CREDIT,
-                amount: line.amount,
-                description: line.description,
-              })),
-            ],
-          },
+          paymentId: payment.id,
+          invoiceNumber: invoice.invoiceNumber,
+          receiptNumber,
+          paymentAmount,
+          paymentMethod: dto.method,
+          paymentAccountCode: resolveCashAccountCode(dto.method),
+          narration: dto.narration,
+          lines: creditLines,
         },
-      });
+        actor,
+        tx,
+      );
 
       return payment;
     });
@@ -2452,9 +2440,6 @@ export class FinanceService {
     await this.ensurePostingPeriodIsOpen(actor.tenantId, refundDate);
 
     const refundNumber = await this.generateRefundNumber(actor.tenantId);
-    const journalEntryNumber = await this.generateJournalEntryNumber(
-      actor.tenantId,
-    );
     const reversedDebitLines = allocateJournalLinesForRefund(
       sourceJournal.lines.filter(
         (line) => line.side === JournalLineSide.CREDIT,
@@ -2462,13 +2447,6 @@ export class FinanceService {
       refundAmount,
       payment.amount,
       JournalLineSide.DEBIT,
-      actor.tenantId,
-    );
-    const reversedCreditLines = allocateJournalLinesForRefund(
-      sourceJournal.lines.filter((line) => line.side === JournalLineSide.DEBIT),
-      refundAmount,
-      payment.amount,
-      JournalLineSide.CREDIT,
       actor.tenantId,
     );
 
@@ -2487,22 +2465,25 @@ export class FinanceService {
         },
       });
 
-      const journalEntry = await tx.journalEntry.create({
-        data: {
+      const journalEntry = await this.accountingPostingService.postPaymentRefund(
+        {
           tenantId: actor.tenantId,
-          entryNumber: journalEntryNumber,
+          refundId: refund.id,
+          paymentId: payment.id,
+          amount: refundAmount,
+          reason,
+          paymentMethod: payment.method,
+          paymentAccountCode: resolveCashAccountCode(payment.method),
           entryDate: refundDate,
-          narration:
-            dto.narration?.trim() ||
-            `Refund ${refundNumber} for payment ${payment.receipt?.receiptNumber ?? payment.id}`,
-          sourceType: JournalSourceType.PAYMENT_REFUND,
-          sourceId: refund.id,
-          createdById: actor.userId,
-          lines: {
-            create: [...reversedDebitLines, ...reversedCreditLines],
-          },
+          lines: reversedDebitLines.map((line) => ({
+            chartAccountId: line.chartAccountId,
+            amount: line.amount,
+            description: line.description,
+          })),
         },
-      });
+        actor,
+        tx,
+      );
 
       const netPaidAmount = sumNetPaidAmount(
         payment.invoice.payments.map((invoicePayment) =>

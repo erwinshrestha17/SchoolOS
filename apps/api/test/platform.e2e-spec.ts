@@ -179,9 +179,13 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
     expect(tenants.find((t) => t.slug === 'school-1')).toBeDefined();
 
     // 7. Suspend school-1
-    await platformController.updateTenantStatus(tenantId, false, {
-      auth: { userId: platformAdmin.id },
-    } as unknown as AuthenticatedRequest);
+    await platformController.updateTenantStatus(
+      tenantId,
+      { isActive: false, reason: 'Testing suspension' },
+      {
+        auth: { userId: platformAdmin.id },
+      } as unknown as AuthenticatedRequest,
+    );
     const detail = await platformController.getTenantDetail(tenantId);
     expect(detail.isActive).toBe(false);
 

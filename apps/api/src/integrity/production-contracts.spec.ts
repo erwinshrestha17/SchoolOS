@@ -133,6 +133,7 @@ describe('production data integrity contracts', () => {
     const auditedServices = [
       'academic-years/academic-years.service.ts',
       'academics/academics.service.ts',
+      'accounting/accounting-posting.service.ts',
       'accounting/accounting.service.ts',
       'activity-feed/activity-feed.service.ts',
       'admissions/admissions.service.ts',
@@ -165,6 +166,24 @@ describe('production data integrity contracts', () => {
   it('prevents direct mutation of immutable accounting artifacts', () => {
     const offenders = readSourceFiles()
       .filter(({ content }) => immutableMutationPattern.test(content))
+      .map(({ path }) => relative(sourceRoot, path));
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('enforces ledger write-boundary for journal entries', () => {
+    const authorizedServices = [
+      'accounting/accounting-posting.service.ts',
+    ];
+
+    const offenders = readSourceFiles()
+      .filter(({ path, content }) => {
+        const relativePath = relative(sourceRoot, path);
+        if (authorizedServices.includes(relativePath)) return false;
+
+        const createPattern = /\.journal(Entry|Line)\.create(Many)?\b/;
+        return createPattern.test(content);
+      })
       .map(({ path }) => relative(sourceRoot, path));
 
     expect(offenders).toEqual([]);

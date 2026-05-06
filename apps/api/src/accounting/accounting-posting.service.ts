@@ -44,11 +44,54 @@ export interface JournalPostingLineInput {
   description?: string | null;
 }
 
+export interface FeePaymentPostingInput {
+  tenantId: string;
+  paymentId: string;
+  invoiceNumber: string;
+  receiptNumber: string;
+  paymentAmount: Prisma.Decimal;
+  paymentMethod: string;
+  paymentAccountCode?: string;
+  narration?: string | null;
+  entryDate?: Date;
+  lines: Array<{
+    chartAccountId: string;
+    amount: Prisma.Decimal;
+    description: string;
+  }>;
+}
+
+export interface FeeWaiverPostingInput {
+  tenantId: string;
+  waiverId: string;
+  studentId: string;
+  invoiceId?: string | null;
+  amount: Prisma.Decimal;
+  reason: string;
+  entryDate?: Date;
+}
+
+export interface PaymentRefundPostingInput {
+  tenantId: string;
+  refundId: string;
+  paymentId: string;
+  amount: Prisma.Decimal;
+  reason: string;
+  paymentMethod: string;
+  paymentAccountCode?: string;
+  entryDate?: Date;
+  lines: Array<{
+    chartAccountId: string;
+    amount: Prisma.Decimal;
+    description: string;
+  }>;
+}
+
 @Injectable()
 export class AccountingPostingService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly auditService?: AuditService,
+    private readonly auditService: AuditService,
   ) {}
 
   async postPayrollAccrual(
@@ -198,7 +241,7 @@ export class AccountingPostingService {
 
     this.ensureBalanced(lines);
 
-    return tx.journalEntry.create({
+    const entry = await tx.journalEntry.create({
       data: {
         tenantId: input.tenantId,
         fiscalYearId: period?.fiscalYearId ?? null,
@@ -224,6 +267,21 @@ export class AccountingPostingService {
         lines: true,
       },
     });
+
+    await this.auditService.record({
+      action: 'post',
+      resource: 'journal_entry',
+      tenantId: input.tenantId,
+      userId: actor.userId,
+      resourceId: entry.id,
+      after: {
+        sourceType: entry.sourceType,
+        sourceId: entry.sourceId,
+        amount: input.grossAmount.toString(),
+      },
+    });
+
+    return entry;
   }
 
   async postPayrollDisbursement(
@@ -282,7 +340,7 @@ export class AccountingPostingService {
 
     this.ensureBalanced(lines);
 
-    return tx.journalEntry.create({
+    const entry = await tx.journalEntry.create({
       data: {
         tenantId: input.tenantId,
         fiscalYearId: period?.fiscalYearId ?? null,
@@ -306,6 +364,21 @@ export class AccountingPostingService {
       },
       include: { lines: true },
     });
+
+    await this.auditService.record({
+      action: 'post',
+      resource: 'journal_entry',
+      tenantId: input.tenantId,
+      userId: actor.userId,
+      resourceId: entry.id,
+      after: {
+        sourceType: entry.sourceType,
+        sourceId: entry.sourceId,
+        amount: input.netAmount.toString(),
+      },
+    });
+
+    return entry;
   }
 
   async postManualJournal(
@@ -347,7 +420,7 @@ export class AccountingPostingService {
 
     this.ensureBalanced(lines);
 
-    return tx.journalEntry.create({
+    const entry = await tx.journalEntry.create({
       data: {
         tenantId: input.tenantId,
         fiscalYearId: period?.fiscalYearId ?? null,
@@ -366,12 +439,347 @@ export class AccountingPostingService {
       },
       include: { lines: true },
     });
+
+    await this.auditService.record({
+      action: 'post',
+      resource: 'journal_entry',
+      tenantId: input.tenantId,
+      userId: actor.userId,
+      resourceId: entry.id,
+      after: {
+        sourceType: entry.sourceType,
+        sourceId: entry.sourceId,
+      },
+    });
+
+    return entry;
   }
 
-  async postFeePayment() {
-    throw new ConflictException(
-      'Fee payment posting remains owned by the existing finance workflow in this phase.',
+  async postReversal(
+    input: {
+      tenantId: string;
+      originalEntryId: string;
+      reversalDate: Date;
+      narration: string;
+      lines: Array<{
+        chartAccountId: string;
+        side: JournalLineSide;
+        amount: Prisma.Decimal;
+        description: string;
+      }>;
+    },
+    actor: AuthContext,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const period = await this.ensurePostingPeriodIsOpen(
+      tx,
+      input.tenantId,
+      input.reversalDate,
     );
+
+    const entry = await tx.journalEntry.create({
+      data: {
+        tenantId: input.tenantId,
+        fiscalYearId: period?.fiscalYearId ?? null,
+        fiscalPeriodId: period?.id ?? null,
+        entryNumber: await this.generateJournalEntryNumber(tx, input.tenantId),
+        entryDate: input.reversalDate,
+        status: JournalEntryStatus.POSTED,
+        narration: input.narration,
+        sourceModule: 'ACCOUNTING',
+        sourceType: JournalSourceType.REVERSAL,
+        sourceId: input.originalEntryId,
+        postingType: 'REVERSAL',
+        reversalOfId: input.originalEntryId,
+        createdById: actor.userId,
+        postedAt: new Date(),
+        lines: {
+          create: input.lines.map((line, index) => ({
+            tenantId: input.tenantId,
+            chartAccountId: line.chartAccountId,
+            side: line.side,
+            debit: line.side === JournalLineSide.DEBIT ? line.amount : 0,
+            credit: line.side === JournalLineSide.CREDIT ? line.amount : 0,
+            amount: line.amount,
+            lineNumber: index + 1,
+            description: line.description,
+          })),
+        },
+      },
+      include: { lines: true },
+    });
+
+    await this.auditService.record({
+      action: 'reverse',
+      resource: 'journal_entry',
+      tenantId: input.tenantId,
+      userId: actor.userId,
+      resourceId: entry.id,
+      after: {
+        sourceType: entry.sourceType,
+        sourceId: entry.sourceId,
+        reversalOfId: input.originalEntryId,
+      },
+    });
+
+    return entry;
+  }
+
+  async postFeePayment(
+    input: FeePaymentPostingInput,
+    actor: AuthContext,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const entryDate = input.entryDate ?? new Date();
+    const period = await this.ensurePostingPeriodIsOpen(
+      tx,
+      input.tenantId,
+      entryDate,
+    );
+
+    await this.ensureNoDuplicateSource(
+      tx,
+      input.tenantId,
+      'FINANCE',
+      JournalSourceType.FEE_PAYMENT,
+      input.paymentId,
+      'RECEIPT',
+    );
+
+    const debitAccount = await tx.chartAccount.findUniqueOrThrow({
+      where: {
+        tenantId_code: {
+          tenantId: input.tenantId,
+          code: input.paymentAccountCode ?? '1010',
+        },
+      },
+    });
+
+    const lines = [
+      {
+        tenantId: input.tenantId,
+        chartAccountId: debitAccount.id,
+        side: JournalLineSide.DEBIT,
+        amount: input.paymentAmount,
+        description: `Fee collection via ${input.paymentMethod}`,
+      },
+      ...input.lines.map((line) => ({
+        tenantId: input.tenantId,
+        chartAccountId: line.chartAccountId,
+        side: JournalLineSide.CREDIT,
+        amount: line.amount,
+        description: line.description,
+      })),
+    ];
+
+    this.ensureBalanced(lines);
+
+    const entry = await tx.journalEntry.create({
+      data: {
+        tenantId: input.tenantId,
+        fiscalYearId: period?.fiscalYearId ?? null,
+        fiscalPeriodId: period?.id ?? null,
+        entryNumber: await this.generateJournalEntryNumber(tx, input.tenantId),
+        entryDate,
+        status: JournalEntryStatus.POSTED,
+        narration: input.narration ?? `Fee payment ${input.receiptNumber}`,
+        sourceModule: 'FINANCE',
+        sourceType: JournalSourceType.FEE_PAYMENT,
+        sourceId: input.paymentId,
+        postingType: 'RECEIPT',
+        createdById: actor.userId,
+        postedAt: new Date(),
+        lines: {
+          create: lines.map((line, index) => ({
+            ...line,
+            lineNumber: index + 1,
+            debit: line.side === JournalLineSide.DEBIT ? line.amount : 0,
+            credit: line.side === JournalLineSide.CREDIT ? line.amount : 0,
+          })),
+        },
+      },
+    });
+
+    await this.auditService.record({
+      action: 'post',
+      resource: 'journal_entry',
+      tenantId: input.tenantId,
+      userId: actor.userId,
+      resourceId: entry.id,
+      after: {
+        sourceType: entry.sourceType,
+        sourceId: entry.sourceId,
+        amount: input.paymentAmount.toString(),
+      },
+    });
+
+    return entry;
+  }
+
+  async postFeeWaiver(
+    input: FeeWaiverPostingInput,
+    actor: AuthContext,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const entryDate = input.entryDate ?? new Date();
+    const period = await this.ensurePostingPeriodIsOpen(
+      tx,
+      input.tenantId,
+      entryDate,
+    );
+
+    const waiverExpense = await this.ensureAccount(tx, input.tenantId, {
+      code: '5100',
+      name: 'Fee Waivers & Discounts',
+      type: ChartAccountType.EXPENSE,
+    });
+    const studentReceivable = await this.ensureAccount(tx, input.tenantId, {
+      code: '1200',
+      name: 'Student Receivables',
+      type: ChartAccountType.ASSET,
+    });
+
+    const lines = [
+      {
+        tenantId: input.tenantId,
+        chartAccountId: waiverExpense.id,
+        side: JournalLineSide.DEBIT,
+        amount: input.amount,
+        description: `Waiver: ${input.reason}`,
+      },
+      {
+        tenantId: input.tenantId,
+        chartAccountId: studentReceivable.id,
+        side: JournalLineSide.CREDIT,
+        amount: input.amount,
+        description: `Waiver adjustment for student ${input.studentId}`,
+      },
+    ];
+
+    this.ensureBalanced(lines);
+
+    const entry = await tx.journalEntry.create({
+      data: {
+        tenantId: input.tenantId,
+        fiscalYearId: period?.fiscalYearId ?? null,
+        fiscalPeriodId: period?.id ?? null,
+        entryNumber: await this.generateJournalEntryNumber(tx, input.tenantId),
+        entryDate,
+        status: JournalEntryStatus.POSTED,
+        narration: `Fee waiver: ${input.reason}`,
+        sourceModule: 'FINANCE',
+        sourceType: JournalSourceType.ADJUSTMENT,
+        sourceId: input.waiverId,
+        postingType: 'WAIVER',
+        createdById: actor.userId,
+        postedAt: new Date(),
+        lines: {
+          create: lines.map((line, index) => ({
+            ...line,
+            lineNumber: index + 1,
+            debit: line.side === JournalLineSide.DEBIT ? line.amount : 0,
+            credit: line.side === JournalLineSide.CREDIT ? line.amount : 0,
+          })),
+        },
+      },
+    });
+
+    await this.auditService.record({
+      action: 'post',
+      resource: 'journal_entry',
+      tenantId: input.tenantId,
+      userId: actor.userId,
+      resourceId: entry.id,
+      after: {
+        sourceType: entry.sourceType,
+        sourceId: entry.sourceId,
+        amount: input.amount.toString(),
+      },
+    });
+
+    return entry;
+  }
+
+  async postPaymentRefund(
+    input: PaymentRefundPostingInput,
+    actor: AuthContext,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const entryDate = input.entryDate ?? new Date();
+    const period = await this.ensurePostingPeriodIsOpen(
+      tx,
+      input.tenantId,
+      entryDate,
+    );
+
+    const paymentAccount = await tx.chartAccount.findUniqueOrThrow({
+      where: {
+        tenantId_code: {
+          tenantId: input.tenantId,
+          code: input.paymentAccountCode ?? '1010',
+        },
+      },
+    });
+
+    const lines = [
+      ...input.lines.map((line) => ({
+        tenantId: input.tenantId,
+        chartAccountId: line.chartAccountId,
+        side: JournalLineSide.DEBIT,
+        amount: line.amount,
+        description: line.description,
+      })),
+      {
+        tenantId: input.tenantId,
+        chartAccountId: paymentAccount.id,
+        side: JournalLineSide.CREDIT,
+        amount: input.amount,
+        description: `Cash/bank refund via ${input.paymentMethod}`,
+      },
+    ];
+
+    this.ensureBalanced(lines);
+
+    const entry = await tx.journalEntry.create({
+      data: {
+        tenantId: input.tenantId,
+        fiscalYearId: period?.fiscalYearId ?? null,
+        fiscalPeriodId: period?.id ?? null,
+        entryNumber: await this.generateJournalEntryNumber(tx, input.tenantId),
+        entryDate,
+        status: JournalEntryStatus.POSTED,
+        narration: `Payment refund: ${input.reason}`,
+        sourceModule: 'FINANCE',
+        sourceType: JournalSourceType.PAYMENT_REFUND,
+        sourceId: input.refundId,
+        postingType: 'REFUND',
+        createdById: actor.userId,
+        postedAt: new Date(),
+        lines: {
+          create: lines.map((line, index) => ({
+            ...line,
+            lineNumber: index + 1,
+            debit: line.side === JournalLineSide.DEBIT ? line.amount : 0,
+            credit: line.side === JournalLineSide.CREDIT ? line.amount : 0,
+          })),
+        },
+      },
+    });
+
+    await this.auditService.record({
+      action: 'post',
+      resource: 'journal_entry',
+      tenantId: input.tenantId,
+      userId: actor.userId,
+      resourceId: entry.id,
+      after: {
+        sourceType: entry.sourceType,
+        sourceId: entry.sourceId,
+        amount: input.amount.toString(),
+      },
+    });
+
+    return entry;
   }
 
   async reverseJournal() {
