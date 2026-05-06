@@ -71,12 +71,11 @@ const platformNavItems: PlatformNavItem[] = [
     disabled: true,
   },
   {
-    href: '#platform-audit-coming-soon',
+    href: '/platform/audit',
     label: 'Audit Logs',
     description: 'Cross-tenant operator actions',
     icon: FileClock,
     permissions: ['platform:manage'],
-    disabled: true,
   },
 ];
 

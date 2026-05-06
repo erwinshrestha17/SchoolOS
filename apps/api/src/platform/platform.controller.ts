@@ -19,6 +19,7 @@ import type {
   PlatformTenantSummary,
   PlatformTenantDetail,
   PlatformTenantUsage,
+  PlatformAuditLog,
 } from '@schoolos/core';
 import { ListPlatformTenantsDto } from './dto/list-platform-tenants.dto';
 import { UpdatePlatformTenantStatusDto } from './dto/update-platform-tenant-status.dto';
@@ -76,5 +77,23 @@ export class PlatformController {
     @Param('tenantId') tenantId: string,
   ): Promise<PlatformTenantUsage> {
     return this.platformService.getTenantUsage(tenantId);
+  }
+
+  @Get('audit-logs')
+  @Permissions('platform:read')
+  async listAuditLogs(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('tenantId') tenantId?: string,
+    @Query('action') action?: string,
+    @Query('userId') userId?: string,
+  ): Promise<PaginatedResponse<PlatformAuditLog>> {
+    return this.platformService.listAuditLogs({
+      page,
+      limit,
+      tenantId,
+      action,
+      userId,
+    });
   }
 }

@@ -27,7 +27,7 @@ export class FileRegistryService {
     entityId?: string;
     metadata?: Prisma.InputJsonValue;
   }) {
-    return this.prisma.fileAsset.create({
+    const asset = await this.prisma.fileAsset.create({
       data: {
         tenantId: input.tenantId,
         uploadedByUserId: input.uploadedByUserId,
@@ -38,9 +38,69 @@ export class FileRegistryService {
         module: input.module,
         entityId: input.entityId,
         metadata: input.metadata || {},
-        status: FileStatus?.UPLOADED || 'UPLOADED',
+        status: FileStatus.PENDING,
       },
     });
+
+    await this.auditService.record({
+      action: 'file_registered',
+      resource: 'file_registry',
+      resourceId: asset.id,
+      tenantId: input.tenantId,
+      userId: input.uploadedByUserId,
+      after: { objectKey: input.objectKey, filename: input.originalFilename },
+    });
+
+    return asset;
+  }
+
+  async markUploaded(tenantId: string, assetId: string, userId: string) {
+    const asset = await this.getFileMetadata(tenantId, assetId);
+
+    if (asset.status === FileStatus.UPLOADED) {
+      return asset;
+    }
+
+    const updated = await this.prisma.fileAsset.update({
+      where: { id: assetId },
+      data: { status: FileStatus.UPLOADED },
+    });
+
+    await this.auditService.record({
+      action: 'file_uploaded',
+      resource: 'file_registry',
+      resourceId: assetId,
+      tenantId,
+      userId,
+    });
+
+    return updated;
+  }
+
+  async linkToEntity(
+    tenantId: string,
+    assetId: string,
+    module: string,
+    entityId: string,
+    userId: string,
+  ) {
+    const asset = await this.getFileMetadata(tenantId, assetId);
+
+    const updated = await this.prisma.fileAsset.update({
+      where: { id: assetId },
+      data: { module, entityId },
+    });
+
+    await this.auditService.record({
+      action: 'file_linked',
+      resource: 'file_registry',
+      resourceId: assetId,
+      tenantId,
+      userId,
+      after: { module, entityId },
+    });
+
+    return updated;
   }
 
   async getFileMetadata(tenantId: string, assetId: string) {

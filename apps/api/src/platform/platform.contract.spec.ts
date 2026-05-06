@@ -34,7 +34,13 @@ describe('M0 Platform Control Plane contracts', () => {
     const dto = read('src/platform/dto/list-platform-tenants.dto.ts');
     const service = read('src/platform/platform.service.ts');
 
-    for (const field of ['page?: number', 'limit?: number', 'search?: string', 'plan?: string', 'status?:']) {
+    for (const field of [
+      'page?: number',
+      'limit?: number',
+      'search?: string',
+      'plan?: string',
+      'status?:',
+    ]) {
       expect(dto).toContain(field);
     }
 

@@ -7,14 +7,17 @@ import {
   PlatformTenantSummary,
   PlatformTenantDetail,
   PlatformTenantUsage,
+  PlatformAuditLog,
 } from '@schoolos/core';
 import { ListPlatformTenantsDto } from './dto/list-platform-tenants.dto';
+import { UsageService } from '../usage/usage.service';
 
 @Injectable()
 export class PlatformService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly usageService: UsageService,
   ) {}
 
   async listTenants(): Promise<PlatformTenantSummary[]> {
@@ -44,7 +47,13 @@ export class PlatformService {
       tenants.map((tenant) => this.toTenantSummary(tenant)),
     );
 
-    return { items, total };
+    return {
+      items,
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
+    };
   }
 
   async getTenantDetail(tenantId: string): Promise<PlatformTenantDetail> {
@@ -56,16 +65,7 @@ export class PlatformService {
       throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
     }
 
-    const [studentCount, staffCount, userCount] = await Promise.all([
-      this.prisma.student.count({ where: { tenantId } }),
-      this.prisma.staff.count({ where: { tenantId } }),
-      this.prisma.user.count({ where: { tenantId } }),
-    ]);
-
-    const lastAudit = await this.prisma.auditLog.findFirst({
-      where: { tenantId },
-      orderBy: { createdAt: 'desc' },
-    });
+    const usage = await this.usageService.getTenantUsageSummary(tenantId);
 
     return {
       id: tenant.id,
@@ -76,15 +76,9 @@ export class PlatformService {
       panNumber: tenant.panNumber,
       createdAt: tenant.createdAt.toISOString(),
       updatedAt: tenant.createdAt.toISOString(),
-      studentCount,
-      staffCount,
-      usage: {
-        tenantId,
-        studentCount,
-        staffCount,
-        userCount,
-        lastActivityAt: lastAudit?.createdAt.toISOString() || null,
-      },
+      studentCount: usage.studentCount,
+      staffCount: usage.staffCount,
+      usage,
     };
   }
 
@@ -132,33 +126,60 @@ export class PlatformService {
   }
 
   async getTenantUsage(tenantId: string): Promise<PlatformTenantUsage> {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { id: true },
-    });
+    return this.usageService.getTenantUsageSummary(tenantId);
+  }
 
-    if (!tenant) {
-      throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
-    }
+  async listAuditLogs(query: {
+    page?: number;
+    limit?: number;
+    tenantId?: string;
+    action?: string;
+    userId?: string;
+  }): Promise<PaginatedResponse<PlatformAuditLog>> {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 25;
+    const skip = (page - 1) * limit;
 
-    const [studentCount, staffCount, userCount] = await Promise.all([
-      this.prisma.student.count({ where: { tenantId } }),
-      this.prisma.staff.count({ where: { tenantId } }),
-      this.prisma.user.count({ where: { tenantId } }),
+    const where: Prisma.AuditLogWhereInput = {};
+    if (query.tenantId) where.tenantId = query.tenantId;
+    if (query.action) where.action = query.action;
+    if (query.userId) where.userId = query.userId;
+
+    const [logs, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              phone: true,
+            },
+          },
+        },
+      }),
+      this.prisma.auditLog.count({ where }),
     ]);
 
-    const lastAudit = await this.prisma.auditLog.findFirst({
-      where: { tenantId },
-      orderBy: { createdAt: 'desc' },
-    });
+    const items: PlatformAuditLog[] = logs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      resource: log.resource,
+      resourceId: log.resourceId,
+      tenantId: log.tenantId,
+      userId: log.userId,
+      before: log.before,
+      after: log.after,
+      ipAddress: log.ipAddress,
+      userAgent: log.userAgent,
+      createdAt: log.createdAt.toISOString(),
+      user: log.user,
+    }));
 
-    return {
-      tenantId,
-      studentCount,
-      staffCount,
-      userCount,
-      lastActivityAt: lastAudit?.createdAt.toISOString() || null,
-    };
+    return { items, total, page, limit, hasNextPage: page * limit < total };
   }
 
   private buildTenantWhere(query: ListPlatformTenantsDto) {

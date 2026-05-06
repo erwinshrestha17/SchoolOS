@@ -29,7 +29,7 @@ export class AccountingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
-    private readonly postingService?: AccountingPostingService,
+    private readonly postingService: AccountingPostingService,
   ) {}
 
   async listPeriods(actor: AuthContext) {
@@ -269,57 +269,16 @@ export class AccountingService {
     const entryDate = new Date(dto.entryDate);
     await this.ensurePostingPeriodIsOpen(actor.tenantId, entryDate);
 
-    const entry = await this.prisma.journalEntry.create({
-      data: {
+    const entry = await this.postingService.postManualJournal(
+      {
         tenantId: actor.tenantId,
-        entryNumber: await this.generateJournalEntryNumber(actor.tenantId),
         entryDate: new Date(dto.entryDate),
-        status: JournalEntryStatus.POSTED,
         narration: dto.narration,
-        sourceModule: 'ACCOUNTING',
-        sourceType: JournalSourceType.MANUAL,
-        sourceId: dto.sourceId ?? null,
-        postingType: 'MANUAL',
-        createdById: actor.userId,
-        postedAt: new Date(),
-        lines: {
-          create: dto.lines.map((line, index) => ({
-            tenantId: actor.tenantId,
-            chartAccountId: line.chartAccountId,
-            side: line.side,
-            debit:
-              line.side === JournalLineSide.DEBIT
-                ? new Prisma.Decimal(line.amount)
-                : new Prisma.Decimal(0),
-            credit:
-              line.side === JournalLineSide.CREDIT
-                ? new Prisma.Decimal(line.amount)
-                : new Prisma.Decimal(0),
-            amount: new Prisma.Decimal(line.amount),
-            lineNumber: index + 1,
-            description: line.description ?? dto.narration,
-          })),
-        },
+        sourceId: dto.sourceId,
+        lines: dto.lines,
       },
-      include: {
-        lines: {
-          include: { chartAccount: true },
-        },
-      },
-    });
-
-    await this.auditService.record({
-      action: 'create',
-      resource: 'manual_journal',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: entry.id,
-      after: {
-        entryNumber: entry.entryNumber,
-        debit: totals.debit,
-        credit: totals.credit,
-      },
-    });
+      actor,
+    );
 
     return entry;
   }
@@ -384,68 +343,24 @@ export class AccountingService {
       : new Date();
     await this.ensurePostingPeriodIsOpen(actor.tenantId, reversalDate);
 
-    const reversal = await this.prisma.journalEntry.create({
-      data: {
+    const reversal = await this.postingService.postReversal(
+      {
         tenantId: actor.tenantId,
-        entryNumber: await this.generateJournalEntryNumber(actor.tenantId),
-        entryDate: reversalDate,
-        status: JournalEntryStatus.POSTED,
+        originalEntryId: original.id,
+        reversalDate,
         narration:
           dto.narration ?? `Reversal of journal entry ${original.entryNumber}`,
-        sourceModule: original.sourceModule ?? 'ACCOUNTING',
-        sourceType: JournalSourceType.REVERSAL,
-        sourceId: original.id,
-        postingType: 'REVERSAL',
-        reversalOfId: original.id,
-        createdById: actor.userId,
-        postedAt: new Date(),
-        lines: {
-          create: original.lines.map((line, index) => {
-            const side = reverseJournalSide(line.side);
-            return {
-              tenantId: actor.tenantId,
-              chartAccountId: line.chartAccountId,
-              side,
-              debit:
-                side === JournalLineSide.DEBIT
-                  ? line.amount
-                  : new Prisma.Decimal(0),
-              credit:
-                side === JournalLineSide.CREDIT
-                  ? line.amount
-                  : new Prisma.Decimal(0),
-              amount: line.amount,
-              lineNumber: index + 1,
-              description:
-                line.description ??
-                `Reversal of ${original.entryNumber} line ${line.id}`,
-            };
-          }),
-        },
+        lines: original.lines.map((line) => ({
+          chartAccountId: line.chartAccountId,
+          side: reverseJournalSide(line.side),
+          amount: line.amount,
+          description:
+            line.description ??
+            `Reversal of ${original.entryNumber} line ${line.id}`,
+        })),
       },
-      include: {
-        reversalOf: true,
-        lines: {
-          include: { chartAccount: true },
-        },
-      },
-    });
-
-    await this.auditService.record({
-      action: 'reverse',
-      resource: 'journal_entry',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: reversal.id,
-      before: {
-        originalEntryId: original.id,
-        originalEntryNumber: original.entryNumber,
-      },
-      after: {
-        reversalEntryNumber: reversal.entryNumber,
-        reversalOfId: reversal.reversalOfId,
-      },
-    });
+      actor,
+    );
 
     return reversal;
   }

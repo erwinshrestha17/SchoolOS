@@ -59,6 +59,7 @@ import type {
   SendParentTeacherMessageResult,
   PlatformTenantSummary,
   PlatformTenantDetail,
+  PlatformAuditLog,
   TenantSettingSummary,
   PayslipSummary,
   PromotionReadiness,
@@ -1318,13 +1319,50 @@ export const api = {
       { method: 'POST', json: body },
     ),
   listPlatformTenants: () => request<PlatformTenantSummary[]>('/platform/tenants'),
+  listPlatformTenantsPage: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    plan?: string;
+  }) =>
+    request<PaginatedResult<PlatformTenantSummary>>(
+      withQuery('/platform/tenants/page', {
+        ...params,
+        page: params?.page?.toString(),
+        limit: params?.limit?.toString(),
+      }),
+    ),
   getPlatformTenantDetail: (tenantId: string) =>
-    request<PlatformTenantDetail>(`/platform/tenants/${encodeURIComponent(tenantId)}`),
-  updatePlatformTenantStatus: (tenantId: string, isActive: boolean) =>
-    request<{ success: true }>(`/platform/tenants/${encodeURIComponent(tenantId)}/status`, {
-      method: 'PATCH',
-      json: { isActive },
-    }),
+    request<PlatformTenantDetail>(
+      `/platform/tenants/${encodeURIComponent(tenantId)}`,
+    ),
+  updatePlatformTenantStatus: (
+    tenantId: string,
+    isActive: boolean,
+    reason?: string,
+  ) =>
+    request<{ success: true }>(
+      `/platform/tenants/${encodeURIComponent(tenantId)}/status`,
+      {
+        method: 'PATCH',
+        json: { isActive, reason },
+      },
+    ),
+  listPlatformAuditLogs: (params?: {
+    page?: number;
+    limit?: number;
+    tenantId?: string;
+    action?: string;
+    userId?: string;
+  }) =>
+    request<PaginatedResult<PlatformAuditLog>>(
+      withQuery('/platform/audit-logs', {
+        ...params,
+        page: params?.page?.toString(),
+        limit: params?.limit?.toString(),
+      }),
+    ),
   getTenantSettings: () => request<TenantSettingSummary[]>('/settings'),
   getPublicTenantSettings: () => request<TenantSettingSummary[]>('/settings/public'),
   updateTenantSetting: (key: string, value: any) =>

@@ -695,17 +695,18 @@ describe('finance production controls', () => {
       status: InvoiceStatus.PARTIAL,
       paidAt: null,
     };
-    const { service, prisma, auditService } = buildService({
-      invoice: null,
-      feeHead: null,
-      payment,
-      sourceJournal,
-      createdRefund,
-      createdJournalEntry: createdRefundJournal,
-      updatedInvoice,
-      paymentRefundCount: 0,
-      journalCount: 4,
-    });
+    const { service, prisma, auditService, accountingPostingService } =
+      buildService({
+        invoice: null,
+        feeHead: null,
+        payment,
+        sourceJournal,
+        createdRefund,
+        createdJournalEntry: createdRefundJournal,
+        updatedInvoice,
+        paymentRefundCount: 0,
+        journalCount: 4,
+      });
 
     const result = await service.refundPayment(
       payment.id,
@@ -742,28 +743,21 @@ describe('finance production controls', () => {
         reason: 'Parent requested correction',
       }),
     });
-    expect(prisma.journalEntry.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+    expect(accountingPostingService.postPaymentRefund).toHaveBeenCalledWith(
+      expect.objectContaining({
         tenantId: actor.tenantId,
-        entryNumber: 'JE-2026-00005',
-        sourceType: JournalSourceType.PAYMENT_REFUND,
-        sourceId: createdRefund.id,
-        lines: {
-          create: [
-            expect.objectContaining({
-              chartAccountId: 'income',
-              side: JournalLineSide.DEBIT,
-              amount: new Prisma.Decimal(200),
-            }),
-            expect.objectContaining({
-              chartAccountId: 'cash',
-              side: JournalLineSide.CREDIT,
-              amount: new Prisma.Decimal(200),
-            }),
-          ],
-        },
+        refundId: createdRefund.id,
+        amount: new Prisma.Decimal(200),
+        lines: [
+          expect.objectContaining({
+            chartAccountId: 'income',
+            amount: new Prisma.Decimal(200),
+          }),
+        ],
       }),
-    });
+      actor,
+      expect.anything(),
+    );
     expect(prisma.invoice.update).toHaveBeenCalledWith({
       where: { id: payment.invoiceId },
       data: {
@@ -1466,6 +1460,23 @@ function buildService(options: {
     record: jest.fn(),
   };
   const communicationsService = {};
+  const accountingPostingService = {
+    postFeePayment: jest
+      .fn()
+      .mockResolvedValue(
+        options.createdJournalEntry ?? { entryNumber: 'JE-PAY-1' },
+      ),
+    postFeeWaiver: jest
+      .fn()
+      .mockResolvedValue(
+        options.createdJournalEntry ?? { entryNumber: 'JE-WAV-1' },
+      ),
+    postPaymentRefund: jest
+      .fn()
+      .mockResolvedValue(
+        options.createdJournalEntry ?? { entryNumber: 'JE-RFD-1' },
+      ),
+  };
   const eventEmitter = {
     emit: jest.fn(),
   };
@@ -1475,10 +1486,12 @@ function buildService(options: {
       prisma as never,
       auditService as never,
       communicationsService as never,
+      accountingPostingService as never,
       eventEmitter as never,
     ),
     prisma,
     auditService,
     eventEmitter,
+    accountingPostingService,
   };
 }

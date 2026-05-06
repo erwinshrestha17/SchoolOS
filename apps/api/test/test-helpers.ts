@@ -285,6 +285,12 @@ export function createPrismaMock() {
         ensureTenantDefaults(tenant.id);
         return tenant;
       }),
+      count: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.tenants.filter((t) => !q.where?.id || t.id === q.where.id)
+            .length,
+        ),
+      ),
     },
     user: {
       findUnique: jest.fn((q: PrismaQuery) => {
@@ -798,7 +804,61 @@ export function createPrismaMock() {
       ),
       update: jest.fn((q: PrismaQuery) => {
         const item = state.fileAssets.find((asset) => asset.id === q.where?.id);
-        if (item) Object.assign(item, q.data ?? {}, { updatedAt: new Date() });
+        if (item) Object.assign(item, q.data ?? {});
+        return Promise.resolve(item);
+      }),
+      aggregate: jest.fn((q: PrismaQuery) => {
+        const sum = state.fileAssets
+          .filter(
+            (a) =>
+              (!q.where?.tenantId || a.tenantId === q.where.tenantId) &&
+              a.softDeletedAt === null,
+          )
+          .reduce((acc, a) => acc + Number(a.sizeBytes || 0), 0);
+        return Promise.resolve({ _sum: { sizeBytes: sum } });
+      }),
+    },
+    auditLog: {
+      findFirst: jest.fn((q: PrismaQuery) => {
+        const logs = state.auditLogs
+          .filter((a) => !q.where?.tenantId || a.tenantId === q.where.tenantId)
+          .sort(
+            (a, b) =>
+              (b.createdAt as Date).getTime() - (a.createdAt as Date).getTime(),
+          );
+        return Promise.resolve(logs[0]);
+      }),
+      findMany: jest.fn((q: PrismaQuery) => {
+        const skip = q.skip || 0;
+        const take = q.take || 25;
+        const logs = state.auditLogs
+          .filter((a) => !q.where?.tenantId || a.tenantId === q.where.tenantId)
+          .sort(
+            (a, b) =>
+              (b.createdAt as Date).getTime() - (a.createdAt as Date).getTime(),
+          );
+        return Promise.resolve(
+          logs.slice(skip, skip + take).map((log) => ({
+            ...log,
+            user: state.users.find((u) => u.id === log.userId),
+          })),
+        );
+      }),
+      count: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.auditLogs.filter(
+            (a) => !q.where?.tenantId || a.tenantId === q.where.tenantId,
+          ).length,
+        ),
+      ),
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
+        const item = {
+          id: nextId('audit'),
+          ...data,
+          createdAt: new Date(),
+        };
+        state.auditLogs.push(item as Record<string, unknown>);
         return Promise.resolve(item);
       }),
     },

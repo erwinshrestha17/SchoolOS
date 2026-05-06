@@ -2203,6 +2203,9 @@ export type PlatformTenantUsage = {
   studentCount: number;
   staffCount: number;
   userCount: number;
+  activeStudents?: number;
+  activeStaff?: number;
+  storageSizeBytes?: number;
   lastActivityAt?: string | null;
 };
 
@@ -2313,4 +2316,23 @@ export type FileAssetSummary = {
   entityId: string | null;
   status: FileStatus;
   createdAt: string;
+};
+
+export type PlatformAuditLog = {
+  id: string;
+  action: string;
+  resource: string;
+  resourceId?: string | null;
+  tenantId: string;
+  userId?: string | null;
+  before?: any;
+  after?: any;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  createdAt: string;
+  user?: {
+    id: string;
+    email?: string | null;
+    phone?: string | null;
+  } | null;
 };
