@@ -17,13 +17,36 @@ import {
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
+import { ConfigService } from '../config/config.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLibraryBookDto } from './dto/create-library-book.dto';
 import { CreateLibraryCopyDto } from './dto/create-library-copy.dto';
 import { IssueLibraryCopyDto } from './dto/issue-library-copy.dto';
+import { MarkLibraryCopyStatusDto } from './dto/mark-library-copy-status.dto';
 import { ReturnLibraryCopyDto } from './dto/return-library-copy.dto';
+import { UpdateLibraryBookDto } from './dto/update-library-book.dto';
+import { UpdateLibraryCopyDto } from './dto/update-library-copy.dto';
 
-import { ConfigService } from '../config/config.service';
+type PaginationQuery = {
+  page?: string;
+  limit?: string;
+};
+
+type ListBooksQuery = PaginationQuery & {
+  query?: string;
+};
+
+type ListCopiesQuery = PaginationQuery & {
+  bookId?: string;
+  status?: string;
+  barcode?: string;
+};
+
+type ListIssuesQuery = PaginationQuery & {
+  status?: string;
+  studentId?: string;
+  staffId?: string;
+};
 
 @Injectable()
 export class LibraryService {
@@ -34,35 +57,44 @@ export class LibraryService {
     private readonly configService: ConfigService,
   ) {}
 
-  listBooks(actor: AuthContext, query?: string) {
-    return this.prisma.libraryBook.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        ...(query
-          ? {
-              OR: [
-                { title: { contains: query, mode: 'insensitive' } },
-                { author: { contains: query, mode: 'insensitive' } },
-                { isbn: { contains: query, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-      },
-      include: { copies: true },
-      orderBy: [{ title: 'asc' }],
-      take: 100,
-    });
+  async listBooks(actor: AuthContext, options: ListBooksQuery = {}) {
+    const { skip, take, page } = this.pagination(options);
+    const where: Prisma.LibraryBookWhereInput = {
+      tenantId: actor.tenantId,
+      ...(options.query
+        ? {
+            OR: [
+              { title: { contains: options.query, mode: 'insensitive' } },
+              { author: { contains: options.query, mode: 'insensitive' } },
+              { isbn: { contains: options.query, mode: 'insensitive' } },
+              {
+                subjectCategory: {
+                  contains: options.query,
+                  mode: 'insensitive',
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.libraryBook.findMany({
+        where,
+        include: { copies: true },
+        orderBy: [{ title: 'asc' }],
+        skip,
+        take,
+      }),
+      this.prisma.libraryBook.count({ where }),
+    ]);
+
+    return { items, meta: { page, limit: take, total } };
   }
 
   async createBook(dto: CreateLibraryBookDto, actor: AuthContext) {
     if (dto.isbn) {
-      const existing = await this.prisma.libraryBook.findUnique({
-        where: { tenantId_isbn: { tenantId: actor.tenantId, isbn: dto.isbn } },
-      });
-
-      if (existing) {
-        throw new ConflictException('Book ISBN already exists in this tenant');
-      }
+      await this.ensureUniqueIsbn(actor.tenantId, dto.isbn);
     }
 
     const book = await this.prisma.libraryBook.create({
@@ -94,16 +126,89 @@ export class LibraryService {
     return book;
   }
 
-  listCopies(actor: AuthContext, bookId?: string) {
-    return this.prisma.libraryCopy.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        ...(bookId ? { bookId } : {}),
-      },
-      include: { book: true },
-      orderBy: [{ createdAt: 'desc' }],
-      take: 100,
+  async updateBook(
+    bookId: string,
+    dto: UpdateLibraryBookDto,
+    actor: AuthContext,
+  ) {
+    const existing = await this.prisma.libraryBook.findFirst({
+      where: { id: bookId, tenantId: actor.tenantId },
     });
+
+    if (!existing) {
+      throw new NotFoundException('Book not found in this tenant');
+    }
+
+    if (dto.isbn && dto.isbn !== existing.isbn) {
+      await this.ensureUniqueIsbn(actor.tenantId, dto.isbn);
+    }
+
+    const updated = await this.prisma.libraryBook.update({
+      where: { id: existing.id },
+      data: {
+        ...(dto.title !== undefined ? { title: dto.title } : {}),
+        ...(dto.author !== undefined ? { author: dto.author } : {}),
+        ...(dto.isbn !== undefined ? { isbn: dto.isbn } : {}),
+        ...(dto.publisher !== undefined ? { publisher: dto.publisher } : {}),
+        ...(dto.publishedYear !== undefined
+          ? { publishedYear: dto.publishedYear }
+          : {}),
+        ...(dto.subjectCategory !== undefined
+          ? { subjectCategory: dto.subjectCategory }
+          : {}),
+        ...(dto.classLevel !== undefined ? { classLevel: dto.classLevel } : {}),
+        ...(dto.purchasePrice !== undefined
+          ? { purchasePrice: new Prisma.Decimal(dto.purchasePrice) }
+          : {}),
+      },
+    });
+
+    await this.auditService.record({
+      action: 'update',
+      resource: 'library_book',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      before: {
+        title: existing.title,
+        author: existing.author,
+        isbn: existing.isbn,
+      },
+      after: {
+        title: updated.title,
+        author: updated.author,
+        isbn: updated.isbn,
+      },
+    });
+
+    return updated;
+  }
+
+  async listCopies(actor: AuthContext, options: ListCopiesQuery = {}) {
+    const { skip, take, page } = this.pagination(options);
+    const where: Prisma.LibraryCopyWhereInput = {
+      tenantId: actor.tenantId,
+      ...(options.bookId ? { bookId: options.bookId } : {}),
+      ...(options.status
+        ? { status: this.parseCopyStatus(options.status) }
+        : {}),
+      ...(options.barcode
+        ? { barcode: { contains: options.barcode, mode: 'insensitive' } }
+        : {}),
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.libraryCopy.findMany({
+        where,
+        include: { book: true },
+        orderBy: [{ createdAt: 'desc' }],
+        skip,
+        take,
+      }),
+      this.prisma.libraryCopy.count({ where }),
+    ]);
+
+    return { items, meta: { page, limit: take, total } };
   }
 
   async createCopy(dto: CreateLibraryCopyDto, actor: AuthContext) {
@@ -114,6 +219,8 @@ export class LibraryService {
     if (!book) {
       throw new NotFoundException('Book not found in this tenant');
     }
+
+    await this.ensureUniqueBarcode(actor.tenantId, dto.barcode);
 
     const copy = await this.prisma.libraryCopy.create({
       data: {
@@ -143,26 +250,159 @@ export class LibraryService {
     return copy;
   }
 
-  listIssues(actor: AuthContext, status?: string) {
-    return this.prisma.libraryIssue.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        ...(status ? { status: status as LibraryIssueStatus } : {}),
-      },
-      include: {
-        copy: { include: { book: true } },
-        borrowerStudent: true,
-        borrowerStaff: true,
-        invoice: true,
-      },
-      orderBy: [{ createdAt: 'desc' }],
-      take: 100,
+  async updateCopy(
+    copyId: string,
+    dto: UpdateLibraryCopyDto,
+    actor: AuthContext,
+  ) {
+    const existing = await this.prisma.libraryCopy.findFirst({
+      where: { id: copyId, tenantId: actor.tenantId },
     });
+
+    if (!existing) {
+      throw new NotFoundException('Library copy not found in this tenant');
+    }
+
+    if (dto.bookId && dto.bookId !== existing.bookId) {
+      const book = await this.prisma.libraryBook.findFirst({
+        where: { id: dto.bookId, tenantId: actor.tenantId },
+      });
+
+      if (!book) {
+        throw new NotFoundException('Book not found in this tenant');
+      }
+    }
+
+    if (dto.barcode && dto.barcode !== existing.barcode) {
+      await this.ensureUniqueBarcode(actor.tenantId, dto.barcode);
+    }
+
+    const updated = await this.prisma.libraryCopy.update({
+      where: { id: existing.id },
+      data: {
+        ...(dto.bookId !== undefined ? { bookId: dto.bookId } : {}),
+        ...(dto.barcode !== undefined ? { barcode: dto.barcode } : {}),
+        ...(dto.qrCode !== undefined ? { qrCode: dto.qrCode } : {}),
+        ...(dto.shelfLocation !== undefined
+          ? { shelfLocation: dto.shelfLocation }
+          : {}),
+        ...(dto.replacementCost !== undefined
+          ? { replacementCost: new Prisma.Decimal(dto.replacementCost) }
+          : {}),
+        ...(dto.purchasedAt !== undefined
+          ? { purchasedAt: dto.purchasedAt ? new Date(dto.purchasedAt) : null }
+          : {}),
+      },
+      include: { book: true },
+    });
+
+    await this.auditService.record({
+      action: 'update',
+      resource: 'library_copy',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      before: {
+        bookId: existing.bookId,
+        barcode: existing.barcode,
+        status: existing.status,
+      },
+      after: {
+        bookId: updated.bookId,
+        barcode: updated.barcode,
+        status: updated.status,
+      },
+    });
+
+    return updated;
+  }
+
+  async markCopyStatus(
+    copyId: string,
+    dto: MarkLibraryCopyStatusDto,
+    actor: AuthContext,
+  ) {
+    const status = this.parseCopyStatus(dto.status);
+    const copy = await this.prisma.libraryCopy.findFirst({
+      where: { id: copyId, tenantId: actor.tenantId },
+    });
+
+    if (!copy) {
+      throw new NotFoundException('Library copy not found in this tenant');
+    }
+
+    if ([LibraryCopyStatus.LOST, LibraryCopyStatus.DAMAGED].includes(status)) {
+      const activeIssue = await this.prisma.libraryIssue.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          copyId: copy.id,
+          status: LibraryIssueStatus.ISSUED,
+        },
+      });
+
+      if (activeIssue) {
+        throw new ConflictException(
+          'Cannot mark an issued copy as lost or damaged. Return or mark the active issue first.',
+        );
+      }
+    }
+
+    const updated = await this.prisma.libraryCopy.update({
+      where: { id: copy.id },
+      data: { status },
+      include: { book: true },
+    });
+
+    await this.auditService.record({
+      action: 'mark_status',
+      resource: 'library_copy',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      before: { status: copy.status },
+      after: { status: updated.status, reason: dto.reason ?? null },
+    });
+
+    return updated;
+  }
+
+  async listIssues(actor: AuthContext, options: ListIssuesQuery = {}) {
+    const { skip, take, page } = this.pagination(options);
+    const where: Prisma.LibraryIssueWhereInput = {
+      tenantId: actor.tenantId,
+      ...(options.status
+        ? { status: this.parseIssueStatus(options.status) }
+        : {}),
+      ...(options.studentId ? { borrowerStudentId: options.studentId } : {}),
+      ...(options.staffId ? { borrowerStaffId: options.staffId } : {}),
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.libraryIssue.findMany({
+        where,
+        include: {
+          copy: { include: { book: true } },
+          borrowerStudent: true,
+          borrowerStaff: true,
+          invoice: true,
+        },
+        orderBy: [{ createdAt: 'desc' }],
+        skip,
+        take,
+      }),
+      this.prisma.libraryIssue.count({ where }),
+    ]);
+
+    return { items, meta: { page, limit: take, total } };
   }
 
   async issueCopy(dto: IssueLibraryCopyDto, actor: AuthContext) {
     if (!dto.borrowerStudentId && !dto.borrowerStaffId) {
       throw new BadRequestException('Student or staff borrower is required');
+    }
+
+    if (dto.borrowerStudentId && dto.borrowerStaffId) {
+      throw new BadRequestException('Choose either a student or staff borrower');
     }
 
     const copy = await this.prisma.libraryCopy.findFirst({
@@ -185,7 +425,20 @@ export class LibraryService {
     );
 
     const issue = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.libraryIssue.create({
+      const lockedCopy = await tx.libraryCopy.updateMany({
+        where: {
+          id: copy.id,
+          tenantId: actor.tenantId,
+          status: LibraryCopyStatus.AVAILABLE,
+        },
+        data: { status: LibraryCopyStatus.ISSUED },
+      });
+
+      if (lockedCopy.count !== 1) {
+        throw new ConflictException('Library copy is not available for issue');
+      }
+
+      return tx.libraryIssue.create({
         data: {
           tenantId: actor.tenantId,
           copyId: copy.id,
@@ -195,13 +448,6 @@ export class LibraryService {
           notes: dto.notes ?? null,
         },
       });
-
-      await tx.libraryCopy.update({
-        where: { id: copy.id },
-        data: { status: LibraryCopyStatus.ISSUED },
-      });
-
-      return created;
     });
 
     await this.auditService.record({
@@ -239,6 +485,10 @@ export class LibraryService {
       throw new ConflictException('Library issue is already returned');
     }
 
+    if (issue.status === LibraryIssueStatus.LOST) {
+      throw new ConflictException('Lost library issue cannot be returned');
+    }
+
     const status = dto.markLost
       ? LibraryIssueStatus.LOST
       : LibraryIssueStatus.RETURNED;
@@ -248,7 +498,6 @@ export class LibraryService {
         ? LibraryCopyStatus.DAMAGED
         : LibraryCopyStatus.AVAILABLE;
 
-    // Automated fine calculation
     let calculatedFine = 0;
     const now = new Date();
     if (now > issue.dueAt && !dto.markLost) {
@@ -273,8 +522,12 @@ export class LibraryService {
             })
           : null;
 
-      const returned = await tx.libraryIssue.update({
-        where: { id: issue.id },
+      const activeIssue = await tx.libraryIssue.updateMany({
+        where: {
+          id: issue.id,
+          tenantId: actor.tenantId,
+          status: LibraryIssueStatus.ISSUED,
+        },
         data: {
           status,
           returnedAt: new Date(),
@@ -283,19 +536,25 @@ export class LibraryService {
           invoiceId,
           notes: dto.notes ?? issue.notes,
         },
-        include: {
-          copy: { include: { book: true } },
-          borrowerStudent: true,
-          invoice: true,
-        },
       });
+
+      if (activeIssue.count !== 1) {
+        throw new ConflictException('Library issue is already closed');
+      }
 
       await tx.libraryCopy.update({
         where: { id: issue.copyId },
         data: { status: copyStatus },
       });
 
-      return returned;
+      return tx.libraryIssue.findUniqueOrThrow({
+        where: { id: issue.id },
+        include: {
+          copy: { include: { book: true } },
+          borrowerStudent: true,
+          invoice: true,
+        },
+      });
     });
 
     await this.auditService.record({
@@ -380,6 +639,54 @@ export class LibraryService {
     if (borrowerStaffId && !staff) {
       throw new NotFoundException('Borrower staff not found in this tenant');
     }
+  }
+
+  private async ensureUniqueIsbn(tenantId: string, isbn: string) {
+    const existing = await this.prisma.libraryBook.findUnique({
+      where: { tenantId_isbn: { tenantId, isbn } },
+    });
+
+    if (existing) {
+      throw new ConflictException('Book ISBN already exists in this tenant');
+    }
+  }
+
+  private async ensureUniqueBarcode(tenantId: string, barcode: string) {
+    const existing = await this.prisma.libraryCopy.findUnique({
+      where: { tenantId_barcode: { tenantId, barcode } },
+    });
+
+    if (existing) {
+      throw new ConflictException('Copy barcode already exists in this tenant');
+    }
+  }
+
+  private parseCopyStatus(status: string) {
+    if (!Object.values(LibraryCopyStatus).includes(status as LibraryCopyStatus)) {
+      throw new BadRequestException(`Invalid library copy status: ${status}`);
+    }
+
+    return status as LibraryCopyStatus;
+  }
+
+  private parseIssueStatus(status: string) {
+    if (!Object.values(LibraryIssueStatus).includes(status as LibraryIssueStatus)) {
+      throw new BadRequestException(`Invalid library issue status: ${status}`);
+    }
+
+    return status as LibraryIssueStatus;
+  }
+
+  private pagination(options: PaginationQuery) {
+    const page = Math.max(Number(options.page ?? 1), 1);
+    const requestedLimit = Math.max(Number(options.limit ?? 50), 1);
+    const take = Math.min(requestedLimit, 100);
+
+    return {
+      page,
+      take,
+      skip: (page - 1) * take,
+    };
   }
 
   private async createLibraryFineInvoice(

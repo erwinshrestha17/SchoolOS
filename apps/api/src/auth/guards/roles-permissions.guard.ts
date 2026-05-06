@@ -45,6 +45,16 @@ const permissionAliases: Record<string, string[]> = {
   'accounting:journals:reverse': ['accounting:reverse'],
   'accounting:reports:read': ['accounting:read'],
   'accounting:exports:create': ['reports:export', 'accounting:close'],
+  'library:books:create': ['library:manage'],
+  'library:books:read': ['library:read'],
+  'library:books:update': ['library:manage'],
+  'library:copies:create': ['library:manage'],
+  'library:copies:read': ['library:read'],
+  'library:copies:update': ['library:manage'],
+  'library:issues:create': ['library:manage'],
+  'library:issues:read': ['library:read'],
+  'library:issues:return': ['library:manage'],
+  'library:reports:read': ['library:read'],
 };
 
 function hasRequiredPermission(
