@@ -36,6 +36,7 @@ import { PayrollModule } from './payroll/payroll.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { LibraryModule } from './library/library.module';
 import { TransportModule } from './transport/transport.module';
+import { CanteenModule } from './canteen/canteen.module';
 import { PlatformModule } from './platform/platform.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from './config/config.service';
@@ -94,6 +95,7 @@ import { ReportsModule } from './reports/reports.module';
     MessagingModule,
     LibraryModule,
     TransportModule,
+    CanteenModule,
     PlatformModule,
     SettingsModule,
     FileRegistryModule,
