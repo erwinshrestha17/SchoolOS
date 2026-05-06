@@ -230,12 +230,12 @@ export default function DashboardPage() {
                 </p>
               </div>
             </div>
-            <Link
-              href="/dashboard/settings"
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-white px-4 text-sm font-semibold text-gray-950 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-            >
-              Finish Setup
-            </Link>
+<Link
+  href="/dashboard/settings"
+  className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-amber-400 px-4 text-sm font-semibold !text-gray-950 shadow-sm transition hover:-translate-y-0.5 hover:bg-amber-300 hover:!text-gray-950 hover:shadow-md"
+>
+  Finish Setup
+</Link>
           </div>
         )}
       </section>
