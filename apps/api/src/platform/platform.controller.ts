@@ -7,6 +7,7 @@ import {
   UseGuards,
   Req,
   UnauthorizedException,
+  Query,
 } from '@nestjs/common';
 import { PlatformService } from './platform.service';
 import { PlatformGuard } from '../auth/guards/platform.guard';
@@ -14,10 +15,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/auth-request.interface';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type {
+  PaginatedResponse,
   PlatformTenantSummary,
   PlatformTenantDetail,
   PlatformTenantUsage,
 } from '@schoolos/core';
+import { ListPlatformTenantsDto } from './dto/list-platform-tenants.dto';
+import { UpdatePlatformTenantStatusDto } from './dto/update-platform-tenant-status.dto';
 
 @Controller('platform')
 @UseGuards(JwtAuthGuard, PlatformGuard)
@@ -28,6 +32,14 @@ export class PlatformController {
   @Permissions('platform:read')
   async listTenants(): Promise<PlatformTenantSummary[]> {
     return this.platformService.listTenants();
+  }
+
+  @Get('tenants/page')
+  @Permissions('platform:read')
+  async listTenantsPage(
+    @Query() query: ListPlatformTenantsDto,
+  ): Promise<PaginatedResponse<PlatformTenantSummary>> {
+    return this.platformService.listTenantsPage(query);
   }
 
   @Get('tenants/:tenantId')
@@ -42,7 +54,7 @@ export class PlatformController {
   @Permissions('platform:manage')
   async updateTenantStatus(
     @Param('tenantId') tenantId: string,
-    @Body('isActive') isActive: boolean,
+    @Body() body: UpdatePlatformTenantStatusDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<{ success: true }> {
     if (!req.auth) {
@@ -51,8 +63,9 @@ export class PlatformController {
 
     await this.platformService.updateTenantStatus(
       tenantId,
-      isActive,
+      body.isActive,
       req.auth.userId,
+      body.reason,
     );
     return { success: true };
   }
