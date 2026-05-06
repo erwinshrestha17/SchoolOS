@@ -1,11 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import {
+  PaginatedResponse,
   PlatformTenantSummary,
   PlatformTenantDetail,
   PlatformTenantUsage,
 } from '@schoolos/core';
+import { ListPlatformTenantsDto } from './dto/list-platform-tenants.dto';
 
 @Injectable()
 export class PlatformService {
@@ -15,32 +18,33 @@ export class PlatformService {
   ) {}
 
   async listTenants(): Promise<PlatformTenantSummary[]> {
-    const tenants = await this.prisma.tenant.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    const page = await this.listTenantsPage({ page: 1, limit: 100 });
+    return page.items;
+  }
 
-    const tenantSummaries = await Promise.all(
-      tenants.map(async (tenant) => {
-        const [studentCount, staffCount] = await Promise.all([
-          this.prisma.student.count({ where: { tenantId: tenant.id } }),
-          this.prisma.staff.count({ where: { tenantId: tenant.id } }),
-        ]);
+  async listTenantsPage(
+    query: ListPlatformTenantsDto = {},
+  ): Promise<PaginatedResponse<PlatformTenantSummary>> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 25;
+    const skip = (page - 1) * limit;
+    const where = this.buildTenantWhere(query);
 
-        return {
-          id: tenant.id,
-          name: tenant.name,
-          slug: tenant.slug,
-          plan: tenant.plan,
-          isActive: tenant.isActive,
-          createdAt: tenant.createdAt.toISOString(),
-          updatedAt: tenant.createdAt.toISOString(), // Placeholder if updatedAt missing in Tenant model
-          studentCount,
-          staffCount,
-        };
+    const [tenants, total] = await Promise.all([
+      this.prisma.tenant.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
       }),
+      this.prisma.tenant.count({ where }),
+    ]);
+
+    const items = await Promise.all(
+      tenants.map((tenant) => this.toTenantSummary(tenant)),
     );
 
-    return tenantSummaries;
+    return { items, total };
   }
 
   async getTenantDetail(tenantId: string): Promise<PlatformTenantDetail> {
@@ -88,6 +92,7 @@ export class PlatformService {
     tenantId: string,
     isActive: boolean,
     userId: string,
+    reason?: string,
   ): Promise<void> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
@@ -95,6 +100,19 @@ export class PlatformService {
 
     if (!tenant) {
       throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
+    }
+
+    if (tenant.isActive === isActive) {
+      await this.auditService.record({
+        action: 'tenant_status_noop',
+        resource: 'tenants',
+        resourceId: tenantId,
+        tenantId: 'platform',
+        userId,
+        before: { isActive: tenant.isActive },
+        after: { isActive, reason: reason ?? null },
+      });
+      return;
     }
 
     await this.prisma.tenant.update({
@@ -106,14 +124,23 @@ export class PlatformService {
       action: isActive ? 'tenant_activated' : 'tenant_suspended',
       resource: 'tenants',
       resourceId: tenantId,
-      tenantId: 'platform', // Platform-wide audit
+      tenantId: 'platform',
       userId,
       before: { isActive: tenant.isActive },
-      after: { isActive },
+      after: { isActive, reason: reason ?? null },
     });
   }
 
   async getTenantUsage(tenantId: string): Promise<PlatformTenantUsage> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
+    }
+
     const [studentCount, staffCount, userCount] = await Promise.all([
       this.prisma.student.count({ where: { tenantId } }),
       this.prisma.staff.count({ where: { tenantId } }),
@@ -131,6 +158,58 @@ export class PlatformService {
       staffCount,
       userCount,
       lastActivityAt: lastAudit?.createdAt.toISOString() || null,
+    };
+  }
+
+  private buildTenantWhere(query: ListPlatformTenantsDto) {
+    const where: Prisma.TenantWhereInput = {};
+
+    if (query.search?.trim()) {
+      const search = query.search.trim();
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { slug: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (query.plan?.trim()) {
+      where.plan = query.plan.trim();
+    }
+
+    if (query.status === 'active') {
+      where.isActive = true;
+    }
+
+    if (query.status === 'suspended') {
+      where.isActive = false;
+    }
+
+    return where;
+  }
+
+  private async toTenantSummary(tenant: {
+    id: string;
+    name: string;
+    slug: string;
+    plan: string;
+    isActive: boolean;
+    createdAt: Date;
+  }): Promise<PlatformTenantSummary> {
+    const [studentCount, staffCount] = await Promise.all([
+      this.prisma.student.count({ where: { tenantId: tenant.id } }),
+      this.prisma.staff.count({ where: { tenantId: tenant.id } }),
+    ]);
+
+    return {
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      plan: tenant.plan,
+      isActive: tenant.isActive,
+      createdAt: tenant.createdAt.toISOString(),
+      updatedAt: tenant.createdAt.toISOString(),
+      studentCount,
+      staffCount,
     };
   }
 }
