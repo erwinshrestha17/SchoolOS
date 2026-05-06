@@ -80,6 +80,10 @@ const emptyIssueForm: LibraryIssuePayload = {
   notes: '',
 };
 
+const emptyBooks: LibraryBook[] = [];
+const emptyCopies: LibraryCopy[] = [];
+const emptyIssues: LibraryIssue[] = [];
+
 export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<LibraryTab>(initialTab);
   const [bookSearch, setBookSearch] = useState('');
@@ -219,10 +223,10 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
     },
   });
 
-  const books = booksQuery.data?.items ?? [];
-  const copies = copiesQuery.data?.items ?? [];
-  const issues = issuesQuery.data?.items ?? [];
-  const overdueIssues = overdueQuery.data ?? [];
+  const books = booksQuery.data?.items ?? emptyBooks;
+  const copies = copiesQuery.data?.items ?? emptyCopies;
+  const issues = issuesQuery.data?.items ?? emptyIssues;
+  const overdueIssues = overdueQuery.data ?? emptyIssues;
 
   const stats = useMemo(() => {
     const totalBooks = booksQuery.data?.meta.total ?? books.length;

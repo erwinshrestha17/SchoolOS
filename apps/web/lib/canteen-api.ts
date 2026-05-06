@@ -1,0 +1,520 @@
+import { clearStoredSession } from './session';
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
+
+type ApiResponse<T> = {
+  success: boolean;
+  message: string;
+  data: T;
+};
+
+type JsonBody = Record<string, unknown>;
+
+type RequestOptions = RequestInit & {
+  json?: JsonBody;
+  auth?: boolean;
+  retryOnUnauthorized?: boolean;
+};
+
+let refreshPromise: Promise<boolean> | null = null;
+
+export type CanteenMenuItemStatus = 'ACTIVE' | 'INACTIVE';
+export type CanteenMealPlanStatus = 'ACTIVE' | 'INACTIVE';
+export type CanteenEnrollmentStatus =
+  | 'ACTIVE'
+  | 'PAUSED'
+  | 'CANCELLED'
+  | 'ENDED';
+export type CanteenMealServingStatus =
+  | 'SERVED'
+  | 'NOT_TAKEN'
+  | 'ABSENT'
+  | 'CANCELLED';
+export type CanteenWalletTransactionType =
+  | 'TOP_UP'
+  | 'DEDUCTION'
+  | 'REFUND'
+  | 'ADJUSTMENT';
+export type CanteenWalletTransactionSource =
+  | 'MANUAL'
+  | 'POS_SALE'
+  | 'MEAL_PURCHASE'
+  | 'FEE_INTEGRATION'
+  | 'ACCOUNTING_ADJUSTMENT';
+export type CanteenPosSaleStatus = 'DRAFT' | 'COMPLETED' | 'CANCELLED';
+export type CanteenPaymentMethod = 'CASH' | 'WALLET' | 'STAFF_CREDIT';
+
+export type CanteenStudentSummary = {
+  id: string;
+  studentSystemId?: string;
+  firstNameEn?: string;
+  lastNameEn?: string;
+};
+
+export type CanteenMenuItem = {
+  id: string;
+  tenantId?: string;
+  name: string;
+  category: string;
+  description?: string | null;
+  unitPrice: string | number;
+  status: CanteenMenuItemStatus;
+  isMealItem: boolean;
+  allergenTags: string[];
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type CanteenMealPlan = {
+  id: string;
+  tenantId?: string;
+  name: string;
+  description?: string | null;
+  mealType: string;
+  price: string | number;
+  billingFrequency: string;
+  status: CanteenMealPlanStatus;
+  duplicateServingPrevention: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type CanteenStudentEnrollment = {
+  id: string;
+  tenantId?: string;
+  studentId: string;
+  mealPlanId: string;
+  startsOn: string;
+  endsOn?: string | null;
+  status: CanteenEnrollmentStatus;
+  notes?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  student?: CanteenStudentSummary;
+  mealPlan?: CanteenMealPlan;
+};
+
+export type CanteenMealServing = {
+  id: string;
+  tenantId?: string;
+  studentId: string;
+  enrollmentId?: string | null;
+  mealPlanId?: string | null;
+  mealType: string;
+  mealDate: string;
+  servedAt: string;
+  status: CanteenMealServingStatus;
+  dietaryWarning?: string | null;
+  notes?: string | null;
+  student?: CanteenStudentSummary;
+  mealPlan?: CanteenMealPlan | null;
+};
+
+export type CanteenWallet = {
+  id: string;
+  tenantId?: string;
+  studentId: string;
+  balance: string | number;
+  lowBalanceThreshold: string | number;
+  createdAt?: string;
+  updatedAt?: string;
+  student?: CanteenStudentSummary;
+};
+
+export type CanteenWalletTransaction = {
+  id: string;
+  tenantId?: string;
+  walletId: string;
+  studentId: string;
+  type: CanteenWalletTransactionType;
+  source: CanteenWalletTransactionSource;
+  amount: string | number;
+  balanceAfter: string | number;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  note?: string | null;
+  transactionDate: string;
+};
+
+export type CanteenPosSaleItem = {
+  id: string;
+  tenantId?: string;
+  saleId: string;
+  menuItemId: string;
+  itemName: string;
+  category: string;
+  quantity: number;
+  unitPrice: string | number;
+  lineTotal: string | number;
+};
+
+export type CanteenPosSale = {
+  id: string;
+  tenantId?: string;
+  studentId?: string | null;
+  staffId?: string | null;
+  walletId?: string | null;
+  saleDate: string;
+  paymentMethod: CanteenPaymentMethod;
+  status: CanteenPosSaleStatus;
+  subtotal: string | number;
+  discountAmount: string | number;
+  totalAmount: string | number;
+  completedAt?: string | null;
+  cancelledAt?: string | null;
+  notes?: string | null;
+  items?: CanteenPosSaleItem[];
+  student?: CanteenStudentSummary | null;
+};
+
+export type CanteenSpendingControl = {
+  id: string;
+  tenantId?: string;
+  studentId: string;
+  dailySpendingLimit?: string | number | null;
+  blockedCategories: string[];
+  blockedMenuItemIds: string[];
+  lowBalanceThreshold?: string | number | null;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type CanteenMenuItemPayload = {
+  name: string;
+  category: string;
+  description?: string;
+  unitPrice: number;
+  isMealItem?: boolean;
+  allergenTags?: string[];
+};
+
+export type CanteenMealPlanPayload = {
+  name: string;
+  description?: string;
+  mealType: string;
+  price: number;
+  billingFrequency?: string;
+  duplicateServingPrevention?: boolean;
+};
+
+export type CanteenEnrollmentPayload = {
+  studentId: string;
+  mealPlanId: string;
+  startsOn: string;
+  endsOn?: string;
+  notes?: string;
+};
+
+export type CanteenMealServingPayload = {
+  studentId: string;
+  enrollmentId?: string;
+  mealPlanId?: string;
+  mealType?: string;
+  mealDate?: string;
+  preventDuplicate?: boolean;
+  notes?: string;
+};
+
+export type CanteenTopUpPayload = {
+  amount: number;
+  note?: string;
+  lowBalanceThreshold?: number;
+};
+
+export type CanteenPosSalePayload = {
+  studentId?: string;
+  staffId?: string;
+  paymentMethod: CanteenPaymentMethod;
+  notes?: string;
+  items: { menuItemId: string; quantity: number }[];
+};
+
+export type CanteenSpendingControlPayload = {
+  studentId: string;
+  dailySpendingLimit?: number;
+  blockedCategories?: string[];
+  blockedMenuItemIds?: string[];
+  lowBalanceThreshold?: number;
+  isActive?: boolean;
+};
+
+export type DailyMealCountReport = {
+  mealType: string;
+  status: CanteenMealServingStatus;
+  _count: { _all: number };
+};
+
+export type ItemWiseSalesReport = {
+  menuItemId: string;
+  itemName: string;
+  category: string;
+  _sum: {
+    quantity: number | null;
+    lineTotal: string | number | null;
+  };
+};
+
+export type StudentSpendingSummary = {
+  studentId: string;
+  _sum: {
+    totalAmount: string | number | null;
+  };
+  _count: {
+    _all: number;
+  };
+};
+
+function withQuery(
+  path: string,
+  params: Record<string, string | number | undefined | null>,
+) {
+  const searchParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') {
+      searchParams.set(key, String(value));
+    }
+  }
+
+  const queryString = searchParams.toString();
+  return queryString ? `${path}?${queryString}` : path;
+}
+
+async function request<T>(path: string, init?: RequestOptions): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init?.headers ?? {}),
+    },
+    body: init?.json ? JSON.stringify(init.json) : init?.body,
+  });
+
+  if (!response.ok) {
+    if (
+      response.status === 401 &&
+      init?.auth !== false &&
+      init?.retryOnUnauthorized !== false &&
+      (await refreshAccessCookie())
+    ) {
+      return request<T>(path, { ...init, retryOnUnauthorized: false });
+    }
+
+    const text = await response.text();
+
+    if (response.status === 401 && init?.auth !== false) {
+      clearStoredSession();
+    }
+
+    throw new Error(
+      parseApiErrorMessage(text) || `Request failed with status ${response.status}`,
+    );
+  }
+
+  const payload = (await response.json()) as ApiResponse<T>;
+  return payload.data;
+}
+
+function parseApiErrorMessage(text: string) {
+  if (!text) return '';
+
+  try {
+    const payload = JSON.parse(text) as {
+      message?: string | string[];
+      error?: string;
+    };
+    const message = Array.isArray(payload.message)
+      ? payload.message.join(', ')
+      : payload.message;
+
+    return message || payload.error || text;
+  } catch {
+    return text;
+  }
+}
+
+async function refreshAccessCookie() {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+
+      return response.ok;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+export const canteenApi = {
+  listMenuItems: (params?: {
+    q?: string | null;
+    category?: string | null;
+    status?: string | null;
+  }) =>
+    request<CanteenMenuItem[]>(
+      withQuery('/canteen/menu-items', params ?? {}),
+    ),
+  createMenuItem: (body: CanteenMenuItemPayload) =>
+    request<CanteenMenuItem>('/canteen/menu-items', {
+      method: 'POST',
+      json: body,
+    }),
+  updateMenuItem: (itemId: string, body: Partial<CanteenMenuItemPayload>) =>
+    request<CanteenMenuItem>(
+      `/canteen/menu-items/${encodeURIComponent(itemId)}`,
+      { method: 'PATCH', json: body },
+    ),
+  updateMenuItemStatus: (
+    itemId: string,
+    body: { status: CanteenMenuItemStatus; reason?: string },
+  ) =>
+    request<CanteenMenuItem>(
+      `/canteen/menu-items/${encodeURIComponent(itemId)}/status`,
+      { method: 'PATCH', json: body },
+    ),
+  listMealPlans: (params?: {
+    q?: string | null;
+    status?: string | null;
+  }) =>
+    request<CanteenMealPlan[]>(
+      withQuery('/canteen/meal-plans', params ?? {}),
+    ),
+  createMealPlan: (body: CanteenMealPlanPayload) =>
+    request<CanteenMealPlan>('/canteen/meal-plans', {
+      method: 'POST',
+      json: body,
+    }),
+  updateMealPlan: (planId: string, body: Partial<CanteenMealPlanPayload>) =>
+    request<CanteenMealPlan>(
+      `/canteen/meal-plans/${encodeURIComponent(planId)}`,
+      { method: 'PATCH', json: body },
+    ),
+  updateMealPlanStatus: (
+    planId: string,
+    body: { status: CanteenMealPlanStatus; reason?: string },
+  ) =>
+    request<CanteenMealPlan>(
+      `/canteen/meal-plans/${encodeURIComponent(planId)}/status`,
+      { method: 'PATCH', json: body },
+    ),
+  listEnrollments: (params?: {
+    studentId?: string | null;
+    status?: string | null;
+  }) =>
+    request<CanteenStudentEnrollment[]>(
+      withQuery('/canteen/enrollments', params ?? {}),
+    ),
+  createEnrollment: (body: CanteenEnrollmentPayload) =>
+    request<CanteenStudentEnrollment>('/canteen/enrollments', {
+      method: 'POST',
+      json: body,
+    }),
+  updateEnrollment: (
+    enrollmentId: string,
+    body: Partial<CanteenEnrollmentPayload> & { status?: CanteenEnrollmentStatus },
+  ) =>
+    request<CanteenStudentEnrollment>(
+      `/canteen/enrollments/${encodeURIComponent(enrollmentId)}`,
+      { method: 'PATCH', json: body },
+    ),
+  cancelEnrollment: (enrollmentId: string, body?: { reason?: string }) =>
+    request<CanteenStudentEnrollment>(
+      `/canteen/enrollments/${encodeURIComponent(enrollmentId)}/cancel`,
+      { method: 'PATCH', json: body ?? {} },
+    ),
+  serveMeal: (body: CanteenMealServingPayload) =>
+    request<CanteenMealServing>('/canteen/servings', {
+      method: 'POST',
+      json: body,
+    }),
+  listServings: (params?: {
+    studentId?: string | null;
+    date?: string | null;
+  }) =>
+    request<CanteenMealServing[]>(withQuery('/canteen/servings', params ?? {})),
+  getOrCreateWallet: (studentId: string) =>
+    request<CanteenWallet>(
+      `/canteen/wallets/student/${encodeURIComponent(studentId)}`,
+      { method: 'POST', json: {} },
+    ),
+  getWalletBalance: (studentId: string) =>
+    request<CanteenWallet>(
+      `/canteen/wallets/student/${encodeURIComponent(studentId)}/balance`,
+    ),
+  topUpWallet: (studentId: string, body: CanteenTopUpPayload) =>
+    request<CanteenWalletTransaction>(
+      `/canteen/wallets/student/${encodeURIComponent(studentId)}/top-up`,
+      { method: 'POST', json: body },
+    ),
+  listWalletTransactions: (studentId: string) =>
+    request<CanteenWalletTransaction[]>(
+      `/canteen/wallets/student/${encodeURIComponent(studentId)}/transactions`,
+    ),
+  createPosSale: (body: CanteenPosSalePayload) =>
+    request<CanteenPosSale>('/canteen/pos-sales', {
+      method: 'POST',
+      json: body,
+    }),
+  completePosSale: (saleId: string, body?: { note?: string }) =>
+    request<CanteenPosSale>(
+      `/canteen/pos-sales/${encodeURIComponent(saleId)}/complete`,
+      { method: 'PATCH', json: body ?? {} },
+    ),
+  cancelPosSale: (saleId: string, body?: { reason?: string }) =>
+    request<CanteenPosSale>(
+      `/canteen/pos-sales/${encodeURIComponent(saleId)}/cancel`,
+      { method: 'PATCH', json: body ?? {} },
+    ),
+  listPosSales: (params?: {
+    studentId?: string | null;
+    status?: string | null;
+    date?: string | null;
+  }) =>
+    request<CanteenPosSale[]>(withQuery('/canteen/pos-sales', params ?? {})),
+  upsertSpendingControl: (body: CanteenSpendingControlPayload) =>
+    request<CanteenSpendingControl>('/canteen/spending-controls', {
+      method: 'POST',
+      json: body,
+    }),
+  getSpendingControl: (studentId: string) =>
+    request<CanteenSpendingControl | null>(
+      `/canteen/spending-controls/student/${encodeURIComponent(studentId)}`,
+    ),
+  getDailyMealCountReport: (params?: { date?: string | null }) =>
+    request<DailyMealCountReport[]>(
+      withQuery('/canteen/reports/daily-meal-count', params ?? {}),
+    ),
+  getItemWiseSalesReport: (params?: {
+    from?: string | null;
+    to?: string | null;
+  }) =>
+    request<ItemWiseSalesReport[]>(
+      withQuery('/canteen/reports/item-wise-sales', params ?? {}),
+    ),
+  getLowBalanceWallets: (params?: { threshold?: number | null }) =>
+    request<CanteenWallet[]>(
+      withQuery('/canteen/reports/low-balance-wallets', params ?? {}),
+    ),
+  getStudentSpendingSummary: (params?: {
+    studentId?: string | null;
+    from?: string | null;
+    to?: string | null;
+  }) =>
+    request<StudentSpendingSummary[]>(
+      withQuery('/canteen/reports/student-spending-summary', params ?? {}),
+    ),
+};

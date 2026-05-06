@@ -155,8 +155,7 @@ export const dashboardNavGroups: NavGroup[] = [
         href: '#transport-coming-soon',
         label: 'Transport',
         icon: Bus,
-        permissions: ['transport:read', 'transport:manage', 'transport:operate'],
-        disabled: true,
+        permissions: ['transport:read', 'transport:manage', 'transport:operate']
       },
     ],
   },
