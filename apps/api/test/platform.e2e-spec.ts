@@ -190,6 +190,7 @@ describe('SchoolOS Platform Control Plane (E2E)', () => {
       (a) => a.action === 'tenant_suspended' && a.resourceId === tenantId,
     );
     expect(audit).toBeDefined();
+    if (!audit) throw new Error('Audit log not found');
     expect(audit.tenantId).toBe('platform');
 
     // 9. Setup platform support admin (Read-only)

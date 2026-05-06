@@ -172,6 +172,8 @@ describe('School OS Auth + RBAC integration', () => {
     );
     expect(teacherRole).toBeDefined();
 
+    if (!teacherRole?.id) throw new Error('Teacher role not found');
+
     const createdStaff = await staffController.createStaff(
       {
         firstName: 'Tara',
@@ -183,7 +185,7 @@ describe('School OS Auth + RBAC integration', () => {
         contractType: 'PERMANENT',
         email: 'teacher@greenvalley.com',
         password: 'teacher12345',
-        roleIds: [teacherRole?.id ?? ''],
+        roleIds: [teacherRole.id as string],
       },
       adminRequest.auth as unknown as AuthContext,
     );
@@ -605,7 +607,6 @@ function asChallenge(
   return result;
 }
 
-import type { AuthenticatedRequest } from '../src/auth/auth-request.interface';
 
 async function authenticateRequest(
   jwtAuthGuard: JwtAuthGuard,

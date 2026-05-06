@@ -43,8 +43,22 @@ SET
     WHEN "status"::TEXT = 'LATE' THEN 'LATE'::"HomeworkSubmissionStatus"
     ELSE 'NOT_SUBMITTED'::"HomeworkSubmissionStatus"
   END,
-  "submissionText" = "submissionContent",
   "teacherRemarks" = "feedback";
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'HomeworkSubmission'
+      AND column_name = 'submissionContent'
+  ) THEN
+    UPDATE "HomeworkSubmission"
+    SET "submissionText" = "submissionContent"
+    WHERE "submissionText" IS NULL;
+  END IF;
+END $$;
 
 ALTER TABLE "HomeworkSubmission" DROP COLUMN "status";
 ALTER TABLE "HomeworkSubmission" RENAME COLUMN "newStatus" TO "status";
@@ -164,6 +178,11 @@ CREATE TABLE "HomeworkReminderBatch" (
   CONSTRAINT "HomeworkReminderBatch_pkey" PRIMARY KEY ("id")
 );
 
+-- Indexes
+CREATE UNIQUE INDEX "TimetablePeriod_tenantId_academicYearId_name_key" ON "TimetablePeriod"("tenantId", "academicYearId", "name");
+CREATE UNIQUE INDEX "Room_tenantId_name_key" ON "Room"("tenantId", "name");
+CREATE UNIQUE INDEX "TeacherWorkloadLimit_tenantId_academicYearId_staffId_key" ON "TeacherWorkloadLimit"("tenantId", "academicYearId", "staffId");
+
 -- Backfill legacy rooms and versions.
 INSERT INTO "Room" ("id", "tenantId", "name", "code", "createdAt", "updatedAt")
 SELECT lower(concat(substr(md5(random()::text || clock_timestamp()::text), 1, 8), '-', substr(md5(random()::text || clock_timestamp()::text), 1, 4), '-', substr(md5(random()::text || clock_timestamp()::text), 1, 4), '-', substr(md5(random()::text || clock_timestamp()::text), 1, 4), '-', substr(md5(random()::text || clock_timestamp()::text), 1, 12))), "tenantId", trim("room"), trim("room"), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
@@ -210,10 +229,8 @@ WHERE slot."tenantId" = version."tenantId"
   AND COALESCE(slot."sectionId", '') = COALESCE(version."sectionId", '')
   AND version."versionName" = 'Legacy timetable';
 
--- Indexes
-CREATE UNIQUE INDEX "TimetablePeriod_tenantId_academicYearId_name_key" ON "TimetablePeriod"("tenantId", "academicYearId", "name");
+-- Remaining Indexes
 CREATE INDEX "TimetablePeriod_tenantId_academicYearId_dayOfWeek_sortOrder_idx" ON "TimetablePeriod"("tenantId", "academicYearId", "dayOfWeek", "sortOrder");
-CREATE UNIQUE INDEX "Room_tenantId_name_key" ON "Room"("tenantId", "name");
 CREATE INDEX "Room_tenantId_isActive_idx" ON "Room"("tenantId", "isActive");
 CREATE INDEX "TimetableVersion_tenantId_academicYearId_classId_sectionId_status_idx" ON "TimetableVersion"("tenantId", "academicYearId", "classId", "sectionId", "status");
 CREATE INDEX "TimetableVersion_tenantId_status_effectiveFrom_effectiveTo_idx" ON "TimetableVersion"("tenantId", "status", "effectiveFrom", "effectiveTo");
@@ -221,7 +238,6 @@ CREATE INDEX "TimetableSlot_tenantId_roomId_dayOfWeek_idx" ON "TimetableSlot"("t
 CREATE INDEX "TimetableSlot_tenantId_versionId_idx" ON "TimetableSlot"("tenantId", "versionId");
 CREATE INDEX "TeacherAvailability_tenantId_staffId_dayOfWeek_idx" ON "TeacherAvailability"("tenantId", "staffId", "dayOfWeek");
 CREATE INDEX "TeacherAvailability_tenantId_academicYearId_staffId_idx" ON "TeacherAvailability"("tenantId", "academicYearId", "staffId");
-CREATE UNIQUE INDEX "TeacherWorkloadLimit_tenantId_academicYearId_staffId_key" ON "TeacherWorkloadLimit"("tenantId", "academicYearId", "staffId");
 CREATE INDEX "TeacherWorkloadLimit_tenantId_staffId_idx" ON "TeacherWorkloadLimit"("tenantId", "staffId");
 CREATE INDEX "TimetableSubstitution_tenantId_date_status_idx" ON "TimetableSubstitution"("tenantId", "date", "status");
 CREATE INDEX "TimetableSubstitution_tenantId_absentTeacherId_date_idx" ON "TimetableSubstitution"("tenantId", "absentTeacherId", "date");

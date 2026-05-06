@@ -619,19 +619,25 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'settings:read_public',
     'settings:read',
     'reports:read',
+    'hr:staff:read',
+    'hr:leave:read',
+    'hr:leave:request',
+    'payroll:payslip:read',
   ],
-  principal: PERMISSION_CATALOG.map(({ resource, action }) =>
-    buildPermissionKey(resource, action),
-  ).filter(
-    (permission) =>
-      ![
-        'roles:manage_permissions',
-        'accounting:close',
-        'accounting:reverse',
-        'tenants:manage',
-        'settings:manage',
-      ].includes(permission),
-  ),
+  principal: [
+    ...PERMISSION_CATALOG.map(({ resource, action }) =>
+      buildPermissionKey(resource, action),
+    ).filter(
+      (permission) =>
+        ![
+          'roles:manage_permissions',
+          'accounting:close',
+          'accounting:reverse',
+          'tenants:manage',
+          'settings:manage',
+        ].includes(permission),
+    ),
+  ],
   subject_teacher: [
     'roles:read',
     'classes:read',
@@ -654,6 +660,10 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'events:read',
     'settings:read_public',
     'reports:read',
+    'hr:staff:read',
+    'hr:leave:read',
+    'hr:leave:request',
+    'payroll:payslip:read',
   ],
   support_staff: [
     'roles:read',
@@ -708,6 +718,24 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'settings:read',
     'reports:read',
     'reports:export',
+    'payroll:salary:read',
+    'payroll:salary:write',
+    'payroll:run:create',
+    'payroll:run:read',
+    'payroll:run:review',
+    'payroll:run:post',
+    'payroll:run:pay',
+    'payroll:payslip:read',
+    'payroll:reports:read',
+    'payroll:exports:create',
+    'accounting:accounts:read',
+    'accounting:accounts:write',
+    'accounting:fiscal:manage',
+    'accounting:journals:read',
+    'accounting:journals:manual',
+    'accounting:journals:reverse',
+    'accounting:reports:read',
+    'accounting:exports:create',
   ],
   librarian: [
     'roles:read',

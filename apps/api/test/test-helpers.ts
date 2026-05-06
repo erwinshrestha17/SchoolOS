@@ -33,6 +33,8 @@ export interface PrismaMock {
 export interface PrismaQuery {
   where?: Record<string, unknown>;
   data?: Record<string, unknown>;
+  create?: Record<string, unknown>;
+  update?: Record<string, unknown>;
   include?: Record<string, unknown>;
   orderBy?: unknown;
   take?: number;

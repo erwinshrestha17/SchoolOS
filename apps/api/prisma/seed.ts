@@ -239,7 +239,9 @@ async function seedRolePermissions(tenantId: string) {
     });
 
     for (const permissionKey of Array.from(new Set(permissionKeys))) {
-      const [resource, action] = permissionKey.split(':');
+      const parts = permissionKey.split(':');
+      const action = parts.pop();
+      const resource = parts.join(':');
 
       if (!resource || !action) {
         throw new Error(`Invalid permission key: ${permissionKey}`);
