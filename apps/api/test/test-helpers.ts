@@ -393,7 +393,7 @@ export function createPrismaMock() {
         }
         const role = {
           id: nextId('role'),
-          ...(create as Record<string, unknown>),
+          ...create!,
         };
         state.roles.push(role as Record<string, unknown>);
         return Promise.resolve(role);
@@ -428,7 +428,7 @@ export function createPrismaMock() {
         }
         const permission = {
           id: nextId('perm'),
-          ...(create as Record<string, unknown>),
+          ...create!,
         };
         state.permissions.push(permission as Record<string, unknown>);
         return Promise.resolve(permission);
@@ -592,7 +592,7 @@ export function createPrismaMock() {
         }
         const year = {
           id: nextId('year'),
-          ...(create as Record<string, unknown>),
+          ...create!,
         };
         state.academicYears.push(year as Record<string, unknown>);
         return Promise.resolve(year);
@@ -615,7 +615,7 @@ export function createPrismaMock() {
         }
         const account = {
           id: nextId('account'),
-          ...(create as Record<string, unknown>),
+          ...create!,
         };
         state.chartAccounts.push(account as Record<string, unknown>);
         return Promise.resolve(account);
@@ -638,7 +638,7 @@ export function createPrismaMock() {
         }
         const feeHead = {
           id: nextId('fee-head'),
-          ...(create as Record<string, unknown>),
+          ...create!,
         };
         state.feeHeads.push(feeHead as Record<string, unknown>);
         return Promise.resolve(feeHead);
@@ -731,7 +731,7 @@ export function createPrismaMock() {
         }
         const item = {
           id: nextId('setting'),
-          ...(create as Record<string, unknown>),
+          ...create!,
           createdAt: new Date(),
           updatedAt: new Date(),
         };

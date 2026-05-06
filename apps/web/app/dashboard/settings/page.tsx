@@ -26,6 +26,62 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Button } from '../../../components/ui/button';
 import Link from 'next/link';
 
+// --- Constants ---
+
+const SCHOOL_PROFILE_SETTING_KEYS: TenantSettingKey[] = [
+  'school_name', 'school_address', 'school_phone', 'school_email', 
+  'school_pan_number', 'principal_name', 'municipality', 'ward_number', 
+  'district', 'province', 'school_type', 'iemis_school_code'
+];
+
+const BRANDING_SETTING_KEYS: TenantSettingKey[] = [
+  'branding_primary_color', 'receipt_header_text', 'receipt_footer_text', 
+  'id_card_footer_text', 'payslip_footer_text', 'certificate_footer_text', 
+  'report_card_footer_text', 'default_paper_size', 'timezone', 'currency', 'date_format'
+];
+
+const ACADEMIC_SETTING_KEYS: TenantSettingKey[] = [
+  'active_academic_year_label', 'default_calendar', 'attendance_working_days', 
+  'promotion_rule_mode', 'grading_scheme_label'
+];
+
+const FEE_SETTING_KEYS: TenantSettingKey[] = [
+  'active_fee_plan_required', 'receipt_number_prefix', 'payment_methods_enabled', 
+  'late_fee_enabled', 'late_fee_grace_days', 'waiver_approval_required', 
+  'discount_approval_required', 'cashier_close_required'
+];
+
+const ATTENDANCE_SETTING_KEYS: TenantSettingKey[] = [
+  'attendance_lock_hours', 'late_threshold_minutes', 'half_day_threshold_minutes', 
+  'allow_teacher_correction_request', 'parent_attendance_visibility', 'weekend_policy'
+];
+
+const PAYROLL_SETTING_KEYS: TenantSettingKey[] = [
+  'payroll_month_day', 'default_working_days_per_month', 'pf_enabled', 
+  'tds_enabled', 'leave_approval_required', 'unpaid_leave_affects_payroll', 
+  'payroll_approval_required', 'salary_payment_methods'
+];
+
+const ACCOUNTING_SETTING_KEYS: TenantSettingKey[] = [
+  'active_fiscal_year_label', 'fiscal_period_lock_policy', 'default_cash_account_label', 
+  'default_bank_account_label', 'salary_payable_account_label', 'tds_payable_account_label', 
+  'pf_payable_account_label', 'fee_income_account_label', 'journal_number_prefix', 
+  'voucher_number_prefix'
+];
+
+const COMMUNICATION_SETTING_KEYS: TenantSettingKey[] = [
+  'default_notice_channel', 'parent_notification_enabled', 'consent_required_for_media', 
+  'quiet_hours_enabled', 'chat_availability_enabled', 'chat_sunday_to_thursday_hours', 
+  'chat_friday_hours', 'chat_saturday_enabled', 'emergency_override_requires_admin'
+];
+
+const SECURITY_SETTING_KEYS: TenantSettingKey[] = [
+  'sensitive_staff_fields_masked', 'export_requires_permission', 'audit_log_retention_days', 
+  'session_timeout_minutes', 'require_reason_for_sensitive_reveal'
+];
+
+// --- Components ---
+
 export default function TenantSettingsPage() {
   const [settings, setSettings] = useState<TenantSettingSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,11 +101,6 @@ export default function TenantSettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getSettingValue = (key: TenantSettingKey, defaultValue: any) => {
-    const setting = settings.find(s => s.key === key);
-    return setting ? setting.value : defaultValue;
   };
 
   if (loading) {
@@ -240,7 +291,7 @@ function Checkbox({ label, checked, onChange }: { label: string, checked: boolea
   );
 }
 
-// --- Sections ---
+// --- Form Hook ---
 
 function useSettingsForm(initialValues: TenantSettingSummary[], keys: TenantSettingKey[], onUpdate: () => void) {
   const [form, setForm] = useState<Record<string, any>>({});
@@ -282,13 +333,10 @@ function useSettingsForm(initialValues: TenantSettingSummary[], keys: TenantSett
   return { form, setFieldValue, save, isSaving, alert };
 }
 
+// --- Sections ---
+
 function SectionSchoolProfile({ initialValues, onUpdate }: { initialValues: TenantSettingSummary[], onUpdate: () => void }) {
-  const keys: TenantSettingKey[] = [
-    'school_name', 'school_address', 'school_phone', 'school_email', 
-    'school_pan_number', 'principal_name', 'municipality', 'ward_number', 
-    'district', 'province', 'school_type', 'iemis_school_code'
-  ];
-  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, keys, onUpdate);
+  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, SCHOOL_PROFILE_SETTING_KEYS, onUpdate);
 
   return (
     <SectionWrapper 
@@ -320,12 +368,7 @@ function SectionSchoolProfile({ initialValues, onUpdate }: { initialValues: Tena
 }
 
 function SectionBranding({ initialValues, onUpdate }: { initialValues: TenantSettingSummary[], onUpdate: () => void }) {
-  const keys: TenantSettingKey[] = [
-    'branding_primary_color', 'receipt_header_text', 'receipt_footer_text', 
-    'id_card_footer_text', 'payslip_footer_text', 'certificate_footer_text', 
-    'report_card_footer_text', 'default_paper_size', 'timezone', 'currency', 'date_format'
-  ];
-  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, keys, onUpdate);
+  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, BRANDING_SETTING_KEYS, onUpdate);
 
   return (
     <SectionWrapper 
@@ -373,11 +416,7 @@ function SectionBranding({ initialValues, onUpdate }: { initialValues: TenantSet
 }
 
 function SectionAcademic({ initialValues, onUpdate }: { initialValues: TenantSettingSummary[], onUpdate: () => void }) {
-  const keys: TenantSettingKey[] = [
-    'active_academic_year_label', 'default_calendar', 'attendance_working_days', 
-    'promotion_rule_mode', 'grading_scheme_label'
-  ];
-  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, keys, onUpdate);
+  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, ACADEMIC_SETTING_KEYS, onUpdate);
 
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -429,12 +468,7 @@ function SectionAcademic({ initialValues, onUpdate }: { initialValues: TenantSet
 }
 
 function SectionFees({ initialValues, onUpdate }: { initialValues: TenantSettingSummary[], onUpdate: () => void }) {
-  const keys: TenantSettingKey[] = [
-    'active_fee_plan_required', 'receipt_number_prefix', 'payment_methods_enabled', 
-    'late_fee_enabled', 'late_fee_grace_days', 'waiver_approval_required', 
-    'discount_approval_required', 'cashier_close_required'
-  ];
-  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, keys, onUpdate);
+  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, FEE_SETTING_KEYS, onUpdate);
 
   const methods = ['Cash', 'Bank Transfer', 'eSewa', 'Khalti', 'Cheque'];
 
@@ -488,11 +522,7 @@ function SectionFees({ initialValues, onUpdate }: { initialValues: TenantSetting
 }
 
 function SectionAttendance({ initialValues, onUpdate }: { initialValues: TenantSettingSummary[], onUpdate: () => void }) {
-  const keys: TenantSettingKey[] = [
-    'attendance_lock_hours', 'late_threshold_minutes', 'half_day_threshold_minutes', 
-    'allow_teacher_correction_request', 'parent_attendance_visibility', 'weekend_policy'
-  ];
-  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, keys, onUpdate);
+  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, ATTENDANCE_SETTING_KEYS, onUpdate);
 
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -535,12 +565,7 @@ function SectionAttendance({ initialValues, onUpdate }: { initialValues: TenantS
 }
 
 function SectionPayroll({ initialValues, onUpdate }: { initialValues: TenantSettingSummary[], onUpdate: () => void }) {
-  const keys: TenantSettingKey[] = [
-    'payroll_month_day', 'default_working_days_per_month', 'pf_enabled', 
-    'tds_enabled', 'leave_approval_required', 'unpaid_leave_affects_payroll', 
-    'payroll_approval_required', 'salary_payment_methods'
-  ];
-  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, keys, onUpdate);
+  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, PAYROLL_SETTING_KEYS, onUpdate);
 
   const methods = ['Bank Transfer', 'Cash', 'Cheque'];
 
@@ -586,13 +611,7 @@ function SectionPayroll({ initialValues, onUpdate }: { initialValues: TenantSett
 }
 
 function SectionAccounting({ initialValues, onUpdate }: { initialValues: TenantSettingSummary[], onUpdate: () => void }) {
-  const keys: TenantSettingKey[] = [
-    'active_fiscal_year_label', 'fiscal_period_lock_policy', 'default_cash_account_label', 
-    'default_bank_account_label', 'salary_payable_account_label', 'tds_payable_account_label', 
-    'pf_payable_account_label', 'fee_income_account_label', 'journal_number_prefix', 
-    'voucher_number_prefix'
-  ];
-  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, keys, onUpdate);
+  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, ACCOUNTING_SETTING_KEYS, onUpdate);
 
   return (
     <SectionWrapper 
@@ -628,12 +647,7 @@ function SectionAccounting({ initialValues, onUpdate }: { initialValues: TenantS
 }
 
 function SectionCommunication({ initialValues, onUpdate }: { initialValues: TenantSettingSummary[], onUpdate: () => void }) {
-  const keys: TenantSettingKey[] = [
-    'default_notice_channel', 'parent_notification_enabled', 'consent_required_for_media', 
-    'quiet_hours_enabled', 'chat_availability_enabled', 'chat_sunday_to_thursday_hours', 
-    'chat_friday_hours', 'chat_saturday_enabled', 'emergency_override_requires_admin'
-  ];
-  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, keys, onUpdate);
+  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, COMMUNICATION_SETTING_KEYS, onUpdate);
 
   return (
     <SectionWrapper 
@@ -664,11 +678,7 @@ function SectionCommunication({ initialValues, onUpdate }: { initialValues: Tena
 }
 
 function SectionSecurity({ initialValues, onUpdate }: { initialValues: TenantSettingSummary[], onUpdate: () => void }) {
-  const keys: TenantSettingKey[] = [
-    'sensitive_staff_fields_masked', 'export_requires_permission', 'audit_log_retention_days', 
-    'session_timeout_minutes', 'require_reason_for_sensitive_reveal'
-  ];
-  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, keys, onUpdate);
+  const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, SECURITY_SETTING_KEYS, onUpdate);
 
   return (
     <SectionWrapper 
