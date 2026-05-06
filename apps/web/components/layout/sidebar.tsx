@@ -22,6 +22,7 @@ import {
   ChevronRight,
   Lock,
   School,
+  Utensils,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -152,10 +153,33 @@ export const dashboardNavGroups: NavGroup[] = [
         permissions: ['library:read', 'library:manage'],
       },
       {
-        href: '#transport-coming-soon',
+        href: '/dashboard/transport',
         label: 'Transport',
         icon: Bus,
-        permissions: ['transport:read', 'transport:manage', 'transport:operate']
+        permissions: [
+          'transport:read',
+          'transport:manage',
+          'transport:operate',
+          'transport:routes:read',
+          'transport:vehicles:read',
+          'transport:assignments:read',
+          'transport:trips:read',
+          'transport:location:read',
+        ],
+      },
+      {
+        href: '/dashboard/canteen',
+        label: 'Canteen',
+        icon: Utensils,
+        permissions: [
+          'canteen:menu:read',
+          'canteen:plans:read',
+          'canteen:enrollments:read',
+          'canteen:serving:read',
+          'canteen:wallets:read',
+          'canteen:pos:read',
+          'canteen:reports:read',
+        ],
       },
     ],
   },
