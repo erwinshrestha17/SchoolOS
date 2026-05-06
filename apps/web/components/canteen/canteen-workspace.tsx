@@ -1,0 +1,336 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
+import { CreditCard, ShoppingCart, Soup, Utensils, Wallet, WalletCards } from 'lucide-react';
+import { api } from '../../lib/api';
+import {
+  canteenApi,
+  type CanteenEnrollmentPayload,
+  type CanteenMealPlanPayload,
+  type CanteenMealServingPayload,
+  type CanteenMenuItemPayload,
+  type CanteenPaymentMethod,
+  type CanteenPosSalePayload,
+  type CanteenSpendingControlPayload,
+  type CanteenTopUpPayload,
+} from '../../lib/canteen-api';
+import { EmptyState } from '../ui/empty-state';
+import { LoadingState } from '../ui/loading-state';
+import { PageHeader } from '../ui/page-header';
+import { StatCard } from '../ui/stat-card';
+import { cn } from '../../lib/utils';
+
+type CanteenTab = 'overview' | 'menu' | 'plans' | 'enrollments' | 'serving' | 'wallets' | 'pos' | 'controls' | 'reports';
+
+type CanteenWorkspaceProps = { initialTab?: CanteenTab };
+
+const tabs: Array<{ key: CanteenTab; label: string; href: string }> = [
+  { key: 'overview', label: 'Overview', href: '/dashboard/canteen' },
+  { key: 'menu', label: 'Menu', href: '/dashboard/canteen/menu' },
+  { key: 'plans', label: 'Meal Plans', href: '/dashboard/canteen/plans' },
+  { key: 'enrollments', label: 'Enrollments', href: '/dashboard/canteen/enrollments' },
+  { key: 'serving', label: 'Serving', href: '/dashboard/canteen/serving' },
+  { key: 'wallets', label: 'Wallets', href: '/dashboard/canteen/wallets' },
+  { key: 'pos', label: 'POS', href: '/dashboard/canteen/pos' },
+  { key: 'controls', label: 'Controls', href: '/dashboard/canteen/controls' },
+  { key: 'reports', label: 'Reports', href: '/dashboard/canteen/reports' },
+];
+
+const today = new Date().toISOString().slice(0, 10);
+
+const emptyMenuForm: CanteenMenuItemPayload = { name: '', category: '', unitPrice: 0, isMealItem: true, allergenTags: [] };
+const emptyPlanForm: CanteenMealPlanPayload = { name: '', mealType: 'LUNCH', price: 0, billingFrequency: 'MONTHLY', duplicateServingPrevention: true };
+const emptyEnrollmentForm: CanteenEnrollmentPayload = { studentId: '', mealPlanId: '', startsOn: today };
+const emptyServingForm: CanteenMealServingPayload = { studentId: '', mealType: 'LUNCH', mealDate: today, preventDuplicate: true };
+const emptyTopUpForm: CanteenTopUpPayload = { amount: 100, note: '', lowBalanceThreshold: 100 };
+const emptyPosForm: CanteenPosSalePayload = { studentId: '', paymentMethod: 'CASH', items: [{ menuItemId: '', quantity: 1 }] };
+const emptyControlForm: CanteenSpendingControlPayload = { studentId: '', dailySpendingLimit: 200, lowBalanceThreshold: 100, isActive: true };
+
+const moneyFormatter = new Intl.NumberFormat('en-NP', { style: 'currency', currency: 'NPR', maximumFractionDigits: 0 });
+
+export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspaceProps) {
+  const [activeTab, setActiveTab] = useState<CanteenTab>(initialTab);
+  const [menuForm, setMenuForm] = useState<CanteenMenuItemPayload>(emptyMenuForm);
+  const [planForm, setPlanForm] = useState<CanteenMealPlanPayload>(emptyPlanForm);
+  const [enrollmentForm, setEnrollmentForm] = useState<CanteenEnrollmentPayload>(emptyEnrollmentForm);
+  const [servingForm, setServingForm] = useState<CanteenMealServingPayload>(emptyServingForm);
+  const [walletStudentId, setWalletStudentId] = useState('');
+  const [topUpForm, setTopUpForm] = useState<CanteenTopUpPayload>(emptyTopUpForm);
+  const [posForm, setPosForm] = useState<CanteenPosSalePayload>(emptyPosForm);
+  const [controlForm, setControlForm] = useState<CanteenSpendingControlPayload>(emptyControlForm);
+  const [reportDate, setReportDate] = useState(today);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const queryClient = useQueryClient();
+  const menuQuery = useQuery({ queryKey: ['canteen-menu'], queryFn: () => canteenApi.listMenuItems({ status: '' }) });
+  const plansQuery = useQuery({ queryKey: ['canteen-plans'], queryFn: () => canteenApi.listMealPlans({ status: '' }) });
+  const enrollmentsQuery = useQuery({ queryKey: ['canteen-enrollments'], queryFn: () => canteenApi.listEnrollments() });
+  const servingsQuery = useQuery({ queryKey: ['canteen-servings', reportDate], queryFn: () => canteenApi.listServings({ date: reportDate }) });
+  const salesQuery = useQuery({ queryKey: ['canteen-pos-sales'], queryFn: () => canteenApi.listPosSales() });
+  const lowBalanceQuery = useQuery({ queryKey: ['canteen-low-balance'], queryFn: () => canteenApi.getLowBalanceWallets() });
+  const mealCountQuery = useQuery({ queryKey: ['canteen-meal-count', reportDate], queryFn: () => canteenApi.getDailyMealCountReport({ date: reportDate }) });
+  const itemSalesQuery = useQuery({ queryKey: ['canteen-item-sales'], queryFn: () => canteenApi.getItemWiseSalesReport() });
+  const spendingSummaryQuery = useQuery({ queryKey: ['canteen-spending-summary'], queryFn: () => canteenApi.getStudentSpendingSummary() });
+  const studentsQuery = useQuery({ queryKey: ['students-for-canteen'], queryFn: api.listStudents });
+  const walletQuery = useQuery({
+    queryKey: ['canteen-wallet', walletStudentId],
+    queryFn: () => canteenApi.getWalletBalance(walletStudentId),
+    enabled: Boolean(walletStudentId),
+  });
+  const transactionsQuery = useQuery({
+    queryKey: ['canteen-wallet-transactions', walletStudentId],
+    queryFn: () => canteenApi.listWalletTransactions(walletStudentId),
+    enabled: Boolean(walletStudentId),
+  });
+
+  const invalidateCanteen = () => {
+    void queryClient.invalidateQueries({ queryKey: ['canteen-menu'] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-plans'] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-enrollments'] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-servings'] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-pos-sales'] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-low-balance'] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-meal-count'] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-item-sales'] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-spending-summary'] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-wallet'] });
+    void queryClient.invalidateQueries({ queryKey: ['canteen-wallet-transactions'] });
+  };
+
+  const menuMutation = useMutation({ mutationFn: canteenApi.createMenuItem, onSuccess: () => { setMenuForm(emptyMenuForm); setNotice('Menu item created.'); invalidateCanteen(); } });
+  const planMutation = useMutation({ mutationFn: canteenApi.createMealPlan, onSuccess: () => { setPlanForm(emptyPlanForm); setNotice('Meal plan created.'); invalidateCanteen(); } });
+  const enrollmentMutation = useMutation({ mutationFn: canteenApi.createEnrollment, onSuccess: () => { setEnrollmentForm(emptyEnrollmentForm); setNotice('Student enrolled.'); invalidateCanteen(); } });
+  const cancelEnrollmentMutation = useMutation({ mutationFn: canteenApi.cancelEnrollment, onSuccess: () => { setNotice('Enrollment cancelled.'); invalidateCanteen(); } });
+  const servingMutation = useMutation({ mutationFn: canteenApi.serveMeal, onSuccess: () => { setServingForm(emptyServingForm); setNotice('Meal served.'); invalidateCanteen(); } });
+  const createWalletMutation = useMutation({ mutationFn: canteenApi.getOrCreateWallet, onSuccess: () => { setNotice('Wallet ready.'); invalidateCanteen(); } });
+  const topUpMutation = useMutation({ mutationFn: ({ studentId, body }: { studentId: string; body: CanteenTopUpPayload }) => canteenApi.topUpWallet(studentId, body), onSuccess: () => { setTopUpForm(emptyTopUpForm); setNotice('Wallet topped up.'); invalidateCanteen(); } });
+  const posMutation = useMutation({ mutationFn: canteenApi.createPosSale, onSuccess: () => { setPosForm(emptyPosForm); setNotice('POS sale created. Complete it from the sales list if required.'); invalidateCanteen(); } });
+  const completeSaleMutation = useMutation({ mutationFn: canteenApi.completePosSale, onSuccess: () => { setNotice('POS sale completed.'); invalidateCanteen(); } });
+  const cancelSaleMutation = useMutation({ mutationFn: canteenApi.cancelPosSale, onSuccess: () => { setNotice('POS sale cancelled.'); invalidateCanteen(); } });
+  const controlMutation = useMutation({ mutationFn: canteenApi.upsertSpendingControl, onSuccess: () => { setNotice('Spending control saved.'); invalidateCanteen(); } });
+
+  const menuItems = menuQuery.data ?? [];
+  const plans = plansQuery.data ?? [];
+  const enrollments = enrollmentsQuery.data ?? [];
+  const servings = servingsQuery.data ?? [];
+  const sales = salesQuery.data ?? [];
+  const lowBalanceWallets = lowBalanceQuery.data ?? [];
+
+  const stats = useMemo(() => ({
+    activeMenuItems: menuItems.filter((item) => item.status === 'ACTIVE').length,
+    activeMealPlans: plans.filter((plan) => plan.status === 'ACTIVE').length,
+    enrolledStudents: enrollments.filter((enrollment) => enrollment.status === 'ACTIVE').length,
+    mealsServedToday: servings.filter((serving) => serving.status === 'SERVED').length,
+    posSalesToday: sales.filter((sale) => sale.status === 'COMPLETED').length,
+    lowBalanceWallets: lowBalanceWallets.length,
+  }), [enrollments, lowBalanceWallets.length, menuItems, plans, sales, servings]);
+
+  const firstError = menuQuery.error || plansQuery.error || enrollmentsQuery.error || servingsQuery.error || salesQuery.error || lowBalanceQuery.error;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Canteen Management"
+        description="Manage menu items, meal plans, enrollments, meal serving, wallets, POS sales, spending controls, and reports."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            {tabs.map((tab) => (
+              <Link
+                key={tab.key}
+                href={tab.href}
+                onClick={() => setActiveTab(tab.key)}
+                className={cn('inline-flex min-h-10 items-center rounded-2xl px-4 text-sm font-semibold transition', activeTab === tab.key ? 'bg-slate-900 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900')}
+              >
+                {tab.label}
+              </Link>
+            ))}
+          </div>
+        }
+      />
+
+      {notice ? <Notice tone="success" message={notice} onDismiss={() => setNotice(null)} /> : null}
+      {firstError ? <Notice tone="error" message={(firstError as Error).message} /> : null}
+
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <StatCard title="Active menu items" value={stats.activeMenuItems} icon={<Utensils size={18} />} loading={menuQuery.isLoading} />
+            <StatCard title="Active meal plans" value={stats.activeMealPlans} icon={<Soup size={18} />} loading={plansQuery.isLoading} />
+            <StatCard title="Enrolled students" value={stats.enrolledStudents} icon={<WalletCards size={18} />} loading={enrollmentsQuery.isLoading} />
+            <StatCard title="Meals served today" value={stats.mealsServedToday} icon={<Soup size={18} />} loading={servingsQuery.isLoading} />
+            <StatCard title="Completed POS sales" value={stats.posSalesToday} icon={<ShoppingCart size={18} />} loading={salesQuery.isLoading} />
+            <StatCard title="Low balance wallets" value={stats.lowBalanceWallets} icon={<Wallet size={18} />} loading={lowBalanceQuery.isLoading} />
+          </div>
+          <InfoCard lines={['All wallet and POS totals come from backend responses; frontend does not calculate financial truth.', 'AccountingPostingService integration remains backend-controlled and will be connected later.', 'Allergy and dietary warnings are shown when backend serving responses include warning data.']} />
+          <SaleList sales={sales.slice(0, 5)} emptyTitle="No recent POS sales" />
+        </div>
+      )}
+
+      {activeTab === 'menu' && (
+        <TwoColumn>
+          <Panel title="Menu items" description="Maintain food, snack, drink, and meal item catalogues.">
+            {menuQuery.isLoading ? <LoadingState label="Loading menu..." /> : null}
+            <div className="space-y-3">
+              {menuItems.map((item) => <RecordCard key={item.id} title={item.name} subtitle={`${item.category} • ${money(item.unitPrice)} • ${item.status}`} />)}
+            </div>
+            {menuItems.length === 0 && !menuQuery.isLoading ? <EmptyState title="No menu items" description="Add the first canteen menu item." /> : null}
+          </Panel>
+          <Panel title="Create menu item" description="Use allergen tags like peanut, dairy, gluten, egg.">
+            <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); menuMutation.mutate(cleanMenu(menuForm)); }}>
+              <TextInput label="Name" value={menuForm.name} onChange={(name) => setMenuForm({ ...menuForm, name })} required />
+              <TextInput label="Category" value={menuForm.category} onChange={(category) => setMenuForm({ ...menuForm, category })} required />
+              <TextInput label="Unit price" type="number" value={String(menuForm.unitPrice)} onChange={(value) => setMenuForm({ ...menuForm, unitPrice: Number(value) || 0 })} required />
+              <TextInput label="Allergen tags" value={menuForm.allergenTags?.join(', ') ?? ''} onChange={(value) => setMenuForm({ ...menuForm, allergenTags: splitCsv(value) })} />
+              <button type="submit" className="btn-primary" disabled={menuMutation.isPending}>{menuMutation.isPending ? 'Saving...' : 'Create item'}</button>
+            </form>
+          </Panel>
+        </TwoColumn>
+      )}
+
+      {activeTab === 'plans' && (
+        <TwoColumn>
+          <Panel title="Meal plans" description="Manage lunch, snacks, hostel, staff, and recurring meal plans.">
+            {plansQuery.isLoading ? <LoadingState label="Loading meal plans..." /> : null}
+            <div className="space-y-3">{plans.map((plan) => <RecordCard key={plan.id} title={plan.name} subtitle={`${plan.mealType} • ${money(plan.price)} • ${plan.billingFrequency} • ${plan.status}`} />)}</div>
+            {plans.length === 0 && !plansQuery.isLoading ? <EmptyState title="No meal plans" description="Create a meal plan to enroll students." /> : null}
+          </Panel>
+          <Panel title="Create meal plan" description="Duplicate serving prevention is enabled by default.">
+            <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); planMutation.mutate(cleanPlan(planForm)); }}>
+              <TextInput label="Plan name" value={planForm.name} onChange={(name) => setPlanForm({ ...planForm, name })} required />
+              <SelectInput label="Meal type" value={planForm.mealType} onChange={(mealType) => setPlanForm({ ...planForm, mealType })} options={mealTypeOptions()} />
+              <TextInput label="Price" type="number" value={String(planForm.price)} onChange={(value) => setPlanForm({ ...planForm, price: Number(value) || 0 })} required />
+              <SelectInput label="Billing frequency" value={planForm.billingFrequency ?? 'MONTHLY'} onChange={(billingFrequency) => setPlanForm({ ...planForm, billingFrequency })} options={[{ label: 'Daily', value: 'DAILY' }, { label: 'Weekly', value: 'WEEKLY' }, { label: 'Monthly', value: 'MONTHLY' }]} />
+              <button type="submit" className="btn-primary" disabled={planMutation.isPending}>{planMutation.isPending ? 'Saving...' : 'Create plan'}</button>
+            </form>
+          </Panel>
+        </TwoColumn>
+      )}
+
+      {activeTab === 'enrollments' && (
+        <TwoColumn>
+          <Panel title="Student enrollments" description="Track student meal plan enrollment and cancellation.">
+            <div className="space-y-3">
+              {enrollments.map((enrollment) => <RecordCard key={enrollment.id} title={studentLabel(enrollment.student) || enrollment.studentId} subtitle={`${enrollment.mealPlan?.name ?? enrollment.mealPlanId} • ${enrollment.status} • starts ${enrollment.startsOn?.slice(0, 10)}`} action={enrollment.status === 'ACTIVE' ? <button className="btn-secondary" onClick={() => cancelEnrollmentMutation.mutate(enrollment.id)}>Cancel</button> : undefined} />)}
+            </div>
+            {enrollments.length === 0 && !enrollmentsQuery.isLoading ? <EmptyState title="No enrollments" description="Enroll students into meal plans." /> : null}
+          </Panel>
+          <Panel title="Enroll student" description="Meal enrollment is tenant-scoped and uses real student records.">
+            <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); enrollmentMutation.mutate(cleanEnrollment(enrollmentForm)); }}>
+              <StudentSelect value={enrollmentForm.studentId} onChange={(studentId) => setEnrollmentForm({ ...enrollmentForm, studentId })} students={studentsQuery.data ?? []} />
+              <SelectInput label="Meal plan" value={enrollmentForm.mealPlanId} onChange={(mealPlanId) => setEnrollmentForm({ ...enrollmentForm, mealPlanId })} required options={plans.map((plan) => ({ label: plan.name, value: plan.id }))} />
+              <TextInput label="Starts on" type="date" value={enrollmentForm.startsOn} onChange={(startsOn) => setEnrollmentForm({ ...enrollmentForm, startsOn })} required />
+              <button type="submit" className="btn-primary" disabled={enrollmentMutation.isPending}>{enrollmentMutation.isPending ? 'Enrolling...' : 'Enroll student'}</button>
+            </form>
+          </Panel>
+        </TwoColumn>
+      )}
+
+      {activeTab === 'serving' && (
+        <TwoColumn>
+          <Panel title="Meal serving history" description="Duplicate serving errors are returned by the backend and shown as readable errors.">
+            <div className="space-y-3">{servings.map((serving) => <RecordCard key={serving.id} title={studentLabel(serving.student) || serving.studentId} subtitle={`${serving.mealType} • ${serving.status} • ${serving.mealDate?.slice(0, 10)}${serving.dietaryWarning ? ` • Warning: ${serving.dietaryWarning}` : ''}`} />)}</div>
+            {servings.length === 0 && !servingsQuery.isLoading ? <EmptyState title="No servings" description="Served meals will appear here." /> : null}
+          </Panel>
+          <Panel title="Serve meal" description="Fast meal serving form for canteen counter staff.">
+            <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); servingMutation.mutate(cleanServing(servingForm)); }}>
+              <StudentSelect value={servingForm.studentId} onChange={(studentId) => setServingForm({ ...servingForm, studentId })} students={studentsQuery.data ?? []} />
+              <SelectInput label="Meal type" value={servingForm.mealType ?? 'LUNCH'} onChange={(mealType) => setServingForm({ ...servingForm, mealType })} options={mealTypeOptions()} />
+              <TextInput label="Meal date" type="date" value={servingForm.mealDate ?? today} onChange={(mealDate) => setServingForm({ ...servingForm, mealDate })} />
+              <button type="submit" className="btn-primary" disabled={servingMutation.isPending}>{servingMutation.isPending ? 'Serving...' : 'Serve meal'}</button>
+            </form>
+          </Panel>
+        </TwoColumn>
+      )}
+
+      {activeTab === 'wallets' && (
+        <TwoColumn>
+          <Panel title="Wallet balance" description="Create wallet, view balance, and review transaction history.">
+            <StudentSelect value={walletStudentId} onChange={setWalletStudentId} students={studentsQuery.data ?? []} />
+            <div className="mt-3 flex gap-2"><button className="btn-secondary" disabled={!walletStudentId || createWalletMutation.isPending} onClick={() => createWalletMutation.mutate(walletStudentId)}>Create / load wallet</button></div>
+            {walletQuery.data ? <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4"><p className="text-sm text-slate-500">Balance</p><p className="text-2xl font-black text-slate-900">{money(walletQuery.data.balance)}</p><p className="text-xs text-slate-400">Low balance threshold: {money(walletQuery.data.lowBalanceThreshold)}</p></div> : <EmptyState title="No wallet selected" description="Select a student to view or create a wallet." />}
+            <div className="mt-4 space-y-3">{(transactionsQuery.data ?? []).slice(0, 6).map((tx) => <RecordCard key={tx.id} title={`${tx.type} • ${money(tx.amount)}`} subtitle={`Balance after: ${money(tx.balanceAfter)} • ${tx.note ?? 'No note'}`} />)}</div>
+          </Panel>
+          <Panel title="Manual top-up" description="Top-up writes are backend-controlled and audited.">
+            <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); if (walletStudentId) topUpMutation.mutate({ studentId: walletStudentId, body: cleanTopUp(topUpForm) }); }}>
+              <TextInput label="Amount" type="number" value={String(topUpForm.amount)} onChange={(value) => setTopUpForm({ ...topUpForm, amount: Number(value) || 0 })} required />
+              <TextInput label="Low balance threshold" type="number" value={topUpForm.lowBalanceThreshold?.toString() ?? ''} onChange={(value) => setTopUpForm({ ...topUpForm, lowBalanceThreshold: value ? Number(value) : undefined })} />
+              <TextInput label="Note" value={topUpForm.note ?? ''} onChange={(note) => setTopUpForm({ ...topUpForm, note })} />
+              <button type="submit" className="btn-primary" disabled={!walletStudentId || topUpMutation.isPending}>{topUpMutation.isPending ? 'Topping up...' : 'Top up wallet'}</button>
+            </form>
+          </Panel>
+        </TwoColumn>
+      )}
+
+      {activeTab === 'pos' && (
+        <TwoColumn>
+          <Panel title="POS sales" description="Create, complete, or cancel canteen POS sales.">
+            <SaleList sales={sales} emptyTitle="No POS sales" onComplete={(saleId) => completeSaleMutation.mutate(saleId)} onCancel={(saleId) => cancelSaleMutation.mutate(saleId)} />
+          </Panel>
+          <Panel title="Create POS sale" description="Wallet spending limits and balance checks are enforced by backend.">
+            <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); posMutation.mutate(cleanPos(posForm)); }}>
+              <StudentSelect value={posForm.studentId ?? ''} onChange={(studentId) => setPosForm({ ...posForm, studentId })} students={studentsQuery.data ?? []} optional />
+              <SelectInput label="Payment method" value={posForm.paymentMethod} onChange={(paymentMethod) => setPosForm({ ...posForm, paymentMethod: paymentMethod as CanteenPaymentMethod })} options={[{ label: 'Cash', value: 'CASH' }, { label: 'Wallet', value: 'WALLET' }, { label: 'Staff credit', value: 'STAFF_CREDIT' }]} />
+              <SelectInput label="Menu item" value={posForm.items[0]?.menuItemId ?? ''} onChange={(menuItemId) => setPosForm({ ...posForm, items: [{ ...(posForm.items[0] ?? { quantity: 1 }), menuItemId }] })} required options={menuItems.map((item) => ({ label: `${item.name} • ${money(item.unitPrice)}`, value: item.id }))} />
+              <TextInput label="Quantity" type="number" value={String(posForm.items[0]?.quantity ?? 1)} onChange={(value) => setPosForm({ ...posForm, items: [{ ...(posForm.items[0] ?? { menuItemId: '' }), quantity: Number(value) || 1 }] })} />
+              <button type="submit" className="btn-primary" disabled={posMutation.isPending}>{posMutation.isPending ? 'Creating...' : 'Create sale'}</button>
+            </form>
+          </Panel>
+        </TwoColumn>
+      )}
+
+      {activeTab === 'controls' && (
+        <TwoColumn>
+          <Panel title="Spending controls" description="Apply daily limits, category blocks, item blocks, and low-balance thresholds.">
+            <InfoCard lines={['Controls are applied by backend during wallet and POS workflows.', 'Use comma-separated blocked categories for now.', 'Parent-facing control UI will come later.']} />
+          </Panel>
+          <Panel title="Save control" description="Server-side controls protect canteen spending rules.">
+            <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); controlMutation.mutate(cleanControl(controlForm)); }}>
+              <StudentSelect value={controlForm.studentId} onChange={(studentId) => setControlForm({ ...controlForm, studentId })} students={studentsQuery.data ?? []} />
+              <TextInput label="Daily spending limit" type="number" value={controlForm.dailySpendingLimit?.toString() ?? ''} onChange={(value) => setControlForm({ ...controlForm, dailySpendingLimit: value ? Number(value) : undefined })} />
+              <TextInput label="Blocked categories" value={controlForm.blockedCategories?.join(', ') ?? ''} onChange={(value) => setControlForm({ ...controlForm, blockedCategories: splitCsv(value) })} />
+              <TextInput label="Low balance threshold" type="number" value={controlForm.lowBalanceThreshold?.toString() ?? ''} onChange={(value) => setControlForm({ ...controlForm, lowBalanceThreshold: value ? Number(value) : undefined })} />
+              <button type="submit" className="btn-primary" disabled={controlMutation.isPending}>{controlMutation.isPending ? 'Saving...' : 'Save control'}</button>
+            </form>
+          </Panel>
+        </TwoColumn>
+      )}
+
+      {activeTab === 'reports' && (
+        <div className="space-y-6">
+          <Panel title="Report filters" description="Reports are backend-generated; frontend displays returned totals.">
+            <TextInput label="Report date" type="date" value={reportDate} onChange={setReportDate} />
+          </Panel>
+          <div className="grid gap-6 xl:grid-cols-3">
+            <ReportPanel title="Daily meal count" loading={mealCountQuery.isLoading} rows={(mealCountQuery.data ?? []).map((row) => `${row.mealType} • ${row.status}: ${row._count._all}`)} />
+            <ReportPanel title="Item-wise sales" loading={itemSalesQuery.isLoading} rows={(itemSalesQuery.data ?? []).map((row) => `${row.itemName}: ${row._sum.quantity ?? 0} sold • ${money(row._sum.lineTotal ?? 0)}`)} />
+            <ReportPanel title="Student spending" loading={spendingSummaryQuery.isLoading} rows={(spendingSummaryQuery.data ?? []).map((row) => `${row.studentId.slice(0, 8)}: ${money(row._sum.totalAmount ?? 0)} • ${row._count._all} sales`)} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TwoColumn({ children }: { children: React.ReactNode }) { return <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">{children}</div>; }
+function Panel({ title, description, children }: { title: string; description: string; children: React.ReactNode }) { return <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm"><h2 className="text-lg font-bold text-slate-900">{title}</h2><p className="mt-1 text-sm text-slate-500">{description}</p><div className="mt-5">{children}</div></section>; }
+function Notice({ tone, message, onDismiss }: { tone: 'success' | 'error'; message: string; onDismiss?: () => void }) { return <div className={cn('flex items-center justify-between rounded-2xl border px-4 py-3 text-sm', tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700')}><span>{message}</span>{onDismiss ? <button type="button" className="font-semibold" onClick={onDismiss}>Dismiss</button> : null}</div>; }
+function InfoCard({ lines }: { lines: string[] }) { return <section className="rounded-[2rem] border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"><ul className="list-disc space-y-1 pl-5">{lines.map((line) => <li key={line}>{line}</li>)}</ul></section>; }
+function RecordCard({ title, subtitle, action }: { title: string; subtitle: string; action?: React.ReactNode }) { return <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><div className="flex items-center justify-between gap-3"><div><h3 className="font-bold text-slate-900">{title}</h3><p className="text-sm text-slate-500">{subtitle}</p></div>{action}</div></div>; }
+function SaleList({ sales, emptyTitle, onComplete, onCancel }: { sales: Array<{ id: string; status: string; paymentMethod: string; totalAmount: string | number; studentId?: string | null; items?: Array<{ itemName: string; quantity: number }> }>; emptyTitle: string; onComplete?: (saleId: string) => void; onCancel?: (saleId: string) => void }) { if (sales.length === 0) return <EmptyState title={emptyTitle} description="Canteen sales will appear here." />; return <div className="space-y-3">{sales.map((sale) => <RecordCard key={sale.id} title={`${sale.paymentMethod} • ${money(sale.totalAmount)}`} subtitle={`${sale.status} • ${sale.items?.map((item) => `${item.itemName} x${item.quantity}`).join(', ') || sale.studentId || 'Walk-in sale'}`} action={sale.status === 'DRAFT' ? <div className="flex gap-2">{onComplete ? <button className="btn-primary" onClick={() => onComplete(sale.id)}>Complete</button> : null}{onCancel ? <button className="btn-secondary" onClick={() => onCancel(sale.id)}>Cancel</button> : null}</div> : undefined} />)}</div>; }
+function ReportPanel({ title, loading, rows }: { title: string; loading: boolean; rows: string[] }) { return <Panel title={title} description="Backend report result.">{loading ? <LoadingState label="Loading report..." /> : rows.length ? <div className="space-y-2">{rows.map((row) => <p key={row} className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">{row}</p>)}</div> : <EmptyState title="No data" description="No report rows returned." />}</Panel>; }
+function TextInput({ label, value, onChange, type = 'text', required }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean }) { return <label className="block text-sm font-semibold text-slate-700">{label}<input required={required} type={type} value={value} onChange={(event) => onChange(event.target.value)} className="input-control mt-1" /></label>; }
+function SelectInput({ label, value, onChange, options, required }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ label: string; value: string }>; required?: boolean }) { return <label className="block text-sm font-semibold text-slate-700">{label}<select required={required} value={value} onChange={(event) => onChange(event.target.value)} className="input-control mt-1"><option value="">Select...</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>; }
+function StudentSelect({ value, onChange, students, optional }: { value: string; onChange: (value: string) => void; students: Array<{ id: string; firstNameEn?: string; lastNameEn?: string; studentSystemId?: string }>; optional?: boolean }) { return <SelectInput label={optional ? 'Student (optional)' : 'Student'} value={value} onChange={onChange} required={!optional} options={students.map((student) => ({ label: studentLabel(student) || student.id, value: student.id }))} />; }
+function mealTypeOptions() { return [{ label: 'Breakfast', value: 'BREAKFAST' }, { label: 'Lunch', value: 'LUNCH' }, { label: 'Snacks', value: 'SNACKS' }, { label: 'Dinner', value: 'DINNER' }, { label: 'Hostel meal', value: 'HOSTEL' }]; }
+function studentLabel(student?: { firstNameEn?: string; lastNameEn?: string; studentSystemId?: string } | null) { if (!student) return ''; return `${student.firstNameEn ?? ''} ${student.lastNameEn ?? ''} ${student.studentSystemId ? `(${student.studentSystemId})` : ''}`.trim(); }
+function money(value: string | number | null | undefined) { return moneyFormatter.format(Number(value ?? 0)); }
+function splitCsv(value: string) { return value.split(',').map((item) => item.trim()).filter(Boolean); }
+function cleanMenu(form: CanteenMenuItemPayload): CanteenMenuItemPayload { return { ...form, description: form.description || undefined, allergenTags: form.allergenTags ?? [] }; }
+function cleanPlan(form: CanteenMealPlanPayload): CanteenMealPlanPayload { return { ...form, description: form.description || undefined, billingFrequency: form.billingFrequency || undefined }; }
+function cleanEnrollment(form: CanteenEnrollmentPayload): CanteenEnrollmentPayload { return { ...form, endsOn: form.endsOn || undefined, notes: form.notes || undefined }; }
+function cleanServing(form: CanteenMealServingPayload): CanteenMealServingPayload { return { ...form, enrollmentId: form.enrollmentId || undefined, mealPlanId: form.mealPlanId || undefined, notes: form.notes || undefined }; }
+function cleanTopUp(form: CanteenTopUpPayload): CanteenTopUpPayload { return { ...form, note: form.note || undefined }; }
+function cleanPos(form: CanteenPosSalePayload): CanteenPosSalePayload { return { ...form, studentId: form.studentId || undefined, staffId: form.staffId || undefined, notes: form.notes || undefined, items: form.items.filter((item) => item.menuItemId && item.quantity > 0) }; }
+function cleanControl(form: CanteenSpendingControlPayload): CanteenSpendingControlPayload { return { ...form, blockedCategories: form.blockedCategories ?? [], blockedMenuItemIds: form.blockedMenuItemIds ?? [] }; }
