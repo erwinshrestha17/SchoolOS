@@ -43,7 +43,7 @@ const OUTSIDE_HOURS_NOTICE =
 const SLA_NOTICE = 'Usually replies within 1 school day.';
 const MAX_PAGE_SIZE = 100;
 
-type ThreadRecord = {
+interface ThreadRecord {
   id: string;
   tenantId: string;
   academicYearId: string;
@@ -56,7 +56,7 @@ type ThreadRecord = {
   closedAt: Date | null;
   closedByUserId: string | null;
   closeReason: string | null;
-};
+}
 
 @Injectable()
 export class ParentTeacherChatService {
@@ -1168,7 +1168,7 @@ function getDefaultAvailabilityRules(tenantId: string) {
       createdAt: new Date(0),
       updatedAt: new Date(0),
     }),
-  ) as unknown as ChatAvailabilityRuleDto[];
+  );
 
   return [
     ...weekdays,
