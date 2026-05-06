@@ -114,9 +114,8 @@ export const dashboardNavItems: NavItem[] = [
     href: '/dashboard/accounting',
     label: 'Accounting',
     icon: Calculator,
-    permissions: ['accounting:read'],
-    phase: 'future',
-    disabled: true,
+    permissions: ['accounting:read', 'accounting:accounts:read', 'accounting:reports:read'],
+    phase: 'phase2',
   },
   {
     href: '#library-coming-soon',
