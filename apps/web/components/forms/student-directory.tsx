@@ -9,6 +9,14 @@ import type {
 } from '@schoolos/core';
 import Link from 'next/link';
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { SectionCard } from '../ui/section-card';
+import { StatCard } from '../ui/stat-card';
+import { Badge } from '../ui/badge';
+import { Avatar } from '../ui/avatar';
+import { LoadingState } from '../ui/loading-state';
+import { EmptyState } from '../ui/empty-state';
+import { cn } from '../../lib/utils';
+import { Search, Filter, Download, UserPlus, Wallet, FileText, ChevronRight } from 'lucide-react';
 
 type StudentDirectoryProps = {
   academicYears: AcademicYearSummary[];
@@ -51,7 +59,6 @@ export function StudentDirectory({
   const currentAcademicYear = academicYears.find((year) => year.isCurrent);
   const selectedAcademicYear =
     academicYears.find((year) => year.id === academicYearId) ?? currentAcademicYear;
-  const selectedClass = classes.find((classroom) => classroom.id === classId);
   const availableSections = sections.filter((section) => {
     const sectionClassId = section.classId ?? section.class?.id;
     return !classId || sectionClassId === classId;
@@ -71,13 +78,9 @@ export function StudentDirectory({
   }, [classId, classes]);
 
   useEffect(() => {
-    if (!sectionId) {
-      return;
-    }
-
+    if (!sectionId) return;
     const existingSection = sections.find((section) => section.id === sectionId);
     const existingSectionClassId = existingSection?.classId ?? existingSection?.class?.id;
-
     if (existingSection && existingSectionClassId !== classId) {
       setSectionId('');
     }
@@ -85,33 +88,28 @@ export function StudentDirectory({
 
   const admissionBySystemId = useMemo(() => {
     const map = new Map<string, AdmissionSummary>();
-
     for (const admission of admissions) {
       map.set(admission.studentSystemId, admission);
     }
-
     return map;
   }, [admissions]);
 
   const filteredStudents = useMemo(() => {
     const normalizedSearch = deferredSearch.trim().toLowerCase();
-
     return students
       .filter((student) => {
         const admission = admissionBySystemId.get(student.studentSystemId);
         const studentClassId = student.class?.id;
-        const studentClassName =
-          student.className ?? student.class?.name ?? admission?.className ?? '';
-        const studentSectionName =
-          student.sectionName ?? student.section ?? admission?.sectionName ?? '';
+        const studentClassName = student.className ?? student.class?.name ?? admission?.className ?? '';
+        const studentSectionName = student.sectionName ?? student.section ?? admission?.sectionName ?? '';
         const academicYearMatches =
           !selectedAcademicYear ||
           !admission?.latestEnrollment ||
           admission.latestEnrollment.academicYear === selectedAcademicYear.name;
         const classMatches =
-          !selectedClass ||
-          studentClassId === selectedClass.id ||
-          studentClassName === selectedClass.name;
+          !classId ||
+          studentClassId === classId ||
+          studentClassName === classes.find(c => c.id === classId)?.name;
         const sectionMatches =
           !selectedSection || studentSectionName === selectedSection.name;
         const searchable = [
@@ -137,230 +135,194 @@ export function StudentDirectory({
         const secondAdmission = admissionBySystemId.get(second.studentSystemId);
         const firstRoll = first.rollNumber ?? firstAdmission?.rollNumber ?? 99999;
         const secondRoll = second.rollNumber ?? secondAdmission?.rollNumber ?? 99999;
-
-        return firstRoll - secondRoll || getStudentName(first, firstAdmission).localeCompare(
-          getStudentName(second, secondAdmission),
-        );
+        return firstRoll - secondRoll || getStudentName(first, firstAdmission).localeCompare(getStudentName(second, secondAdmission));
       });
-  }, [
-    admissionBySystemId,
-    deferredSearch,
-    selectedAcademicYear,
-    selectedClass,
-    selectedSection,
-    students,
-  ]);
+  }, [admissionBySystemId, deferredSearch, selectedAcademicYear, classId, classes, selectedSection, students]);
 
-  if (isLoading) {
-    return <DirectorySkeleton />;
-  }
+  if (isLoading) return <LoadingState label="Loading student directory..." />;
 
   if (isError) {
     return (
-      <section className="rounded-2xl border border-danger-200 bg-danger-50 p-5 text-sm text-danger-600">
-        Student Directory could not load. Refresh the page or check the API connection.
-      </section>
+      <SectionCard title="Error" className="border-danger-100 bg-danger-50/30">
+        <p className="text-sm text-danger-600">Student Directory could not load. Please check your connection.</p>
+      </SectionCard>
     );
   }
 
   if (classes.length === 0) {
     return (
-      <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-        <p className="font-semibold">No class created yet</p>
-        <p className="mt-2">Create academic years, classes, and sections before browsing students.</p>
-        <Link
-          href="/dashboard/settings"
-          className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-amber-900 px-4 text-sm font-semibold text-white"
-        >
-          Open Settings
-        </Link>
-      </section>
+      <EmptyState
+        title="No classes configured"
+        description="You need to set up academic years and classes before you can manage students."
+        action={
+          <Link href="/dashboard/settings" className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800">
+            Configure School Settings
+          </Link>
+        }
+      />
     );
   }
 
   return (
-    <div className="grid gap-5" data-testid="student-directory">
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="label mb-2">Student Directory</p>
-            <h2 className="text-xl font-bold text-gray-900">
-              Browse roster by class and section
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-gray-500">
-              Select a class/section, search by name or SCH-YYYY-NNNN, and open
-              individual student profiles.
-            </p>
-          </div>
-          <div className="flex items-start gap-2">
-            <button
-              type="button"
-              className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50"
-              onClick={() =>
-                onExportRoster('csv', { academicYearId, classId, sectionId })
-              }
-            >
-              Export CSV
-            </button>
-            <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-500">
-              {filteredStudents.length} students
-            </span>
-          </div>
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard title="Directory Total" value={students.length} icon={<Users size={20} />} />
+        <StatCard title="Filtered Total" value={filteredStudents.length} icon={<Filter size={20} />} />
+        <StatCard title="Active Classes" value={classes.length} icon={<School size={20} />} />
+        <div className="flex items-center justify-end px-2">
+           <button
+            type="button"
+            className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            onClick={() => onExportRoster('csv', { academicYearId, classId, sectionId })}
+          >
+            <Download size={18} />
+            Export CSV
+          </button>
         </div>
+      </div>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <label className="block">
-            <span className="label mb-2 block">Academic year</span>
+      <SectionCard title="Directory Filters">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="space-y-1.5">
+            <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Academic Year</label>
             <select
+              className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:ring-primary-500"
               value={academicYearId}
-              onChange={(event) => setAcademicYearId(event.target.value)}
+              onChange={(e) => setAcademicYearId(e.target.value)}
             >
-              <option value="">All academic years</option>
+              <option value="">All Years</option>
               {academicYears.map((year) => (
-                <option key={year.id} value={year.id}>
-                  {year.name}
-                  {year.isCurrent ? ' (current)' : ''}
-                </option>
+                <option key={year.id} value={year.id}>{year.name} {year.isCurrent ? '(Current)' : ''}</option>
               ))}
             </select>
-          </label>
-          <label className="block">
-            <span className="label mb-2 block">Class</span>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Class</label>
             <select
+              className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:ring-primary-500"
               value={classId}
-              onChange={(event) => {
-                setClassId(event.target.value);
+              onChange={(e) => {
+                setClassId(e.target.value);
                 setSectionId('');
               }}
             >
-              <option value="">All classes</option>
-              {classes.map((classroom) => (
-                <option key={classroom.id} value={classroom.id}>
-                  {classroom.name}
-                </option>
+              <option value="">All Classes</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-          </label>
-          <label className="block">
-            <span className="label mb-2 block">Section</span>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Section</label>
             <select
+              className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:ring-primary-500"
               value={sectionId}
-              onChange={(event) => setSectionId(event.target.value)}
+              onChange={(e) => setSectionId(e.target.value)}
               disabled={!classId}
             >
-              <option value="">All sections</option>
-              {availableSections.map((section) => (
-                <option key={section.id} value={section.id}>
-                  {section.name}
-                </option>
+              <option value="">All Sections</option>
+              {availableSections.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-          </label>
-          <label className="block">
-            <span className="label mb-2 block">Search</span>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by name or SCH-YYYY-NNNN"
-            />
-          </label>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Quick Search</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input
+                className="w-full pl-9 rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:ring-primary-500"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Name or SCH-ID..."
+              />
+            </div>
+          </div>
         </div>
-      </section>
+      </SectionCard>
 
-      <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <SectionCard
+        title="Student Roster"
+        description={classId ? `Showing students for ${classes.find(c => c.id === classId)?.name}` : 'Showing all student records'}
+        noPadding
+      >
         {filteredStudents.length > 0 ? (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-slate-100">
             {filteredStudents.map((student) => {
               const admission = admissionBySystemId.get(student.studentSystemId);
               const studentName = getStudentName(student, admission);
-              const className =
-                student.className ?? student.class?.name ?? admission?.className ?? 'Not assigned';
-              const sectionName =
-                student.sectionName ?? student.section ?? admission?.sectionName ?? 'No section';
+              const className = student.className ?? student.class?.name ?? admission?.className ?? 'Not assigned';
+              const sectionName = student.sectionName ?? student.section ?? admission?.sectionName ?? 'No section';
               const rollNumber = student.rollNumber ?? admission?.rollNumber ?? null;
-              const primaryGuardian =
-                (student.guardians ?? admission?.guardians ?? []).find(
-                  (guardian) => guardian.isPrimary,
-                ) ?? (student.guardians ?? admission?.guardians ?? [])[0];
+              const primaryGuardian = (student.guardians ?? admission?.guardians ?? []).find(g => g.isPrimary) ?? (student.guardians ?? admission?.guardians ?? [])[0];
 
               return (
-                <article
-                  key={student.id}
-                  className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
-                >
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-sm font-bold text-primary-700">
-                      {initials(studentName)}
-                    </div>
+                <div key={student.id} className="group flex flex-col gap-4 p-5 transition hover:bg-slate-50/50 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <Avatar initials={initials(studentName)} size="lg" className="ring-2 ring-white shadow-sm" />
                     <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-gray-900">{studentName}</p>
-                        <span className="rounded-full bg-success-50 px-2 py-0.5 text-xs font-semibold text-success-600">
-                          Active
-                        </span>
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-slate-900 truncate">{studentName}</p>
+                        <Badge variant="success">Active</Badge>
                       </div>
-                      <p className="mt-1 text-sm text-gray-500">
-                        {student.studentSystemId} / {className} / {sectionName}
-                        {rollNumber ? ` / Roll ${rollNumber}` : ''}
-                      </p>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Guardian phone: {primaryGuardian?.primaryPhone || 'Not available'}
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-slate-500">
+                        <span className="text-primary-600 font-bold">{student.studentSystemId}</span>
+                        <span className="h-1 w-1 rounded-full bg-slate-300" />
+                        <span>{className} • {sectionName}</span>
+                        {rollNumber && (
+                          <>
+                            <span className="h-1 w-1 rounded-full bg-slate-300" />
+                            <span>Roll: {rollNumber}</span>
+                          </>
+                        )}
+                      </div>
+                      <p className="mt-1 text-[0.7rem] text-slate-400">
+                         Guardian: {primaryGuardian?.fullName || 'N/A'} • {primaryGuardian?.primaryPhone || 'N/A'}
                       </p>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 md:justify-end">
+
+                  <div className="flex flex-wrap items-center gap-2">
                     <Link
                       href={`/dashboard/students/${encodeURIComponent(student.id)}`}
-                      className="inline-flex min-h-11 items-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white"
+                      className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-900 px-4 text-xs font-bold text-white transition hover:bg-slate-800"
                     >
-                      View Profile
+                      Profile
+                      <ChevronRight size={14} />
                     </Link>
                     <Link
                       href={`/dashboard/finance?studentId=${encodeURIComponent(student.id)}`}
-                      className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700"
+                      className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
                     >
-                      Collect Fee
+                      <Wallet size={14} />
+                      Fees
                     </Link>
                     <button
                       type="button"
-                      className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700"
+                      className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
                       onClick={() => onOpenPdf(student.id, 'id-card')}
                     >
-                      Open ID Card
+                      <FileText size={14} />
+                      ID Card
                     </button>
                   </div>
-                </article>
+                </div>
               );
             })}
           </div>
         ) : (
-          <div className="p-6 text-center">
-            <p className="font-semibold text-gray-900">No students in selected class</p>
-            <p className="mt-2 text-sm text-gray-500">
-              Try another class/section, clear the search, or create a new enrollment.
-            </p>
-          </div>
+          <EmptyState
+            title="No students found"
+            description="No student records match your current filters or search query."
+          />
         )}
-      </section>
+      </SectionCard>
 
-    </div>
-  );
-}
-
-function DirectorySkeleton() {
-  return (
-    <div className="grid gap-4">
-      <div className="rounded-2xl border border-gray-200 bg-white p-5">
-        <div className="h-5 w-44 animate-pulse rounded-full bg-gray-100" />
-        <div className="mt-5 grid gap-3 md:grid-cols-4">
-          <div className="h-11 animate-pulse rounded-xl bg-gray-100" />
-          <div className="h-11 animate-pulse rounded-xl bg-gray-100" />
-          <div className="h-11 animate-pulse rounded-xl bg-gray-100" />
-          <div className="h-11 animate-pulse rounded-xl bg-gray-100" />
+      {pdfError && (
+        <div className="rounded-xl border border-danger-100 bg-danger-50 p-4 text-sm font-medium text-danger-600 animate-in fade-in slide-in-from-top-2">
+          {pdfError}
         </div>
-      </div>
-      <div className="h-24 animate-pulse rounded-2xl bg-gray-100" />
-      <div className="h-24 animate-pulse rounded-2xl bg-gray-100" />
+      )}
     </div>
   );
 }
@@ -382,3 +344,9 @@ function initials(name: string) {
     .map((part) => part[0]?.toUpperCase())
     .join('');
 }
+
+function School({ size }: { size: number }) {
+  return <SchoolIcon size={size} />;
+}
+
+import { School as SchoolIcon, Users } from 'lucide-react';

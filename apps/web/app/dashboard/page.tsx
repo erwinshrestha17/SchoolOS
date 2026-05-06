@@ -4,33 +4,43 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
-  Bell,
   CalendarCheck,
   Images,
   Megaphone,
-  Settings,
   UserPlus,
   Users,
   Wallet,
+  Calculator,
+  ArrowRight,
+  TrendingUp,
+  School,
 } from 'lucide-react';
 import { api } from '../../lib/api';
+import { StatCard } from '../../components/ui/stat-card';
+import { SectionCard } from '../../components/ui/section-card';
+import { EmptyState } from '../../components/ui/empty-state';
+import { LoadingState } from '../../components/ui/loading-state';
+import { Badge } from '../../components/ui/badge';
+import { cn } from '../../lib/utils';
+import { useSession } from '../../components/session-provider';
 
-const moneyFormatter = new Intl.NumberFormat('en-NP', {
-  maximumFractionDigits: 0,
-});
+const formatMoney = (amount: number) => {
+  return new Intl.NumberFormat('en-NP', {
+    style: 'currency',
+    currency: 'NPR',
+    maximumFractionDigits: 0,
+  }).format(amount);
+};
 
-const dateFormatter = new Intl.DateTimeFormat('en-NP', {
-  dateStyle: 'medium',
-});
-
-const dashboardQuickStats = [
-  'Students',
-  'Attendance',
-  'Fees',
-  'Notifications',
-] as const;
+const formatDate = (date: string | Date) => {
+  return new Intl.DateTimeFormat('en-NP', {
+    dateStyle: 'medium',
+  }).format(new Date(date));
+};
 
 export default function DashboardPage() {
+  const { session } = useSession();
+  
   const academicYearsQuery = useQuery({
     queryKey: ['dashboard-academic-years'],
     queryFn: api.listAcademicYears,
@@ -87,6 +97,7 @@ export default function DashboardPage() {
   const classCount = classesQuery.data?.length ?? 0;
   const activeFeePlanCount =
     feePlansQuery.data?.filter((plan) => plan.isActive).length ?? 0;
+  
   const setupWarnings = [
     !currentAcademicYear ? 'Create an academic year' : null,
     classCount === 0 ? 'Create at least one class' : null,
@@ -100,11 +111,13 @@ export default function DashboardPage() {
     totalMarkedToday > 0
       ? Math.round(((todayTotals?.present ?? 0) / totalMarkedToday) * 100)
       : 0;
+  
   const collectedThisMonth = sumReceiptsThisMonth(receiptsQuery.data ?? []);
   const outstandingFees = sumOutstandingFees(
     defaultersQuery.data ?? [],
     invoicesQuery.data ?? [],
   );
+  
   const failedDeliveries =
     deliveriesQuery.data?.filter(
       (delivery) => delivery.status.toUpperCase() === 'FAILED',
@@ -159,786 +172,408 @@ export default function DashboardPage() {
           },
         ]
       : []),
-    ...(activityPostsQuery.isSuccess && (activityPostsQuery.data?.length ?? 0) === 0
-      ? [
-          {
-            tone: 'neutral' as const,
-            title: 'No recent activity posts',
-            body: 'Create a classroom activity update to keep guardians engaged.',
-            href: '/dashboard/activity',
-            cta: 'Create Activity',
-          },
-        ]
-      : []),
   ];
 
-  const recentItems = buildRecentItems({
-    admissions: admissionsQuery.data ?? [],
-    receipts: receiptsQuery.data ?? [],
-    attendanceSessions: attendanceQuery.data?.latestSessions ?? [],
-    activityPosts: activityPostsQuery.data ?? [],
-    notices: noticesQuery.data ?? [],
-    deliveries: deliveriesQuery.data ?? [],
-  });
+  const isInitialLoading = 
+    academicYearsQuery.isLoading || 
+    classesQuery.isLoading || 
+    studentsQuery.isLoading || 
+    attendanceQuery.isLoading || 
+    receiptsQuery.isLoading;
+
+  if (isInitialLoading) {
+    return <LoadingState variant="page" label="Gathering school insights..." />;
+  }
 
   return (
-    <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[32px] border border-[var(--line)] bg-gradient-to-br from-gray-950 via-slate-900 to-indigo-950 p-6 text-white shadow-sm sm:p-8">
-        <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-indigo-400/20 blur-3xl" />
-        <div className="absolute bottom-0 left-1/3 h-36 w-36 rounded-full bg-emerald-400/15 blur-3xl" />
-
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80 ring-1 ring-white/15">
-              Phase 1 Operations
-            </span>
-            <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-              Admin Command Center
+    <div className="space-y-8 animate-fade-in">
+      <header className="relative overflow-hidden rounded-[2rem] bg-slate-900 px-6 py-10 text-white shadow-2xl lg:px-12">
+        <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-primary-500/20 blur-3xl" />
+        <div className="absolute bottom-0 left-1/4 h-48 w-48 rounded-full bg-secondary-500/10 blur-3xl" />
+        
+        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2 mb-4">
+              <Badge variant="phase2" className="bg-white/10 text-white border-white/20">
+                Admin Command Center
+              </Badge>
+              <div className="h-1 w-1 rounded-full bg-white/30" />
+              <span className="text-xs font-bold uppercase tracking-wider text-white/50">
+                {currentAcademicYear?.name ?? 'No Academic Year'}
+              </span>
+            </div>
+            <h1 className="text-3xl font-extrabold tracking-tight sm:text-5xl">
+              Namaste, <span className="text-primary-400">{session?.user.email?.split('@')[0] ?? 'User'}</span>
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
-              Daily school operations summary for admissions, attendance, fees,
-              activity feed, and parent communications.
+            <p className="mt-4 text-lg text-slate-300 leading-relaxed">
+              Here is what is happening across <span className="font-bold text-white">{session?.tenant.name}</span> today.
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[420px]">
-            <CommandMetric
-              label="Academic Year"
-              value={
-                academicYearsQuery.isLoading
-                  ? 'Loading...'
-                  : currentAcademicYear?.name ?? 'Not configured'
-              }
-              tone="neutral"
-            />
-            <CommandMetric
-              label="Setup Alerts"
-              value={String(setupWarnings.length)}
-              tone={setupWarnings.length > 0 ? 'warning' : 'success'}
-            />
+          <div className="flex flex-wrap gap-4">
+            <Link
+              href="/dashboard/admissions"
+              className="flex items-center gap-2 rounded-xl bg-primary-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary-500/20 transition hover:bg-primary-600 hover:-translate-y-0.5"
+            >
+              <UserPlus size={18} />
+              New Admission
+            </Link>
+            <Link
+              href="/dashboard/attendance"
+              className="flex items-center gap-2 rounded-xl bg-white/10 px-5 py-3 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/20"
+            >
+              <CalendarCheck size={18} />
+              Mark Attendance
+            </Link>
           </div>
         </div>
 
         {setupWarnings.length > 0 && (
-          <div className="relative mt-6 flex flex-col gap-3 rounded-2xl border border-amber-300/25 bg-amber-400/10 p-4 text-sm text-amber-50 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex gap-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+          <div className="relative mt-8 flex flex-col gap-4 rounded-2xl border border-warning-500/30 bg-warning-500/10 p-5 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning-500 text-white">
+                <AlertTriangle size={20} />
+              </div>
               <div>
-                <p className="font-semibold">Setup needs attention</p>
-                <p className="mt-1 text-amber-100/90">
+                <p className="font-bold text-warning-400">Configuration Required</p>
+                <p className="mt-0.5 text-sm text-slate-300">
                   {setupWarnings.join(' · ')}
                 </p>
               </div>
             </div>
-<Link
-  href="/dashboard/settings"
-  className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-amber-400 px-4 text-sm font-semibold !text-gray-950 shadow-sm transition hover:-translate-y-0.5 hover:bg-amber-300 hover:!text-gray-950 hover:shadow-md"
->
-  Finish Setup
-</Link>
+            <Link
+              href="/dashboard/settings"
+              className="inline-flex items-center gap-2 rounded-xl bg-warning-500 px-4 py-2 text-xs font-bold text-slate-900 transition hover:bg-warning-400"
+            >
+              Open Settings
+              <ArrowRight size={14} />
+            </Link>
           </div>
         )}
-      </section>
+      </header>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <KpiCard
-          accent="bg-primary-500"
-          isLoading={studentsQuery.isLoading}
-          label="Total Students"
-          value={String(totalStudents)}
-          detail="Active student profiles"
+      <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Total Students"
+          value={totalStudents}
+          icon={<Users size={20} />}
+          loading={studentsQuery.isLoading}
         />
-        <KpiCard
-          accent="bg-success-500"
-          isLoading={attendanceQuery.isLoading}
-          label="Today's Attendance"
+        <StatCard
+          title="Attendance Today"
           value={`${attendancePercent}%`}
-          detail={`${todayTotals?.present ?? 0} present of ${totalMarkedToday}`}
+          icon={<CalendarCheck size={20} />}
+          loading={attendanceQuery.isLoading}
+          trend={{
+            value: attendancePercent,
+            label: "Presence rate",
+            isUp: attendancePercent >= 80
+          }}
         />
-        <KpiCard
-          accent="bg-emerald-500"
-          isLoading={receiptsQuery.isLoading}
-          label="Fee Collected This Month"
+        <StatCard
+          title="Monthly Collection"
           value={formatMoney(collectedThisMonth)}
-          detail="Receipt-backed collections"
+          icon={<Wallet size={20} />}
+          loading={receiptsQuery.isLoading}
         />
-        <KpiCard
-          accent="bg-warning-500"
-          isLoading={defaultersQuery.isLoading || invoicesQuery.isLoading}
-          label="Outstanding Fees"
+        <StatCard
+          title="Outstanding Fees"
           value={formatMoney(outstandingFees)}
-          detail={`${defaultersQuery.data?.length ?? 0} overdue record${defaultersQuery.data?.length === 1 ? '' : 's'}`}
-        />
-        <KpiCard
-          accent={failedDeliveries > 0 ? 'bg-danger-500' : 'bg-slate-500'}
-          isLoading={deliveriesQuery.isLoading}
-          label="Delivery Health"
-          value={`${failedDeliveries} failed`}
-          detail={`${queuedDeliveries} queued · ${sentDeliveries} sent`}
+          icon={<Calculator size={20} />}
+          loading={defaultersQuery.isLoading}
         />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <Panel title="Operational Alerts" error={firstError([
-          academicYearsQuery.error,
-          classesQuery.error,
-          feePlansQuery.error,
-          attendanceQuery.error,
-          defaultersQuery.error,
-          deliveriesQuery.error,
-          activityPostsQuery.error,
-        ])}>
-          {allLoading([
-            academicYearsQuery.isLoading,
-            classesQuery.isLoading,
-            feePlansQuery.isLoading,
-            attendanceQuery.isLoading,
-            defaultersQuery.isLoading,
-            deliveriesQuery.isLoading,
-            activityPostsQuery.isLoading,
-          ]) ? (
-            <StackedSkeleton />
-          ) : operationalAlerts.length > 0 ? (
-            <div className="space-y-3">
-              {operationalAlerts.slice(0, 5).map((alert) => (
-                <AlertRow key={`${alert.title}-${alert.href}`} alert={alert} />
+      <div className="grid gap-8 lg:grid-cols-3">
+        <SectionCard
+          title="Operational Alerts"
+          description="Issues requiring immediate attention"
+          className="lg:col-span-2"
+        >
+          {operationalAlerts.length > 0 ? (
+            <div className="space-y-4">
+              {operationalAlerts.map((alert, idx) => (
+                <div
+                  key={idx}
+                  className={cn(
+                    "flex flex-col gap-4 rounded-2xl border p-5 sm:flex-row sm:items-center sm:justify-between",
+                    alert.tone === 'danger' 
+                      ? 'border-danger-100 bg-danger-50/50' 
+                      : 'border-warning-100 bg-warning-50/50'
+                  )}
+                >
+                  <div className="flex gap-4">
+                    <div className={cn(
+                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+                      alert.tone === 'danger' ? 'bg-danger-500 text-white' : 'bg-warning-500 text-white'
+                    )}>
+                      <AlertTriangle size={20} />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900">{alert.title}</p>
+                      <p className="mt-0.5 text-sm text-slate-500">{alert.body}</p>
+                    </div>
+                  </div>
+                  <Link
+                    href={alert.href}
+                    className="inline-flex items-center gap-2 text-sm font-bold text-primary-600 hover:text-primary-700"
+                  >
+                    {alert.cta}
+                    <ArrowRight size={16} />
+                  </Link>
+                </div>
               ))}
             </div>
           ) : (
             <EmptyState
-              title="No alerts available yet"
-              body="SchoolOS will surface setup, attendance, fee, notification, and activity risks here as data arrives."
+              title="All systems operational"
+              description="No critical alerts at this time. Your school operations are running smoothly."
+              icon={<TrendingUp size={32} />}
             />
           )}
-        </Panel>
+        </SectionCard>
 
-        <Panel title="Quick Actions">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-            {quickActions.map((action) => (
+        <SectionCard title="Quick Actions">
+          <div className="grid gap-3">
+            {[
+              { label: 'New Admission', href: '/dashboard/admissions', icon: UserPlus },
+              { label: 'Collect Fees', href: '/dashboard/finance', icon: Wallet },
+              { label: 'Mark Attendance', href: '/dashboard/attendance', icon: CalendarCheck },
+              { label: 'Post Update', href: '/dashboard/activity', icon: Images },
+              { label: 'Send Notice', href: '/dashboard/notices', icon: Megaphone },
+              { label: 'Accounting', href: '/dashboard/accounting', icon: Calculator },
+            ].map((action) => (
               <Link
-                key={`${action.href}-${action.label}`}
+                key={action.label}
                 href={action.href}
-                className="flex min-h-11 items-center gap-3 rounded-2xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-800 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700"
+                className="group flex items-center gap-4 rounded-xl border border-slate-100 bg-slate-50/30 p-4 transition hover:border-primary-200 hover:bg-primary-50"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 transition group-hover:bg-white">
-                  <action.icon className="h-5 w-5 text-gray-500" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition group-hover:bg-primary-500 group-hover:text-white">
+                  <action.icon size={20} />
+                </div>
+                <span className="font-bold text-slate-700 group-hover:text-primary-700">
+                  {action.label}
                 </span>
-                {action.label}
+                <ArrowRight size={16} className="ml-auto opacity-0 transition group-hover:opacity-100 group-hover:translate-x-1 text-primary-500" />
               </Link>
             ))}
           </div>
-        </Panel>
-      </section>
+        </SectionCard>
 
-      <section className="grid gap-6 xl:grid-cols-3">
-        <Panel title="Fee Snapshot">
-          <ProgressSummary
-            label="Collected vs outstanding"
-            value={collectedThisMonth}
-            total={collectedThisMonth + outstandingFees}
-            valueLabel={formatMoney(collectedThisMonth)}
-            totalLabel={formatMoney(outstandingFees)}
-          />
-        </Panel>
-
-        <Panel title="Attendance Mix">
-          <AttendanceBars
-            absent={todayTotals?.absent ?? 0}
-            late={todayTotals?.late ?? 0}
-            leave={todayTotals?.leave ?? 0}
-            present={todayTotals?.present ?? 0}
-            total={totalMarkedToday}
-          />
-        </Panel>
-
-        <Panel title="Notification Status">
-          <DeliveryBars
-            failed={failedDeliveries}
-            queued={queuedDeliveries}
-            sent={sentDeliveries}
-          />
-        </Panel>
-      </section>
-
-      <Panel title="Recent Activity" error={firstError([
-        admissionsQuery.error,
-        receiptsQuery.error,
-        attendanceQuery.error,
-        activityPostsQuery.error,
-        noticesQuery.error,
-        deliveriesQuery.error,
-      ])}>
-        {allLoading([
-          admissionsQuery.isLoading,
-          receiptsQuery.isLoading,
-          attendanceQuery.isLoading,
-          activityPostsQuery.isLoading,
-          noticesQuery.isLoading,
-          deliveriesQuery.isLoading,
-        ]) ? (
-          <StackedSkeleton />
-        ) : recentItems.length > 0 ? (
-          <div className="divide-y divide-gray-100">
-            {recentItems.slice(0, 8).map((item) => (
-              <div
-                key={`${item.kind}-${item.id}`}
-                className="flex flex-col gap-1 py-4 transition hover:bg-gray-50/70 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {item.title}
-                  </p>
-                  <p className="text-sm text-gray-500">{item.body}</p>
-                </div>
-                <span className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                  {item.date ? formatDate(item.date) : item.kind}
-                </span>
-              </div>
-            ))}
+        <SectionCard title="Attendance Mix" description="Today's presence summary">
+          <div className="space-y-6">
+            <div className="flex items-end gap-2">
+              <span className="text-4xl font-extrabold text-slate-900">{attendancePercent}%</span>
+              <span className="mb-1 text-sm font-bold text-slate-400">Presence</span>
+            </div>
+            
+            <div className="space-y-4">
+              <AttendanceRow 
+                label="Present" 
+                count={todayTotals?.present ?? 0} 
+                total={totalMarkedToday} 
+                color="bg-success-500" 
+              />
+              <AttendanceRow 
+                label="Absent" 
+                count={todayTotals?.absent ?? 0} 
+                total={totalMarkedToday} 
+                color="bg-danger-500" 
+              />
+              <AttendanceRow 
+                label="Late" 
+                count={todayTotals?.late ?? 0} 
+                total={totalMarkedToday} 
+                color="bg-warning-500" 
+              />
+              <AttendanceRow 
+                label="Leave" 
+                count={todayTotals?.leave ?? 0} 
+                total={totalMarkedToday} 
+                color="bg-primary-500" 
+              />
+            </div>
           </div>
-        ) : (
-          <EmptyState
-            title="No recent operations yet"
-            body="Admissions, receipts, attendance sessions, activity posts, and notices will appear here."
-            href="/dashboard/settings"
-            cta="Open Settings"
-          />
-        )}
-      </Panel>
-    </div>
-  );
-}
+        </SectionCard>
 
-function CommandMetric({
-  label,
-  value,
-  tone = 'neutral',
-}: {
-  label: string;
-  value: string;
-  tone?: 'neutral' | 'success' | 'warning';
-}) {
-  const toneClass = {
-    neutral: 'bg-white/10 text-white ring-white/15',
-    success: 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/20',
-    warning: 'bg-amber-400/15 text-amber-100 ring-amber-300/20',
-  }[tone];
+        <SectionCard title="Fee Collection" description="Monthly target tracking">
+          <div className="space-y-6">
+            <div className="flex items-end gap-2">
+              <span className="text-2xl font-extrabold text-slate-900">{formatMoney(collectedThisMonth)}</span>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span className="font-bold text-slate-500 uppercase tracking-wider text-[0.65rem]">Collection vs Due</span>
+                  <span className="font-bold text-slate-900">{Math.round((collectedThisMonth / (collectedThisMonth + outstandingFees)) * 100) || 0}%</span>
+                </div>
+                <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div 
+                    className="h-full rounded-full bg-primary-500 transition-all duration-1000" 
+                    style={{ width: `${Math.min(100, (collectedThisMonth / (collectedThisMonth + outstandingFees)) * 100) || 0}%` }}
+                  />
+                </div>
+              </div>
 
-  return (
-    <div className={`rounded-2xl p-4 ring-1 ${toneClass}`}>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-75">
-        {label}
-      </p>
-      <p className="mt-2 text-xl font-bold">{value}</p>
-    </div>
-  );
-}
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <div className="rounded-2xl bg-success-50 p-4">
+                  <p className="text-[0.65rem] font-bold uppercase tracking-wider text-success-700">Collected</p>
+                  <p className="mt-1 font-bold text-success-900">{formatMoney(collectedThisMonth)}</p>
+                </div>
+                <div className="rounded-2xl bg-danger-50 p-4">
+                  <p className="text-[0.65rem] font-bold uppercase tracking-wider text-danger-700">Outstanding</p>
+                  <p className="mt-1 font-bold text-danger-900">{formatMoney(outstandingFees)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </SectionCard>
 
-function KpiCard({
-  accent,
-  detail,
-  isLoading,
-  label,
-  value,
-}: {
-  accent: string;
-  detail: string;
-  isLoading: boolean;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="group shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-5 shadow-sm backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <p className="label">{label}</p>
-        <span className={`h-3 w-3 rounded-full ${accent} shadow-sm`} />
+        <SectionCard title="Notification Health" description="Message delivery status">
+          <div className="space-y-6">
+            <div className="flex items-end gap-2">
+              <span className="text-2xl font-extrabold text-slate-900">{sentDeliveries}</span>
+              <span className="mb-0.5 text-sm font-bold text-slate-400">Sent Today</span>
+            </div>
+            
+            <div className="space-y-4">
+              <HealthRow label="Sent Successfully" count={sentDeliveries} total={sentDeliveries + queuedDeliveries + failedDeliveries} color="bg-success-500" />
+              <HealthRow label="Queued/Pending" count={queuedDeliveries} total={sentDeliveries + queuedDeliveries + failedDeliveries} color="bg-warning-500" />
+              <HealthRow label="Failed" count={failedDeliveries} total={sentDeliveries + queuedDeliveries + failedDeliveries} color="bg-danger-500" />
+            </div>
+          </div>
+        </SectionCard>
       </div>
-      {isLoading ? (
-        <div className="space-y-3">
-          <SkeletonLine className="h-8 w-24" />
-          <SkeletonLine className="h-3 w-36" />
-        </div>
-      ) : (
-        <>
-          <p className="text-3xl font-bold tracking-tight text-gray-950">
-            {value}
-          </p>
-          <p className="mt-2 text-sm leading-5 text-gray-500">{detail}</p>
-        </>
-      )}
-    </div>
-  );
-}
 
-function Panel({
-  children,
-  error,
-  title,
-}: {
-  children: React.ReactNode;
-  error?: unknown;
-  title: string;
-}) {
-  return (
-    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-5 shadow-sm backdrop-blur-sm">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <p className="label">Overview</p>
-          <h2 className="mt-1 text-lg font-bold text-gray-950">{title}</h2>
-        </div>
-      </div>
-      {error ? <ErrorCard error={error} /> : children}
-    </section>
-  );
-}
-
-function AlertRow({
-  alert,
-}: {
-  alert: {
-    tone: 'danger' | 'neutral' | 'warning';
-    title: string;
-    body: string;
-    href: string;
-    cta: string;
-  };
-}) {
-  const toneClass =
-    alert.tone === 'danger'
-      ? 'border-danger-200 bg-danger-50 text-danger-600'
-      : alert.tone === 'warning'
-        ? 'border-warning-200 bg-warning-50 text-warning-600'
-        : 'border-gray-200 bg-gray-50 text-gray-600';
-
-  return (
-    <div className={`rounded-2xl border p-4 shadow-sm ${toneClass}`}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="font-semibold">{alert.title}</p>
-          <p className="mt-1 text-sm opacity-85">{alert.body}</p>
-        </div>
-        <Link
-          href={alert.href}
-          className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-white px-4 text-sm font-semibold text-gray-900 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-        >
-          {alert.cta}
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-function ProgressSummary({
-  label,
-  total,
-  totalLabel,
-  value,
-  valueLabel,
-}: {
-  label: string;
-  total: number;
-  totalLabel: string;
-  value: number;
-  valueLabel: string;
-}) {
-  const percent = total > 0 ? Math.round((value / total) * 100) : 0;
-
-  return (
-    <div>
-      <div className="mb-3 flex items-center justify-between gap-3 text-sm">
-        <span className="font-medium text-gray-700">{label}</span>
-        <span className="font-semibold text-gray-900">{percent}%</span>
-      </div>
-      <div
-        className="h-3 overflow-hidden rounded-full bg-gray-100"
-        role="progressbar"
-        aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={percent}
+      <SectionCard
+        title="Recent School Activity"
+        description="Latest updates from across all modules"
+        headerAction={
+          <Link href="/dashboard/activity" className="text-sm font-bold text-primary-600 hover:text-primary-700">
+            View All Activity
+          </Link>
+        }
       >
-        <div
-          className="h-3 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all"
-          style={{ width: `${percent}%` }}
+        <RecentActivityList 
+          admissions={admissionsQuery.data ?? []}
+          receipts={receiptsQuery.data ?? []}
+          activityPosts={activityPostsQuery.data ?? []}
+          notices={noticesQuery.data ?? []}
         />
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-        <p>
-          <span className="block text-gray-500">Collected</span>
-          <span className="font-semibold text-gray-900">{valueLabel}</span>
-        </p>
-        <p>
-          <span className="block text-gray-500">Outstanding</span>
-          <span className="font-semibold text-gray-900">{totalLabel}</span>
-        </p>
-      </div>
+      </SectionCard>
     </div>
   );
 }
 
-function AttendanceBars({
-  absent,
-  late,
-  leave,
-  present,
-  total,
-}: {
-  absent: number;
-  late: number;
-  leave: number;
-  present: number;
-  total: number;
-}) {
-  return (
-    <div className="space-y-3">
-      {[
-        ['Present', present, 'bg-success-500'],
-        ['Absent', absent, 'bg-danger-500'],
-        ['Late', late, 'bg-warning-500'],
-        ['Leave', leave, 'bg-primary-500'],
-      ].map(([label, rawValue, color]) => {
-        const value = Number(rawValue);
-        const percent = total > 0 ? Math.round((value / total) * 100) : 0;
-
-        return (
-          <MiniBar
-            key={label}
-            color={String(color)}
-            label={String(label)}
-            percent={percent}
-            value={String(value)}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
-function DeliveryBars({
-  failed,
-  queued,
-  sent,
-}: {
-  failed: number;
-  queued: number;
-  sent: number;
-}) {
-  const total = failed + queued + sent;
-
-  return (
-    <div className="space-y-3">
-      <MiniBar
-        color="bg-success-500"
-        label="Sent"
-        percent={total > 0 ? Math.round((sent / total) * 100) : 0}
-        value={String(sent)}
-      />
-      <MiniBar
-        color="bg-warning-500"
-        label="Queued"
-        percent={total > 0 ? Math.round((queued / total) * 100) : 0}
-        value={String(queued)}
-      />
-      <MiniBar
-        color="bg-danger-500"
-        label="Failed"
-        percent={total > 0 ? Math.round((failed / total) * 100) : 0}
-        value={String(failed)}
-      />
-    </div>
-  );
-}
-
-function MiniBar({
-  color,
-  label,
-  percent,
-  value,
-}: {
-  color: string;
-  label: string;
-  percent: number;
-  value: string;
-}) {
+function AttendanceRow({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
+  const percent = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between text-sm">
-        <span className="text-gray-600">{label}</span>
-        <span className="font-semibold text-gray-900">{value}</span>
+      <div className="mb-1.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider">
+        <span className="text-slate-500">{label}</span>
+        <span className="text-slate-900">{count} <span className="text-slate-400 font-medium">({percent}%)</span></span>
       </div>
-      <div
-        className="h-2 overflow-hidden rounded-full bg-gray-100"
-        role="progressbar"
-        aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={percent}
-      >
-        <div className={`h-2 rounded-full ${color} transition-all`} style={{ width: `${percent}%` }} />
+      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className={cn("h-full rounded-full transition-all duration-1000", color)} style={{ width: `${percent}%` }} />
       </div>
     </div>
   );
 }
 
-function EmptyState({
-  body,
-  cta,
-  href,
-  title,
-}: {
-  body: string;
-  cta?: string;
-  href?: string;
-  title: string;
-}) {
+function HealthRow({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
+  const percent = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
-    <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 p-6 text-center">
-      <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg shadow-sm">
-        ✦
+    <div>
+      <div className="mb-1.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider">
+        <span className="text-slate-500">{label}</span>
+        <span className="text-slate-900">{count}</span>
       </div>
-      <p className="font-semibold text-gray-900">{title}</p>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-500">
-        {body}
-      </p>
-      {href && cta && (
-        <Link
-          href={href}
-          className="mt-4 inline-flex min-h-11 items-center justify-center rounded-2xl bg-gradient-to-r from-gray-950 to-gray-800 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-        >
-          {cta}
-        </Link>
-      )}
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className={cn("h-full rounded-full transition-all duration-1000", color)} style={{ width: `${percent}%` }} />
+      </div>
     </div>
   );
 }
 
-function ErrorCard({ error }: { error: unknown }) {
+function RecentActivityList({ admissions, receipts, activityPosts, notices }: any) {
+  const items = [
+    ...admissions.slice(0, 3).map((a: any) => ({
+      title: `New Admission: ${a.student?.firstName} ${a.student?.lastName}`,
+      body: `Class ${a.class?.name}`,
+      date: a.createdAt,
+      icon: UserPlus,
+      color: 'text-primary-500',
+      bg: 'bg-primary-50'
+    })),
+    ...receipts.slice(0, 3).map((r: any) => ({
+      title: `Fee Collected: ${formatMoney(r.amount)}`,
+      body: `Receipt #${r.receiptNumber}`,
+      date: r.issuedAt,
+      icon: Wallet,
+      color: 'text-success-500',
+      bg: 'bg-success-50'
+    })),
+    ...activityPosts.slice(0, 3).map((p: any) => ({
+      title: `Activity: ${p.title}`,
+      body: p.category,
+      date: p.publishedAt,
+      icon: Images,
+      color: 'text-secondary-500',
+      bg: 'bg-secondary-50'
+    })),
+    ...notices.slice(0, 3).map((n: any) => ({
+      title: `Notice: ${n.title}`,
+      body: n.priority,
+      date: n.createdAt,
+      icon: Megaphone,
+      color: 'text-warning-500',
+      bg: 'bg-warning-50'
+    }))
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 6);
+
+  if (items.length === 0) {
+    return <EmptyState title="No recent activity" description="Activity from all modules will appear here once you start using the system." />;
+  }
+
   return (
-    <div className="rounded-2xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-600 shadow-sm">
-      <p className="font-semibold">This section could not load.</p>
-      <p className="mt-1 opacity-85">
-        {error instanceof Error ? error.message : 'Please retry after checking your session.'}
-      </p>
+    <div className="divide-y divide-slate-50">
+      {items.map((item, idx) => (
+        <div key={idx} className="flex items-center gap-4 py-4 transition first:pt-0 last:pb-0 hover:bg-slate-50/50">
+          <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", item.bg, item.color)}>
+            <item.icon size={20} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold text-slate-900">{item.title}</p>
+            <p className="truncate text-xs text-slate-500">{item.body}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">
+              {formatDate(item.date)}
+            </p>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
-function StackedSkeleton() {
-  return (
-    <div className="space-y-3">
-      <SkeletonLine className="h-14 w-full" />
-      <SkeletonLine className="h-14 w-full" />
-      <SkeletonLine className="h-14 w-4/5" />
-    </div>
-  );
-}
-
-function SkeletonLine({ className }: { className: string }) {
-  return (
-    <div
-      className={`animate-pulse rounded-xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 ${className}`}
-    />
-  );
-}
-
-function sumReceiptsThisMonth(
-  receipts: Array<{
-    amount?: number;
-    issuedAt: string;
-    payment?: { amount: number; paidAt: string };
-    refundedAmount?: number;
-  }>,
-) {
+function sumReceiptsThisMonth(receipts: any[]) {
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
 
-  return receipts.reduce((sum, receipt) => {
+  return (receipts || []).reduce((sum, receipt) => {
     const paidAt = new Date(receipt.payment?.paidAt ?? receipt.issuedAt);
-
-    if (
-      paidAt.getMonth() !== currentMonth ||
-      paidAt.getFullYear() !== currentYear
-    ) {
-      return sum;
-    }
-
+    if (paidAt.getMonth() !== currentMonth || paidAt.getFullYear() !== currentYear) return sum;
     const gross = receipt.amount ?? receipt.payment?.amount ?? 0;
     return sum + Math.max(0, gross - (receipt.refundedAmount ?? 0));
   }, 0);
 }
 
-function sumOutstandingFees(
-  defaulters: Array<{ outstanding: number }>,
-  invoices: Array<{ paidAmount?: number; status: string; totalAmount: number }>,
-) {
-  if (defaulters.length > 0) {
-    return defaulters.reduce((sum, item) => sum + item.outstanding, 0);
-  }
-
-  return invoices
+function sumOutstandingFees(defaulters: any[], invoices: any[]) {
+  if (defaulters?.length > 0) return defaulters.reduce((sum, item) => sum + item.outstanding, 0);
+  return (invoices || [])
     .filter((invoice) => !['PAID', 'WAIVED'].includes(invoice.status.toUpperCase()))
-    .reduce(
-      (sum, invoice) =>
-        sum + Math.max(0, invoice.totalAmount - (invoice.paidAmount ?? 0)),
-      0,
-    );
+    .reduce((sum, invoice) => sum + Math.max(0, invoice.totalAmount - (invoice.paidAmount ?? 0)), 0);
 }
-
-function buildRecentItems({
-  activityPosts,
-  admissions,
-  attendanceSessions,
-  deliveries,
-  notices,
-  receipts,
-}: {
-  activityPosts: Array<{
-    id: string;
-    title: string;
-    category: string;
-    publishedAt: string | null;
-  }>;
-  admissions: Array<{
-    id: string;
-    fullNameEn: string;
-    studentSystemId: string;
-    latestEnrollment: { academicYear: string } | null;
-  }>;
-  attendanceSessions: Array<{
-    sessionId: string;
-    attendanceDate: string;
-    className: string;
-    sectionName: string | null;
-    submittedAt: string | null;
-  }>;
-  deliveries: Array<{
-    id: string;
-    title: string;
-    status: string;
-    createdAt: string;
-  }>;
-  notices: Array<{
-    id: string;
-    title: string;
-    priority: string;
-    createdAt?: string;
-    publishedAt: string | null;
-  }>;
-  receipts: Array<{
-    id: string;
-    receiptNumber: string;
-    issuedAt: string;
-    amount?: number;
-    student?: { name: string };
-  }>;
-}) {
-  return [
-    ...admissions.slice(0, 3).map((item) => ({
-      id: item.id,
-      kind: 'Admission',
-      title: `Admitted ${item.fullNameEn}`,
-      body: `${item.studentSystemId}${item.latestEnrollment ? ` · ${item.latestEnrollment.academicYear}` : ''}`,
-      date: null,
-    })),
-    ...receipts.slice(0, 3).map((item) => ({
-      id: item.id,
-      kind: 'Receipt',
-      title: `Receipt ${item.receiptNumber}`,
-      body: `${item.student?.name ?? 'Student'} · ${formatMoney(item.amount ?? 0)}`,
-      date: item.issuedAt,
-    })),
-    ...attendanceSessions.slice(0, 3).map((item) => ({
-      id: item.sessionId,
-      kind: 'Attendance',
-      title: `Attendance submitted for ${item.className}`,
-      body: item.sectionName ? `Section ${item.sectionName}` : 'Class session',
-      date: item.submittedAt ?? item.attendanceDate,
-    })),
-    ...activityPosts.slice(0, 3).map((item) => ({
-      id: item.id,
-      kind: 'Activity',
-      title: item.title,
-      body: item.category.replace(/_/g, ' '),
-      date: item.publishedAt,
-    })),
-    ...notices.slice(0, 3).map((item) => ({
-      id: item.id,
-      kind: 'Notice',
-      title: item.title,
-      body: `${item.priority.toLowerCase()} priority`,
-      date: item.publishedAt ?? item.createdAt ?? null,
-    })),
-    ...deliveries.slice(0, 3).map((item) => ({
-      id: item.id,
-      kind: 'Delivery',
-      title: item.title,
-      body: `Delivery ${item.status.toLowerCase()}`,
-      date: item.createdAt,
-    })),
-  ].sort((first, second) => {
-    const firstTime = first.date ? new Date(first.date).getTime() : 0;
-    const secondTime = second.date ? new Date(second.date).getTime() : 0;
-    return secondTime - firstTime;
-  });
-}
-
-function formatMoney(amount: number) {
-  return `Rs. ${moneyFormatter.format(amount)}`;
-}
-
-function formatDate(value: string) {
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : dateFormatter.format(parsed);
-}
-
-function firstError(errors: unknown[]) {
-  return errors.find(Boolean);
-}
-
-function allLoading(values: boolean[]) {
-  return values.every(Boolean);
-}
-
-const quickActions = [
-  {
-    href: '/dashboard/admissions/create',
-    label: 'Admit Student',
-    icon: UserPlus,
-  },
-  {
-    href: '/dashboard/admissions',
-    label: 'View Students',
-    icon: Users,
-  },
-  {
-    href: '/dashboard/attendance',
-    label: 'Mark Attendance',
-    icon: CalendarCheck,
-  },
-  {
-    href: '/dashboard/finance/collect',
-    label: 'Collect Fee',
-    icon: Wallet,
-  },
-  {
-    href: '/dashboard/activity/create',
-    label: 'Create Activity Post',
-    icon: Images,
-  },
-  {
-    href: '/dashboard/notices/create',
-    label: 'Create Notice',
-    icon: Megaphone,
-  },
-  {
-    href: '/dashboard/notices/deliveries',
-    label: 'Review Deliveries',
-    icon: Bell,
-  },
-  {
-    href: '/dashboard/settings',
-    label: 'Open Settings',
-    icon: Settings,
-  },
-];

@@ -68,6 +68,7 @@ Public website / landing-page module card order:
 - Academic placement: academic year, class, section, roll number, admission date, system-generated student ID.
 - Student lifecycle: active, inactive, transferred, graduated, alumni.
 - Student edit/update, guardian edit/update, transfer workflow, document manager, document history.
+- Modular Profile Tabs: Overview, Guardians, Health, Documents, Fees, Attendance, Activity, and History.
 - Student ID card, enrollment confirmation, transfer certificate, leaving certificate, character certificate.
 - Bulk CSV import, duplicate detection, class roster CSV/PDF export, student photo upload, iEMIS export.
 - Audit trail for profile, guardian, lifecycle, and document actions.
@@ -485,7 +486,10 @@ pnpm smoke:phase1
 - Academic year/class/section filters.
 - Search by name or SCH ID.
 - Student roster cards.
-- Student profile viewer.
+- Modular Student Profile (`/dashboard/students/[studentId]`):
+  - Refactored from monolithic 80KB file into granular tab-based components.
+  - Sub-components: `ProfileHeader`, `LifecyclePanel`, `StudentEditCard`.
+  - Specialized tabs for Attendance history and Fee ledger integration.
 - Multi-step enrollment.
 - Guardian management in enrollment.
 - iEMIS disability/no-disability confirmation.

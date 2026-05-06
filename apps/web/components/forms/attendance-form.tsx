@@ -1,49 +1,21 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api } from '@/lib/api';
+import { SectionCard } from '@/components/ui/section-card';
+import { FilterBar } from '@/components/ui/filter-bar';
+import { AttendanceHeader } from '@/components/attendance/attendance-header';
+import { AttendanceRosterItem } from '@/components/attendance/attendance-roster-item';
+import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LoadingState } from '@/components/ui/loading-state';
+import { CheckCircle2, AlertCircle, Save, Download } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const today = new Date().toISOString().slice(0, 10);
 
-const statusCycle = [
-  'PRESENT',
-  'ABSENT',
-  'LATE',
-  'SICK_LEAVE',
-  'EXCUSED_LEAVE',
-  'UNEXCUSED_LEAVE',
-] as const;
-
-type AttendanceStatus = (typeof statusCycle)[number];
-
-const statusLabels: Record<AttendanceStatus, string> = {
-  PRESENT: 'Present',
-  ABSENT: 'Absent',
-  LATE: 'Late',
-  SICK_LEAVE: 'Sick leave',
-  EXCUSED_LEAVE: 'Excused leave',
-  UNEXCUSED_LEAVE: 'Unexcused leave',
-};
-
-const statusShortLabels: Record<AttendanceStatus, string> = {
-  PRESENT: 'P',
-  ABSENT: 'A',
-  LATE: 'L',
-  SICK_LEAVE: 'SL',
-  EXCUSED_LEAVE: 'EL',
-  UNEXCUSED_LEAVE: 'UL',
-};
-
-const statusHelperText: Record<AttendanceStatus, string> = {
-  PRESENT: 'Default status',
-  ABSENT: 'Student is absent',
-  LATE: 'Arrived late',
-  SICK_LEAVE: 'Medical leave',
-  EXCUSED_LEAVE: 'Approved leave',
-  UNEXCUSED_LEAVE: 'Unapproved leave',
-};
+type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'SICK_LEAVE' | 'EXCUSED_LEAVE' | 'UNEXCUSED_LEAVE';
 
 export function AttendanceForm() {
   const queryClient = useQueryClient();
@@ -54,8 +26,6 @@ export function AttendanceForm() {
   const [exceptions, setExceptions] = useState<Record<string, AttendanceStatus>>({});
   const [remarks, setRemarks] = useState<Record<string, string>>({});
   const [submitMessage, setSubmitMessage] = useState('');
-  const [exportError, setExportError] = useState('');
-  const [isExporting, setIsExporting] = useState(false);
 
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years'],
@@ -80,936 +50,228 @@ export function AttendanceForm() {
       }),
     enabled: Boolean(academicYearId && classId && !isFutureDate(attendanceDate)),
   });
-  const analyticsQuery = useQuery({
-    queryKey: ['attendance-analytics'],
-    queryFn: api.listAttendanceAnalytics,
-  });
-  const conflictsQuery = useQuery({
-    queryKey: ['attendance-conflicts'],
-    queryFn: api.listAttendanceConflicts,
-  });
 
   useEffect(() => {
     const currentAcademicYear = academicYearsQuery.data?.find((year) => year.isCurrent);
-    const firstAcademicYear = currentAcademicYear ?? academicYearsQuery.data?.[0];
-
-    if (firstAcademicYear && !academicYearId) {
-      setAcademicYearId(firstAcademicYear.id);
+    if (currentAcademicYear && !academicYearId) {
+      setAcademicYearId(currentAcademicYear.id);
     }
-  }, [academicYearId, academicYearsQuery.data]);
+  }, [academicYearsQuery.data, academicYearId]);
 
   useEffect(() => {
-    const firstClass = classesQuery.data?.[0];
-
-    if (firstClass && !classId) {
-      setClassId(firstClass.id);
+    if (classesQuery.data?.[0] && !classId) {
+      setClassId(classesQuery.data[0].id);
     }
-  }, [classId, classesQuery.data]);
+  }, [classesQuery.data, classId]);
 
   useEffect(() => {
-    setExceptions({});
-    setRemarks({});
-    setSubmitMessage('');
-    setExportError('');
-  }, [academicYearId, classId, sectionId, attendanceDate]);
-
-  useEffect(() => {
-    if (!rosterQuery.data) {
-      return;
-    }
-
-    const existingExceptions = rosterQuery.data.students.reduce(
-      (next, student) => {
-        const normalized = normalizeStatus(student.status);
-
-        if (normalized !== 'PRESENT') {
-          next[student.id] = normalized;
-        }
-
-        return next;
-      },
-      {} as Record<string, AttendanceStatus>,
-    );
-    const existingRemarks = rosterQuery.data.students.reduce(
-      (next, student) => {
-        if (student.remark) {
-          next[student.id] = student.remark;
-        }
-
-        return next;
-      },
-      {} as Record<string, string>,
-    );
-
-    setExceptions(existingExceptions);
-    setRemarks(existingRemarks);
+    if (!rosterQuery.data) return;
+    const nextExceptions: Record<string, AttendanceStatus> = {};
+    const nextRemarks: Record<string, string> = {};
+    rosterQuery.data.students.forEach((student) => {
+      const normalized = normalizeStatus(student.status);
+      if (normalized !== 'PRESENT') nextExceptions[student.id] = normalized;
+      if (student.remark) nextRemarks[student.id] = student.remark;
+    });
+    setExceptions(nextExceptions);
+    setRemarks(nextRemarks);
   }, [rosterQuery.data]);
-
-  const availableSections = (sectionsQuery.data ?? []).filter((section) => {
-    const sectionClassId = section.classId ?? section.class?.id;
-    return !classId || sectionClassId === classId;
-  });
-  const hasAcademicYears = (academicYearsQuery.data ?? []).length > 0;
-  const hasClasses = (classesQuery.data ?? []).length > 0;
-  const setupIsLoading = academicYearsQuery.isLoading || classesQuery.isLoading;
-  const setupIsMissing = !hasAcademicYears || !hasClasses;
-  const futureDateBlocked = isFutureDate(attendanceDate);
 
   const mutation = useMutation({
     mutationFn: api.submitAttendance,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['attendance-roster'] });
-      void queryClient.invalidateQueries({ queryKey: ['attendance-analytics'] });
-      void queryClient.invalidateQueries({ queryKey: ['attendance-conflicts'] });
-      setSubmitMessage(
-        `Submitted at ${new Date().toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        })}. Parent notifications queued.`,
-      );
-    },
-  });
-  const syncMutation = useMutation({
-    mutationFn: api.syncAttendance,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['attendance-roster'] });
-      void queryClient.invalidateQueries({ queryKey: ['attendance-analytics'] });
-      void queryClient.invalidateQueries({ queryKey: ['attendance-conflicts'] });
-    },
-  });
-  const reviewMutation = useMutation({
-    mutationFn: ({ id, resolutionNote }: { id: string; resolutionNote: string }) =>
-      api.reviewAttendanceConflict(id, { resolutionNote }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['attendance-conflicts'] });
-      void queryClient.invalidateQueries({ queryKey: ['attendance-analytics'] });
-      void queryClient.invalidateQueries({ queryKey: ['attendance-roster'] });
-    },
-  });
-  const registerExportMutation = useMutation({
-    mutationFn: (format: 'csv' | 'json') => {
-      const date = new Date(attendanceDate);
-      return api.exportReport('monthly-attendance-register', {
-        format,
-        filters: {
-          academicYearId,
-          classId,
-          sectionId: sectionId || undefined,
-          month: date.getMonth() + 1,
-          year: date.getFullYear(),
-        },
-      });
-    },
-    onMutate: () => {
-      setIsExporting(true);
-      setExportError('');
-    },
-    onSuccess: () => {
-      setIsExporting(false);
-    },
-    onError: (error: unknown) => {
-      setIsExporting(false);
-      setExportError(error instanceof Error ? error.message : 'Export failed');
+      setSubmitMessage(`Attendance submitted successfully at ${new Date().toLocaleTimeString()}.`);
     },
   });
 
-  function cycleStudentStatus(studentId: string) {
-    const currentStatus = exceptions[studentId] ?? 'PRESENT';
-    const nextStatus =
-      statusCycle[(statusCycle.indexOf(currentStatus) + 1) % statusCycle.length];
-    setStudentStatus(studentId, nextStatus);
-  }
-
-  function setStudentStatus(studentId: string, status: AttendanceStatus) {
-    setExceptions((current) => {
-      if (status === 'PRESENT') {
-        const next = { ...current };
-        delete next[studentId];
-        return next;
-      }
-
-      return {
-        ...current,
-        [studentId]: status,
-      };
-    });
-
-    if (status === 'PRESENT') {
-      setRemarks((current) => {
-        const next = { ...current };
-        delete next[studentId];
-        return next;
-      });
-    }
-  }
-
+  const availableSections = (sectionsQuery.data ?? []).filter((s) => !classId || (s.classId ?? s.class?.id) === classId);
   const roster = rosterQuery.data?.students ?? [];
-  const exceptionPayload = Object.entries(exceptions).map(([studentId, status]) => ({
-    studentId,
-    status,
-    remark: remarks[studentId]?.trim() || null,
-  }));
-  const attendancePayload = {
-    academicYearId,
-    classId,
-    sectionId: sectionId || null,
-    attendanceDate: new Date(attendanceDate).toISOString(),
-    exceptions: exceptionPayload,
-  };
-  const rosterTotals = roster.reduce(
-    (totals, student) => {
-      const status = exceptions[student.id] ?? 'PRESENT';
-      const leaveIncrement = isLeaveStatus(status) ? 1 : 0;
+  const futureDateBlocked = isFutureDate(attendanceDate);
 
-      return {
-        total: totals.total + 1,
-        present: totals.present + (status === 'PRESENT' ? 1 : 0),
-        absent: totals.absent + (status === 'ABSENT' ? 1 : 0),
-        late: totals.late + (status === 'LATE' ? 1 : 0),
-        leave: totals.leave + leaveIncrement,
-      };
+  const totals = roster.reduce(
+    (acc, s) => {
+      const status = exceptions[s.id] ?? 'PRESENT';
+      acc.total++;
+      if (status === 'PRESENT') acc.present++;
+      else acc.exceptions++;
+      return acc;
     },
-    { total: 0, present: 0, absent: 0, late: 0, leave: 0 },
+    { total: 0, present: 0, exceptions: 0 }
   );
-  const sessionBadge = resolveSessionBadge(rosterQuery.data?.existingSession);
 
-  const attendancePercent =
-    rosterTotals.total > 0 ? Math.round((rosterTotals.present / rosterTotals.total) * 100) : 0;
-  const exceptionCount = rosterTotals.absent + rosterTotals.late + rosterTotals.leave;
+  const presentPercent = totals.total > 0 ? Math.round((totals.present / totals.total) * 100) : 0;
 
   return (
-    <div className="grid gap-6">
-      <section className="relative overflow-hidden rounded-[32px] border border-[var(--line)] bg-gradient-to-br from-gray-950 via-slate-900 to-emerald-950 p-6 text-white shadow-sm sm:p-8">
-        <div className="absolute right-0 top-0 h-44 w-44 rounded-full bg-emerald-400/20 blur-3xl" />
-        <div className="absolute bottom-0 left-1/3 h-36 w-36 rounded-full bg-white/10 blur-3xl" />
+    <div className="space-y-6 animate-fade-in">
+      <AttendanceHeader 
+        total={totals.total} 
+        presentPercent={presentPercent} 
+        exceptions={totals.exceptions} 
+      />
 
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80 ring-1 ring-white/15">
-              3-Tap Attendance Flow
-            </span>
-            <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-              Open class → tap exceptions → submit
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
-              Everyone starts as present by default. Mark only absences, late arrivals, or leave cases.
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[560px]">
-            <AttendanceMetricCard label="Roster" value={String(rosterTotals.total)} />
-            <AttendanceMetricCard label="Present" value={`${attendancePercent}%`} tone="success" />
-            <AttendanceMetricCard label="Exceptions" value={String(exceptionCount)} tone="warning" />
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-[30px] border border-[var(--line)] bg-white/90 p-5 shadow-sm backdrop-blur-sm">
-        <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="label mb-2">Attendance Session</p>
-            <h2 className="text-xl font-bold text-gray-950">
-              Choose class, section, year, and date
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-              The roster loads automatically once a class and academic year are selected.
-            </p>
-          </div>
-          <span
-            className={`inline-flex min-h-11 items-center justify-center rounded-2xl px-4 text-sm font-semibold ${sessionBadge.className}`}
-          >
-            {sessionBadge.label}
-          </span>
-        </div>
-
-        {setupIsLoading ? <SetupSkeleton /> : null}
-        {!setupIsLoading && setupIsMissing ? (
-          <SetupRequiredCard
-            hasAcademicYears={hasAcademicYears}
-            hasClasses={hasClasses}
-          />
-        ) : null}
-
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <label className="grid gap-2">
-            <span className="label">Class</span>
-            <select
-              value={classId}
-              onChange={(event) => {
-                setClassId(event.target.value);
-                setSectionId('');
-              }}
-            >
-              <option value="">Select class</option>
-              {(classesQuery.data ?? []).map((classroom) => (
-                <option key={classroom.id} value={classroom.id}>
-                  {classroom.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-2">
-            <span className="label">Section</span>
-            <select
-              value={sectionId}
-              onChange={(event) => setSectionId(event.target.value)}
-            >
-              <option value="">All sections</option>
-              {availableSections.map((section) => (
-                <option key={section.id} value={section.id}>
-                  {section.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-2">
-            <span className="label">Academic year</span>
+      <FilterBar label="Roster Filters">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
+          <label className="space-y-1.5">
+            <span className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-wider ml-1">Academic Year</span>
             <select
               value={academicYearId}
-              onChange={(event) => setAcademicYearId(event.target.value)}
+              onChange={(e) => setAcademicYearId(e.target.value)}
+              className="w-full text-sm font-medium bg-white border-slate-200 rounded-xl"
             >
-              <option value="">Select year</option>
-              {(academicYearsQuery.data ?? []).map((year) => (
-                <option key={year.id} value={year.id}>
-                  {year.name}
-                  {year.isCurrent ? ' (current)' : ''}
-                </option>
+              <option value="">Select Year</option>
+              {academicYearsQuery.data?.map((y) => (
+                <option key={y.id} value={y.id}>{y.name}{y.isCurrent ? ' (Current)' : ''}</option>
               ))}
             </select>
           </label>
-          <label className="grid gap-2">
-            <span className="label">Date</span>
+
+          <label className="space-y-1.5">
+            <span className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-wider ml-1">Class</span>
+            <select
+              value={classId}
+              onChange={(e) => { setClassId(e.target.value); setSectionId(''); }}
+              className="w-full text-sm font-medium bg-white border-slate-200 rounded-xl"
+            >
+              <option value="">Select Class</option>
+              {classesQuery.data?.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="space-y-1.5">
+            <span className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-wider ml-1">Section</span>
+            <select
+              value={sectionId}
+              onChange={(e) => setSectionId(e.target.value)}
+              className="w-full text-sm font-medium bg-white border-slate-200 rounded-xl"
+            >
+              <option value="">All Sections</option>
+              {availableSections.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="space-y-1.5">
+            <span className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-wider ml-1">Date</span>
             <input
               type="date"
               value={attendanceDate}
               max={today}
-              onChange={(event) => setAttendanceDate(event.target.value)}
+              onChange={(e) => setAttendanceDate(e.target.value)}
+              className="w-full text-sm font-medium bg-white border-slate-200 rounded-xl"
             />
-            {futureDateBlocked ? (
-              <span className="text-xs text-danger-600">
-                Future dates cannot be submitted.
-              </span>
-            ) : null}
           </label>
         </div>
+      </FilterBar>
 
-        {rosterQuery.data?.existingSession ? (
-          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm text-sm text-amber-900">
-            <p>
-              Existing session lock:{' '}
-              {new Date(rosterQuery.data.existingSession.lockAt).toLocaleString()}.
-            </p>
-            <p>
-              Conflict status: {rosterQuery.data.existingSession.conflictStatus}.
-              Resubmissions before lock are flagged for review.
-            </p>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="rounded-[30px] border border-[var(--line)] bg-white/90 p-5 shadow-sm backdrop-blur-sm">
-        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="label">Student Roster</p>
-            <h2 className="mt-2 text-xl font-bold text-gray-950">
-              Tap a student row to cycle status
-            </h2>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-gray-50 disabled:translate-y-0 disabled:opacity-50"
-              disabled={!academicYearId || !classId || isExporting}
-              onClick={() => registerExportMutation.mutate('csv')}
-            >
-              {isExporting ? 'Exporting...' : 'Export Monthly Register CSV'}
+      <SectionCard 
+        title="Student Roster" 
+        description="Mark attendance by student. Everyone is present by default."
+        headerAction={
+          <div className="flex items-center gap-2">
+            <button className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+              <Download size={14} />
+              Export Register
             </button>
-            <p className="text-sm font-medium text-[var(--muted)]">
-              {exceptionCount} exception{exceptionCount === 1 ? '' : 's'} selected
-            </p>
           </div>
-        </div>
-
-        <div className="grid gap-3">
-        {rosterQuery.isLoading ? <RosterSkeleton /> : null}
-        {futureDateBlocked ? (
-          <EmptyRosterState message="Pick today or a past date to load and submit attendance." />
-        ) : null}
-        {roster.length === 0 && rosterQuery.isSuccess ? (
-          <EmptyRosterState message="No students are enrolled for this class/section yet." />
-        ) : null}
-        {roster.map((student) => {
-          const status = exceptions[student.id] ?? 'PRESENT';
-          const style = rowStyle(status);
-
-          return (
-            <article
-              key={student.id}
-              className={`rounded-[26px] border ${style.card} p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md`}
-            >
-              <button
-                type="button"
-                className="flex min-h-16 w-full items-center gap-4 text-left"
-                onClick={() => cycleStudentStatus(student.id)}
-                aria-label={`Cycle attendance status for ${student.fullNameEn}. Current status: ${statusLabels[status]}`}
-              >
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-sm font-bold text-gray-700 shadow-sm ring-1 ring-gray-200">
-                  {student.rollNumber ?? student.fullNameEn[0]?.toUpperCase() ?? 'S'}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-gray-900">
-                      {student.fullNameEn}
-                    </p>
-                    {student.hasMedicalAlert ? (
-                      <span className="rounded-full bg-danger-50 px-2 py-0.5 text-xs font-semibold text-danger-600">
-                        Health alert
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {student.studentSystemId}
-                    {student.rollNumber ? ` / Roll ${student.rollNumber}` : ''}
-                  </p>
-                </div>
-                <span
-                  className={`inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold ${style.badge}`}
-                >
-                  {statusLabels[status]}
-                </span>
-              </button>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                {statusCycle.map((nextStatus) => (
-                  <button
-                    key={nextStatus}
-                    type="button"
-                    className={`inline-flex min-h-11 items-center rounded-xl border px-3 text-xs font-semibold transition-all hover:-translate-y-0.5 ${
-                      status === nextStatus
-                        ? 'border-gray-900 bg-gray-900 text-white shadow-sm'
-                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-400 hover:bg-gray-50'
-                    }`}
-                    aria-label={`Mark ${student.fullNameEn} as ${statusLabels[nextStatus]}`}
-                    onClick={() => setStudentStatus(student.id, nextStatus)}
-                  >
-                    <span className="mr-1 rounded-md bg-black/5 px-1.5 py-0.5 text-[10px]">
-                      {statusShortLabels[nextStatus]}
-                    </span>
-                    {statusLabels[nextStatus]}
-                  </button>
-                ))}
-              </div>
-
-              {status !== 'PRESENT' ? (
-                <label className="mt-3 block">
-                  <span className="label mb-2 block">Remark</span>
-                  <input
-                    value={remarks[student.id] ?? ''}
-                    placeholder="Optional note for this exception"
-                    onChange={(event) =>
-                      setRemarks((current) => ({
-                        ...current,
-                        [student.id]: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-              ) : null}
-            </article>
-          );
-        })}
-        </div>
-      </section>
-
-      <SummaryBar
-        canSubmit={
-          Boolean(academicYearId && classId) &&
-          roster.length > 0 &&
-          !futureDateBlocked &&
-          !setupIsMissing
         }
-        isSubmitting={mutation.isPending}
-        onSubmit={() => mutation.mutate(attendancePayload)}
-        totals={rosterTotals}
-      />
-
-      {mutation.isError ? (
-        <InlineMessage
-          tone="danger"
-          message={`${mutation.error.message} ${
-            rosterQuery.data?.existingSession
-              ? `Locked at ${new Date(rosterQuery.data.existingSession.lockAt).toLocaleString()}.`
-              : ''
-          }`}
-        />
-      ) : null}
-      {exportError ? (
-        <InlineMessage tone="danger" message={exportError} />
-      ) : null}
-      {submitMessage ? <InlineMessage tone="success" message={submitMessage} /> : null}
-
-      <details className="rounded-[30px] border border-[var(--line)] bg-white/90 p-5 shadow-sm backdrop-blur-sm">
-        <summary className="cursor-pointer text-sm font-bold text-gray-900">
-          Sync offline draft
-        </summary>
-        <p className="mt-3 text-sm leading-6 text-gray-500">
-          Use this only when a saved browser draft needs to be reconciled with the
-          server. Normal daily attendance should use Submit attendance.
-        </p>
-        <button
-          type="button"
-          className="mt-4 inline-flex min-h-11 items-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-gray-50 disabled:translate-y-0 disabled:opacity-50"
-          disabled={
-            !academicYearId ||
-            !classId ||
-            roster.length === 0 ||
-            syncMutation.isPending ||
-            futureDateBlocked
-          }
-          onClick={() =>
-            syncMutation.mutate({
-              ...attendancePayload,
-              clientSubmissionId: `web-${Date.now()}`,
-              deviceTimestamp: new Date().toISOString(),
-              deviceLabel: 'SchoolOS web dashboard',
-            })
-          }
-        >
-          {syncMutation.isPending ? 'Syncing draft...' : 'Sync offline draft'}
-        </button>
-        {syncMutation.isError ? (
-          <InlineMessage tone="danger" message={syncMutation.error.message} />
-        ) : null}
-        {syncMutation.data ? (
-          <InlineMessage
-            tone="success"
-            message={`Offline draft synced as ${syncMutation.data.syncStatus}${
-              syncMutation.data.conflictId
-                ? ` with conflict ${syncMutation.data.conflictId}`
-                : ''
-            }.`}
-          />
-        ) : null}
-      </details>
-
-      <AttendanceAnalyticsSection analyticsQuery={analyticsQuery} />
-      <ConflictReviewSection
-        analyticsQuery={analyticsQuery}
-        conflictsQuery={conflictsQuery}
-        reviewMutation={reviewMutation}
-      />
-    </div>
-  );
-}
-
-function AttendanceMetricCard({
-  label,
-  value,
-  tone = 'neutral',
-}: {
-  label: string;
-  value: string;
-  tone?: 'neutral' | 'success' | 'warning';
-}) {
-  const toneClass = {
-    neutral: 'bg-white/10 text-white ring-white/15',
-    success: 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/20',
-    warning: 'bg-amber-400/15 text-amber-100 ring-amber-300/20',
-  }[tone];
-
-  return (
-    <div className={`rounded-2xl p-4 ring-1 ${toneClass}`}>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-75">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-bold">{value}</p>
-    </div>
-  );
-}
-
-function SummaryBar({
-  canSubmit,
-  isSubmitting,
-  onSubmit,
-  totals,
-}: {
-  canSubmit: boolean;
-  isSubmitting: boolean;
-  onSubmit: () => void;
-  totals: {
-    absent: number;
-    late: number;
-    leave: number;
-    present: number;
-    total: number;
-  };
-}) {
-  const exceptionsOnly = totals.absent + totals.late + totals.leave;
-
-  return (
-    <div className="sticky bottom-3 z-30 rounded-[28px] border border-[var(--line)] bg-white/95 p-4 shadow-2xl shadow-gray-900/10 backdrop-blur-xl">
-      <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-          <SummaryCount label="Present" value={totals.present} />
-          <SummaryCount label="Absent" value={totals.absent} />
-          <SummaryCount label="Late" value={totals.late} />
-          <SummaryCount label="Leave" value={totals.leave} />
-          <SummaryCount label="Total" value={totals.total} />
-        </div>
-        <button
-          type="button"
-          className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-gradient-to-r from-gray-950 to-gray-800 px-5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 lg:w-auto"
-          disabled={!canSubmit || isSubmitting}
-          onClick={onSubmit}
-        >
-          {isSubmitting
-            ? 'Submitting...'
-            : `Submit attendance (${exceptionsOnly} exceptions only)`}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function SummaryCount({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-2xl border border-gray-100 bg-gray-50 px-3 py-2">
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-        {label}
-      </p>
-      <p className="text-lg font-bold text-gray-900">{value}</p>
-    </div>
-  );
-}
-
-function AttendanceAnalyticsSection({
-  analyticsQuery,
-}: {
-  analyticsQuery: ReturnType<typeof useQuery<Awaited<ReturnType<typeof api.listAttendanceAnalytics>>, Error>>;
-}) {
-  return (
-    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-      <p className="label mb-4">Recent Attendance Analytics</p>
-      {analyticsQuery.isLoading ? <RosterSkeleton /> : null}
-      {analyticsQuery.isError ? (
-        <InlineMessage tone="danger" message={analyticsQuery.error.message} />
-      ) : null}
-      {analyticsQuery.data ? (
-        <div className="grid gap-3 lg:grid-cols-[1.3fr_0.7fr]">
-          <div className="grid gap-3">
-            {(analyticsQuery.data.latestSessions ?? []).slice(0, 5).map((session) => (
-              <div key={session.sessionId} className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                <p className="font-semibold text-gray-900">
-                  {session.className}
-                  {session.sectionName ? ` / ${session.sectionName}` : ''} /{' '}
-                  {new Date(session.attendanceDate).toLocaleDateString()}
-                </p>
-                <p className="text-sm text-gray-500">
-                  Present {session.totals.present}, absent {session.totals.absent},
-                  late {session.totals.late}, leave {session.totals.leave} /{' '}
-                  {session.conflictStatus}
-                </p>
-              </div>
-            ))}
-            {analyticsQuery.data.latestSessions.length === 0 ? (
-              <p className="text-sm text-gray-500">No attendance sessions yet.</p>
-            ) : null}
-          </div>
-          <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-            <p className="font-semibold text-gray-900">Absence Hotlist</p>
-            <div className="mt-3 grid gap-2 text-sm text-gray-500">
-              {(analyticsQuery.data.absenceHotlist ?? []).slice(0, 5).map((item) => (
-                <span key={item.studentId}>
-                  {item.studentId}: {item.absenceCount} absences
-                </span>
-              ))}
-              {analyticsQuery.data.absenceHotlist.length === 0 ? (
-                <span>No absence pattern yet.</span>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function ConflictReviewSection({
-  analyticsQuery,
-  conflictsQuery,
-  reviewMutation,
-}: {
-  analyticsQuery: ReturnType<typeof useQuery<Awaited<ReturnType<typeof api.listAttendanceAnalytics>>, Error>>;
-  conflictsQuery: ReturnType<typeof useQuery<Awaited<ReturnType<typeof api.listAttendanceConflicts>>, Error>>;
-  reviewMutation: ReturnType<typeof useMutation<unknown, Error, { id: string; resolutionNote: string }>>;
-}) {
-  return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-        <p className="label mb-4">Conflict Review</p>
-        {conflictsQuery.isLoading ? <RosterSkeleton /> : null}
-        {conflictsQuery.isError ? (
-          <InlineMessage tone="danger" message={conflictsQuery.error.message} />
-        ) : null}
-        <div className="grid gap-3">
-          {(conflictsQuery.data ?? []).slice(0, 5).map((conflict) => (
-            <div key={conflict.id} className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-              <p className="font-semibold text-gray-900">
-                {conflict.className ?? 'Attendance session'}
-                {conflict.sectionName ? ` / ${conflict.sectionName}` : ''}
-              </p>
-              <p className="text-sm text-gray-500">
-                {conflict.status} / submitted {new Date(conflict.submittedAt).toLocaleString()}
-                {conflict.reviewedAt
-                  ? ` / reviewed ${new Date(conflict.reviewedAt).toLocaleString()}`
-                  : ''}
-              </p>
-              {!conflict.reviewedAt ? (
-                <button
-                  type="button"
-                  className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-primary-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50"
-                  disabled={reviewMutation.isPending}
-                  onClick={() =>
-                    reviewMutation.mutate({
-                      id: conflict.id,
-                      resolutionNote: 'Reviewed from admin attendance screen.',
-                    })
-                  }
-                >
-                  Mark reviewed
-                </button>
-              ) : null}
-            </div>
-          ))}
-          {conflictsQuery.data?.length === 0 ? (
-            <p className="text-sm text-gray-500">No attendance conflicts waiting.</p>
-          ) : null}
-        </div>
-        {reviewMutation.isError ? (
-          <InlineMessage tone="danger" message={reviewMutation.error.message} />
-        ) : null}
-      </section>
-
-      <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-        <p className="label mb-4">Attendance Risk Alerts</p>
-        <AttendanceRiskAlerts analyticsQuery={analyticsQuery} />
-      </section>
-    </div>
-  );
-}
-
-function AttendanceRiskAlerts({
-  analyticsQuery,
-}: {
-  analyticsQuery: ReturnType<typeof useQuery<Awaited<ReturnType<typeof api.listAttendanceAnalytics>>, Error>>;
-}) {
-  if (analyticsQuery.isLoading) {
-    return <RosterSkeleton />;
-  }
-
-  if (analyticsQuery.isError) {
-    return <InlineMessage tone="danger" message={analyticsQuery.error.message} />;
-  }
-
-  return (
-    <div className="grid gap-4">
-      <div>
-        <p className="font-semibold text-gray-900">Below 80 percent</p>
-        <div className="mt-2 grid gap-2 text-sm text-gray-500">
-          {(analyticsQuery.data?.below80Warnings ?? []).slice(0, 5).map((item) => (
-            <span key={item.studentId}>
-              {item.fullNameEn} / {item.studentSystemId} / {item.attendancePercent}%
-            </span>
-          ))}
-          {analyticsQuery.data?.below80Warnings?.length === 0 ? (
-            <span>No below-80 warning yet.</span>
-          ) : null}
-        </div>
-      </div>
-      <div>
-        <p className="font-semibold text-gray-900">Consecutive absences</p>
-        <div className="mt-2 grid gap-2 text-sm text-gray-500">
-          {(analyticsQuery.data?.consecutiveAbsences ?? []).slice(0, 5).map((item) => (
-            <span key={item.studentId}>
-              {item.studentId}: {item.consecutiveAbsences} consecutive absences
-            </span>
-          ))}
-          {analyticsQuery.data?.consecutiveAbsences?.length === 0 ? (
-            <span>No consecutive absence pattern yet.</span>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SetupRequiredCard({
-  hasAcademicYears,
-  hasClasses,
-}: {
-  hasAcademicYears: boolean;
-  hasClasses: boolean;
-}) {
-  return (
-    <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm text-sm text-amber-900">
-      <p className="font-semibold">Setup required before marking attendance</p>
-      <p className="mt-2">
-        {!hasAcademicYears ? 'Create an academic year. ' : ''}
-        {!hasClasses ? 'Create at least one class. ' : ''}
-      </p>
-      <Link
-        href="/dashboard/settings"
-        className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-amber-900 px-4 text-sm font-semibold text-white"
       >
-        Open Settings
-      </Link>
-    </div>
-  );
-}
+        {rosterQuery.isLoading ? (
+          <LoadingState label="Loading roster..." />
+        ) : futureDateBlocked ? (
+          <EmptyState title="Date Not Allowed" description="Please select a date that is not in the future." icon={<AlertCircle size={32} />} />
+        ) : roster.length === 0 ? (
+          <EmptyState title="No Students" description="No students found for the selected filters." />
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {roster.map((student) => (
+              <AttendanceRosterItem
+                key={student.id}
+                student={student}
+                status={exceptions[student.id] ?? 'PRESENT'}
+                remark={remarks[student.id]}
+                onStatusChange={(status) => {
+                  setExceptions(prev => {
+                    const next = { ...prev };
+                    if (status === 'PRESENT') delete next[student.id];
+                    else next[student.id] = status;
+                    return next;
+                  });
+                }}
+                onRemarkChange={(remark) => setRemarks(prev => ({ ...prev, [student.id]: remark }))}
+              />
+            ))}
+          </div>
+        )}
+      </SectionCard>
 
-function SetupSkeleton() {
-  return (
-    <div className="mb-4 grid gap-3 md:grid-cols-3">
-      <div className="h-12 animate-pulse rounded-xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
-      <div className="h-12 animate-pulse rounded-xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
-      <div className="h-12 animate-pulse rounded-xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
-    </div>
-  );
-}
+      <div className="sticky bottom-6 flex items-center justify-between p-4 bg-slate-900 text-white rounded-2xl shadow-2xl animate-slide-up border border-slate-800">
+        <div className="flex items-center gap-6 px-4">
+          <div className="flex flex-col">
+            <span className="text-[0.6rem] font-bold text-slate-400 uppercase tracking-widest">Present</span>
+            <span className="text-lg font-black text-emerald-400">{totals.present}</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[0.6rem] font-bold text-slate-400 uppercase tracking-widest">Exceptions</span>
+            <span className="text-lg font-black text-amber-400">{totals.exceptions}</span>
+          </div>
+          <div className="h-8 w-px bg-slate-800" />
+          <div className="flex flex-col">
+            <span className="text-[0.6rem] font-bold text-slate-400 uppercase tracking-widest">Rate</span>
+            <span className="text-lg font-black">{presentPercent}%</span>
+          </div>
+        </div>
 
-function RosterSkeleton() {
-  return (
-    <div className="grid gap-3">
-      <div className="h-24 animate-pulse rounded-2xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
-      <div className="h-24 animate-pulse rounded-2xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
-      <div className="h-24 animate-pulse rounded-2xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
-    </div>
-  );
-}
-
-function EmptyRosterState({ message }: { message: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 p-6 text-center text-sm text-gray-500">
-      <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg shadow-sm">
-        ✓
+        <button
+          onClick={() => mutation.mutate({
+            academicYearId,
+            classId,
+            sectionId: sectionId || null,
+            attendanceDate: new Date(attendanceDate).toISOString(),
+            exceptions: Object.entries(exceptions).map(([studentId, status]) => ({
+              studentId,
+              status,
+              remark: remarks[studentId]?.trim() || null,
+            }))
+          })}
+          disabled={mutation.isPending || roster.length === 0 || futureDateBlocked}
+          className="flex items-center gap-2 px-8 py-3 bg-white text-slate-950 rounded-xl font-bold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+        >
+          {mutation.isPending ? (
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-900 border-t-transparent" />
+          ) : <Save size={18} />}
+          Submit Attendance
+        </button>
       </div>
-      {message}
+
+      {submitMessage && (
+        <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 text-emerald-800 text-sm font-bold animate-fade-in">
+          <CheckCircle2 size={18} />
+          {submitMessage}
+        </div>
+      )}
+      {mutation.isError && (
+        <div className="p-4 bg-destructive/5 border border-destructive/10 rounded-2xl flex items-center gap-3 text-destructive text-sm font-bold animate-fade-in">
+          <AlertCircle size={18} />
+          {mutation.error.message}
+        </div>
+      )}
     </div>
   );
-}
-
-function InlineMessage({
-  message,
-  tone,
-}: {
-  message: string;
-  tone: 'danger' | 'success';
-}) {
-  const className =
-    tone === 'danger'
-      ? 'border-danger-200 bg-danger-50 text-danger-600'
-      : 'border-success-200 bg-success-50 text-success-600';
-
-  return <p className={`rounded-2xl border p-4 text-sm font-medium shadow-sm ${className}`}>{message}</p>;
 }
 
 function normalizeStatus(status: string | null | undefined): AttendanceStatus {
-  if (status === 'A' || status === 'ABSENT') {
-    return 'ABSENT';
-  }
-
-  if (status === 'L' || status === 'LATE') {
-    return 'LATE';
-  }
-
-  if (status === 'LS' || status === 'SICK_LEAVE') {
-    return 'SICK_LEAVE';
-  }
-
-  if (status === 'LE' || status === 'EXCUSED_LEAVE') {
-    return 'EXCUSED_LEAVE';
-  }
-
-  if (status === 'LU' || status === 'UNEXCUSED_LEAVE') {
-    return 'UNEXCUSED_LEAVE';
-  }
-
+  if (status === 'A' || status === 'ABSENT') return 'ABSENT';
+  if (status === 'L' || status === 'LATE') return 'LATE';
+  if (status === 'LS' || status === 'SICK_LEAVE') return 'SICK_LEAVE';
+  if (status === 'LE' || status === 'EXCUSED_LEAVE') return 'EXCUSED_LEAVE';
+  if (status === 'LU' || status === 'UNEXCUSED_LEAVE') return 'UNEXCUSED_LEAVE';
   return 'PRESENT';
-}
-
-function isLeaveStatus(status: AttendanceStatus) {
-  return ['SICK_LEAVE', 'EXCUSED_LEAVE', 'UNEXCUSED_LEAVE'].includes(status);
 }
 
 function isFutureDate(value: string) {
   return value > today;
-}
-
-function rowStyle(status: AttendanceStatus) {
-  if (status === 'ABSENT') {
-    return {
-      card: 'border-danger-200 border-l-4 border-l-danger-500 bg-danger-50',
-      badge: 'bg-danger-500 text-white shadow-sm',
-    };
-  }
-
-  if (status === 'LATE') {
-    return {
-      card: 'border-warning-200 border-l-4 border-l-warning-500 bg-warning-50',
-      badge: 'bg-warning-500 text-white shadow-sm',
-    };
-  }
-
-  if (isLeaveStatus(status)) {
-    return {
-      card: 'border-primary-200 border-l-4 border-l-primary-500 bg-primary-50',
-      badge: 'bg-primary-500 text-white shadow-sm',
-    };
-  }
-
-  return {
-    card: 'border-gray-200 bg-white',
-    badge: 'bg-gray-100 text-gray-700 shadow-sm',
-  };
-}
-
-function resolveSessionBadge(
-  existingSession:
-    | {
-        conflictStatus: string;
-        lockAt: string;
-      }
-    | null
-    | undefined,
-) {
-  if (!existingSession) {
-    return {
-      label: 'Pending',
-      className: 'bg-gray-100 text-gray-700',
-    };
-  }
-
-  if (
-    existingSession.conflictStatus &&
-    !['NONE', 'RESOLVED', 'REVIEWED'].includes(
-      existingSession.conflictStatus.toUpperCase(),
-    )
-  ) {
-    return {
-      label: 'Conflict Review',
-      className: 'bg-warning-50 text-warning-600',
-    };
-  }
-
-  if (new Date(existingSession.lockAt).getTime() <= Date.now()) {
-    return {
-      label: 'Locked',
-      className: 'bg-danger-50 text-danger-600',
-    };
-  }
-
-  return {
-    label: 'Submitted',
-    className: 'bg-success-50 text-success-600',
-  };
 }
