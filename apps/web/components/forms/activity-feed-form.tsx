@@ -13,6 +13,35 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { filesToBase64Payloads } from '../../lib/files';
+import { cn } from '../../lib/utils';
+import { 
+  StatCard 
+} from '../ui/stat-card';
+import { 
+  Tabs, 
+  TabsList, 
+  TabsTrigger, 
+  TabsContent 
+} from '../ui/tabs';
+import { Badge } from '../ui/badge';
+import { EmptyState } from '../ui/empty-state';
+import { LoadingState } from '../ui/loading-state';
+import { 
+  FormField, 
+  Input, 
+  Select, 
+  TextArea 
+} from '../ui/form-field';
+import { 
+  Heart, 
+  Sparkles, 
+  Star, 
+  Camera, 
+  History, 
+  Target, 
+  Truck, 
+  Smile 
+} from 'lucide-react';
 
 const today = new Date().toISOString().slice(0, 10);
 const maxImageBytes = 10 * 1024 * 1024;
@@ -30,33 +59,33 @@ const activitySectionMeta: Record<
   {
     title: string;
     description: string;
-    badge: string;
+    icon: any;
   }
 > = {
   'Create Post': {
     title: 'Activity Feed',
     description: 'Capture classroom moments, tag students, and notify guardians with private media.',
-    badge: 'Composer',
+    icon: Camera,
   },
   'Feed Preview': {
     title: 'Feed Preview',
     description: 'Review recently published classroom posts, attachments, tags, and reactions.',
-    badge: 'Guardian View',
+    icon: History,
   },
   'Mood Logs': {
     title: 'Mood Logs',
     description: 'Record daily emotional context for whole classes, sections, or individual children.',
-    badge: 'Wellbeing',
+    icon: Smile,
   },
   Milestones: {
     title: 'Development Milestones',
     description: 'Track Montessori and ECE observations with clear child-level progress evidence.',
-    badge: 'Progress',
+    icon: Target,
   },
   'Delivery Records': {
     title: 'Delivery Records',
     description: 'Audit guardian notification delivery records generated from activity posts.',
-    badge: 'Audit Trail',
+    icon: Truck,
   },
 };
 
@@ -348,157 +377,147 @@ export function ActivityFeedForm() {
   const activeMeta = activitySectionMeta[activeSection];
 
   return (
-    <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[32px] border border-[var(--line)] bg-gradient-to-br from-gray-950 via-slate-900 to-emerald-950 p-6 text-white shadow-sm sm:p-8">
-        <div className="absolute right-0 top-0 h-44 w-44 rounded-full bg-emerald-400/20 blur-3xl" />
-        <div className="absolute bottom-0 left-1/3 h-36 w-36 rounded-full bg-white/10 blur-3xl" />
+    <div className="space-y-12">
+      <section className="relative overflow-hidden rounded-[2.5rem] border border-slate-200 bg-slate-900 p-8 text-white shadow-xl">
+        <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-emerald-500/10 blur-[100px]" />
+        <div className="absolute bottom-0 left-1/4 h-64 w-64 rounded-full bg-blue-500/10 blur-[100px]" />
 
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80 ring-1 ring-white/15">
-              {activeMeta.badge}
-            </span>
-            <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-              {activeMeta.title}
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
+        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-md ring-1 ring-white/20">
+                <activeMeta.icon className="h-6 w-6 text-emerald-400" />
+              </div>
+              <h1 className="text-3xl font-black tracking-tight sm:text-4xl uppercase italic">
+                {activeMeta.title}
+              </h1>
+            </div>
+            <p className="mt-4 text-lg font-medium leading-relaxed text-slate-300">
               {activeMeta.description}
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[560px]">
-            <ActivityMetricCard
-              label="Published Posts"
-              value={String(posts.length)}
-              tone="success"
+          <div className="grid gap-4 sm:grid-cols-3 lg:w-[600px]">
+            <StatCard
+              title="Posts"
+              value={posts.length}
+              className="bg-white/5 border-white/10"
             />
-            <ActivityMetricCard
-              label="Mood Logs"
-              value={String(moodLogs.length)}
-              tone="info"
+            <StatCard
+              title="Mood Logs"
+              value={moodLogs.length}
+              className="bg-white/5 border-white/10"
             />
-            <ActivityMetricCard
-              label="Milestones"
-              value={String(milestones.length)}
-              tone="warning"
+            <StatCard
+              title="Milestones"
+              value={milestones.length}
+              className="bg-white/5 border-white/10"
             />
           </div>
         </div>
       </section>
 
-      <section className="sticky top-4 z-20 rounded-[30px] border border-[var(--line)] bg-white/85 p-3 shadow-sm backdrop-blur-xl">
-        <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Activity feed sections">
-          {activitySections.map((section) => {
-            const isActive = activeSection === section;
+      <Tabs 
+        value={activeSection} 
+        onValueChange={(val) => setActiveSection(val as ActivitySection)} 
+        className="space-y-8"
+      >
+        <TabsList className="bg-slate-100 p-1.5 rounded-[1.5rem] inline-flex h-auto">
+          {activitySections.map((section) => (
+            <TabsTrigger 
+              key={section} 
+              value={section}
+              className="rounded-[1.2rem] px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 font-black uppercase tracking-widest text-[10px]"
+            >
+              {section}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-            return (
-              <button
-                key={section}
-                type="button"
-                className={`group min-h-12 whitespace-nowrap rounded-2xl border px-4 text-sm font-semibold transition-all duration-200 ${
-                  isActive
-                    ? 'border-gray-950 bg-gray-950 text-white shadow-md shadow-gray-900/20'
-                    : 'border-transparent bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-950'
-                }`}
-                onClick={() => setActiveSection(section)}
-              >
-                <span className="flex items-center gap-2">
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      isActive ? 'bg-emerald-400' : 'bg-gray-300 group-hover:bg-gray-500'
-                    }`}
-                  />
-                  {section}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+        <TabsContent value="Create Post">
+          <CreatePostSection
+            classes={classes}
+            classesLoading={classesQuery.isLoading}
+            post={post}
+            setPost={setPost}
+            sections={postSections}
+            students={visiblePostStudents}
+            selectedStudents={selectedPostStudents}
+            selectedFiles={selectedFiles}
+            fileWarning={fileWarning}
+            postSuccess={postSuccess}
+            mutationError={postMutation.isError ? postMutation.error.message : null}
+            isPending={postMutation.isPending}
+            updateFiles={updateFiles}
+            toggleStudent={toggleStudent}
+            createPost={createPost}
+          />
+        </TabsContent>
 
-      {activeSection === 'Create Post' ? (
-        <CreatePostSection
-          classes={classes}
-          classesLoading={classesQuery.isLoading}
-          post={post}
-          setPost={setPost}
-          sections={postSections}
-          students={visiblePostStudents}
-          selectedStudents={selectedPostStudents}
-          selectedFiles={selectedFiles}
-          fileWarning={fileWarning}
-          postSuccess={postSuccess}
-          mutationError={postMutation.isError ? postMutation.error.message : null}
-          isPending={postMutation.isPending}
-          updateFiles={updateFiles}
-          toggleStudent={toggleStudent}
-          createPost={createPost}
-        />
-      ) : null}
+        <TabsContent value="Feed Preview">
+          <FeedPreviewSection
+            posts={posts}
+            isLoading={postsQuery.isLoading}
+            students={students}
+            reactionMutation={reactionMutation}
+          />
+        </TabsContent>
 
-      {activeSection === 'Feed Preview' ? (
-        <FeedPreviewSection
-          posts={posts}
-          isLoading={postsQuery.isLoading}
-          students={students}
-          reactionMutation={reactionMutation}
-        />
-      ) : null}
+        <TabsContent value="Mood Logs">
+          <MoodLogsSection
+            classes={classes}
+            moodLog={moodLog}
+            setMoodLog={setMoodLog}
+            sections={moodSections}
+            students={moodStudents}
+            logs={moodLogs}
+            logsLoading={moodLogsQuery.isLoading}
+            mutationError={moodMutation.isError ? moodMutation.error.message : null}
+            isPending={moodMutation.isPending}
+            saveMoodLog={() =>
+              moodMutation.mutate({
+                ...moodLog,
+                sectionId: moodLog.sectionId || null,
+                studentId: moodLog.studentId || null,
+                logDate: new Date(moodLog.logDate).toISOString(),
+              })
+            }
+          />
+        </TabsContent>
 
-      {activeSection === 'Mood Logs' ? (
-        <MoodLogsSection
-          classes={classes}
-          moodLog={moodLog}
-          setMoodLog={setMoodLog}
-          sections={moodSections}
-          students={moodStudents}
-          logs={moodLogs}
-          logsLoading={moodLogsQuery.isLoading}
-          mutationError={moodMutation.isError ? moodMutation.error.message : null}
-          isPending={moodMutation.isPending}
-          saveMoodLog={() =>
-            moodMutation.mutate({
-              ...moodLog,
-              sectionId: moodLog.sectionId || null,
-              studentId: moodLog.studentId || null,
-              logDate: new Date(moodLog.logDate).toISOString(),
-            })
-          }
-        />
-      ) : null}
+        <TabsContent value="Milestones">
+          <MilestonesSection
+            classes={classes}
+            milestone={milestone}
+            setMilestone={setMilestone}
+            sections={milestoneSections}
+            students={milestoneStudents}
+            allStudents={students}
+            filters={milestoneFilters}
+            setFilters={setMilestoneFilters}
+            milestones={milestones}
+            milestonesLoading={milestonesQuery.isLoading}
+            mutationError={milestoneMutation.isError ? milestoneMutation.error.message : null}
+            isPending={milestoneMutation.isPending}
+            saveMilestone={() =>
+              milestoneMutation.mutate({
+                ...milestone,
+                sectionId: milestone.sectionId || null,
+                observationNote: milestone.observationNote || null,
+                photoObjectKey: milestone.photoObjectKey || null,
+                observedAt: new Date(milestone.observedAt).toISOString(),
+              })
+            }
+          />
+        </TabsContent>
 
-      {activeSection === 'Milestones' ? (
-        <MilestonesSection
-          classes={classes}
-          milestone={milestone}
-          setMilestone={setMilestone}
-          sections={milestoneSections}
-          students={milestoneStudents}
-          allStudents={students}
-          filters={milestoneFilters}
-          setFilters={setMilestoneFilters}
-          milestones={milestones}
-          milestonesLoading={milestonesQuery.isLoading}
-          mutationError={milestoneMutation.isError ? milestoneMutation.error.message : null}
-          isPending={milestoneMutation.isPending}
-          saveMilestone={() =>
-            milestoneMutation.mutate({
-              ...milestone,
-              sectionId: milestone.sectionId || null,
-              observationNote: milestone.observationNote || null,
-              photoObjectKey: milestone.photoObjectKey || null,
-              observedAt: new Date(milestone.observedAt).toISOString(),
-            })
-          }
-        />
-      ) : null}
-
-      {activeSection === 'Delivery Records' ? (
-        <DeliveryRecordsSection
-          deliveries={activityDeliveries}
-          isLoading={deliveriesQuery.isLoading}
-        />
-      ) : null}
+        <TabsContent value="Delivery Records">
+          <DeliveryRecordsSection
+            deliveries={activityDeliveries}
+            isLoading={deliveriesQuery.isLoading}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -536,7 +555,6 @@ function CreatePostSection({
   toggleStudent: (studentId: string) => void;
   createPost: () => void;
 }) {
-  const setupMissing = !classesLoading && classes.length === 0;
   const audienceLabel = post.studentIds.length
     ? `${post.studentIds.length} specific student${post.studentIds.length === 1 ? '' : 's'}`
     : post.sectionId
@@ -544,193 +562,188 @@ function CreatePostSection({
       : 'Whole class';
 
   return (
-    <section className="grid gap-6 xl:grid-cols-[minmax(0,1.12fr)_minmax(340px,0.88fr)]">
-      <div className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="label">Activity Composer</p>
-            <h2 className="mt-2 text-xl font-bold text-gray-950">Create classroom moment</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">
-              Guardians will be notified through SchoolOS notifications after publish.
-            </p>
-          </div>
-          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
-            AI captions later
-          </span>
-        </div>
-
-        {setupMissing ? (
-          <EmptyState
-            title="Setup required"
-            body="Create at least one class before publishing activity posts."
-          />
-        ) : (
-          <div className="mt-5 grid gap-5">
-            <div className="grid gap-3 md:grid-cols-2">
-              <label>
-                <span className="label mb-2 block">Class</span>
-                <select
-                  value={post.classId}
-                  onChange={(event) =>
-                    setPost((current) => ({
-                      ...current,
-                      classId: event.target.value,
-                      sectionId: '',
-                      studentIds: [],
-                    }))
-                  }
-                  className="min-h-11"
-                >
-                  <option value="">Select class</option>
-                  {classes.map((classroom) => (
-                    <option key={classroom.id} value={classroom.id}>
-                      {classroom.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span className="label mb-2 block">Section</span>
-                <select
-                  value={post.sectionId}
-                  onChange={(event) =>
-                    setPost((current) => ({
-                      ...current,
-                      sectionId: event.target.value,
-                      studentIds: [],
-                    }))
-                  }
-                  className="min-h-11"
-                >
-                  <option value="">Whole class</option>
-                  {sections.map((section) => (
-                    <option key={section.id} value={section.id}>
-                      {section.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div className="rounded-3xl border border-[var(--line)] bg-white/80 p-4 shadow-sm">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="label">Audience</p>
-                  <p className="mt-1 text-sm text-[var(--muted)]">
-                    Choose no students for whole class/section, or tag specific children.
-                  </p>
-                </div>
-                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                  {post.studentIds.length} selected
-                </span>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {students.length > 0 ? (
-                  students.map((student) => {
-                    const selected = post.studentIds.includes(student.id);
-
-                    return (
-                      <button
-                        key={student.id}
-                        type="button"
-                        className={`min-h-11 rounded-full border px-3 text-xs font-semibold transition-all hover:-translate-y-0.5 ${
-                          selected
-                            ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
-                            : 'border-[var(--line)] bg-white text-gray-700 hover:border-emerald-400 hover:bg-emerald-50'
-                        }`}
-                        onClick={() => toggleStudent(student.id)}
-                      >
-                        {studentDisplayName(student)}
-                      </button>
-                    );
-                  })
-                ) : (
-                  <p className="text-sm text-[var(--muted)]">No students found for this class.</p>
-                )}
-              </div>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-[220px_1fr]">
-              <label>
-                <span className="label mb-2 block">Category</span>
-                <select
-                  value={post.category}
-                  onChange={(event) =>
-                    setPost((current) => ({
-                      ...current,
-                      category: event.target.value as ActivityCategory,
-                    }))
-                  }
-                  className="min-h-11"
-                >
-                  {activityCategories.map((category) => (
-                    <option key={category} value={category}>
-                      {formatEnumLabel(category)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span className="label mb-2 block">Title</span>
-                <input
-                  value={post.title}
-                  onChange={(event) =>
-                    setPost((current) => ({ ...current, title: event.target.value }))
-                  }
-                  placeholder="Post title"
-                  className="min-h-11"
-                />
-              </label>
-            </div>
-
-            <label>
-              <span className="label mb-2 block">Caption</span>
-              <textarea
-                rows={4}
-                value={post.caption}
-                onChange={(event) =>
-                  setPost((current) => ({ ...current, caption: event.target.value }))
-                }
-                placeholder="What happened in class today?"
-              />
-            </label>
-
+    <div className="grid gap-8 xl:grid-cols-3">
+      <div className="xl:col-span-2 space-y-6">
+        <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-8">
+          <div className="flex items-center justify-between">
             <div>
-              <label>
-                <span className="label mb-2 block">Photos</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(event) => updateFiles(event.target.files)}
-                  className="min-h-11"
-                />
-              </label>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Attach 1 to 5 images. Files stay private; permanent public URLs are not shown.
+              <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">Create classroom moment</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Guardians will be notified through SchoolOS notifications after publish.
               </p>
-              {selectedFiles.length > 0 ? (
-                <div className="mt-3 grid gap-2">
+            </div>
+            <Badge variant="outline" className="font-black uppercase tracking-widest text-[10px]">
+              AI captions later
+            </Badge>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <FormField label="Class">
+              <Select
+                value={post.classId}
+                onChange={(event) =>
+                  setPost((current) => ({
+                    ...current,
+                    classId: event.target.value,
+                    sectionId: '',
+                    studentIds: [],
+                  }))
+                }
+              >
+                <option value="">Select class</option>
+                {classes.map((classroom) => (
+                  <option key={classroom.id} value={classroom.id}>
+                    {classroom.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+
+            <FormField label="Section">
+              <Select
+                value={post.sectionId}
+                onChange={(event) =>
+                  setPost((current) => ({
+                    ...current,
+                    sectionId: event.target.value,
+                    studentIds: [],
+                  }))
+                }
+              >
+                <option value="">Whole class</option>
+                {sections.map((section) => (
+                  <option key={section.id} value={section.id}>
+                    {section.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          </div>
+
+          <div className="bg-slate-50 p-6 rounded-[1.5rem] border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-black text-slate-900 uppercase tracking-widest text-[11px]">Tagged Students</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Choose specific children to notify their guardians exclusively.
+                </p>
+              </div>
+              <Badge variant="secondary" className="font-black uppercase tracking-widest text-[10px]">
+                {post.studentIds.length} Selected
+              </Badge>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {students.length > 0 ? (
+                students.map((student) => {
+                  const selected = post.studentIds.includes(student.id);
+
+                  return (
+                    <button
+                      key={student.id}
+                      type="button"
+                      className={cn(
+                        "h-9 px-4 rounded-full text-[11px] font-black uppercase tracking-widest transition-all",
+                        selected
+                          ? "bg-slate-900 text-white shadow-md shadow-slate-200"
+                          : "bg-white border border-slate-200 text-slate-600 hover:border-slate-300"
+                      )}
+                      onClick={() => toggleStudent(student.id)}
+                    >
+                      {studentDisplayName(student)}
+                    </button>
+                  );
+                })
+              ) : (
+                <EmptyState 
+                  title="No students" 
+                  description="No students found for this class/section." 
+                  className="bg-white"
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-3">
+            <FormField label="Category">
+              <Select
+                value={post.category}
+                onChange={(event) =>
+                  setPost((current) => ({
+                    ...current,
+                    category: event.target.value as ActivityCategory,
+                  }))
+                }
+              >
+                {activityCategories.map((category) => (
+                  <option key={category} value={category}>
+                    {formatEnumLabel(category)}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+
+            <FormField label="Title" className="md:col-span-2">
+              <Input
+                value={post.title}
+                onChange={(event) =>
+                  setPost((current) => ({ ...current, title: event.target.value }))
+                }
+                placeholder="Post title"
+              />
+            </FormField>
+          </div>
+
+          <FormField label="Caption">
+            <TextArea
+              rows={4}
+              value={post.caption}
+              onChange={(event) =>
+                setPost((current) => ({ ...current, caption: event.target.value }))
+              }
+              placeholder="What happened in class today?"
+            />
+          </FormField>
+
+          <FormField label="Photos">
+            <div className="space-y-4">
+              <Input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(event) => updateFiles(event.target.files)}
+                className="file:bg-slate-100 file:border-0 file:rounded-full file:px-4 file:text-[10px] file:font-black file:uppercase file:tracking-widest"
+              />
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Attach 1 to 5 images. Private media stay encrypted.
+              </p>
+              
+              {selectedFiles.length > 0 && (
+                <div className="grid gap-2">
                   {selectedFiles.map((file) => (
                     <div
                       key={`${file.name}-${file.size}`}
-                      className="rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm shadow-sm"
+                      className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50"
                     >
-                      <span className="font-semibold">{file.name}</span>
-                      <span className="text-[var(--muted)]"> / {formatFileSize(file.size)}</span>
+                      <span className="text-xs font-black text-slate-900 uppercase tracking-tight">{file.name}</span>
+                      <Badge variant="outline" className="text-[10px] font-black uppercase">
+                        {formatFileSize(file.size)}
+                      </Badge>
                     </div>
                   ))}
                 </div>
-              ) : null}
+              )}
             </div>
+          </FormField>
 
-            {fileWarning ? <InlineMessage tone="error" message={fileWarning} /> : null}
-            {mutationError ? <InlineMessage tone="error" message={mutationError} /> : null}
-            {postSuccess ? <InlineMessage tone="success" message={postSuccess} /> : null}
+          <div className="space-y-4 pt-4">
+            {fileWarning && <InlineMessage tone="error" message={fileWarning} />}
+            {mutationError && <InlineMessage tone="error" message={mutationError} />}
+            {postSuccess && <InlineMessage tone="success" message={postSuccess} />}
 
             <button
               type="button"
-              className="min-h-12 rounded-2xl bg-gradient-to-r from-gray-950 to-gray-800 px-5 py-3 font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full h-14 rounded-2xl bg-slate-900 text-white font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-slate-200 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0"
               disabled={
                 !post.classId ||
                 post.caption.trim().length < 2 ||
@@ -741,21 +754,23 @@ function CreatePostSection({
               }
               onClick={() => void createPost()}
             >
-              {isPending ? 'Publishing...' : 'Publish activity post'}
+              {isPending ? 'Publishing...' : 'Publish Activity Post'}
             </button>
           </div>
-        )}
+        </div>
       </div>
 
-      <ReviewPanel
-        audienceLabel={audienceLabel}
-        selectedClassName={classes.find((item) => item.id === post.classId)?.name ?? 'Not selected'}
-        selectedSectionName={sections.find((item) => item.id === post.sectionId)?.name ?? 'Whole class'}
-        selectedStudents={selectedStudents}
-        photoCount={selectedFiles.length}
-        category={post.category}
-      />
-    </section>
+      <div className="space-y-6">
+        <ReviewPanel
+          audienceLabel={audienceLabel}
+          selectedClassName={classes.find((item) => item.id === post.classId)?.name ?? 'Not selected'}
+          selectedSectionName={sections.find((item) => item.id === post.sectionId)?.name ?? 'Whole class'}
+          selectedStudents={selectedStudents}
+          photoCount={selectedFiles.length}
+          category={post.category}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -775,26 +790,35 @@ function ReviewPanel({
   category: string;
 }) {
   return (
-    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm xl:sticky xl:top-28 xl:self-start">
-      <p className="label">Review Before Publish</p>
-      <div className="mt-4 grid gap-3">
+    <div className="bg-slate-900 p-8 rounded-[2rem] text-white space-y-6 sticky top-28 shadow-2xl">
+      <div>
+        <h3 className="text-lg font-black uppercase italic tracking-widest text-emerald-400">Review Summary</h3>
+        <p className="text-xs text-slate-400 mt-1 uppercase tracking-[0.1em] font-bold">Verify before publishing</p>
+      </div>
+
+      <div className="space-y-4">
         <Fact label="Audience" value={audienceLabel} />
         <Fact label="Class / Section" value={`${selectedClassName} / ${selectedSectionName}`} />
         <Fact label="Category" value={formatEnumLabel(category)} />
-        <Fact label="Photo Count" value={`${photoCount} image${photoCount === 1 ? '' : 's'}`} />
+        <Fact label="Photos" value={`${photoCount} image${photoCount === 1 ? '' : 's'}`} />
       </div>
-      <div className="mt-4 rounded-2xl border border-[var(--line)] bg-white/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-        <p className="font-semibold text-gray-950">Tagged students</p>
-        <p className="mt-1 text-sm text-[var(--muted)]">
+
+      <div className="p-5 rounded-2xl bg-white/5 border border-white/10">
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Tagged Students</p>
+        <p className="text-xs leading-relaxed font-medium">
           {selectedStudents.length > 0
             ? selectedStudents.map(studentDisplayName).join(', ')
             : 'No specific students tagged; audience follows class/section selection.'}
         </p>
       </div>
-      <p className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-        Guardians will be notified through SchoolOS notifications.
-      </p>
-    </section>
+
+      <div className="flex items-center gap-3 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+        <Smile className="h-5 w-5 text-emerald-400 shrink-0" />
+        <p className="text-[11px] font-black uppercase tracking-widest leading-tight text-emerald-200">
+          Guardians will receive real-time notifications.
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -809,15 +833,22 @@ function FeedPreviewSection({
   students: StudentProfile[];
   reactionMutation: ReactionMutation;
 }) {
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
   return (
-    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-      <p className="label">Feed Preview</p>
-      <h2 className="mt-2 text-xl font-bold text-gray-950">Recent classroom moments</h2>
-      <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        {isLoading ? (
-          <SkeletonList />
-        ) : posts.length > 0 ? (
-          posts.slice(0, 8).map((post) => (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">Recent classroom moments</h2>
+        <Badge variant="secondary" className="font-black uppercase tracking-widest text-[10px]">
+          {posts.length} Posts
+        </Badge>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        {posts.length > 0 ? (
+          posts.slice(0, 12).map((post) => (
             <PostCard
               key={post.id}
               post={post}
@@ -826,13 +857,15 @@ function FeedPreviewSection({
             />
           ))
         ) : (
-          <EmptyState
-            title="No activity posts yet"
-            body="No activity posts yet. Create the first classroom moment."
-          />
+          <div className="lg:col-span-2 xl:col-span-3">
+            <EmptyState
+              title="No activity posts yet"
+              description="Capture the first classroom moment to see it here."
+            />
+          </div>
         )}
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -876,150 +909,109 @@ function PostCard({
   const actor = findReactionActor(students, taggedStudentIds);
 
   return (
-    <article className="rounded-[26px] border border-[var(--line)] bg-white/75 p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h3 className="font-bold text-gray-950">{post.title}</h3>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            {post.publishedAt ? formatDateTime(post.publishedAt) : 'Draft timestamp unavailable'}
-          </p>
+    <article className="group bg-white rounded-[2rem] border border-slate-200 overflow-hidden hover:shadow-xl transition-all duration-300">
+      <div className="p-6 space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <h3 className="font-black text-slate-900 uppercase tracking-tight leading-tight">{post.title}</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              {post.publishedAt ? formatDateTime(post.publishedAt) : 'Draft'}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-1.5">
+            <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest">
+              {formatEnumLabel(post.category)}
+            </Badge>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Badge>{formatEnumLabel(post.category)}</Badge>
-          <Badge>{formatEnumLabel(post.audienceType)}</Badge>
-        </div>
-      </div>
-      <p className="mt-4 text-sm text-gray-700">{post.caption ?? post.body ?? 'No caption'}</p>
 
-      <div className="mt-4 grid gap-3">
-        {post.attachments.length > 0 ? (
-          post.attachments.map((attachment) => (
+        <p className="text-sm text-slate-600 line-clamp-3 leading-relaxed">
+          {post.caption ?? post.body ?? 'No caption'}
+        </p>
+
+        <div className="grid gap-3">
+          {post.attachments.map((attachment) => (
             <div
               key={attachment.id}
-              className="group relative overflow-hidden rounded-2xl border border-[var(--line)] bg-gray-50 transition hover:shadow-md"
+              className="relative aspect-[16/10] rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 group/media"
             >
               {attachment.previewUrl ? (
-                <div className="aspect-[16/10] w-full overflow-hidden">
-                  {/* Private signed media previews are dynamic URLs; keep native img for this viewer. */}
+                <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={attachment.previewUrl}
                     alt={attachment.fileName}
-                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                    className="h-full w-full object-cover transition duration-500 group-hover/media:scale-110"
                   />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
-                  <div className="absolute inset-x-0 bottom-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 transition-transform duration-200 translate-y-full group-hover:translate-y-0">
-                    <p className="text-sm font-semibold text-white truncate">{attachment.fileName}</p>
-                    <div className="mt-3 flex items-center justify-between">
-                      <p className="text-[11px] text-white/80">{formatFileSize(attachment.sizeBytes)}</p>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handlePreview(attachment.id)}
-                          disabled={loadingAttachmentId === attachment.id}
-                          className="rounded-full bg-white/20 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-white/30 disabled:opacity-50"
-                        >
-                          {loadingAttachmentId === attachment.id ? 'Wait...' : 'Preview'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDownload(attachment.id, attachment.fileName)}
-                          disabled={loadingAttachmentId === attachment.id}
-                          className="rounded-full bg-emerald-500/90 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-emerald-400 disabled:opacity-50"
-                        >
-                          {loadingAttachmentId === attachment.id ? 'Wait...' : 'Download'}
-                        </button>
-                      </div>
-                    </div>
-                    {errorAttachmentId === attachment.id && (
-                      <p className="mt-2 text-xs text-red-300">Action failed. Try again.</p>
-                    )}
-                  </div>
-                  <div className="absolute left-3 top-3 rounded bg-black/60 px-2 py-1 text-[10px] font-medium text-white backdrop-blur-sm transition-opacity duration-200 group-hover:opacity-0">
-                    {formatFileSize(attachment.sizeBytes)}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <span className="text-sm font-semibold text-gray-900 truncate block">
-                      {attachment.fileName}
-                    </span>
-                    <span className="text-xs text-[var(--muted)]">
-                      Private media • {formatFileSize(attachment.sizeBytes)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover/media:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2">
                     <button
-                      type="button"
                       onClick={() => handlePreview(attachment.id)}
                       disabled={loadingAttachmentId === attachment.id}
-                      className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50"
+                      className="h-9 px-4 rounded-full bg-white text-slate-900 text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-transform"
                     >
-                      {loadingAttachmentId === attachment.id ? 'Wait...' : 'Preview'}
+                      Preview
                     </button>
                     <button
-                      type="button"
                       onClick={() => handleDownload(attachment.id, attachment.fileName)}
                       disabled={loadingAttachmentId === attachment.id}
-                      className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 disabled:opacity-50"
+                      className="h-9 px-4 rounded-full bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-transform"
                     >
-                      {loadingAttachmentId === attachment.id ? 'Wait...' : 'Download'}
+                      Save
                     </button>
                   </div>
-                  {errorAttachmentId === attachment.id && (
-                    <p className="mt-2 w-full text-xs text-red-500 sm:w-auto">Action failed.</p>
-                  )}
+                </>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center p-4 text-center">
+                  <Camera className="h-6 w-6 text-slate-300 mb-2" />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Private Media</p>
                 </div>
               )}
             </div>
-          ))
-        ) : (
-          <p className="text-sm text-[var(--muted)]">No attachments.</p>
+          ))}
+        </div>
+
+        {post.studentTags.length > 0 && (
+          <div className="pt-4 border-t border-slate-100">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Tagged</p>
+            <div className="flex flex-wrap gap-1.5">
+              {post.studentTags.map((tag) => (
+                <span 
+                  key={tag.studentId}
+                  className="px-2 py-1 rounded-md bg-slate-50 text-slate-600 text-[9px] font-black uppercase tracking-widest border border-slate-100"
+                >
+                  {tag.student ? `${tag.student.firstNameEn} ${tag.student.lastNameEn}` : 'Student'}
+                </span>
+              ))}
+            </div>
+          </div>
         )}
-      </div>
 
-      {post.studentTags.length > 0 ? (
-        <p className="mt-4 text-sm text-[var(--muted)]">
-          Tagged:{' '}
-          {post.studentTags
-            .map((tag) =>
-              tag.student
-                ? `${tag.student.firstNameEn} ${tag.student.lastNameEn}`.trim()
-                : tag.studentId,
-            )
-            .join(', ')}
-        </p>
-      ) : null}
+        <div className="pt-4 flex items-center gap-2">
+          {(['HEART', 'CLAP', 'STAR'] as const).map((reaction) => {
+            const count = post.reactions?.filter((entry) => entry.reaction === reaction).length ?? 0;
+            const Icon = reaction === 'HEART' ? Heart : reaction === 'CLAP' ? Sparkles : Star;
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        {(['HEART', 'CLAP', 'STAR'] as const).map((reaction) => {
-          const count = post.reactions?.filter((entry) => entry.reaction === reaction).length ?? 0;
-
-          return (
-            <button
-              key={reaction}
-              type="button"
-              className="min-h-10 rounded-full border border-[var(--line)] px-3 text-xs font-semibold disabled:opacity-50"
-              disabled={!actor.guardianId && !actor.studentId}
-              title={
-                actor.guardianId || actor.studentId
-                  ? 'Uses linked guardian/student context when available.'
-                  : 'No linked guardian/student context available for reactions.'
-              }
-              onClick={() =>
-                reactionMutation.mutate({
-                  postId: post.id,
-                  reaction,
-                  guardianId: actor.guardianId,
-                  studentId: actor.studentId,
-                })
-              }
-            >
-              {formatEnumLabel(reaction)} {count}
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={reaction}
+                type="button"
+                className="flex items-center gap-1.5 h-9 px-4 rounded-full border border-slate-100 bg-slate-50 hover:bg-slate-100 transition-colors"
+                disabled={!actor.guardianId && !actor.studentId}
+                onClick={() =>
+                  reactionMutation.mutate({
+                    postId: post.id,
+                    reaction,
+                    guardianId: actor.guardianId,
+                    studentId: actor.studentId,
+                  })
+                }
+              >
+                <Icon className={cn("h-3.5 w-3.5", count > 0 ? "text-emerald-500 fill-emerald-500" : "text-slate-400")} />
+                <span className="text-[11px] font-black text-slate-900">{count}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </article>
   );
@@ -1049,111 +1041,142 @@ function MoodLogsSection({
   saveMoodLog: () => void;
 }) {
   return (
-    <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-      <div className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-        <p className="label">Daily Mood Log</p>
-        <p className="mt-2 text-sm text-[var(--muted)]">
-          Record whole-class mood or a child-specific observation for parent context.
-        </p>
-        <div className="mt-5 grid gap-3">
-          <select
-            value={moodLog.classId}
-            onChange={(event) =>
-              setMoodLog((current) => ({
-                ...current,
-                classId: event.target.value,
-                sectionId: '',
-                studentId: '',
-              }))
-            }
-          >
-            <option value="">Select class</option>
-            {classes.map((classroom) => (
-              <option key={classroom.id} value={classroom.id}>
-                {classroom.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={moodLog.sectionId}
-            onChange={(event) =>
-              setMoodLog((current) => ({ ...current, sectionId: event.target.value, studentId: '' }))
-            }
-          >
-            <option value="">Whole class</option>
-            {sections.map((section) => (
-              <option key={section.id} value={section.id}>
-                {section.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={moodLog.studentId}
-            onChange={(event) => setMoodLog((current) => ({ ...current, studentId: event.target.value }))}
-          >
-            <option value="">Whole-class mood option</option>
-            {students.map((student) => (
-              <option key={student.id} value={student.id}>
-                {studentDisplayName(student)}
-              </option>
-            ))}
-          </select>
-          <div className="grid gap-3 md:grid-cols-2">
-            <select
-              value={moodLog.mood}
-              onChange={(event) => setMoodLog((current) => ({ ...current, mood: event.target.value }))}
-            >
-              <option value="CALM">Calm</option>
-              <option value="ENGAGED">Engaged</option>
-              <option value="EXCITED">Excited</option>
-              <option value="UNSETTLED">Unsettled</option>
-              <option value="TIRED">Tired</option>
-            </select>
-            <input
-              type="date"
-              value={moodLog.logDate}
-              onChange={(event) => setMoodLog((current) => ({ ...current, logDate: event.target.value }))}
-            />
+    <div className="grid gap-8 xl:grid-cols-2">
+      <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-8">
+        <div>
+          <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">Daily Mood Log</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Record emotional context for whole-class or child-specific observations.
+          </p>
+        </div>
+
+        <div className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <FormField label="Class">
+              <Select
+                value={moodLog.classId}
+                onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+                  setMoodLog((current) => ({
+                    ...current,
+                    classId: event.target.value,
+                    sectionId: '',
+                    studentId: '',
+                  }))
+                }
+              >
+                <option value="">Select class</option>
+                {classes.map((classroom) => (
+                  <option key={classroom.id} value={classroom.id}>
+                    {classroom.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+
+            <FormField label="Section">
+              <Select
+                value={moodLog.sectionId}
+                onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+                  setMoodLog((current) => ({ ...current, sectionId: event.target.value, studentId: '' }))
+                }
+              >
+                <option value="">Whole class</option>
+                {sections.map((section) => (
+                  <option key={section.id} value={section.id}>
+                    {section.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
           </div>
-          <textarea
-            rows={4}
-            value={moodLog.note}
-            onChange={(event) => setMoodLog((current) => ({ ...current, note: event.target.value }))}
-            placeholder="Optional note"
-          />
-          {mutationError ? <InlineMessage tone="error" message={mutationError} /> : null}
-          <button
-            type="button"
-            className="min-h-12 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!moodLog.classId || isPending}
-            onClick={saveMoodLog}
-          >
-            {isPending ? 'Saving...' : 'Save mood log'}
-          </button>
+
+          <FormField label="Student (Optional)">
+            <Select
+              value={moodLog.studentId}
+              onChange={(event: React.ChangeEvent<HTMLSelectElement>) => setMoodLog((current) => ({ ...current, studentId: event.target.value }))}
+            >
+              <option value="">Whole-class mood</option>
+              {students.map((student) => (
+                <option key={student.id} value={student.id}>
+                  {studentDisplayName(student)}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <FormField label="Mood">
+              <Select
+                value={moodLog.mood}
+                onChange={(event: React.ChangeEvent<HTMLSelectElement>) => setMoodLog((current) => ({ ...current, mood: event.target.value }))}
+              >
+                <option value="CALM">Calm</option>
+                <option value="ENGAGED">Engaged</option>
+                <option value="EXCITED">Excited</option>
+                <option value="UNSETTLED">Unsettled</option>
+                <option value="TIRED">Tired</option>
+              </Select>
+            </FormField>
+            <FormField label="Date">
+              <Input
+                type="date"
+                value={moodLog.logDate}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) => setMoodLog((current) => ({ ...current, logDate: event.target.value }))}
+              />
+            </FormField>
+          </div>
+
+          <FormField label="Observation Note">
+            <TextArea
+              rows={4}
+              value={moodLog.note}
+              onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setMoodLog((current) => ({ ...current, logNote: event.target.value }))}
+              placeholder="Optional teacher observation..."
+            />
+          </FormField>
+
+          <div className="space-y-4">
+            {mutationError && <InlineMessage tone="error" message={mutationError} />}
+            <button
+              type="button"
+              className="w-full h-14 rounded-2xl bg-emerald-600 text-white font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-emerald-100 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0"
+              disabled={!moodLog.classId || isPending}
+              onClick={saveMoodLog}
+            >
+              {isPending ? 'Saving...' : 'Save Mood Log'}
+            </button>
+          </div>
         </div>
       </div>
 
       <HistoryCard title="Mood History" isLoading={logsLoading}>
         {logs.length > 0 ? (
-          logs.slice(0, 8).map((item) => (
-            <div key={item.id} className="rounded-2xl border border-[var(--line)] bg-white/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-              <p className="font-semibold">
-                {formatEnumLabel(item.mood)}
-                {item.student
-                  ? ` / ${item.student.firstNameEn} ${item.student.lastNameEn}`
-                  : ' / Class mood'}
-              </p>
-              <p className="text-sm text-[var(--muted)]">
-                {formatDate(item.logDate)}
-                {item.note ? ` / ${item.note}` : ''}
-              </p>
-            </div>
-          ))
+          <div className="grid gap-4">
+            {logs.slice(0, 8).map((item) => (
+              <div key={item.id} className="p-5 rounded-[1.5rem] bg-white border border-slate-100 shadow-sm flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="font-black text-slate-900 uppercase tracking-tight leading-tight">
+                    {formatEnumLabel(item.mood)}
+                    <span className="ml-2 text-slate-400 font-bold">/</span>
+                    <span className="ml-2 text-slate-600">
+                      {item.student
+                        ? `${item.student.firstNameEn} ${item.student.lastNameEn}`
+                        : 'Whole Class'}
+                    </span>
+                  </p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    {formatDate(item.logDate)}
+                    {item.note && ` · ${item.note}`}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
-          <EmptyState title="No mood logs yet" body="Mood history will appear after teachers save logs." />
+          <EmptyState title="No mood logs" description="Mood history will appear here once recorded." />
         )}
       </HistoryCard>
-    </section>
+    </div>
   );
 }
 
@@ -1187,133 +1210,163 @@ function MilestonesSection({
   saveMilestone: () => void;
 }) {
   return (
-    <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-      <div className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-        <p className="label">Montessori / ECE Milestones</p>
-        <p className="mt-2 text-sm text-[var(--muted)]">
-          Track developmental observations without public photo URLs.
-        </p>
-        <div className="mt-5 grid gap-3">
-          <div className="grid gap-3 md:grid-cols-2">
-            <select
-              value={milestone.classId}
-              onChange={(event) =>
-                setMilestone((current) => ({
-                  ...current,
-                  classId: event.target.value,
-                  sectionId: '',
-                  studentId: '',
-                }))
+    <div className="grid gap-8 xl:grid-cols-2">
+      <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-8">
+        <div>
+          <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">ECE Milestones</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Track developmental observations without exposing public photo URLs.
+          </p>
+        </div>
+
+        <div className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <FormField label="Class">
+              <Select
+                value={milestone.classId}
+                onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+                  setMilestone((current) => ({
+                    ...current,
+                    classId: event.target.value,
+                    sectionId: '',
+                    studentId: '',
+                  }))
+                }
+              >
+                <option value="">Select class</option>
+                {classes.map((classroom) => (
+                  <option key={classroom.id} value={classroom.id}>
+                    {classroom.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+
+            <FormField label="Section">
+              <Select
+                value={milestone.sectionId}
+                onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+                  setMilestone((current) => ({
+                    ...current,
+                    sectionId: event.target.value,
+                    studentId: '',
+                  }))
+                }
+              >
+                <option value="">Whole class</option>
+                {sections.map((section) => (
+                  <option key={section.id} value={section.id}>
+                    {section.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          </div>
+
+          <FormField label="Student">
+            <Select
+              value={milestone.studentId}
+              onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+                setMilestone((current) => ({ ...current, studentId: event.target.value }))
               }
             >
-              <option value="">Select class</option>
-              {classes.map((classroom) => (
-                <option key={classroom.id} value={classroom.id}>
-                  {classroom.name}
+              <option value="">Select child</option>
+              {students.map((student) => (
+                <option key={student.id} value={student.id}>
+                  {studentDisplayName(student)}
                 </option>
               ))}
-            </select>
-            <select
-              value={milestone.sectionId}
+            </Select>
+          </FormField>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <FormField label="Domain">
+              <Input
+                value={milestone.domain}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  setMilestone((current) => ({ ...current, domain: event.target.value }))
+                }
+                placeholder="e.g. Cognitive"
+              />
+            </FormField>
+            <FormField label="Status">
+              <Select
+                value={milestone.status}
+                onChange={(event) =>
+                  setMilestone((current) => ({
+                    ...current,
+                    status: event.target.value as MilestoneStatus,
+                  }))
+                }
+              >
+                {milestoneStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {formatEnumLabel(status)}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          </div>
+
+          <FormField label="Milestone Description">
+            <Input
+              value={milestone.milestone}
               onChange={(event) =>
-                setMilestone((current) => ({
-                  ...current,
-                  sectionId: event.target.value,
-                  studentId: '',
-                }))
+                setMilestone((current) => ({ ...current, milestone: event.target.value }))
               }
+              placeholder="e.g. Recognizing primary colors"
+            />
+          </FormField>
+
+          <FormField label="Observation Note">
+            <TextArea
+              rows={3}
+              value={milestone.observationNote}
+              onChange={(event) =>
+                setMilestone((current) => ({ ...current, observationNote: event.target.value }))
+              }
+              placeholder="Detail your observation..."
+            />
+          </FormField>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <FormField label="Photo Reference (Optional)">
+              <Input
+                value={milestone.photoObjectKey}
+                onChange={(event) =>
+                  setMilestone((current) => ({ ...current, photoObjectKey: event.target.value }))
+                }
+                placeholder="Private object key"
+              />
+            </FormField>
+            <FormField label="Observed At">
+              <Input
+                type="date"
+                value={milestone.observedAt}
+                onChange={(event) =>
+                  setMilestone((current) => ({ ...current, observedAt: event.target.value }))
+                }
+              />
+            </FormField>
+          </div>
+
+          <div className="space-y-4">
+            {mutationError && <InlineMessage tone="error" message={mutationError} />}
+            <button
+              type="button"
+              className="w-full h-14 rounded-2xl bg-indigo-600 text-white font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-indigo-100 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0"
+              disabled={!milestone.classId || !milestone.studentId || isPending}
+              onClick={saveMilestone}
             >
-              <option value="">Whole class</option>
-              {sections.map((section) => (
-                <option key={section.id} value={section.id}>
-                  {section.name}
-                </option>
-              ))}
-            </select>
+              {isPending ? 'Saving...' : 'Save Milestone'}
+            </button>
           </div>
-          <select
-            value={milestone.studentId}
-            onChange={(event) =>
-              setMilestone((current) => ({ ...current, studentId: event.target.value }))
-            }
-          >
-            <option value="">Select child</option>
-            {students.map((student) => (
-              <option key={student.id} value={student.id}>
-                {studentDisplayName(student)}
-              </option>
-            ))}
-          </select>
-          <div className="grid gap-3 md:grid-cols-2">
-            <input
-              value={milestone.domain}
-              onChange={(event) =>
-                setMilestone((current) => ({ ...current, domain: event.target.value }))
-              }
-              placeholder="Domain"
-            />
-            <select
-              value={milestone.status}
-              onChange={(event) =>
-                setMilestone((current) => ({
-                  ...current,
-                  status: event.target.value as MilestoneStatus,
-                }))
-              }
-            >
-              {milestoneStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {formatEnumLabel(status)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <input
-            value={milestone.milestone}
-            onChange={(event) =>
-              setMilestone((current) => ({ ...current, milestone: event.target.value }))
-            }
-            placeholder="Milestone"
-          />
-          <textarea
-            rows={3}
-            value={milestone.observationNote}
-            onChange={(event) =>
-              setMilestone((current) => ({ ...current, observationNote: event.target.value }))
-            }
-            placeholder="Observation note"
-          />
-          <div className="grid gap-3 md:grid-cols-2">
-            <input
-              value={milestone.photoObjectKey}
-              onChange={(event) =>
-                setMilestone((current) => ({ ...current, photoObjectKey: event.target.value }))
-              }
-              placeholder="Optional private photo object reference"
-            />
-            <input
-              type="date"
-              value={milestone.observedAt}
-              onChange={(event) =>
-                setMilestone((current) => ({ ...current, observedAt: event.target.value }))
-              }
-            />
-          </div>
-          {mutationError ? <InlineMessage tone="error" message={mutationError} /> : null}
-          <button
-            type="button"
-            className="min-h-12 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!milestone.classId || !milestone.studentId || isPending}
-            onClick={saveMilestone}
-          >
-            {isPending ? 'Saving...' : 'Save milestone'}
-          </button>
         </div>
       </div>
 
       <HistoryCard title="Milestone Archive" isLoading={milestonesLoading}>
-        <div className="grid gap-3 md:grid-cols-2">
-          <select
+        <div className="grid gap-4 md:grid-cols-2 mb-8">
+          <Select
             value={filters.studentId}
             onChange={(event) =>
               setFilters((current) => ({
@@ -1328,8 +1381,8 @@ function MilestonesSection({
                 {studentDisplayName(student)}
               </option>
             ))}
-          </select>
-          <input
+          </Select>
+          <Input
             type="month"
             value={filters.month}
             onChange={(event) =>
@@ -1340,25 +1393,33 @@ function MilestonesSection({
             }
           />
         </div>
-        <div className="mt-4 grid gap-3">
-          {milestones.length > 0 ? (
-            milestones.slice(0, 8).map((item) => (
-              <div key={item.id} className="rounded-2xl border border-[var(--line)] bg-white/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                <p className="font-semibold">{item.milestone}</p>
-                <p className="text-sm text-[var(--muted)]">
-                  {item.domain} / {formatEnumLabel(item.status)} / {formatDate(item.observedAt)}
+
+        {milestones.length > 0 ? (
+          <div className="grid gap-4">
+            {milestones.slice(0, 8).map((item) => (
+              <div key={item.id} className="p-5 rounded-[1.5rem] bg-white border border-slate-100 shadow-sm space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-black text-slate-900 uppercase tracking-tight">{item.milestone}</h4>
+                  <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest">
+                    {formatEnumLabel(item.status)}
+                  </Badge>
+                </div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  {item.domain} · {formatDate(item.observedAt)}
                 </p>
-                {item.observationNote ? (
-                  <p className="mt-2 text-sm text-[var(--muted)]">{item.observationNote}</p>
-                ) : null}
+                {item.observationNote && (
+                  <p className="text-xs text-slate-600 leading-relaxed italic border-l-2 border-slate-100 pl-4 py-1">
+                    {item.observationNote}
+                  </p>
+                )}
               </div>
-            ))
-          ) : (
-            <EmptyState title="No milestones" body="No milestones for this filter yet." />
-          )}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="No milestones" description="No developmental observations found for these filters." />
+        )}
       </HistoryCard>
-    </section>
+    </div>
   );
 }
 
@@ -1369,34 +1430,38 @@ function DeliveryRecordsSection({
   deliveries: NotificationDelivery[];
   isLoading: boolean;
 }) {
+  if (isLoading) return <LoadingState />;
+
   return (
-    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-      <p className="label">Activity Delivery Records</p>
-      <h2 className="mt-2 text-xl font-bold text-gray-950">Guardian notification delivery</h2>
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
-        {isLoading ? (
-          <SkeletonList />
-        ) : deliveries.length > 0 ? (
-          deliveries.slice(0, 10).map((delivery) => (
-            <div key={delivery.id} className="rounded-2xl border border-[var(--line)] bg-white/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-              <div className="flex items-start justify-between gap-3">
-                <p className="font-semibold">{delivery.title}</p>
-                <StatusBadge status={delivery.status} />
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">Activity Delivery Records</h2>
+        <p className="mt-1 text-sm text-slate-500">Audit trail for guardian notification delivery status.</p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {deliveries.length > 0 ? (
+          deliveries.slice(0, 20).map((delivery) => (
+            <div key={delivery.id} className="p-5 rounded-[1.5rem] bg-white border border-slate-200 shadow-sm flex items-start justify-between gap-4">
+              <div className="space-y-2">
+                <p className="font-black text-slate-900 uppercase tracking-tight leading-tight">{delivery.title}</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  {delivery.channel} · {delivery.destination || 'Direct'} · {formatDateTime(delivery.createdAt)}
+                </p>
               </div>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                {delivery.channel} / {delivery.destination ?? 'no destination'} /{' '}
-                {formatDateTime(delivery.createdAt)}
-              </p>
+              <StatusBadge status={delivery.status} />
             </div>
           ))
         ) : (
-          <EmptyState
-            title="No activity delivery records"
-            body="No activity delivery records yet."
-          />
+          <div className="md:col-span-2">
+            <EmptyState
+              title="No delivery records"
+              description="Notification history will appear here once activities are published."
+            />
+          </div>
         )}
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -1410,109 +1475,55 @@ function HistoryCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-      <p className="label mb-4">{title}</p>
-      {isLoading ? <SkeletonList /> : children}
-    </section>
-  );
-}
-
-function ActivityMetricCard({
-  label,
-  value,
-  tone = 'neutral',
-}: {
-  label: string;
-  value: string;
-  tone?: 'neutral' | 'success' | 'warning' | 'info';
-}) {
-  const toneClass = {
-    neutral: 'bg-white/10 text-white ring-white/15',
-    success: 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/20',
-    warning: 'bg-amber-400/15 text-amber-100 ring-amber-300/20',
-    info: 'bg-sky-400/15 text-sky-100 ring-sky-300/20',
-  }[tone];
-
-  return (
-    <div className={`rounded-2xl p-4 ring-1 ${toneClass}`}>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-75">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-bold">{value}</p>
+    <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-200 shadow-inner">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">{title}</h3>
+        {isLoading && <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />}
+      </div>
+      {children}
     </div>
   );
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-[var(--line)] bg-white/80 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-      <p className="label">{label}</p>
-      <p className="mt-1 font-semibold text-gray-950">{value}</p>
+    <div className="flex items-center justify-between py-1 border-b border-white/5 last:border-0">
+      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</span>
+      <span className="text-[11px] font-bold text-slate-200">{value}</span>
     </div>
-  );
-}
-
-function Badge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded-full border border-[var(--line)] bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700">
-      {children}
-    </span>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const statusTone = deliveryStatuses.includes(status as (typeof deliveryStatuses)[number])
-    ? status
-    : 'QUEUED';
-  const className =
-    statusTone === 'SENT'
-      ? 'bg-emerald-50 text-emerald-700'
-      : statusTone === 'FAILED'
-        ? 'bg-red-50 text-red-700'
-        : statusTone === 'SKIPPED'
-          ? 'bg-gray-100 text-gray-700'
-          : 'bg-amber-50 text-amber-700';
+  const isSent = status === 'SENT';
+  const isFailed = status === 'FAILED';
+  const isSkipped = status === 'SKIPPED';
 
   return (
-    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${className}`}>
+    <span className={cn(
+      "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest",
+      isSent ? "bg-emerald-100 text-emerald-700" :
+      isFailed ? "bg-red-100 text-red-700" :
+      isSkipped ? "bg-slate-100 text-slate-600" :
+      "bg-amber-100 text-amber-700"
+    )}>
       {status}
     </span>
-  );
-}
-
-function EmptyState({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-[var(--line)] bg-gray-50/80 p-5 text-sm">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg shadow-sm">
-        ✦
-      </div>
-      <p className="font-semibold text-gray-950">{title}</p>
-      <p className="mt-1 text-[var(--muted)]">{body}</p>
-    </div>
   );
 }
 
 function InlineMessage({ tone, message }: { tone: 'success' | 'error'; message: string }) {
   return (
     <p
-      className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
+      className={cn(
+        "rounded-2xl border px-5 py-4 text-[11px] font-black uppercase tracking-widest leading-relaxed",
         tone === 'success'
-          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-          : 'border-red-200 bg-red-50 text-red-700'
-      }`}
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm shadow-emerald-100'
+          : 'border-red-200 bg-red-50 text-red-700 shadow-sm shadow-red-100'
+      )}
     >
       {message}
     </p>
-  );
-}
-
-function SkeletonList() {
-  return (
-    <div className="grid gap-3">
-      {[0, 1, 2].map((item) => (
-        <div key={item} className="h-24 animate-pulse rounded-2xl bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
-      ))}
-    </div>
   );
 }
 
@@ -1602,3 +1613,4 @@ function formatDateTime(value: string | Date | null | undefined) {
     timeStyle: 'short',
   }).format(new Date(value));
 }
+

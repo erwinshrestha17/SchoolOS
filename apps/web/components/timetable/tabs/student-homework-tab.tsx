@@ -13,9 +13,23 @@ import {
   MessageSquare,
   Trophy,
   Paperclip,
-  X
+  X,
+  FileText,
+  User,
+  GraduationCap
 } from 'lucide-react';
 import type { HomeworkSubmissionSummary } from '@schoolos/core';
+import { SectionCard } from '../../ui/section-card';
+import { StatCard } from '../../ui/stat-card';
+import { Badge } from '../../ui/badge';
+import { EmptyState } from '../../ui/empty-state';
+import { LoadingState } from '../../ui/loading-state';
+import { 
+  FormField, 
+  Input, 
+  TextArea 
+} from '../../ui/form-field';
+import { cn } from '../../../lib/utils';
 
 type HomeworkAttachment = {
   id: string;
@@ -24,18 +38,6 @@ type HomeworkAttachment = {
     originalFilename?: string | null;
   } | null;
 };
-
-// Simple local format helper since date-fns is missing
-function format(date: Date | string, pattern: string) {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  if (pattern === 'MMM d, h:mm a') {
-    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
-  }
-  if (pattern === 'PPP p') {
-    return d.toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' });
-  }
-  return d.toLocaleDateString();
-}
 
 export function StudentHomeworkTab() {
   const queryClient = useQueryClient();
@@ -46,186 +48,223 @@ export function StudentHomeworkTab() {
     queryFn: () => api.listHomeworkSubmissions(),
   });
 
-  // Since the current listHomework might return all assignments if we're not careful,
-  // we should ideally have an endpoint that returns ONLY the student's submissions.
-  // But listHomework with studentId filter works if we can get the studentId.
-  // For now, let's assume the backend handles the student scoping if we're logged in as a student.
-
   const selectedSubmission = submissions?.find((s: HomeworkSubmissionSummary) => s.id === selectedSubmissionId);
 
-  if (isLoading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
-      </div>
-    );
-  }
-
-  if (!submissions || submissions.length === 0) {
-    return (
-      <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--line)] bg-white/50 text-center">
-        <BookOpen className="mb-2 h-10 w-10 text-[var(--muted)]" />
-        <h3 className="text-lg font-semibold">No homework assigned</h3>
-        <p className="text-sm text-[var(--muted)]">Great job! You&apos;re all caught up.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="grid h-full grid-cols-1 gap-6 lg:grid-cols-12">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 items-start">
       {/* Submissions List */}
-      <div className="space-y-4 lg:col-span-5 overflow-y-auto pr-2">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--muted)] px-1">Assignments</h3>
-        {submissions.map((submission: HomeworkSubmissionSummary) => (
-          <button
-            key={submission.id}
-            onClick={() => setSelectedSubmissionId(submission.id)}
-            className={`w-full flex flex-col gap-2 rounded-2xl border p-4 text-left transition-all hover:shadow-md ${
-              selectedSubmissionId === submission.id
-                ? 'border-primary-500 bg-primary-50/30 ring-1 ring-primary-500'
-                : 'border-[var(--line)] bg-white/70 hover:border-gray-300'
-            }`}
-          >
-            <div className="flex items-start justify-between">
-              <StatusBadge status={submission.status} />
-              <div className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
-                <Clock size={12} />
-                {format(new Date(submission.homework?.dueAt || ''), 'MMM d, h:mm a')}
-              </div>
+      <div className="lg:col-span-4 space-y-6">
+        <SectionCard 
+          title="My Assignments" 
+          headerAction={
+            <Badge variant="secondary" className="font-black uppercase tracking-widest text-[10px]">
+              {submissions?.length ?? 0} Tasks
+            </Badge>
+          }
+        >
+          {isLoading ? (
+            <LoadingState />
+          ) : !submissions || submissions.length === 0 ? (
+            <EmptyState 
+              title="All caught up!" 
+              description="No homework assignments found for your account." 
+              className="bg-slate-50/50"
+              icon={<GraduationCap className="h-8 w-8 text-slate-300" />}
+            />
+          ) : (
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+              {submissions.map((submission: HomeworkSubmissionSummary) => (
+                <button
+                  key={submission.id}
+                  onClick={() => setSelectedSubmissionId(submission.id)}
+                  className={cn(
+                    "w-full text-left p-5 rounded-[1.5rem] border transition-all duration-300 group",
+                    selectedSubmissionId === submission.id
+                      ? "bg-slate-900 border-slate-900 text-white shadow-xl shadow-slate-200"
+                      : "bg-white border-slate-100 hover:border-slate-200 hover:shadow-md"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <p className={cn("text-[9px] font-black uppercase tracking-widest", selectedSubmissionId === submission.id ? "text-indigo-400" : "text-indigo-600")}>
+                        {submission.homework?.subject?.name}
+                      </p>
+                      <h4 className="font-black uppercase tracking-tight text-base italic leading-tight">{submission.homework?.title}</h4>
+                    </div>
+                    <StatusBadge status={submission.status} isSelected={selectedSubmissionId === submission.id} />
+                  </div>
+                  
+                  <div className="mt-4 flex items-center justify-between pt-3 border-t border-white/10">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <Clock size={12} className="shrink-0" />
+                      {new Date(submission.homework?.dueAt || '').toLocaleDateString()}
+                    </div>
+                    {submission.score !== null && (
+                      <div className={cn("flex items-center gap-1 text-[10px] font-black uppercase tracking-widest", selectedSubmissionId === submission.id ? "text-emerald-400" : "text-emerald-600")}>
+                        <Trophy size={12} />
+                        {submission.score}/{submission.homework?.maxScore}
+                      </div>
+                    )}
+                  </div>
+                </button>
+              ))}
             </div>
-            
-            <div>
-              <h4 className="font-semibold text-gray-900 line-clamp-1">{submission.homework?.title}</h4>
-              <p className="text-xs text-[var(--muted)]">{submission.homework?.subject?.name}</p>
-            </div>
-
-            {submission.score !== null && (
-              <div className="mt-1 flex items-center gap-1 text-xs font-bold text-success-600">
-                <Trophy size={12} />
-                Score: {submission.score} / {submission.homework?.maxScore}
-              </div>
-            )}
-          </button>
-        ))}
+          )}
+        </SectionCard>
       </div>
 
       {/* Detail & Submission View */}
-      <div className="lg:col-span-7">
+      <div className="lg:col-span-8 space-y-8">
         {selectedSubmission ? (
-          <div className="flex flex-col gap-6 rounded-3xl border border-[var(--line)] bg-white/80 p-6 shadow-sm min-h-full">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 text-xs font-medium text-primary-600">
-                <span>{selectedSubmission.homework?.subject?.name}</span>
-                <span className="text-gray-300">•</span>
-                <span>Assigned by {selectedSubmission.homework?.assignedByStaff?.firstName} {selectedSubmission.homework?.assignedByStaff?.lastName}</span>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900">{selectedSubmission.homework?.title}</h2>
-            </div>
-
-            <div className="space-y-3">
-              <h4 className="text-sm font-bold uppercase tracking-wider text-[var(--muted)]">Instructions</h4>
-              <div className="rounded-2xl bg-gray-50/50 p-4 text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">
-                {selectedSubmission.homework?.instructions}
-              </div>
-            </div>
-
-            {selectedSubmission.status === 'ASSIGNED' || selectedSubmission.status === 'LATE' ? (
-              <SubmissionForm 
-                submissionId={selectedSubmission.id} 
-                onSuccess={() => {
-                  queryClient.invalidateQueries({ queryKey: ['my-homework'] });
-                }}
-              />
-            ) : (
+          <>
+            <SectionCard title="Assignment Overview">
               <div className="space-y-6">
-                <div className="space-y-3">
-                  <h4 className="text-sm font-bold uppercase tracking-wider text-[var(--muted)]">Your Submission</h4>
-                  <div className="rounded-2xl border border-[var(--line)] bg-white p-4 text-sm text-gray-700 whitespace-pre-wrap">
-                    {selectedSubmission.submissionContent || 'No text content provided.'}
-                    <div className="mt-4 flex items-center gap-2 text-xs text-[var(--muted)] border-t border-[var(--line)] pt-3">
-                      <CheckCircle2 size={14} className="text-success-600" />
-                      Submitted on {format(new Date(selectedSubmission.submittedAt || ''), 'PPP p')}
-                    </div>
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <Badge variant="outline" className="font-black uppercase tracking-widest text-[9px] py-0.5 border-indigo-200 text-indigo-600">
+                      {selectedSubmission.homework?.subject?.name}
+                    </Badge>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      By {selectedSubmission.homework?.assignedByStaff?.firstName} {selectedSubmission.homework?.assignedByStaff?.lastName}
+                    </span>
+                  </div>
+                  <h2 className="text-3xl font-black text-slate-900 uppercase italic tracking-tight leading-none mb-4">{selectedSubmission.homework?.title}</h2>
+                  <div className="rounded-[2rem] bg-slate-50 p-6 text-sm leading-relaxed text-slate-600 italic border border-slate-100 whitespace-pre-wrap">
+                    {selectedSubmission.homework?.instructions}
                   </div>
                 </div>
 
-                {selectedSubmission.attachments && selectedSubmission.attachments.length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-bold uppercase tracking-wider text-[var(--muted)]">Attachments</h4>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {selectedSubmission.attachments.map((a: HomeworkAttachment) => (
-                        <a
-                          key={a.id}
-                          href={a.fileAsset?.publicUrl || '#'}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-3 rounded-xl border border-[var(--line)] bg-white p-3 text-sm transition hover:bg-gray-50"
-                        >
-                          <Paperclip size={14} className="text-primary-600" />
-                          <span className="truncate flex-1 font-medium">{a.fileAsset?.originalFilename}</span>
-                        </a>
-                      ))}
+                <div className="flex items-center gap-6 pt-2">
+                   <div className="space-y-1">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Due Date</p>
+                      <p className="text-sm font-bold text-slate-900 uppercase">
+                        {new Date(selectedSubmission.homework?.dueAt || '').toLocaleString()}
+                      </p>
+                   </div>
+                   <div className="h-8 w-px bg-slate-100" />
+                   <div className="space-y-1">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Max Points</p>
+                      <p className="text-sm font-bold text-slate-900 uppercase">
+                        {selectedSubmission.homework?.maxScore} Points
+                      </p>
+                   </div>
+                </div>
+              </div>
+            </SectionCard>
+
+            {selectedSubmission.status === 'ASSIGNED' || selectedSubmission.status === 'LATE' ? (
+              <SectionCard 
+                title="Your Work" 
+                description="Provide your answer and attach necessary files below."
+              >
+                <SubmissionForm 
+                  submissionId={selectedSubmission.id} 
+                  onSuccess={() => {
+                    queryClient.invalidateQueries({ queryKey: ['my-homework'] });
+                  }}
+                />
+              </SectionCard>
+            ) : (
+              <div className="space-y-8">
+                <SectionCard 
+                  title="My Submission"
+                  headerAction={
+                    <Badge variant="success" className="font-black uppercase tracking-widest text-[9px]">
+                       Submitted
+                    </Badge>
+                  }
+                >
+                  <div className="space-y-6">
+                    <div className="rounded-[2rem] border border-slate-100 bg-white p-6 text-sm text-slate-700 leading-relaxed shadow-sm whitespace-pre-wrap">
+                      {selectedSubmission.submissionContent || 'No text content provided.'}
+                    </div>
+
+                    {selectedSubmission.attachments && selectedSubmission.attachments.length > 0 && (
+                      <div className="space-y-4">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900">Attachments</h4>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {selectedSubmission.attachments.map((a: HomeworkAttachment) => (
+                            <a
+                              key={a.id}
+                              href={a.fileAsset?.publicUrl || '#'}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-[11px] font-black uppercase tracking-widest transition hover:bg-slate-100"
+                            >
+                              <FileText size={16} className="text-indigo-500" />
+                              <span className="truncate flex-1">{a.fileAsset?.originalFilename}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-t border-slate-50 pt-4">
+                      <CheckCircle2 size={14} className="text-emerald-500" />
+                      Finalized on {new Date(selectedSubmission.submittedAt || '').toLocaleString()}
                     </div>
                   </div>
-                )}
+                </SectionCard>
 
                 {selectedSubmission.feedback && (
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-bold uppercase tracking-wider text-[var(--muted)]">Teacher Feedback</h4>
-                    <div className="rounded-2xl bg-primary-50/50 p-4 text-sm border border-primary-100 shadow-inner">
-                      <div className="flex items-start gap-3">
-                        <MessageSquare className="mt-1 h-4 w-4 shrink-0 text-primary-600" />
-                        <p className="text-gray-800 italic">&ldquo;{selectedSubmission.feedback}&rdquo;</p>
+                  <SectionCard 
+                    title="Teacher Feedback" 
+                    className="bg-indigo-900 text-white border-indigo-800 shadow-indigo-100"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="h-10 w-10 rounded-2xl bg-white/10 flex items-center justify-center shrink-0 ring-1 ring-white/20">
+                         <MessageSquare className="h-5 w-5 text-indigo-300" />
+                      </div>
+                      <div>
+                        <p className="text-sm italic leading-relaxed text-indigo-100">&ldquo;{selectedSubmission.feedback}&rdquo;</p>
+                        {selectedSubmission.score !== null && (
+                          <div className="mt-4 flex items-center gap-2">
+                             <Trophy size={14} className="text-amber-400" />
+                             <span className="text-xs font-black uppercase tracking-[0.2em]">Score: {selectedSubmission.score} / {selectedSubmission.homework?.maxScore}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
+                  </SectionCard>
                 )}
               </div>
             )}
-          </div>
+          </>
         ) : (
-          <div className="flex h-full flex-col items-center justify-center rounded-3xl border border-dashed border-[var(--line)] bg-white/50 p-12 text-center">
-            <BookOpen className="mb-4 h-12 w-12 text-[var(--muted)] opacity-20" />
-            <h3 className="text-xl font-bold text-gray-900">Select an assignment</h3>
-            <p className="text-sm text-[var(--muted)] max-w-xs mx-auto mt-1">
-              Click on an assignment from the list to view instructions and submit your work.
+          <SectionCard className="h-full flex flex-col items-center justify-center py-24 bg-slate-50/50 border-dashed border-2">
+            <div className="h-20 w-20 rounded-full bg-white flex items-center justify-center shadow-sm mb-8 ring-8 ring-slate-100/50">
+              <BookOpen className="h-10 w-10 text-slate-300" />
+            </div>
+            <h3 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">Assignment Portal</h3>
+            <p className="mt-2 text-sm text-slate-500 max-w-xs text-center font-medium">
+              Select an active assignment from the sidebar to view details, instructions, and submit your work.
             </p>
-          </div>
+          </SectionCard>
         )}
       </div>
     </div>
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  switch (status) {
-    case 'ASSIGNED':
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-600 border border-gray-200">
-          Pending
-        </span>
-      );
-    case 'SUBMITTED':
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-700 border border-primary-100">
-          Submitted
-        </span>
-      );
-    case 'REVIEWED':
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-success-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-success-700 border border-success-100">
-          Reviewed
-        </span>
-      );
-    case 'LATE':
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-danger-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-danger-700 border border-danger-100">
-          Late
-        </span>
-      );
-    default:
-      return null;
-  }
+function StatusBadge({ status, isSelected }: { status: string; isSelected: boolean }) {
+  const isAssigned = status === 'ASSIGNED';
+  const isSubmitted = status === 'SUBMITTED';
+  const isReviewed = status === 'REVIEWED';
+  const isLate = status === 'LATE';
+
+  return (
+    <span className={cn(
+      "inline-flex items-center px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest",
+      isSelected 
+        ? "bg-white/10 text-white ring-1 ring-white/20" 
+        : isReviewed ? "bg-emerald-100 text-emerald-700" :
+          isSubmitted ? "bg-indigo-100 text-indigo-700" :
+          isLate ? "bg-amber-100 text-amber-700" :
+          "bg-slate-100 text-slate-500"
+    )}>
+      {isAssigned ? 'Pending' : status}
+    </span>
+  );
 }
 
 function SubmissionForm({ submissionId, onSuccess }: { submissionId: string, onSuccess: () => void }) {
@@ -279,24 +318,23 @@ function SubmissionForm({ submissionId, onSuccess }: { submissionId: string, onS
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 mt-auto border-t border-[var(--line)] pt-6">
-      <div className="space-y-2">
-        <label className="text-sm font-bold uppercase tracking-wider text-[var(--muted)]">Your Answer</label>
-        <textarea
-          className="w-full rounded-2xl border border-[var(--line)] bg-white p-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 min-h-[160px] resize-none"
-          placeholder="Type your response here..."
+    <form onSubmit={handleSubmit} className="space-y-8">
+      <FormField label="Your Submission Text">
+        <TextArea
+          rows={6}
+          placeholder="Type your response or assignment details here..."
           value={content}
           onChange={(e) => setContent(e.target.value)}
           disabled={mutation.isPending || isUploading}
         />
-      </div>
+      </FormField>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-bold uppercase tracking-wider text-[var(--muted)]">Attachments</label>
-          <label className="cursor-pointer text-xs font-bold text-indigo-600 hover:text-indigo-700 transition flex items-center gap-1">
+          <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900">Supportive Files</h4>
+          <label className="cursor-pointer h-9 px-4 rounded-full bg-indigo-50 text-indigo-700 text-[9px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-colors flex items-center gap-2">
             <Paperclip size={12} />
-            Add File
+            Upload File
             <input 
               type="file" 
               className="hidden" 
@@ -306,41 +344,47 @@ function SubmissionForm({ submissionId, onSuccess }: { submissionId: string, onS
           </label>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           {attachments.map((a) => (
-            <div key={a.id} className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium border border-gray-200">
-              <span className="truncate max-w-[120px]">{a.fileName}</span>
+            <div key={a.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm group">
+              <FileText size={16} className="text-slate-400" />
+              <span className="truncate flex-1 text-[11px] font-bold text-slate-700 uppercase tracking-tight">{a.fileName}</span>
               <button 
                 type="button" 
                 onClick={() => removeAttachment(a.id)}
-                className="text-gray-400 hover:text-danger-600 transition"
+                className="h-8 w-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
               >
                 <X size={14} />
               </button>
             </div>
           ))}
           {isUploading && (
-            <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-1.5 text-xs font-medium border border-dashed border-gray-300">
-              <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
-              <span className="text-gray-400 italic">Uploading...</span>
+            <div className="flex items-center gap-3 rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/30 p-4 animate-pulse">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+              <span className="text-[11px] font-bold text-indigo-500 uppercase tracking-widest italic">Uploading...</span>
             </div>
           )}
         </div>
       </div>
+
       {error && (
-        <div className="flex items-center gap-2 text-xs font-medium text-danger-600 bg-danger-50 p-3 rounded-xl border border-danger-100">
-          <AlertCircle size={14} />
-          {error}
+        <div className="flex items-center gap-3 p-4 rounded-[1.5rem] bg-red-50 border border-red-100 text-red-700">
+          <AlertCircle size={18} className="shrink-0" />
+          <p className="text-xs font-bold uppercase tracking-widest">{error}</p>
         </div>
       )}
-      <div className="flex justify-end">
+
+      <div className="flex justify-end pt-4">
         <button
           type="submit"
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-8 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
-          disabled={mutation.isPending}
+          className="h-14 px-12 rounded-[1.5rem] bg-slate-900 text-white font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-slate-200 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0 flex items-center gap-3"
+          disabled={mutation.isPending || isUploading}
         >
           {mutation.isPending ? (
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            <>
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              Sending...
+            </>
           ) : (
             <>
               <Send size={16} />

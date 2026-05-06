@@ -14,6 +14,27 @@ import type {
   TimetableValidationResult,
   TimetableVersionSummary,
 } from '@schoolos/core';
+import { cn } from '../../../lib/utils';
+import { SectionCard } from '../../ui/section-card';
+import { StatCard } from '../../ui/stat-card';
+import { Badge } from '../../ui/badge';
+import { EmptyState } from '../../ui/empty-state';
+import { LoadingState } from '../../ui/loading-state';
+import { 
+  FormField, 
+  Input, 
+  Select 
+} from '../../ui/form-field';
+import { 
+  Plus, 
+  CheckCircle2, 
+  AlertCircle, 
+  History, 
+  Lock, 
+  Archive, 
+  Zap,
+  Clock
+} from 'lucide-react';
 
 type Props = {
   academicYears: AcademicYearSummary[];
@@ -158,231 +179,271 @@ export function TimetableBuilderTab({
   }, {} as Record<number, any[]>);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Class Context Selector */}
-      <section className="rounded-[28px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm flex items-end gap-4">
-        <div className="flex-1">
-          <label className="mb-2 block text-sm font-semibold text-gray-700">Select Class</label>
-          <select value={classId} onChange={(e) => setClassId(e.target.value)} className="w-full">
-            <option value="">Choose a class to view/build timetable</option>
-            {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+      <SectionCard className="bg-white/90 backdrop-blur-md">
+        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <FormField label="Target Class" className="flex-1 max-w-md">
+            <Select 
+              value={classId} 
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setClassId(e.target.value)}
+            >
+              <option value="">Choose a class to view/build timetable</option>
+              {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+          </FormField>
+
+          <div className="flex items-center gap-3">
+             <Badge variant="outline" className="font-black uppercase tracking-widest text-[10px] py-1.5">
+               {currentYear?.name ?? 'No active year'}
+             </Badge>
+          </div>
         </div>
-      </section>
+      </SectionCard>
 
       {classId && (
         <div className="space-y-6">
-          <section className="grid gap-4 rounded-[28px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm xl:grid-cols-4">
-            <SetupColumn
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <StatCard
               title="Periods"
-              body={`${periodsQuery.data?.length ?? 0} configured`}
-              detail="Create and edit periods from the setup API; slots can link to these period records."
+              value={periodsQuery.data?.length ?? 0}
+              icon={<Clock className="h-5 w-5" />}
             />
-            <SetupColumn
+            <StatCard
               title="Rooms"
-              body={`${rooms.length} active room records`}
-              detail={rooms.slice(0, 3).map((room: RoomSummary) => room.name).join(', ') || 'No rooms configured'}
+              value={rooms.length}
+              icon={<CheckCircle2 className="h-5 w-5" />}
             />
-            <div className="space-y-3 rounded-2xl border border-[var(--line)] p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">Version Workflow</p>
-              <select value={activeVersionId} onChange={(event) => setSelectedVersionId(event.target.value)}>
-                <option value="">Select version</option>
-                {versions.map((version) => (
-                  <option key={version.id} value={version.id}>
-                    {version.versionName} · {version.status}
-                  </option>
-                ))}
-              </select>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="rounded-xl bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700"
-                  onClick={() => createVersionMut.mutate()}
-                  disabled={createVersionMut.isPending || !currentYear?.id}
+            
+            <SectionCard title="Version Workflow" className="lg:col-span-2">
+              <div className="space-y-4">
+                <Select 
+                  value={activeVersionId} 
+                  onChange={(event: React.ChangeEvent<HTMLSelectElement>) => setSelectedVersionId(event.target.value)}
                 >
-                  New Draft
-                </button>
-                <button
-                  type="button"
-                  className="rounded-xl bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700"
-                  onClick={() => activeVersionId && validateVersionMut.mutate(activeVersionId)}
-                  disabled={!activeVersionId || validateVersionMut.isPending}
-                >
-                  Validate
-                </button>
-                <button
-                  type="button"
-                  className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700"
-                  onClick={() => activeVersionId && publishVersionMut.mutate(activeVersionId)}
-                  disabled={!activeVersionId || publishVersionMut.isPending}
-                >
-                  Publish
-                </button>
-                <button
-                  type="button"
-                  className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700"
-                  onClick={() => activeVersionId && lockVersionMut.mutate(activeVersionId)}
-                  disabled={!activeVersionId || lockVersionMut.isPending}
-                >
-                  Lock
-                </button>
-                <button
-                  type="button"
-                  className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
-                  onClick={() => activeVersionId && archiveVersionMut.mutate(activeVersionId)}
-                  disabled={!activeVersionId || archiveVersionMut.isPending}
-                >
-                  Archive
-                </button>
+                  <option value="">Select version</option>
+                  {versions.map((version) => (
+                    <option key={version.id} value={version.id}>
+                      {version.versionName} · {version.status}
+                    </option>
+                  ))}
+                </Select>
+                
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="h-9 px-4 rounded-full bg-slate-100 text-slate-900 text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-colors flex items-center gap-2"
+                    onClick={() => createVersionMut.mutate()}
+                    disabled={createVersionMut.isPending || !currentYear?.id}
+                  >
+                    <Plus className="h-3 w-3" />
+                    New Draft
+                  </button>
+                  <button
+                    type="button"
+                    className="h-9 px-4 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-colors flex items-center gap-2"
+                    onClick={() => activeVersionId && validateVersionMut.mutate(activeVersionId)}
+                    disabled={!activeVersionId || validateVersionMut.isPending}
+                  >
+                    <Zap className="h-3 w-3" />
+                    Validate
+                  </button>
+                  <button
+                    type="button"
+                    className="h-9 px-4 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-colors flex items-center gap-2"
+                    onClick={() => activeVersionId && publishVersionMut.mutate(activeVersionId)}
+                    disabled={!activeVersionId || publishVersionMut.isPending}
+                  >
+                    <CheckCircle2 className="h-3 w-3" />
+                    Publish
+                  </button>
+                </div>
               </div>
-            </div>
-            <div className="space-y-3 rounded-2xl border border-[var(--line)] p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-red-600">Conflict Validation</p>
-              {validationResult ? (
-                <div className="space-y-2 text-xs">
-                  <p className={validationResult.valid ? 'font-semibold text-emerald-700' : 'font-semibold text-red-700'}>
+            </SectionCard>
+          </div>
+
+          {validationResult && (
+            <SectionCard 
+              title="Conflict Validation" 
+              className={cn("border-2", validationResult.valid ? "border-emerald-100" : "border-red-100")}
+            >
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  {validationResult.valid ? (
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5 text-red-500" />
+                  )}
+                  <p className={cn("text-sm font-black uppercase tracking-widest", validationResult.valid ? 'text-emerald-700' : 'text-red-700')}>
                     {validationResult.valid ? 'No blocking conflicts' : `${validationResult.errors.length} conflict(s) found`}
                   </p>
-                  {validationResult.errors.slice(0, 3).map((issue) => (
-                    <p key={`${issue.type}-${issue.conflictingSlotId ?? issue.message}`} className="rounded-xl bg-red-50 p-2 text-red-700">
-                      {issue.message}
-                    </p>
-                  ))}
                 </div>
-              ) : (
-                <p className="text-sm text-gray-500">Run backend validation before publishing.</p>
-              )}
-            </div>
-          </section>
-
-          <section className="rounded-[28px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-purple-600">Substitution Management</p>
-                <h2 className="text-lg font-bold text-gray-950">Absent Teacher Substitutions</h2>
+                {!validationResult.valid && (
+                  <div className="grid gap-2">
+                    {validationResult.errors.slice(0, 3).map((issue) => (
+                      <div key={`${issue.type}-${issue.conflictingSlotId ?? issue.message}`} className="rounded-xl bg-red-50/50 p-3 border border-red-100 text-xs text-red-700 font-medium">
+                        {issue.message}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-700">
-                {substitutionsQuery.data?.length ?? 0} records
-              </span>
-            </div>
+            </SectionCard>
+          )}
+
+          <SectionCard 
+            title="Absent Teacher Substitutions" 
+            description="Manage substitutions for missing teachers."
+            headerAction={
+              <Badge variant="secondary" className="font-black uppercase tracking-widest text-[10px]">
+                {substitutionsQuery.data?.length ?? 0} Records
+              </Badge>
+            }
+          >
             {substitutionsQuery.data?.length ? (
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {substitutionsQuery.data.slice(0, 6).map((item) => (
-                  <div key={item.id} className="rounded-2xl border border-[var(--line)] p-3 text-sm">
-                    <p className="font-semibold text-gray-950">{item.status}</p>
-                    <p className="text-xs text-gray-500">{new Date(item.date).toLocaleDateString()} · {item.reason}</p>
+                  <div key={item.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-1">
+                    <p className="text-xs font-black uppercase tracking-tight text-slate-900">{item.status}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      {new Date(item.date).toLocaleDateString()} · {item.reason}
+                    </p>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-500">No substitutions recorded for this class.</p>
+              <EmptyState 
+                title="No substitutions" 
+                description="No teacher substitutions recorded for this class." 
+                className="bg-slate-50/50"
+              />
             )}
-          </section>
+          </SectionCard>
 
-          <div className="grid gap-6 lg:grid-cols-3">
-          {/* Slot Entry Form */}
-          <section className="rounded-[28px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm lg:col-span-1">
-            <div className="mb-5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Schedule</p>
-              <h2 className="mt-1 text-lg font-bold text-gray-950">Add Slot</h2>
-            </div>
+          <div className="grid gap-8 lg:grid-cols-3">
+            <SectionCard title="Add Schedule Slot" className="lg:col-span-1">
+              <div className="space-y-6">
+                <FormField label="Academic Year">
+                  <Select value={slot.academicYearId} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSlot((c) => ({ ...c, academicYearId: e.target.value }))}>
+                    <option value="">Select Year</option>
+                    {academicYears.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}
+                  </Select>
+                </FormField>
 
-            <div className="space-y-4">
-              <select value={slot.academicYearId} onChange={(e) => setSlot((c) => ({ ...c, academicYearId: e.target.value }))}>
-                <option value="">Academic Year</option>
-                {academicYears.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}
-              </select>
+                <FormField label="Section (Optional)">
+                  <Select value={slot.sectionId} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSlot((c) => ({ ...c, sectionId: e.target.value }))}>
+                    <option value="">Whole Class</option>
+                    {sectionsForClass.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}
+                  </Select>
+                </FormField>
 
-              <select value={slot.sectionId} onChange={(e) => setSlot((c) => ({ ...c, sectionId: e.target.value }))}>
-                <option value="">All Sections (Whole Class)</option>
-                {sectionsForClass.map((section) => <option key={section.id} value={section.id}>{section.name}</option>)}
-              </select>
+                <FormField label="Subject">
+                  <Select value={slot.subjectId} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSlot((c) => ({ ...c, subjectId: e.target.value }))}>
+                    <option value="">Select Subject</option>
+                    {subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.code} - {subject.name}</option>)}
+                  </Select>
+                </FormField>
 
-              <select value={slot.subjectId} onChange={(e) => setSlot((c) => ({ ...c, subjectId: e.target.value }))}>
-                <option value="">Subject</option>
-                {subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.code} - {subject.name}</option>)}
-              </select>
+                <FormField label="Teacher">
+                  <Select value={slot.staffId} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSlot((c) => ({ ...c, staffId: e.target.value }))}>
+                    <option value="">Select Staff</option>
+                    {staff.map((member) => <option key={member.id} value={member.id}>{member.firstName} {member.lastName}</option>)}
+                  </Select>
+                </FormField>
 
-              <select value={slot.staffId} onChange={(e) => setSlot((c) => ({ ...c, staffId: e.target.value }))}>
-                <option value="">Teacher</option>
-                {staff.map((member) => <option key={member.id} value={member.id}>{member.firstName} {member.lastName}</option>)}
-              </select>
+                <FormField label="Day of Week">
+                  <Select value={slot.dayOfWeek} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSlot((c) => ({ ...c, dayOfWeek: Number(e.target.value) }))}>
+                    {daysOfWeek.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                  </Select>
+                </FormField>
 
-              <select value={slot.dayOfWeek} onChange={(e) => setSlot((c) => ({ ...c, dayOfWeek: Number(e.target.value) }))}>
-                {daysOfWeek.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-              </select>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField label="Starts At">
+                    <Input type="time" value={slot.startsAt} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSlot((c) => ({ ...c, startsAt: e.target.value }))} />
+                  </FormField>
+                  <FormField label="Ends At">
+                    <Input type="time" value={slot.endsAt} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSlot((c) => ({ ...c, endsAt: e.target.value }))} />
+                  </FormField>
+                </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <input type="time" value={slot.startsAt} onChange={(e) => setSlot((c) => ({ ...c, startsAt: e.target.value }))} />
-                <input type="time" value={slot.endsAt} onChange={(e) => setSlot((c) => ({ ...c, endsAt: e.target.value }))} />
+                <FormField label="Room">
+                  <div className="space-y-3">
+                    <Input type="text" placeholder="Custom room name" value={slot.room} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSlot((c) => ({ ...c, room: e.target.value }))} />
+                    <Select value="" onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSlot((c) => ({ ...c, room: rooms.find((room: any) => room.id === e.target.value)?.name ?? c.room }))}>
+                      <option value="">Or use room record</option>
+                      {rooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
+                    </Select>
+                  </div>
+                </FormField>
+
+                {slotMut.isError && (
+                  <div className="rounded-2xl bg-red-50 p-4 border border-red-100 flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-widest text-red-700">Conflict Detected</p>
+                      <p className="text-[11px] text-red-600 mt-1 font-medium leading-relaxed">{slotMut.error.message}</p>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className="w-full h-14 rounded-2xl bg-slate-900 text-white font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-slate-200 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0"
+                  disabled={!slot.academicYearId || !slot.subjectId || !slot.staffId || slot.startsAt >= slot.endsAt || slotMut.isPending}
+                  onClick={() => slotMut.mutate({ ...slot, classId, sectionId: slot.sectionId || null })}
+                >
+                  {slotMut.isPending ? 'Saving...' : 'Add Slot to Schedule'}
+                </button>
               </div>
+            </SectionCard>
 
-              <input type="text" placeholder="Room (optional)" value={slot.room} onChange={(e) => setSlot((c) => ({ ...c, room: e.target.value }))} />
-              <select value="" onChange={(e) => setSlot((c) => ({ ...c, room: rooms.find((room) => room.id === e.target.value)?.name ?? c.room }))}>
-                <option value="">Use room record</option>
-                {rooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
-              </select>
-
-              {slotMut.isError && (
-                <div className="rounded-xl bg-red-50 p-3 border border-red-100">
-                  <p className="text-sm text-red-700 font-medium">Conflict Detected</p>
-                  <p className="text-xs text-red-600 mt-1">{slotMut.error.message}</p>
+            <SectionCard title="Weekly Grid Visualization" className="lg:col-span-2">
+              {isLoadingTimetable ? (
+                <LoadingState />
+              ) : timetable.length === 0 ? (
+                <EmptyState 
+                  title="No schedule created" 
+                  description="Start by adding slots using the form on the left." 
+                  className="bg-slate-50/50"
+                />
+              ) : (
+                <div className="grid gap-6">
+                  {daysOfWeek.map((day) => {
+                    const daySlots = gridByDay[day.value];
+                    if (!daySlots || daySlots.length === 0) return null;
+                    
+                    return (
+                      <div key={day.value} className="flex gap-6 border-b border-slate-100 pb-6 last:border-0 last:pb-0">
+                        <div className="w-28 shrink-0 pt-1">
+                           <p className="text-xs font-black uppercase tracking-widest text-slate-400">{day.label}</p>
+                        </div>
+                        <div className="flex flex-1 flex-wrap gap-3">
+                          {daySlots.map((s) => (
+                            <div key={s.id} className="rounded-2xl border border-indigo-100 bg-indigo-50/30 p-4 w-48 flex-shrink-0 space-y-2 group/slot hover:bg-indigo-50 transition-colors">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="font-black text-indigo-900 uppercase tracking-tight text-xs leading-tight">{s.subject?.code ?? 'SUB'}</p>
+                                <Badge variant="outline" className="text-[8px] font-black uppercase py-0 px-1 border-indigo-200 text-indigo-400">
+                                  {s.startsAt}
+                                </Badge>
+                              </div>
+                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest truncate">
+                                {s.staff?.firstName} {s.staff?.lastName}
+                              </p>
+                              {(s.section?.name || s.room) && (
+                                <div className="flex gap-2 text-[9px] font-black uppercase tracking-widest text-indigo-300">
+                                  {s.section?.name && <span>Sec {s.section.name}</span>}
+                                  {s.room && <span>• {s.room}</span>}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
-
-              <button
-                type="button"
-                className="w-full rounded-2xl bg-indigo-950 px-6 py-3 font-semibold text-white transition hover:bg-indigo-900 disabled:opacity-50"
-                disabled={!slot.academicYearId || !slot.subjectId || !slot.staffId || slot.startsAt >= slot.endsAt || slotMut.isPending}
-                onClick={() => slotMut.mutate({ ...slot, classId, sectionId: slot.sectionId || null })}
-              >
-                {slotMut.isPending ? 'Saving...' : 'Create Timetable Slot'}
-              </button>
-            </div>
-          </section>
-
-          {/* Weekly Grid Visualization */}
-          <section className="rounded-[28px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm lg:col-span-2">
-            <h2 className="text-lg font-bold text-gray-950 mb-4">Weekly Schedule</h2>
-            
-            {isLoadingTimetable ? (
-              <div className="py-12 flex justify-center">
-                <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
-              </div>
-            ) : timetable.length === 0 ? (
-              <div className="py-12 text-center text-gray-400 text-sm border-2 border-dashed border-[var(--line)] rounded-2xl">
-                No timetable slots created for this class yet.
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {daysOfWeek.map((day) => {
-                  const daySlots = gridByDay[day.value];
-                  if (!daySlots || daySlots.length === 0) return null;
-                  
-                  return (
-                    <div key={day.value} className="flex gap-4 border-b border-[var(--line)] pb-4 last:border-0 last:pb-0">
-                      <div className="w-24 shrink-0 pt-2 font-semibold text-gray-700">{day.label}</div>
-                      <div className="flex flex-1 flex-wrap gap-2">
-                        {daySlots.map((s) => (
-                          <div key={s.id} className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-2 text-xs w-40 flex-shrink-0">
-                            <p className="font-semibold text-indigo-900">{s.subject?.code ?? 'Subject'}</p>
-                            <p className="text-indigo-700 mt-0.5">{s.startsAt} - {s.endsAt}</p>
-                            <p className="text-gray-500 mt-1 truncate">{s.staff?.firstName} {s.staff?.lastName}</p>
-                            {(s.section?.name || s.room) && (
-                              <div className="flex gap-1 mt-1 text-[10px] text-gray-400 font-medium">
-                                {s.section?.name && <span>Sec {s.section.name}</span>}
-                                {s.room && <span>• {s.room}</span>}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
+            </SectionCard>
           </div>
         </div>
       )}

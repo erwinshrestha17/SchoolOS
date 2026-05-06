@@ -25,7 +25,6 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import { Badge } from '../ui/badge';
 import { cn } from '../../lib/utils';
 
 export type NavItem = {
@@ -35,7 +34,6 @@ export type NavItem = {
   permissions?: PermissionKey[];
   platformRoles?: string[];
   badge?: number | string;
-  phase: 'phase1' | 'phase2' | 'future';
   disabled?: boolean;
 };
 
@@ -52,7 +50,6 @@ export const dashboardNavGroups: NavGroup[] = [
         href: '/dashboard',
         label: 'Dashboard',
         icon: LayoutDashboard,
-        phase: 'phase1',
       },
     ],
   },
@@ -64,14 +61,12 @@ export const dashboardNavGroups: NavGroup[] = [
         label: 'Students',
         icon: Users,
         permissions: ['students:read', 'students:create'],
-        phase: 'phase1',
       },
       {
         href: '/dashboard/admissions',
         label: 'Admissions',
         icon: Users,
         permissions: ['students:read', 'students:create'],
-        phase: 'phase1',
       },
     ],
   },
@@ -83,21 +78,18 @@ export const dashboardNavGroups: NavGroup[] = [
         label: 'Attendance',
         icon: CalendarCheck,
         permissions: ['attendance:read', 'attendance:mark'],
-        phase: 'phase1',
       },
       {
         href: '/dashboard/academics',
         label: 'Exams & Marks',
         icon: GraduationCap,
         permissions: ['academics:read', 'academics:manage'],
-        phase: 'phase2',
       },
       {
         href: '/dashboard/timetable',
         label: 'Timetable & HW',
         icon: CalendarCheck,
         permissions: ['timetable:read', 'homework:read'],
-        phase: 'phase2',
       },
     ],
   },
@@ -108,15 +100,22 @@ export const dashboardNavGroups: NavGroup[] = [
         href: '/dashboard/finance',
         label: 'Fee Collection',
         icon: Wallet,
-        permissions: ['fees:manage', 'fees:bill', 'payments:collect', 'receipts:read'],
-        phase: 'phase1',
+        permissions: [
+          'fees:manage',
+          'fees:bill',
+          'payments:collect',
+          'receipts:read',
+        ],
       },
       {
         href: '/dashboard/accounting',
         label: 'Accounting',
         icon: Calculator,
-        permissions: ['accounting:read', 'accounting:accounts:read', 'accounting:reports:read'],
-        phase: 'phase2',
+        permissions: [
+          'accounting:read',
+          'accounting:accounts:read',
+          'accounting:reports:read',
+        ],
       },
     ],
   },
@@ -127,29 +126,30 @@ export const dashboardNavGroups: NavGroup[] = [
         href: '/dashboard/notices',
         label: 'Notices',
         icon: Megaphone,
-        permissions: ['notices:read', 'notices:create', 'events:read', 'events:create'],
-        phase: 'phase1',
+        permissions: [
+          'notices:read',
+          'notices:create',
+          'events:read',
+          'events:create',
+        ],
       },
       {
         href: '/dashboard/messages',
         label: 'Messages',
         icon: MessageSquare,
         permissions: ['messaging:read'],
-        phase: 'phase2',
       },
       {
         href: '/dashboard/activity',
         label: 'Activity Feed',
         icon: Images,
         permissions: ['activity_feed:read', 'activity_feed:create'],
-        phase: 'phase1',
       },
       {
         href: '#library-coming-soon',
         label: 'Library',
         icon: BookOpen,
         permissions: ['library:read', 'library:manage'],
-        phase: 'future',
         disabled: true,
       },
       {
@@ -157,7 +157,6 @@ export const dashboardNavGroups: NavGroup[] = [
         label: 'Transport',
         icon: Bus,
         permissions: ['transport:read', 'transport:manage', 'transport:operate'],
-        phase: 'future',
         disabled: true,
       },
     ],
@@ -170,14 +169,12 @@ export const dashboardNavGroups: NavGroup[] = [
         label: 'HR / Staff',
         icon: UserCog,
         permissions: ['hr:read'],
-        phase: 'phase2',
       },
       {
         href: '/dashboard/payroll',
         label: 'Payroll',
         icon: UserCog,
         permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
-        phase: 'phase2',
       },
     ],
   },
@@ -194,7 +191,6 @@ export const dashboardNavGroups: NavGroup[] = [
           'classes:read',
           'academic_years:read',
         ],
-        phase: 'phase1',
       },
     ],
   },
@@ -210,14 +206,12 @@ export const platformNavItems: NavItem[] = [
       'platform_support',
       'platform_billing_admin',
     ],
-    phase: 'phase1',
   },
   {
     href: '/platform/schools',
     label: 'Managed Schools',
     icon: School,
     platformRoles: ['platform_super_admin', 'platform_support'],
-    phase: 'phase1',
   },
 ];
 
@@ -326,6 +320,7 @@ function SidebarContent({
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-sm font-bold shadow-lg shadow-primary-600/20">
           S
         </div>
+
         <div
           className={cn(
             'sidebar-label',
@@ -352,6 +347,7 @@ function SidebarContent({
                 {group.label}
               </p>
             )}
+
             <div className="space-y-1">
               {group.items.map((item) => (
                 <NavEntry
@@ -373,6 +369,7 @@ function SidebarContent({
                 Platform
               </p>
             )}
+
             <div className="space-y-1">
               {platformItems.map((item) => (
                 <NavEntry
@@ -423,6 +420,7 @@ function NavEntry({
   onMobileClose: () => void;
 }) {
   const Icon = item.icon;
+
   const active =
     (item.href === '/dashboard' && pathname === '/dashboard') ||
     (item.href !== '/dashboard' && pathname?.startsWith(item.href));
@@ -452,28 +450,15 @@ function NavEntry({
         {item.label}
       </span>
 
-      {!collapsed && (
-        <div className="ml-auto flex items-center gap-1.5">
-          {item.disabled ? (
-            <Badge variant="later">Later</Badge>
-          ) : item.phase === 'phase2' ? (
-            <Badge variant="phase2">Phase 2</Badge>
-          ) : (
-            <Badge variant="success">Live</Badge>
-          )}
-          
-          {item.badge && (
-            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary-600 px-1.5 text-[0.65rem] font-bold text-white">
-              {item.badge}
-            </span>
-          )}
-        </div>
+      {!collapsed && item.badge && (
+        <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary-600 px-1.5 text-[0.65rem] font-bold text-white">
+          {item.badge}
+        </span>
       )}
 
       {collapsed && (
         <div className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
           {item.label}
-          {item.disabled ? ' · Later' : item.phase === 'phase2' ? ' · Phase 2' : ' · Live'}
         </div>
       )}
     </>
@@ -484,7 +469,8 @@ function NavEntry({
     active && !item.disabled
       ? 'bg-primary-600/10 text-primary-50 shadow-sm'
       : 'text-slate-400 hover:bg-white/[0.04] hover:text-white',
-    item.disabled && 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-400'
+    item.disabled &&
+      'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-400'
   );
 
   if (item.disabled) {
@@ -524,5 +510,6 @@ function canSeeNavItem(
   }
 
   const permissionSet = new Set(session?.user.permissions ?? []);
+
   return item.permissions.some((permission) => permissionSet.has(permission));
 }

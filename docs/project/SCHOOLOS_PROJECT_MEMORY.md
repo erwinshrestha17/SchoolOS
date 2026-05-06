@@ -73,14 +73,14 @@ Public website / landing-page module card order:
 - Bulk CSV import, duplicate detection, class roster CSV/PDF export, student photo upload, iEMIS export.
 - Audit trail for profile, guardian, lifecycle, and document actions.
 - Integrates with M2 roster, M3 fees, M4 academics, M5 activity visibility, M8B transport, M8C canteen, and M10 guardian notifications.
+- Integrates with M1 roster, M3 fees, M4 academics, M5 activity visibility, M8B transport, M8C canteen, and M10 guardian notifications.
 
 ### M2 — Smart Attendance
 - Teacher-first 3-tap attendance: open class, tap exceptions, submit.
 - Present-by-default attendance with absent, late, sick leave, excused leave, and unexcused leave statuses.
 - Teacher-specific assigned class filtering.
 - 6-hour edit lock, admin/principal override, conflict review.
-- Monthly attendance register and student attendance history inside profile.
-- Attendance correction requests, CSV/PDF export, parent-facing attendance summary.
+- Monthly attendance register, attendance correction requests, CSV/PDF export, parent-facing attendance summary.
 - Consecutive absence alerts and below-threshold attendance risk alerts.
 - Offline sync envelope and later true offline draft persistence.
 - Integrates with M1 roster, M4 report cards/promotion, M7 staff attendance/payroll later, and M10 alerts.
@@ -608,7 +608,15 @@ Phase 1B operational depth, reports, detail pages, management actions, exports, 
 - **Logo Upload:** Deferred to Phase 2.
 - **iEMIS Export Format:** Deferred.
 - **Duplicate Merge Workflow:** Deferred.
-- **Playwright Smoke Tests:** Stabilized foundation exists; full coverage deferred.
+- **Sprint 5: Student & Attendance UI Modernization** - [x] Completed
+- **Sprint 6: Activity, Homework, and Timetable Modernization** - [x] Completed
+  - Refactored Activity Feed with high-density `SectionCard` layouts.
+  - Modernized Homework module with submission tracking and grading workflows.
+  - Refactored Timetable Builder with conflict validation and versioning UI.
+  - Standardized student-facing Homework and Timetable views.
+  - Adopted shared `FormField`, `Input`, `Select`, and `TextArea` primitives.
+- **Applied (Web Admin)**: ~95% (Shell, Students, Attendance, Finance, Notices, Settings, Activity, Homework, Timetable completed)
+- **Remaining**: ~5% (HR, Payroll, Accounting, Reports)
 
 ## Phase 2 — Academic, HR, Timetable, and Accounting Expansion (Next)
 
