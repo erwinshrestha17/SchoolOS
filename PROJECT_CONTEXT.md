@@ -9,6 +9,7 @@ For full project memory, read:
 - `docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md`
 - `docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md`
 - `docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md`
+- `docs/project/SCHOOLOS_PRICING_TIERS_AND_ENTITLEMENTS_PLAN.md`
 - `ARCHITECTURE.md`
 - `DEVELOPMENT_RULES.md`
 
@@ -179,6 +180,8 @@ The long-term memory includes a separate `M0 Platform Core` roadmap in `docs/pro
 
 The detailed boundary between school-owned settings and platform-owned SaaS settings is documented in `docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md`.
 
+The pricing, packaging, plan entitlement, backend feature gating, usage metering, and tier-access roadmap is documented in `docs/project/SCHOOLOS_PRICING_TIERS_AND_ENTITLEMENTS_PLAN.md`.
+
 These features are documented for future implementation and should be added gradually without disrupting Phase 1 pilot hardening or focused Phase 2 vertical work:
 
 1. Tenant Settings Module
@@ -190,6 +193,7 @@ These features are documented for future implementation and should be added grad
 7. API Key Management
 8. Webhook System
 9. SaaS Subscription and Billing Module
+10. Pricing Tiers and Entitlements Foundation
 
 Important distinction:
 
@@ -207,7 +211,31 @@ Recommended near-term platform sequence:
 5. Reports foundation for Phase 1/2 reports
 6. Safe Activity Logs projection
 7. Usage limits and plan rules
+8. Pricing tiers, entitlements, and feature access enforcement
 
+## Pricing Tiers and Entitlements Roadmap
+
+SchoolOS commercial packaging is documented as:
+
+```text
+Tier 1: SchoolOS Core
+Tier 2: SchoolOS Professional
+Tier 3: SchoolOS Intelligence
+Optional add-ons: Transport GPS, Canteen, Library, SMS Pack, AI Credits, Branded Parent App, Advanced Accounting, Custom Reports
+```
+
+Technical rule:
+
+```text
+Plan controls what the school bought.
+Feature entitlement controls what the tenant can access.
+RBAC controls what the user can do.
+Usage limits control how much they can use.
+Frontend uses entitlements only for display.
+Backend enforces entitlements for security.
+```
+
+Do not hardcode plan names across the app. Use feature keys such as `module.exams`, `module.transport`, `module.intelligence`, `feature.ai_teacher_assistant`, and `feature.parent_teacher_chat`.
 
 ## M11 School Intelligence & Analytics Roadmap
 
@@ -258,6 +286,7 @@ Rules:
 - Move slow, retryable, provider, report, and PDF work to BullMQ workers.
 - Redis is for cache, queue, latest-value, and rate-limit style use cases; PostgreSQL remains source of truth.
 - Do not start AI feature implementation until the M11 event/snapshot/risk-score foundation is approved and reliable production data exists.
+- Do not start pricing/entitlement implementation until the platform plan/subscription boundary is approved.
 - Do not copy generic SaaS-template modules blindly; adapt reusable platform pieces into SchoolOS only when they strengthen production readiness.
 
 ## Recommended Codex Prompt Format
@@ -272,6 +301,7 @@ Read these files first:
 - docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md
 - docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
 - docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md
+- docs/project/SCHOOLOS_PRICING_TIERS_AND_ENTITLEMENTS_PLAN.md when touching plans, pricing, subscriptions, feature access, or UI gating
 
 Task:
 [Exact feature/change]
