@@ -1,6 +1,10 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { HomeworkAssignmentStatus, HomeworkSubmissionStatus } from '@prisma/client';
+import {
+  AuthMethod,
+  HomeworkAssignmentStatus,
+  HomeworkSubmissionStatus,
+} from '@prisma/client';
 import { HomeworkService } from './homework.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -15,6 +19,9 @@ describe('Homework Hardening', () => {
   const actor: AuthContext = {
     userId: 'user-1',
     tenantId: 'tenant-a',
+    tenantSlug: 'tenant-a',
+    email: 'user1@example.com',
+    authMethod: AuthMethod.PASSWORD,
     roles: ['teacher'],
     permissions: ['homework:create', 'homework:review'],
   };
@@ -26,7 +33,10 @@ describe('Homework Hardening', () => {
         HomeworkService,
         { provide: PrismaService, useValue: prisma },
         { provide: AuditService, useValue: { record: jest.fn() } },
-        { provide: CommunicationsService, useValue: { recordDeliveryRecords: jest.fn() } },
+        {
+          provide: CommunicationsService,
+          useValue: { recordDeliveryRecords: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -36,10 +46,13 @@ describe('Homework Hardening', () => {
   describe('Tenant Isolation & Ownership', () => {
     it('should reject creating homework for a class from another tenant', async () => {
       const p = prisma as any;
-      
+
       // Class from another tenant or not found
       p.class.findFirst.mockResolvedValue(null);
-      p.academicYear.findFirst.mockResolvedValue({ id: 'year-1', tenantId: 'tenant-a' });
+      p.academicYear.findFirst.mockResolvedValue({
+        id: 'year-1',
+        tenantId: 'tenant-a',
+      });
 
       await expect(
         homeworkService.createAssignment(
@@ -67,7 +80,7 @@ describe('Homework Hardening', () => {
         dueDate: new Date('2026-12-31'),
       };
       p.homeworkAssignment.findFirst.mockResolvedValue(assignment);
-      
+
       // Student from another class or tenant
       p.student.findFirst.mockResolvedValue(null);
 
@@ -87,10 +100,24 @@ describe('Homework Hardening', () => {
   describe('Date Integrity', () => {
     it('should reject due date before assigned date', async () => {
       const p = prisma as any;
-      p.academicYear.findFirst.mockResolvedValue({ id: 'year-1', tenantId: 'tenant-a' });
-      p.class.findFirst.mockResolvedValue({ id: 'class-1', tenantId: 'tenant-a' });
-      p.subject.findFirst.mockResolvedValue({ id: 'sub-1', tenantId: 'tenant-a', classId: 'class-1' });
-      p.staff.findFirst.mockResolvedValue({ id: 'staff-1', tenantId: 'tenant-a', userId: 'user-1' });
+      p.academicYear.findFirst.mockResolvedValue({
+        id: 'year-1',
+        tenantId: 'tenant-a',
+      });
+      p.class.findFirst.mockResolvedValue({
+        id: 'class-1',
+        tenantId: 'tenant-a',
+      });
+      p.subject.findFirst.mockResolvedValue({
+        id: 'sub-1',
+        tenantId: 'tenant-a',
+        classId: 'class-1',
+      });
+      p.staff.findFirst.mockResolvedValue({
+        id: 'staff-1',
+        tenantId: 'tenant-a',
+        userId: 'user-1',
+      });
 
       await expect(
         homeworkService.createAssignment(
@@ -117,11 +144,25 @@ describe('Homework Hardening', () => {
         roles: ['subject_teacher'],
       };
 
-      p.academicYear.findFirst.mockResolvedValue({ id: 'year-1', tenantId: 'tenant-a' });
-      p.class.findFirst.mockResolvedValue({ id: 'class-1', tenantId: 'tenant-a' });
-      p.subject.findFirst.mockResolvedValue({ id: 'sub-1', tenantId: 'tenant-a', classId: 'class-1' });
-      p.staff.findFirst.mockResolvedValue({ id: 'teacher-1', tenantId: 'tenant-a', userId: 'user-1' });
-      
+      p.academicYear.findFirst.mockResolvedValue({
+        id: 'year-1',
+        tenantId: 'tenant-a',
+      });
+      p.class.findFirst.mockResolvedValue({
+        id: 'class-1',
+        tenantId: 'tenant-a',
+      });
+      p.subject.findFirst.mockResolvedValue({
+        id: 'sub-1',
+        tenantId: 'tenant-a',
+        classId: 'class-1',
+      });
+      p.staff.findFirst.mockResolvedValue({
+        id: 'teacher-1',
+        tenantId: 'tenant-a',
+        userId: 'user-1',
+      });
+
       // No assignment for this subject
       p.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
 

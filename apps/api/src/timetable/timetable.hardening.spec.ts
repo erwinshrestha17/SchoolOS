@@ -1,6 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { TimetableVersionStatus } from '@prisma/client';
+import { AuthMethod, TimetableVersionStatus } from '@prisma/client';
 import { TimetableService } from './timetable.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -15,6 +15,9 @@ describe('Timetable Hardening', () => {
   const actor: AuthContext = {
     userId: 'user-1',
     tenantId: 'tenant-a',
+    tenantSlug: 'tenant-a',
+    email: 'admin@example.com',
+    authMethod: AuthMethod.PASSWORD,
     roles: ['admin'],
     permissions: ['timetable:manage'],
   };
@@ -26,7 +29,10 @@ describe('Timetable Hardening', () => {
         TimetableService,
         { provide: PrismaService, useValue: prisma },
         { provide: AuditService, useValue: { record: jest.fn() } },
-        { provide: CommunicationsService, useValue: { recordDeliveryRecords: jest.fn() } },
+        {
+          provide: CommunicationsService,
+          useValue: { recordDeliveryRecords: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -42,16 +48,29 @@ describe('Timetable Hardening', () => {
         status: TimetableVersionStatus.DRAFT,
         academicYearId: 'year-1',
       });
-      
+
       // Mock ensureSlotRefs dependencies
-      p.academicYear.findFirst.mockResolvedValue({ id: 'year-1', tenantId: 'tenant-a' });
-      p.class.findFirst.mockResolvedValue({ id: 'class-1', tenantId: 'tenant-a' });
-      p.staff.findFirst.mockResolvedValue({ id: 'staff-1', tenantId: 'tenant-a' });
-      p.subject.findFirst.mockResolvedValue({ id: 'sub-1', tenantId: 'tenant-a' });
-      
+      p.academicYear.findFirst.mockResolvedValue({
+        id: 'year-1',
+        tenantId: 'tenant-a',
+      });
+      p.class.findFirst.mockResolvedValue({
+        id: 'class-1',
+        tenantId: 'tenant-a',
+      });
+      p.staff.findFirst.mockResolvedValue({
+        id: 'staff-1',
+        tenantId: 'tenant-a',
+      });
+      p.subject.findFirst.mockResolvedValue({
+        id: 'sub-1',
+        tenantId: 'tenant-a',
+      });
+
       // Room from another tenant
       p.room.findFirst.mockImplementation((q: any) => {
-        if (q.where.id === 'room-b' && q.where.tenantId === 'tenant-a') return Promise.resolve(null);
+        if (q.where.id === 'room-b' && q.where.tenantId === 'tenant-a')
+          return Promise.resolve(null);
         return Promise.resolve(null);
       });
 
@@ -77,11 +96,7 @@ describe('Timetable Hardening', () => {
       p.timetableVersion.findFirst.mockResolvedValue(null); // Not found because of tenant mismatch
 
       await expect(
-        timetableService.updateSlot(
-          'slot-1',
-          { subjectId: 'new-sub' },
-          actor,
-        ),
+        timetableService.updateSlot('slot-1', { subjectId: 'new-sub' }, actor),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -98,7 +113,7 @@ describe('Timetable Hardening', () => {
         effectiveTo: null,
       };
       p.timetableVersion.findFirst.mockResolvedValue(version);
-      
+
       p.timetableSlot.findMany.mockResolvedValue([
         {
           id: 'existing-slot',
@@ -112,10 +127,23 @@ describe('Timetable Hardening', () => {
       ]);
 
       // Mock refs
-      p.academicYear.findFirst.mockResolvedValue({ id: 'year-1', tenantId: 'tenant-a' });
-      p.class.findFirst.mockResolvedValue({ id: 'class-1', tenantId: 'tenant-a' });
-      p.staff.findFirst.mockResolvedValue({ id: 'teacher-1', tenantId: 'tenant-a' });
-      p.subject.findFirst.mockResolvedValue({ id: 'sub-1', tenantId: 'tenant-a', classId: 'class-1' });
+      p.academicYear.findFirst.mockResolvedValue({
+        id: 'year-1',
+        tenantId: 'tenant-a',
+      });
+      p.class.findFirst.mockResolvedValue({
+        id: 'class-1',
+        tenantId: 'tenant-a',
+      });
+      p.staff.findFirst.mockResolvedValue({
+        id: 'teacher-1',
+        tenantId: 'tenant-a',
+      });
+      p.subject.findFirst.mockResolvedValue({
+        id: 'sub-1',
+        tenantId: 'tenant-a',
+        classId: 'class-1',
+      });
 
       await expect(
         timetableService.createVersionSlot(
@@ -144,7 +172,7 @@ describe('Timetable Hardening', () => {
         effectiveTo: null,
       };
       p.timetableVersion.findFirst.mockResolvedValue(version);
-      
+
       p.timetableSlot.findMany.mockResolvedValue([
         {
           id: 'existing-slot',
@@ -159,11 +187,27 @@ describe('Timetable Hardening', () => {
       ]);
 
       // Mock refs
-      p.academicYear.findFirst.mockResolvedValue({ id: 'year-1', tenantId: 'tenant-a' });
-      p.class.findFirst.mockResolvedValue({ id: 'class-1', tenantId: 'tenant-a' });
-      p.staff.findFirst.mockResolvedValue({ id: 'teacher-2', tenantId: 'tenant-a' });
-      p.subject.findFirst.mockResolvedValue({ id: 'sub-1', tenantId: 'tenant-a', classId: 'class-1' });
-      p.room.findFirst.mockResolvedValue({ id: 'room-1', tenantId: 'tenant-a' });
+      p.academicYear.findFirst.mockResolvedValue({
+        id: 'year-1',
+        tenantId: 'tenant-a',
+      });
+      p.class.findFirst.mockResolvedValue({
+        id: 'class-1',
+        tenantId: 'tenant-a',
+      });
+      p.staff.findFirst.mockResolvedValue({
+        id: 'teacher-2',
+        tenantId: 'tenant-a',
+      });
+      p.subject.findFirst.mockResolvedValue({
+        id: 'sub-1',
+        tenantId: 'tenant-a',
+        classId: 'class-1',
+      });
+      p.room.findFirst.mockResolvedValue({
+        id: 'room-1',
+        tenantId: 'tenant-a',
+      });
 
       await expect(
         timetableService.createVersionSlot(
@@ -193,11 +237,7 @@ describe('Timetable Hardening', () => {
       });
 
       await expect(
-        timetableService.updateSlot(
-          'slot-1',
-          { subjectId: 'new-sub' },
-          actor,
-        ),
+        timetableService.updateSlot('slot-1', { subjectId: 'new-sub' }, actor),
       ).rejects.toThrow(ConflictException);
     });
 
@@ -221,11 +261,11 @@ describe('Timetable Hardening', () => {
             dayOfWeek: 1,
             startsAt: '09:30',
             endsAt: '10:30',
-          }
-        ]
+          },
+        ],
       };
       p.timetableVersion.findFirst.mockResolvedValue(version);
-      
+
       // First slot validation
       p.timetableSlot.findMany.mockResolvedValueOnce([version.slots[1]]);
       // Second slot validation

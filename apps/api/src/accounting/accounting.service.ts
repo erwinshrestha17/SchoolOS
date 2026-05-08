@@ -263,7 +263,7 @@ export class AccountingService {
 
     const totals = sumJournalSides(dto.lines);
 
-    if (totals.debit.toString() !== totals.credit.toString()) {
+    if (!totals.debit.equals(totals.credit)) {
       throw new ConflictException(
         `Manual journal must be balanced. Debit: ${totals.debit.toString()}, Credit: ${totals.credit.toString()}`,
       );
@@ -278,7 +278,12 @@ export class AccountingService {
         entryDate: new Date(dto.entryDate),
         narration: dto.narration,
         sourceId: dto.sourceId,
-        lines: dto.lines,
+        lines: dto.lines.map((line) => ({
+          chartAccountId: line.chartAccountId,
+          debit: line.side === JournalLineSide.DEBIT ? line.amount : 0,
+          credit: line.side === JournalLineSide.CREDIT ? line.amount : 0,
+          description: line.description,
+        })),
       },
       actor,
     );
@@ -876,7 +881,7 @@ function sumJournalSides(
     credit?: number | Prisma.Decimal;
   }>,
 ) {
-  return lines.reduce(
+  return lines.reduce<{ debit: Prisma.Decimal; credit: Prisma.Decimal }>(
     (totals, line) => {
       const debit = new Prisma.Decimal(
         line.debit ??

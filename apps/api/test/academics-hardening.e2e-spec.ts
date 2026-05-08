@@ -1,6 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { GradeLockStatus, MarkEntryStatus } from '@prisma/client';
+import { AuthMethod, GradeLockStatus, MarkEntryStatus } from '@prisma/client';
 import { AcademicsService } from '../src/academics/academics.service';
 import { ReportCardsService } from '../src/academics/report-cards.service';
 import { ReportCardPdfService } from '../src/academics/report-card-pdf.service';
@@ -19,6 +19,9 @@ describe('Academics Hardening (Service Layer)', () => {
   const actor: AuthContext = {
     userId: 'user-1',
     tenantId: 'tenant-a',
+    tenantSlug: 'tenant-a',
+    email: 'teacher@example.com',
+    authMethod: AuthMethod.PASSWORD,
     roles: ['teacher'],
     permissions: ['academics:enter_marks'],
   };

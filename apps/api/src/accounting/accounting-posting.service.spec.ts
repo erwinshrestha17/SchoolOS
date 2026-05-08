@@ -1,5 +1,6 @@
 import { ConflictException } from '@nestjs/common';
 import {
+  AccountingPeriodStatus,
   ChartAccountType,
   JournalLineSide,
   JournalSourceType,
@@ -22,7 +23,12 @@ function createPostingClient(overrides?: {
       findFirst: jest.fn().mockResolvedValue(overrides?.closedPeriod ?? null),
     },
     fiscalPeriod: {
-      findFirst: jest.fn().mockResolvedValue(null),
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'fp-1',
+        status: AccountingPeriodStatus.OPEN,
+        label: 'OPEN Period',
+        fiscalYear: { status: AccountingPeriodStatus.OPEN, name: 'FY 2026' },
+      }),
     },
     journalEntry: {
       count: jest.fn().mockResolvedValue(4),
@@ -88,7 +94,7 @@ describe('AccountingPostingService payroll posting', () => {
       client as never,
     );
 
-    expect(entry.entryNumber).toBe('JE-2026-00005');
+    expect(entry.entryNumber).toBe('JE-2026-000005');
     expect(entry.sourceType).toBe(JournalSourceType.PAYROLL_RUN);
     expect(entry.sourceId).toBe('run-1');
     expect(entry.lines).toHaveLength(3);

@@ -98,7 +98,7 @@ describe('Accounting Module Hardening (E2E)', () => {
 
   describe('Tenant Isolation', () => {
     it('should not allow tenant B to see tenant A accounts', async () => {
-      (prisma.chartAccount.findMany as jest.Mock).mockResolvedValue([
+      ((prisma as any).chartAccount.findMany as jest.Mock).mockResolvedValue([
         {
           id: 'acc-b1',
           tenantId: tenantB,
@@ -122,7 +122,7 @@ describe('Accounting Module Hardening (E2E)', () => {
 
     it('should not allow cross-tenant posting via manual journal', async () => {
       // Mock findMany for chartAccount
-      (prisma.chartAccount.findMany as jest.Mock).mockResolvedValue([
+      ((prisma as any).chartAccount.findMany as jest.Mock).mockResolvedValue([
         { id: 'acc-b1', tenantId: tenantB, code: '1000' },
       ]);
 
@@ -132,8 +132,16 @@ describe('Accounting Module Hardening (E2E)', () => {
             entryDate: new Date().toISOString(),
             narration: 'Cross tenant attempt',
             lines: [
-              { chartAccountId: 'acc-a1', debit: 100, credit: 0 },
-              { chartAccountId: 'acc-b1', debit: 0, credit: 100 },
+              {
+                chartAccountId: 'acc-a1',
+                side: JournalLineSide.DEBIT,
+                amount: 100,
+              },
+              {
+                chartAccountId: 'acc-b1',
+                side: JournalLineSide.CREDIT,
+                amount: 100,
+              },
             ],
           },
           actorB,
@@ -145,7 +153,7 @@ describe('Accounting Module Hardening (E2E)', () => {
   describe('Double-Entry Validation', () => {
     it('should reject imbalanced manual journals', async () => {
       // Mock findMany for chartAccount
-      (prisma.chartAccount.findMany as jest.Mock).mockResolvedValue([
+      ((prisma as any).chartAccount.findMany as jest.Mock).mockResolvedValue([
         { id: 'acc-a1', tenantId: tenantA, code: '1000' },
         { id: 'acc-a2', tenantId: tenantA, code: '4000' },
       ]);
@@ -156,8 +164,16 @@ describe('Accounting Module Hardening (E2E)', () => {
             entryDate: new Date().toISOString(),
             narration: 'Imbalanced',
             lines: [
-              { chartAccountId: 'acc-a1', debit: 100, credit: 0 },
-              { chartAccountId: 'acc-a2', debit: 0, credit: 99.99 },
+              {
+                chartAccountId: 'acc-a1',
+                side: JournalLineSide.DEBIT,
+                amount: 100,
+              },
+              {
+                chartAccountId: 'acc-a2',
+                side: JournalLineSide.CREDIT,
+                amount: 99.99,
+              },
             ],
           },
           actorA,
@@ -173,12 +189,12 @@ describe('Accounting Module Hardening (E2E)', () => {
           id: 'period-1',
           fiscalYearId: 'fy-1',
         });
-      (prisma.chartAccount.findMany as jest.Mock).mockResolvedValue([
+      ((prisma as any).chartAccount.findMany as jest.Mock).mockResolvedValue([
         { id: 'acc-a1', tenantId: tenantA, code: '1000' },
         { id: 'acc-a2', tenantId: tenantA, code: '4000' },
       ]);
-      (prisma.journalEntry.count as jest.Mock).mockResolvedValue(0);
-      (prisma.journalEntry.create as jest.Mock).mockResolvedValue({
+      ((prisma as any).journalEntry.count as jest.Mock).mockResolvedValue(0);
+      ((prisma as any).journalEntry.create as jest.Mock).mockResolvedValue({
         id: 'je-1',
       });
 
@@ -187,8 +203,16 @@ describe('Accounting Module Hardening (E2E)', () => {
           entryDate: new Date().toISOString(),
           narration: 'Balanced',
           lines: [
-            { chartAccountId: 'acc-a1', debit: 100, credit: 0 },
-            { chartAccountId: 'acc-a2', debit: 0, credit: 100 },
+            {
+              chartAccountId: 'acc-a1',
+              side: JournalLineSide.DEBIT,
+              amount: 100,
+            },
+            {
+              chartAccountId: 'acc-a2',
+              side: JournalLineSide.CREDIT,
+              amount: 100,
+            },
           ],
         },
         actorA,
@@ -200,10 +224,10 @@ describe('Accounting Module Hardening (E2E)', () => {
 
   describe('Period Boundaries', () => {
     it('should reject posting to a CLOSED fiscal period', async () => {
-      if (!prisma.fiscalPeriod) {
+      if (!(prisma as any).fiscalPeriod) {
         (prisma as any).fiscalPeriod = { findFirst: jest.fn() };
       }
-      (prisma.fiscalPeriod.findFirst as jest.Mock).mockResolvedValue({
+      ((prisma as any).fiscalPeriod.findFirst as jest.Mock).mockResolvedValue({
         id: 'closed-period',
         status: AccountingPeriodStatus.CLOSED,
         label: 'Closed Month',
@@ -227,10 +251,12 @@ describe('Accounting Module Hardening (E2E)', () => {
     });
 
     it('should reject posting if no fiscal period exists for the date', async () => {
-      if (!prisma.fiscalPeriod) {
+      if (!(prisma as any).fiscalPeriod) {
         (prisma as any).fiscalPeriod = { findFirst: jest.fn() };
       }
-      (prisma.fiscalPeriod.findFirst as jest.Mock).mockResolvedValue(null);
+      ((prisma as any).fiscalPeriod.findFirst as jest.Mock).mockResolvedValue(
+        null,
+      );
 
       await expect(
         postingService.postManualJournal(

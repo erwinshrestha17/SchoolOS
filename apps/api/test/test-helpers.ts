@@ -1046,7 +1046,11 @@ export function createPrismaMock() {
         ),
       ),
       create: jest.fn((q: PrismaQuery) => {
-        const item = { id: nextId('version'), ...q.data, createdAt: new Date() };
+        const item = {
+          id: nextId('version'),
+          ...q.data,
+          createdAt: new Date(),
+        };
         state.timetableVersions.push(item as Record<string, unknown>);
         return Promise.resolve(item);
       }),
