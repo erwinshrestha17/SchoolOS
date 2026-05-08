@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsDateString, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateStaffContractDto {
   @IsString()
@@ -10,11 +10,11 @@ export class CreateStaffContractDto {
   @IsString()
   position!: string;
 
-  @IsString()
+  @IsDateString()
   startDate!: string;
 
   @IsOptional()
-  @IsString()
+  @IsDateString()
   endDate?: string;
 
   @IsNumber()
