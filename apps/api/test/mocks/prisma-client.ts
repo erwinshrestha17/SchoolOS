@@ -6,6 +6,14 @@ class Decimal {
       value instanceof Decimal ? value.numericValue : Number(value);
   }
 
+  eq(value: number | string | Decimal) {
+    return this.numericValue === decimalToNumber(value);
+  }
+
+  equals(value: number | string | Decimal) {
+    return this.eq(value);
+  }
+
   add(value: number | string | Decimal) {
     return new Decimal(this.numericValue + decimalToNumber(value));
   }

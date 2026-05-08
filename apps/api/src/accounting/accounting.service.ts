@@ -263,7 +263,7 @@ export class AccountingService {
 
     const totals = sumJournalSides(dto.lines);
 
-    if (!totals.debit.equals(totals.credit)) {
+    if (!totals.debit.eq(totals.credit)) {
       throw new ConflictException(
         `Manual journal must be balanced. Debit: ${totals.debit.toString()}, Credit: ${totals.credit.toString()}`,
       );
@@ -519,7 +519,7 @@ export class AccountingService {
           .reduce((sum, row) => sum.add(row.balance), new Prisma.Decimal(0))
           .toNumber(),
       },
-      balanced: totals.debit.equals(totals.credit),
+      balanced: totals.debit.eq(totals.credit),
     };
   }
 
