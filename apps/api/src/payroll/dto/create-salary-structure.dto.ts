@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -19,6 +20,7 @@ export class SalaryComponentDto {
   componentType!: SalaryComponentType;
 
   @IsNumber()
+  @Min(0)
   amount!: number;
 
   @IsOptional()
@@ -38,14 +40,17 @@ export class CreateSalaryStructureDto {
   effectiveTo?: string;
 
   @IsNumber()
+  @Min(0)
   basicSalary!: number;
 
   @IsOptional()
   @IsNumber()
+  @Min(0)
   allowances?: number;
 
   @IsOptional()
   @IsNumber()
+  @Min(0)
   deductions?: number;
 
   @IsOptional()
