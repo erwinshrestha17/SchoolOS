@@ -1,12 +1,19 @@
 # SchoolOS Master Project Memory
 
-**Status:** Phase 2 implemented foundations + Phase 3 operations admin foundations
+**Status:** Phase 2 implemented foundations + Phase 3 operations admin foundations  
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard
 
 This is the consolidated source of truth for SchoolOS. It merges the long-term project roadmap, main phase structure, platform core memory, scalability roadmap, and current repo analysis summary.
 
-For the full locally generated version, use the file already prepared in this conversation: `SCHOOLOS_MASTER_PROJECT_MEMORY.md`. This GitHub copy establishes the master document path and consolidates the decision surface so future updates can be made here instead of spreading context across many long files.
+Focused companion plans:
+
+```text
+PROJECT_CONTEXT.md
+docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md
+docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md
+docs/project/SCHOOLOS_M11_INTELLIGENCE_ROADMAP.md
+```
 
 ---
 
@@ -28,7 +35,7 @@ Recommended near-term direction:
 ```text
 Run pilot hardening while deepening one existing vertical at a time.
 Highest priority: M9 accounting correctness, tenant isolation, reports/exports, and production verification.
-Keep parent/mobile portal, driver app, live map/WebSocket, full inventory/vendor workflows, and AI/ML deferred.
+Keep parent/mobile portal, driver app, live map/WebSocket, full inventory/vendor workflows, and AI/ML implementation deferred.
 ```
 
 Do not expand Phase 2/3 modules broadly at once. Existing Phase 3 admin modules may be polished and hardened, but parent/mobile and driver-facing experiences remain separate future scope.
@@ -105,7 +112,7 @@ Roles: TENANT_ADMIN, TENANT_TEACHER, TENANT_ACCOUNTANT, TENANT_STAFF, TENANT_PAR
 
 Purpose:
 
-- Students, admissions, attendance, fees, notices, activity, reports, and later academics, HR/payroll, library, transport, canteen, accounting.
+- Students, admissions, attendance, fees, notices, activity, reports, academics, HR/payroll, library, transport, canteen, accounting, and future intelligence dashboards.
 
 ---
 
@@ -126,6 +133,7 @@ Purpose:
 | M8C | Canteen Management | Phase 3 admin foundation implemented |
 | M9 | Accounting & Finance | Phase 2 foundation implemented; hardening priority |
 | M10 | Notices & Communication | Phase 1A/1B + parent-teacher chat foundation |
+| M11 | School Intelligence & Analytics | Phase 4 roadmap documented; implementation deferred |
 
 ---
 
@@ -157,6 +165,7 @@ Sub-phases:
 - 2C HR and Payroll.
 - 2D Full M9 Accounting and Finance.
 - 2E Parent Communication Expansion.
+- 2F Student Identity QR Foundation.
 
 ### Phase 3 — Extended School Operations
 
@@ -169,18 +178,56 @@ Status: Admin foundations implemented for Library, Transport, and Canteen. Paren
 
 ### Phase 4 — AI, Analytics, Scale, and Enterprise SaaS
 
-Start only after reliable production data exists.
+Status: Roadmap documented; implementation later.
 
-Includes:
+Phase 4 is owned primarily by **M11 School Intelligence & Analytics**. The detailed plan lives in:
 
-- Attendance risk prediction.
-- Fee defaulter scoring.
-- Student insights.
-- Activity caption assistance.
-- Transport ETA prediction.
-- Accounting anomaly detection.
-- Analytics warehouse/read models.
-- Enterprise SaaS controls.
+```text
+docs/project/SCHOOLOS_M11_INTELLIGENCE_ROADMAP.md
+```
+
+Phase 4 must start with intelligence foundations, not model-first AI. Required sequence:
+
+```text
+4A School Intelligence Foundation
+4B Rule-Based Operational Intelligence
+4C Student Risk and Academic Quality Intelligence
+4D AI Teacher Assistant and Natural Language Interface
+4E Offline-First and Network Intelligence
+4F Scale Optimization and Enterprise SaaS
+```
+
+M11 planned capabilities:
+
+```text
+- Structured SchoolEvent capture across M1-M10.
+- Feature snapshots for students, guardians, teachers, classrooms, and schools.
+- Explainable RiskScoreSnapshot and InsightAction workflows.
+- Teacher Workload Balance Monitor.
+- Substitute Teacher Intelligence.
+- Guardian Communication Health Score.
+- Academic Year Momentum Tracker.
+- Classroom-Level Heat Events.
+- Sibling Academic Correlation Report.
+- Predictive Dropout Engine, rule-based first and ML later.
+- Exam Paper Difficulty Calibration.
+- AI Teaching Assistant for teachers with human review.
+- Natural Language School Management Interface in English using approved query templates.
+- Offline-first AI inference contract for future on-device workflows.
+- Aggregate-only opt-in School Health Network Intelligence.
+```
+
+M11 safety rules:
+
+```text
+- No automated punishment.
+- No fee blocking, student suspension, payroll decision, staff discipline, or public teacher ranking from AI/risk scores.
+- Human review is required before AI output becomes official communication, report, record, or action.
+- Sensitive intelligence views are principal/admin-only unless explicitly designed otherwise.
+- Cross-school analytics require anonymization, aggregation, explicit opt-in, and platform audit.
+- Every intelligence read/write must remain tenant-scoped by tenantId unless it is an approved platform aggregate.
+- Every sensitive insight access must be audited.
+```
 
 ---
 
@@ -217,7 +264,7 @@ Scalability must be implemented as development continues.
 Every new feature must answer:
 
 ```text
-1. Which module owns this feature: M0 or M1-M10?
+1. Which module owns this feature: M0 or M1-M11?
 2. Which backend folder/API namespace/frontend route owns it?
 3. Which tenant owns this data?
 4. Which role/permission can access it?
@@ -229,6 +276,7 @@ Every new feature must answer:
 10. Does it require audit logging?
 11. Does it affect accounting/ledger?
 12. What tests prove tenant isolation and permissions?
+13. If intelligence/AI is involved, is the output explainable and human-reviewed?
 ```
 
 Implementation order:
@@ -259,6 +307,7 @@ Move slow/retryable work to BullMQ workers:
 - Media compression.
 - Large CSV/PDF exports.
 - Future transport ETA jobs.
+- Future M11 intelligence snapshot generation, risk scoring, insight generation, AI inference logging, and network aggregate jobs.
 
 ---
 
@@ -286,8 +335,8 @@ Non-negotiable rules:
 Repo inspection on May 6, 2026 indicates:
 
 ```text
-Full SchoolOS vision: around 60–70% implemented
-Phase 1 pilot product: around 90–95% implemented
+Full SchoolOS vision: around 60-70% implemented
+Phase 1 pilot product: around 90-95% implemented
 ```
 
 Readiness:
@@ -304,28 +353,28 @@ Module estimates:
 
 | Module | Estimated Completion |
 |---|---:|
-| Auth/Security/Tenant | 90–95% |
-| Platform Control Plane | 65–75% |
-| M1 Admissions & Student Profiles | 90–95% |
-| M2 Attendance | 85–90% |
-| M3 Fees & Receipts | 85–90% |
-| M5 Activity Feed | 75–85% |
-| M10 Notices & Communication | 85–90% |
-| M4 Academics | 70–80% |
-| M6 Homework & Timetable | 60–70% |
-| M7 HR & Payroll | 65–75% |
-| M9 Accounting | 75–85% |
-| M8A Library | 45–55% |
-| M8B Transport | 45–55% |
-| M8C Canteen | 45–55% |
-| AI/ML | 0% |
+| Auth/Security/Tenant | 90-95% |
+| Platform Control Plane | 65-75% |
+| M1 Admissions & Student Profiles | 90-95% |
+| M2 Attendance | 85-90% |
+| M3 Fees & Receipts | 85-90% |
+| M5 Activity Feed | 75-85% |
+| M10 Notices & Communication | 85-90% |
+| M4 Academics | 70-80% |
+| M6 Homework & Timetable | 60-70% |
+| M7 HR & Payroll | 65-75% |
+| M9 Accounting | 75-85% |
+| M8A Library | 45-55% |
+| M8B Transport | 45-55% |
+| M8C Canteen | 45-55% |
+| M11 School Intelligence & Analytics / AI | 0%; roadmap documented, implementation deferred |
 
 Biggest risks:
 
 - Existing Phase 2/3 breadth without enough depth.
 - Accounting complexity and ledger immutability.
 - Pilot operations exposing real-world data-entry, fee, attendance, guardian-contact, PDF, slow-network, and contract-test drift issues.
-- Parent/mobile portal, driver app, live map/WebSocket, full canteen inventory/vendor workflows, and AI/ML remain intentionally unbuilt.
+- Parent/mobile portal, driver app, live map/WebSocket, full canteen inventory/vendor workflows, and AI/ML implementation remain intentionally unbuilt.
 
 ---
 
@@ -346,6 +395,8 @@ pnpm verify:production
 pnpm smoke:phase1
 ```
 
+Documentation-only roadmap changes do not require runtime verification, but should still be reviewed for consistency.
+
 ---
 
 ## 11. Future Codex Prompt Format
@@ -357,6 +408,7 @@ Read these first:
 - DEVELOPMENT_RULES.md
 - docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
 - docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md
+- docs/project/SCHOOLOS_M11_INTELLIGENCE_ROADMAP.md when touching Phase 4/intelligence/AI work
 
 Task:
 [exact feature/change]
@@ -369,8 +421,9 @@ Constraints:
 - Keep platform, tenant settings, and school operations route boundaries separate.
 - Add pagination/filtering for growing lists.
 - Review/add indexes for high-volume queries.
-- Move slow/retryable/provider/report/PDF work to BullMQ where appropriate.
+- Move slow/retryable/provider/report/PDF/intelligence jobs to BullMQ where appropriate.
 - Add validation, error handling, audit logs, and tests.
+- Do not implement AI features until reliable production data and M11 foundations exist.
 - Run relevant verification commands.
 
 Return:
