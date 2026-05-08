@@ -210,6 +210,9 @@ export class TimetableService {
   }
 
   async listVersions(actor: AuthContext, query: TimetableVersionQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 50;
+
     return this.prisma.timetableVersion.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -227,7 +230,8 @@ export class TimetableService {
         slots: { include: timetableSlotInclude() },
       },
       orderBy: [{ effectiveFrom: 'desc' }, { createdAt: 'desc' }],
-      take: 100,
+      skip: (page - 1) * limit,
+      take: limit,
     });
   }
 
@@ -698,7 +702,10 @@ export class TimetableService {
   }
 
   async listSubstitutions(actor: AuthContext, query: SubstitutionQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 50;
     const date = query.date ? parseDate(query.date, 'date') : null;
+
     return this.prisma.timetableSubstitution.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -723,7 +730,8 @@ export class TimetableService {
       },
       include: substitutionInclude(),
       orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-      take: 100,
+      skip: (page - 1) * limit,
+      take: limit,
     });
   }
 

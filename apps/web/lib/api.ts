@@ -812,6 +812,8 @@ export const api = {
     classId?: string;
     sectionId?: string;
     status?: string;
+    page?: number;
+    limit?: number;
   }) => request<TimetableVersionSummary[]>(withQuery('/timetable/versions', params ?? {})),
   createTimetableVersion: (body: JsonBody) =>
     request<TimetableVersionSummary>('/timetable/versions', { method: 'POST', json: body }),
@@ -875,6 +877,8 @@ export const api = {
     classId?: string;
     sectionId?: string;
     status?: string;
+    page?: number;
+    limit?: number;
   }) => request<TimetableSubstitutionSummary[]>(withQuery('/timetable/substitutions', params ?? {})),
   createSubstitution: (body: JsonBody) =>
     request<TimetableSubstitutionSummary>('/timetable/substitutions', {

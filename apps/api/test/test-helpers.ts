@@ -22,6 +22,11 @@ export interface MockState {
   tenantSettings: Record<string, unknown>[];
   fileAssets: Record<string, unknown>[];
   studentDocuments: Record<string, unknown>[];
+  timetableVersions: Record<string, unknown>[];
+  timetableSlots: Record<string, unknown>[];
+  timetableSubstitutions: Record<string, unknown>[];
+  homeworkAssignments: Record<string, unknown>[];
+  homeworkSubmissions: Record<string, unknown>[];
   [key: string]: Record<string, unknown>[];
 }
 
@@ -188,6 +193,11 @@ export function createPrismaMock() {
     tenantSettings: [] as Record<string, unknown>[],
     fileAssets: [] as Record<string, unknown>[],
     studentDocuments: [] as Record<string, unknown>[],
+    timetableVersions: [] as Record<string, unknown>[],
+    timetableSlots: [] as Record<string, unknown>[],
+    timetableSubstitutions: [] as Record<string, unknown>[],
+    homeworkAssignments: [] as Record<string, unknown>[],
+    homeworkSubmissions: [] as Record<string, unknown>[],
   };
 
   const nextId = (prefix: string) =>
@@ -533,6 +543,11 @@ export function createPrismaMock() {
             .length,
         ),
       ),
+      delete: jest.fn((q: PrismaQuery) => {
+        const index = state.classes.findIndex((i) => i.id === q.where?.id);
+        if (index !== -1) state.classes.splice(index, 1);
+        return Promise.resolve({ id: q.where?.id });
+      }),
     },
     staff: {
       findUnique: jest.fn((q: PrismaQuery) =>
@@ -582,6 +597,24 @@ export function createPrismaMock() {
       }),
     },
     academicYear: {
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.academicYears.find(
+            (item) =>
+              item.id === q.where?.id &&
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId),
+          ),
+        ),
+      ),
+      findUnique: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.academicYears.find(
+            (item) =>
+              item.id === q.where?.id &&
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId),
+          ),
+        ),
+      ),
       upsert: jest.fn((q: PrismaQuery) => {
         const { where, update, create } = q;
         const tenantIdName = where?.tenantId_name as
@@ -985,6 +1018,137 @@ export function createPrismaMock() {
     },
     invoice: {
       count: jest.fn(() => Promise.resolve(0)),
+    },
+    timetableVersion: {
+      findUnique: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.timetableVersions.find(
+            (item) =>
+              item.id === q.where?.id &&
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId),
+          ),
+        ),
+      ),
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.timetableVersions.find(
+            (item) =>
+              item.id === q.where?.id &&
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId),
+          ),
+        ),
+      ),
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.timetableVersions.filter(
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ),
+        ),
+      ),
+      create: jest.fn((q: PrismaQuery) => {
+        const item = { id: nextId('version'), ...q.data, createdAt: new Date() };
+        state.timetableVersions.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
+      }),
+      update: jest.fn((q: PrismaQuery) => {
+        const item = state.timetableVersions.find((i) => i.id === q.where?.id);
+        if (item) Object.assign(item, q.data);
+        return Promise.resolve(item);
+      }),
+    },
+    timetableSlot: {
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.timetableSlots.filter(
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ),
+        ),
+      ),
+      create: jest.fn((q: PrismaQuery) => {
+        const item = { id: nextId('slot'), ...q.data };
+        state.timetableSlots.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
+      }),
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.timetableSlots.find(
+            (item) =>
+              item.id === q.where?.id &&
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId),
+          ),
+        ),
+      ),
+      update: jest.fn((q: PrismaQuery) => {
+        const item = state.timetableSlots.find((i) => i.id === q.where?.id);
+        if (item) Object.assign(item, q.data);
+        return Promise.resolve(item);
+      }),
+    },
+    room: {
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.rooms?.find(
+            (item) =>
+              item.id === q.where?.id &&
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId),
+          ),
+        ),
+      ),
+      findUnique: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.rooms?.find(
+            (item) =>
+              item.id === q.where?.id &&
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId),
+          ),
+        ),
+      ),
+      findMany: jest.fn(() => Promise.resolve([])),
+    },
+    subject: {
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.subjects?.find(
+            (item) =>
+              item.id === q.where?.id &&
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId),
+          ),
+        ),
+      ),
+      findUnique: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.subjects?.find(
+            (item) =>
+              item.id === q.where?.id &&
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId),
+          ),
+        ),
+      ),
+      findMany: jest.fn(() => Promise.resolve([])),
+    },
+    timetablePeriod: {
+      findFirst: jest.fn((q: PrismaQuery) => Promise.resolve(null)),
+    },
+    timetableSubstitution: {
+      findFirst: jest.fn((q: PrismaQuery) => Promise.resolve(null)),
+      findMany: jest.fn(() => Promise.resolve([])),
+    },
+    homeworkAssignment: {
+      findFirst: jest.fn((q: PrismaQuery) => Promise.resolve(null)),
+      findMany: jest.fn(() => Promise.resolve([])),
+    },
+    homeworkSubmission: {
+      findFirst: jest.fn((q: PrismaQuery) => Promise.resolve(null)),
+      findMany: jest.fn(() => Promise.resolve([])),
+    },
+    teacherAvailability: {
+      findMany: jest.fn(() => Promise.resolve([])),
+    },
+    teacherWorkloadLimit: {
+      findFirst: jest.fn(() => Promise.resolve(null)),
+    },
+    subjectTeacherAssignment: {
+      findFirst: jest.fn(() => Promise.resolve(null)),
     },
   };
 }

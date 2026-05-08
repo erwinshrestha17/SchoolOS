@@ -107,7 +107,7 @@ export class UpdateRoomDto {
   isActive?: boolean;
 }
 
-export class TimetableVersionQueryDto {
+export class TimetableVersionQueryDto extends PaginatedQueryDto {
   @IsOptional()
   @IsString()
   academicYearId?: string;
@@ -261,7 +261,7 @@ export class WorkloadQueryDto {
   versionId?: string;
 }
 
-export class SubstitutionQueryDto {
+export class SubstitutionQueryDto extends PaginatedQueryDto {
   @IsOptional()
   @IsISO8601()
   date?: string;
