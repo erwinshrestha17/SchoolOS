@@ -2288,19 +2288,26 @@ model AssessmentComponent {
   @@unique([tenantId, examTermId, subjectId, name])
 }
 
+enum MarkEntryStatus {
+  SUBMITTED
+  ABSENT
+  WITHHELD
+}
+
 model MarkEntry {
-  id                    String   @id @default(uuid())
+  id                    String          @id @default(uuid())
   tenantId              String
   examTermId            String
   assessmentComponentId String
   subjectId             String
   studentId             String
   enteredById           String?
-  marksObtained         Decimal  @db.Decimal(8, 2)
+  marksObtained         Decimal         @db.Decimal(8, 2)
+  status                MarkEntryStatus @default(SUBMITTED)
   remarks               String?
-  isLocked              Boolean  @default(false)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  isLocked              Boolean         @default(false)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
 
   tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   examTerm            ExamTerm            @relation(fields: [examTermId], references: [id], onDelete: Cascade)

@@ -798,7 +798,7 @@ export function createPrismaMock() {
               item.tenantId === q.where?.tenantId &&
               item.module === q.where?.module &&
               item.entityId === q.where?.entityId &&
-              item.softDeletedAt === q.where?.softDeletedAt,
+              !item.softDeletedAt,
           ),
         ),
       ),
@@ -969,6 +969,22 @@ export function createPrismaMock() {
           ),
         });
       }),
+    },
+    assessmentComponent: {
+      findFirst: jest.fn(() => Promise.resolve(null)),
+      findMany: jest.fn(() => Promise.resolve([])),
+    },
+    markEntry: {
+      findUnique: jest.fn(() => Promise.resolve(null)),
+      findFirst: jest.fn(() => Promise.resolve(null)),
+      findMany: jest.fn(() => Promise.resolve([])),
+      upsert: jest.fn((q: any) => Promise.resolve(q.create || {})),
+    },
+    examTerm: {
+      findFirst: jest.fn(() => Promise.resolve(null)),
+    },
+    invoice: {
+      count: jest.fn(() => Promise.resolve(0)),
     },
   };
 }

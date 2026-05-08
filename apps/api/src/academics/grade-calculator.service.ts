@@ -1,5 +1,11 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 
+const MarkEntryStatusEnum = {
+  SUBMITTED: 'SUBMITTED',
+  ABSENT: 'ABSENT',
+  WITHHELD: 'WITHHELD',
+};
+
 export type MoestLetterGrade =
   | 'A+'
   | 'A'
@@ -29,9 +35,8 @@ export interface ComponentScoreInput {
   marksObtained?: number | null;
   passMarks?: number | null;
   weightPercent: number;
+  status?: MarkEntryStatus;
   isMissing?: boolean;
-  isAbsent?: boolean;
-  isWithheld?: boolean;
 }
 
 export interface SubjectGradeInput {
@@ -124,16 +129,18 @@ export class GradeCalculatorService {
     for (const component of input.components) {
       this.validateComponent(component);
 
-      if (component.isWithheld || component.isMissing) {
+      const isWithheld =
+        component.status === MarkEntryStatusEnum.WITHHELD || component.isMissing;
+      const isAbsent = component.status === MarkEntryStatusEnum.ABSENT;
+
+      if (isWithheld) {
         missingComponentCount += 1;
         if (!input.includeIncomplete) {
           continue;
         }
       }
 
-      const marksObtained = component.isAbsent
-        ? 0
-        : Number(component.marksObtained ?? 0);
+      const marksObtained = isAbsent ? 0 : Number(component.marksObtained ?? 0);
       const componentPercentage =
         component.maxMarks === 0
           ? 0

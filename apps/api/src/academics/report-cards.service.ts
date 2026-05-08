@@ -230,6 +230,7 @@ export class ReportCardsService {
               subjectId,
               maxMarks: Number(component.maxMarks),
               marksObtained: mark ? Number(mark.marksObtained) : null,
+              status: mark?.status,
               passMarks:
                 component.passMarks === null ||
                 component.passMarks === undefined

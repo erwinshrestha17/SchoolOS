@@ -6,6 +6,7 @@ import {
 import { Prisma } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { GradeCalculatorService } from './grade-calculator.service';
 
 type ReportCardWithRelations = Prisma.ReportCardGetPayload<{
   include: {
@@ -43,7 +44,10 @@ interface ReportPdfSubject {
 
 @Injectable()
 export class ReportCardPdfService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly gradeCalculator: GradeCalculatorService,
+  ) {}
 
   async getReportCardPdf(reportCardId: string, actor: AuthContext) {
     const reportCard = await this.prisma.reportCard.findFirst({
@@ -99,66 +103,70 @@ export class ReportCardPdfService {
       schoolName: tenant?.name ?? 'SchoolOS School',
       panNumber: tenant?.panNumber ?? null,
       reportCard,
-      subjects: buildSubjectRows(marks),
+      subjects: this.buildSubjectRows(marks),
     });
   }
-}
 
-function buildSubjectRows(marks: MarkWithRelations[]) {
-  const grouped = new Map<string, ReportPdfSubject>();
+  private buildSubjectRows(marks: MarkWithRelations[]) {
+    const groupedMarks = new Map<string, MarkWithRelations[]>();
 
-  for (const mark of marks) {
-    const subject = grouped.get(mark.subjectId) ?? {
-      subject: `${mark.subject.code} / ${mark.subject.name}`,
-      components: [],
-      totalObtained: 0,
-      totalMax: 0,
-      percentage: 0,
-      grade: 'NG',
-    };
+    for (const mark of marks) {
+      const existing = groupedMarks.get(mark.subjectId) ?? [];
+      existing.push(mark);
+      groupedMarks.set(mark.subjectId, existing);
+    }
 
-    const obtained = Number(mark.marksObtained);
-    const max = Number(mark.assessmentComponent.maxMarks);
-    const passMarks = mark.assessmentComponent.passMarks
-      ? Number(mark.assessmentComponent.passMarks)
-      : null;
+    const rows: ReportPdfSubject[] = [];
 
-    subject.components.push({
-      name: mark.assessmentComponent.name,
-      type: mark.assessmentComponent.type,
-      obtained,
-      max,
-      weightPercent: Number(mark.assessmentComponent.weightPercent),
-      passMarks,
-      status: passMarks === null || obtained >= passMarks ? 'PASS' : 'FAIL',
-    });
-    subject.totalObtained += obtained;
-    subject.totalMax += max;
-    subject.percentage =
-      subject.totalMax > 0
-        ? (subject.totalObtained / subject.totalMax) * 100
-        : 0;
-    subject.grade = gradeFromPercentage(
-      subject.percentage,
-      subject.components.some((item) => item.status === 'FAIL'),
-    );
+    for (const [subjectId, subjectMarks] of groupedMarks.entries()) {
+      const firstMark = subjectMarks[0];
+      const result = this.gradeCalculator.calculateWeightedSubjectGrade({
+        subjectId,
+        components: subjectMarks.map((m) => ({
+          componentId: m.assessmentComponentId,
+          subjectId,
+          maxMarks: Number(m.assessmentComponent.maxMarks),
+          marksObtained: Number(m.marksObtained),
+          status: m.status,
+          passMarks: m.assessmentComponent.passMarks
+            ? Number(m.assessmentComponent.passMarks)
+            : null,
+          weightPercent: Number(m.assessmentComponent.weightPercent),
+        })),
+      });
 
-    grouped.set(mark.subjectId, subject);
+      rows.push({
+        subject: `${firstMark.subject.code} / ${firstMark.subject.name}`,
+        components: subjectMarks.map((m) => ({
+          name: m.assessmentComponent.name,
+          type: m.assessmentComponent.type,
+          obtained: Number(m.marksObtained),
+          max: Number(m.assessmentComponent.maxMarks),
+          weightPercent: Number(m.assessmentComponent.weightPercent),
+          passMarks: m.assessmentComponent.passMarks
+            ? Number(m.assessmentComponent.passMarks)
+            : null,
+          status:
+            m.assessmentComponent.passMarks === null ||
+            Number(m.marksObtained) >= Number(m.assessmentComponent.passMarks)
+              ? 'PASS'
+              : 'FAIL',
+        })),
+        totalObtained: subjectMarks.reduce(
+          (sum, m) => sum + Number(m.marksObtained),
+          0,
+        ),
+        totalMax: subjectMarks.reduce(
+          (sum, m) => sum + Number(m.assessmentComponent.maxMarks),
+          0,
+        ),
+        percentage: result.percentage,
+        grade: result.grade,
+      });
+    }
+
+    return rows;
   }
-
-  return Array.from(grouped.values());
-}
-
-function gradeFromPercentage(percentage: number, failedComponent: boolean) {
-  if (failedComponent) return 'NG';
-  if (percentage >= 90) return 'A+';
-  if (percentage >= 80) return 'A';
-  if (percentage >= 70) return 'B+';
-  if (percentage >= 60) return 'B';
-  if (percentage >= 50) return 'C+';
-  if (percentage >= 40) return 'C';
-  if (percentage >= 35) return 'D';
-  return 'NG';
 }
 
 function buildPolishedReportCardPdf(input: {

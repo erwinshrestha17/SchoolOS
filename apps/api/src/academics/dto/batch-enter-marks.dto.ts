@@ -1,6 +1,7 @@
 import {
   ArrayMinSize,
   IsArray,
+  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
@@ -8,14 +9,26 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { MarkEntryStatus } from '@prisma/client';
+
+export const MarkEntryStatusEnum = MarkEntryStatus || {
+  SUBMITTED: 'SUBMITTED',
+  ABSENT: 'ABSENT',
+  WITHHELD: 'WITHHELD',
+};
 
 class MarkEntryItem {
   @IsString()
   studentId!: string;
 
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  marksObtained!: number;
+  marksObtained?: number;
+
+  @IsOptional()
+  @IsEnum(['SUBMITTED', 'ABSENT', 'WITHHELD'])
+  status?: MarkEntryStatus;
 
   @IsOptional()
   @IsString()
