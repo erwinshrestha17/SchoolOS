@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import { ReportsQueryDto } from './dto/reports-query.dto';
 
-import { OnEvent } from '@nestjs/event-emitter';
 import {
   AccountingPeriodStatus,
   ChartAccountType,
@@ -1005,16 +1004,73 @@ function toCsv(rows: Array<Record<string, unknown>>) {
   }
 
   const headers = Object.keys(rows[0]);
-  return [
-    headers.join(','),
+
+  const csvValue = (value: unknown): string => {
+    if (value === null || value === undefined) {
+      return '';
+    }
+
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean' ||
+      typeof value === 'bigint'
+    ) {
+      return String(value);
+    }
+
+    if (typeof value === 'symbol') {
+      return value.description ?? '';
+    }
+
+    if (typeof value === 'function') {
+      return '[Function]';
+    }
+
+    if (Array.isArray(value)) {
+      return JSON.stringify(value);
+    }
+
+    if (typeof value === 'object') {
+      if (
+        value.constructor.name === 'Decimal' &&
+        'toString' in value &&
+        typeof value.toString === 'function'
+      ) {
+        return value.toString();
+      }
+
+      return JSON.stringify(value);
+    }
+
+    return '';
+  };
+
+  const escapeCsv = (value: unknown): string => {
+    const stringValue = csvValue(value);
+
+    if (
+      stringValue.includes(',') ||
+      stringValue.includes('"') ||
+      stringValue.includes('\n') ||
+      stringValue.includes('\r')
+    ) {
+      return `"${stringValue.replaceAll('"', '""')}"`;
+    }
+
+    return stringValue;
+  };
+
+  const lines = [
+    headers.map(escapeCsv).join(','),
     ...rows.map((row) =>
-      headers
-        .map((header) =>
-          String(row[header] ?? '')
-            .replaceAll('"', '""')
-            .replace(/^(.+)$/, '"$1"'),
-        )
-        .join(','),
+      headers.map((header) => escapeCsv(row[header])).join(','),
     ),
-  ].join('\n');
+  ];
+
+  return lines.join('\n');
 }
