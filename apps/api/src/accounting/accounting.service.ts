@@ -397,7 +397,7 @@ export class AccountingService {
       tenantId: actor.tenantId,
       journalEntry: {
         status: JournalEntryStatus.POSTED,
-      } as Prisma.JournalEntryWhereInput,
+      },
     };
 
     if (query?.startDate || query?.endDate) {
@@ -695,7 +695,7 @@ export class AccountingService {
       tenantId: actor.tenantId,
       journalEntry: {
         status: JournalEntryStatus.POSTED,
-      } as Prisma.JournalEntryWhereInput,
+      },
     };
 
     if (query?.startDate || query?.endDate) {
