@@ -12,6 +12,7 @@ Related focused plans:
 
 ```text
 docs/project/SCHOOLOS_STUDENT_IDENTITY_QR_PLAN.md
+docs/project/SCHOOLOS_M11_INTELLIGENCE_ROADMAP.md
 ```
 
 Keep this file only as a compatibility pointer for older prompts that still reference `SCHOOLOS_PHASE_STRUCTURE.md`.
@@ -36,7 +37,7 @@ Current stage: Phase 2 implemented foundations + Phase 3 operations admin founda
 | Phase 1 | Pilot-Ready Core School System | Make the system usable for real live-school daily operations and polish it for pilot use. | Completed |
 | Phase 2 | Academic, HR, Timetable, and Accounting Expansion | Add academic depth, timetable/homework, HR/payroll, full M9 accounting, controlled parent communication expansion, and cross-module hardening such as QR-based Student Identity. | Foundation implemented; hardening in progress |
 | Phase 3 | Extended School Operations | Add library, transport, canteen, and parent/mobile expansion using shared foundations such as Student QR Identity. | Admin foundations implemented for Library/Transport/Canteen; parent/mobile later |
-| Phase 4 | AI, Analytics, Scale, and Enterprise SaaS | Add AI/ML features, analytics platform, scale optimizations, and enterprise SaaS controls. | Later |
+| Phase 4 | AI, Analytics, Scale, and Enterprise SaaS | Add M11 School Intelligence & Analytics, AI/ML features, analytics platform, scale optimizations, and enterprise SaaS controls. | Roadmap documented; implementation later |
 
 ---
 
@@ -99,6 +100,72 @@ Expose canteen wallet balance, top-up history, purchase history, spending contro
 
 ---
 
+## Phase 4 — AI, Analytics, Scale, and Enterprise SaaS
+
+Phase 4 is owned primarily by **M11 School Intelligence & Analytics**.
+
+Detailed M11 plan:
+
+```text
+docs/project/SCHOOLOS_M11_INTELLIGENCE_ROADMAP.md
+```
+
+### Phase 4A — School Intelligence Foundation
+
+- Structured `SchoolEvent` capture roadmap across M1-M10.
+- Feature snapshot roadmap for students, guardians, teachers, classrooms, and schools.
+- Explainable `RiskScoreSnapshot` roadmap.
+- `InsightAction` workflow roadmap.
+- `AiInferenceRequest` contract roadmap for future cloud and on-device AI.
+- Tenant isolation, RBAC, audit, and sensitive-view rules.
+
+### Phase 4B — Rule-Based Operational Intelligence
+
+- Teacher Workload Balance Monitor.
+- Substitute Teacher Intelligence.
+- Guardian Communication Health Score.
+- Academic Year Momentum Tracker.
+- Classroom-Level Heat Events.
+
+### Phase 4C — Student Risk and Academic Quality Intelligence
+
+- Sibling Academic Correlation Report.
+- Predictive Dropout Engine v1, rule-based first and ML later.
+- Student risk dashboard and intervention checklist.
+- Exam Paper Difficulty Calibration.
+- Tenant-level curriculum gap detection.
+
+### Phase 4D — AI Teacher Assistant and Natural Language Interface
+
+- AI Teaching Assistant for teachers only, with human review.
+- Report card remark drafts.
+- Lesson plan drafts.
+- Homework feedback drafts.
+- Notice/message drafts.
+- English-first Natural Language School Management Interface using approved query templates.
+
+### Phase 4E — Offline-First and Network Intelligence
+
+- Offline-first AI inference contract.
+- Future on-device model support.
+- Aggregate-only opt-in School Health Network Intelligence.
+- Cross-school curriculum benchmarking with anonymization and platform audit.
+
+### Phase 4F — Scale Optimization and Enterprise SaaS
+
+- Analytics read models.
+- Background intelligence jobs.
+- Model/version governance.
+- Platform intelligence dashboards.
+- Enterprise observability.
+- Plan-based AI/analytics limits.
+
+### Phase 4 Safety Rule
+
+Do not start AI/ML implementation until reliable production data exists and the M11 event/snapshot/risk-score foundation is approved. M11 outputs must never automatically punish students, block fees, suspend access, make payroll/staff discipline decisions, or publicly rank teachers.
+
+---
+
 ## Rule
 
-Do not expand every Phase 2/3 module at once. Keep existing Phase 2 and Phase 3 admin foundations focused, tenant-scoped, tested, production-aware, and clear about deferred parent/mobile, driver app, live map/WebSocket, inventory/vendor, AI, and biometric scope.
+Do not expand every Phase 2/3 module at once. Keep existing Phase 2 and Phase 3 admin foundations focused, tenant-scoped, tested, production-aware, and clear about deferred parent/mobile, driver app, live map/WebSocket, inventory/vendor, AI implementation, and biometric scope.
