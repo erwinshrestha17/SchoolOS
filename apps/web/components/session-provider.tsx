@@ -48,8 +48,10 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
     if (existingSession) {
       setSession(existingSession);
-      // We do not set status to 'authenticated' yet.
-      // We keep it as 'loading' until api.refreshSession() confirms the session is valid via cookies.
+      // Keep the UI in loading while the cookie-backed session is verified.
+      // Local storage is only a browser display cache and must not be trusted
+      // as proof that the httpOnly access/refresh cookies still exist.
+      setStatus('loading');
     }
 
     let cancelled = false;
@@ -66,12 +68,11 @@ export function SessionProvider({ children }: PropsWithChildren) {
         storeSession(browserSession);
         setSession(browserSession);
         setStatus('authenticated');
-      } catch (error) {
+      } catch {
         if (cancelled) {
           return;
         }
 
-        // If refresh fails, the session is invalid or cookies are missing/expired.
         clearStoredSession();
         setSession(null);
         setStatus('anonymous');
@@ -87,6 +88,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, []);
 
   async function refreshSession() {
+    setStatus('loading');
+
     try {
       const refreshedSession = await api.refreshSession();
       const browserSession = toBrowserSession(refreshedSession);
