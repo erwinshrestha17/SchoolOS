@@ -263,8 +263,10 @@ export class AccountingService {
 
     const totals = sumJournalSides(dto.lines);
 
-    if (Math.abs(totals.debit - totals.credit) > 0.01) {
-      throw new ConflictException('Manual journal must be balanced');
+    if (totals.debit.toString() !== totals.credit.toString()) {
+      throw new ConflictException(
+        `Manual journal must be balanced. Debit: ${totals.debit.toString()}, Credit: ${totals.credit.toString()}`,
+      );
     }
 
     const entryDate = new Date(dto.entryDate);
@@ -431,12 +433,12 @@ export class AccountingService {
 
     const trialBalance = accounts.map((account) => {
       const debit = account.journalLines.reduce(
-        (sum, line) => sum + Number(line.debit),
-        0,
+        (sum, line) => sum.add(line.debit),
+        new Prisma.Decimal(0),
       );
       const credit = account.journalLines.reduce(
-        (sum, line) => sum + Number(line.credit),
-        0,
+        (sum, line) => sum.add(line.credit),
+        new Prisma.Decimal(0),
       );
 
       return {
@@ -444,34 +446,43 @@ export class AccountingService {
         code: account.code,
         name: account.name,
         type: account.type,
-        debit,
-        credit,
-        balance: debit - credit,
+        debit: Number(debit),
+        credit: Number(credit),
+        balance: Number(debit.sub(credit)),
       };
     });
 
     const totals = trialBalance.reduce(
       (acc, row) => ({
-        debit: acc.debit + row.debit,
-        credit: acc.credit + row.credit,
+        debit: acc.debit.add(row.debit),
+        credit: acc.credit.add(row.credit),
       }),
-      { debit: 0, credit: 0 },
+      { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(0) },
     );
 
     const income = trialBalance
       .filter((row) => row.type === ChartAccountType.REVENUE)
-      .reduce((sum, row) => sum + row.credit - row.debit, 0);
+      .reduce(
+        (sum, row) => sum.add(row.credit).sub(row.debit),
+        new Prisma.Decimal(0),
+      );
     const expenses = trialBalance
       .filter((row) => row.type === ChartAccountType.EXPENSE)
-      .reduce((sum, row) => sum + row.debit - row.credit, 0);
+      .reduce(
+        (sum, row) => sum.add(row.debit).sub(row.credit),
+        new Prisma.Decimal(0),
+      );
 
     return {
       trialBalance,
-      totals,
+      totals: {
+        debit: Number(totals.debit),
+        credit: Number(totals.credit),
+      },
       incomeStatement: {
-        income,
-        expenses,
-        netIncome: income - expenses,
+        income: Number(income),
+        expenses: Number(expenses),
+        netIncome: Number(income.sub(expenses)),
         groups: {
           revenue: trialBalance.filter(
             (r) => r.type === ChartAccountType.REVENUE,
@@ -500,9 +511,13 @@ export class AccountingService {
               row.type === ChartAccountType.ASSET &&
               /cash|bank/i.test(row.name),
           )
-          .reduce((sum, row) => sum + row.balance, 0),
+          .reduce(
+            (sum, row) => sum.add(row.balance),
+            new Prisma.Decimal(0),
+          )
+          .toNumber(),
       },
-      balanced: Math.abs(totals.debit - totals.credit) < 0.01,
+      balanced: totals.debit.equals(totals.credit),
     };
   }
 
@@ -857,17 +872,28 @@ export class AccountingService {
 }
 
 function sumJournalSides(
-  lines: Array<{ side: JournalLineSide; amount: number }>,
+  lines: Array<{
+    side?: JournalLineSide;
+    amount?: number | Prisma.Decimal;
+    debit?: number | Prisma.Decimal;
+    credit?: number | Prisma.Decimal;
+  }>,
 ) {
   return lines.reduce(
-    (totals, line) => ({
-      debit:
-        totals.debit + (line.side === JournalLineSide.DEBIT ? line.amount : 0),
-      credit:
-        totals.credit +
-        (line.side === JournalLineSide.CREDIT ? line.amount : 0),
-    }),
-    { debit: 0, credit: 0 },
+    (totals, line) => {
+      const debit = new Prisma.Decimal(
+        line.debit ?? (line.side === JournalLineSide.DEBIT ? line.amount ?? 0 : 0),
+      );
+      const credit = new Prisma.Decimal(
+        line.credit ??
+          (line.side === JournalLineSide.CREDIT ? line.amount ?? 0 : 0),
+      );
+      return {
+        debit: totals.debit.add(debit),
+        credit: totals.credit.add(credit),
+      };
+    },
+    { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(0) },
   );
 }
 

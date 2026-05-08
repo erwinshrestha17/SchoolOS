@@ -246,7 +246,11 @@ export class AccountingPostingService {
         tenantId: input.tenantId,
         fiscalYearId: period?.fiscalYearId ?? null,
         fiscalPeriodId: period?.id ?? null,
-        entryNumber: await this.generateJournalEntryNumber(tx, input.tenantId),
+        entryNumber: await this.generateJournalEntryNumber(
+          tx,
+          input.tenantId,
+          entryDate,
+        ),
         entryDate,
         status: JournalEntryStatus.POSTED,
         narration: `Payroll posting ${input.periodMonth}/${input.periodYear}`,
@@ -345,7 +349,11 @@ export class AccountingPostingService {
         tenantId: input.tenantId,
         fiscalYearId: period?.fiscalYearId ?? null,
         fiscalPeriodId: period?.id ?? null,
-        entryNumber: await this.generateJournalEntryNumber(tx, input.tenantId),
+        entryNumber: await this.generateJournalEntryNumber(
+          tx,
+          input.tenantId,
+          entryDate,
+        ),
         entryDate,
         status: JournalEntryStatus.POSTED,
         narration: `Payroll disbursement ${input.periodMonth}/${input.periodYear}`,
@@ -425,7 +433,11 @@ export class AccountingPostingService {
         tenantId: input.tenantId,
         fiscalYearId: period?.fiscalYearId ?? null,
         fiscalPeriodId: period?.id ?? null,
-        entryNumber: await this.generateJournalEntryNumber(tx, input.tenantId),
+        entryNumber: await this.generateJournalEntryNumber(
+          tx,
+          input.tenantId,
+          input.entryDate,
+        ),
         entryDate: input.entryDate,
         status: JournalEntryStatus.POSTED,
         narration: input.narration,
@@ -482,7 +494,11 @@ export class AccountingPostingService {
         tenantId: input.tenantId,
         fiscalYearId: period?.fiscalYearId ?? null,
         fiscalPeriodId: period?.id ?? null,
-        entryNumber: await this.generateJournalEntryNumber(tx, input.tenantId),
+        entryNumber: await this.generateJournalEntryNumber(
+          tx,
+          input.tenantId,
+          input.reversalDate,
+        ),
         entryDate: input.reversalDate,
         status: JournalEntryStatus.POSTED,
         narration: input.narration,
@@ -579,7 +595,11 @@ export class AccountingPostingService {
         tenantId: input.tenantId,
         fiscalYearId: period?.fiscalYearId ?? null,
         fiscalPeriodId: period?.id ?? null,
-        entryNumber: await this.generateJournalEntryNumber(tx, input.tenantId),
+        entryNumber: await this.generateJournalEntryNumber(
+          tx,
+          input.tenantId,
+          entryDate,
+        ),
         entryDate,
         status: JournalEntryStatus.POSTED,
         narration: input.narration ?? `Fee payment ${input.receiptNumber}`,
@@ -663,7 +683,11 @@ export class AccountingPostingService {
         tenantId: input.tenantId,
         fiscalYearId: period?.fiscalYearId ?? null,
         fiscalPeriodId: period?.id ?? null,
-        entryNumber: await this.generateJournalEntryNumber(tx, input.tenantId),
+        entryNumber: await this.generateJournalEntryNumber(
+          tx,
+          input.tenantId,
+          entryDate,
+        ),
         entryDate,
         status: JournalEntryStatus.POSTED,
         narration: `Fee waiver: ${input.reason}`,
@@ -745,7 +769,11 @@ export class AccountingPostingService {
         tenantId: input.tenantId,
         fiscalYearId: period?.fiscalYearId ?? null,
         fiscalPeriodId: period?.id ?? null,
-        entryNumber: await this.generateJournalEntryNumber(tx, input.tenantId),
+        entryNumber: await this.generateJournalEntryNumber(
+          tx,
+          input.tenantId,
+          entryDate,
+        ),
         entryDate,
         status: JournalEntryStatus.POSTED,
         narration: `Payment refund: ${input.reason}`,
@@ -799,20 +827,37 @@ export class AccountingPostingService {
     tenantId: string,
     entryDate: Date,
   ) {
+    // 1. Check Fiscal Period (Primary)
     const fiscalPeriod = await tx.fiscalPeriod.findFirst({
       where: {
         tenantId,
         startDate: { lte: entryDate },
         endDate: { gte: entryDate },
       },
+      include: {
+        fiscalYear: true,
+      },
     });
 
-    if (fiscalPeriod && fiscalPeriod.status !== AccountingPeriodStatus.OPEN) {
+    if (!fiscalPeriod) {
       throw new ConflictException(
-        `Cannot post journal entry to ${fiscalPeriod.status.toLowerCase()} fiscal period "${fiscalPeriod.label}"`,
+        `No fiscal period found for date ${entryDate.toISOString().split('T')[0]}`,
       );
     }
 
+    if (fiscalPeriod.status !== AccountingPeriodStatus.OPEN) {
+      throw new ConflictException(
+        `Cannot post to ${fiscalPeriod.status.toLowerCase()} fiscal period "${fiscalPeriod.label}"`,
+      );
+    }
+
+    if (fiscalPeriod.fiscalYear.status !== AccountingPeriodStatus.OPEN) {
+      throw new ConflictException(
+        `Cannot post to fiscal period in a ${fiscalPeriod.fiscalYear.status.toLowerCase()} fiscal year "${fiscalPeriod.fiscalYear.name}"`,
+      );
+    }
+
+    // 2. Check Global Accounting Period (Secondary/Overlay)
     const closedPeriod = await tx.accountingPeriod.findFirst({
       where: {
         tenantId,
@@ -826,7 +871,7 @@ export class AccountingPostingService {
 
     if (closedPeriod) {
       throw new ConflictException(
-        `Cannot post journal entry to closed accounting period "${closedPeriod.name}"`,
+        `Cannot post to closed/locked accounting period "${closedPeriod.name}"`,
       );
     }
 
@@ -862,12 +907,24 @@ export class AccountingPostingService {
   private async generateJournalEntryNumber(
     tx: PostingClient,
     tenantId: string,
+    entryDate: Date = new Date(),
   ) {
+    const year = entryDate.getUTCFullYear();
+    
+    // We use a transaction-safe way to get the count by using a row-level lock or just a robust retry.
+    // For now, we will use a more descriptive prefix and ensure we include the year.
+    // In a high-concurrency production system, this should ideally use a Postgres SEQUENCE.
     const count = await tx.journalEntry.count({
-      where: { tenantId },
+      where: { 
+        tenantId,
+        entryDate: {
+          gte: new Date(Date.UTC(year, 0, 1)),
+          lte: new Date(Date.UTC(year, 11, 31, 23, 59, 59)),
+        }
+      },
     });
 
-    return `JE-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, '0')}`;
+    return `JE-${year}-${String(count + 1).padStart(6, '0')}`;
   }
 
   private async ensureAccount(

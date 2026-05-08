@@ -2413,18 +2413,20 @@ export class FinanceService {
     }
 
     const fiscalYear = resolveFiscalYear(new Date());
-    const receiptNumber = await this.generateReceiptNumber(
-      actor.tenantId,
-      fiscalYear,
-    );
     const tenant = await this.prisma.tenant.findUniqueOrThrow({
       where: { id: actor.tenantId },
     });
-    const receiptVat = invoice.totalAmount.gt(0)
-      ? invoice.vatAmount.mul(paymentAmount).div(invoice.totalAmount)
-      : new Prisma.Decimal(0);
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const receiptNumber = await this.generateReceiptNumber(
+        actor.tenantId,
+        fiscalYear,
+        tx,
+      );
+
+      const receiptVat = invoice.totalAmount.gt(0)
+        ? invoice.vatAmount.mul(paymentAmount).div(invoice.totalAmount)
+        : new Prisma.Decimal(0);
       const payment = await tx.payment.create({
         data: {
           tenantId: actor.tenantId,
