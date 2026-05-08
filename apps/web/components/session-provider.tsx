@@ -48,7 +48,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
     if (existingSession) {
       setSession(existingSession);
-      setStatus('authenticated');
+      // We do not set status to 'authenticated' yet.
+      // We keep it as 'loading' until api.refreshSession() confirms the session is valid via cookies.
     }
 
     let cancelled = false;
@@ -65,11 +66,12 @@ export function SessionProvider({ children }: PropsWithChildren) {
         storeSession(browserSession);
         setSession(browserSession);
         setStatus('authenticated');
-      } catch {
+      } catch (error) {
         if (cancelled) {
           return;
         }
 
+        // If refresh fails, the session is invalid or cookies are missing/expired.
         clearStoredSession();
         setSession(null);
         setStatus('anonymous');
