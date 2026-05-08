@@ -27,7 +27,7 @@ test.describe('Phase 2F.2 public browser smoke', () => {
   test('loads the public home and login pages', async ({ page }) => {
     await page.goto('/');
     await expect(
-      page.getByRole('heading', { name: /One operating system for every school workflow/i }),
+      page.getByRole('heading', { name: /Run your entire school from one modern platform/i }),
     ).toBeVisible();
 
     await page.goto('/login');

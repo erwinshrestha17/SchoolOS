@@ -5,7 +5,7 @@ test.describe('Public route smoke', () => {
     await page.goto('/');
 
     await expect(
-      page.getByRole('heading', { name: /One operating system for every school workflow/i }),
+      page.getByRole('heading', { name: /Run your entire school from one modern platform/i }),
     ).toBeVisible();
     await expect(page.getByRole('banner').getByRole('link', { name: /^Sign in$/i })).toBeVisible();
   });
