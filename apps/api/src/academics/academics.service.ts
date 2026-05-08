@@ -13,11 +13,6 @@ import {
   Prisma,
 } from '@prisma/client';
 
-const MarkEntryStatusEnum = {
-  SUBMITTED: 'SUBMITTED',
-  ABSENT: 'ABSENT',
-  WITHHELD: 'WITHHELD',
-};
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
@@ -589,9 +584,10 @@ export class AcademicsService {
       throw new ConflictException('Exam term is locked');
     }
 
-    const marksObtainedValue = dto.status && dto.status !== MarkEntryStatusEnum.SUBMITTED
-      ? 0
-      : (dto.marksObtained ?? 0);
+    const marksObtainedValue =
+      dto.status && dto.status !== MarkEntryStatus.SUBMITTED
+        ? 0
+        : (dto.marksObtained ?? 0);
 
     if (marksObtainedValue > Number(component.maxMarks)) {
       throw new ConflictException('Marks cannot exceed component max marks');
@@ -621,7 +617,9 @@ export class AcademicsService {
     }
 
     if (existingMark?.isLocked) {
-      throw new ConflictException('Individual mark entry is locked and cannot be edited');
+      throw new ConflictException(
+        'Individual mark entry is locked and cannot be edited',
+      );
     }
 
     const mark = await this.prisma.markEntry.upsert({
@@ -634,7 +632,7 @@ export class AcademicsService {
       },
       update: {
         marksObtained: new Prisma.Decimal(marksObtainedValue),
-        status: dto.status ?? MarkEntryStatusEnum.SUBMITTED,
+        status: dto.status ?? MarkEntryStatus.SUBMITTED,
         remarks: dto.remarks ?? null,
         enteredById: actor.userId,
       },
@@ -713,9 +711,10 @@ export class AcademicsService {
     }
 
     const overMax = dto.entries.filter((entry) => {
-      const marks = entry.status && entry.status !== MarkEntryStatusEnum.SUBMITTED
-        ? 0
-        : (entry.marksObtained ?? 0);
+      const marks =
+        entry.status && entry.status !== MarkEntryStatus.SUBMITTED
+          ? 0
+          : (entry.marksObtained ?? 0);
       return marks > Number(component.maxMarks) || marks < 0;
     });
 
@@ -742,9 +741,10 @@ export class AcademicsService {
 
     const entries = await this.prisma.$transaction(
       dto.entries.map((entry) => {
-        const marksObtainedValue = entry.status && entry.status !== MarkEntryStatusEnum.SUBMITTED
-          ? 0
-          : (entry.marksObtained ?? 0);
+        const marksObtainedValue =
+          entry.status && entry.status !== MarkEntryStatus.SUBMITTED
+            ? 0
+            : (entry.marksObtained ?? 0);
 
         return this.prisma.markEntry.upsert({
           where: {
@@ -756,7 +756,7 @@ export class AcademicsService {
           },
           update: {
             marksObtained: new Prisma.Decimal(marksObtainedValue),
-            status: entry.status ?? MarkEntryStatusEnum.SUBMITTED,
+            status: entry.status ?? MarkEntryStatus.SUBMITTED,
             remarks: entry.remarks ?? null,
             enteredById: actor.userId,
           },
@@ -768,7 +768,7 @@ export class AcademicsService {
             studentId: entry.studentId,
             enteredById: actor.userId,
             marksObtained: new Prisma.Decimal(marksObtainedValue),
-            status: entry.status ?? MarkEntryStatusEnum.SUBMITTED,
+            status: entry.status ?? MarkEntryStatus.SUBMITTED,
             remarks: entry.remarks ?? null,
           },
         });

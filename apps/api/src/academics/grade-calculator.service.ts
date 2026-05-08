@@ -1,10 +1,5 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-
-const MarkEntryStatusEnum = {
-  SUBMITTED: 'SUBMITTED',
-  ABSENT: 'ABSENT',
-  WITHHELD: 'WITHHELD',
-};
+import { MarkEntryStatus } from '@prisma/client';
 
 export type MoestLetterGrade =
   | 'A+'
@@ -130,8 +125,8 @@ export class GradeCalculatorService {
       this.validateComponent(component);
 
       const isWithheld =
-        component.status === MarkEntryStatusEnum.WITHHELD || component.isMissing;
-      const isAbsent = component.status === MarkEntryStatusEnum.ABSENT;
+        component.status === MarkEntryStatus.WITHHELD || component.isMissing;
+      const isAbsent = component.status === MarkEntryStatus.ABSENT;
 
       if (isWithheld) {
         missingComponentCount += 1;
@@ -140,7 +135,7 @@ export class GradeCalculatorService {
         }
       }
 
-      const marksObtained = isAbsent ? 0 : Number(component.marksObtained ?? 0);
+      const marksObtained = isAbsent ? 0 : (component.marksObtained ?? 0);
       const componentPercentage =
         component.maxMarks === 0
           ? 0

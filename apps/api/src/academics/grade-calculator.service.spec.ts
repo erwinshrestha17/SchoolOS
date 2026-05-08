@@ -1,4 +1,5 @@
 import { ConflictException } from '@nestjs/common';
+import { MarkEntryStatus } from '@prisma/client';
 import { GradeCalculatorService } from './grade-calculator.service';
 
 describe('GradeCalculatorService', () => {
@@ -128,7 +129,7 @@ describe('GradeCalculatorService', () => {
           marksObtained: null,
           passMarks: 35,
           weightPercent: 100,
-          isAbsent: true,
+          status: MarkEntryStatus.ABSENT,
         },
       ],
     });

@@ -11,12 +11,6 @@ import {
 import { Type } from 'class-transformer';
 import { MarkEntryStatus } from '@prisma/client';
 
-export const MarkEntryStatusEnum = MarkEntryStatus || {
-  SUBMITTED: 'SUBMITTED',
-  ABSENT: 'ABSENT',
-  WITHHELD: 'WITHHELD',
-};
-
 class MarkEntryItem {
   @IsString()
   studentId!: string;
@@ -27,7 +21,7 @@ class MarkEntryItem {
   marksObtained?: number;
 
   @IsOptional()
-  @IsEnum(['SUBMITTED', 'ABSENT', 'WITHHELD'])
+  @IsEnum(MarkEntryStatus)
   status?: MarkEntryStatus;
 
   @IsOptional()

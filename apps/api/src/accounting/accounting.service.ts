@@ -511,10 +511,7 @@ export class AccountingService {
               row.type === ChartAccountType.ASSET &&
               /cash|bank/i.test(row.name),
           )
-          .reduce(
-            (sum, row) => sum.add(row.balance),
-            new Prisma.Decimal(0),
-          )
+          .reduce((sum, row) => sum.add(row.balance), new Prisma.Decimal(0))
           .toNumber(),
       },
       balanced: totals.debit.equals(totals.credit),
@@ -882,11 +879,12 @@ function sumJournalSides(
   return lines.reduce(
     (totals, line) => {
       const debit = new Prisma.Decimal(
-        line.debit ?? (line.side === JournalLineSide.DEBIT ? line.amount ?? 0 : 0),
+        line.debit ??
+          (line.side === JournalLineSide.DEBIT ? (line.amount ?? 0) : 0),
       );
       const credit = new Prisma.Decimal(
         line.credit ??
-          (line.side === JournalLineSide.CREDIT ? line.amount ?? 0 : 0),
+          (line.side === JournalLineSide.CREDIT ? (line.amount ?? 0) : 0),
       );
       return {
         debit: totals.debit.add(debit),

@@ -362,6 +362,12 @@ export const GradeLockStatus = {
   LOCKED: 'LOCKED',
 } as const;
 
+export const MarkEntryStatus = {
+  SUBMITTED: 'SUBMITTED',
+  ABSENT: 'ABSENT',
+  WITHHELD: 'WITHHELD',
+} as const;
+
 export const HomeworkAssignmentStatus = {
   DRAFT: 'DRAFT',
   ASSIGNED: 'ASSIGNED',

@@ -910,17 +910,17 @@ export class AccountingPostingService {
     entryDate: Date = new Date(),
   ) {
     const year = entryDate.getUTCFullYear();
-    
+
     // We use a transaction-safe way to get the count by using a row-level lock or just a robust retry.
     // For now, we will use a more descriptive prefix and ensure we include the year.
     // In a high-concurrency production system, this should ideally use a Postgres SEQUENCE.
     const count = await tx.journalEntry.count({
-      where: { 
+      where: {
         tenantId,
         entryDate: {
           gte: new Date(Date.UTC(year, 0, 1)),
           lte: new Date(Date.UTC(year, 11, 31, 23, 59, 59)),
-        }
+        },
       },
     });
 

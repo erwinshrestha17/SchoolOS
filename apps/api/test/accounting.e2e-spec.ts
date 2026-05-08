@@ -30,7 +30,7 @@ describe('Accounting Module Hardening (E2E)', () => {
 
   beforeEach(async () => {
     prisma = createPrismaMock() as unknown as PrismaMock;
-    
+
     // Ensure model mocks have all necessary functions
     const ensureMock = (model: any) => {
       if (!model.findMany) model.findMany = jest.fn();
@@ -43,7 +43,8 @@ describe('Accounting Module Hardening (E2E)', () => {
 
     if (!(prisma as any).chartAccount) (prisma as any).chartAccount = {};
     if (!(prisma as any).fiscalPeriod) (prisma as any).fiscalPeriod = {};
-    if (!(prisma as any).accountingPeriod) (prisma as any).accountingPeriod = {};
+    if (!(prisma as any).accountingPeriod)
+      (prisma as any).accountingPeriod = {};
     if (!(prisma as any).journalEntry) (prisma as any).journalEntry = {};
     if (!(prisma as any).journalLine) (prisma as any).journalLine = {};
 
@@ -65,14 +66,30 @@ describe('Accounting Module Hardening (E2E)', () => {
 
     // Setup initial data for tenant A
     prisma.__state.chartAccounts.push(
-      { id: 'acc-a1', tenantId: tenantA, code: '1000', name: 'Cash', type: ChartAccountType.ASSET },
-      { id: 'acc-a2', tenantId: tenantA, code: '4000', name: 'Revenue', type: ChartAccountType.REVENUE },
+      {
+        id: 'acc-a1',
+        tenantId: tenantA,
+        code: '1000',
+        name: 'Cash',
+        type: ChartAccountType.ASSET,
+      },
+      {
+        id: 'acc-a2',
+        tenantId: tenantA,
+        code: '4000',
+        name: 'Revenue',
+        type: ChartAccountType.REVENUE,
+      },
     );
 
     // Setup initial data for tenant B
-    prisma.__state.chartAccounts.push(
-      { id: 'acc-b1', tenantId: tenantB, code: '1000', name: 'Cash', type: ChartAccountType.ASSET },
-    );
+    prisma.__state.chartAccounts.push({
+      id: 'acc-b1',
+      tenantId: tenantB,
+      code: '1000',
+      name: 'Cash',
+      type: ChartAccountType.ASSET,
+    });
   });
 
   afterEach(async () => {
@@ -82,25 +99,31 @@ describe('Accounting Module Hardening (E2E)', () => {
   describe('Tenant Isolation', () => {
     it('should not allow tenant B to see tenant A accounts', async () => {
       (prisma.chartAccount.findMany as jest.Mock).mockResolvedValue([
-        { id: 'acc-b1', tenantId: tenantB, code: '1000', name: 'Cash', type: ChartAccountType.ASSET }
+        {
+          id: 'acc-b1',
+          tenantId: tenantB,
+          code: '1000',
+          name: 'Cash',
+          type: ChartAccountType.ASSET,
+        },
       ]);
       const accounts = await accountingService.listChartAccounts(actorB);
       expect(accounts).toBeDefined();
-      expect(accounts.some(a => a.tenantId === tenantA)).toBe(false);
-      expect(accounts.every(a => a.tenantId === tenantB)).toBe(true);
+      expect(accounts.some((a) => a.tenantId === tenantA)).toBe(false);
+      expect(accounts.every((a) => a.tenantId === tenantB)).toBe(true);
     });
 
     it('should throw NotFound if tenant B tries to get tenant A account', async () => {
       // getAccount Ledgers is what we have or list by ID
       await expect(
-        accountingService.getAccountLedger('acc-a1', actorB)
+        accountingService.getAccountLedger('acc-a1', actorB),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should not allow cross-tenant posting via manual journal', async () => {
       // Mock findMany for chartAccount
       (prisma.chartAccount.findMany as jest.Mock).mockResolvedValue([
-        { id: 'acc-b1', tenantId: tenantB, code: '1000' }
+        { id: 'acc-b1', tenantId: tenantB, code: '1000' },
       ]);
 
       await expect(
@@ -113,8 +136,8 @@ describe('Accounting Module Hardening (E2E)', () => {
               { chartAccountId: 'acc-b1', debit: 0, credit: 100 },
             ],
           },
-          actorB
-        )
+          actorB,
+        ),
       ).rejects.toThrow();
     });
   });
@@ -124,7 +147,7 @@ describe('Accounting Module Hardening (E2E)', () => {
       // Mock findMany for chartAccount
       (prisma.chartAccount.findMany as jest.Mock).mockResolvedValue([
         { id: 'acc-a1', tenantId: tenantA, code: '1000' },
-        { id: 'acc-a2', tenantId: tenantA, code: '4000' }
+        { id: 'acc-a2', tenantId: tenantA, code: '4000' },
       ]);
 
       await expect(
@@ -137,23 +160,27 @@ describe('Accounting Module Hardening (E2E)', () => {
               { chartAccountId: 'acc-a2', debit: 0, credit: 99.99 },
             ],
           },
-          actorA
-        )
+          actorA,
+        ),
       ).rejects.toThrow(ConflictException);
     });
 
     it('should accept balanced manual journals', async () => {
       // Mock period check to pass
-      jest.spyOn(postingService as any, 'ensurePostingPeriodIsOpen').mockResolvedValue({
-        id: 'period-1',
-        fiscalYearId: 'fy-1',
-      });
+      jest
+        .spyOn(postingService as any, 'ensurePostingPeriodIsOpen')
+        .mockResolvedValue({
+          id: 'period-1',
+          fiscalYearId: 'fy-1',
+        });
       (prisma.chartAccount.findMany as jest.Mock).mockResolvedValue([
         { id: 'acc-a1', tenantId: tenantA, code: '1000' },
-        { id: 'acc-a2', tenantId: tenantA, code: '4000' }
+        { id: 'acc-a2', tenantId: tenantA, code: '4000' },
       ]);
       (prisma.journalEntry.count as jest.Mock).mockResolvedValue(0);
-      (prisma.journalEntry.create as jest.Mock).mockResolvedValue({ id: 'je-1' });
+      (prisma.journalEntry.create as jest.Mock).mockResolvedValue({
+        id: 'je-1',
+      });
 
       const entry = await accountingService.createManualJournal(
         {
@@ -164,7 +191,7 @@ describe('Accounting Module Hardening (E2E)', () => {
             { chartAccountId: 'acc-a2', debit: 0, credit: 100 },
           ],
         },
-        actorA
+        actorA,
       );
 
       expect(entry).toBeDefined();
@@ -180,7 +207,7 @@ describe('Accounting Module Hardening (E2E)', () => {
         id: 'closed-period',
         status: AccountingPeriodStatus.CLOSED,
         label: 'Closed Month',
-        fiscalYear: { status: AccountingPeriodStatus.OPEN, name: 'FY 2024' }
+        fiscalYear: { status: AccountingPeriodStatus.OPEN, name: 'FY 2024' },
       });
 
       await expect(
@@ -194,8 +221,8 @@ describe('Accounting Module Hardening (E2E)', () => {
               { chartAccountId: 'acc-a2', debit: 0, credit: 100 },
             ],
           },
-          actorA
-        )
+          actorA,
+        ),
       ).rejects.toThrow(/Cannot post to closed fiscal period/);
     });
 
@@ -216,8 +243,8 @@ describe('Accounting Module Hardening (E2E)', () => {
               { chartAccountId: 'acc-a2', debit: 0, credit: 100 },
             ],
           },
-          actorA
-        )
+          actorA,
+        ),
       ).rejects.toThrow(/No fiscal period found/);
     });
   });
@@ -227,7 +254,6 @@ describe('Accounting Module Hardening (E2E)', () => {
       // Confirmed entries should not be updateable via normal update
       // We don't have a direct "updateJournalEntry" in AccountingService for confirmation,
       // but we should ensure no other service can bypass this.
-      
       // JournalEntry confirmed state check is usually done in service layer before any mutation.
     });
   });
