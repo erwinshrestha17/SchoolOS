@@ -13,6 +13,7 @@ PROJECT_CONTEXT.md
 docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md
 docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md
 docs/project/SCHOOLOS_M11_INTELLIGENCE_ROADMAP.md
+docs/project/SCHOOLOS_PRICING_TIERS_AND_ENTITLEMENTS_PLAN.md
 ```
 
 ---
@@ -244,15 +245,33 @@ Priority order:
 5. Generic Reports Foundation.
 6. Safe Activity Logs Module.
 7. Usage Limits and Plan Rules.
-8. API Key Management.
-9. Webhook System.
-10. SaaS Subscription and Billing.
+8. Pricing Tiers and Entitlements Foundation.
+9. API Key Management.
+10. Webhook System.
+11. SaaS Subscription and Billing.
+
+Detailed pricing and entitlement plan:
+
+```text
+docs/project/SCHOOLOS_PRICING_TIERS_AND_ENTITLEMENTS_PLAN.md
+```
 
 Important distinction:
 
 ```text
 SchoolOS Finance/M3/M9 = school collects money from students/parents.
 SaaS Billing = SchoolOS company charges schools for using SchoolOS.
+```
+
+Pricing/entitlement golden rule:
+
+```text
+Plan controls what the school bought.
+Feature entitlement controls what the tenant can access.
+RBAC controls what the user can do.
+Usage limits control how much they can use.
+Frontend uses entitlements only for display.
+Backend enforces entitlements for security.
 ```
 
 ---
@@ -277,6 +296,7 @@ Every new feature must answer:
 11. Does it affect accounting/ledger?
 12. What tests prove tenant isolation and permissions?
 13. If intelligence/AI is involved, is the output explainable and human-reviewed?
+14. If pricing/tiered access is involved, which feature key, entitlement, and usage limit controls access?
 ```
 
 Implementation order:
@@ -375,6 +395,7 @@ Biggest risks:
 - Accounting complexity and ledger immutability.
 - Pilot operations exposing real-world data-entry, fee, attendance, guardian-contact, PDF, slow-network, and contract-test drift issues.
 - Parent/mobile portal, driver app, live map/WebSocket, full canteen inventory/vendor workflows, and AI/ML implementation remain intentionally unbuilt.
+- Tiered pricing and entitlements must be enforced backend-side before broad paid rollout; sidebar hiding alone is not security.
 
 ---
 
@@ -409,6 +430,7 @@ Read these first:
 - docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
 - docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md
 - docs/project/SCHOOLOS_M11_INTELLIGENCE_ROADMAP.md when touching Phase 4/intelligence/AI work
+- docs/project/SCHOOLOS_PRICING_TIERS_AND_ENTITLEMENTS_PLAN.md when touching plans, pricing, subscriptions, feature access, usage limits, or UI gating
 
 Task:
 [exact feature/change]
@@ -424,6 +446,7 @@ Constraints:
 - Move slow/retryable/provider/report/PDF/intelligence jobs to BullMQ where appropriate.
 - Add validation, error handling, audit logs, and tests.
 - Do not implement AI features until reliable production data and M11 foundations exist.
+- Enforce plan/feature access backend-side; frontend gating is display only.
 - Run relevant verification commands.
 
 Return:
