@@ -23,11 +23,20 @@ describe('StudentRecordsService', () => {
       },
       studentDocument: {
         create: jest.fn(),
+        update: jest.fn(),
+        findFirst: jest.fn(),
         findMany: jest.fn(),
+      },
+      studentDocumentHistory: {
+        create: jest.fn(),
       },
       siblingGroup: {
         create: jest.fn(),
         findMany: jest.fn(),
+      },
+      fileAsset: {
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
       },
     };
     storageService = {
@@ -37,7 +46,7 @@ describe('StudentRecordsService', () => {
       record: jest.fn(),
     };
     fileRegistryService = {
-      registerFile: jest.fn(),
+      registerFile: jest.fn().mockResolvedValue({ id: 'asset-1' }),
       getSignedUrl: jest.fn(),
       softDeleteFile: jest.fn(),
       auditAccess: jest.fn(),

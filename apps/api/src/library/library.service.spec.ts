@@ -391,6 +391,7 @@ function buildService(
       auditService as never,
       communicationsService as never,
       configService as never,
+      {} as any,
     ),
     prisma,
     tx,

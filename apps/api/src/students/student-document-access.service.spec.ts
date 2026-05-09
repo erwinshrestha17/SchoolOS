@@ -1,4 +1,5 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { StudentDocumentAccessService } from './student-document-access.service';
 import type { AuthContext } from '../auth/auth.types';
 

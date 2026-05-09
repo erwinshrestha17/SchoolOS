@@ -1095,28 +1095,6 @@ function getDefaultSchoolChartAccounts() {
   ];
 }
 
-  private async ensureJournalIsMutable(id: string, tenantId: string) {
-    const entry = await this.prisma.journalEntry.findFirst({
-      where: { id, tenantId },
-      include: { fiscalPeriod: true },
-    });
-
-    if (!entry) {
-      throw new NotFoundException('Journal entry not found');
-    }
-
-    if (entry.status === JournalEntryStatus.REVERSED) {
-      throw new ConflictException('Journal entry is already reversed and immutable');
-    }
-
-    if (entry.fiscalPeriod?.status === AccountingPeriodStatus.CLOSED) {
-      throw new ConflictException(
-        `Journal entry belongs to a closed fiscal period "${entry.fiscalPeriod.label}" and is immutable`,
-      );
-    }
-  }
-}
-
 function toCsv(rows: Array<Record<string, unknown>>) {
   if (rows.length === 0) {
     return '';

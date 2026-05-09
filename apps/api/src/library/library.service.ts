@@ -13,6 +13,7 @@ import {
   LibraryIssueStatus,
   NotificationChannel,
   Prisma,
+  ChartAccountType,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
@@ -778,16 +779,6 @@ export class LibraryService {
       },
     });
 
-    const incomeAccount = await this.accountingPostingService.ensureAccount(
-      tx,
-      input.actor.tenantId,
-      {
-        code: '4040', // Library Fine Income
-        name: 'Library Fine Income',
-        type: ChartAccountType.REVENUE,
-      },
-    );
-
     await this.accountingPostingService.postInvoice(
       {
         tenantId: input.actor.tenantId,
@@ -798,7 +789,9 @@ export class LibraryService {
         entryDate: new Date(),
         lines: [
           {
-            chartAccountId: incomeAccount.id,
+            accountCode: '4040',
+            accountName: 'Library Fine Income',
+            accountType: ChartAccountType.REVENUE,
             amount: input.amount,
             description: input.description,
           },

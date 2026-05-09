@@ -2829,6 +2829,7 @@ model HomeworkAssignment {
   assignedByStaff Staff?                  @relation(fields: [assignedByStaffId], references: [id], onDelete: SetNull)
   submissions     HomeworkSubmission[]
   reminderBatches HomeworkReminderBatch[]
+  attachments     HomeworkAttachment[]
 
   @@index([tenantId, academicYearId, classId, sectionId, status])
   @@index([tenantId, subjectId, assignedByStaffId, status])

@@ -851,6 +851,7 @@ function buildService(options: {
     student: {
       findMany: jest.fn().mockResolvedValue(options.students ?? []),
       findFirst: jest.fn().mockResolvedValue(options.studentFindFirst ?? null),
+      findUnique: jest.fn().mockResolvedValue(options.studentFindFirst ?? null),
     },
     attendanceSyncSubmission: {
       findUnique: jest
@@ -892,6 +893,8 @@ function buildService(options: {
     },
     staff: {
       count: jest.fn().mockResolvedValue(1),
+      findUnique: jest.fn().mockResolvedValue(null),
+      findFirst: jest.fn().mockResolvedValue(null),
     },
     staffAttendance: {
       upsert: jest.fn().mockResolvedValue({}),

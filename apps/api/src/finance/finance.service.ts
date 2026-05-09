@@ -16,6 +16,7 @@ import {
   PaymentMethod,
   PaymentStatus,
   Prisma,
+  ChartAccountType,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
@@ -3836,24 +3837,13 @@ export class FinanceService {
     actor: AuthContext,
     tx: Prisma.TransactionClient,
   ) {
-    const invoiceLines = [];
-    for (const line of invoice.lines) {
-      const accountCode = resolveIncomeAccountCode(line.feeHead.code);
-      const account = await this.accountingPostingService.ensureAccount(
-        tx,
-        actor.tenantId,
-        {
-          code: accountCode,
-          name: line.feeHead.name,
-          type: ChartAccountType.REVENUE,
-        },
-      );
-      invoiceLines.push({
-        chartAccountId: account.id,
-        amount: line.totalAmount,
-        description: line.description,
-      });
-    }
+    const invoiceLines = invoice.lines.map((line: any) => ({
+      accountCode: resolveIncomeAccountCode(line.feeHead.code),
+      accountName: line.feeHead.name,
+      accountType: ChartAccountType.REVENUE,
+      amount: line.totalAmount,
+      description: line.description,
+    }));
 
     await this.accountingPostingService.postInvoice(
       {

@@ -90,6 +90,15 @@ export interface FeePaymentPostingInput {
   }>;
 }
 
+export interface InvoicePostingLineInput {
+  chartAccountId?: string;
+  accountCode?: string;
+  accountName?: string;
+  accountType?: ChartAccountType;
+  amount: Prisma.Decimal;
+  description: string;
+}
+
 export interface InvoicePostingInput {
   tenantId: string;
   invoiceId: string;
@@ -97,11 +106,7 @@ export interface InvoicePostingInput {
   studentId: string;
   totalAmount: Prisma.Decimal;
   entryDate?: Date;
-  lines: Array<{
-    chartAccountId: string;
-    amount: Prisma.Decimal;
-    description: string;
-  }>;
+  lines: InvoicePostingLineInput[];
 }
 
 export interface FeeWaiverPostingInput {
@@ -816,7 +821,7 @@ export class AccountingPostingService {
       type: ChartAccountType.ASSET,
     });
 
-    const lines = [
+    const lines: any[] = [
       {
         tenantId: input.tenantId,
         chartAccountId: receivableAccount.id,
@@ -824,14 +829,33 @@ export class AccountingPostingService {
         amount: input.totalAmount,
         description: `Invoice ${input.invoiceNumber} for student ${input.studentId}`,
       },
-      ...input.lines.map((line) => ({
+    ];
+
+    for (const line of input.lines) {
+      let chartAccountId = line.chartAccountId;
+      if (!chartAccountId && line.accountCode) {
+        const account = await this.ensureAccount(tx, input.tenantId, {
+          code: line.accountCode,
+          name: line.accountName ?? 'Revenue Account',
+          type: line.accountType ?? ChartAccountType.REVENUE,
+        });
+        chartAccountId = account.id;
+      }
+
+      if (!chartAccountId) {
+        throw new ConflictException(
+          `Line for invoice ${input.invoiceNumber} is missing chartAccountId or accountCode`,
+        );
+      }
+
+      lines.push({
         tenantId: input.tenantId,
-        chartAccountId: line.chartAccountId,
+        chartAccountId,
         side: JournalLineSide.CREDIT,
         amount: line.amount,
         description: line.description,
-      })),
-    ];
+      });
+    }
 
     this.ensureBalanced(lines);
 

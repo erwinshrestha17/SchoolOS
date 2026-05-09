@@ -389,5 +389,4 @@ describe('Accounting Module Hardening (E2E)', () => {
       );
     });
   });
-  });
 });

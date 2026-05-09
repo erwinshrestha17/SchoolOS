@@ -314,9 +314,19 @@ function buildService(
     record: jest.fn().mockResolvedValue(undefined),
   };
 
+  const accountingPostingService = {
+    postCanteenTopUp: jest.fn().mockResolvedValue({ id: 'acc-topup' }),
+    postCanteenSale: jest.fn().mockResolvedValue({ id: 'acc-sale' }),
+  };
+
   return {
-    service: new CanteenService(prisma as never, auditService as never),
+    service: new CanteenService(
+      prisma as never,
+      auditService as never,
+      accountingPostingService as never,
+    ),
     prisma,
     tx,
+    accountingPostingService,
   };
 }

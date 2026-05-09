@@ -70,6 +70,7 @@ function createController() {
   };
 
   const marksEntryService = {
+    list: jest.fn(),
     enterMark: jest.fn(),
     batchEnterMarks: jest.fn(),
     listLockRequests: jest.fn(),
@@ -101,8 +102,8 @@ function createController() {
 
 describe('AcademicsController M4 contracts', () => {
   it('delegates filtered mark listing with tenant actor context', () => {
-    const { controller, academicsService } = createController();
-    academicsService.listMarksByFilters.mockReturnValue([{ id: 'mark-1' }]);
+    const { controller, marksEntryService } = createController();
+    (marksEntryService.list as any).mockReturnValue([{ id: 'mark-1' }]);
 
     const result = controller.listMarks(
       actor,
@@ -113,18 +114,19 @@ describe('AcademicsController M4 contracts', () => {
       'subject-1',
     );
 
-    expect(academicsService.listMarksByFilters).toHaveBeenCalledWith(actor, {
+    expect(marksEntryService.list).toHaveBeenCalledWith(actor, {
       examTermId: 'term-1',
       assessmentComponentId: 'component-1',
       classId: 'class-1',
       sectionId: 'section-1',
       subjectId: 'subject-1',
+      studentId: undefined,
     });
     expect(result).toEqual([{ id: 'mark-1' }]);
   });
 
   it('delegates single mark entry with current actor', () => {
-    const { controller, academicsService } = createController();
+    const { controller, marksEntryService } = createController();
     const dto = {
       examTermId: 'term-1',
       assessmentComponentId: 'component-1',
@@ -132,26 +134,26 @@ describe('AcademicsController M4 contracts', () => {
       marksObtained: 89,
       remarks: 'Good',
     };
-    academicsService.enterMark.mockReturnValue({ id: 'mark-1' });
+    (marksEntryService.enterMark as any).mockReturnValue({ id: 'mark-1' });
 
     const result = controller.enterMark(dto as never, actor);
 
-    expect(academicsService.enterMark).toHaveBeenCalledWith(dto, actor);
+    expect(marksEntryService.enterMark).toHaveBeenCalledWith(dto, actor);
     expect(result).toEqual({ id: 'mark-1' });
   });
 
   it('delegates transactional batch marks entry with current actor', () => {
-    const { controller, academicsService } = createController();
+    const { controller, marksEntryService } = createController();
     const dto = {
       examTermId: 'term-1',
       assessmentComponentId: 'component-1',
       entries: [{ studentId: 'student-1', marksObtained: 90 }],
     };
-    academicsService.batchEnterMarks.mockReturnValue({ updated: 1 });
+    (marksEntryService.batchEnterMarks as any).mockReturnValue({ updated: 1 });
 
     const result = controller.batchEnterMarks(dto as never, actor);
 
-    expect(academicsService.batchEnterMarks).toHaveBeenCalledWith(dto, actor);
+    expect(marksEntryService.batchEnterMarks).toHaveBeenCalledWith(dto, actor);
     expect(result).toEqual({ updated: 1 });
   });
 
