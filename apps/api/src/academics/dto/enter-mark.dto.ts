@@ -1,14 +1,22 @@
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { MarkEntryStatus } from '@prisma/client';
 
 export class EnterMarkDto {
-  @IsString()
+  @IsUUID()
   examTermId!: string;
 
-  @IsString()
+  @IsUUID()
   assessmentComponentId!: string;
 
-  @IsString()
+  @IsUUID()
   studentId!: string;
 
   @IsOptional()
@@ -22,5 +30,6 @@ export class EnterMarkDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   remarks?: string;
 }
