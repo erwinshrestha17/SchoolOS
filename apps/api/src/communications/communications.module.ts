@@ -7,6 +7,8 @@ import { ConsentsController } from './consents.controller';
 import { DeliveriesController } from './deliveries.controller';
 import { DeliveryRetryService } from './delivery-retry.service';
 import { EventsController } from './events.controller';
+import { M10HardeningController } from './m10-hardening.controller';
+import { M10HardeningService } from './m10-hardening.service';
 import { NoticeDetailController } from './notice-detail.controller';
 import { NoticeDetailService } from './notice-detail.service';
 import { NoticeUnreadRecipientsService } from './notice-unread-recipients.service';
@@ -34,6 +36,7 @@ import { NoticesController } from './notices.controller';
     NoticeDetailService,
     NoticeUnreadRecipientsService,
     DeliveryRetryService,
+    M10HardeningService,
   ],
   exports: [
     CommunicationsService,
@@ -41,6 +44,7 @@ import { NoticesController } from './notices.controller';
     NoticeDetailService,
     NoticeUnreadRecipientsService,
     DeliveryRetryService,
+    M10HardeningService,
   ],
 })
 export class CommunicationsModule {}
