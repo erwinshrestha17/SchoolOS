@@ -1,5 +1,5 @@
 import { StaffStatus } from '@prisma/client';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class StaffLifecycleDto {
   @IsEnum(StaffStatus)
@@ -7,5 +7,7 @@ export class StaffLifecycleDto {
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
   reason?: string;
 }
