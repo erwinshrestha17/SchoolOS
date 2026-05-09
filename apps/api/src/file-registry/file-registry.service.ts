@@ -170,6 +170,15 @@ export class FileRegistryService {
   async getSignedUrl(tenantId: string, assetId: string) {
     const asset = await this.getFileMetadata(tenantId, assetId);
 
+    if (asset.module === 'students' && asset.entityId) {
+      const metadata = asset.metadata as Prisma.JsonObject | null;
+      if (metadata?.kind === 'PHOTO') {
+        return `${this.apiBaseUrl}/students/${encodeURIComponent(
+          asset.entityId,
+        )}/photo/preview`;
+      }
+    }
+
     if (asset.module === 'activity') {
       const attachment = await this.prisma.activityAttachment.findFirst({
         where: {
@@ -184,11 +193,7 @@ export class FileRegistryService {
       }
     }
 
-    // Placeholder for actual S3/R2 signed URL generation
-    // For now, return a simulated URL if it's not local, or the publicUrl
-    return asset.objectKey.startsWith('http')
-      ? asset.objectKey
-      : `https://storage.schoolos.cloud/${asset.objectKey}?token=simulated-jwt-for-${assetId}`;
+    return `${this.apiBaseUrl}/files/${encodeURIComponent(asset.id)}/preview`;
   }
 
   private get apiBaseUrl() {
