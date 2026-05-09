@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Patch,
   Post,
@@ -13,6 +14,11 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { CanteenHardeningService } from './canteen-hardening.service';
+import {
+  CanteenLowBalanceAlertDto,
+  CanteenReasonDto,
+} from './dto/canteen-hardening.dto';
 import {
   CompleteCanteenPosSaleDto,
   CreateCanteenMealPlanDto,
@@ -32,7 +38,10 @@ import { CanteenService } from './canteen.service';
 @Controller('canteen')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class CanteenController {
-  constructor(private readonly canteenService: CanteenService) {}
+  constructor(
+    private readonly canteenService: CanteenService,
+    private readonly canteenHardeningService: CanteenHardeningService,
+  ) {}
 
   @Post('menu-items')
   @Permissions('canteen:menu:create')
@@ -172,6 +181,36 @@ export class CanteenController {
     return this.canteenService.cancelEnrollment(id, auth);
   }
 
+  @Patch('enrollments/:id/pause')
+  @Permissions('canteen:enrollments:update')
+  pauseEnrollment(
+    @Param('id') id: string,
+    @Body() dto: CanteenReasonDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.canteenHardeningService.pauseEnrollment(id, dto, auth);
+  }
+
+  @Patch('enrollments/:id/resume')
+  @Permissions('canteen:enrollments:update')
+  resumeEnrollment(
+    @Param('id') id: string,
+    @Body() dto: CanteenReasonDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.canteenHardeningService.resumeEnrollment(id, dto, auth);
+  }
+
+  @Patch('enrollments/:id/end')
+  @Permissions('canteen:enrollments:update')
+  endEnrollment(
+    @Param('id') id: string,
+    @Body() dto: CanteenReasonDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.canteenHardeningService.endEnrollment(id, dto, auth);
+  }
+
   @Post('servings')
   @Permissions('canteen:serving:create')
   serveMeal(
@@ -196,6 +235,26 @@ export class CanteenController {
       page,
       limit,
     });
+  }
+
+  @Patch('servings/:id/cancel')
+  @Permissions('canteen:serving:update')
+  cancelServing(
+    @Param('id') id: string,
+    @Body() dto: CanteenReasonDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.canteenHardeningService.cancelServing(id, dto, auth);
+  }
+
+  @Patch('servings/:id/not-taken')
+  @Permissions('canteen:serving:update')
+  markServingNotTaken(
+    @Param('id') id: string,
+    @Body() dto: CanteenReasonDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.canteenHardeningService.markServingNotTaken(id, dto, auth);
   }
 
   @Post('wallets/student/:studentId')
@@ -238,6 +297,15 @@ export class CanteenController {
       page,
       limit,
     });
+  }
+
+  @Post('wallets/low-balance-alerts')
+  @Permissions('canteen:wallets:update')
+  sendLowBalanceAlerts(
+    @Body() dto: CanteenLowBalanceAlertDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.canteenHardeningService.sendLowBalanceAlerts(dto, auth);
   }
 
   @Post('pos-sales')
@@ -313,6 +381,17 @@ export class CanteenController {
     return this.canteenService.dailyMealCountReport(auth, date);
   }
 
+  @Get('reports/daily-meal-count.csv')
+  @Header('Content-Type', 'text/csv')
+  @Header('Content-Disposition', 'attachment; filename="canteen-daily-meal-count.csv"')
+  @Permissions('canteen:reports:read')
+  exportDailyMealCountCsv(
+    @CurrentAuth() auth: AuthContext,
+    @Query('date') date?: string,
+  ) {
+    return this.canteenHardeningService.exportDailyMealCountCsv(auth, date);
+  }
+
   @Get('reports/item-wise-sales')
   @Permissions('canteen:reports:read')
   itemWiseSalesReport(
@@ -321,6 +400,21 @@ export class CanteenController {
     @Query('to') to?: string,
   ) {
     return this.canteenService.itemWiseSalesReport(auth, { from, to });
+  }
+
+  @Get('reports/item-wise-sales.csv')
+  @Header('Content-Type', 'text/csv')
+  @Header('Content-Disposition', 'attachment; filename="canteen-item-wise-sales.csv"')
+  @Permissions('canteen:reports:read')
+  exportItemWiseSalesCsv(
+    @CurrentAuth() auth: AuthContext,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.canteenHardeningService.exportItemWiseSalesCsv(auth, {
+      from,
+      to,
+    });
   }
 
   @Get('reports/low-balance-wallets')
