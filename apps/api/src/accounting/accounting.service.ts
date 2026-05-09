@@ -702,7 +702,9 @@ export class AccountingService {
     await this.ensureJournalIsMutable(original.id, actor.tenantId);
 
     if (original.status === JournalEntryStatus.REVERSED) {
-      throw new ConflictException('Cannot correct a reversed journal entry. Reverse the reversal first (if applicable) or post a new entry.');
+      throw new ConflictException(
+        'Cannot correct a reversed journal entry. Reverse the reversal first (if applicable) or post a new entry.',
+      );
     }
 
     const correctionDate = dto.reversalDate
@@ -930,7 +932,9 @@ export class AccountingService {
     }
 
     if (entry.status === JournalEntryStatus.REVERSED) {
-      throw new ConflictException('Journal entry is already reversed and immutable');
+      throw new ConflictException(
+        'Journal entry is already reversed and immutable',
+      );
     }
 
     if (entry.fiscalPeriod?.status === AccountingPeriodStatus.CLOSED) {

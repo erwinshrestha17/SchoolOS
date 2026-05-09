@@ -1193,7 +1193,10 @@ export class AccountingPostingService {
     const debitAccount = await this.ensureAccount(tx, input.tenantId, {
       code: debitAccountCode,
       name: debitAccountName,
-      type: input.paymentMethod === 'WALLET' ? ChartAccountType.LIABILITY : ChartAccountType.ASSET,
+      type:
+        input.paymentMethod === 'WALLET'
+          ? ChartAccountType.LIABILITY
+          : ChartAccountType.ASSET,
     });
 
     const lines = [
@@ -1419,11 +1422,15 @@ export class AccountingPostingService {
     }
 
     if (totals.debit.lte(0) && totals.credit.lte(0)) {
-      throw new ConflictException('Accounting posting must have non-zero amounts');
+      throw new ConflictException(
+        'Accounting posting must have non-zero amounts',
+      );
     }
 
     if (lines.length === 0) {
-      throw new ConflictException('Accounting posting must have at least one line');
+      throw new ConflictException(
+        'Accounting posting must have at least one line',
+      );
     }
   }
 }

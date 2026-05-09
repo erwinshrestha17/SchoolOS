@@ -14,7 +14,11 @@ export class LibraryHardeningService {
     private readonly libraryService: LibraryService,
   ) {}
 
-  async archiveBook(bookId: string, dto: ArchiveLibraryBookDto, actor: AuthContext) {
+  async archiveBook(
+    bookId: string,
+    dto: ArchiveLibraryBookDto,
+    actor: AuthContext,
+  ) {
     const book = await this.prisma.libraryBook.findFirst({
       where: { id: bookId, tenantId: actor.tenantId },
       include: { copies: true },
@@ -35,7 +39,11 @@ export class LibraryHardeningService {
     }
 
     const [updated] = await this.prisma.$queryRaw<
-      Array<{ id: string; archivedAt: Date | null; archiveReason: string | null }>
+      Array<{
+        id: string;
+        archivedAt: Date | null;
+        archiveReason: string | null;
+      }>
     >(
       Prisma.sql`
         UPDATE "LibraryBook"
@@ -59,7 +67,10 @@ export class LibraryHardeningService {
     return updated;
   }
 
-  async getIssuedBooksReport(actor: AuthContext, options: { page?: string; limit?: string } = {}) {
+  async getIssuedBooksReport(
+    actor: AuthContext,
+    options: { page?: string; limit?: string } = {},
+  ) {
     return this.libraryService.listIssues(actor, {
       status: LibraryIssueStatus.ISSUED,
       page: options.page,
@@ -116,7 +127,12 @@ export class LibraryHardeningService {
 
   async getBorrowerHistory(
     actor: AuthContext,
-    input: { studentId?: string; staffId?: string; page?: string; limit?: string },
+    input: {
+      studentId?: string;
+      staffId?: string;
+      page?: string;
+      limit?: string;
+    },
   ) {
     return this.libraryService.listIssues(actor, {
       studentId: input.studentId,
@@ -134,7 +150,15 @@ export class LibraryHardeningService {
     });
 
     const rows = [
-      ['Issue ID', 'Book Title', 'Barcode', 'Borrower', 'Issued At', 'Due At', 'Status'],
+      [
+        'Issue ID',
+        'Book Title',
+        'Barcode',
+        'Borrower',
+        'Issued At',
+        'Due At',
+        'Status',
+      ],
       ...report.items.map((issue) => [
         issue.id,
         issue.copy.book.title,

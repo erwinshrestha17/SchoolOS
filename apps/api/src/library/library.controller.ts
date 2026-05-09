@@ -225,7 +225,10 @@ export class LibraryController {
 
   @Get('reports/issued.csv')
   @Header('Content-Type', 'text/csv')
-  @Header('Content-Disposition', 'attachment; filename="library-issued-books.csv"')
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="library-issued-books.csv"',
+  )
   @Permissions('library:reports:read')
   exportIssuedBooksCsv(@CurrentAuth() auth: AuthContext) {
     return this.libraryHardeningService.exportIssuedBooksCsv(auth);

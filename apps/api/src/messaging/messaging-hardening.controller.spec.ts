@@ -65,11 +65,8 @@ describe('MessagingHardeningController contracts', () => {
   });
 
   it('delegates moderation escalation listing and resolution aliases', () => {
-    const {
-      controller,
-      messagingHardeningService,
-      parentTeacherChatService,
-    } = createController();
+    const { controller, messagingHardeningService, parentTeacherChatService } =
+      createController();
     messagingHardeningService.listEscalations.mockReturnValue([
       { id: 'escalation-1' },
     ]);
@@ -81,7 +78,9 @@ describe('MessagingHardeningController contracts', () => {
     expect(controller.resolveEscalation('escalation-1', actor)).toEqual({
       status: 'RESOLVED',
     });
-    expect(messagingHardeningService.listEscalations).toHaveBeenCalledWith(actor);
+    expect(messagingHardeningService.listEscalations).toHaveBeenCalledWith(
+      actor,
+    );
     expect(parentTeacherChatService.resolveEscalation).toHaveBeenCalledWith(
       'escalation-1',
       { resolutionNote: 'Resolved by moderator' },

@@ -126,8 +126,13 @@ describe('StudentPhotoService', () => {
   });
 
   it('soft-deletes the previous photo when replacing it', async () => {
-    const { service, prisma, storageService, fileRegistryService, auditService } =
-      createServiceMocks();
+    const {
+      service,
+      prisma,
+      storageService,
+      fileRegistryService,
+      auditService,
+    } = createServiceMocks();
     prisma.student.findFirst.mockResolvedValue({
       id: 'student-1',
       tenantId: actor.tenantId,
@@ -144,7 +149,9 @@ describe('StudentPhotoService', () => {
       mimeType: 'image/jpeg',
       sizeBytes: BigInt(256),
     });
-    fileRegistryService.markUploaded.mockResolvedValue({ id: 'new-photo-file' });
+    fileRegistryService.markUploaded.mockResolvedValue({
+      id: 'new-photo-file',
+    });
     prisma.student.update.mockResolvedValue({ id: 'student-1' });
 
     const result = await service.uploadPhoto(

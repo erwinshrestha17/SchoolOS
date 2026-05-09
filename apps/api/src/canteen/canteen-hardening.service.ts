@@ -11,7 +11,10 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { CanteenReasonDto, CanteenLowBalanceAlertDto } from './dto/canteen-hardening.dto';
+import {
+  CanteenReasonDto,
+  CanteenLowBalanceAlertDto,
+} from './dto/canteen-hardening.dto';
 
 @Injectable()
 export class CanteenHardeningService {
@@ -61,7 +64,11 @@ export class CanteenHardeningService {
     );
   }
 
-  async markServingNotTaken(id: string, dto: CanteenReasonDto, actor: AuthContext) {
+  async markServingNotTaken(
+    id: string,
+    dto: CanteenReasonDto,
+    actor: AuthContext,
+  ) {
     return this.transitionServing(
       id,
       CanteenMealServingStatus.NOT_TAKEN,
@@ -71,7 +78,10 @@ export class CanteenHardeningService {
     );
   }
 
-  async sendLowBalanceAlerts(dto: CanteenLowBalanceAlertDto, actor: AuthContext) {
+  async sendLowBalanceAlerts(
+    dto: CanteenLowBalanceAlertDto,
+    actor: AuthContext,
+  ) {
     const windowKey = dto.windowKey ?? new Date().toISOString().slice(0, 10);
     const wallets = await this.prisma.canteenWallet.findMany({
       where: { tenantId: actor.tenantId },
@@ -121,7 +131,12 @@ export class CanteenHardeningService {
       resource: 'canteen_wallet',
       tenantId: actor.tenantId,
       userId: actor.userId,
-      after: { walletCount: lowBalanceWallets.length, queued, skipped, windowKey },
+      after: {
+        walletCount: lowBalanceWallets.length,
+        queued,
+        skipped,
+        windowKey,
+      },
     });
 
     return {
@@ -148,7 +163,10 @@ export class CanteenHardeningService {
       resource: 'canteen_daily_meal_count_report',
       tenantId: actor.tenantId,
       userId: actor.userId,
-      after: { rowCount: rows.length, date: mealDate.toISOString().slice(0, 10) },
+      after: {
+        rowCount: rows.length,
+        date: mealDate.toISOString().slice(0, 10),
+      },
     });
 
     return [
@@ -159,8 +177,13 @@ export class CanteenHardeningService {
       .join('\n');
   }
 
-  async exportItemWiseSalesCsv(actor: AuthContext, input: { from?: string; to?: string }) {
-    const from = input.from ? new Date(input.from) : new Date('1970-01-01T00:00:00.000Z');
+  async exportItemWiseSalesCsv(
+    actor: AuthContext,
+    input: { from?: string; to?: string },
+  ) {
+    const from = input.from
+      ? new Date(input.from)
+      : new Date('1970-01-01T00:00:00.000Z');
     const to = input.to ? new Date(input.to) : new Date();
 
     const rows = await this.prisma.canteenPosSaleItem.groupBy({
@@ -211,7 +234,9 @@ export class CanteenHardeningService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Canteen enrollment not found in this tenant');
+      throw new NotFoundException(
+        'Canteen enrollment not found in this tenant',
+      );
     }
 
     const updated = await this.prisma.canteenStudentEnrollment.update({
@@ -251,7 +276,9 @@ export class CanteenHardeningService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Canteen meal serving not found in this tenant');
+      throw new NotFoundException(
+        'Canteen meal serving not found in this tenant',
+      );
     }
 
     const updated = await this.prisma.canteenMealServing.update({

@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -33,13 +37,18 @@ export class HomeworkAttachmentAccessService {
     })) as any;
 
     if (!attachment) {
-      throw new NotFoundException('Homework attachment not found in this tenant');
+      throw new NotFoundException(
+        'Homework attachment not found in this tenant',
+      );
     }
 
-    const homeworkId = attachment.submission?.homeworkId ?? attachment.assignmentId;
+    const homeworkId =
+      attachment.submission?.homeworkId ?? attachment.assignmentId;
 
     if (!homeworkId) {
-      throw new NotFoundException('Homework attachment is not linked to homework');
+      throw new NotFoundException(
+        'Homework attachment is not linked to homework',
+      );
     }
 
     await this.ensureHomeworkAttachmentVisibleToActor(actor, attachment);
@@ -49,7 +58,9 @@ export class HomeworkAttachmentAccessService {
     }
 
     if (attachment.fileAsset.tenantId !== actor.tenantId) {
-      throw new ForbiddenException('Homework attachment file is outside this tenant');
+      throw new ForbiddenException(
+        'Homework attachment file is outside this tenant',
+      );
     }
 
     if (attachment.fileAsset.status !== 'UPLOADED') {
@@ -60,7 +71,9 @@ export class HomeworkAttachmentAccessService {
       attachment.fileAsset.module &&
       attachment.fileAsset.module !== 'homework'
     ) {
-      throw new ForbiddenException('Homework attachment file module is invalid');
+      throw new ForbiddenException(
+        'Homework attachment file module is invalid',
+      );
     }
 
     if (
@@ -118,17 +131,25 @@ export class HomeworkAttachmentAccessService {
         throw new ForbiddenException('Student profile not found');
       }
 
-      if (attachment.submission && attachment.submission.studentId !== student.id) {
-        throw new ForbiddenException('Homework attachment is outside your scope');
+      if (
+        attachment.submission &&
+        attachment.submission.studentId !== student.id
+      ) {
+        throw new ForbiddenException(
+          'Homework attachment is outside your scope',
+        );
       }
 
-      const assignment = attachment.submission?.homework ?? attachment.assignment;
+      const assignment =
+        attachment.submission?.homework ?? attachment.assignment;
       if (
         assignment &&
         (assignment.classId !== student.classId ||
           (assignment.sectionId && assignment.sectionId !== student.sectionId))
       ) {
-        throw new ForbiddenException('Homework attachment is outside your class scope');
+        throw new ForbiddenException(
+          'Homework attachment is outside your class scope',
+        );
       }
 
       return;
@@ -150,16 +171,21 @@ export class HomeworkAttachmentAccessService {
     });
 
     if (!link) {
-      throw new ForbiddenException('Homework attachment is outside your child scope');
+      throw new ForbiddenException(
+        'Homework attachment is outside your child scope',
+      );
     }
 
     const assignment = attachment.submission?.homework ?? attachment.assignment;
     if (
       assignment &&
       (assignment.classId !== link.student.classId ||
-        (assignment.sectionId && assignment.sectionId !== link.student.sectionId))
+        (assignment.sectionId &&
+          assignment.sectionId !== link.student.sectionId))
     ) {
-      throw new ForbiddenException('Homework attachment is outside your child class scope');
+      throw new ForbiddenException(
+        'Homework attachment is outside your child class scope',
+      );
     }
   }
 }

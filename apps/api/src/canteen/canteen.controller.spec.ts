@@ -79,11 +79,22 @@ describe('CanteenController M8C contracts', () => {
     canteenService.updateMenuItem.mockReturnValue({ id: 'item-1' });
     canteenService.updateMenuItemStatus.mockReturnValue({ status: 'INACTIVE' });
 
-    expect(controller.createMenuItem(createDto as never, actor)).toEqual({ id: 'item-1' });
-    expect(controller.listMenuItems(actor, 'momo', 'Snacks', 'ACTIVE', '1', '20')).toEqual({ items: [] });
-    expect(controller.updateMenuItem('item-1', updateDto as never, actor)).toEqual({ id: 'item-1' });
-    expect(controller.updateMenuItemStatus('item-1', statusDto, actor)).toEqual({ status: 'INACTIVE' });
-    expect(canteenService.createMenuItem).toHaveBeenCalledWith(createDto, actor);
+    expect(controller.createMenuItem(createDto as never, actor)).toEqual({
+      id: 'item-1',
+    });
+    expect(
+      controller.listMenuItems(actor, 'momo', 'Snacks', 'ACTIVE', '1', '20'),
+    ).toEqual({ items: [] });
+    expect(
+      controller.updateMenuItem('item-1', updateDto as never, actor),
+    ).toEqual({ id: 'item-1' });
+    expect(controller.updateMenuItemStatus('item-1', statusDto, actor)).toEqual(
+      { status: 'INACTIVE' },
+    );
+    expect(canteenService.createMenuItem).toHaveBeenCalledWith(
+      createDto,
+      actor,
+    );
     expect(canteenService.listMenuItems).toHaveBeenCalledWith(actor, {
       query: 'momo',
       category: 'Snacks',
@@ -91,8 +102,16 @@ describe('CanteenController M8C contracts', () => {
       page: '1',
       limit: '20',
     });
-    expect(canteenService.updateMenuItem).toHaveBeenCalledWith('item-1', updateDto, actor);
-    expect(canteenService.updateMenuItemStatus).toHaveBeenCalledWith('item-1', statusDto, actor);
+    expect(canteenService.updateMenuItem).toHaveBeenCalledWith(
+      'item-1',
+      updateDto,
+      actor,
+    );
+    expect(canteenService.updateMenuItemStatus).toHaveBeenCalledWith(
+      'item-1',
+      statusDto,
+      actor,
+    );
   });
 
   it('delegates meal plan create/list/update/status with current actor', () => {
@@ -110,23 +129,43 @@ describe('CanteenController M8C contracts', () => {
     canteenService.updateMealPlan.mockReturnValue({ id: 'plan-1' });
     canteenService.updateMealPlanStatus.mockReturnValue({ status: 'ACTIVE' });
 
-    expect(controller.createMealPlan(createDto as never, actor)).toEqual({ id: 'plan-1' });
-    expect(controller.listMealPlans(actor, 'ACTIVE', 'LUNCH', '1', '20')).toEqual({ items: [] });
-    expect(controller.updateMealPlan('plan-1', updateDto as never, actor)).toEqual({ id: 'plan-1' });
-    expect(controller.updateMealPlanStatus('plan-1', statusDto, actor)).toEqual({ status: 'ACTIVE' });
-    expect(canteenService.createMealPlan).toHaveBeenCalledWith(createDto, actor);
+    expect(controller.createMealPlan(createDto as never, actor)).toEqual({
+      id: 'plan-1',
+    });
+    expect(
+      controller.listMealPlans(actor, 'ACTIVE', 'LUNCH', '1', '20'),
+    ).toEqual({ items: [] });
+    expect(
+      controller.updateMealPlan('plan-1', updateDto as never, actor),
+    ).toEqual({ id: 'plan-1' });
+    expect(controller.updateMealPlanStatus('plan-1', statusDto, actor)).toEqual(
+      { status: 'ACTIVE' },
+    );
+    expect(canteenService.createMealPlan).toHaveBeenCalledWith(
+      createDto,
+      actor,
+    );
     expect(canteenService.listMealPlans).toHaveBeenCalledWith(actor, {
       status: 'ACTIVE',
       mealType: 'LUNCH',
       page: '1',
       limit: '20',
     });
-    expect(canteenService.updateMealPlan).toHaveBeenCalledWith('plan-1', updateDto, actor);
-    expect(canteenService.updateMealPlanStatus).toHaveBeenCalledWith('plan-1', statusDto, actor);
+    expect(canteenService.updateMealPlan).toHaveBeenCalledWith(
+      'plan-1',
+      updateDto,
+      actor,
+    );
+    expect(canteenService.updateMealPlanStatus).toHaveBeenCalledWith(
+      'plan-1',
+      statusDto,
+      actor,
+    );
   });
 
   it('delegates enrollment lifecycle including pause/resume/end hardening routes', () => {
-    const { controller, canteenService, canteenHardeningService } = createController();
+    const { controller, canteenService, canteenHardeningService } =
+      createController();
     const enrollDto = {
       studentId: 'student-1',
       mealPlanId: 'plan-1',
@@ -138,17 +177,42 @@ describe('CanteenController M8C contracts', () => {
     canteenService.listEnrollments.mockReturnValue({ items: [] });
     canteenService.updateEnrollment.mockReturnValue({ id: 'enrollment-1' });
     canteenService.cancelEnrollment.mockReturnValue({ status: 'CANCELLED' });
-    canteenHardeningService.pauseEnrollment.mockReturnValue({ status: 'PAUSED' });
-    canteenHardeningService.resumeEnrollment.mockReturnValue({ status: 'ACTIVE' });
+    canteenHardeningService.pauseEnrollment.mockReturnValue({
+      status: 'PAUSED',
+    });
+    canteenHardeningService.resumeEnrollment.mockReturnValue({
+      status: 'ACTIVE',
+    });
     canteenHardeningService.endEnrollment.mockReturnValue({ status: 'ENDED' });
 
-    expect(controller.enrollStudent(enrollDto as never, actor)).toEqual({ id: 'enrollment-1' });
-    expect(controller.listEnrollments(actor, 'student-1', 'plan-1', 'ACTIVE', '1', '20')).toEqual({ items: [] });
-    expect(controller.updateEnrollment('enrollment-1', updateDto as never, actor)).toEqual({ id: 'enrollment-1' });
-    expect(controller.cancelEnrollment('enrollment-1', actor)).toEqual({ status: 'CANCELLED' });
-    expect(controller.pauseEnrollment('enrollment-1', reasonDto, actor)).toEqual({ status: 'PAUSED' });
-    expect(controller.resumeEnrollment('enrollment-1', reasonDto, actor)).toEqual({ status: 'ACTIVE' });
-    expect(controller.endEnrollment('enrollment-1', reasonDto, actor)).toEqual({ status: 'ENDED' });
+    expect(controller.enrollStudent(enrollDto as never, actor)).toEqual({
+      id: 'enrollment-1',
+    });
+    expect(
+      controller.listEnrollments(
+        actor,
+        'student-1',
+        'plan-1',
+        'ACTIVE',
+        '1',
+        '20',
+      ),
+    ).toEqual({ items: [] });
+    expect(
+      controller.updateEnrollment('enrollment-1', updateDto as never, actor),
+    ).toEqual({ id: 'enrollment-1' });
+    expect(controller.cancelEnrollment('enrollment-1', actor)).toEqual({
+      status: 'CANCELLED',
+    });
+    expect(
+      controller.pauseEnrollment('enrollment-1', reasonDto, actor),
+    ).toEqual({ status: 'PAUSED' });
+    expect(
+      controller.resumeEnrollment('enrollment-1', reasonDto, actor),
+    ).toEqual({ status: 'ACTIVE' });
+    expect(controller.endEnrollment('enrollment-1', reasonDto, actor)).toEqual({
+      status: 'ENDED',
+    });
     expect(canteenService.enrollStudent).toHaveBeenCalledWith(enrollDto, actor);
     expect(canteenService.listEnrollments).toHaveBeenCalledWith(actor, {
       studentId: 'student-1',
@@ -157,13 +221,26 @@ describe('CanteenController M8C contracts', () => {
       page: '1',
       limit: '20',
     });
-    expect(canteenHardeningService.pauseEnrollment).toHaveBeenCalledWith('enrollment-1', reasonDto, actor);
-    expect(canteenHardeningService.resumeEnrollment).toHaveBeenCalledWith('enrollment-1', reasonDto, actor);
-    expect(canteenHardeningService.endEnrollment).toHaveBeenCalledWith('enrollment-1', reasonDto, actor);
+    expect(canteenHardeningService.pauseEnrollment).toHaveBeenCalledWith(
+      'enrollment-1',
+      reasonDto,
+      actor,
+    );
+    expect(canteenHardeningService.resumeEnrollment).toHaveBeenCalledWith(
+      'enrollment-1',
+      reasonDto,
+      actor,
+    );
+    expect(canteenHardeningService.endEnrollment).toHaveBeenCalledWith(
+      'enrollment-1',
+      reasonDto,
+      actor,
+    );
   });
 
   it('delegates serving and serving cancellation/not-taken routes', () => {
-    const { controller, canteenService, canteenHardeningService } = createController();
+    const { controller, canteenService, canteenHardeningService } =
+      createController();
     const serveDto = {
       studentId: 'student-1',
       mealPlanId: 'plan-1',
@@ -173,13 +250,25 @@ describe('CanteenController M8C contracts', () => {
     const reasonDto = { reason: 'Duplicate scan correction' };
     canteenService.serveMeal.mockReturnValue({ id: 'serving-1' });
     canteenService.listDailyServings.mockReturnValue({ items: [] });
-    canteenHardeningService.cancelServing.mockReturnValue({ status: 'CANCELLED' });
-    canteenHardeningService.markServingNotTaken.mockReturnValue({ status: 'NOT_TAKEN' });
+    canteenHardeningService.cancelServing.mockReturnValue({
+      status: 'CANCELLED',
+    });
+    canteenHardeningService.markServingNotTaken.mockReturnValue({
+      status: 'NOT_TAKEN',
+    });
 
-    expect(controller.serveMeal(serveDto as never, actor)).toEqual({ id: 'serving-1' });
-    expect(controller.listDailyServings(actor, '2026-05-09', 'LUNCH', '1', '20')).toEqual({ items: [] });
-    expect(controller.cancelServing('serving-1', reasonDto, actor)).toEqual({ status: 'CANCELLED' });
-    expect(controller.markServingNotTaken('serving-1', reasonDto, actor)).toEqual({ status: 'NOT_TAKEN' });
+    expect(controller.serveMeal(serveDto as never, actor)).toEqual({
+      id: 'serving-1',
+    });
+    expect(
+      controller.listDailyServings(actor, '2026-05-09', 'LUNCH', '1', '20'),
+    ).toEqual({ items: [] });
+    expect(controller.cancelServing('serving-1', reasonDto, actor)).toEqual({
+      status: 'CANCELLED',
+    });
+    expect(
+      controller.markServingNotTaken('serving-1', reasonDto, actor),
+    ).toEqual({ status: 'NOT_TAKEN' });
     expect(canteenService.serveMeal).toHaveBeenCalledWith(serveDto, actor);
     expect(canteenService.listDailyServings).toHaveBeenCalledWith(actor, {
       date: '2026-05-09',
@@ -190,26 +279,52 @@ describe('CanteenController M8C contracts', () => {
   });
 
   it('delegates wallet top-up, transaction history, and low-balance alerts', () => {
-    const { controller, canteenService, canteenHardeningService } = createController();
+    const { controller, canteenService, canteenHardeningService } =
+      createController();
     const topUpDto = { amount: 1000, note: 'Cash top-up' };
     const alertDto = { windowKey: '2026-05-09' };
     canteenService.getOrCreateWallet.mockReturnValue({ id: 'wallet-1' });
     canteenService.walletBalance.mockReturnValue({ balance: '1000' });
     canteenService.topUpWallet.mockReturnValue({ wallet: { id: 'wallet-1' } });
     canteenService.transactionHistory.mockReturnValue({ items: [] });
-    canteenHardeningService.sendLowBalanceAlerts.mockReturnValue({ queued: 1, skipped: 0 });
-
-    expect(controller.getOrCreateWallet('student-1', actor)).toEqual({ id: 'wallet-1' });
-    expect(controller.walletBalance('student-1', actor)).toEqual({ balance: '1000' });
-    expect(controller.topUpWallet('student-1', topUpDto as never, actor)).toEqual({ wallet: { id: 'wallet-1' } });
-    expect(controller.transactionHistory('student-1', actor, '1', '20')).toEqual({ items: [] });
-    expect(controller.sendLowBalanceAlerts(alertDto, actor)).toEqual({ queued: 1, skipped: 0 });
-    expect(canteenService.topUpWallet).toHaveBeenCalledWith('student-1', topUpDto, actor);
-    expect(canteenService.transactionHistory).toHaveBeenCalledWith('student-1', actor, {
-      page: '1',
-      limit: '20',
+    canteenHardeningService.sendLowBalanceAlerts.mockReturnValue({
+      queued: 1,
+      skipped: 0,
     });
-    expect(canteenHardeningService.sendLowBalanceAlerts).toHaveBeenCalledWith(alertDto, actor);
+
+    expect(controller.getOrCreateWallet('student-1', actor)).toEqual({
+      id: 'wallet-1',
+    });
+    expect(controller.walletBalance('student-1', actor)).toEqual({
+      balance: '1000',
+    });
+    expect(
+      controller.topUpWallet('student-1', topUpDto as never, actor),
+    ).toEqual({ wallet: { id: 'wallet-1' } });
+    expect(
+      controller.transactionHistory('student-1', actor, '1', '20'),
+    ).toEqual({ items: [] });
+    expect(controller.sendLowBalanceAlerts(alertDto, actor)).toEqual({
+      queued: 1,
+      skipped: 0,
+    });
+    expect(canteenService.topUpWallet).toHaveBeenCalledWith(
+      'student-1',
+      topUpDto,
+      actor,
+    );
+    expect(canteenService.transactionHistory).toHaveBeenCalledWith(
+      'student-1',
+      actor,
+      {
+        page: '1',
+        limit: '20',
+      },
+    );
+    expect(canteenHardeningService.sendLowBalanceAlerts).toHaveBeenCalledWith(
+      alertDto,
+      actor,
+    );
   });
 
   it('delegates POS sale lifecycle and spending controls', () => {
@@ -233,14 +348,38 @@ describe('CanteenController M8C contracts', () => {
     canteenService.upsertSpendingControl.mockReturnValue({ id: 'control-1' });
     canteenService.getSpendingControl.mockReturnValue({ id: 'control-1' });
 
-    expect(controller.createPosSale(saleDto as never, actor)).toEqual({ id: 'sale-1' });
-    expect(controller.completePosSale('sale-1', completeDto, actor)).toEqual({ status: 'COMPLETED' });
-    expect(controller.cancelPosSale('sale-1', actor)).toEqual({ status: 'CANCELLED' });
-    expect(controller.listPosSales(actor, 'COMPLETED', 'student-1', '2026-05-01', '2026-05-09', '1', '20')).toEqual({ items: [] });
-    expect(controller.upsertSpendingControl(controlDto as never, actor)).toEqual({ id: 'control-1' });
-    expect(controller.getSpendingControl('student-1', actor)).toEqual({ id: 'control-1' });
+    expect(controller.createPosSale(saleDto as never, actor)).toEqual({
+      id: 'sale-1',
+    });
+    expect(controller.completePosSale('sale-1', completeDto, actor)).toEqual({
+      status: 'COMPLETED',
+    });
+    expect(controller.cancelPosSale('sale-1', actor)).toEqual({
+      status: 'CANCELLED',
+    });
+    expect(
+      controller.listPosSales(
+        actor,
+        'COMPLETED',
+        'student-1',
+        '2026-05-01',
+        '2026-05-09',
+        '1',
+        '20',
+      ),
+    ).toEqual({ items: [] });
+    expect(
+      controller.upsertSpendingControl(controlDto as never, actor),
+    ).toEqual({ id: 'control-1' });
+    expect(controller.getSpendingControl('student-1', actor)).toEqual({
+      id: 'control-1',
+    });
     expect(canteenService.createPosSale).toHaveBeenCalledWith(saleDto, actor);
-    expect(canteenService.completePosSale).toHaveBeenCalledWith('sale-1', completeDto, actor);
+    expect(canteenService.completePosSale).toHaveBeenCalledWith(
+      'sale-1',
+      completeDto,
+      actor,
+    );
     expect(canteenService.listPosSales).toHaveBeenCalledWith(actor, {
       status: 'COMPLETED',
       studentId: 'student-1',
@@ -252,24 +391,59 @@ describe('CanteenController M8C contracts', () => {
   });
 
   it('delegates reports and CSV exports from backend service boundaries', () => {
-    const { controller, canteenService, canteenHardeningService } = createController();
-    canteenService.dailyMealCountReport.mockReturnValue([{ mealType: 'LUNCH' }]);
-    canteenHardeningService.exportDailyMealCountCsv.mockReturnValue('Meal Type,Status,Count\nLUNCH,SERVED,10');
-    canteenService.itemWiseSalesReport.mockReturnValue([{ itemName: 'Veg Momo' }]);
-    canteenHardeningService.exportItemWiseSalesCsv.mockReturnValue('Item Name,Sales Amount\nVeg Momo,800');
-    canteenService.lowBalanceWalletList.mockReturnValue([{ studentId: 'student-1' }]);
-    canteenService.studentSpendingSummary.mockReturnValue([{ studentId: 'student-1' }]);
+    const { controller, canteenService, canteenHardeningService } =
+      createController();
+    canteenService.dailyMealCountReport.mockReturnValue([
+      { mealType: 'LUNCH' },
+    ]);
+    canteenHardeningService.exportDailyMealCountCsv.mockReturnValue(
+      'Meal Type,Status,Count\nLUNCH,SERVED,10',
+    );
+    canteenService.itemWiseSalesReport.mockReturnValue([
+      { itemName: 'Veg Momo' },
+    ]);
+    canteenHardeningService.exportItemWiseSalesCsv.mockReturnValue(
+      'Item Name,Sales Amount\nVeg Momo,800',
+    );
+    canteenService.lowBalanceWalletList.mockReturnValue([
+      { studentId: 'student-1' },
+    ]);
+    canteenService.studentSpendingSummary.mockReturnValue([
+      { studentId: 'student-1' },
+    ]);
 
-    expect(controller.dailyMealCountReport(actor, '2026-05-09')).toEqual([{ mealType: 'LUNCH' }]);
-    expect(controller.exportDailyMealCountCsv(actor, '2026-05-09')).toBe('Meal Type,Status,Count\nLUNCH,SERVED,10');
-    expect(controller.itemWiseSalesReport(actor, '2026-05-01', '2026-05-09')).toEqual([{ itemName: 'Veg Momo' }]);
-    expect(controller.exportItemWiseSalesCsv(actor, '2026-05-01', '2026-05-09')).toBe('Item Name,Sales Amount\nVeg Momo,800');
-    expect(controller.lowBalanceWalletList(actor)).toEqual([{ studentId: 'student-1' }]);
-    expect(controller.studentSpendingSummary(actor, 'student-1', '2026-05-01', '2026-05-09')).toEqual([{ studentId: 'student-1' }]);
-    expect(canteenHardeningService.exportDailyMealCountCsv).toHaveBeenCalledWith(actor, '2026-05-09');
-    expect(canteenHardeningService.exportItemWiseSalesCsv).toHaveBeenCalledWith(actor, {
-      from: '2026-05-01',
-      to: '2026-05-09',
-    });
+    expect(controller.dailyMealCountReport(actor, '2026-05-09')).toEqual([
+      { mealType: 'LUNCH' },
+    ]);
+    expect(controller.exportDailyMealCountCsv(actor, '2026-05-09')).toBe(
+      'Meal Type,Status,Count\nLUNCH,SERVED,10',
+    );
+    expect(
+      controller.itemWiseSalesReport(actor, '2026-05-01', '2026-05-09'),
+    ).toEqual([{ itemName: 'Veg Momo' }]);
+    expect(
+      controller.exportItemWiseSalesCsv(actor, '2026-05-01', '2026-05-09'),
+    ).toBe('Item Name,Sales Amount\nVeg Momo,800');
+    expect(controller.lowBalanceWalletList(actor)).toEqual([
+      { studentId: 'student-1' },
+    ]);
+    expect(
+      controller.studentSpendingSummary(
+        actor,
+        'student-1',
+        '2026-05-01',
+        '2026-05-09',
+      ),
+    ).toEqual([{ studentId: 'student-1' }]);
+    expect(
+      canteenHardeningService.exportDailyMealCountCsv,
+    ).toHaveBeenCalledWith(actor, '2026-05-09');
+    expect(canteenHardeningService.exportItemWiseSalesCsv).toHaveBeenCalledWith(
+      actor,
+      {
+        from: '2026-05-01',
+        to: '2026-05-09',
+      },
+    );
   });
 });

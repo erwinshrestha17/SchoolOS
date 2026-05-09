@@ -28,7 +28,8 @@ describe('sanitizeStudentProfileResponse', () => {
               id: 'attachment-1',
               objectKey: 'tenant/activity/file.jpg',
               publicUrl: 'https://public.example/file.jpg',
-              previewUrl: '/api/v1/activity-feed/attachments/attachment-1/preview',
+              previewUrl:
+                '/api/v1/activity-feed/attachments/attachment-1/preview',
             },
           ],
         },

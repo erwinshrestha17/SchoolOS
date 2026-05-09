@@ -144,7 +144,11 @@ describe('StudentsController M1 contracts', () => {
 
     const result = controller.archiveStudent('student-1', dto as never, actor);
 
-    expect(service.archiveStudent).toHaveBeenCalledWith('student-1', dto, actor);
+    expect(service.archiveStudent).toHaveBeenCalledWith(
+      'student-1',
+      dto,
+      actor,
+    );
     expect(result).toEqual({ lifecycleStatus: 'ARCHIVED' });
   });
 
@@ -177,7 +181,9 @@ describe('StudentsController M1 contracts', () => {
   it('delegates generated document revocation with reason payload', () => {
     const { controller, service } = createController();
     const dto = { reason: 'Incorrect student detail' };
-    service.revokeGeneratedStudentDocument.mockReturnValue({ revokedAt: 'now' });
+    service.revokeGeneratedStudentDocument.mockReturnValue({
+      revokedAt: 'now',
+    });
 
     const result = controller.revokeGeneratedDocument(
       'student-1',

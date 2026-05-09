@@ -109,7 +109,9 @@ describe('ActivityFeedController M5 contracts', () => {
   it('delegates soft delete with reason to lifecycle service', () => {
     const { controller, activityPostLifecycleService } = createController();
     const dto = { reason: 'Duplicate post' };
-    activityPostLifecycleService.softDeletePost.mockReturnValue({ deleted: true });
+    activityPostLifecycleService.softDeletePost.mockReturnValue({
+      deleted: true,
+    });
 
     const result = controller.softDeletePost('post-1', dto, actor);
 
@@ -123,7 +125,9 @@ describe('ActivityFeedController M5 contracts', () => {
 
   it('delegates restore to lifecycle service', () => {
     const { controller, activityPostLifecycleService } = createController();
-    activityPostLifecycleService.restorePost.mockReturnValue({ restored: true });
+    activityPostLifecycleService.restorePost.mockReturnValue({
+      restored: true,
+    });
 
     const result = controller.restorePost('post-1', actor);
 
@@ -176,7 +180,10 @@ describe('ActivityFeedController M5 contracts', () => {
     expect(controller.createMilestone(milestoneDto as never, actor)).toEqual({
       id: 'milestone-1',
     });
-    expect(activityFeedService.createMoodLog).toHaveBeenCalledWith(moodDto, actor);
+    expect(activityFeedService.createMoodLog).toHaveBeenCalledWith(
+      moodDto,
+      actor,
+    );
     expect(activityFeedService.createMilestone).toHaveBeenCalledWith(
       milestoneDto,
       actor,

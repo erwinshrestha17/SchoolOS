@@ -24,7 +24,11 @@ export class TransportHardeningService {
     private readonly transportService: TransportService,
   ) {}
 
-  async cancelTrip(tripId: string, dto: CancelTransportTripDto, actor: AuthContext) {
+  async cancelTrip(
+    tripId: string,
+    dto: CancelTransportTripDto,
+    actor: AuthContext,
+  ) {
     const trip = await this.prisma.transportTrip.findFirst({
       where: { id: tripId, tenantId: actor.tenantId },
     });
@@ -34,7 +38,9 @@ export class TransportHardeningService {
     }
 
     if (trip.status !== TransportTripStatus.ACTIVE) {
-      throw new ForbiddenException('Only active transport trips can be cancelled');
+      throw new ForbiddenException(
+        'Only active transport trips can be cancelled',
+      );
     }
 
     const updated = await this.prisma.transportTrip.update({
@@ -110,7 +116,9 @@ export class TransportHardeningService {
           include: {
             route: true,
             vehicle: true,
-            driverAssignment: { include: { staff: { include: { user: true } } } },
+            driverAssignment: {
+              include: { staff: { include: { user: true } } },
+            },
           },
         },
       },
@@ -118,7 +126,9 @@ export class TransportHardeningService {
     });
 
     if (!status) {
-      throw new NotFoundException('No active transport trip found for this child');
+      throw new NotFoundException(
+        'No active transport trip found for this child',
+      );
     }
 
     const latestLocation = await this.transportService
@@ -165,14 +175,19 @@ export class TransportHardeningService {
       eta: {
         strategy: 'STOP_SEQUENCE_FOUNDATION',
         stopSequence: status.stop.sequence,
-        message: 'ETA foundation available; GPS/distance ETA can be added later.',
+        message:
+          'ETA foundation available; GPS/distance ETA can be added later.',
       },
     };
   }
 
   async getTripHistoryReport(
     actor: AuthContext,
-    filters: { routeId?: string; vehicleId?: string; driverAssignmentId?: string } = {},
+    filters: {
+      routeId?: string;
+      vehicleId?: string;
+      driverAssignmentId?: string;
+    } = {},
   ) {
     const items = await this.prisma.transportTrip.findMany({
       where: {
@@ -221,7 +236,16 @@ export class TransportHardeningService {
   async exportTripHistoryCsv(actor: AuthContext) {
     const report = await this.getTripHistoryReport(actor);
     const rows = [
-      ['Trip ID', 'Route', 'Vehicle', 'Driver', 'Direction', 'Status', 'Started At', 'Completed At'],
+      [
+        'Trip ID',
+        'Route',
+        'Vehicle',
+        'Driver',
+        'Direction',
+        'Status',
+        'Started At',
+        'Completed At',
+      ],
       ...report.items.map((trip) => [
         trip.id,
         trip.route.name,
@@ -256,7 +280,9 @@ export class TransportHardeningService {
     });
 
     if (!assignment) {
-      throw new NotFoundException('Transport student assignment not found in this tenant');
+      throw new NotFoundException(
+        'Transport student assignment not found in this tenant',
+      );
     }
 
     const updated = await this.prisma.transportStudentAssignment.update({
@@ -264,7 +290,9 @@ export class TransportHardeningService {
       data: {
         status,
         endedAt:
-          status === TransportEnrollmentStatus.ENDED ? new Date() : assignment.endedAt,
+          status === TransportEnrollmentStatus.ENDED
+            ? new Date()
+            : assignment.endedAt,
       },
     });
 

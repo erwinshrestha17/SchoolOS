@@ -328,7 +328,10 @@ export class PayrollController {
 
   @Get('reports/tds/export.csv')
   @Header('Content-Type', 'text/csv')
-  @Header('Content-Disposition', 'attachment; filename="payroll-tds-report.csv"')
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="payroll-tds-report.csv"',
+  )
   @Permissions('payroll:exports:create')
   exportPayrollTdsCsv(@CurrentAuth() auth: AuthContext) {
     return this.payrollService.exportPayrollRegisterCsv(auth);

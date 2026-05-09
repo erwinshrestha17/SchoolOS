@@ -68,10 +68,18 @@ describe('TimetableController M6 contracts', () => {
     timetableService.createPeriod.mockReturnValue({ id: 'period-1' });
     timetableService.updatePeriod.mockReturnValue({ id: 'period-1' });
 
-    expect(controller.createPeriod(dto as never, actor)).toEqual({ id: 'period-1' });
-    expect(controller.updatePeriod('period-1', dto as never, actor)).toEqual({ id: 'period-1' });
+    expect(controller.createPeriod(dto as never, actor)).toEqual({
+      id: 'period-1',
+    });
+    expect(controller.updatePeriod('period-1', dto as never, actor)).toEqual({
+      id: 'period-1',
+    });
     expect(timetableService.createPeriod).toHaveBeenCalledWith(dto, actor);
-    expect(timetableService.updatePeriod).toHaveBeenCalledWith('period-1', dto, actor);
+    expect(timetableService.updatePeriod).toHaveBeenCalledWith(
+      'period-1',
+      dto,
+      actor,
+    );
   });
 
   it('delegates room setup through service boundary', () => {
@@ -81,9 +89,15 @@ describe('TimetableController M6 contracts', () => {
     timetableService.updateRoom.mockReturnValue({ id: 'room-1' });
 
     expect(controller.createRoom(dto, actor)).toEqual({ id: 'room-1' });
-    expect(controller.updateRoom('room-1', dto, actor)).toEqual({ id: 'room-1' });
+    expect(controller.updateRoom('room-1', dto, actor)).toEqual({
+      id: 'room-1',
+    });
     expect(timetableService.createRoom).toHaveBeenCalledWith(dto, actor);
-    expect(timetableService.updateRoom).toHaveBeenCalledWith('room-1', dto, actor);
+    expect(timetableService.updateRoom).toHaveBeenCalledWith(
+      'room-1',
+      dto,
+      actor,
+    );
   });
 
   it('delegates timetable version lifecycle commands with current actor', () => {
@@ -93,14 +107,34 @@ describe('TimetableController M6 contracts', () => {
     timetableService.archiveVersion.mockReturnValue({ status: 'ARCHIVED' });
     timetableService.reopenVersion.mockReturnValue({ status: 'DRAFT' });
 
-    expect(controller.publishVersion('version-1', actor)).toEqual({ status: 'PUBLISHED' });
-    expect(controller.lockVersion('version-1', actor)).toEqual({ status: 'LOCKED' });
-    expect(controller.archiveVersion('version-1', actor)).toEqual({ status: 'ARCHIVED' });
-    expect(controller.reopenVersion('version-1', actor)).toEqual({ status: 'DRAFT' });
-    expect(timetableService.publishVersion).toHaveBeenCalledWith('version-1', actor);
-    expect(timetableService.lockVersion).toHaveBeenCalledWith('version-1', actor);
-    expect(timetableService.archiveVersion).toHaveBeenCalledWith('version-1', actor);
-    expect(timetableService.reopenVersion).toHaveBeenCalledWith('version-1', actor);
+    expect(controller.publishVersion('version-1', actor)).toEqual({
+      status: 'PUBLISHED',
+    });
+    expect(controller.lockVersion('version-1', actor)).toEqual({
+      status: 'LOCKED',
+    });
+    expect(controller.archiveVersion('version-1', actor)).toEqual({
+      status: 'ARCHIVED',
+    });
+    expect(controller.reopenVersion('version-1', actor)).toEqual({
+      status: 'DRAFT',
+    });
+    expect(timetableService.publishVersion).toHaveBeenCalledWith(
+      'version-1',
+      actor,
+    );
+    expect(timetableService.lockVersion).toHaveBeenCalledWith(
+      'version-1',
+      actor,
+    );
+    expect(timetableService.archiveVersion).toHaveBeenCalledWith(
+      'version-1',
+      actor,
+    );
+    expect(timetableService.reopenVersion).toHaveBeenCalledWith(
+      'version-1',
+      actor,
+    );
   });
 
   it('delegates version validation and slot mutation through server-side conflict service', () => {
@@ -114,16 +148,37 @@ describe('TimetableController M6 contracts', () => {
       endsAt: '09:45',
       roomId: 'room-1',
     };
-    timetableService.validateVersion.mockReturnValue({ valid: true, errors: [] });
+    timetableService.validateVersion.mockReturnValue({
+      valid: true,
+      errors: [],
+    });
     timetableService.createVersionSlot.mockReturnValue({ id: 'slot-1' });
     timetableService.updateSlot.mockReturnValue({ id: 'slot-1' });
 
-    expect(controller.validateVersion('version-1', actor)).toEqual({ valid: true, errors: [] });
-    expect(controller.createVersionSlot('version-1', slotDto as never, actor)).toEqual({ id: 'slot-1' });
-    expect(controller.updateSlot('slot-1', slotDto as never, actor)).toEqual({ id: 'slot-1' });
-    expect(timetableService.validateVersion).toHaveBeenCalledWith('version-1', actor);
-    expect(timetableService.createVersionSlot).toHaveBeenCalledWith('version-1', slotDto, actor);
-    expect(timetableService.updateSlot).toHaveBeenCalledWith('slot-1', slotDto, actor);
+    expect(controller.validateVersion('version-1', actor)).toEqual({
+      valid: true,
+      errors: [],
+    });
+    expect(
+      controller.createVersionSlot('version-1', slotDto as never, actor),
+    ).toEqual({ id: 'slot-1' });
+    expect(controller.updateSlot('slot-1', slotDto as never, actor)).toEqual({
+      id: 'slot-1',
+    });
+    expect(timetableService.validateVersion).toHaveBeenCalledWith(
+      'version-1',
+      actor,
+    );
+    expect(timetableService.createVersionSlot).toHaveBeenCalledWith(
+      'version-1',
+      slotDto,
+      actor,
+    );
+    expect(timetableService.updateSlot).toHaveBeenCalledWith(
+      'slot-1',
+      slotDto,
+      actor,
+    );
   });
 
   it('delegates teacher availability and workload queries with current actor', () => {
@@ -135,16 +190,41 @@ describe('TimetableController M6 contracts', () => {
       type: 'AVAILABLE',
     };
     const workloadQuery = { academicYearId: 'year-1', versionId: 'version-1' };
-    timetableService.listTeacherAvailability.mockReturnValue({ availability: [] });
-    timetableService.createTeacherAvailability.mockReturnValue({ availability: [] });
+    timetableService.listTeacherAvailability.mockReturnValue({
+      availability: [],
+    });
+    timetableService.createTeacherAvailability.mockReturnValue({
+      availability: [],
+    });
     timetableService.getTeacherWorkload.mockReturnValue({ weeklyPeriods: 20 });
 
-    expect(controller.listTeacherAvailability('teacher-1', actor)).toEqual({ availability: [] });
-    expect(controller.upsertTeacherAvailability('teacher-1', availabilityDto as never, actor)).toEqual({ availability: [] });
-    expect(controller.getTeacherWorkload('teacher-1', workloadQuery as never, actor)).toEqual({ weeklyPeriods: 20 });
-    expect(timetableService.listTeacherAvailability).toHaveBeenCalledWith('teacher-1', actor);
-    expect(timetableService.createTeacherAvailability).toHaveBeenCalledWith('teacher-1', availabilityDto, actor);
-    expect(timetableService.getTeacherWorkload).toHaveBeenCalledWith('teacher-1', workloadQuery, actor);
+    expect(controller.listTeacherAvailability('teacher-1', actor)).toEqual({
+      availability: [],
+    });
+    expect(
+      controller.upsertTeacherAvailability(
+        'teacher-1',
+        availabilityDto as never,
+        actor,
+      ),
+    ).toEqual({ availability: [] });
+    expect(
+      controller.getTeacherWorkload('teacher-1', workloadQuery as never, actor),
+    ).toEqual({ weeklyPeriods: 20 });
+    expect(timetableService.listTeacherAvailability).toHaveBeenCalledWith(
+      'teacher-1',
+      actor,
+    );
+    expect(timetableService.createTeacherAvailability).toHaveBeenCalledWith(
+      'teacher-1',
+      availabilityDto,
+      actor,
+    );
+    expect(timetableService.getTeacherWorkload).toHaveBeenCalledWith(
+      'teacher-1',
+      workloadQuery,
+      actor,
+    );
   });
 
   it('delegates substitution workflow and status transitions through service boundary', () => {
@@ -160,18 +240,49 @@ describe('TimetableController M6 contracts', () => {
     timetableService.createSubstitution.mockReturnValue({ status: 'ASSIGNED' });
     timetableService.updateSubstitution.mockReturnValue({ status: 'DRAFT' });
     timetableService.assignSubstitution.mockReturnValue({ status: 'ASSIGNED' });
-    timetableService.cancelSubstitution.mockReturnValue({ status: 'CANCELLED' });
-    timetableService.completeSubstitution.mockReturnValue({ status: 'COMPLETED' });
+    timetableService.cancelSubstitution.mockReturnValue({
+      status: 'CANCELLED',
+    });
+    timetableService.completeSubstitution.mockReturnValue({
+      status: 'COMPLETED',
+    });
 
-    expect(controller.createSubstitution(createDto as never, actor)).toEqual({ status: 'ASSIGNED' });
-    expect(controller.updateSubstitution('sub-1', createDto as never, actor)).toEqual({ status: 'DRAFT' });
-    expect(controller.assignSubstitution('sub-1', assignDto, actor)).toEqual({ status: 'ASSIGNED' });
-    expect(controller.cancelSubstitution('sub-1', actor)).toEqual({ status: 'CANCELLED' });
-    expect(controller.completeSubstitution('sub-1', actor)).toEqual({ status: 'COMPLETED' });
-    expect(timetableService.createSubstitution).toHaveBeenCalledWith(createDto, actor);
-    expect(timetableService.updateSubstitution).toHaveBeenCalledWith('sub-1', createDto, actor);
-    expect(timetableService.assignSubstitution).toHaveBeenCalledWith('sub-1', assignDto, actor);
-    expect(timetableService.cancelSubstitution).toHaveBeenCalledWith('sub-1', actor);
-    expect(timetableService.completeSubstitution).toHaveBeenCalledWith('sub-1', actor);
+    expect(controller.createSubstitution(createDto as never, actor)).toEqual({
+      status: 'ASSIGNED',
+    });
+    expect(
+      controller.updateSubstitution('sub-1', createDto as never, actor),
+    ).toEqual({ status: 'DRAFT' });
+    expect(controller.assignSubstitution('sub-1', assignDto, actor)).toEqual({
+      status: 'ASSIGNED',
+    });
+    expect(controller.cancelSubstitution('sub-1', actor)).toEqual({
+      status: 'CANCELLED',
+    });
+    expect(controller.completeSubstitution('sub-1', actor)).toEqual({
+      status: 'COMPLETED',
+    });
+    expect(timetableService.createSubstitution).toHaveBeenCalledWith(
+      createDto,
+      actor,
+    );
+    expect(timetableService.updateSubstitution).toHaveBeenCalledWith(
+      'sub-1',
+      createDto,
+      actor,
+    );
+    expect(timetableService.assignSubstitution).toHaveBeenCalledWith(
+      'sub-1',
+      assignDto,
+      actor,
+    );
+    expect(timetableService.cancelSubstitution).toHaveBeenCalledWith(
+      'sub-1',
+      actor,
+    );
+    expect(timetableService.completeSubstitution).toHaveBeenCalledWith(
+      'sub-1',
+      actor,
+    );
   });
 });

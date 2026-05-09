@@ -80,9 +80,18 @@ describe('HomeworkController M6 contracts', () => {
     expect(controller.cancelHomework('homework-1', actor)).toEqual({
       status: 'CANCELLED',
     });
-    expect(homeworkService.assignHomework).toHaveBeenCalledWith('homework-1', actor);
-    expect(homeworkService.closeHomework).toHaveBeenCalledWith('homework-1', actor);
-    expect(homeworkService.cancelHomework).toHaveBeenCalledWith('homework-1', actor);
+    expect(homeworkService.assignHomework).toHaveBeenCalledWith(
+      'homework-1',
+      actor,
+    );
+    expect(homeworkService.closeHomework).toHaveBeenCalledWith(
+      'homework-1',
+      actor,
+    );
+    expect(homeworkService.cancelHomework).toHaveBeenCalledWith(
+      'homework-1',
+      actor,
+    );
   });
 
   it('delegates reminder preview/send through service boundary', () => {
@@ -90,12 +99,20 @@ describe('HomeworkController M6 contracts', () => {
     homeworkService.previewReminders.mockReturnValue({ targetCount: 2 });
     homeworkService.sendReminders.mockReturnValue({ delivery: { count: 2 } });
 
-    expect(controller.previewReminders('homework-1', actor)).toEqual({ targetCount: 2 });
+    expect(controller.previewReminders('homework-1', actor)).toEqual({
+      targetCount: 2,
+    });
     expect(controller.sendReminders('homework-1', actor)).toEqual({
       delivery: { count: 2 },
     });
-    expect(homeworkService.previewReminders).toHaveBeenCalledWith('homework-1', actor);
-    expect(homeworkService.sendReminders).toHaveBeenCalledWith('homework-1', actor);
+    expect(homeworkService.previewReminders).toHaveBeenCalledWith(
+      'homework-1',
+      actor,
+    );
+    expect(homeworkService.sendReminders).toHaveBeenCalledWith(
+      'homework-1',
+      actor,
+    );
   });
 
   it('delegates late/correction submission lifecycle routes with current actor', () => {
@@ -110,15 +127,27 @@ describe('HomeworkController M6 contracts', () => {
     const correctionDto = { correctionRemarks: 'Please improve diagram' };
     homeworkService.createSubmission.mockReturnValue({ status: 'SUBMITTED' });
     homeworkService.reviewSubmission.mockReturnValue({ status: 'REVIEWED' });
-    homeworkService.requestCorrection.mockReturnValue({ status: 'NEEDS_CORRECTION' });
+    homeworkService.requestCorrection.mockReturnValue({
+      status: 'NEEDS_CORRECTION',
+    });
 
-    expect(controller.createSubmission('homework-1', submitDto as never, actor)).toEqual({
+    expect(
+      controller.createSubmission('homework-1', submitDto as never, actor),
+    ).toEqual({
       status: 'SUBMITTED',
     });
-    expect(controller.reviewSubmission('submission-1', reviewDto as never, actor)).toEqual({
+    expect(
+      controller.reviewSubmission('submission-1', reviewDto as never, actor),
+    ).toEqual({
       status: 'REVIEWED',
     });
-    expect(controller.requestCorrection('submission-1', correctionDto as never, actor)).toEqual({
+    expect(
+      controller.requestCorrection(
+        'submission-1',
+        correctionDto as never,
+        actor,
+      ),
+    ).toEqual({
       status: 'NEEDS_CORRECTION',
     });
     expect(homeworkService.createSubmission).toHaveBeenCalledWith(
@@ -153,17 +182,11 @@ describe('HomeworkController M6 contracts', () => {
       attachmentId: 'attachment-1',
       url: '/api/v1/files/file-1/preview',
     });
-    expect(homeworkAttachmentAccessService.getAttachmentAccessUrl).toHaveBeenNthCalledWith(
-      1,
-      'attachment-1',
-      actor,
-      'preview',
-    );
-    expect(homeworkAttachmentAccessService.getAttachmentAccessUrl).toHaveBeenNthCalledWith(
-      2,
-      'attachment-1',
-      actor,
-      'download',
-    );
+    expect(
+      homeworkAttachmentAccessService.getAttachmentAccessUrl,
+    ).toHaveBeenNthCalledWith(1, 'attachment-1', actor, 'preview');
+    expect(
+      homeworkAttachmentAccessService.getAttachmentAccessUrl,
+    ).toHaveBeenNthCalledWith(2, 'attachment-1', actor, 'download');
   });
 });

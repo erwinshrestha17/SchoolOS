@@ -93,14 +93,20 @@ export class MessagingHardeningService {
     `);
   }
 
-  private resolveRecipientType(actor: AuthContext): 'PARENT' | 'TEACHER' | 'ADMIN' {
+  private resolveRecipientType(
+    actor: AuthContext,
+  ): 'PARENT' | 'TEACHER' | 'ADMIN' {
     if (
-      actor.roles.some((role) => ['super_admin', 'admin', 'principal'].includes(role))
+      actor.roles.some((role) =>
+        ['super_admin', 'admin', 'principal'].includes(role),
+      )
     ) {
       return 'ADMIN';
     }
 
-    if (actor.roles.some((role) => ['teacher', 'subject_teacher'].includes(role))) {
+    if (
+      actor.roles.some((role) => ['teacher', 'subject_teacher'].includes(role))
+    ) {
       return 'TEACHER';
     }
 

@@ -27,7 +27,10 @@ import { CreateActivityPostDto } from './dto/create-activity-post.dto';
 import { CreateActivityReactionDto } from './dto/create-activity-reaction.dto';
 import { CreateDevelopmentalMilestoneDto } from './dto/create-developmental-milestone.dto';
 import { CreateMoodLogDto } from './dto/create-mood-log.dto';
-import { DeleteActivityPostDto, ModerateActivityPostDto } from './dto/moderate-activity-post.dto';
+import {
+  DeleteActivityPostDto,
+  ModerateActivityPostDto,
+} from './dto/moderate-activity-post.dto';
 import { UpdateActivityPostDto } from './dto/update-activity-post.dto';
 
 interface FeedPostEvent {
@@ -137,10 +140,7 @@ export class ActivityFeedController {
 
   @Patch('posts/:id/restore')
   @Permissions('activity_feed:moderate')
-  restorePost(
-    @Param('id') postId: string,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  restorePost(@Param('id') postId: string, @CurrentAuth() auth: AuthContext) {
     return this.activityPostLifecycleService.restorePost(postId, auth);
   }
 

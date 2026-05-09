@@ -176,7 +176,10 @@ export class TimetableController {
 
   @Post('versions/:id/publish')
   @Permissions('timetable:publish')
-  publishVersionPost(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+  publishVersionPost(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.timetableService.publishVersion(id, auth);
   }
 
@@ -200,7 +203,10 @@ export class TimetableController {
 
   @Post('versions/:id/archive')
   @Permissions('timetable:publish')
-  archiveVersionPost(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+  archiveVersionPost(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.timetableService.archiveVersion(id, auth);
   }
 

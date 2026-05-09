@@ -176,7 +176,11 @@ export class M10HardeningService {
     return this.deliveryRetryService.retryDelivery(deliveryId, actor);
   }
 
-  async resendNoticeFailed(noticeId: string, dto: ResendNoticeDto, actor: AuthContext) {
+  async resendNoticeFailed(
+    noticeId: string,
+    dto: ResendNoticeDto,
+    actor: AuthContext,
+  ) {
     const notice = await this.prisma.notice.findFirst({
       where: { id: noticeId, tenantId: actor.tenantId },
     });
@@ -193,7 +197,9 @@ export class M10HardeningService {
         ...(dto.recipientUserIds?.length
           ? { recipientUserId: { in: dto.recipientUserIds } }
           : {}),
-        ...(dto.guardianIds?.length ? { guardianId: { in: dto.guardianIds } } : {}),
+        ...(dto.guardianIds?.length
+          ? { guardianId: { in: dto.guardianIds } }
+          : {}),
       },
       take: 100,
     });
@@ -201,7 +207,11 @@ export class M10HardeningService {
     const results: any[] = [];
     for (const delivery of failed) {
       results.push(
-        await this.retryDeliveryWithMetadata(delivery.id, { reason: dto.reason }, actor),
+        await this.retryDeliveryWithMetadata(
+          delivery.id,
+          { reason: dto.reason },
+          actor,
+        ),
       );
     }
 
@@ -211,13 +221,20 @@ export class M10HardeningService {
       tenantId: actor.tenantId,
       userId: actor.userId,
       resourceId: noticeId,
-      after: { requested: failed.length, retried: results.length, reason: dto.reason ?? null },
+      after: {
+        requested: failed.length,
+        retried: results.length,
+        reason: dto.reason ?? null,
+      },
     });
 
     return { requested: failed.length, retried: results.length, results };
   }
 
-  async createConsentTemplate(dto: CreateConsentTemplateDto, actor: AuthContext) {
+  async createConsentTemplate(
+    dto: CreateConsentTemplateDto,
+    actor: AuthContext,
+  ) {
     const rows = await this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
       INSERT INTO "ConsentTemplate" (
         "tenantId",
@@ -247,7 +264,11 @@ export class M10HardeningService {
       tenantId: actor.tenantId,
       userId: actor.userId,
       resourceId: rows[0]?.id,
-      after: { key: dto.key, version: dto.version, consentType: dto.consentType },
+      after: {
+        key: dto.key,
+        version: dto.version,
+        consentType: dto.consentType,
+      },
     });
 
     return rows[0];
@@ -311,7 +332,10 @@ export class M10HardeningService {
         AND "guardianId" = ${guardian.id}
       LIMIT 1
     `);
-    return { guardianId: guardian.id, preference: Array.isArray(rows) ? rows[0] ?? null : null };
+    return {
+      guardianId: guardian.id,
+      preference: Array.isArray(rows) ? (rows[0] ?? null) : null,
+    };
   }
 
   async marketingOptOut(dto: CommunicationPreferenceDto, actor: AuthContext) {
@@ -327,7 +351,9 @@ export class M10HardeningService {
     status: 'PUBLISHED' | 'ARCHIVED',
     actor: AuthContext,
   ) {
-    const rows = await this.prisma.$queryRaw<Array<{ id: string; status: string }>>(Prisma.sql`
+    const rows = await this.prisma.$queryRaw<
+      Array<{ id: string; status: string }>
+    >(Prisma.sql`
       UPDATE "ConsentTemplate"
       SET
         "status" = ${status},
@@ -372,8 +398,8 @@ export class M10HardeningService {
         ${guardian.id},
         ${optOut ? new Date() : null},
         ${optOut ? actor.userId : null},
-        ${optOut ? dto.reason ?? null : null},
-        ${optOut ? dto.source ?? 'self_service' : null}
+        ${optOut ? (dto.reason ?? null) : null},
+        ${optOut ? (dto.source ?? 'self_service') : null}
       )
       ON CONFLICT ("tenantId", "guardianId")
       DO UPDATE SET
@@ -403,7 +429,9 @@ export class M10HardeningService {
     });
 
     if (!guardian) {
-      throw new NotFoundException('Guardian profile not found for current user');
+      throw new NotFoundException(
+        'Guardian profile not found for current user',
+      );
     }
 
     return guardian;

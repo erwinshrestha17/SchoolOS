@@ -74,16 +74,26 @@ describe('StaffController M7 contracts', () => {
     staffService.createStaff.mockReturnValue({ id: 'staff-1' });
     staffService.updateStaff.mockReturnValue({ id: 'staff-1' });
 
-    expect(controller.createStaff(createDto as never, actor)).toEqual({ id: 'staff-1' });
-    expect(controller.updateStaff('staff-1', updateDto as never, actor)).toEqual({ id: 'staff-1' });
+    expect(controller.createStaff(createDto as never, actor)).toEqual({
+      id: 'staff-1',
+    });
+    expect(
+      controller.updateStaff('staff-1', updateDto as never, actor),
+    ).toEqual({ id: 'staff-1' });
     expect(staffService.createStaff).toHaveBeenCalledWith(createDto, actor);
-    expect(staffService.updateStaff).toHaveBeenCalledWith('staff-1', updateDto, actor);
+    expect(staffService.updateStaff).toHaveBeenCalledWith(
+      'staff-1',
+      updateDto,
+      actor,
+    );
   });
 
   it('maps archive endpoint to INACTIVE lifecycle status', () => {
     const { controller, staffService } = createController();
     const dto = { status: StaffStatus.ACTIVE, reason: 'Contract ended' };
-    staffService.transitionStaffStatus.mockReturnValue({ status: StaffStatus.INACTIVE });
+    staffService.transitionStaffStatus.mockReturnValue({
+      status: StaffStatus.INACTIVE,
+    });
 
     const result = controller.archiveStaff('staff-1', dto, actor);
 
@@ -98,7 +108,9 @@ describe('StaffController M7 contracts', () => {
   it('maps terminate endpoint to TERMINATED lifecycle status', () => {
     const { controller, staffService } = createController();
     const dto = { status: StaffStatus.ACTIVE, reason: 'Policy violation' };
-    staffService.transitionStaffStatus.mockReturnValue({ status: StaffStatus.TERMINATED });
+    staffService.transitionStaffStatus.mockReturnValue({
+      status: StaffStatus.TERMINATED,
+    });
 
     const result = controller.terminateStaff('staff-1', dto, actor);
 

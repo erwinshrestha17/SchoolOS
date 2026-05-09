@@ -1,4 +1,11 @@
-import { IsBase64, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsBase64,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 const ALLOWED_STUDENT_PHOTO_MIME_TYPES = [
   'image/jpeg',

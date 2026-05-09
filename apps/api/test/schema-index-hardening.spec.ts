@@ -71,7 +71,10 @@ function hasIndex(
   tableName: string,
   fields: string[],
 ) {
-  return hasPrismaIndex(schema, modelName, fields) || hasSqlIndex(sql, tableName, fields);
+  return (
+    hasPrismaIndex(schema, modelName, fields) ||
+    hasSqlIndex(sql, tableName, fields)
+  );
 }
 
 describe('schema index hardening gate', () => {
@@ -80,41 +83,52 @@ describe('schema index hardening gate', () => {
 
   it('keeps high-volume notification delivery indexes available', () => {
     expect(
-      hasIndex(schema, migrations, 'NotificationDelivery', 'NotificationDelivery', [
-        'tenantId',
-        'sourceType',
-        'sourceId',
-      ]),
+      hasIndex(
+        schema,
+        migrations,
+        'NotificationDelivery',
+        'NotificationDelivery',
+        ['tenantId', 'sourceType', 'sourceId'],
+      ),
     ).toBe(true);
     expect(
-      hasIndex(schema, migrations, 'NotificationDelivery', 'NotificationDelivery', [
-        'tenantId',
-        'recipientUserId',
-      ]),
+      hasIndex(
+        schema,
+        migrations,
+        'NotificationDelivery',
+        'NotificationDelivery',
+        ['tenantId', 'recipientUserId'],
+      ),
     ).toBe(true);
     expect(
-      hasIndex(schema, migrations, 'NotificationDelivery', 'NotificationDelivery', [
-        'tenantId',
-        'status',
-        'createdAt',
-      ]),
+      hasIndex(
+        schema,
+        migrations,
+        'NotificationDelivery',
+        'NotificationDelivery',
+        ['tenantId', 'status', 'createdAt'],
+      ),
     ).toBe(true);
   });
 
   it('keeps notification read receipt lookup indexes available', () => {
     expect(
-      hasIndex(schema, migrations, 'NotificationReadReceipt', 'NotificationReadReceipt', [
-        'tenantId',
-        'userId',
-        'readAt',
-      ]),
+      hasIndex(
+        schema,
+        migrations,
+        'NotificationReadReceipt',
+        'NotificationReadReceipt',
+        ['tenantId', 'userId', 'readAt'],
+      ),
     ).toBe(true);
     expect(
-      hasIndex(schema, migrations, 'NotificationReadReceipt', 'NotificationReadReceipt', [
-        'tenantId',
-        'notificationDeliveryId',
-        'userId',
-      ]),
+      hasIndex(
+        schema,
+        migrations,
+        'NotificationReadReceipt',
+        'NotificationReadReceipt',
+        ['tenantId', 'notificationDeliveryId', 'userId'],
+      ),
     ).toBe(true);
   });
 
@@ -170,11 +184,13 @@ describe('schema index hardening gate', () => {
       ]),
     ).toBe(true);
     expect(
-      hasIndex(schema, migrations, 'TimetableSubstitution', 'TimetableSubstitution', [
-        'tenantId',
-        'date',
-        'status',
-      ]),
+      hasIndex(
+        schema,
+        migrations,
+        'TimetableSubstitution',
+        'TimetableSubstitution',
+        ['tenantId', 'date', 'status'],
+      ),
     ).toBe(true);
   });
 

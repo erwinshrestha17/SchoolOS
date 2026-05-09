@@ -383,7 +383,10 @@ export class CanteenController {
 
   @Get('reports/daily-meal-count.csv')
   @Header('Content-Type', 'text/csv')
-  @Header('Content-Disposition', 'attachment; filename="canteen-daily-meal-count.csv"')
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="canteen-daily-meal-count.csv"',
+  )
   @Permissions('canteen:reports:read')
   exportDailyMealCountCsv(
     @CurrentAuth() auth: AuthContext,
@@ -404,7 +407,10 @@ export class CanteenController {
 
   @Get('reports/item-wise-sales.csv')
   @Header('Content-Type', 'text/csv')
-  @Header('Content-Disposition', 'attachment; filename="canteen-item-wise-sales.csv"')
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="canteen-item-wise-sales.csv"',
+  )
   @Permissions('canteen:reports:read')
   exportItemWiseSalesCsv(
     @CurrentAuth() auth: AuthContext,

@@ -63,10 +63,18 @@ describe('LibraryController M8A contracts', () => {
     libraryService.updateBook.mockReturnValue({ id: 'book-1' });
     libraryHardeningService.archiveBook.mockReturnValue({ id: 'book-1' });
 
-    expect(controller.listBooks(actor, 'English', '1', '20')).toEqual({ items: [] });
-    expect(controller.createBook(createDto as never, actor)).toEqual({ id: 'book-1' });
-    expect(controller.updateBook('book-1', updateDto as never, actor)).toEqual({ id: 'book-1' });
-    expect(controller.archiveBook('book-1', archiveDto, actor)).toEqual({ id: 'book-1' });
+    expect(controller.listBooks(actor, 'English', '1', '20')).toEqual({
+      items: [],
+    });
+    expect(controller.createBook(createDto as never, actor)).toEqual({
+      id: 'book-1',
+    });
+    expect(controller.updateBook('book-1', updateDto as never, actor)).toEqual({
+      id: 'book-1',
+    });
+    expect(controller.archiveBook('book-1', archiveDto, actor)).toEqual({
+      id: 'book-1',
+    });
     expect(libraryService.listBooks).toHaveBeenCalledWith(actor, {
       query: 'English',
       page: '1',
@@ -102,9 +110,15 @@ describe('LibraryController M8A contracts', () => {
     expect(
       controller.listCopies(actor, 'book-1', 'AVAILABLE', 'LIB', '1', '50'),
     ).toEqual({ items: [] });
-    expect(controller.createCopy(createDto as never, actor)).toEqual({ id: 'copy-1' });
-    expect(controller.updateCopy('copy-1', updateDto as never, actor)).toEqual({ id: 'copy-1' });
-    expect(controller.markCopyStatus('copy-1', statusDto as never, actor)).toEqual({
+    expect(controller.createCopy(createDto as never, actor)).toEqual({
+      id: 'copy-1',
+    });
+    expect(controller.updateCopy('copy-1', updateDto as never, actor)).toEqual({
+      id: 'copy-1',
+    });
+    expect(
+      controller.markCopyStatus('copy-1', statusDto as never, actor),
+    ).toEqual({
       status: 'DAMAGED',
     });
     expect(libraryService.listCopies).toHaveBeenCalledWith(actor, {
@@ -141,16 +155,23 @@ describe('LibraryController M8A contracts', () => {
     };
     libraryService.listIssues.mockReturnValue({ items: [] });
     libraryService.issueCopy.mockReturnValue({ id: 'issue-1' });
-    libraryService.returnCopy.mockReturnValue({ id: 'issue-1', status: 'RETURNED' });
+    libraryService.returnCopy.mockReturnValue({
+      id: 'issue-1',
+      status: 'RETURNED',
+    });
 
     expect(
       controller.listIssues(actor, 'ISSUED', 'student-1', undefined, '1', '20'),
     ).toEqual({ items: [] });
-    expect(controller.issueCopy(issueDto as never, actor)).toEqual({ id: 'issue-1' });
-    expect(controller.returnCopy('issue-1', returnDto as never, actor)).toEqual({
+    expect(controller.issueCopy(issueDto as never, actor)).toEqual({
       id: 'issue-1',
-      status: 'RETURNED',
     });
+    expect(controller.returnCopy('issue-1', returnDto as never, actor)).toEqual(
+      {
+        id: 'issue-1',
+        status: 'RETURNED',
+      },
+    );
     expect(libraryService.listIssues).toHaveBeenCalledWith(actor, {
       status: 'ISSUED',
       studentId: 'student-1',
@@ -189,18 +210,26 @@ describe('LibraryController M8A contracts', () => {
   it('delegates library reports and CSV export from backend service', () => {
     const { controller, libraryHardeningService } = createController();
     libraryHardeningService.getIssuedBooksReport.mockReturnValue({ items: [] });
-    libraryHardeningService.getOverdueBooksReport.mockReturnValue({ items: [] });
+    libraryHardeningService.getOverdueBooksReport.mockReturnValue({
+      items: [],
+    });
     libraryHardeningService.getLostDamagedReport.mockReturnValue({ items: [] });
-    libraryHardeningService.getFineSummary.mockReturnValue({ summary: { totalFine: '0' } });
+    libraryHardeningService.getFineSummary.mockReturnValue({
+      summary: { totalFine: '0' },
+    });
     libraryHardeningService.getBorrowerHistory.mockReturnValue({ items: [] });
     libraryHardeningService.exportIssuedBooksCsv.mockReturnValue(
       'Issue ID,Book Title\nissue-1,English Reader',
     );
 
-    expect(controller.getIssuedBooksReport(actor, '1', '25')).toEqual({ items: [] });
+    expect(controller.getIssuedBooksReport(actor, '1', '25')).toEqual({
+      items: [],
+    });
     expect(controller.getOverdueBooksReport(actor)).toEqual({ items: [] });
     expect(controller.getLostDamagedReport(actor)).toEqual({ items: [] });
-    expect(controller.getFineSummary(actor)).toEqual({ summary: { totalFine: '0' } });
+    expect(controller.getFineSummary(actor)).toEqual({
+      summary: { totalFine: '0' },
+    });
     expect(
       controller.getBorrowerHistory(actor, 'student-1', undefined, '1', '25'),
     ).toEqual({ items: [] });
@@ -215,6 +244,8 @@ describe('LibraryController M8A contracts', () => {
       actor,
       { studentId: 'student-1', staffId: undefined, page: '1', limit: '25' },
     );
-    expect(libraryHardeningService.exportIssuedBooksCsv).toHaveBeenCalledWith(actor);
+    expect(libraryHardeningService.exportIssuedBooksCsv).toHaveBeenCalledWith(
+      actor,
+    );
   });
 });

@@ -216,10 +216,14 @@ describe('AcademicsController M4 contracts', () => {
     expect(controller.requestMarkLock(requestDto as never, actor)).toEqual({
       id: 'lock-1',
     });
-    expect(controller.reviewMarkLockRequest('lock-1', reviewDto as never, actor)).toEqual({
+    expect(
+      controller.reviewMarkLockRequest('lock-1', reviewDto as never, actor),
+    ).toEqual({
       status: 'APPROVED',
     });
-    expect(controller.unlockExamTerm('term-1', unlockDto as never, actor)).toEqual({
+    expect(
+      controller.unlockExamTerm('term-1', unlockDto as never, actor),
+    ).toEqual({
       unlocked: true,
     });
     expect(markLockWorkflowService.request).toHaveBeenCalledWith(
@@ -251,12 +255,16 @@ describe('AcademicsController M4 contracts', () => {
       classId: 'class-1',
     };
     reportCardsService.generateReportCard.mockReturnValue({ id: 'rc-1' });
-    reportCardsService.batchGenerateReportCards.mockReturnValue({ queued: true });
+    reportCardsService.batchGenerateReportCards.mockReturnValue({
+      queued: true,
+    });
 
     expect(controller.generateReportCard(singleDto as never, actor)).toEqual({
       id: 'rc-1',
     });
-    expect(controller.batchGenerateReportCards(batchDto as never, actor)).toEqual({
+    expect(
+      controller.batchGenerateReportCards(batchDto as never, actor),
+    ).toEqual({
       queued: true,
     });
     expect(reportCardsService.generateReportCard).toHaveBeenCalledWith(
@@ -289,7 +297,9 @@ describe('AcademicsController M4 contracts', () => {
     const unpublishDto = { reportCardIds: ['rc-1'], reason: 'Correction' };
     const notifyDto = { reportCardIds: ['rc-1'], message: 'Results published' };
     resultPublishingService.publishResults.mockReturnValue({ published: 1 });
-    resultPublishingService.unpublishResults.mockReturnValue({ unpublished: 1 });
+    resultPublishingService.unpublishResults.mockReturnValue({
+      unpublished: 1,
+    });
     resultPublishingService.notifyResults.mockReturnValue({ notified: 1 });
 
     expect(controller.publishResults(publishDto as never, actor)).toEqual({
@@ -317,12 +327,20 @@ describe('AcademicsController M4 contracts', () => {
 
   it('delegates promotion readiness and promotion actions with current actor', () => {
     const { controller, academicsService } = createController();
-    academicsService.listPromotionReadiness.mockReturnValue([{ studentId: 's1' }]);
+    academicsService.listPromotionReadiness.mockReturnValue([
+      { studentId: 's1' },
+    ]);
     academicsService.promoteStudent.mockReturnValue({ id: 'promotion-1' });
     academicsService.batchPromote.mockReturnValue({ promoted: 1 });
 
     expect(
-      controller.listPromotions(actor, 'year-1', 'class-1', 'section-1', 'READY'),
+      controller.listPromotions(
+        actor,
+        'year-1',
+        'class-1',
+        'section-1',
+        'READY',
+      ),
     ).toEqual([{ studentId: 's1' }]);
     expect(
       controller.promoteStudent(
@@ -342,11 +360,14 @@ describe('AcademicsController M4 contracts', () => {
         actor,
       ),
     ).toEqual({ promoted: 1 });
-    expect(academicsService.listPromotionReadiness).toHaveBeenCalledWith(actor, {
-      academicYearId: 'year-1',
-      classId: 'class-1',
-      sectionId: 'section-1',
-      status: 'READY',
-    });
+    expect(academicsService.listPromotionReadiness).toHaveBeenCalledWith(
+      actor,
+      {
+        academicYearId: 'year-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        status: 'READY',
+      },
+    );
   });
 });

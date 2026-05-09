@@ -158,7 +158,10 @@ describe('backend hardening gate', () => {
         return false;
       }
 
-      return source.includes('journalEntry.create') && !source.includes('AccountingPostingService');
+      return (
+        source.includes('journalEntry.create') &&
+        !source.includes('AccountingPostingService')
+      );
     });
 
     expect(suspiciousFiles.map(normalizePath)).toEqual([]);
@@ -184,7 +187,8 @@ describe('backend hardening gate', () => {
       file.endsWith('.controller.ts'),
     );
 
-    const providerCallPattern = /\.(sendEmail|sendSms|sendPushNotification)\s*\(/;
+    const providerCallPattern =
+      /\.(sendEmail|sendSms|sendPushNotification)\s*\(/;
     const violations = controllerFiles.filter((file) =>
       providerCallPattern.test(read(file)),
     );

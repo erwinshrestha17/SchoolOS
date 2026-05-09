@@ -16,6 +16,10 @@ import { ParentTeacherChatService } from './parent-teacher-chat.service';
     ParentTeacherChatController,
     MessagingHardeningController,
   ],
-  providers: [MessagingService, ParentTeacherChatService, MessagingHardeningService],
+  providers: [
+    MessagingService,
+    ParentTeacherChatService,
+    MessagingHardeningService,
+  ],
 })
 export class MessagingModule {}

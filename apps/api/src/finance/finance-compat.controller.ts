@@ -160,7 +160,10 @@ export class FinanceCompatController {
   @Get('students/:studentId/ledger/export.csv')
   @Permissions('fees:manage')
   @Header('Content-Type', 'text/csv')
-  @Header('Content-Disposition', 'attachment; filename="student-fee-ledger.csv"')
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="student-fee-ledger.csv"',
+  )
   exportStudentFeeLedger(
     @Param('studentId') studentId: string,
     @CurrentAuth() auth: AuthContext,

@@ -608,7 +608,10 @@ export class LibraryService {
   }
 
   async sendOverdueReminders(actor: AuthContext) {
-    const overdueResult = await this.listOverdue(actor, { page: '1', limit: '100' });
+    const overdueResult = await this.listOverdue(actor, {
+      page: '1',
+      limit: '100',
+    });
     const overdue = overdueResult.items;
     const studentIds = overdue
       .map((issue) => issue.borrowerStudentId)

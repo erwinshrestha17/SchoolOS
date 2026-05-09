@@ -345,7 +345,10 @@ export class TransportController {
 
   @Get('reports/trips.csv')
   @Header('Content-Type', 'text/csv')
-  @Header('Content-Disposition', 'attachment; filename="transport-trip-history.csv"')
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="transport-trip-history.csv"',
+  )
   @Permissions('transport:reports:read')
   exportTripHistoryCsv(@CurrentAuth() auth: AuthContext) {
     return this.transportHardeningService.exportTripHistoryCsv(auth);

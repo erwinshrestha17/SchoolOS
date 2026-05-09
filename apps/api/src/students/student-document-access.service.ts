@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { FileRegistryService } from '../file-registry/file-registry.service';
@@ -46,7 +50,11 @@ export class StudentDocumentAccessService {
       throw new NotFoundException('Student not found in this tenant');
     }
 
-    const document = await this.findStudentDocument(actor, studentId, documentId);
+    const document = await this.findStudentDocument(
+      actor,
+      studentId,
+      documentId,
+    );
 
     if (!document.documentFileId) {
       throw new NotFoundException('Student document file not found');
@@ -92,7 +100,10 @@ export class StudentDocumentAccessService {
       fileAssetId: asset.id,
       fileName: document.fileName ?? asset.originalFilename,
       kind: document.kind,
-      url: await this.fileRegistryService.getSignedUrl(actor.tenantId, asset.id),
+      url: await this.fileRegistryService.getSignedUrl(
+        actor.tenantId,
+        asset.id,
+      ),
       expiresInSeconds: 60,
     };
   }

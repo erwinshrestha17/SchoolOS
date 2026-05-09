@@ -27,7 +27,11 @@ export class StudentPhotoService {
     private readonly auditService: AuditService,
   ) {}
 
-  async uploadPhoto(studentId: string, dto: UploadStudentPhotoDto, actor: AuthContext) {
+  async uploadPhoto(
+    studentId: string,
+    dto: UploadStudentPhotoDto,
+    actor: AuthContext,
+  ) {
     const student = await this.findStudentOrThrow(studentId, actor);
 
     if (!ALLOWED_PHOTO_MIME_TYPES.has(dto.mimeType)) {
@@ -68,7 +72,11 @@ export class StudentPhotoService {
       },
     });
 
-    await this.fileRegistryService.markUploaded(actor.tenantId, asset.id, actor.userId);
+    await this.fileRegistryService.markUploaded(
+      actor.tenantId,
+      asset.id,
+      actor.userId,
+    );
 
     const previousPhotoFileId = student.photoFileId;
 
@@ -114,7 +122,11 @@ export class StudentPhotoService {
     };
   }
 
-  async getPhotoAccess(studentId: string, actor: AuthContext, action: 'preview' | 'download') {
+  async getPhotoAccess(
+    studentId: string,
+    actor: AuthContext,
+    action: 'preview' | 'download',
+  ) {
     const student = await this.findStudentOrThrow(studentId, actor);
 
     if (!student.photoFileId) {
@@ -131,7 +143,9 @@ export class StudentPhotoService {
     }
 
     if (asset.module !== 'students' || asset.entityId !== student.id) {
-      throw new NotFoundException('Student photo is not linked to this student');
+      throw new NotFoundException(
+        'Student photo is not linked to this student',
+      );
     }
 
     await this.fileRegistryService.auditAccess(
@@ -147,7 +161,10 @@ export class StudentPhotoService {
       fileName: asset.originalFilename,
       mimeType: asset.mimeType,
       sizeBytes: Number(asset.sizeBytes),
-      url: await this.fileRegistryService.getSignedUrl(actor.tenantId, asset.id),
+      url: await this.fileRegistryService.getSignedUrl(
+        actor.tenantId,
+        asset.id,
+      ),
       expiresInSeconds: 60,
     };
   }

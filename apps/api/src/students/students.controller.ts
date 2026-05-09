@@ -46,7 +46,10 @@ export class StudentsController {
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    const profile = await this.studentsService.getStudentProfile(studentId, auth);
+    const profile = await this.studentsService.getStudentProfile(
+      studentId,
+      auth,
+    );
     return sanitizeStudentProfileResponse(profile);
   }
 

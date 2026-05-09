@@ -7,7 +7,10 @@ import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
-import { DeleteActivityPostDto, ModerateActivityPostDto } from './dto/moderate-activity-post.dto';
+import {
+  DeleteActivityPostDto,
+  ModerateActivityPostDto,
+} from './dto/moderate-activity-post.dto';
 import { UpdateActivityPostDto } from './dto/update-activity-post.dto';
 
 export interface ActivityPostLifecycleRow {
@@ -25,7 +28,11 @@ export class ActivityPostLifecycleService {
     private readonly auditService: AuditService,
   ) {}
 
-  async updatePost(postId: string, dto: UpdateActivityPostDto, actor: AuthContext) {
+  async updatePost(
+    postId: string,
+    dto: UpdateActivityPostDto,
+    actor: AuthContext,
+  ) {
     const post = await this.getPostOrThrow(postId, actor);
     this.ensureCanModify(post, actor);
 
@@ -33,8 +40,13 @@ export class ActivityPostLifecycleService {
       throw new ForbiddenException('Deleted activity post cannot be edited');
     }
 
-    if (post.moderationStatus === 'APPROVED' || post.moderationStatus === 'PUBLISHED') {
-      throw new ForbiddenException('Approved activity post cannot be silently edited');
+    if (
+      post.moderationStatus === 'APPROVED' ||
+      post.moderationStatus === 'PUBLISHED'
+    ) {
+      throw new ForbiddenException(
+        'Approved activity post cannot be silently edited',
+      );
     }
 
     const updatedRows = await this.prisma.$queryRaw<ActivityPostLifecycleRow[]>(
@@ -74,7 +86,11 @@ export class ActivityPostLifecycleService {
     return updatedRows[0];
   }
 
-  async softDeletePost(postId: string, dto: DeleteActivityPostDto, actor: AuthContext) {
+  async softDeletePost(
+    postId: string,
+    dto: DeleteActivityPostDto,
+    actor: AuthContext,
+  ) {
     const post = await this.getPostOrThrow(postId, actor);
     this.ensureCanModify(post, actor);
 
@@ -139,14 +155,21 @@ export class ActivityPostLifecycleService {
       resourceId: post.id,
       tenantId: actor.tenantId,
       userId: actor.userId,
-      before: { moderationStatus: post.moderationStatus, softDeletedAt: post.softDeletedAt },
+      before: {
+        moderationStatus: post.moderationStatus,
+        softDeletedAt: post.softDeletedAt,
+      },
       after: { moderationStatus: 'PENDING', softDeletedAt: null },
     });
 
     return { ...updatedRows[0], restored: true };
   }
 
-  async moderatePost(postId: string, dto: ModerateActivityPostDto, actor: AuthContext) {
+  async moderatePost(
+    postId: string,
+    dto: ModerateActivityPostDto,
+    actor: AuthContext,
+  ) {
     this.ensureCanModerate(actor);
     const post = await this.getPostOrThrow(postId, actor);
 
@@ -220,13 +243,17 @@ export class ActivityPostLifecycleService {
     }
 
     if (post.createdById !== actor.userId) {
-      throw new ForbiddenException('You can only modify your own activity posts');
+      throw new ForbiddenException(
+        'You can only modify your own activity posts',
+      );
     }
   }
 
   private ensureCanModerate(actor: AuthContext) {
     if (!this.canManageAllActivity(actor)) {
-      throw new ForbiddenException('Only admin or principal can moderate activity posts');
+      throw new ForbiddenException(
+        'Only admin or principal can moderate activity posts',
+      );
     }
   }
 
