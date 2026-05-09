@@ -177,12 +177,6 @@ export class PayrollController {
     return this.payrollService.listMyPayslips(auth);
   }
 
-  @Get('payslips/:payslipNumber')
-  @Permissions('payroll:payslip:read', 'staff:read')
-  getPayslip(@Param('payslipNumber') payslipNumber: string, @CurrentAuth() auth: AuthContext) {
-    return this.payrollService.getPayslipByNumber(payslipNumber, auth);
-  }
-
   @Get('payslips/:payslipNumber/pdf')
   @Header('Content-Type', 'application/pdf')
   @Permissions('payroll:read', 'staff:read')
@@ -201,15 +195,6 @@ export class PayrollController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.payrollService.getPayslipPdf(payslipNumber, auth);
-  }
-
-  @Get('staff/:staffId/payslips')
-  @Permissions('payroll:payslip:read')
-  listStaffPayslips(
-    @Param('staffId') staffId: string,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.payrollService.listPayslipsForStaff(staffId, auth);
   }
 
   @Get('runs/:runId/staff/:staffId/payslip.pdf')
@@ -242,15 +227,6 @@ export class PayrollController {
   @Permissions('payroll:salary:read')
   listSalaryStructures(@CurrentAuth() auth: AuthContext) {
     return this.payrollService.listSalaryStructures(auth);
-  }
-
-  @Get('staff/:staffId/salary-structures')
-  @Permissions('payroll:salary:read')
-  getSalaryStructures(
-    @Param('staffId') staffId: string,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.payrollService.listSalaryStructuresForStaff(staffId, auth);
   }
 
   @Get('staff/:staffId/salary-structure')
@@ -292,16 +268,16 @@ export class PayrollController {
 
   @Get('runs/:id/register')
   @Permissions('payroll:reports:read')
-  getPayrollRunRegister(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
-    return this.payrollService.getPayrollRegister(auth, id);
+  getPayrollRunRegister(@CurrentAuth() auth: AuthContext) {
+    return this.payrollService.getPayrollRegister(auth);
   }
 
   @Get('runs/:id/register/export.csv')
   @Header('Content-Type', 'text/csv')
   @Header('Content-Disposition', 'attachment; filename="payroll-register.csv"')
   @Permissions('payroll:exports:create')
-  exportPayrollRunRegisterCsv(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
-    return this.payrollService.exportPayrollRegisterCsv(auth, id);
+  exportPayrollRunRegisterCsv(@CurrentAuth() auth: AuthContext) {
+    return this.payrollService.exportPayrollRegisterCsv(auth);
   }
 
   @Get('reports/register')
