@@ -578,24 +578,35 @@ export class LibraryService {
     return updated;
   }
 
-  listOverdue(actor: AuthContext) {
-    return this.prisma.libraryIssue.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        status: LibraryIssueStatus.ISSUED,
-        dueAt: { lt: new Date() },
-      },
-      include: {
-        copy: { include: { book: true } },
-        borrowerStudent: true,
-        borrowerStaff: true,
-      },
-      orderBy: [{ dueAt: 'asc' }],
-    });
+  async listOverdue(actor: AuthContext, options: PaginationQuery = {}) {
+    const { skip, take, page } = this.pagination(options);
+    const where: Prisma.LibraryIssueWhereInput = {
+      tenantId: actor.tenantId,
+      status: LibraryIssueStatus.ISSUED,
+      dueAt: { lt: new Date() },
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.libraryIssue.findMany({
+        where,
+        include: {
+          copy: { include: { book: true } },
+          borrowerStudent: true,
+          borrowerStaff: true,
+        },
+        orderBy: [{ dueAt: 'asc' }],
+        skip,
+        take,
+      }),
+      this.prisma.libraryIssue.count({ where }),
+    ]);
+
+    return { items, meta: { page, limit: take, total } };
   }
 
   async sendOverdueReminders(actor: AuthContext) {
-    const overdue = await this.listOverdue(actor);
+    const overdueResult = await this.listOverdue(actor, { page: '1', limit: '100' });
+    const overdue = overdueResult.items;
     const studentIds = overdue
       .map((issue) => issue.borrowerStudentId)
       .filter((studentId): studentId is string => Boolean(studentId));

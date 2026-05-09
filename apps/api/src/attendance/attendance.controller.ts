@@ -25,6 +25,10 @@ import { SubmitStaffAttendanceDto } from './dto/submit-staff-attendance.dto';
 import { SubmitAttendanceDto } from './dto/submit-attendance.dto';
 import { SyncAttendanceDto } from './dto/sync-attendance.dto';
 import { UpsertCalendarDayDto } from './dto/upsert-calendar-day.dto';
+import { CreateAttendanceCorrectionDto } from './dto/create-attendance-correction.dto';
+import { ReviewAttendanceCorrectionDto } from './dto/review-attendance-correction.dto';
+import { GetMonthlyRegisterDto } from './dto/get-monthly-register.dto';
+import { GetStudentHistoryDto } from './dto/get-student-history.dto';
 
 @Controller('attendance')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -73,7 +77,7 @@ export class AttendanceController {
   @Get('register')
   @Permissions('attendance:read')
   getMonthlyRegister(
-    @Query() query: ListAttendanceSummaryDto,
+    @Query() query: GetMonthlyRegisterDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.attendanceService.getMonthlyRegister(query, auth);
@@ -87,7 +91,7 @@ export class AttendanceController {
     'attachment; filename="attendance-register.csv"',
   )
   exportMonthlyRegister(
-    @Query() query: ListAttendanceSummaryDto,
+    @Query() query: GetMonthlyRegisterDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.attendanceService.exportMonthlyRegister(query, auth);
@@ -217,5 +221,77 @@ export class AttendanceController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.attendanceService.reviewConflict(conflictId, dto, auth);
+  }
+
+  @Post('corrections')
+  @Permissions('attendance:mark')
+  createCorrectionRequest(
+    @Body() dto: CreateAttendanceCorrectionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.createCorrectionRequest(dto, auth);
+  }
+
+  @Get('corrections')
+  @Permissions('attendance:read')
+  listCorrectionRequests(@CurrentAuth() auth: AuthContext) {
+    return this.attendanceService.listCorrectionRequests(auth);
+  }
+
+  @Patch('corrections/:id/approve')
+  @Permissions('attendance:review_conflicts')
+  approveCorrectionRequest(
+    @Param('id') id: string,
+    @Body() dto: ReviewAttendanceCorrectionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.approveCorrectionRequest(
+      id,
+      { ...dto, status: 'APPROVED' },
+      auth,
+    );
+  }
+
+  @Patch('corrections/:id/reject')
+  @Permissions('attendance:review_conflicts')
+  rejectCorrectionRequest(
+    @Param('id') id: string,
+    @Body() dto: ReviewAttendanceCorrectionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.approveCorrectionRequest(
+      id,
+      { ...dto, status: 'REJECTED' },
+      auth,
+    );
+  }
+
+  @Patch('corrections/:id/review')
+  @Permissions('attendance:review_conflicts')
+  reviewCorrectionRequest(
+    @Param('id') id: string,
+    @Body() dto: ReviewAttendanceCorrectionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.approveCorrectionRequest(id, dto, auth);
+  }
+
+  @Get('students/:id/history')
+  @Permissions('attendance:read')
+  getStudentHistory(
+    @Param('id') studentId: string,
+    @Query() query: GetStudentHistoryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.getStudentHistory(studentId, query, auth);
+  }
+
+  @Get('students/:id/summary')
+  @Permissions('attendance:read')
+  getParentSummary(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.getParentSummary(studentId, auth);
   }
 }

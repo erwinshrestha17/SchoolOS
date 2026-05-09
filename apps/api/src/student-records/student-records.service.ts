@@ -58,15 +58,17 @@ export class StudentRecordsService {
         title: dto.title ?? dto.fileName,
         fileName: dto.fileName,
         contentType: dto.contentType,
-        sizeBytes: stored.sizeBytes,
+        sizeBytes: Number(stored.sizeBytes),
         provider: stored.provider,
         objectKey: stored.objectKey,
         publicUrl: stored.publicUrl,
         uploadedById: actor.userId,
+        notes: dto.notes,
+        expiryDate: dto.expiryDate ? new Date(dto.expiryDate) : null,
       },
     });
 
-    await this.fileRegistryService.registerFile({
+    const asset = await this.fileRegistryService.registerFile({
       tenantId: actor.tenantId,
       uploadedByUserId: actor.userId,
       originalFilename: dto.fileName,
@@ -80,6 +82,27 @@ export class StudentRecordsService {
         title: dto.title ?? dto.fileName,
         source: 'student_document',
         sourceId: document.id,
+      },
+    });
+
+    await this.prisma.studentDocument.update({
+      where: { id: document.id },
+      data: { fileId: asset.id },
+    });
+
+    await this.prisma.studentDocumentHistory.create({
+      data: {
+        tenantId: actor.tenantId,
+        documentId: document.id,
+        action: 'UPLOAD',
+        documentTitle: document.title,
+        documentKind: document.kind,
+        performedBy: actor.userId,
+        reason: dto.reason,
+        metadata: {
+          originalFilename: dto.fileName,
+          sizeBytes: stored.sizeBytes,
+        },
       },
     });
 
@@ -184,7 +207,30 @@ export class StudentRecordsService {
       action,
     );
 
-    // 2. Get the signed URL
+    // 2. Log to StudentDocumentHistory
+    const asset = await this.prisma.fileAsset.findUnique({
+      where: { id: assetId },
+    });
+    if (asset) {
+      const doc = await this.prisma.studentDocument.findFirst({
+        where: { tenantId: actor.tenantId, objectKey: asset.objectKey },
+      });
+      if (doc) {
+        await this.prisma.studentDocumentHistory.create({
+          data: {
+            tenantId: actor.tenantId,
+            documentId: doc.id,
+            action: 'VIEW',
+            documentTitle: doc.title,
+            documentKind: doc.kind,
+            performedBy: actor.userId,
+            metadata: { action },
+          },
+        });
+      }
+    }
+
+    // 3. Get the signed URL
     let url: string;
     try {
       url = await this.fileRegistryService.getSignedUrl(
@@ -201,13 +247,124 @@ export class StudentRecordsService {
     return { url };
   }
 
-  async deleteDocument(actor: AuthContext, assetId: string) {
-    // Soft delete in registry (this also audits)
-    await this.fileRegistryService.softDeleteFile(
-      actor.tenantId,
-      assetId,
-      actor.userId,
-    );
+  async deleteDocument(actor: AuthContext, assetId: string, reason?: string) {
+    const asset = await this.prisma.fileAsset.findFirst({
+      where: {
+        id: assetId,
+        tenantId: actor.tenantId,
+      },
+    });
+
+    if (!asset) {
+      throw new NotFoundException('File asset not found');
+    }
+
+    const document = await this.prisma.studentDocument.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        objectKey: asset.objectKey,
+      },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      if (document) {
+        await tx.studentDocumentHistory.create({
+          data: {
+            tenantId: actor.tenantId,
+            documentId: document.id,
+            action: 'DELETE',
+            documentTitle: document.title,
+            documentKind: document.kind,
+            performedBy: actor.userId,
+            reason: reason ?? 'Manual deletion',
+          },
+        });
+      }
+
+      await this.fileRegistryService.softDeleteFile(
+        actor.tenantId,
+        assetId,
+        actor.userId,
+      );
+    });
+
+    return { success: true };
+  }
+
+  async archiveDocument(
+    actor: AuthContext,
+    documentId: string,
+    reason?: string,
+  ) {
+    const document = await this.prisma.studentDocument.findFirst({
+      where: { id: documentId, tenantId: actor.tenantId },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.studentDocument.update({
+        where: { id: documentId },
+        data: { status: 'ARCHIVED' },
+      });
+
+      await tx.studentDocumentHistory.create({
+        data: {
+          tenantId: actor.tenantId,
+          documentId: document.id,
+          action: 'ARCHIVE',
+          documentTitle: document.title,
+          documentKind: document.kind,
+          performedBy: actor.userId,
+          reason: reason ?? 'Archived for record keeping',
+        },
+      });
+    });
+
+    return { success: true };
+  }
+
+  async verifyDocument(
+    actor: AuthContext,
+    documentId: string,
+    status: 'VERIFIED' | 'REJECTED',
+    notes?: string,
+  ) {
+    const document = await this.prisma.studentDocument.findFirst({
+      where: { id: documentId, tenantId: actor.tenantId },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.studentDocument.update({
+        where: { id: documentId },
+        data: {
+          status,
+          verifiedAt: status === 'VERIFIED' ? new Date() : null,
+          verifiedById: status === 'VERIFIED' ? actor.userId : null,
+          notes: notes
+            ? `${document.notes ?? ''}\nVerification Note: ${notes}`.trim()
+            : document.notes,
+        },
+      });
+
+      await tx.studentDocumentHistory.create({
+        data: {
+          tenantId: actor.tenantId,
+          documentId: document.id,
+          action: status,
+          documentTitle: document.title,
+          documentKind: document.kind,
+          performedBy: actor.userId,
+          reason: notes,
+        },
+      });
+    });
 
     return { success: true };
   }

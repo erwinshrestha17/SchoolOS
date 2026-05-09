@@ -128,18 +128,38 @@ export class NotificationCenterService {
       throw new NotFoundException('Notification not found');
     }
 
-    await this.prisma.$executeRaw(Prisma.sql`
-      INSERT INTO "NotificationReadReceipt" (
-        "tenantId",
-        "notificationDeliveryId",
-        "userId",
-        "readAt"
-      ) VALUES (${actor.tenantId}, ${notificationId}, ${actor.userId}, NOW())
-      ON CONFLICT ("tenantId", "notificationDeliveryId", "userId")
-      DO UPDATE SET "readAt" = EXCLUDED."readAt"
-    `);
+    await this.insertReadReceipt(actor, notificationId);
 
     return { success: true };
+  }
+
+  async markNoticeRead(noticeId: string, actor: AuthContext) {
+    const deliveries = await this.prisma.$queryRaw<Array<{ id: string }>>(
+      Prisma.sql`
+        SELECT d."id"
+        FROM "NotificationDelivery" d
+        WHERE d."noticeId" = ${noticeId}
+          AND d."tenantId" = ${actor.tenantId}
+          ${this.visibilitySql(actor)}
+      `,
+    );
+
+    if (deliveries.length === 0) {
+      const notice = await this.prisma.notice.findFirst({
+        where: { id: noticeId, tenantId: actor.tenantId },
+        select: { id: true },
+      });
+
+      if (!notice) {
+        throw new NotFoundException('Notice not found');
+      }
+    }
+
+    for (const delivery of deliveries) {
+      await this.insertReadReceipt(actor, delivery.id);
+    }
+
+    return { success: true, markedCount: deliveries.length };
   }
 
   async markAllRead(actor: AuthContext) {
@@ -164,6 +184,19 @@ export class NotificationCenterService {
     `);
 
     return { success: true, markedCount: Number(result) };
+  }
+
+  private async insertReadReceipt(actor: AuthContext, notificationId: string) {
+    await this.prisma.$executeRaw(Prisma.sql`
+      INSERT INTO "NotificationReadReceipt" (
+        "tenantId",
+        "notificationDeliveryId",
+        "userId",
+        "readAt"
+      ) VALUES (${actor.tenantId}, ${notificationId}, ${actor.userId}, NOW())
+      ON CONFLICT ("tenantId", "notificationDeliveryId", "userId")
+      DO UPDATE SET "readAt" = EXCLUDED."readAt"
+    `);
   }
 
   private visibilitySql(actor: AuthContext) {

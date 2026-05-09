@@ -12,6 +12,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
+import { FinanceService } from '../finance/finance.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PublishResultsDto } from './dto/publish-results.dto';
 import { UnpublishResultsDto } from './dto/unpublish-results.dto';
@@ -47,6 +48,7 @@ export class ResultPublishingService {
     private readonly prisma: PrismaService,
     private readonly communicationsService: CommunicationsService,
     private readonly auditService: AuditService,
+    private readonly financeService: FinanceService,
   ) {}
 
   async listPublishingReadiness(
@@ -96,6 +98,22 @@ export class ResultPublishingService {
         );
       }
 
+      const publishingBlockSetting = await this.prisma.tenantSetting.findFirst({
+        where: { tenantId: actor.tenantId, key: 'block_publishing_on_dues' },
+      });
+
+      if (publishingBlockSetting?.value === 'true') {
+        const ledger = await this.financeService.getStudentFeeLedger(
+          card.studentId,
+          actor,
+        );
+        if (ledger.outstandingBalance > 0) {
+          blockedReasons.push(
+            `Student has outstanding dues of ${ledger.outstandingBalance}`,
+          );
+        }
+      }
+
       results.push({
         reportCardId: card.id,
         studentId: card.studentId,
@@ -143,7 +161,27 @@ export class ResultPublishingService {
       rows: [] as Array<{ id: string }>,
     };
 
+    const publishingBlockSetting = await this.prisma.tenantSetting.findFirst({
+      where: { tenantId: actor.tenantId, key: 'block_publishing_on_dues' },
+    });
+    const blockOnDues = publishingBlockSetting?.value === 'true';
+
     for (const card of cards) {
+      if (blockOnDues) {
+        const ledger = await this.financeService.getStudentFeeLedger(
+          card.studentId,
+          actor,
+        );
+        if (ledger.outstandingBalance > 0) {
+          results.skipped++;
+          results.failed.push({
+            id: card.id,
+            reason: `Student has outstanding dues of ${ledger.outstandingBalance}`,
+          });
+          continue;
+        }
+      }
+
       if (card.status !== GradeLockStatus.LOCKED) {
         results.skipped++;
         results.failed.push({

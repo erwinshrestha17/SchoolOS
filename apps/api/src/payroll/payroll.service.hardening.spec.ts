@@ -95,7 +95,9 @@ describe('PayrollService hardening boundaries', () => {
         { basicSalary: 50000 },
         actor as never,
       ),
-    ).rejects.toThrow('Salary structure used by payroll cannot be mutated retroactively');
+    ).rejects.toThrow(
+      'Salary structure used by payroll cannot be mutated retroactively',
+    );
 
     expect(prisma.payrollLine.count).toHaveBeenCalledWith({
       where: { tenantId: actor.tenantId, salaryStructureId: 'salary-used' },
@@ -107,9 +109,9 @@ describe('PayrollService hardening boundaries', () => {
     const run = buildPayrollRun({ status: PayrollRunStatus.POSTED });
     const { service, prisma } = buildService({ payrollRun: run });
 
-    await expect(service.approvePayrollRun('run-1', actor as never)).rejects.toThrow(
-      'Posted payroll cannot be re-approved',
-    );
+    await expect(
+      service.approvePayrollRun('run-1', actor as never),
+    ).rejects.toThrow('Posted payroll cannot be re-approved');
 
     expect(prisma.payrollRun.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -175,7 +177,9 @@ describe('PayrollService hardening boundaries', () => {
       }),
     );
     expect(prisma.journalEntry.create).not.toHaveBeenCalled();
-    expect(result).toEqual(expect.objectContaining({ journalEntryId: 'journal-1' }));
+    expect(result).toEqual(
+      expect.objectContaining({ journalEntryId: 'journal-1' }),
+    );
   });
 });
 
@@ -227,7 +231,9 @@ function buildService(options: {
       create: jest.fn().mockResolvedValue(buildSalaryStructure()),
     },
     payrollRun: {
-      findFirst: jest.fn().mockResolvedValue(options.payrollRun ?? buildPayrollRun()),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(options.payrollRun ?? buildPayrollRun()),
       findUnique: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue(buildPayrollRun()),
       update: jest.fn().mockResolvedValue(buildPayrollRun()),
@@ -264,7 +270,9 @@ function buildService(options: {
   };
   const accountingPostingService = {
     postPayrollAccrual: jest.fn().mockResolvedValue({ id: 'journal-1' }),
-    postPayrollDisbursement: jest.fn().mockResolvedValue({ id: 'journal-disbursement-1' }),
+    postPayrollDisbursement: jest
+      .fn()
+      .mockResolvedValue({ id: 'journal-disbursement-1' }),
   };
 
   return {

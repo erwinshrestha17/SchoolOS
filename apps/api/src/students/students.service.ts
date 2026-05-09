@@ -12,6 +12,8 @@ import {
   NotificationChannel,
   Prisma,
   StudentLifecycleStatus,
+  StudentDocumentKind,
+  StudentDocumentStatus,
 } from '@prisma/client';
 import {
   StudentAttendanceHistory,
@@ -21,7 +23,11 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
-import { buildCertificatePdf, buildIdCardPdf } from '../common/pdf/simple-pdf';
+import {
+  buildCertificatePdf,
+  buildIdCardPdf,
+  buildRosterPdf,
+} from '../common/pdf/simple-pdf';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
@@ -37,6 +43,7 @@ import { RevokeGeneratedStudentDocumentDto } from './dto/revoke-generated-studen
 import { ReviewGuardianIdentityVerificationDto } from './dto/review-guardian-identity-verification.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { UpdateStudentGuardianDto } from './dto/update-student-guardian.dto';
+import { UploadStudentDocumentDto } from './dto/upload-student-document.dto';
 import { AttendanceHistoryQueryDto } from './dto/attendance-history.dto';
 
 @Injectable()
@@ -116,6 +123,18 @@ export class StudentsService {
         user: true,
       },
     });
+
+    await this.recordLifecycleTransition(
+      student.id,
+      null, // Initial state
+      StudentLifecycleStatus.ACTIVE,
+      'Initial enrollment',
+      actor,
+      {
+        admissionDate: student.admissionDate.toISOString(),
+        classId: student.classId,
+      },
+    );
 
     await this.auditService.record({
       action: 'create',
@@ -224,6 +243,7 @@ export class StudentsService {
           orderBy: [{ attendanceSession: { attendanceDate: 'desc' } }],
           take: 30,
         },
+        identities: true,
       },
     });
 
@@ -306,6 +326,10 @@ export class StudentsService {
         null,
     }));
 
+    const identities = student.identities.filter(
+      (id) => id.status === 'ACTIVE',
+    );
+
     return {
       student: {
         id: student.id,
@@ -340,6 +364,8 @@ export class StudentsService {
         emergencyPhone: student.emergencyPhone,
         doctorName: student.doctorName,
         doctorPhone: student.doctorPhone,
+        studentIdentityCode: student.studentIdentityCode ?? null,
+        activeIdentity: identities[0]?.identityCode ?? null,
       },
       guardians,
       enrollments: student.enrollments.map((enrollment) => ({
@@ -755,7 +781,8 @@ export class StudentsService {
         },
       });
 
-      studentData.photoUrl = asset.id; // Store asset ID as the photoUrl
+      studentData.photoFileId = asset.id;
+      studentData.photoUrl = asset.id; // Keep legacy for now
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -1315,6 +1342,31 @@ export class StudentsService {
       );
     }
 
+    // CHECK FOR FINANCIAL RECORDS
+    const financialSummary = await this.prisma.student.findUnique({
+      where: { id: sourceStudent.id },
+      select: {
+        _count: {
+          select: {
+            invoices: true,
+            payments: true,
+            studentFeeAssignments: true,
+          },
+        },
+      },
+    });
+
+    if (
+      financialSummary &&
+      (financialSummary._count.invoices > 0 ||
+        financialSummary._count.payments > 0 ||
+        financialSummary._count.studentFeeAssignments > 0)
+    ) {
+      throw new ConflictException(
+        `Cannot merge student ${sourceStudent.studentSystemId} because they have existing financial records (Invoices: ${financialSummary._count.invoices}, Payments: ${financialSummary._count.payments}). Merging financial records requires manual reconciliation or zeroing out the source ledger first.`,
+      );
+    }
+
     if (!isProbableDuplicateStudent(sourceStudent, targetStudent)) {
       throw new BadRequestException(
         'The selected student records do not match duplicate identity checks',
@@ -1323,7 +1375,7 @@ export class StudentsService {
 
     ensureAllowedLifecycleTransition(
       sourceStudent.lifecycleStatus,
-      StudentLifecycleStatus.DELETED,
+      StudentLifecycleStatus.MERGED,
     );
 
     const mergedAt = new Date();
@@ -1346,6 +1398,10 @@ export class StudentsService {
       }));
 
     const mergeCounts = await this.prisma.$transaction(async (tx) => {
+      const sourceDocs = await tx.studentDocument.findMany({
+        where: { tenantId: actor.tenantId, studentId: sourceStudent.id },
+      });
+
       const [
         guardianLinks,
         documents,
@@ -1461,6 +1517,24 @@ export class StudentsService {
         }),
       ]);
 
+      if (sourceDocs.length > 0) {
+        await tx.studentDocumentHistory.createMany({
+          data: sourceDocs.map((doc) => ({
+            tenantId: actor.tenantId,
+            documentId: doc.id,
+            action: 'MOVE_MERGE',
+            documentTitle: doc.title,
+            documentKind: doc.kind,
+            performedBy: actor.userId,
+            reason: `Merged from student ${sourceStudent.studentSystemId}`,
+            metadata: {
+              sourceStudentId: sourceStudent.id,
+              targetStudentId: targetStudent.id,
+            },
+          })),
+        });
+      }
+
       await tx.enrollment.updateMany({
         where: {
           tenantId: actor.tenantId,
@@ -1475,9 +1549,27 @@ export class StudentsService {
       await tx.student.update({
         where: { id: sourceStudent.id },
         data: {
-          lifecycleStatus: StudentLifecycleStatus.DELETED,
-          exitReason: dto.reason,
+          lifecycleStatus: StudentLifecycleStatus.MERGED,
+          exitReason: `Merged into ${targetStudent.studentSystemId}: ${dto.reason}`,
           exitedAt: mergedAt,
+        },
+      });
+
+      await tx.studentMergeHistory.create({
+        data: {
+          tenantId: actor.tenantId,
+          sourceStudentId: sourceStudent.id,
+          targetStudentId: targetStudent.id,
+          mergedById: actor.userId,
+          reason: dto.reason,
+          metadata: {
+            sourceStudentSystemId: sourceStudent.studentSystemId,
+            targetStudentSystemId: targetStudent.studentSystemId,
+            counts: {
+              guardianLinks: missingGuardianLinks.length,
+              documents: sourceDocs.length,
+            },
+          },
         },
       });
 
@@ -1486,7 +1578,7 @@ export class StudentsService {
           tenantId: actor.tenantId,
           studentId: sourceStudent.id,
           fromStatus: sourceStudent.lifecycleStatus,
-          toStatus: StudentLifecycleStatus.DELETED,
+          toStatus: StudentLifecycleStatus.MERGED,
           reason: dto.reason,
           changedById: actor.userId,
           feeClearanceWaived: false,
@@ -1806,6 +1898,293 @@ export class StudentsService {
     };
   }
 
+  async uploadStudentDocument(
+    studentId: string,
+    dto: UploadStudentDocumentDto,
+    actor: AuthContext,
+  ) {
+    const student = await this.findTenantStudent(studentId, actor);
+
+    const stored = await this.storageService.saveBase64Object({
+      tenantId: actor.tenantId,
+      prefix: `students/${student.id}/documents/${dto.kind}`,
+      fileName: dto.fileName,
+      contentType: dto.contentType || 'application/octet-stream',
+      base64Content: dto.base64Content,
+    });
+
+    const asset = await this.fileRegistryService.registerFile({
+      tenantId: actor.tenantId,
+      uploadedByUserId: actor.userId,
+      originalFilename: dto.fileName,
+      objectKey: stored.objectKey,
+      mimeType: dto.contentType || 'application/octet-stream',
+      sizeBytes: stored.sizeBytes,
+      module: 'students',
+      entityId: student.id,
+      metadata: {
+        kind: dto.kind,
+        title: dto.title,
+        expiryDate: dto.expiryDate,
+      },
+    });
+
+    const document = await this.prisma.studentDocument.create({
+      data: {
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        fileId: asset.id,
+        kind: dto.kind,
+        title: dto.title,
+        fileName: dto.fileName,
+        contentType: dto.contentType || 'application/octet-stream',
+        sizeBytes: Number(stored.sizeBytes),
+        objectKey: stored.objectKey,
+        uploadedById: actor.userId,
+        notes: dto.notes,
+        expiryDate: dto.expiryDate ? new Date(dto.expiryDate) : null,
+      },
+    });
+
+    await this.prisma.studentDocumentHistory.create({
+      data: {
+        tenantId: actor.tenantId,
+        documentId: document.id,
+        action: 'UPLOAD',
+        documentTitle: document.title,
+        documentKind: document.kind,
+        performedBy: actor.userId,
+        reason: dto.reason,
+        metadata: {
+          assetId: asset.id,
+          originalFilename: dto.fileName,
+        },
+      },
+    });
+
+    await this.auditService.record({
+      action: 'upload',
+      resource: 'student_document',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: document.id,
+      after: {
+        studentId: student.id,
+        kind: document.kind,
+        fileName: document.fileName,
+      },
+    });
+
+    return document;
+  }
+
+  async getStudentIdentity(studentId: string, actor: AuthContext) {
+    const student = await this.findTenantStudent(studentId, actor);
+
+    let identity = await this.prisma.studentIdentity.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        status: 'ACTIVE',
+      },
+    });
+
+    if (!identity) {
+      identity = await this.generateStudentIdentity(student.id, actor);
+    }
+
+    return {
+      studentId: student.id,
+      studentSystemId: student.studentSystemId,
+      identityCode: identity.identityCode,
+      status: identity.status,
+      createdAt: identity.createdAt,
+    };
+  }
+
+  async generateStudentIdentity(studentId: string, actor: AuthContext) {
+    const student = await this.findTenantStudent(studentId, actor);
+
+    // Revoke old identities
+    await this.prisma.studentIdentity.updateMany({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        status: 'ACTIVE',
+      },
+      data: {
+        status: 'REVOKED',
+        revokedAt: new Date(),
+        revokedById: actor.userId,
+      },
+    });
+
+    const identityCode =
+      `ST-${actor.tenantId.slice(0, 4)}-${student.studentSystemId}-${createHash('sha256').update(`${student.id}-${Date.now()}`).digest('hex').slice(0, 8)}`.toUpperCase();
+
+    const identity = await this.prisma.studentIdentity.create({
+      data: {
+        tenantId: actor.tenantId,
+        studentId: student.id,
+        identityCode,
+        status: 'ACTIVE',
+      },
+    });
+
+    await this.prisma.student.update({
+      where: { id: student.id },
+      data: { studentIdentityCode: identityCode },
+    });
+
+    await this.auditService.record({
+      action: 'generate_identity',
+      resource: 'student_identity',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: identity.id,
+      after: {
+        studentId: student.id,
+        identityCode,
+      },
+    });
+
+    return identity;
+  }
+
+  async revokeStudentIdentity(
+    studentId: string,
+    identityCode: string,
+    actor: AuthContext,
+  ) {
+    const identity = await this.prisma.studentIdentity.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        studentId,
+        identityCode,
+      },
+    });
+
+    if (!identity) {
+      throw new NotFoundException('Identity code not found for this student');
+    }
+
+    await this.prisma.studentIdentity.update({
+      where: { id: identity.id },
+      data: {
+        status: 'REVOKED',
+        revokedAt: new Date(),
+        revokedById: actor.userId,
+      },
+    });
+
+    await this.prisma.student.update({
+      where: { id: studentId },
+      data: { studentIdentityCode: null },
+    });
+
+    return { success: true };
+  }
+
+  async deleteStudentDocument(
+    studentId: string,
+    documentId: string,
+    dto: { reason: string },
+    actor: AuthContext,
+  ) {
+    const document = await this.prisma.studentDocument.findFirst({
+      where: {
+        id: documentId,
+        studentId,
+        tenantId: actor.tenantId,
+      },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.studentDocumentHistory.create({
+        data: {
+          tenantId: actor.tenantId,
+          documentId: document.id,
+          action: 'DELETE',
+          documentTitle: document.title,
+          documentKind: document.kind,
+          performedBy: actor.userId,
+          reason: dto.reason,
+        },
+      });
+
+      await tx.studentDocument.delete({
+        where: { id: documentId },
+      });
+    });
+
+    await this.auditService.record({
+      action: 'delete_document',
+      resource: 'student_document',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: studentId,
+      before: {
+        documentId: document.id,
+        kind: document.kind,
+        title: document.title,
+      },
+    });
+
+    return { success: true };
+  }
+
+  async generateStudentQrCode(studentId: string, actor: AuthContext) {
+    const student = await this.findTenantStudent(studentId, actor);
+
+    const qrData = `schoolos:std:${actor.tenantId}:${student.studentSystemId}:${Date.now()}`;
+
+    const updated = await this.prisma.student.update({
+      where: { id: student.id },
+      data: { qrCode: qrData },
+    });
+
+    await this.auditService.record({
+      action: 'generate_qr',
+      resource: 'student',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: student.id,
+      after: { qrCode: qrData },
+    });
+
+    return { qrCode: updated.qrCode };
+  }
+
+  async verifyStudentQrCode(qrCode: string, actor: AuthContext) {
+    const student = await this.prisma.student.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        qrCode,
+      },
+      include: {
+        class: true,
+        sectionRef: true,
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Invalid or expired student QR code');
+    }
+
+    return {
+      id: student.id,
+      studentSystemId: student.studentSystemId,
+      fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`,
+      lifecycleStatus: student.lifecycleStatus,
+      class: student.class.name,
+      section: student.sectionRef?.name ?? null,
+    };
+  }
+
   async exportRoster(
     filters: {
       academicYearId?: string;
@@ -1869,7 +2248,39 @@ export class StudentsService {
       };
     });
 
-    return buildCsv(headers, rows);
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: actor.tenantId },
+    });
+
+    const targetClass = filters.classId
+      ? await this.prisma.class.findUnique({ where: { id: filters.classId } })
+      : null;
+
+    const targetSection = filters.sectionId
+      ? await this.prisma.section.findUnique({
+          where: { id: filters.sectionId },
+        })
+      : null;
+
+    return {
+      headers,
+      rows,
+      csv: buildCsv(headers, rows),
+      pdf: buildRosterPdf({
+        schoolName: tenant?.name || 'SchoolOS',
+        className: targetClass?.name || 'All Classes',
+        sectionName: targetSection?.name || null,
+        headers: [
+          'Student ID',
+          'Name',
+          'Class',
+          'Section',
+          'Roll Number',
+          'Status',
+        ],
+        rows,
+      }),
+    };
   }
 
   async generateStudentDocumentPdf(
@@ -2161,7 +2572,7 @@ export class StudentsService {
 
   private async recordLifecycleTransition(
     studentId: string,
-    fromStatus: StudentLifecycleStatus,
+    fromStatus: StudentLifecycleStatus | null,
     toStatus: StudentLifecycleStatus,
     reason: string,
     actor: AuthContext,
@@ -2683,12 +3094,21 @@ function ensureAllowedLifecycleTransition(
     [StudentLifecycleStatus.ACTIVE]: [
       StudentLifecycleStatus.TRANSFERRED,
       StudentLifecycleStatus.EXITED,
+      StudentLifecycleStatus.ALUMNI,
       StudentLifecycleStatus.DELETED,
     ],
-    [StudentLifecycleStatus.TRANSFERRED]: [StudentLifecycleStatus.ALUMNI],
-    [StudentLifecycleStatus.EXITED]: [StudentLifecycleStatus.ALUMNI],
-    [StudentLifecycleStatus.ALUMNI]: [],
-    [StudentLifecycleStatus.DELETED]: [],
+    [StudentLifecycleStatus.TRANSFERRED]: [
+      StudentLifecycleStatus.ACTIVE,
+      StudentLifecycleStatus.ALUMNI,
+    ],
+    [StudentLifecycleStatus.EXITED]: [
+      StudentLifecycleStatus.ACTIVE,
+      StudentLifecycleStatus.ALUMNI,
+    ],
+    [StudentLifecycleStatus.ALUMNI]: [StudentLifecycleStatus.DELETED],
+    [StudentLifecycleStatus.DELETED]: [StudentLifecycleStatus.ACTIVE],
+    [StudentLifecycleStatus.ARCHIVED]: [StudentLifecycleStatus.ACTIVE],
+    [StudentLifecycleStatus.MERGED]: [],
   };
 
   if (!allowedTransitions[currentStatus].includes(nextStatus)) {

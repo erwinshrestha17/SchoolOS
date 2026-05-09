@@ -1,9 +1,11 @@
-import { IsString } from 'class-validator';
+import { IsNotEmpty, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class RequestMarkLockDto {
-  @IsString()
+  @IsUUID()
   examTermId!: string;
 
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
   reason!: string;
 }

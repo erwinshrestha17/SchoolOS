@@ -33,6 +33,7 @@ import { BatchEnterMarksDto } from './dto/batch-enter-marks.dto';
 import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
+import { GradeCalculatorService } from './grade-calculator.service';
 
 interface ReportCardPdfComponent {
   max: number;
@@ -74,6 +75,7 @@ export class AcademicsService {
     private readonly communicationsService: CommunicationsService,
     private readonly auditService: AuditService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly gradeCalculator: GradeCalculatorService,
   ) {}
 
   async listSubjects(actor: AuthContext) {
@@ -512,283 +514,6 @@ export class AcademicsService {
     });
   }
 
-  async listMarks(actor: AuthContext) {
-    return this.prisma.markEntry.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        student: true,
-        subject: true,
-        assessmentComponent: true,
-        examTerm: true,
-      },
-      orderBy: [{ updatedAt: 'desc' }],
-      take: 100,
-    });
-  }
-
-  async listMarksByFilters(
-    actor: AuthContext,
-    filters: {
-      examTermId?: string;
-      assessmentComponentId?: string;
-      classId?: string;
-      sectionId?: string;
-      subjectId?: string;
-    },
-  ) {
-    return this.prisma.markEntry.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        ...(filters.examTermId ? { examTermId: filters.examTermId } : {}),
-        ...(filters.assessmentComponentId
-          ? { assessmentComponentId: filters.assessmentComponentId }
-          : {}),
-        ...(filters.subjectId ? { subjectId: filters.subjectId } : {}),
-        ...(filters.classId
-          ? {
-              student: {
-                classId: filters.classId,
-                ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
-              },
-            }
-          : {}),
-      },
-      include: {
-        student: true,
-        subject: true,
-        assessmentComponent: true,
-        examTerm: true,
-      },
-      orderBy: [{ student: { rollNumber: 'asc' } }, { updatedAt: 'desc' }],
-    });
-  }
-
-  async enterMark(dto: EnterMarkDto, actor: AuthContext) {
-    const component = await this.prisma.assessmentComponent.findFirst({
-      where: {
-        id: dto.assessmentComponentId,
-        tenantId: actor.tenantId,
-        examTermId: dto.examTermId,
-      },
-      include: {
-        examTerm: true,
-        subject: true,
-      },
-    });
-
-    if (!component) {
-      throw new NotFoundException('Assessment component not found');
-    }
-
-    if (component.examTerm.isLocked) {
-      throw new ConflictException('Exam term is locked');
-    }
-
-    const marksObtainedValue =
-      dto.status && dto.status !== MarkEntryStatus.SUBMITTED
-        ? 0
-        : (dto.marksObtained ?? 0);
-
-    if (marksObtainedValue > Number(component.maxMarks)) {
-      throw new ConflictException('Marks cannot exceed component max marks');
-    }
-
-    if (marksObtainedValue < 0) {
-      throw new ConflictException('Marks cannot be negative');
-    }
-
-    const [student, existingMark] = await Promise.all([
-      this.prisma.student.findFirst({
-        where: { id: dto.studentId, tenantId: actor.tenantId },
-      }),
-      this.prisma.markEntry.findUnique({
-        where: {
-          tenantId_assessmentComponentId_studentId: {
-            tenantId: actor.tenantId,
-            assessmentComponentId: dto.assessmentComponentId,
-            studentId: dto.studentId,
-          },
-        },
-      }),
-    ]);
-
-    if (!student) {
-      throw new NotFoundException('Student not found in this tenant');
-    }
-
-    if (existingMark?.isLocked) {
-      throw new ConflictException(
-        'Individual mark entry is locked and cannot be edited',
-      );
-    }
-
-    const mark = await this.prisma.markEntry.upsert({
-      where: {
-        tenantId_assessmentComponentId_studentId: {
-          tenantId: actor.tenantId,
-          assessmentComponentId: dto.assessmentComponentId,
-          studentId: dto.studentId,
-        },
-      },
-      update: {
-        marksObtained: new Prisma.Decimal(marksObtainedValue),
-        status: dto.status ?? MarkEntryStatus.SUBMITTED,
-        remarks: dto.remarks ?? null,
-        enteredById: actor.userId,
-      },
-      create: {
-        tenantId: actor.tenantId,
-        examTermId: dto.examTermId,
-        assessmentComponentId: dto.assessmentComponentId,
-        subjectId: component.subjectId,
-        studentId: dto.studentId,
-        enteredById: actor.userId,
-        marksObtained: new Prisma.Decimal(marksObtainedValue),
-        status: dto.status ?? MarkEntryStatus.SUBMITTED,
-        remarks: dto.remarks ?? null,
-      },
-      include: {
-        student: true,
-        subject: true,
-        assessmentComponent: true,
-      },
-    });
-
-    await this.auditService.record({
-      action: 'upsert',
-      resource: 'mark_entry',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: mark.id,
-      after: {
-        studentId: mark.studentId,
-        componentId: mark.assessmentComponentId,
-        marksObtained: Number(mark.marksObtained),
-        status: mark.status,
-      },
-    });
-
-    return mark;
-  }
-
-  async batchEnterMarks(dto: BatchEnterMarksDto, actor: AuthContext) {
-    const component = await this.prisma.assessmentComponent.findFirst({
-      where: {
-        id: dto.assessmentComponentId,
-        tenantId: actor.tenantId,
-        examTermId: dto.examTermId,
-      },
-      include: {
-        examTerm: true,
-        subject: true,
-      },
-    });
-
-    if (!component) {
-      throw new NotFoundException('Assessment component not found');
-    }
-
-    if (component.examTerm.isLocked) {
-      throw new ConflictException('Exam term is locked');
-    }
-
-    const studentIds = dto.entries.map((entry) => entry.studentId);
-    const students = await this.prisma.student.findMany({
-      where: {
-        id: { in: studentIds },
-        tenantId: actor.tenantId,
-      },
-      select: { id: true },
-    });
-
-    const foundIds = new Set(students.map((s) => s.id));
-    const missing = studentIds.filter((id) => !foundIds.has(id));
-
-    if (missing.length > 0) {
-      throw new NotFoundException(
-        `Students not found: ${missing.slice(0, 5).join(', ')}`,
-      );
-    }
-
-    const overMax = dto.entries.filter((entry) => {
-      const marks =
-        entry.status && entry.status !== MarkEntryStatus.SUBMITTED
-          ? 0
-          : (entry.marksObtained ?? 0);
-      return marks > Number(component.maxMarks) || marks < 0;
-    });
-
-    if (overMax.length > 0) {
-      throw new ConflictException(
-        `${overMax.length} entries have invalid marks (exceed max or negative)`,
-      );
-    }
-
-    const existingMarks = await this.prisma.markEntry.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        assessmentComponentId: dto.assessmentComponentId,
-        studentId: { in: studentIds },
-      },
-    });
-
-    const lockedMarks = existingMarks.filter((m) => m.isLocked);
-    if (lockedMarks.length > 0) {
-      throw new ConflictException(
-        `${lockedMarks.length} mark entries are locked and cannot be updated`,
-      );
-    }
-
-    const entries = await this.prisma.$transaction(
-      dto.entries.map((entry) => {
-        const marksObtainedValue =
-          entry.status && entry.status !== MarkEntryStatus.SUBMITTED
-            ? 0
-            : (entry.marksObtained ?? 0);
-
-        return this.prisma.markEntry.upsert({
-          where: {
-            tenantId_assessmentComponentId_studentId: {
-              tenantId: actor.tenantId,
-              assessmentComponentId: dto.assessmentComponentId,
-              studentId: entry.studentId,
-            },
-          },
-          update: {
-            marksObtained: new Prisma.Decimal(marksObtainedValue),
-            status: entry.status ?? MarkEntryStatus.SUBMITTED,
-            remarks: entry.remarks ?? null,
-            enteredById: actor.userId,
-          },
-          create: {
-            tenantId: actor.tenantId,
-            examTermId: dto.examTermId,
-            assessmentComponentId: dto.assessmentComponentId,
-            subjectId: component.subjectId,
-            studentId: entry.studentId,
-            enteredById: actor.userId,
-            marksObtained: new Prisma.Decimal(marksObtainedValue),
-            status: entry.status ?? MarkEntryStatus.SUBMITTED,
-            remarks: entry.remarks ?? null,
-          },
-        });
-      }),
-    );
-
-    await this.auditService.record({
-      action: 'batch_upsert',
-      resource: 'mark_entry',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      after: {
-        componentId: dto.assessmentComponentId,
-        count: entries.length,
-      },
-    });
-
-    return { updated: entries.length, entries };
-  }
-
   async listMarkLockRequests(actor: AuthContext) {
     return this.prisma.markLockRequest.findMany({
       where: { tenantId: actor.tenantId },
@@ -1093,7 +818,7 @@ export class AcademicsService {
         sub.theory = {
           max: Number(mark.assessmentComponent.maxMarks),
           obtained: Number(mark.marksObtained),
-          grade: calculateMoestGrade(
+          grade: this.gradeCalculator.getMoestGrade(
             (Number(mark.marksObtained) /
               Number(mark.assessmentComponent.maxMarks)) *
               100,
@@ -1107,7 +832,7 @@ export class AcademicsService {
         sub.practical = {
           max: Number(mark.assessmentComponent.maxMarks),
           obtained: Number(mark.marksObtained),
-          grade: calculateMoestGrade(
+          grade: this.gradeCalculator.getMoestGrade(
             (Number(mark.marksObtained) /
               Number(mark.assessmentComponent.maxMarks)) *
               100,
@@ -1122,7 +847,7 @@ export class AcademicsService {
     const subjects = Array.from(subjectMap.values()).map((sub) => {
       const percentage =
         sub.totalMax > 0 ? (sub.totalObtained / sub.totalMax) * 100 : 0;
-      const { grade, gpa } = calculateMoestGrade(percentage);
+      const { grade, gpa } = this.gradeCalculator.getMoestGrade(percentage);
 
       return {
         name: sub.name,
@@ -1467,7 +1192,9 @@ export class AcademicsService {
         0,
       ) / lockedReportCards.length;
 
-    if (getPromotionStatus(averagePercentage) !== 'READY') {
+    if (
+      this.gradeCalculator.getPromotionStatus(averagePercentage) !== 'READY'
+    ) {
       throw new ConflictException(
         'Student requires academic review before promotion',
       );
@@ -1802,40 +1529,4 @@ export class AcademicsService {
     }
     return parsed;
   }
-}
-
-export function calculateMoestGrade(percentage: number) {
-  if (percentage >= 90) {
-    return { grade: 'A+', gpa: 4.0 };
-  }
-
-  if (percentage >= 80) {
-    return { grade: 'A', gpa: 3.6 };
-  }
-
-  if (percentage >= 70) {
-    return { grade: 'B+', gpa: 3.2 };
-  }
-
-  if (percentage >= 60) {
-    return { grade: 'B', gpa: 2.8 };
-  }
-
-  if (percentage >= 50) {
-    return { grade: 'C+', gpa: 2.4 };
-  }
-
-  if (percentage >= 40) {
-    return { grade: 'C', gpa: 2.0 };
-  }
-
-  if (percentage >= 35) {
-    return { grade: 'D', gpa: 1.6 };
-  }
-
-  return { grade: 'NG', gpa: 0 };
-}
-
-export function getPromotionStatus(percentage: number) {
-  return percentage >= 35 ? 'READY' : 'REVIEW';
 }

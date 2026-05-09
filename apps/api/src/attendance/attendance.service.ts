@@ -10,6 +10,7 @@ import {
   AttendanceSyncRejectionReason,
   AttendanceSyncStatus,
   AttendanceStatus,
+  AttendanceCorrectionStatus,
   AudienceType,
   ConsentType,
   EnrollmentStatus,
@@ -38,6 +39,11 @@ import { SyncAttendanceDto } from './dto/sync-attendance.dto';
 import { UpsertCalendarDayDto } from './dto/upsert-calendar-day.dto';
 import { buildStudentScopeFilter } from '../common/security/parent-scope';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { SettingsService } from '../settings/settings.service';
+import { CreateAttendanceCorrectionDto } from './dto/create-attendance-correction.dto';
+import { ReviewAttendanceCorrectionDto } from './dto/review-attendance-correction.dto';
+import { GetMonthlyRegisterDto } from './dto/get-monthly-register.dto';
+import { GetStudentHistoryDto } from './dto/get-student-history.dto';
 
 @Injectable()
 export class AttendanceService {
@@ -46,13 +52,48 @@ export class AttendanceService {
     private readonly communicationsService: CommunicationsService,
     private readonly auditService: AuditService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly settingsService: SettingsService,
   ) {}
 
   async listAttendance(actor: AuthContext) {
     const studentScope = await buildStudentScopeFilter(this.prisma, actor);
 
+    // Teacher filtering
+    let teacherSectionIds: string[] | undefined;
+    if (
+      !actor.permissions.includes('attendance:read_all') &&
+      Object.keys(studentScope).length === 0
+    ) {
+      const staff = await this.prisma.staff.findUnique({
+        where: { userId: actor.userId },
+      });
+      if (staff) {
+        const [assignments, sections] = await Promise.all([
+          this.prisma.subjectTeacherAssignment.findMany({
+            where: { staffId: staff.id, tenantId: actor.tenantId },
+            select: { sectionId: true },
+          }),
+          this.prisma.section.findMany({
+            where: { classTeacherId: staff.id, tenantId: actor.tenantId },
+            select: { id: true },
+          }),
+        ]);
+        teacherSectionIds = Array.from(
+          new Set([
+            ...assignments
+              .map((a) => a.sectionId)
+              .filter((id): id is string => !!id),
+            ...sections.map((s) => s.id),
+          ]),
+        );
+      }
+    }
+
     const sessions = await this.prisma.attendanceSession.findMany({
-      where: { tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        ...(teacherSectionIds ? { sectionId: { in: teacherSectionIds } } : {}),
+      },
       include: {
         class: true,
         section: true,
@@ -196,7 +237,10 @@ export class AttendanceService {
               academicYearId: dto.academicYearId,
               submittedById: actor.userId,
               submittedAt: new Date(),
-              lockAt: new Date(Date.now() + 6 * 60 * 60 * 1000),
+              lockAt: await this.getAttendanceLockAt(
+                actor.tenantId,
+                attendanceDate,
+              ),
               conflictStatus: existingSession.submittedAt
                 ? AttendanceConflictStatus.FLAGGED
                 : AttendanceConflictStatus.NONE,
@@ -211,7 +255,10 @@ export class AttendanceService {
               attendanceDate,
               submittedById: actor.userId,
               submittedAt: new Date(),
-              lockAt: new Date(Date.now() + 6 * 60 * 60 * 1000),
+              lockAt: await this.getAttendanceLockAt(
+                actor.tenantId,
+                attendanceDate,
+              ),
               conflictStatus: AttendanceConflictStatus.NONE,
             },
           });
@@ -721,6 +768,426 @@ export class AttendanceService {
       affectedSyncSubmissionCount: syncUpdate.count,
       totals: summarizeAttendance(updated.records),
     };
+  }
+
+  async getMonthlyRegister(dto: GetMonthlyRegisterDto, actor: AuthContext) {
+    await this.checkTeacherAssignment(actor, dto.classId, dto.sectionId);
+
+    const startDate = new Date(dto.year, dto.month - 1, 1);
+    const endDate = new Date(dto.year, dto.month, 0);
+
+    const [students, sessions, calendarDays] = await Promise.all([
+      this.prisma.student.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          classId: dto.classId,
+          ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
+          enrollments: {
+            some: {
+              academicYearId: dto.academicYearId,
+              status: EnrollmentStatus.ACTIVE,
+            },
+          },
+        },
+        orderBy: [{ rollNumber: 'asc' }, { firstNameEn: 'asc' }],
+      }),
+      this.prisma.attendanceSession.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          classId: dto.classId,
+          sectionId: dto.sectionId ?? null,
+          attendanceDate: {
+            gte: startDate,
+            lte: endDate,
+          },
+        },
+        include: {
+          records: true,
+        },
+      }),
+      this.prisma.schoolCalendarDay.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          calendarDate: {
+            gte: startDate,
+            lte: endDate,
+          },
+        },
+      }),
+    ]);
+
+    const sessionByDate = new Map(
+      sessions.map((s) => [s.attendanceDate.toISOString().split('T')[0], s]),
+    );
+    const calendarByDate = new Map(
+      calendarDays.map((d) => [d.calendarDate.toISOString().split('T')[0], d]),
+    );
+
+    const daysCount = endDate.getDate();
+    const matrix = students.map((student) => {
+      const row: any = {
+        studentId: student.id,
+        rollNumber: student.rollNumber,
+        name: `${student.firstNameEn} ${student.lastNameEn}`,
+        attendance: [],
+        totals: {
+          PRESENT: 0,
+          ABSENT: 0,
+          LATE: 0,
+          LEAVE: 0,
+          HOLIDAY: 0,
+          NOT_MARKED: 0,
+        },
+      };
+
+      for (let day = 1; day <= daysCount; day++) {
+        const date = new Date(dto.year, dto.month - 1, day);
+        const dateKey = date.toISOString().split('T')[0];
+        const session = sessionByDate.get(dateKey);
+        const calendar = calendarByDate.get(dateKey);
+
+        let status: string = 'NOT_MARKED';
+        if (calendar && !calendar.isWorkingDay) {
+          status = 'HOLIDAY';
+        } else if (session) {
+          const record = session.records.find(
+            (r) => r.studentId === student.id,
+          );
+          status = record?.status ?? 'NOT_MARKED';
+        }
+
+        row.attendance.push({ day, status });
+        if (status === AttendanceStatus.PRESENT) {
+          row.totals.PRESENT++;
+        } else if (status === AttendanceStatus.ABSENT) {
+          row.totals.ABSENT++;
+        } else if (status === AttendanceStatus.LATE) {
+          row.totals.LATE++;
+        } else if (status === AttendanceStatus.HOLIDAY) {
+          row.totals.HOLIDAY++;
+        } else if (
+          status === AttendanceStatus.SICK_LEAVE ||
+          status === AttendanceStatus.EXCUSED_LEAVE ||
+          status === AttendanceStatus.UNEXCUSED_LEAVE ||
+          status === AttendanceStatus.ON_LEAVE ||
+          status === AttendanceStatus.LEAVE
+        ) {
+          row.totals.LEAVE++;
+        } else if (status === AttendanceStatus.HALF_DAY) {
+          row.totals.PRESENT += 0.5;
+          row.totals.ABSENT += 0.5;
+        } else {
+          row.totals.NOT_MARKED++;
+        }
+      }
+
+      return row;
+    });
+
+    return {
+      month: dto.month,
+      year: dto.year,
+      daysCount,
+      matrix,
+    };
+  }
+
+  async getStudentHistory(
+    studentId: string,
+    dto: GetStudentHistoryDto,
+    actor: AuthContext,
+  ) {
+    const studentScope = await buildStudentScopeFilter(this.prisma, actor);
+    if (
+      Object.keys(studentScope).length > 0 &&
+      studentScope.studentId !== studentId
+    ) {
+      throw new ForbiddenException('Access denied to this student history');
+    }
+
+    const records = await this.prisma.attendanceRecord.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        studentId,
+        attendanceSession: {
+          attendanceDate: {
+            ...(dto.startDate ? { gte: new Date(dto.startDate) } : {}),
+            ...(dto.endDate ? { lte: new Date(dto.endDate) } : {}),
+          },
+        },
+      },
+      include: {
+        attendanceSession: {
+          include: {
+            submittedBy: true,
+          },
+        },
+      },
+      orderBy: { attendanceSession: { attendanceDate: 'desc' } },
+    });
+
+    return records.map((r) => ({
+      date: r.attendanceSession.attendanceDate,
+      status: r.status,
+      remark: r.remark,
+      lateAt: r.lateAt,
+      markedBy: r.attendanceSession.submittedBy?.email ?? 'System',
+      sessionId: r.attendanceSessionId,
+    }));
+  }
+
+  async createCorrectionRequest(
+    dto: CreateAttendanceCorrectionDto,
+    actor: AuthContext,
+  ) {
+    const staff = await this.prisma.staff.findUnique({
+      where: { userId: actor.userId },
+    });
+    if (!staff) {
+      throw new ForbiddenException('Only staff can create correction requests');
+    }
+
+    // Check if direct edit is allowed or locked
+    const attendanceDate = stripTime(new Date(dto.attendanceDate));
+    const lockAt = await this.getAttendanceLockAt(
+      actor.tenantId,
+      attendanceDate,
+    );
+    const isLocked = lockAt <= new Date();
+
+    const allowCorrection =
+      ((await this.settingsService.getSetting(
+        actor.tenantId,
+        'allow_teacher_correction_request',
+      )) as boolean) ?? true;
+    if (!allowCorrection && isLocked) {
+      throw new ForbiddenException(
+        'Attendance corrections are not allowed for this tenant',
+      );
+    }
+
+    // Prevent duplicate pending requests
+    const existing = await this.prisma.attendanceCorrectionRequest.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        studentId: dto.studentId,
+        attendanceDate,
+        status: 'PENDING',
+      },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        'A pending correction request already exists for this student and date',
+      );
+    }
+
+    const request = await this.prisma.attendanceCorrectionRequest.create({
+      data: {
+        tenantId: actor.tenantId,
+        attendanceRecordId: dto.attendanceRecordId,
+        attendanceSessionId: dto.attendanceSessionId,
+        studentId: dto.studentId,
+        attendanceDate,
+        requestedStatus: dto.requestedStatus,
+        reason: dto.reason,
+        requestedById: actor.userId,
+        status: 'PENDING',
+      },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'attendance_correction_request',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: request.id,
+      after: request,
+    });
+
+    return request;
+  }
+
+  async listCorrectionRequests(actor: AuthContext) {
+    return this.prisma.attendanceCorrectionRequest.findMany({
+      where: { tenantId: actor.tenantId },
+      include: {
+        student: true,
+        requestedBy: true,
+        reviewedBy: true,
+      },
+      orderBy: { requestedAt: 'desc' },
+    });
+  }
+
+  async approveCorrectionRequest(
+    id: string,
+    dto: ReviewAttendanceCorrectionDto,
+    actor: AuthContext,
+  ) {
+    const request = await this.prisma.attendanceCorrectionRequest.findFirst({
+      where: { id, tenantId: actor.tenantId },
+      include: { session: true },
+    });
+
+    if (!request) throw new NotFoundException('Correction request not found');
+    if (request.status !== 'PENDING') {
+      throw new ConflictException('Request is no longer pending');
+    }
+
+    if (dto.status === 'REJECTED') {
+      return this.prisma.attendanceCorrectionRequest.update({
+        where: { id },
+        data: {
+          status: 'REJECTED',
+          reviewedById: actor.userId,
+          reviewedAt: new Date(),
+          reviewNote: dto.reviewNote,
+        },
+      });
+    }
+
+    // APPROVED
+    return this.prisma.$transaction(async (tx) => {
+      // Update the record if it exists
+      if (request.attendanceRecordId) {
+        await tx.attendanceRecord.update({
+          where: { id: request.attendanceRecordId },
+          data: {
+            status: request.requestedStatus,
+            remark: `Corrected: ${request.reason}`,
+          },
+        });
+      } else {
+        // Find session or create one
+        let sessionId = request.attendanceSessionId;
+        if (!sessionId) {
+          const student = await tx.student.findUnique({
+            where: { id: request.studentId },
+          });
+          const existingSession = await tx.attendanceSession.findFirst({
+            where: {
+              tenantId: actor.tenantId,
+              attendanceDate: request.attendanceDate,
+              classId: student!.classId,
+              sectionId: student!.sectionId,
+            },
+          });
+          if (existingSession) {
+            sessionId = existingSession.id;
+          } else {
+            const activeYear = await tx.academicYear.findFirst({
+              where: { tenantId: actor.tenantId, isCurrent: true },
+            });
+            const newSession = await tx.attendanceSession.create({
+              data: {
+                tenantId: actor.tenantId,
+                academicYearId: activeYear!.id,
+                classId: student!.classId,
+                sectionId: student!.sectionId,
+                attendanceDate: request.attendanceDate,
+                lockAt: new Date(), // Already locked
+              },
+            });
+            sessionId = newSession.id;
+          }
+        }
+
+        await tx.attendanceRecord.upsert({
+          where: {
+            attendanceSessionId_studentId: {
+              attendanceSessionId: sessionId!,
+              studentId: request.studentId,
+            },
+          },
+          create: {
+            tenantId: actor.tenantId,
+            attendanceSessionId: sessionId!,
+            studentId: request.studentId,
+            status: request.requestedStatus,
+            remark: `Corrected: ${request.reason}`,
+          },
+          update: {
+            status: request.requestedStatus,
+            remark: `Corrected: ${request.reason}`,
+          },
+        });
+      }
+
+      return tx.attendanceCorrectionRequest.update({
+        where: { id },
+        data: {
+          status: 'APPROVED',
+          reviewedById: actor.userId,
+          reviewedAt: new Date(),
+          reviewNote: dto.reviewNote,
+        },
+      });
+    });
+  }
+
+  async getParentSummary(studentId: string, actor: AuthContext) {
+    const studentScope = await buildStudentScopeFilter(this.prisma, actor);
+    if (
+      Object.keys(studentScope).length > 0 &&
+      studentScope.studentId !== studentId
+    ) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [monthRecords, recentAbsences] = await Promise.all([
+      this.prisma.attendanceRecord.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          studentId,
+          attendanceSession: {
+            attendanceDate: { gte: firstDayOfMonth },
+          },
+        },
+      }),
+      this.prisma.attendanceRecord.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          studentId,
+          status: AttendanceStatus.ABSENT,
+        },
+        include: { attendanceSession: true },
+        orderBy: { attendanceSession: { attendanceDate: 'desc' } },
+        take: 5,
+      }),
+    ]);
+
+    const totals = summarizeAttendance(monthRecords);
+    const totalMarked = monthRecords.length;
+    const percentage =
+      totalMarked > 0 ? (totals.present / totalMarked) * 100 : 100;
+
+    return {
+      monthSummary: {
+        ...totals,
+        totalMarked,
+        attendancePercentage: Math.round(percentage * 100) / 100,
+      },
+      recentAbsences: recentAbsences.map((a) => ({
+        date: a.attendanceSession.attendanceDate,
+        remark: a.remark,
+      })),
+    };
+  }
+
+  private async getAttendanceLockAt(
+    tenantId: string,
+    attendanceDate: Date,
+  ): Promise<Date> {
+    const lockHours =
+      ((await this.settingsService.getSetting(
+        tenantId,
+        'attendance_lock_hours',
+      )) as number) ?? 24;
+    return new Date(attendanceDate.getTime() + lockHours * 60 * 60 * 1000);
   }
 
   async listCalendarDays(actor: AuthContext) {
@@ -1773,172 +2240,37 @@ export class AttendanceService {
     };
   }
 
-  async getMonthlyRegister(
-    query: ListAttendanceSummaryDto,
-    actor: AuthContext,
-  ) {
-    await this.validateAttendanceScope(actor, {
-      academicYearId: query.academicYearId,
-      classId: query.classId,
-      sectionId: query.sectionId,
-    });
-
-    const attendanceDate = stripTime(
-      query.attendanceDate ? new Date(query.attendanceDate) : new Date(),
-    );
-    const month = query.month ?? attendanceDate.getMonth() + 1;
-    const year = query.year ?? attendanceDate.getFullYear();
-    const monthStart = new Date(year, month - 1, 1);
-    const nextMonthStart = new Date(year, month, 1);
-    const daysInMonth = new Date(year, month, 0).getDate();
-
-    const [students, sessions, calendarDays] = await Promise.all([
-      this.prisma.student.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          classId: query.classId,
-          ...(query.sectionId ? { sectionId: query.sectionId } : {}),
-          enrollments: {
-            some: {
-              academicYearId: query.academicYearId,
-              status: EnrollmentStatus.ACTIVE,
-            },
-          },
-        },
-        orderBy: [{ rollNumber: 'asc' }, { firstNameEn: 'asc' }],
-      }),
-      this.prisma.attendanceSession.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          academicYearId: query.academicYearId,
-          classId: query.classId,
-          sectionId: query.sectionId ?? null,
-          attendanceDate: {
-            gte: monthStart,
-            lt: nextMonthStart,
-          },
-        },
-        include: {
-          records: true,
-        },
-      }),
-      this.prisma.schoolCalendarDay.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          calendarDate: {
-            gte: monthStart,
-            lt: nextMonthStart,
-          },
-        },
-      }),
-    ]);
-
-    const calendarMap = new Map(
-      calendarDays.map((day) => [day.calendarDate.getDate(), day]),
-    );
-
-    const sessionByDate = new Map(
-      sessions.map((session) => [session.attendanceDate.getDate(), session]),
-    );
-
-    const days = Array.from({ length: daysInMonth }, (_, i) => {
-      const date = i + 1;
-      const calendarDay = calendarMap.get(date);
-      const session = sessionByDate.get(date);
-      const dateObj = new Date(year, month - 1, date);
-      const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
-      const isWorkingDay = calendarDay ? calendarDay.isWorkingDay : !isWeekend;
-
-      return {
-        date,
-        isWorkingDay,
-        holidayType: calendarDay?.holidayType ?? null,
-        label: calendarDay?.label ?? null,
-        hasSession: !!session,
-      };
-    });
-
-    const studentsRegister = students.map((student) => {
-      const statuses = Array.from({ length: daysInMonth }, (_, i) => {
-        const date = i + 1;
-        const session = sessionByDate.get(date);
-        if (!session) return null;
-        const record = session.records.find((r) => r.studentId === student.id);
-        return record?.status ?? null;
-      });
-
-      const totalPresent = statuses.filter(
-        (s) => s === AttendanceStatus.PRESENT || s === AttendanceStatus.LATE,
-      ).length;
-      const totalAbsent = statuses.filter(
-        (s) =>
-          s === AttendanceStatus.ABSENT ||
-          s === AttendanceStatus.UNEXCUSED_LEAVE,
-      ).length;
-      const totalLeave = statuses.filter(
-        (s) =>
-          s === AttendanceStatus.SICK_LEAVE ||
-          s === AttendanceStatus.EXCUSED_LEAVE,
-      ).length;
-
-      return {
-        studentId: student.id,
-        rollNumber: student.rollNumber,
-        studentSystemId: student.studentSystemId,
-        fullName: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
-        statuses,
-        totalPresent,
-        totalAbsent,
-        totalLeave,
-      };
-    });
-
-    return {
-      month,
-      year,
-      days,
-      students: studentsRegister,
-    };
-  }
-
-  async exportMonthlyRegister(
-    query: ListAttendanceSummaryDto,
-    actor: AuthContext,
-  ) {
-    const data = await this.getMonthlyRegister(query, actor);
+  async exportMonthlyRegister(dto: GetMonthlyRegisterDto, actor: AuthContext) {
+    const data = await this.getMonthlyRegister(dto, actor);
 
     const headers = [
       'Roll No',
-      'Student ID',
       'Student Name',
-      ...data.days.map((d) => d.date.toString()),
-      'Present',
-      'Absent',
-      'Leave',
+      ...Array.from({ length: data.daysCount }, (_, i) => (i + 1).toString()),
+      'PRESENT',
+      'ABSENT',
+      'LATE',
+      'LEAVE',
+      'HOLIDAY',
     ];
 
-    const rows = data.students.map((student) => [
+    const rows = data.matrix.map((student: any) => [
       student.rollNumber?.toString() ?? '',
-      student.studentSystemId,
-      student.fullName,
-      ...student.statuses.map((status, i) => {
-        const day = data.days[i];
-        if (!day.isWorkingDay) return 'H';
-        if (!status) return '-';
-        if (status === AttendanceStatus.PRESENT) return 'P';
-        if (status === AttendanceStatus.ABSENT) return 'A';
-        if (status === AttendanceStatus.LATE) return 'L';
-        if (status === AttendanceStatus.SICK_LEAVE) return 'S';
-        if (
-          status === AttendanceStatus.EXCUSED_LEAVE ||
-          status === AttendanceStatus.UNEXCUSED_LEAVE
-        )
-          return 'E';
-        return 'U';
+      student.name,
+      ...student.attendance.map((a: any) => {
+        if (a.status === 'PRESENT') return 'P';
+        if (a.status === 'ABSENT') return 'A';
+        if (a.status === 'LATE') return 'L';
+        if (a.status === 'HOLIDAY') return 'H';
+        if (a.status === 'LEAVE') return 'Lv';
+        if (a.status === 'HALF_DAY') return '0.5';
+        return '-';
       }),
-      student.totalPresent.toString(),
-      student.totalAbsent.toString(),
-      student.totalLeave.toString(),
+      student.totals.PRESENT.toString(),
+      student.totals.ABSENT.toString(),
+      student.totals.LATE.toString(),
+      student.totals.LEAVE.toString(),
+      student.totals.HOLIDAY.toString(),
     ]);
 
     const escapeCsv = (str: string) => `"${str.replace(/"/g, '""')}"`;
@@ -2222,7 +2554,61 @@ export class AttendanceService {
       );
     }
 
+    // Teacher Assignment check
+    await this.checkTeacherAssignment(actor, scope.classId, scope.sectionId);
+
     return { academicYear, classroom, section };
+  }
+
+  private async checkTeacherAssignment(
+    actor: AuthContext,
+    classId: string,
+    sectionId?: string | null,
+  ) {
+    // Admins and full-permission staff can access everything
+    if (
+      actor.permissions.includes('attendance:mark_all') ||
+      actor.permissions.includes('attendance:override_lock') ||
+      actor.permissions.includes('attendance:read_all')
+    ) {
+      return;
+    }
+
+    const staff = await this.prisma.staff.findUnique({
+      where: { userId: actor.userId },
+    });
+
+    if (!staff) {
+      throw new ForbiddenException('Staff record not found for the user');
+    }
+
+    // Check if class teacher of the section
+    if (sectionId) {
+      const section = await this.prisma.section.findFirst({
+        where: {
+          id: sectionId,
+          classTeacherId: staff.id,
+          tenantId: actor.tenantId,
+        },
+      });
+      if (section) return;
+    }
+
+    // Check if subject teacher in this section/class
+    const assignment = await this.prisma.subjectTeacherAssignment.findFirst({
+      where: {
+        staffId: staff.id,
+        classId,
+        ...(sectionId ? { sectionId } : {}),
+        tenantId: actor.tenantId,
+      },
+    });
+
+    if (!assignment) {
+      throw new ForbiddenException(
+        'You are not assigned as Class Teacher or Subject Teacher for this section',
+      );
+    }
   }
 
   private async ensureStudentInAttendanceScope(

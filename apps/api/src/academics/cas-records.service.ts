@@ -52,6 +52,55 @@ export class CasRecordsService {
     });
   }
 
+  async getCasRoster(
+    actor: AuthContext,
+    filters: {
+      classId: string;
+      sectionId?: string;
+      subjectId: string;
+      academicYearId: string;
+      category?: string;
+    },
+  ) {
+    await this.ensureCasScope(actor, {
+      academicYearId: filters.academicYearId,
+      classId: filters.classId,
+      sectionId: filters.sectionId,
+      subjectId: filters.subjectId,
+    });
+
+    const students = await this.prisma.student.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        classId: filters.classId,
+        ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+        lifecycleStatus: 'ACTIVE',
+      },
+      orderBy: [{ rollNumber: 'asc' }, { firstNameEn: 'asc' }],
+    });
+
+    const existingRecords = await this.prisma.casRecord.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        academicYearId: filters.academicYearId,
+        classId: filters.classId,
+        ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+        subjectId: filters.subjectId,
+        ...(filters.category ? { category: filters.category } : {}),
+      },
+    });
+
+    // Note: Multiple CAS records can exist for one student if category is different or multiple observations.
+    // For a simple roster, we might group by student and category.
+    return students.map((student) => ({
+      studentId: student.id,
+      studentName: `${student.firstNameEn} ${student.lastNameEn}`,
+      studentSystemId: student.studentSystemId,
+      rollNumber: student.rollNumber,
+      records: existingRecords.filter((r) => r.studentId === student.id),
+    }));
+  }
+
   async create(dto: CreateCasRecordDto, actor: AuthContext) {
     await this.ensureCasScope(actor, {
       academicYearId: dto.academicYearId,
