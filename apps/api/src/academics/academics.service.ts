@@ -514,9 +514,6 @@ export class AcademicsService {
     });
   }
 
-
-
-
   async listMarkLockRequests(actor: AuthContext) {
     return this.prisma.markLockRequest.findMany({
       where: { tenantId: actor.tenantId },
@@ -1195,7 +1192,9 @@ export class AcademicsService {
         0,
       ) / lockedReportCards.length;
 
-    if (this.gradeCalculator.getPromotionStatus(averagePercentage) !== 'READY') {
+    if (
+      this.gradeCalculator.getPromotionStatus(averagePercentage) !== 'READY'
+    ) {
       throw new ConflictException(
         'Student requires academic review before promotion',
       );
@@ -1530,5 +1529,4 @@ export class AcademicsService {
     }
     return parsed;
   }
-
 }
