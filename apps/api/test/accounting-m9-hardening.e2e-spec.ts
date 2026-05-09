@@ -36,7 +36,10 @@ describe('Accounting M9 Hardening (E2E)', () => {
       if (!model.findMany) model.findMany = jest.fn().mockResolvedValue([]);
       if (!model.findFirst) model.findFirst = jest.fn();
       if (!model.findUnique) model.findUnique = jest.fn();
-      if (!model.findUniqueOrThrow) model.findUniqueOrThrow = jest.fn().mockResolvedValue({ id: 'mock-id', code: 'mock-code' });
+      if (!model.findUniqueOrThrow)
+        model.findUniqueOrThrow = jest
+          .fn()
+          .mockResolvedValue({ id: 'mock-id', code: 'mock-code' });
       if (!model.create) model.create = jest.fn();
       if (!model.count) model.count = jest.fn();
       if (!model.upsert) model.upsert = jest.fn();
@@ -45,7 +48,8 @@ describe('Accounting M9 Hardening (E2E)', () => {
 
     if (!(prisma as any).chartAccount) (prisma as any).chartAccount = {};
     if (!(prisma as any).fiscalPeriod) (prisma as any).fiscalPeriod = {};
-    if (!(prisma as any).accountingPeriod) (prisma as any).accountingPeriod = {};
+    if (!(prisma as any).accountingPeriod)
+      (prisma as any).accountingPeriod = {};
     if (!(prisma as any).journalEntry) (prisma as any).journalEntry = {};
     if (!(prisma as any).journalLine) (prisma as any).journalLine = {};
     if (!(prisma as any).auditLog) (prisma as any).auditLog = {};
@@ -86,14 +90,16 @@ describe('Accounting M9 Hardening (E2E)', () => {
     );
 
     // Mock successful period check by default
-    jest.spyOn(postingService as any, 'ensurePostingPeriodIsOpen').mockResolvedValue({
-      id: 'period-open',
-      tenantId,
-      fiscalYearId: 'fy-2026',
-      label: 'May 2026',
-      status: AccountingPeriodStatus.OPEN,
-      fiscalYear: { status: 'OPEN', name: 'FY 2026' },
-    });
+    jest
+      .spyOn(postingService as any, 'ensurePostingPeriodIsOpen')
+      .mockResolvedValue({
+        id: 'period-open',
+        tenantId,
+        fiscalYearId: 'fy-2026',
+        label: 'May 2026',
+        status: AccountingPeriodStatus.OPEN,
+        fiscalYear: { status: 'OPEN', name: 'FY 2026' },
+      });
   });
 
   afterEach(async () => {
@@ -110,15 +116,31 @@ describe('Accounting M9 Hardening (E2E)', () => {
         tenantId,
         sourceType: JournalSourceType.MANUAL,
         lines: [
-          { chartAccountId: 'acc-cash', side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(1000) },
-          { chartAccountId: 'acc-revenue', side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(1000) },
+          {
+            chartAccountId: 'acc-cash',
+            side: JournalLineSide.DEBIT,
+            amount: new Prisma.Decimal(1000),
+          },
+          {
+            chartAccountId: 'acc-revenue',
+            side: JournalLineSide.CREDIT,
+            amount: new Prisma.Decimal(1000),
+          },
         ],
       };
 
-      (prisma.journalEntry.findFirst as jest.Mock).mockResolvedValue(originalEntry);
+      (prisma.journalEntry.findFirst as jest.Mock).mockResolvedValue(
+        originalEntry,
+      );
       (prisma.journalEntry.create as jest.Mock)
-        .mockResolvedValueOnce({ id: 'reversal-je', entryNumber: 'JE-2026-0002' }) // Reversal
-        .mockResolvedValueOnce({ id: 'correction-je', entryNumber: 'JE-2026-0003' }); // Correction
+        .mockResolvedValueOnce({
+          id: 'reversal-je',
+          entryNumber: 'JE-2026-0002',
+        }) // Reversal
+        .mockResolvedValueOnce({
+          id: 'correction-je',
+          entryNumber: 'JE-2026-0003',
+        }); // Correction
 
       const result = await accountingService.correctJournalEntry(
         originalEntry.id,
@@ -131,22 +153,26 @@ describe('Accounting M9 Hardening (E2E)', () => {
 
       expect(result.reversal).toBeDefined();
       expect(result.correction).toBeDefined();
-      
+
       // Verify reversal is linked to original
-      expect(prisma.journalEntry.create).toHaveBeenCalledWith(expect.objectContaining({
-        data: expect.objectContaining({
-          reversalOfId: originalEntry.id,
-          sourceType: JournalSourceType.REVERSAL,
-        })
-      }));
+      expect(prisma.journalEntry.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            reversalOfId: originalEntry.id,
+            sourceType: JournalSourceType.REVERSAL,
+          }),
+        }),
+      );
 
       // Verify correction is linked to original
-      expect(prisma.journalEntry.create).toHaveBeenCalledWith(expect.objectContaining({
-        data: expect.objectContaining({
-          sourceType: JournalSourceType.CORRECTION,
-          sourceId: originalEntry.id,
-        })
-      }));
+      expect(prisma.journalEntry.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            sourceType: JournalSourceType.CORRECTION,
+            sourceId: originalEntry.id,
+          }),
+        }),
+      );
     });
   });
 
@@ -154,25 +180,37 @@ describe('Accounting M9 Hardening (E2E)', () => {
     it('should reject imbalanced postings from all sources', async () => {
       // Manual Journal
       await expect(
-        postingService.postManualJournal({
-          tenantId,
-          entryDate: new Date(),
-          narration: 'Imbalanced',
-          lines: [{ chartAccountId: 'acc-cash', debit: 100, credit: 0 }]
-        }, actor)
+        postingService.postManualJournal(
+          {
+            tenantId,
+            entryDate: new Date(),
+            narration: 'Imbalanced',
+            lines: [{ chartAccountId: 'acc-cash', debit: 100, credit: 0 }],
+          },
+          actor,
+        ),
       ).rejects.toThrow(/balanced/i);
 
       // Fee Payment
       await expect(
-        postingService.postFeePayment({
-          tenantId,
-          paymentId: 'pay-1',
-          invoiceNumber: 'INV-1',
-          receiptNumber: 'RCP-1',
-          paymentAmount: new Prisma.Decimal(100),
-          paymentMethod: 'CASH',
-          lines: [{ chartAccountId: 'acc-revenue', amount: new Prisma.Decimal(90), description: 'Partial' }]
-        }, actor)
+        postingService.postFeePayment(
+          {
+            tenantId,
+            paymentId: 'pay-1',
+            invoiceNumber: 'INV-1',
+            receiptNumber: 'RCP-1',
+            paymentAmount: new Prisma.Decimal(100),
+            paymentMethod: 'CASH',
+            lines: [
+              {
+                chartAccountId: 'acc-revenue',
+                amount: new Prisma.Decimal(90),
+                description: 'Partial',
+              },
+            ],
+          },
+          actor,
+        ),
       ).rejects.toThrow(/balanced/i);
     });
   });
@@ -180,23 +218,28 @@ describe('Accounting M9 Hardening (E2E)', () => {
   describe('Locked Period Behavior', () => {
     it('should reject posting to a LOCKED period for regular users', async () => {
       // Mock period as LOCKED
-      jest.spyOn(postingService as any, 'ensurePostingPeriodIsOpen').mockImplementation(async (tx, tid, date, allowLocked) => {
-        if (!allowLocked) {
-          throw new ConflictException('Fiscal period is locked for posting.');
-        }
-        return { id: 'period-locked', status: AccountingPeriodStatus.LOCKED };
-      });
+      jest
+        .spyOn(postingService as any, 'ensurePostingPeriodIsOpen')
+        .mockImplementation(async (tx, tid, date, allowLocked) => {
+          if (!allowLocked) {
+            throw new ConflictException('Fiscal period is locked for posting.');
+          }
+          return { id: 'period-locked', status: AccountingPeriodStatus.LOCKED };
+        });
 
       await expect(
-        postingService.postManualJournal({
-          tenantId,
-          entryDate: new Date(),
-          narration: 'Trying to post to locked',
-          lines: [
-            { chartAccountId: 'acc-cash', debit: 100, credit: 0 },
-            { chartAccountId: 'acc-revenue', debit: 0, credit: 100 }
-          ]
-        }, actor)
+        postingService.postManualJournal(
+          {
+            tenantId,
+            entryDate: new Date(),
+            narration: 'Trying to post to locked',
+            lines: [
+              { chartAccountId: 'acc-cash', debit: 100, credit: 0 },
+              { chartAccountId: 'acc-revenue', debit: 0, credit: 100 },
+            ],
+          },
+          actor,
+        ),
       ).rejects.toThrow(/locked/i);
     });
   });
@@ -204,34 +247,44 @@ describe('Accounting M9 Hardening (E2E)', () => {
   describe('Audit Logging', () => {
     it('should log all major accounting actions', async () => {
       const spy = jest.spyOn(moduleRef.get(PrismaService).auditLog, 'create');
-      
+
       // Mock create to pass
-      (prisma.journalEntry.create as jest.Mock).mockResolvedValue({ id: 'je-audit', entryNumber: 'JE-AUDIT' });
+      (prisma.journalEntry.create as jest.Mock).mockResolvedValue({
+        id: 'je-audit',
+        entryNumber: 'JE-AUDIT',
+      });
 
-      await postingService.postManualJournal({
-        tenantId,
-        entryDate: new Date(),
-        narration: 'Audit test',
-        lines: [
-          { chartAccountId: 'acc-cash', debit: 100, credit: 0 },
-          { chartAccountId: 'acc-revenue', debit: 0, credit: 100 }
-        ]
-      }, actor);
+      await postingService.postManualJournal(
+        {
+          tenantId,
+          entryDate: new Date(),
+          narration: 'Audit test',
+          lines: [
+            { chartAccountId: 'acc-cash', debit: 100, credit: 0 },
+            { chartAccountId: 'acc-revenue', debit: 0, credit: 100 },
+          ],
+        },
+        actor,
+      );
 
-      expect(spy).toHaveBeenCalledWith(expect.objectContaining({
-        data: expect.objectContaining({
-          action: 'post',
-          resource: 'journal_entry',
-        })
-      }));
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'post',
+            resource: 'journal_entry',
+          }),
+        }),
+      );
 
       await accountingService.runConsistencyCheck(actor);
-      expect(spy).toHaveBeenCalledWith(expect.objectContaining({
-        data: expect.objectContaining({
-          action: 'reconcile',
-          resource: 'ledger',
-        })
-      }));
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'reconcile',
+            resource: 'ledger',
+          }),
+        }),
+      );
     });
   });
 
@@ -245,8 +298,8 @@ describe('Accounting M9 Hardening (E2E)', () => {
           lines: [
             { debit: new Prisma.Decimal(100), credit: new Prisma.Decimal(0) },
             { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(99) },
-          ]
-        }
+          ],
+        },
       ]);
 
       const result = await accountingService.runConsistencyCheck(actor);
@@ -260,13 +313,23 @@ describe('Accounting M9 Hardening (E2E)', () => {
       // Mock balanced ledger
       (prisma.chartAccount.findMany as jest.Mock).mockResolvedValue([
         {
-          id: 'acc-1', code: '1000', name: 'Cash', type: ChartAccountType.ASSET,
-          journalLines: [{ debit: new Prisma.Decimal(1000), credit: new Prisma.Decimal(0) }]
+          id: 'acc-1',
+          code: '1000',
+          name: 'Cash',
+          type: ChartAccountType.ASSET,
+          journalLines: [
+            { debit: new Prisma.Decimal(1000), credit: new Prisma.Decimal(0) },
+          ],
         },
         {
-          id: 'acc-2', code: '4000', name: 'Revenue', type: ChartAccountType.REVENUE,
-          journalLines: [{ debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(1000) }]
-        }
+          id: 'acc-2',
+          code: '4000',
+          name: 'Revenue',
+          type: ChartAccountType.REVENUE,
+          journalLines: [
+            { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(1000) },
+          ],
+        },
       ]);
 
       const reports = await accountingService.buildReports(actor);

@@ -148,7 +148,11 @@ export class MarksEntryService {
       throw new ConflictException('Exam term is locked');
     }
 
-    this.validateMarkValue(Number(component.maxMarks), dto.marksObtained, dto.status);
+    this.validateMarkValue(
+      Number(component.maxMarks),
+      dto.marksObtained,
+      dto.status,
+    );
 
     const student = await this.prisma.student.findFirst({
       where: { id: dto.studentId, tenantId: actor.tenantId },
@@ -172,7 +176,10 @@ export class MarksEntryService {
       throw new ConflictException('Mark entry is locked and cannot be edited');
     }
 
-    const marksObtainedValue = this.resolveMarkValue(dto.marksObtained, dto.status);
+    const marksObtainedValue = this.resolveMarkValue(
+      dto.marksObtained,
+      dto.status,
+    );
 
     const mark = await this.prisma.markEntry.upsert({
       where: {
@@ -248,7 +255,9 @@ export class MarksEntryService {
     const foundIds = new Set(students.map((s) => s.id));
     const missing = studentIds.filter((id) => !foundIds.has(id));
     if (missing.length > 0) {
-      throw new NotFoundException(`Students not found: ${missing.slice(0, 5).join(', ')}`);
+      throw new NotFoundException(
+        `Students not found: ${missing.slice(0, 5).join(', ')}`,
+      );
     }
 
     const maxMarks = Number(component.maxMarks);
@@ -266,7 +275,9 @@ export class MarksEntryService {
 
     const lockedCount = existingMarks.filter((m) => m.isLocked).length;
     if (lockedCount > 0) {
-      throw new ConflictException(`${lockedCount} mark entries are locked and cannot be updated`);
+      throw new ConflictException(
+        `${lockedCount} mark entries are locked and cannot be updated`,
+      );
     }
 
     const results = await this.prisma.$transaction(
@@ -315,9 +326,17 @@ export class MarksEntryService {
     return { updated: results.length, entries: results };
   }
 
-  private validateMarkValue(maxMarks: number, obtained?: number, status?: MarkEntryStatus) {
+  private validateMarkValue(
+    maxMarks: number,
+    obtained?: number,
+    status?: MarkEntryStatus,
+  ) {
     // If absent/missing/withheld, marksObtained is usually ignored or forced to 0
-    if (status && status !== MarkEntryStatus.SUBMITTED && status !== MarkEntryStatus.PRESENT) {
+    if (
+      status &&
+      status !== MarkEntryStatus.SUBMITTED &&
+      status !== MarkEntryStatus.PRESENT
+    ) {
       return;
     }
 
@@ -326,12 +345,21 @@ export class MarksEntryService {
       throw new ConflictException('Marks cannot be negative');
     }
     if (val > maxMarks) {
-      throw new ConflictException(`Marks cannot exceed max marks (${maxMarks})`);
+      throw new ConflictException(
+        `Marks cannot exceed max marks (${maxMarks})`,
+      );
     }
   }
 
-  private resolveMarkValue(obtained?: number, status?: MarkEntryStatus): number {
-    if (status && status !== MarkEntryStatus.SUBMITTED && status !== MarkEntryStatus.PRESENT) {
+  private resolveMarkValue(
+    obtained?: number,
+    status?: MarkEntryStatus,
+  ): number {
+    if (
+      status &&
+      status !== MarkEntryStatus.SUBMITTED &&
+      status !== MarkEntryStatus.PRESENT
+    ) {
       return 0;
     }
     return obtained ?? 0;

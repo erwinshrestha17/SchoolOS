@@ -2843,7 +2843,9 @@ export class FinanceService {
     });
 
     if (!sourceJournal) {
-      throw new ConflictException('No accounting journal found for this payment');
+      throw new ConflictException(
+        'No accounting journal found for this payment',
+      );
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -2891,8 +2893,10 @@ export class FinanceService {
       await tx.invoice.update({
         where: { id: payment.invoiceId },
         data: {
-          status: paidSoFar.gt(0) ? InvoiceStatus.PARTIAL : InvoiceStatus.ISSUED,
-          paidAt: paidSoFar.gt(0) ? (payment.invoice.paidAt) : null,
+          status: paidSoFar.gt(0)
+            ? InvoiceStatus.PARTIAL
+            : InvoiceStatus.ISSUED,
+          paidAt: paidSoFar.gt(0) ? payment.invoice.paidAt : null,
         },
       });
 

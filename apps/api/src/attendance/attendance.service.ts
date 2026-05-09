@@ -820,10 +820,7 @@ export class AttendanceService {
       sessions.map((s) => [s.attendanceDate.toISOString().split('T')[0], s]),
     );
     const calendarByDate = new Map(
-      calendarDays.map((d) => [
-        d.calendarDate.toISOString().split('T')[0],
-        d,
-      ]),
+      calendarDays.map((d) => [d.calendarDate.toISOString().split('T')[0], d]),
     );
 
     const daysCount = endDate.getDate();
@@ -947,9 +944,7 @@ export class AttendanceService {
       where: { userId: actor.userId },
     });
     if (!staff) {
-      throw new ForbiddenException(
-        'Only staff can create correction requests',
-      );
+      throw new ForbiddenException('Only staff can create correction requests');
     }
 
     // Check if direct edit is allowed or locked
@@ -2245,10 +2240,7 @@ export class AttendanceService {
     };
   }
 
-  async exportMonthlyRegister(
-    dto: GetMonthlyRegisterDto,
-    actor: AuthContext,
-  ) {
+  async exportMonthlyRegister(dto: GetMonthlyRegisterDto, actor: AuthContext) {
     const data = await this.getMonthlyRegister(dto, actor);
 
     const headers = [

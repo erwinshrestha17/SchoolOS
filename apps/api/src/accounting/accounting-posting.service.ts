@@ -962,10 +962,7 @@ export class AccountingPostingService {
       );
     }
 
-    if (
-      fiscalPeriod.status === AccountingPeriodStatus.LOCKED &&
-      !allowLocked
-    ) {
+    if (fiscalPeriod.status === AccountingPeriodStatus.LOCKED && !allowLocked) {
       throw new ConflictException(
         `Fiscal period "${fiscalPeriod.label}" is locked for posting.`,
       );

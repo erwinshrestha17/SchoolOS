@@ -1,9 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  INestApplication,
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { StudentsService } from '../src/students/students.service';
-import { StudentLifecycleStatus, EnrollmentStatus, StudentDocumentKind } from '@prisma/client';
+import {
+  StudentLifecycleStatus,
+  EnrollmentStatus,
+  StudentDocumentKind,
+} from '@prisma/client';
 import { createAuthContextMock } from './test-helpers';
 
 describe('Student Lifecycle Hardening (E2E)', () => {
@@ -118,7 +127,11 @@ describe('Student Lifecycle Hardening (E2E)', () => {
 
     // Attempt transfer without waiver -> should fail
     await expect(
-      studentsService.requestTransfer(student.id, { reason: 'Relocation' }, actor),
+      studentsService.requestTransfer(
+        student.id,
+        { reason: 'Relocation' },
+        actor,
+      ),
     ).rejects.toThrow(BadRequestException);
 
     // Attempt transfer with waiver -> should succeed
@@ -128,12 +141,17 @@ describe('Student Lifecycle Hardening (E2E)', () => {
       actor,
     );
 
-    const updated = await prisma.student.findUnique({ where: { id: student.id } });
+    const updated = await prisma.student.findUnique({
+      where: { id: student.id },
+    });
     expect(updated?.lifecycleStatus).toBe(StudentLifecycleStatus.TRANSFERRED);
     expect(updated?.feeClearanceWaivedAt).toBeDefined();
 
     const transitions = await prisma.studentLifecycleTransition.findMany({
-      where: { studentId: student.id, toStatus: StudentLifecycleStatus.TRANSFERRED },
+      where: {
+        studentId: student.id,
+        toStatus: StudentLifecycleStatus.TRANSFERRED,
+      },
     });
     expect(transitions).toHaveLength(1);
     expect(transitions[0].feeClearanceWaived).toBe(true);
@@ -152,7 +170,10 @@ describe('Student Lifecycle Hardening (E2E)', () => {
       actor,
     );
 
-    const { qrCode } = await studentsService.generateStudentQrCode(student.id, actor);
+    const { qrCode } = await studentsService.generateStudentQrCode(
+      student.id,
+      actor,
+    );
     expect(qrCode).toContain(`schoolos:std:${tenantId}`);
 
     const verified = await studentsService.verifyStudentQrCode(qrCode!, actor);
@@ -194,8 +215,13 @@ describe('Student Lifecycle Hardening (E2E)', () => {
     expect(history[0].action).toBe('UPLOAD');
     expect(history[0].reason).toBe('Initial admission doc');
 
-    await studentsService.deleteStudentDocument(student.id, doc.id, { reason: 'Correction' }, actor);
-    
+    await studentsService.deleteStudentDocument(
+      student.id,
+      doc.id,
+      { reason: 'Correction' },
+      actor,
+    );
+
     const historyAfter = await prisma.studentDocumentHistory.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'desc' },
@@ -257,7 +283,9 @@ describe('Student Lifecycle Hardening (E2E)', () => {
       actor,
     );
 
-    const student1After = await prisma.student.findUnique({ where: { id: student1.id } });
+    const student1After = await prisma.student.findUnique({
+      where: { id: student1.id },
+    });
     expect(student1After?.lifecycleStatus).toBe(StudentLifecycleStatus.DELETED);
 
     const docsAtTarget = await prisma.studentDocument.findMany({

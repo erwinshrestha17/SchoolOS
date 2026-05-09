@@ -529,8 +529,16 @@ export function buildRosterPdf(input: {
     '36 36 540 720 re S',
     text(input.schoolName, 48, 726, 16, 'F2'),
     text('CLASS ROSTER', 460, 726, 14, 'F2'),
-    text(`${input.className} ${input.sectionName ? '- ' + input.sectionName : ''}`, 48, 712, 10, 'F1'),
-    input.academicYear ? text(`Academic Year: ${input.academicYear}`, 48, 700, 9, 'F1') : '',
+    text(
+      `${input.className} ${input.sectionName ? '- ' + input.sectionName : ''}`,
+      48,
+      712,
+      10,
+      'F1',
+    ),
+    input.academicYear
+      ? text(`Academic Year: ${input.academicYear}`, 48, 700, 9, 'F1')
+      : '',
     '36 690 m 576 690 l S',
   ];
 
@@ -558,7 +566,13 @@ export function buildRosterPdf(input: {
 
   contentParts.push(
     text(`Total Students: ${input.rows.length}`, 48, 45, 9, 'F2'),
-    text(`Generated: ${new Date().toISOString().slice(0, 10)}`, 460, 45, 8, 'F1'),
+    text(
+      `Generated: ${new Date().toISOString().slice(0, 10)}`,
+      460,
+      45,
+      8,
+      'F1',
+    ),
   );
 
   return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
