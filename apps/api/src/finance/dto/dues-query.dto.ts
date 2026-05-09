@@ -1,5 +1,15 @@
-import { IsOptional, IsString, IsUUID, IsInt, Min, Max } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
+import { InvoiceStatus } from '@prisma/client';
 
 export class DuesQueryDto {
   @IsOptional()
@@ -23,6 +33,18 @@ export class DuesQueryDto {
   studentId?: string;
 
   @IsOptional()
+  @IsDateString()
+  dueFrom?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dueTo?: string;
+
+  @IsOptional()
+  @IsEnum(InvoiceStatus)
+  status?: InvoiceStatus;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
@@ -34,4 +56,17 @@ export class DuesQueryDto {
   @IsInt()
   @Min(2000)
   year?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
 }

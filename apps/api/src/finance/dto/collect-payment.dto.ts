@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
 } from 'class-validator';
 
@@ -22,10 +23,12 @@ export class CollectPaymentDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   referenceNumber?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   narration?: string;
 
   @IsOptional()
@@ -38,5 +41,6 @@ export class CollectPaymentDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(150)
   idempotencyKey?: string;
 }
