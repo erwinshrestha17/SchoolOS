@@ -145,8 +145,12 @@ export class LibraryController {
 
   @Get('overdue')
   @Permissions('library:reports:read')
-  listOverdue(@CurrentAuth() auth: AuthContext) {
-    return this.libraryService.listOverdue(auth);
+  listOverdue(
+    @CurrentAuth() auth: AuthContext,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.libraryService.listOverdue(auth, { page, limit });
   }
 
   @Post('overdue/reminders')
