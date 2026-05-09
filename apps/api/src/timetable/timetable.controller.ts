@@ -152,6 +152,16 @@ export class TimetableController {
     return this.timetableService.createVersionSlot(id, dto, auth);
   }
 
+  @Post('versions/:id/entries')
+  @Permissions('timetable:create')
+  createVersionEntry(
+    @Param('id') id: string,
+    @Body() dto: CreateVersionSlotDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.createVersionSlot(id, dto, auth);
+  }
+
   @Post('versions/:id/validate')
   @Permissions('timetable:read')
   validateVersion(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
@@ -164,15 +174,33 @@ export class TimetableController {
     return this.timetableService.publishVersion(id, auth);
   }
 
+  @Post('versions/:id/publish')
+  @Permissions('timetable:publish')
+  publishVersionPost(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+    return this.timetableService.publishVersion(id, auth);
+  }
+
   @Patch('versions/:id/lock')
   @Permissions('timetable:publish')
   lockVersion(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.timetableService.lockVersion(id, auth);
   }
 
+  @Post('versions/:id/lock')
+  @Permissions('timetable:publish')
+  lockVersionPost(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+    return this.timetableService.lockVersion(id, auth);
+  }
+
   @Patch('versions/:id/archive')
   @Permissions('timetable:publish')
   archiveVersion(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+    return this.timetableService.archiveVersion(id, auth);
+  }
+
+  @Post('versions/:id/archive')
+  @Permissions('timetable:publish')
+  archiveVersionPost(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.timetableService.archiveVersion(id, auth);
   }
 
@@ -195,6 +223,28 @@ export class TimetableController {
   @Delete('slots/:id')
   @Permissions('timetable:delete')
   deleteSlot(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+    return this.timetableService.deleteSlot(id, auth);
+  }
+
+  @Patch('entries/:id')
+  @Permissions('timetable:update')
+  updateEntry(
+    @Param('id') id: string,
+    @Body() dto: UpdateVersionSlotDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.updateSlot(id, dto, auth);
+  }
+
+  @Delete('entries/:id')
+  @Permissions('timetable:delete')
+  deleteEntry(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+    return this.timetableService.deleteSlot(id, auth);
+  }
+
+  @Post('entries/:id/archive')
+  @Permissions('timetable:delete')
+  archiveEntry(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.timetableService.deleteSlot(id, auth);
   }
 
@@ -297,6 +347,15 @@ export class TimetableController {
   @Patch('substitutions/:id/cancel')
   @Permissions('timetable:substitute')
   cancelSubstitution(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.cancelSubstitution(id, auth);
+  }
+
+  @Post('substitutions/:id/cancel')
+  @Permissions('timetable:substitute')
+  cancelSubstitutionPost(
     @Param('id') id: string,
     @CurrentAuth() auth: AuthContext,
   ) {
