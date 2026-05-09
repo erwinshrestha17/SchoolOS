@@ -16,6 +16,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
+import { AccountingPostingService } from '../accounting/accounting-posting.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -83,6 +84,7 @@ export class CanteenService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly accountingPostingService: AccountingPostingService,
   ) {}
 
   async createMenuItem(dto: CreateCanteenMenuItemDto, actor: AuthContext) {
@@ -529,6 +531,20 @@ export class CanteenService {
           createdByUserId: actor.userId,
         },
       });
+
+      await this.accountingPostingService.postCanteenTopUp(
+        {
+          tenantId: actor.tenantId,
+          walletId: wallet.id,
+          studentId,
+          amount: new Prisma.Decimal(dto.amount),
+          paymentMethod: 'CASH', // Assuming cash for manual top-up or add to DTO
+          note: dto.note,
+        },
+        actor,
+        tx,
+      );
+
       return { wallet: updated, transaction };
     });
     await this.audit(
@@ -665,6 +681,20 @@ export class CanteenService {
           },
         });
       }
+
+      await this.accountingPostingService.postCanteenSale(
+        {
+          tenantId: actor.tenantId,
+          saleId: id,
+          studentId: existing.studentId,
+          walletId: existing.walletId,
+          amount: existing.totalAmount,
+          paymentMethod: existing.paymentMethod,
+          note: dto.note ?? existing.notes,
+        },
+        actor,
+        tx,
+      );
       return tx.canteenPosSale.update({
         where: { id },
         data: {

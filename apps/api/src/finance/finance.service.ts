@@ -548,30 +548,31 @@ export class FinanceService {
           tx,
         );
 
-        invoices.push(
-          await tx.invoice.create({
-            data: {
-              tenantId: actor.tenantId,
-              studentId: assignment.studentId,
-              academicYearId: dto.academicYearId,
-              billingRunId: run.id,
-              invoiceNumber,
-              fiscalYear,
-              billNumber: invoiceNumber,
-              dueDate,
-              subtotal: calculated.subtotal,
-              vatAmount: calculated.vatAmount,
-              totalAmount: calculated.totalAmount,
-              lines: {
-                create: calculated.lines,
-              },
+        const invoice = await tx.invoice.create({
+          data: {
+            tenantId: actor.tenantId,
+            studentId: assignment.studentId,
+            academicYearId: dto.academicYearId,
+            billingRunId: run.id,
+            invoiceNumber,
+            fiscalYear,
+            billNumber: invoiceNumber,
+            dueDate,
+            subtotal: calculated.subtotal,
+            vatAmount: calculated.vatAmount,
+            totalAmount: calculated.totalAmount,
+            lines: {
+              create: calculated.lines,
             },
-            include: {
-              student: true,
-              lines: true,
-            },
-          }),
-        );
+          },
+          include: {
+            student: true,
+            lines: { include: { feeHead: true } },
+          },
+        });
+        invoices.push(invoice);
+
+        await this.postInvoiceToLedger(invoice, actor, tx);
       }
 
       return { run, invoices };
@@ -2592,7 +2593,7 @@ export class FinanceService {
           paymentMethod: dto.method,
           paymentAccountCode: resolveCashAccountCode(dto.method),
           narration: dto.narration,
-          lines: creditLines,
+          lines: [], // Lines no longer needed for payment in accrual model
         },
         actor,
         tx,
@@ -3828,6 +3829,45 @@ export class FinanceService {
     });
 
     return Boolean(line);
+  }
+
+  private async postInvoiceToLedger(
+    invoice: any,
+    actor: AuthContext,
+    tx: Prisma.TransactionClient,
+  ) {
+    const invoiceLines = [];
+    for (const line of invoice.lines) {
+      const accountCode = resolveIncomeAccountCode(line.feeHead.code);
+      const account = await this.accountingPostingService.ensureAccount(
+        tx,
+        actor.tenantId,
+        {
+          code: accountCode,
+          name: line.feeHead.name,
+          type: ChartAccountType.REVENUE,
+        },
+      );
+      invoiceLines.push({
+        chartAccountId: account.id,
+        amount: line.totalAmount,
+        description: line.description,
+      });
+    }
+
+    await this.accountingPostingService.postInvoice(
+      {
+        tenantId: actor.tenantId,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        studentId: invoice.studentId,
+        totalAmount: invoice.totalAmount,
+        entryDate: new Date(),
+        lines: invoiceLines,
+      },
+      actor,
+      tx,
+    );
   }
 }
 

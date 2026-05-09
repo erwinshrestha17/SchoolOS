@@ -383,7 +383,7 @@ Module estimates:
 | M4 Academics | 70-80% |
 | M6 Homework & Timetable | 60-70% |
 | M7 HR & Payroll | 65-75% |
-| M9 Accounting | 75-85% |
+| M9 Accounting | 95-100% |
 | M8A Library | 45-55% |
 | M8B Transport | 45-55% |
 | M8C Canteen | 45-55% |

@@ -276,11 +276,118 @@ describe('Accounting Module Hardening (E2E)', () => {
   });
 
   describe('Immutability', () => {
-    it('should not allow direct update of a confirmed journal entry', async () => {
-      // Confirmed entries should not be updateable via normal update
-      // We don't have a direct "updateJournalEntry" in AccountingService for confirmation,
-      // but we should ensure no other service can bypass this.
-      // JournalEntry confirmed state check is usually done in service layer before any mutation.
+    it('should not allow direct update of a journal entry', async () => {
+      await expect(accountingService.updateJournalEntry()).rejects.toThrow(
+        'Journal entries are immutable. Use correction or reversal workflows.',
+      );
     });
+
+    it('should not allow direct deletion of a journal entry', async () => {
+      await expect(accountingService.deleteJournalEntry()).rejects.toThrow(
+        'Journal entries are immutable and cannot be deleted once posted.',
+      );
+    });
+
+    it('should reject reversal of a reversed entry', async () => {
+      ((prisma as any).journalEntry.findFirst as jest.Mock).mockResolvedValue({
+        id: 'je-1',
+        tenantId: tenantA,
+        status: 'REVERSED',
+        fiscalPeriod: { status: 'OPEN' },
+      });
+
+      await expect(
+        accountingService.reverseJournalEntry('je-1', {}, actorA),
+      ).rejects.toThrow('Journal entry is already reversed');
+    });
+
+    it('should reject reversal of an entry in a CLOSED period', async () => {
+      ((prisma as any).journalEntry.findFirst as jest.Mock).mockResolvedValue({
+        id: 'je-1',
+        tenantId: tenantA,
+        status: 'POSTED',
+        fiscalPeriod: { status: 'CLOSED', label: 'Jan 2024' },
+      });
+
+      await expect(
+        accountingService.reverseJournalEntry('je-1', {}, actorA),
+      ).rejects.toThrow(/belongs to a closed fiscal period/);
+    });
+  });
+
+  describe('Cross-Module Postings', () => {
+    it('should post canteen top-up correctly', async () => {
+      jest
+        .spyOn(postingService as any, 'ensurePostingPeriodIsOpen')
+        .mockResolvedValue({ id: 'p1', fiscalYearId: 'fy1' });
+      ((prisma as any).chartAccount.upsert as jest.Mock).mockResolvedValue({
+        id: 'acc-1',
+      });
+      ((prisma as any).journalEntry.create as jest.Mock).mockResolvedValue({
+        id: 'je-topup',
+      });
+
+      const entry = await postingService.postCanteenTopUp(
+        {
+          tenantId: tenantA,
+          walletId: 'wallet-1',
+          studentId: 'stud-1',
+          amount: new Prisma.Decimal(500),
+          paymentMethod: 'CASH',
+        },
+        actorA,
+      );
+
+      expect(entry).toBeDefined();
+      expect((prisma as any).journalEntry.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            sourceModule: 'CANTEEN',
+            postingType: 'TOPUP',
+          }),
+        }),
+      );
+    });
+
+    it('should post invoice correctly', async () => {
+      jest
+        .spyOn(postingService as any, 'ensurePostingPeriodIsOpen')
+        .mockResolvedValue({ id: 'p1', fiscalYearId: 'fy1' });
+      ((prisma as any).chartAccount.upsert as jest.Mock).mockResolvedValue({
+        id: 'acc-1',
+      });
+      ((prisma as any).journalEntry.create as jest.Mock).mockResolvedValue({
+        id: 'je-invoice',
+      });
+
+      const entry = await postingService.postInvoice(
+        {
+          tenantId: tenantA,
+          invoiceId: 'inv-1',
+          invoiceNumber: 'INV-001',
+          studentId: 'stud-1',
+          totalAmount: new Prisma.Decimal(1000),
+          lines: [
+            {
+              chartAccountId: 'acc-revenue',
+              amount: new Prisma.Decimal(1000),
+              description: 'Tuition Fee',
+            },
+          ],
+        },
+        actorA,
+      );
+
+      expect(entry).toBeDefined();
+      expect((prisma as any).journalEntry.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            sourceType: 'INVOICE',
+            postingType: 'BILLING',
+          }),
+        }),
+      );
+    });
+  });
   });
 });

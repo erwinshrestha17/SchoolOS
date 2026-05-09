@@ -19,6 +19,29 @@ export enum PostingAction {
   CORRECT = 'CORRECT',
 }
 
+export interface CanteenTopUpPostingInput {
+  tenantId: string;
+  walletId: string;
+  studentId: string;
+  amount: Prisma.Decimal;
+  paymentMethod: string;
+  paymentAccountCode?: string;
+  note?: string | null;
+  entryDate?: Date;
+}
+
+export interface CanteenSalePostingInput {
+  tenantId: string;
+  saleId: string;
+  studentId?: string | null;
+  walletId?: string | null;
+  amount: Prisma.Decimal;
+  paymentMethod: string;
+  paymentAccountCode?: string;
+  note?: string | null;
+  entryDate?: Date;
+}
+
 export interface PayrollPostingInput {
   tenantId: string;
   payrollRunId: string;
@@ -59,6 +82,20 @@ export interface FeePaymentPostingInput {
   paymentMethod: string;
   paymentAccountCode?: string;
   narration?: string | null;
+  entryDate?: Date;
+  lines: Array<{
+    chartAccountId: string;
+    amount: Prisma.Decimal;
+    description: string;
+  }>;
+}
+
+export interface InvoicePostingInput {
+  tenantId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  studentId: string;
+  totalAmount: Prisma.Decimal;
   entryDate?: Date;
   lines: Array<{
     chartAccountId: string;
@@ -681,21 +718,27 @@ export class AccountingPostingService {
       },
     });
 
+    const receivableAccount = await this.ensureAccount(tx, input.tenantId, {
+      code: '1200',
+      name: 'Student Receivables',
+      type: ChartAccountType.ASSET,
+    });
+
     const lines = [
       {
         tenantId: input.tenantId,
         chartAccountId: debitAccount.id,
         side: JournalLineSide.DEBIT,
         amount: input.paymentAmount,
-        description: `Fee collection via ${input.paymentMethod}`,
+        description: `Fee collection via ${input.paymentMethod}: ${input.receiptNumber}`,
       },
-      ...input.lines.map((line) => ({
+      {
         tenantId: input.tenantId,
-        chartAccountId: line.chartAccountId,
+        chartAccountId: receivableAccount.id,
         side: JournalLineSide.CREDIT,
-        amount: line.amount,
-        description: line.description,
-      })),
+        amount: input.paymentAmount,
+        description: `Payment applied to ${input.invoiceNumber}`,
+      },
     ];
 
     this.ensureBalanced(lines);
@@ -740,6 +783,98 @@ export class AccountingPostingService {
         sourceType: entry.sourceType,
         sourceId: entry.sourceId,
         amount: input.paymentAmount.toString(),
+      },
+    });
+
+    return entry;
+  }
+
+  async postInvoice(
+    input: InvoicePostingInput,
+    actor: AuthContext,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const entryDate = input.entryDate ?? new Date();
+    const period = await this.ensurePostingPeriodIsOpen(
+      tx,
+      input.tenantId,
+      entryDate,
+    );
+
+    await this.ensureNoDuplicateSource(
+      tx,
+      input.tenantId,
+      'FINANCE',
+      JournalSourceType.INVOICE,
+      input.invoiceId,
+      'BILLING',
+    );
+
+    const receivableAccount = await this.ensureAccount(tx, input.tenantId, {
+      code: '1200',
+      name: 'Student Receivables',
+      type: ChartAccountType.ASSET,
+    });
+
+    const lines = [
+      {
+        tenantId: input.tenantId,
+        chartAccountId: receivableAccount.id,
+        side: JournalLineSide.DEBIT,
+        amount: input.totalAmount,
+        description: `Invoice ${input.invoiceNumber} for student ${input.studentId}`,
+      },
+      ...input.lines.map((line) => ({
+        tenantId: input.tenantId,
+        chartAccountId: line.chartAccountId,
+        side: JournalLineSide.CREDIT,
+        amount: line.amount,
+        description: line.description,
+      })),
+    ];
+
+    this.ensureBalanced(lines);
+
+    const entry = await tx.journalEntry.create({
+      data: {
+        tenantId: input.tenantId,
+        fiscalYearId: period?.fiscalYearId ?? null,
+        fiscalPeriodId: period?.id ?? null,
+        entryNumber: await this.generateJournalEntryNumber(
+          tx,
+          input.tenantId,
+          entryDate,
+        ),
+        entryDate,
+        status: JournalEntryStatus.POSTED,
+        narration: `Invoice ${input.invoiceNumber}`,
+        sourceModule: 'FINANCE',
+        sourceType: JournalSourceType.INVOICE,
+        sourceId: input.invoiceId,
+        postingType: 'BILLING',
+        createdById: actor.userId,
+        postedAt: new Date(),
+        lines: {
+          create: lines.map((line, index) => ({
+            ...line,
+            lineNumber: index + 1,
+            debit: line.side === JournalLineSide.DEBIT ? line.amount : 0,
+            credit: line.side === JournalLineSide.CREDIT ? line.amount : 0,
+          })),
+        },
+      },
+    });
+
+    await this.auditService.record({
+      action: 'post',
+      resource: 'journal_entry',
+      tenantId: input.tenantId,
+      userId: actor.userId,
+      resourceId: entry.id,
+      after: {
+        sourceType: entry.sourceType,
+        sourceId: entry.sourceId,
+        amount: input.totalAmount.toString(),
       },
     });
 
@@ -932,6 +1067,161 @@ export class AccountingPostingService {
     );
   }
 
+  async postCanteenTopUp(
+    input: CanteenTopUpPostingInput,
+    actor: AuthContext,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const entryDate = input.entryDate ?? new Date();
+    const period = await this.ensurePostingPeriodIsOpen(
+      tx,
+      input.tenantId,
+      entryDate,
+    );
+
+    const cashAccount = await this.ensureAccount(tx, input.tenantId, {
+      code: input.paymentAccountCode ?? '1010',
+      name: 'Cash/Bank',
+      type: ChartAccountType.ASSET,
+    });
+    const walletLiability = await this.ensureAccount(tx, input.tenantId, {
+      code: '2400',
+      name: 'Canteen Wallet Liability',
+      type: ChartAccountType.LIABILITY,
+    });
+
+    const lines = [
+      {
+        tenantId: input.tenantId,
+        chartAccountId: cashAccount.id,
+        side: JournalLineSide.DEBIT,
+        amount: input.amount,
+        description: `Canteen top-up via ${input.paymentMethod}`,
+      },
+      {
+        tenantId: input.tenantId,
+        chartAccountId: walletLiability.id,
+        side: JournalLineSide.CREDIT,
+        amount: input.amount,
+        description: `Wallet top-up for student ${input.studentId}`,
+      },
+    ];
+
+    this.ensureBalanced(lines);
+
+    return tx.journalEntry.create({
+      data: {
+        tenantId: input.tenantId,
+        fiscalYearId: period?.fiscalYearId ?? null,
+        fiscalPeriodId: period?.id ?? null,
+        entryNumber: await this.generateJournalEntryNumber(
+          tx,
+          input.tenantId,
+          entryDate,
+        ),
+        entryDate,
+        status: JournalEntryStatus.POSTED,
+        narration: input.note ?? `Canteen top-up for ${input.studentId}`,
+        sourceModule: 'CANTEEN',
+        sourceType: JournalSourceType.ADJUSTMENT,
+        sourceId: input.walletId,
+        postingType: 'TOPUP',
+        createdById: actor.userId,
+        postedAt: new Date(),
+        lines: {
+          create: lines.map((l, i) => ({
+            ...l,
+            lineNumber: i + 1,
+            debit: l.side === JournalLineSide.DEBIT ? l.amount : 0,
+            credit: l.side === JournalLineSide.CREDIT ? l.amount : 0,
+          })),
+        },
+      },
+    });
+  }
+
+  async postCanteenSale(
+    input: CanteenSalePostingInput,
+    actor: AuthContext,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const entryDate = input.entryDate ?? new Date();
+    const period = await this.ensurePostingPeriodIsOpen(
+      tx,
+      input.tenantId,
+      entryDate,
+    );
+
+    const revenueAccount = await this.ensureAccount(tx, input.tenantId, {
+      code: '4100',
+      name: 'Canteen Revenue',
+      type: ChartAccountType.REVENUE,
+    });
+
+    let debitAccountCode = '1010';
+    let debitAccountName = 'Cash/Bank';
+
+    if (input.paymentMethod === 'WALLET') {
+      debitAccountCode = '2400';
+      debitAccountName = 'Canteen Wallet Liability';
+    }
+
+    const debitAccount = await this.ensureAccount(tx, input.tenantId, {
+      code: debitAccountCode,
+      name: debitAccountName,
+      type: input.paymentMethod === 'WALLET' ? ChartAccountType.LIABILITY : ChartAccountType.ASSET,
+    });
+
+    const lines = [
+      {
+        tenantId: input.tenantId,
+        chartAccountId: debitAccount.id,
+        side: JournalLineSide.DEBIT,
+        amount: input.amount,
+        description: `Canteen sale payment via ${input.paymentMethod}`,
+      },
+      {
+        tenantId: input.tenantId,
+        chartAccountId: revenueAccount.id,
+        side: JournalLineSide.CREDIT,
+        amount: input.amount,
+        description: `Canteen sale revenue: ${input.saleId}`,
+      },
+    ];
+
+    this.ensureBalanced(lines);
+
+    return tx.journalEntry.create({
+      data: {
+        tenantId: input.tenantId,
+        fiscalYearId: period?.fiscalYearId ?? null,
+        fiscalPeriodId: period?.id ?? null,
+        entryNumber: await this.generateJournalEntryNumber(
+          tx,
+          input.tenantId,
+          entryDate,
+        ),
+        entryDate,
+        status: JournalEntryStatus.POSTED,
+        narration: input.note ?? `Canteen sale ${input.saleId}`,
+        sourceModule: 'CANTEEN',
+        sourceType: JournalSourceType.FEE_PAYMENT, // Reusing FeePayment for sale revenue for now or add CANTEEN_SALE to enum if possible
+        sourceId: input.saleId,
+        postingType: 'SALE',
+        createdById: actor.userId,
+        postedAt: new Date(),
+        lines: {
+          create: lines.map((l, i) => ({
+            ...l,
+            lineNumber: i + 1,
+            debit: l.side === JournalLineSide.DEBIT ? l.amount : 0,
+            credit: l.side === JournalLineSide.CREDIT ? l.amount : 0,
+          })),
+        },
+      },
+    });
+  }
+
   private async ensurePostingPeriodIsOpen(
     tx: PostingClient,
     tenantId: string,
@@ -1099,7 +1389,17 @@ export class AccountingPostingService {
     );
 
     if (decimalText(totals.debit) !== decimalText(totals.credit)) {
-      throw new ConflictException('Accounting posting must be balanced');
+      throw new ConflictException(
+        `Accounting posting must be balanced. Total Debit: ${decimalText(totals.debit)}, Total Credit: ${decimalText(totals.credit)}`,
+      );
+    }
+
+    if (totals.debit.lte(0) && totals.credit.lte(0)) {
+      throw new ConflictException('Accounting posting must have non-zero amounts');
+    }
+
+    if (lines.length === 0) {
+      throw new ConflictException('Accounting posting must have at least one line');
     }
   }
 }

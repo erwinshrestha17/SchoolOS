@@ -33,6 +33,24 @@ export class AccountingService {
     private readonly postingService: AccountingPostingService,
   ) {}
 
+  /**
+   * Block direct updates to posted journal entries.
+   */
+  async updateJournalEntry() {
+    throw new ConflictException(
+      'Journal entries are immutable. Use correction or reversal workflows.',
+    );
+  }
+
+  /**
+   * Block direct deletions of journal entries.
+   */
+  async deleteJournalEntry() {
+    throw new ConflictException(
+      'Journal entries are immutable and cannot be deleted once posted.',
+    );
+  }
+
   async listPeriods(actor: AuthContext) {
     return this.prisma.accountingPeriod.findMany({
       where: { tenantId: actor.tenantId },
@@ -322,6 +340,12 @@ export class AccountingService {
 
     if (!original) {
       throw new NotFoundException('Journal entry not found in this tenant');
+    }
+
+    await this.ensureJournalIsMutable(original.id, actor.tenantId);
+
+    if (original.status === JournalEntryStatus.REVERSED) {
+      throw new ConflictException('Journal entry is already reversed');
     }
 
     if (original.sourceType === JournalSourceType.REVERSAL) {
@@ -675,6 +699,12 @@ export class AccountingService {
       throw new NotFoundException('Journal entry not found');
     }
 
+    await this.ensureJournalIsMutable(original.id, actor.tenantId);
+
+    if (original.status === JournalEntryStatus.REVERSED) {
+      throw new ConflictException('Cannot correct a reversed journal entry. Reverse the reversal first (if applicable) or post a new entry.');
+    }
+
     const correctionDate = dto.reversalDate
       ? new Date(dto.reversalDate)
       : new Date();
@@ -888,6 +918,27 @@ export class AccountingService {
 
     return toCsv(Array.isArray(data) ? data : [data]);
   }
+
+  private async ensureJournalIsMutable(id: string, tenantId: string) {
+    const entry = await this.prisma.journalEntry.findFirst({
+      where: { id, tenantId },
+      include: { fiscalPeriod: true },
+    });
+
+    if (!entry) {
+      throw new NotFoundException('Journal entry not found');
+    }
+
+    if (entry.status === JournalEntryStatus.REVERSED) {
+      throw new ConflictException('Journal entry is already reversed and immutable');
+    }
+
+    if (entry.fiscalPeriod?.status === AccountingPeriodStatus.CLOSED) {
+      throw new ConflictException(
+        `Journal entry belongs to a closed fiscal period "${entry.fiscalPeriod.label}" and is immutable`,
+      );
+    }
+  }
 }
 
 function sumJournalSides(
@@ -1042,6 +1093,28 @@ function getDefaultSchoolChartAccounts() {
       type: ChartAccountType.EXPENSE,
     },
   ];
+}
+
+  private async ensureJournalIsMutable(id: string, tenantId: string) {
+    const entry = await this.prisma.journalEntry.findFirst({
+      where: { id, tenantId },
+      include: { fiscalPeriod: true },
+    });
+
+    if (!entry) {
+      throw new NotFoundException('Journal entry not found');
+    }
+
+    if (entry.status === JournalEntryStatus.REVERSED) {
+      throw new ConflictException('Journal entry is already reversed and immutable');
+    }
+
+    if (entry.fiscalPeriod?.status === AccountingPeriodStatus.CLOSED) {
+      throw new ConflictException(
+        `Journal entry belongs to a closed fiscal period "${entry.fiscalPeriod.label}" and is immutable`,
+      );
+    }
+  }
 }
 
 function toCsv(rows: Array<Record<string, unknown>>) {

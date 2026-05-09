@@ -15,6 +15,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
+import { AccountingPostingService } from '../accounting/accounting-posting.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { ConfigService } from '../config/config.service';
@@ -55,6 +56,7 @@ export class LibraryService {
     private readonly auditService: AuditService,
     private readonly communicationsService: CommunicationsService,
     private readonly configService: ConfigService,
+    private readonly accountingPostingService: AccountingPostingService,
   ) {}
 
   async listBooks(actor: AuthContext, options: ListBooksQuery = {}) {
@@ -771,7 +773,40 @@ export class LibraryService {
           },
         },
       },
+      include: {
+        lines: { include: { feeHead: true } },
+      },
     });
+
+    const incomeAccount = await this.accountingPostingService.ensureAccount(
+      tx,
+      input.actor.tenantId,
+      {
+        code: '4040', // Library Fine Income
+        name: 'Library Fine Income',
+        type: ChartAccountType.REVENUE,
+      },
+    );
+
+    await this.accountingPostingService.postInvoice(
+      {
+        tenantId: input.actor.tenantId,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        studentId: input.studentId,
+        totalAmount: input.amount,
+        entryDate: new Date(),
+        lines: [
+          {
+            chartAccountId: incomeAccount.id,
+            amount: input.amount,
+            description: input.description,
+          },
+        ],
+      },
+      input.actor,
+      tx,
+    );
 
     return invoice.id;
   }
