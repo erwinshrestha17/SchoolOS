@@ -257,6 +257,38 @@ export class StudentsController {
   ) {
     return this.studentsService.getAttendanceHistory(studentId, query, auth);
   }
+
+  @Get(':id/identity')
+  @Permissions('students:read')
+  getStudentIdentity(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.getStudentIdentity(studentId, auth);
+  }
+
+  @Post(':id/identity')
+  @Permissions('students:update')
+  generateStudentIdentity(
+    @Param('id') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.generateStudentIdentity(studentId, auth);
+  }
+
+  @Post(':id/identity/revoke')
+  @Permissions('students:update')
+  revokeStudentIdentity(
+    @Param('id') studentId: string,
+    @Body('identityCode') identityCode: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.revokeStudentIdentity(
+      studentId,
+      identityCode,
+      auth,
+    );
+  }
 }
 
 function safePdfFileName(value: string) {

@@ -14,6 +14,7 @@ import {
   JournalSourceType,
   NotificationChannel,
   PaymentMethod,
+  PaymentStatus,
   Prisma,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
@@ -1761,7 +1762,7 @@ export class FinanceService {
     const ledgerEvents: Array<{
       id: string;
       date: Date;
-      type: 'INVOICE' | 'PAYMENT' | 'WAIVER' | 'REFUND';
+      type: 'INVOICE' | 'PAYMENT' | 'WAIVER' | 'REFUND' | 'REVERSAL';
       reference: string;
       description: string;
       debit: Prisma.Decimal;
@@ -1795,7 +1796,7 @@ export class FinanceService {
           date: payment.paidAt,
           type: 'PAYMENT',
           reference: payment.receipt?.receiptNumber ?? payment.id,
-          description: `${payment.method} payment for ${invoice.invoiceNumber}`,
+          description: `${payment.method} payment for ${invoice.invoiceNumber}${payment.status === PaymentStatus.REVERSED ? ' (REVERSED)' : ''}`,
           debit: new Prisma.Decimal(0),
           credit: payment.amount,
           affectsBalance: true,
@@ -1803,7 +1804,25 @@ export class FinanceService {
           invoiceNumber: invoice.invoiceNumber,
           paymentId: payment.id,
           receiptNumber: payment.receipt?.receiptNumber ?? null,
+          status: payment.status,
         });
+
+        if (payment.status === PaymentStatus.REVERSED) {
+          ledgerEvents.push({
+            id: `reversal:${payment.id}`,
+            date: payment.reversedAt ?? payment.paidAt,
+            type: 'REVERSAL',
+            reference: payment.receipt?.receiptNumber ?? payment.id,
+            description: `REVERSAL: ${payment.reversalReason ?? 'Payment voided'}`,
+            debit: payment.amount,
+            credit: new Prisma.Decimal(0),
+            affectsBalance: true,
+            invoiceId: invoice.id,
+            invoiceNumber: invoice.invoiceNumber,
+            paymentId: payment.id,
+            receiptNumber: payment.receipt?.receiptNumber ?? null,
+          });
+        }
 
         for (const refund of payment.refunds) {
           ledgerEvents.push({
@@ -1912,6 +1931,39 @@ export class FinanceService {
       outstandingBalance: Math.max(0, Number(outstandingBalance)),
       rows,
     };
+  }
+
+  async exportStudentFeeLedgerCsv(studentId: string, actor: AuthContext) {
+    const ledger = await this.getStudentFeeLedger(studentId, actor);
+    const headers = [
+      'Date',
+      'Type',
+      'Reference',
+      'Description',
+      'Debit',
+      'Credit',
+      'Running Balance',
+    ];
+
+    const rows = ledger.rows.map((r) => ({
+      Date: r.date.toISOString().split('T')[0],
+      Type: r.type,
+      Reference: r.reference,
+      Description: r.description,
+      Debit: r.debit,
+      Credit: r.credit,
+      'Running Balance': r.runningBalance,
+    }));
+
+    await this.auditService.record({
+      action: 'export',
+      resource: 'student_fee_ledger',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: { studentId },
+    });
+
+    return toCsv(rows, headers);
   }
 
   async voidInvoice(
@@ -2399,16 +2451,30 @@ export class FinanceService {
       const duplicatePayment = await this.prisma.payment.findFirst({
         where: {
           tenantId: actor.tenantId,
-          invoiceId: invoice.id,
           method: dto.method,
-          referenceNumber: dto.referenceNumber,
+          referenceNumber: dto.referenceNumber.trim(),
+          status: { not: PaymentStatus.REVERSED },
         },
       });
 
       if (duplicatePayment) {
         throw new ConflictException(
-          'Payment reference was already recorded for this invoice',
+          `Payment reference ${dto.referenceNumber} has already been used for an active payment in this tenant`,
         );
+      }
+    }
+
+    if (dto.idempotencyKey) {
+      const existingPayment = await this.prisma.payment.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          idempotencyKey: dto.idempotencyKey,
+        },
+        include: { receipt: true },
+      });
+
+      if (existingPayment) {
+        return existingPayment;
       }
     }
 
@@ -2434,6 +2500,7 @@ export class FinanceService {
           invoiceId: invoice.id,
           collectedById: actor.userId,
           method: dto.method,
+          status: PaymentStatus.SUCCESS,
           referenceNumber: dto.referenceNumber ?? null,
           amount: paymentAmount,
           isAdvance: dto.isAdvance ?? false,
@@ -2443,6 +2510,7 @@ export class FinanceService {
           },
           paidAt: new Date(),
           narration: dto.narration ?? null,
+          idempotencyKey: dto.idempotencyKey ?? null,
           receipt: {
             create: {
               tenantId: actor.tenantId,
@@ -2719,14 +2787,12 @@ export class FinanceService {
       resourceId: result.refund.id,
       before: {
         paymentId: payment.id,
-        invoiceId: payment.invoiceId,
-        refundableAmount: Number(refundableAmount),
+        amount: Number(payment.amount),
       },
       after: {
-        refundNumber: result.refund.refundNumber,
+        refundId: result.refund.id,
         amount: Number(result.refund.amount),
-        journalEntryNumber: result.journalEntry.entryNumber,
-        invoiceStatus: result.updatedInvoice.status,
+        status: result.updatedInvoice.status,
       },
     });
 
@@ -2741,6 +2807,112 @@ export class FinanceService {
       remainingRefundableAmount: Number(refundableAmount.sub(refundAmount)),
       invoiceStatus: result.updatedInvoice.status,
     };
+  }
+
+  async reversePayment(
+    paymentId: string,
+    dto: { reason: string },
+    actor: AuthContext,
+  ) {
+    const payment = await this.prisma.payment.findFirst({
+      where: { id: paymentId, tenantId: actor.tenantId },
+      include: {
+        invoice: true,
+        refunds: true,
+        receipt: true,
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    if (payment.refunds.length > 0) {
+      throw new ConflictException(
+        'Cannot reverse a payment that has been partially or fully refunded. Void the refunds first.',
+      );
+    }
+
+    const sourceJournal = await this.prisma.journalEntry.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        sourceType: JournalSourceType.FEE_PAYMENT,
+        sourceId: payment.id,
+      },
+      include: { lines: true },
+    });
+
+    if (!sourceJournal) {
+      throw new ConflictException('No accounting journal found for this payment');
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const reversal = await this.accountingPostingService.postReversal(
+        {
+          tenantId: actor.tenantId,
+          originalEntryId: sourceJournal.id,
+          reversalDate: new Date(),
+          narration: `Voiding Payment ${payment.receipt?.receiptNumber ?? payment.id}: ${dto.reason}`,
+          lines: sourceJournal.lines.map((line) => ({
+            chartAccountId: line.chartAccountId,
+            side:
+              line.side === JournalLineSide.DEBIT
+                ? JournalLineSide.CREDIT
+                : JournalLineSide.DEBIT,
+            amount: line.amount,
+            description: `Reversal of ${sourceJournal.entryNumber}`,
+          })),
+        },
+        actor,
+        tx,
+      );
+
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: PaymentStatus.REVERSED,
+          reversedAt: new Date(),
+          reversedById: actor.userId,
+          reversalReason: dto.reason,
+        },
+      });
+
+      const remainingPayments = await tx.payment.findMany({
+        where: {
+          invoiceId: payment.invoiceId,
+          status: { not: PaymentStatus.REVERSED },
+        },
+      });
+      const paidSoFar = remainingPayments.reduce(
+        (sum, p) => sum.add(p.amount),
+        new Prisma.Decimal(0),
+      );
+
+      await tx.invoice.update({
+        where: { id: payment.invoiceId },
+        data: {
+          status: paidSoFar.gt(0) ? InvoiceStatus.PARTIAL : InvoiceStatus.ISSUED,
+          paidAt: paidSoFar.gt(0) ? (payment.invoice.paidAt) : null,
+        },
+      });
+
+      return { reversal };
+    });
+
+    await this.auditService.record({
+      action: 'reverse',
+      resource: 'payment',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: paymentId,
+      after: {
+        invoiceId: payment.invoiceId,
+        amount: Number(payment.amount),
+        reason: dto.reason,
+      },
+    });
+
+    return result;
   }
 
   async previewCashierClose(query: CashierCloseWindowDto, actor: AuthContext) {
@@ -2806,6 +2978,7 @@ export class FinanceService {
     const existing = await this.prisma.cashierClose.findFirst({
       where: {
         tenantId: actor.tenantId,
+        collectorUserId: dto.collectorUserId ?? null,
         openedAt: { lt: window.closedAt },
         closedAt: { gt: window.openedAt },
       },
@@ -2909,7 +3082,60 @@ export class FinanceService {
       },
     });
 
-    return this.buildCashierCloseResponse(close);
+    return close;
+  }
+
+  async runFinanceConsistencyCheck(actor: AuthContext) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const payments = await this.prisma.payment.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        paidAt: { gte: today },
+        status: { not: PaymentStatus.REVERSED },
+      },
+    });
+
+    const journalEntries = await this.prisma.journalEntry.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        entryDate: { gte: today },
+        sourceType: {
+          in: [JournalSourceType.FEE_PAYMENT, JournalSourceType.PAYMENT_REFUND],
+        },
+      },
+      include: { lines: true },
+    });
+
+    const paymentTotal = payments.reduce(
+      (sum, p) => sum.add(p.amount),
+      new Prisma.Decimal(0),
+    );
+    const journalTotal = journalEntries.reduce((sum, entry) => {
+      const cashLine = entry.lines.find((l) => l.debit.gt(0));
+      return sum.add(cashLine?.debit ?? 0);
+    }, new Prisma.Decimal(0));
+
+    const isConsistent = paymentTotal.eq(journalTotal);
+
+    const result = {
+      timestamp: new Date(),
+      paymentTotal: Number(paymentTotal),
+      journalTotal: Number(journalTotal),
+      isConsistent,
+      discrepancy: Number(paymentTotal.sub(journalTotal)),
+    };
+
+    await this.auditService.record({
+      action: 'reconcile',
+      resource: 'finance_daily',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: result,
+    });
+
+    return result;
   }
 
   async getReconciliationSummary(
@@ -3615,17 +3841,17 @@ function formatStudentName(student: {
   return `${student.firstNameEn} ${student.lastNameEn}`.trim();
 }
 
-function ledgerEventOrder(type: 'INVOICE' | 'PAYMENT' | 'WAIVER' | 'REFUND') {
-  switch (type) {
-    case 'INVOICE':
-      return 1;
-    case 'WAIVER':
-      return 2;
-    case 'PAYMENT':
-      return 3;
-    case 'REFUND':
-      return 4;
-  }
+function ledgerEventOrder(
+  type: 'INVOICE' | 'PAYMENT' | 'WAIVER' | 'REFUND' | 'REVERSAL',
+) {
+  const orders = {
+    INVOICE: 1,
+    WAIVER: 2,
+    PAYMENT: 3,
+    REFUND: 4,
+    REVERSAL: 5,
+  };
+  return orders[type] || 99;
 }
 
 function sumRefundedAmount(refunds: Array<{ amount: Prisma.Decimal }>) {
@@ -3638,14 +3864,14 @@ function sumRefundedAmount(refunds: Array<{ amount: Prisma.Decimal }>) {
 function sumNetPaidAmount(
   payments: Array<{
     amount: Prisma.Decimal;
+    status?: PaymentStatus;
     refunds: Array<{ amount: Prisma.Decimal }>;
   }>,
 ) {
-  return payments.reduce(
-    (sum, payment) =>
-      sum.add(payment.amount).sub(sumRefundedAmount(payment.refunds)),
-    new Prisma.Decimal(0),
-  );
+  return payments.reduce((sum, p) => {
+    if (p.status === PaymentStatus.REVERSED) return sum;
+    return sum.add(p.amount).sub(sumRefundedAmount(p.refunds));
+  }, new Prisma.Decimal(0));
 }
 
 function allocateJournalLinesForRefund(
@@ -3989,6 +4215,15 @@ export function resolveInvoiceStatusAfterAdjustment(
   }
 
   return InvoiceStatus.ISSUED;
+}
+
+function toCsv(rows: any[], headers: string[]) {
+  const escape = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+  const headerLine = headers.map(escape).join(',');
+  const rowLines = rows.map((row) =>
+    headers.map((h) => escape(row[h])).join(','),
+  );
+  return [headerLine, ...rowLines].join('\n');
 }
 
 function groupByAmount<T>(items: T[], getKey: (item: T) => string) {

@@ -35,4 +35,8 @@ export class CollectPaymentDto {
   @IsOptional()
   @IsDateString()
   recognizedAt?: string;
+
+  @IsOptional()
+  @IsString()
+  idempotencyKey?: string;
 }

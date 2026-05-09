@@ -516,6 +516,54 @@ export function buildReportCardPdf(input: {
   return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
 }
 
+export function buildRosterPdf(input: {
+  schoolName: string;
+  className: string;
+  sectionName?: string | null;
+  academicYear?: string | null;
+  headers: string[];
+  rows: Array<Record<string, unknown>>;
+}) {
+  const contentParts = [
+    '0.5 w',
+    '36 36 540 720 re S',
+    text(input.schoolName, 48, 726, 16, 'F2'),
+    text('CLASS ROSTER', 460, 726, 14, 'F2'),
+    text(`${input.className} ${input.sectionName ? '- ' + input.sectionName : ''}`, 48, 712, 10, 'F1'),
+    input.academicYear ? text(`Academic Year: ${input.academicYear}`, 48, 700, 9, 'F1') : '',
+    '36 690 m 576 690 l S',
+  ];
+
+  // Header
+  let x = 48;
+  const colWidth = 520 / input.headers.length;
+  for (const header of input.headers) {
+    contentParts.push(text(header, x, 675, 9, 'F2'));
+    x += colWidth;
+  }
+  contentParts.push('36 670 m 576 670 l S');
+
+  // Rows
+  let y = 655;
+  for (const row of input.rows) {
+    x = 48;
+    for (const header of input.headers) {
+      const val = row[header];
+      contentParts.push(text(String(val ?? ''), x, y, 8, 'F1'));
+      x += colWidth;
+    }
+    y -= 16;
+    if (y < 60) break; // Simplification: single page
+  }
+
+  contentParts.push(
+    text(`Total Students: ${input.rows.length}`, 48, 45, 9, 'F2'),
+    text(`Generated: ${new Date().toISOString().slice(0, 10)}`, 460, 45, 8, 'F1'),
+  );
+
+  return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
+}
+
 function escapePdfText(text: string | number | null | undefined) {
   const safeText = String(text ?? 'N/A');
   return safeText

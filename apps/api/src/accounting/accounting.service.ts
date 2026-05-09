@@ -269,9 +269,6 @@ export class AccountingService {
       );
     }
 
-    const entryDate = new Date(dto.entryDate);
-    await this.ensurePostingPeriodIsOpen(actor.tenantId, entryDate);
-
     const entry = await this.postingService.postManualJournal(
       {
         tenantId: actor.tenantId,
@@ -349,8 +346,6 @@ export class AccountingService {
     const reversalDate = dto.reversalDate
       ? new Date(dto.reversalDate)
       : new Date();
-    await this.ensurePostingPeriodIsOpen(actor.tenantId, reversalDate);
-
     const reversal = await this.postingService.postReversal(
       {
         tenantId: actor.tenantId,
@@ -671,18 +666,36 @@ export class AccountingService {
     dto: ReverseJournalEntryDto,
     actor: AuthContext,
   ) {
-    const reversal = await this.reverseJournalEntry(id, dto, actor);
-
-    await this.auditService.record({
-      action: 'correct',
-      resource: 'journal_entry',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: id,
-      after: { reversalId: reversal.id, reason: dto.narration ?? null },
+    const original = await this.prisma.journalEntry.findFirst({
+      where: { id, tenantId: actor.tenantId },
+      include: { lines: true },
     });
 
-    return { reversal };
+    if (!original) {
+      throw new NotFoundException('Journal entry not found');
+    }
+
+    const correctionDate = dto.reversalDate
+      ? new Date(dto.reversalDate)
+      : new Date();
+
+    const result = await this.postingService.postCorrection(
+      {
+        tenantId: actor.tenantId,
+        originalEntryId: id,
+        correctionDate,
+        narration: dto.narration ?? `Correction of ${original.entryNumber}`,
+        lines: original.lines.map((l) => ({
+          chartAccountId: l.chartAccountId,
+          debit: l.debit,
+          credit: l.credit,
+          description: l.description,
+        })),
+      },
+      actor,
+    );
+
+    return result;
   }
 
   async listJournalEntries(actor: AuthContext) {
@@ -810,6 +823,51 @@ export class AccountingService {
     return ledger.filter((line) => /pf/i.test(line.accountName));
   }
 
+  async runConsistencyCheck(actor: AuthContext) {
+    const entries = await this.prisma.journalEntry.findMany({
+      where: { tenantId: actor.tenantId, status: JournalEntryStatus.POSTED },
+      include: { lines: true },
+    });
+
+    const imbalanced = entries.filter((entry) => {
+      const debit = entry.lines.reduce(
+        (sum, l) => sum.add(l.debit),
+        new Prisma.Decimal(0),
+      );
+      const credit = entry.lines.reduce(
+        (sum, l) => sum.add(l.credit),
+        new Prisma.Decimal(0),
+      );
+      return !debit.eq(credit);
+    });
+
+    const report = await this.buildReports(actor);
+    const tbImbalanced = !new Prisma.Decimal(report.totals.debit).eq(
+      new Prisma.Decimal(report.totals.credit),
+    );
+
+    const result = {
+      timestamp: new Date(),
+      totalEntriesChecked: entries.length,
+      imbalancedEntries: imbalanced.map((e) => ({
+        id: e.id,
+        number: e.entryNumber,
+      })),
+      trialBalanceBalanced: !tbImbalanced,
+      isConsistent: imbalanced.length === 0 && !tbImbalanced,
+    };
+
+    await this.auditService.record({
+      action: 'reconcile',
+      resource: 'ledger',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: result,
+    });
+
+    return result;
+  }
+
   async exportCsv(report: string, actor: AuthContext) {
     const data =
       report === 'general-ledger'
@@ -829,47 +887,6 @@ export class AccountingService {
     });
 
     return toCsv(Array.isArray(data) ? data : [data]);
-  }
-
-  private async generateJournalEntryNumber(tenantId: string) {
-    const count = await this.prisma.journalEntry.count({
-      where: { tenantId },
-    });
-
-    return `JE-${new Date().getUTCFullYear()}-${String(count + 1).padStart(5, '0')}`;
-  }
-
-  private async ensurePostingPeriodIsOpen(tenantId: string, entryDate: Date) {
-    const fiscalPeriod = await this.prisma.fiscalPeriod.findFirst({
-      where: {
-        tenantId,
-        startDate: { lte: entryDate },
-        endDate: { gte: entryDate },
-      },
-    });
-
-    if (fiscalPeriod && fiscalPeriod.status !== AccountingPeriodStatus.OPEN) {
-      throw new ConflictException(
-        `Cannot post journal entry to ${fiscalPeriod.status.toLowerCase()} fiscal period "${fiscalPeriod.label}"`,
-      );
-    }
-
-    const closedPeriod = await this.prisma.accountingPeriod.findFirst({
-      where: {
-        tenantId,
-        status: {
-          in: [AccountingPeriodStatus.LOCKED, AccountingPeriodStatus.CLOSED],
-        },
-        startsOn: { lte: entryDate },
-        endsOn: { gte: entryDate },
-      },
-    });
-
-    if (closedPeriod) {
-      throw new ConflictException(
-        `Cannot post journal entry to closed accounting period "${closedPeriod.name}"`,
-      );
-    }
   }
 }
 

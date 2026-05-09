@@ -65,4 +65,30 @@ export class StudentDocumentsController {
   ) {
     return this.studentRecordsService.deleteDocument(auth, assetId);
   }
+
+  @Post(':id/archive')
+  @Permissions('student_documents:manage')
+  async archiveDocument(
+    @Param('id') documentId: string,
+    @Body('reason') reason: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentRecordsService.archiveDocument(auth, documentId, reason);
+  }
+
+  @Post(':id/verify')
+  @Permissions('student_documents:manage')
+  async verifyDocument(
+    @Param('id') documentId: string,
+    @Body('status') status: 'VERIFIED' | 'REJECTED',
+    @Body('notes') notes: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentRecordsService.verifyDocument(
+      auth,
+      documentId,
+      status,
+      notes,
+    );
+  }
 }
