@@ -1,15 +1,26 @@
-import { IsBoolean, IsDateString, IsOptional, IsString } from 'class-validator';
+import {
+  IsBoolean,
+  IsDateString,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class RequestStudentTransferDto {
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
   reason!: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   destinationSchool?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   conductRemark?: string;
 
   @IsOptional()
