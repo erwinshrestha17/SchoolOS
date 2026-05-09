@@ -69,6 +69,12 @@ function createController() {
     notifyResults: jest.fn(),
   };
 
+  const marksEntryService = {
+    enterMark: jest.fn(),
+    batchEnterMarks: jest.fn(),
+    listLockRequests: jest.fn(),
+    reviewLockRequest: jest.fn(),
+  };
   return {
     controller: new AcademicsController(
       academicsService as never,
@@ -78,6 +84,7 @@ function createController() {
       markLockWorkflowService as never,
       reportCardPdfService as never,
       reportCardsService as never,
+      marksEntryService as never,
       resultPublishingService as never,
     ),
     academicsService,
@@ -87,6 +94,7 @@ function createController() {
     markLockWorkflowService,
     reportCardPdfService,
     reportCardsService,
+    marksEntryService,
     resultPublishingService,
   };
 }

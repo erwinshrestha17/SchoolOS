@@ -110,7 +110,7 @@ export class TransportHardeningService {
           include: {
             route: true,
             vehicle: true,
-            driverAssignment: { include: { staff: true } },
+            driverAssignment: { include: { staff: { include: { user: true } } } },
           },
         },
       },
@@ -154,7 +154,7 @@ export class TransportHardeningService {
       driver: {
         id: status.trip.driverAssignment.staff.id,
         name: `${status.trip.driverAssignment.staff.firstName} ${status.trip.driverAssignment.staff.lastName}`,
-        phone: status.trip.driverAssignment.staff.phone,
+        phone: status.trip.driverAssignment.staff.user.phone,
       },
       childStatus: {
         status: status.status,
@@ -186,7 +186,7 @@ export class TransportHardeningService {
       include: {
         route: true,
         vehicle: true,
-        driverAssignment: { include: { staff: true } },
+        driverAssignment: { include: { staff: { include: { user: true } } } },
         studentStatuses: true,
       },
       orderBy: [{ startedAt: 'desc' }],
@@ -226,7 +226,7 @@ export class TransportHardeningService {
         trip.id,
         trip.route.name,
         trip.vehicle.registrationNumber,
-        `${trip.driverAssignment.staff.firstName} ${trip.driverAssignment.staff.lastName}`,
+        `${trip.driverAssignment.staff.firstName} ${trip.driverAssignment.staff.lastName} (${trip.driverAssignment.staff.user.phone ?? 'N/A'})`,
         trip.direction,
         trip.status,
         trip.startedAt.toISOString(),

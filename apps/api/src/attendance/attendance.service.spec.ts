@@ -914,6 +914,13 @@ function buildService(options: {
   const communicationsService = {
     recordDeliveryRecords: jest.fn().mockResolvedValue({ count: 1 }),
   };
+  const settingsService = {
+    getSetting: jest.fn().mockImplementation((tid, key) => {
+      if (key === 'attendance_lock_hours') return 24;
+      if (key === 'allow_teacher_correction_request') return true;
+      return true;
+    }),
+  };
   const auditService = {
     record: jest.fn(),
   };
@@ -927,12 +934,14 @@ function buildService(options: {
       communicationsService as never,
       auditService as never,
       eventEmitter as never,
+      settingsService as never,
     ),
     prisma,
     tx,
     communicationsService,
     auditService,
     eventEmitter,
+    settingsService,
   };
 }
 

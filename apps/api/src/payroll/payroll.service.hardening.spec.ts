@@ -261,7 +261,7 @@ function buildService(options: {
         return Promise.all(input);
       }
 
-      return (input as (tx: typeof tx) => Promise<unknown>)(tx);
+      return (input as any)(tx);
     }),
   };
 

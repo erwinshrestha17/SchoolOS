@@ -5,6 +5,7 @@ import { AcademicsService } from '../src/academics/academics.service';
 import { ReportCardsService } from '../src/academics/report-cards.service';
 import { ReportCardPdfService } from '../src/academics/report-card-pdf.service';
 import { GradeCalculatorService } from '../src/academics/grade-calculator.service';
+import { MarksEntryService } from '../src/academics/marks-entry.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
 import { AuthContext } from '../src/auth/auth.types';
@@ -14,6 +15,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 describe('Academics Hardening (Service Layer)', () => {
   let academicsService: AcademicsService;
+  let marksEntryService: MarksEntryService;
   let prisma: PrismaMock;
 
   const actor: AuthContext = {
@@ -31,6 +33,7 @@ describe('Academics Hardening (Service Layer)', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AcademicsService,
+        MarksEntryService,
         ReportCardsService,
         ReportCardPdfService,
         GradeCalculatorService,
@@ -42,6 +45,7 @@ describe('Academics Hardening (Service Layer)', () => {
     }).compile();
 
     academicsService = module.get<AcademicsService>(AcademicsService);
+    marksEntryService = module.get<MarksEntryService>(MarksEntryService);
   });
 
   describe('enterMark Hardening', () => {
@@ -57,7 +61,7 @@ describe('Academics Hardening (Service Layer)', () => {
       p.student.findFirst.mockResolvedValue(null);
 
       await expect(
-        academicsService.enterMark(
+        marksEntryService.enterMark(
           {
             examTermId: 'term-1',
             assessmentComponentId: 'comp-1',
@@ -85,7 +89,7 @@ describe('Academics Hardening (Service Layer)', () => {
       } as any);
 
       await expect(
-        academicsService.enterMark(
+        marksEntryService.enterMark(
           {
             examTermId: 'term-1',
             assessmentComponentId: 'comp-1',
@@ -113,7 +117,7 @@ describe('Academics Hardening (Service Layer)', () => {
       } as any);
 
       await expect(
-        academicsService.enterMark(
+        marksEntryService.enterMark(
           {
             examTermId: 'term-1',
             assessmentComponentId: 'comp-1',
@@ -146,7 +150,7 @@ describe('Academics Hardening (Service Layer)', () => {
         status: MarkEntryStatus.ABSENT,
       } as any);
 
-      await academicsService.enterMark(
+      await marksEntryService.enterMark(
         {
           examTermId: 'term-1',
           assessmentComponentId: 'comp-1',
@@ -186,7 +190,7 @@ describe('Academics Hardening (Service Layer)', () => {
       } as any);
 
       await expect(
-        academicsService.enterMark(
+        marksEntryService.enterMark(
           {
             examTermId: 'term-1',
             assessmentComponentId: 'comp-1',

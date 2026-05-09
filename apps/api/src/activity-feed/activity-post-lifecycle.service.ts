@@ -10,7 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { DeleteActivityPostDto, ModerateActivityPostDto } from './dto/moderate-activity-post.dto';
 import { UpdateActivityPostDto } from './dto/update-activity-post.dto';
 
-interface ActivityPostLifecycleRow {
+export interface ActivityPostLifecycleRow {
   id: string;
   tenantId: string;
   createdById: string;

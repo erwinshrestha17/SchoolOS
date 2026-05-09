@@ -1,21 +1,40 @@
-import { calculateMoestGrade, getPromotionStatus } from './academics.service';
+import { GradeCalculatorService } from './grade-calculator.service';
 
-describe('calculateMoestGrade', () => {
-  it('maps Nepal-ready grading bands for report cards', () => {
-    expect(calculateMoestGrade(94)).toEqual({ grade: 'A+', gpa: 4 });
-    expect(calculateMoestGrade(82)).toEqual({ grade: 'A', gpa: 3.6 });
-    expect(calculateMoestGrade(72)).toEqual({ grade: 'B+', gpa: 3.2 });
-    expect(calculateMoestGrade(63)).toEqual({ grade: 'B', gpa: 2.8 });
-    expect(calculateMoestGrade(52)).toEqual({ grade: 'C+', gpa: 2.4 });
-    expect(calculateMoestGrade(42)).toEqual({ grade: 'C', gpa: 2 });
-    expect(calculateMoestGrade(36)).toEqual({ grade: 'D', gpa: 1.6 });
-    expect(calculateMoestGrade(32)).toEqual({ grade: 'NG', gpa: 0 });
+describe('Academics Service Utilities (via GradeCalculator)', () => {
+  let service: GradeCalculatorService;
+
+  beforeEach(() => {
+    service = new GradeCalculatorService();
   });
-});
 
-describe('getPromotionStatus', () => {
+  it('maps Nepal-ready grading bands for report cards', () => {
+    expect(service.getMoestGrade(94).grade).toEqual('A+');
+    expect(service.getMoestGrade(94).gpa).toEqual(4);
+    
+    expect(service.getMoestGrade(82).grade).toEqual('A');
+    expect(service.getMoestGrade(82).gpa).toEqual(3.6);
+    
+    expect(service.getMoestGrade(72).grade).toEqual('B+');
+    expect(service.getMoestGrade(72).gpa).toEqual(3.2);
+    
+    expect(service.getMoestGrade(63).grade).toEqual('B');
+    expect(service.getMoestGrade(63).gpa).toEqual(2.8);
+    
+    expect(service.getMoestGrade(52).grade).toEqual('C+');
+    expect(service.getMoestGrade(52).gpa).toEqual(2.4);
+    
+    expect(service.getMoestGrade(42).grade).toEqual('C');
+    expect(service.getMoestGrade(42).gpa).toEqual(2);
+    
+    expect(service.getMoestGrade(36).grade).toEqual('D');
+    expect(service.getMoestGrade(36).gpa).toEqual(1.6);
+    
+    expect(service.getMoestGrade(32).grade).toEqual('NG');
+    expect(service.getMoestGrade(32).gpa).toEqual(0);
+  });
+
   it('requires academic review below the promotion threshold', () => {
-    expect(getPromotionStatus(34.99)).toBe('REVIEW');
-    expect(getPromotionStatus(35)).toBe('READY');
+    expect(service.getPromotionStatus(34.99)).toBe('REVIEW');
+    expect(service.getPromotionStatus(35)).toBe('READY');
   });
 });

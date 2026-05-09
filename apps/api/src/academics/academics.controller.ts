@@ -298,8 +298,8 @@ export class AcademicsController {
     @CurrentAuth() auth: AuthContext,
     @Query('academicYearId') academicYearId: string,
     @Query('classId') classId: string,
-    @Query('sectionId') sectionId?: string,
     @Query('subjectId') subjectId: string,
+    @Query('sectionId') sectionId?: string,
     @Query('category') category?: string,
   ) {
     return this.casRecordsService.getCasRoster(auth, {

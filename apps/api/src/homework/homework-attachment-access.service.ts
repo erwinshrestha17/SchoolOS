@@ -15,7 +15,7 @@ export class HomeworkAttachmentAccessService {
     actor: AuthContext,
     action: 'preview' | 'download',
   ) {
-    const attachment = await this.prisma.homeworkAttachment.findFirst({
+    const attachment = (await this.prisma.homeworkAttachment.findFirst({
       where: {
         id: attachmentId,
         tenantId: actor.tenantId,
@@ -29,8 +29,8 @@ export class HomeworkAttachmentAccessService {
           },
         },
         assignment: true,
-      },
-    });
+      } as any,
+    })) as any;
 
     if (!attachment) {
       throw new NotFoundException('Homework attachment not found in this tenant');
@@ -99,23 +99,7 @@ export class HomeworkAttachmentAccessService {
 
   private async ensureHomeworkAttachmentVisibleToActor(
     actor: AuthContext,
-    attachment: {
-      submissionId: string | null;
-      assignmentId: string | null;
-      submission?: {
-        studentId: string;
-        homework: {
-          id: string;
-          classId: string;
-          sectionId: string | null;
-        };
-      } | null;
-      assignment?: {
-        id: string;
-        classId: string;
-        sectionId: string | null;
-      } | null;
-    },
+    attachment: any,
   ) {
     if (!actor.roles.includes('student') && !actor.roles.includes('parent')) {
       return;

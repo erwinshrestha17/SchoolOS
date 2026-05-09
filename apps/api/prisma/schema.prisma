@@ -2868,15 +2868,18 @@ model HomeworkSubmission {
 model HomeworkAttachment {
   id           String   @id @default(uuid())
   tenantId     String
-  submissionId String
+  submissionId String?
+  assignmentId String?
   fileAssetId  String
   createdAt    DateTime @default(now())
 
-  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  submission HomeworkSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  fileAsset  FileAsset          @relation(fields: [fileAssetId], references: [id], onDelete: Cascade)
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  submission HomeworkSubmission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  assignment HomeworkAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  fileAsset  FileAsset           @relation(fields: [fileAssetId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, submissionId])
+  @@index([tenantId, assignmentId])
 }
 
 model SyllabusTopic {

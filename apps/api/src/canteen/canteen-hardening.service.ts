@@ -89,7 +89,7 @@ export class CanteenHardeningService {
 
     for (const wallet of lowBalanceWallets) {
       const sourceId = `canteen-low-balance:${wallet.studentId}:${wallet.lowBalanceThreshold.toString()}:${windowKey}`;
-      const existing = await this.prisma.notificationDeliveryRecord.count({
+      const existing = await this.prisma.notificationDelivery.count({
         where: {
           tenantId: actor.tenantId,
           sourceType: 'canteen_low_balance',

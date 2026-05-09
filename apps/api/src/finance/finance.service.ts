@@ -2474,7 +2474,15 @@ export class FinanceService {
       });
 
       if (existingPayment) {
-        return existingPayment;
+        return {
+          paymentId: existingPayment.id,
+          invoiceId: existingPayment.invoiceId,
+          amount: Number(existingPayment.amount),
+          method: existingPayment.method,
+          paidAt: existingPayment.paidAt,
+          receiptNumber: existingPayment.receipt?.receiptNumber ?? null,
+          receiptPdfUrl: existingPayment.receipt?.pdfUrl ?? null,
+        };
       }
     }
 

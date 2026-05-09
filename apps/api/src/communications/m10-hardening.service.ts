@@ -198,7 +198,7 @@ export class M10HardeningService {
       take: 100,
     });
 
-    const results = [];
+    const results: any[] = [];
     for (const delivery of failed) {
       results.push(
         await this.retryDeliveryWithMetadata(delivery.id, { reason: dto.reason }, actor),

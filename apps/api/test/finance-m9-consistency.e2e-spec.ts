@@ -145,7 +145,7 @@ describe('Finance M9 Consistency (E2E)', () => {
         actor,
       );
 
-      expect(result.id).toBe(existingPayment.id);
+      expect(result.paymentId).toBe('payment-1');
       expect(prisma.payment.create).not.toHaveBeenCalled();
     });
   });

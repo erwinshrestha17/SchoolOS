@@ -1041,8 +1041,8 @@ describe('finance production controls', () => {
       },
     });
     expect(finalized.closeNumber).toBe('CLS-2026-00001');
-    expect(finalized.actualCashAmount).toBe(390);
-    expect(finalized.varianceAmount).toBe(-10);
+    expect(Number(finalized.actualCashAmount)).toBe(390);
+    expect(Number(finalized.varianceAmount)).toBe(-10);
   });
 
   it('requires a variance reason when actual cash differs from expected cash', async () => {

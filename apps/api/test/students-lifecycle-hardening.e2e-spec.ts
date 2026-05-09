@@ -48,9 +48,9 @@ describe('Student Lifecycle Hardening (E2E)', () => {
       data: {
         tenantId,
         name: '2024-2025',
-        startDate: new Date('2024-04-14'),
-        endDate: new Date('2025-04-13'),
-        status: 'ACTIVE',
+        startsOn: new Date('2024-04-14'),
+        endsOn: new Date('2025-04-13'),
+        isCurrent: true,
       },
     });
     academicYearId = ay.id;
@@ -59,6 +59,7 @@ describe('Student Lifecycle Hardening (E2E)', () => {
       data: {
         tenantId,
         name: 'Grade 10',
+        level: 10,
       },
     });
     classId = cls.id;
@@ -116,12 +117,14 @@ describe('Student Lifecycle Hardening (E2E)', () => {
       data: {
         tenantId,
         studentId: student.id,
+        academicYearId,
         invoiceNumber: 'INV-001',
-        issueDate: new Date(),
+        issuedAt: new Date(),
         dueDate: new Date(),
+        subtotal: 1000,
+        vatAmount: 0,
         totalAmount: 1000,
-        outstandingAmount: 1000,
-        status: 'PARTIAL',
+        status: 'ISSUED',
       },
     });
 

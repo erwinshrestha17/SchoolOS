@@ -2296,7 +2296,9 @@ export type TenantSettingKey =
   | 'export_requires_permission'
   | 'audit_log_retention_days'
   | 'session_timeout_minutes'
-  | 'require_reason_for_sensitive_reveal';
+  | 'require_reason_for_sensitive_reveal'
+  | 'block_report_card_on_dues'
+  | 'block_publishing_on_dues';
 
 export type TenantSettingSummary = {
   key: TenantSettingKey;

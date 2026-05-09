@@ -68,11 +68,7 @@ export class LibraryHardeningService {
   }
 
   async getOverdueBooksReport(actor: AuthContext) {
-    const items = await this.libraryService.listOverdue(actor);
-    return {
-      items,
-      meta: { total: items.length },
-    };
+    return this.libraryService.listOverdue(actor);
   }
 
   async getLostDamagedReport(actor: AuthContext) {
@@ -169,7 +165,7 @@ export class LibraryHardeningService {
     const windowKey = new Date().toISOString().slice(0, 10);
     const sourceId = `library-overdue-${actor.tenantId}-${windowKey}`;
 
-    const existing = await this.prisma.notificationDeliveryRecord.count({
+    const existing = await this.prisma.notificationDelivery.count({
       where: {
         tenantId: actor.tenantId,
         sourceType: 'library_overdue',

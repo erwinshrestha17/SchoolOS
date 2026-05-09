@@ -32,7 +32,7 @@ export interface MockState {
 
 export interface PrismaMock {
   __state: MockState;
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 export interface PrismaQuery {
