@@ -79,6 +79,21 @@ export class ActivityFeedController {
     });
   }
 
+  @Get('parent')
+  @Permissions('activity_feed:read')
+  listParentPosts(
+    @CurrentAuth() auth: AuthContext,
+    @Query('studentId') studentId?: string,
+    @Query('category') category?: string,
+    @Query('month') month?: string,
+  ) {
+    return this.activityFeedService.listPosts(auth, {
+      studentId,
+      category,
+      month,
+    });
+  }
+
   @Get('reactions/analytics')
   @Permissions('activity_feed:read')
   getReactionAnalytics(@CurrentAuth() auth: AuthContext) {
@@ -136,6 +151,58 @@ export class ActivityFeedController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.activityFeedService.createMilestone(dto, auth);
+  }
+
+  @Get('media/:id/preview-url')
+  @Permissions('activity_feed:read')
+  getMediaPreviewUrl(
+    @Param('id') attachmentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.activityMediaService.getAttachmentAccessUrl(
+      auth,
+      attachmentId,
+      'preview',
+    );
+  }
+
+  @Get('media/:id/download-url')
+  @Permissions('activity_feed:read')
+  getMediaDownloadUrl(
+    @Param('id') attachmentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.activityMediaService.getAttachmentAccessUrl(
+      auth,
+      attachmentId,
+      'download',
+    );
+  }
+
+  @Get('parent/media/:id/preview-url')
+  @Permissions('activity_feed:read')
+  getParentMediaPreviewUrl(
+    @Param('id') attachmentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.activityMediaService.getAttachmentAccessUrl(
+      auth,
+      attachmentId,
+      'preview',
+    );
+  }
+
+  @Get('parent/media/:id/download-url')
+  @Permissions('activity_feed:read')
+  getParentMediaDownloadUrl(
+    @Param('id') attachmentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.activityMediaService.getAttachmentAccessUrl(
+      auth,
+      attachmentId,
+      'download',
+    );
   }
 
   @Get('attachments/:id/preview')

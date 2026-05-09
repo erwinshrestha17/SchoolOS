@@ -8,6 +8,7 @@ import { ActivityFeedController } from './activity-feed.controller';
 import { ActivityFeedService } from './activity-feed.service';
 import { ActivityMediaService } from './activity-media.service';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
+import { MediaAccessController } from './media-access.controller';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { FileRegistryModule } from '../file-registry/file-registry.module';
     CommunicationsModule,
     FileRegistryModule,
   ],
-  controllers: [ActivityFeedController],
+  controllers: [ActivityFeedController, MediaAccessController],
   providers: [ActivityFeedService, ActivityMediaService],
 })
 export class ActivityFeedModule {}
