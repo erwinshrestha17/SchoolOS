@@ -320,11 +320,19 @@ enum DevelopmentalMilestoneStatus {
   NEEDS_SUPPORT
 }
 
+enum ExamTermStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
 enum AssessmentType {
-  TERMINAL
-  CAS
+  THEORY
   PRACTICAL
+  CAS
   PROJECT
+  INTERNAL
+  TERMINAL
 }
 
 enum GradeLockStatus {
@@ -2408,8 +2416,9 @@ model ExamTerm {
   name           String
   startsOn       DateTime
   endsOn         DateTime
-  weightPercent  Decimal  @default(100) @db.Decimal(5, 2)
-  isLocked       Boolean  @default(false)
+  weightPercent  Decimal        @default(100) @db.Decimal(5, 2)
+  status         ExamTermStatus @default(ACTIVE)
+  isLocked       Boolean        @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -2446,9 +2455,12 @@ model AssessmentComponent {
 }
 
 enum MarkEntryStatus {
-  SUBMITTED
+  PRESENT
   ABSENT
+  EXCUSED
+  MISSING
   WITHHELD
+  SUBMITTED
 }
 
 model MarkEntry {

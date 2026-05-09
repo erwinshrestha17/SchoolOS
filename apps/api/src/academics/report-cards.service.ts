@@ -14,6 +14,8 @@ import {
   type ComponentScoreInput,
   type SubjectGradeResult,
 } from './grade-calculator.service';
+import { FinanceService } from '../finance/finance.service';
+import { SettingsService } from '../settings/settings.service';
 
 type MarkWithComponent = Prisma.MarkEntryGetPayload<{
   include: {
@@ -36,6 +38,8 @@ export class ReportCardsService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly gradeCalculator: GradeCalculatorService,
+    private readonly financeService: FinanceService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   async generateReportCard(dto: GenerateReportCardDto, actor: AuthContext) {
@@ -66,6 +70,22 @@ export class ReportCardsService {
 
     if (!student) {
       throw new NotFoundException('Student not found in this tenant');
+    }
+
+    const settings = await this.prisma.tenantSetting.findFirst({
+      where: { tenantId: actor.tenantId, key: 'block_report_card_on_dues' },
+    });
+
+    if (settings?.value === 'true') {
+      const ledger = await this.financeService.getStudentFeeLedger(
+        dto.studentId,
+        actor,
+      );
+      if (ledger.outstandingBalance > 0) {
+        throw new ConflictException(
+          `Report card generation blocked: student has outstanding dues of ${ledger.outstandingBalance}`,
+        );
+      }
     }
 
     const [components, marks] = await Promise.all([
