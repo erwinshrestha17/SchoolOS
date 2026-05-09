@@ -22,4 +22,15 @@ export class UploadStudentDocumentDto {
   @IsString()
   @MinLength(1)
   base64Content!: string;
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @IsOptional()
+  @IsString()
+  expiryDate?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }

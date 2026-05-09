@@ -18,4 +18,8 @@ export class CreateExamTermDto {
   @Min(0)
   @Max(100)
   weightPercent?: number;
+
+  @IsOptional()
+  @IsString()
+  status?: any;
 }

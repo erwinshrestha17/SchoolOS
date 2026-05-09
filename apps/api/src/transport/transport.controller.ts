@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Patch,
   Post,
@@ -15,6 +16,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { AssignTransportDriverDto } from './dto/assign-transport-driver.dto';
 import { BroadcastRouteDelayDto } from './dto/broadcast-route-delay.dto';
+import { CancelTransportTripDto } from './dto/cancel-transport-trip.dto';
 import { CompleteTransportTripDto } from './dto/complete-transport-trip.dto';
 import { CreateTransportRouteDto } from './dto/create-transport-route.dto';
 import { CreateTransportStopDto } from './dto/create-transport-stop.dto';
@@ -27,12 +29,16 @@ import { TransportLocationPingDto } from './dto/transport-location-ping.dto';
 import { UpdateTransportRouteDto } from './dto/update-transport-route.dto';
 import { UpdateTransportStopDto } from './dto/update-transport-stop.dto';
 import { UpdateTransportVehicleDto } from './dto/update-transport-vehicle.dto';
+import { TransportHardeningService } from './transport-hardening.service';
 import { TransportService } from './transport.service';
 
 @Controller('transport')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class TransportController {
-  constructor(private readonly transportService: TransportService) {}
+  constructor(
+    private readonly transportService: TransportService,
+    private readonly transportHardeningService: TransportHardeningService,
+  ) {}
 
   @Get('routes')
   @Permissions('transport:routes:read')
@@ -156,6 +162,42 @@ export class TransportController {
     return this.transportService.assignStudent(dto, auth);
   }
 
+  @Patch('assignments/students/:id/pause')
+  @Permissions('transport:assignments:update')
+  pauseStudentAssignment(
+    @Param('id') assignmentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportHardeningService.pauseStudentAssignment(
+      assignmentId,
+      auth,
+    );
+  }
+
+  @Patch('assignments/students/:id/end')
+  @Permissions('transport:assignments:update')
+  endStudentAssignment(
+    @Param('id') assignmentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportHardeningService.endStudentAssignment(
+      assignmentId,
+      auth,
+    );
+  }
+
+  @Get('parent/students/:studentId/active-trip')
+  @Permissions('transport:trips:read')
+  getParentStudentActiveTrip(
+    @Param('studentId') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportHardeningService.getParentStudentActiveTrip(
+      studentId,
+      auth,
+    );
+  }
+
   @Post('trips')
   @Permissions('transport:trips:create')
   startTrip(
@@ -173,6 +215,16 @@ export class TransportController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.transportService.completeTrip(tripId, dto, auth);
+  }
+
+  @Patch('trips/:id/cancel')
+  @Permissions('transport:trips:update')
+  cancelTrip(
+    @Param('id') tripId: string,
+    @Body() dto: CancelTransportTripDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportHardeningService.cancelTrip(tripId, dto, auth);
   }
 
   @Patch('trips/:id/students/boarded')
@@ -261,5 +313,41 @@ export class TransportController {
   @Permissions('transport:reports:read')
   getReports(@CurrentAuth() auth: AuthContext) {
     return this.transportService.getReports(auth);
+  }
+
+  @Get('reports/trips')
+  @Permissions('transport:reports:read')
+  getTripHistoryReport(
+    @CurrentAuth() auth: AuthContext,
+    @Query('routeId') routeId?: string,
+    @Query('vehicleId') vehicleId?: string,
+    @Query('driverAssignmentId') driverAssignmentId?: string,
+  ) {
+    return this.transportHardeningService.getTripHistoryReport(auth, {
+      routeId,
+      vehicleId,
+      driverAssignmentId,
+    });
+  }
+
+  @Get('reports/boarding')
+  @Permissions('transport:reports:read')
+  getBoardingReport(
+    @CurrentAuth() auth: AuthContext,
+    @Query('tripId') tripId?: string,
+    @Query('studentId') studentId?: string,
+  ) {
+    return this.transportHardeningService.getBoardingReport(auth, {
+      tripId,
+      studentId,
+    });
+  }
+
+  @Get('reports/trips.csv')
+  @Header('Content-Type', 'text/csv')
+  @Header('Content-Disposition', 'attachment; filename="transport-trip-history.csv"')
+  @Permissions('transport:reports:read')
+  exportTripHistoryCsv(@CurrentAuth() auth: AuthContext) {
+    return this.transportHardeningService.exportTripHistoryCsv(auth);
   }
 }

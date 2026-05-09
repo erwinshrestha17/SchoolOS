@@ -1,23 +1,32 @@
-import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsDateString,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class CreateCasRecordDto {
-  @IsString()
+  @IsUUID()
   academicYearId!: string;
 
-  @IsString()
+  @IsUUID()
   subjectId!: string;
 
-  @IsString()
+  @IsUUID()
   studentId!: string;
 
-  @IsString()
+  @IsUUID()
   classId!: string;
 
   @IsOptional()
-  @IsString()
+  @IsUUID()
   sectionId?: string;
 
   @IsString()
+  @MaxLength(100)
   category!: string;
 
   @IsNumber()
@@ -28,10 +37,11 @@ export class CreateCasRecordDto {
   @Min(1)
   maxScore!: number;
 
-  @IsString()
+  @IsDateString()
   observedOn!: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   note?: string;
 }

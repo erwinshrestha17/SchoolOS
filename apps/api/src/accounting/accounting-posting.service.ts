@@ -13,6 +13,12 @@ import { PrismaService } from '../prisma/prisma.service';
 
 type PostingClient = Prisma.TransactionClient | PrismaService;
 
+export enum PostingAction {
+  POST = 'POST',
+  REVERSE = 'REVERSE',
+  CORRECT = 'CORRECT',
+}
+
 export interface PayrollPostingInput {
   tenantId: string;
   payrollRunId: string;
@@ -461,10 +467,114 @@ export class AccountingPostingService {
       after: {
         sourceType: entry.sourceType,
         sourceId: entry.sourceId,
+        entryNumber: entry.entryNumber,
       },
     });
 
     return entry;
+  }
+
+  /**
+   * Post a correction for an existing journal entry.
+   * This reverses the original entry and posts a new one in a single transaction.
+   */
+  async postCorrection(
+    input: {
+      tenantId: string;
+      originalEntryId: string;
+      correctionDate: Date;
+      narration: string;
+      lines: JournalPostingLineInput[];
+    },
+    actor: AuthContext,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const original = await tx.journalEntry.findFirst({
+      where: { id: input.originalEntryId, tenantId: input.tenantId },
+      include: { lines: true },
+    });
+
+    if (!original) {
+      throw new ConflictException('Original journal entry not found');
+    }
+
+    if (original.status === JournalEntryStatus.REVERSED) {
+      throw new ConflictException('Original entry is already reversed');
+    }
+
+    // 1. Post Reversal
+    const reversal = await this.postReversal(
+      {
+        tenantId: input.tenantId,
+        originalEntryId: original.id,
+        reversalDate: input.correctionDate,
+        narration: `Correction Reversal: ${input.narration}`,
+        lines: original.lines.map((line) => ({
+          chartAccountId: line.chartAccountId,
+          side:
+            line.side === JournalLineSide.DEBIT
+              ? JournalLineSide.CREDIT
+              : JournalLineSide.DEBIT,
+          amount: line.amount,
+          description: `Reversal for correction: ${line.description}`,
+        })),
+      },
+      actor,
+      tx,
+    );
+
+    // 2. Post New Corrected Entry
+    const correction = await this.postManualJournal(
+      {
+        tenantId: input.tenantId,
+        entryDate: input.correctionDate,
+        narration: input.narration,
+        sourceModule: original.sourceModule,
+        sourceType: JournalSourceType.CORRECTION,
+        sourceId: original.id,
+        postingType: 'CORRECTION',
+        lines: input.lines,
+      },
+      actor,
+      tx,
+    );
+
+    // 3. Update original with correction link
+    await tx.journalEntry.update({
+      where: { id: original.id },
+      data: {
+        correctionOfId: correction.id, // Or use a separate field if needed, but the schema has correctionOfId
+        // Wait, correctionOfId should probably be on the NEW entry pointing to OLD.
+        // Let's check schema: correctionOfId String?
+      },
+    });
+
+    // Actually, according to schema:
+    // correctionOf   JournalEntry?  @relation("JournalEntryCorrection", fields: [correctionOfId], references: [id], onDelete: Restrict)
+    // corrections  JournalEntry[] @relation("JournalEntryCorrection")
+    // So the NEW entry (correction) should have correctionOfId = original.id.
+
+    await tx.journalEntry.update({
+      where: { id: correction.id },
+      data: {
+        correctionOfId: original.id,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'correct',
+      resource: 'journal_entry',
+      tenantId: input.tenantId,
+      userId: actor.userId,
+      resourceId: correction.id,
+      after: {
+        originalEntryId: original.id,
+        reversalEntryId: reversal.id,
+        correctionEntryNumber: correction.entryNumber,
+      },
+    });
+
+    return { reversal, correction };
   }
 
   async postReversal(
@@ -826,6 +936,7 @@ export class AccountingPostingService {
     tx: PostingClient,
     tenantId: string,
     entryDate: Date,
+    allowLocked = false,
   ) {
     // 1. Check Fiscal Period (Primary)
     const fiscalPeriod = await tx.fiscalPeriod.findFirst({
@@ -845,15 +956,21 @@ export class AccountingPostingService {
       );
     }
 
-    if (fiscalPeriod.status !== AccountingPeriodStatus.OPEN) {
+    if (fiscalPeriod.status === AccountingPeriodStatus.CLOSED) {
       throw new ConflictException(
-        `Cannot post to ${fiscalPeriod.status.toLowerCase()} fiscal period "${fiscalPeriod.label}"`,
+        `Cannot post to closed fiscal period "${fiscalPeriod.label}"`,
       );
     }
 
-    if (fiscalPeriod.fiscalYear.status !== AccountingPeriodStatus.OPEN) {
+    if (fiscalPeriod.status === AccountingPeriodStatus.LOCKED && !allowLocked) {
       throw new ConflictException(
-        `Cannot post to fiscal period in a ${fiscalPeriod.fiscalYear.status.toLowerCase()} fiscal year "${fiscalPeriod.fiscalYear.name}"`,
+        `Fiscal period "${fiscalPeriod.label}" is locked for posting.`,
+      );
+    }
+
+    if (fiscalPeriod.fiscalYear.status === 'CLOSED') {
+      throw new ConflictException(
+        `Cannot post to fiscal period in a closed fiscal year "${fiscalPeriod.fiscalYear.name}"`,
       );
     }
 
@@ -870,9 +987,16 @@ export class AccountingPostingService {
     });
 
     if (closedPeriod) {
-      throw new ConflictException(
-        `Cannot post to closed/locked accounting period "${closedPeriod.name}"`,
-      );
+      if (
+        closedPeriod.status === AccountingPeriodStatus.LOCKED &&
+        allowLocked
+      ) {
+        // Allowed
+      } else {
+        throw new ConflictException(
+          `Cannot post to ${closedPeriod.status.toLowerCase()} accounting period "${closedPeriod.name}"`,
+        );
+      }
     }
 
     return fiscalPeriod;

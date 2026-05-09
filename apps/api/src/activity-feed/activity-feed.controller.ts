@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Param,
+  Patch,
   Post,
   Query,
   Res,
@@ -20,10 +22,13 @@ import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { ActivityFeedService } from './activity-feed.service';
 import { ActivityMediaService } from './activity-media.service';
+import { ActivityPostLifecycleService } from './activity-post-lifecycle.service';
 import { CreateActivityPostDto } from './dto/create-activity-post.dto';
 import { CreateActivityReactionDto } from './dto/create-activity-reaction.dto';
 import { CreateDevelopmentalMilestoneDto } from './dto/create-developmental-milestone.dto';
 import { CreateMoodLogDto } from './dto/create-mood-log.dto';
+import { DeleteActivityPostDto, ModerateActivityPostDto } from './dto/moderate-activity-post.dto';
+import { UpdateActivityPostDto } from './dto/update-activity-post.dto';
 
 interface FeedPostEvent {
   tenantId: string;
@@ -35,6 +40,7 @@ export class ActivityFeedController {
   constructor(
     private readonly activityFeedService: ActivityFeedService,
     private readonly activityMediaService: ActivityMediaService,
+    private readonly activityPostLifecycleService: ActivityPostLifecycleService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -79,6 +85,21 @@ export class ActivityFeedController {
     });
   }
 
+  @Get('parent')
+  @Permissions('activity_feed:read')
+  listParentPosts(
+    @CurrentAuth() auth: AuthContext,
+    @Query('studentId') studentId?: string,
+    @Query('category') category?: string,
+    @Query('month') month?: string,
+  ) {
+    return this.activityFeedService.listPosts(auth, {
+      studentId,
+      category,
+      month,
+    });
+  }
+
   @Get('reactions/analytics')
   @Permissions('activity_feed:read')
   getReactionAnalytics(@CurrentAuth() auth: AuthContext) {
@@ -92,6 +113,45 @@ export class ActivityFeedController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.activityFeedService.createPost(dto, auth);
+  }
+
+  @Patch('posts/:id')
+  @Permissions('activity_feed:create')
+  updatePost(
+    @Param('id') postId: string,
+    @Body() dto: UpdateActivityPostDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.activityPostLifecycleService.updatePost(postId, dto, auth);
+  }
+
+  @Delete('posts/:id')
+  @Permissions('activity_feed:create')
+  softDeletePost(
+    @Param('id') postId: string,
+    @Body() dto: DeleteActivityPostDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.activityPostLifecycleService.softDeletePost(postId, dto, auth);
+  }
+
+  @Patch('posts/:id/restore')
+  @Permissions('activity_feed:moderate')
+  restorePost(
+    @Param('id') postId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.activityPostLifecycleService.restorePost(postId, auth);
+  }
+
+  @Patch('posts/:id/moderation')
+  @Permissions('activity_feed:moderate')
+  moderatePost(
+    @Param('id') postId: string,
+    @Body() dto: ModerateActivityPostDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.activityPostLifecycleService.moderatePost(postId, dto, auth);
   }
 
   @Post('posts/:id/reactions')
@@ -136,6 +196,58 @@ export class ActivityFeedController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.activityFeedService.createMilestone(dto, auth);
+  }
+
+  @Get('media/:id/preview-url')
+  @Permissions('activity_feed:read')
+  getMediaPreviewUrl(
+    @Param('id') attachmentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.activityMediaService.getAttachmentAccessUrl(
+      auth,
+      attachmentId,
+      'preview',
+    );
+  }
+
+  @Get('media/:id/download-url')
+  @Permissions('activity_feed:read')
+  getMediaDownloadUrl(
+    @Param('id') attachmentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.activityMediaService.getAttachmentAccessUrl(
+      auth,
+      attachmentId,
+      'download',
+    );
+  }
+
+  @Get('parent/media/:id/preview-url')
+  @Permissions('activity_feed:read')
+  getParentMediaPreviewUrl(
+    @Param('id') attachmentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.activityMediaService.getAttachmentAccessUrl(
+      auth,
+      attachmentId,
+      'preview',
+    );
+  }
+
+  @Get('parent/media/:id/download-url')
+  @Permissions('activity_feed:read')
+  getParentMediaDownloadUrl(
+    @Param('id') attachmentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.activityMediaService.getAttachmentAccessUrl(
+      auth,
+      attachmentId,
+      'download',
+    );
   }
 
   @Get('attachments/:id/preview')

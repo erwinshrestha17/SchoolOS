@@ -76,6 +76,12 @@ enum InvoiceStatus {
   VOID
 }
 
+enum PaymentStatus {
+  SUCCESS
+  REVERSED
+  FAILED
+}
+
 enum PaymentMethod {
   CASH
   BANK
@@ -192,10 +198,12 @@ enum StorageProvider {
   LOCAL
   R2
 }
-
 enum StudentDocumentKind {
   BIRTH_CERTIFICATE
   TRANSFER_CERTIFICATE
+  CITIZENSHIP_DOC
+  PREVIOUS_REPORT_CARD
+  MEDICAL_RECORD
   PHOTO
   ID_CARD
   ENROLLMENT_CONFIRMATION
@@ -272,9 +280,11 @@ enum ConsentType {
 }
 
 enum AttendanceSyncStatus {
-  ACCEPTED
+  SYNCED
   CONFLICTED
   REJECTED
+  DUPLICATE
+  ACCEPTED
 }
 
 enum AttendanceSyncRejectionReason {
@@ -283,6 +293,18 @@ enum AttendanceSyncRejectionReason {
   ROSTER_MISMATCH
   REFERENCE_NOT_FOUND
   UNKNOWN
+  ALREADY_MARKED
+  HOLIDAY
+  CROSS_TENANT
+  STALE_DRAFT
+  UNASSIGNED_TEACHER
+}
+
+enum AttendanceCorrectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
 }
 
 enum ActivityReactionType {
@@ -298,11 +320,19 @@ enum DevelopmentalMilestoneStatus {
   NEEDS_SUPPORT
 }
 
+enum ExamTermStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
 enum AssessmentType {
-  TERMINAL
-  CAS
+  THEORY
   PRACTICAL
+  CAS
   PROJECT
+  INTERNAL
+  TERMINAL
 }
 
 enum GradeLockStatus {
@@ -384,7 +414,17 @@ enum StudentLifecycleStatus {
   TRANSFERRED
   EXITED
   ALUMNI
+  ARCHIVED
+  MERGED
   DELETED
+}
+
+enum StudentDocumentStatus {
+  ACTIVE
+  ARCHIVED
+  REPLACED
+  REJECTED
+  VERIFIED
 }
 
 enum GuardianIdentityVerificationStatus {
@@ -674,6 +714,10 @@ model Tenant {
   syllabusTopics                SyllabusTopic[]
   settings                      TenantSetting[]
   fileAssets                    FileAsset[]
+  studentMergeHistory           StudentMergeHistory[]
+  studentIdentities             StudentIdentity[]
+  studentDocumentHistory        StudentDocumentHistory[]
+  attendanceCorrectionRequests   AttendanceCorrectionRequest[]
 }
 
 model User {
@@ -722,6 +766,11 @@ model User {
   canteenWalletTransactions   CanteenWalletTransaction[]   @relation("CanteenWalletTransactionCreatedBy")
   canteenPosSalesCreated      CanteenPosSale[]             @relation("CanteenPosSaleCreatedBy")
   reprintedReceipts           ReceiptReprintHistory[]      @relation("ReceiptReprinter")
+  reversedPayments            Payment[]                    @relation("ReversedPayments")
+  mergedStudents              StudentMergeHistory[]        @relation("MergedBy")
+
+  requestedAttendanceCorrections AttendanceCorrectionRequest[] @relation("RequestedAttendanceCorrections")
+  reviewedAttendanceCorrections  AttendanceCorrectionRequest[] @relation("ReviewedAttendanceCorrections")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
@@ -850,6 +899,8 @@ model FileAsset {
   uploadedBy          User?                @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
   activityAttachments ActivityAttachment[]
   homeworkAttachments HomeworkAttachment[]
+  studentPhoto        Student?             @relation("StudentPhoto")
+  studentDocuments    StudentDocument[]    @relation("DocumentFile")
 
   @@index([tenantId, module, entityId])
 }
@@ -925,11 +976,13 @@ model Section {
   classId   String
   name      String
   capacity  Int?
+  classTeacherId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   tenant                  Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   class                   Class                      @relation(fields: [classId], references: [id], onDelete: Restrict)
+  classTeacher            Staff?                     @relation("ClassTeacherSections", fields: [classTeacherId], references: [id], onDelete: SetNull)
   students                Student[]
   enrollments             Enrollment[]
   attendanceSessions      AttendanceSession[]
@@ -999,6 +1052,7 @@ model Student {
   birthCertNumber           String?
   citizenshipNo             String?
   photoUrl                  String?
+  photoFileId               String?                @unique
   admissionDate             DateTime
   admissionNumber           String?
   previousSchool            String?
@@ -1023,6 +1077,8 @@ model Student {
   emergencyPhone            String?
   doctorName                String?
   doctorPhone               String?
+  qrCode                    String?                @unique
+  studentIdentityCode       String?                @unique
   privacyConsentAt          DateTime?
   dataProcessingConsentedAt DateTime?
   medicalConsentAt          DateTime?
@@ -1043,6 +1099,10 @@ model Student {
   documents                 StudentDocument[]
   generatedDocuments        GeneratedStudentDocument[]
   lifecycleTransitions      StudentLifecycleTransition[]
+  mergeHistorySource        StudentMergeHistory[]        @relation("SourceStudentMerge")
+  mergeHistoryTarget        StudentMergeHistory[]        @relation("TargetStudentMerge")
+  identities                StudentIdentity[]
+  photoFile                 FileAsset?                   @relation("StudentPhoto", fields: [photoFileId], references: [id])
   siblingMemberships        SiblingGroupMember[]
   activityTags              ActivityPostStudent[]
   activityReactions         ActivityReaction[]
@@ -1068,6 +1128,7 @@ model Student {
   canteenWalletTransactions CanteenWalletTransaction[]
   canteenPosSales           CanteenPosSale[]
   canteenSpendingControls   CanteenSpendingControl[]
+  attendanceCorrectionRequests AttendanceCorrectionRequest[]
 
   @@unique([tenantId, studentSystemId])
   @@index([tenantId, classId, sectionId])
@@ -1230,6 +1291,7 @@ model Staff {
   leaveBalances              StaffLeaveBalance[]
   leaveRequests              StaffLeaveRequest[]
   syllabusTopics             SyllabusTopic[]
+  classTeacherSections       Section[]                   @relation("ClassTeacherSections")
 
   @@unique([tenantId, employeeId])
   @@unique([tenantId, staffCode])
@@ -1293,6 +1355,7 @@ model AttendanceSession {
   submittedBy  User?                @relation("SubmittedAttendanceSessions", fields: [submittedById], references: [id], onDelete: SetNull)
   records      AttendanceRecord[]
   conflicts    AttendanceConflict[]
+  correctionRequests AttendanceCorrectionRequest[]
 
   @@unique([tenantId, attendanceDate, classId, sectionId])
 }
@@ -1311,7 +1374,37 @@ model AttendanceRecord {
   attendanceSession AttendanceSession @relation(fields: [attendanceSessionId], references: [id], onDelete: Cascade)
   student           Student           @relation(fields: [studentId], references: [id], onDelete: Restrict)
 
+  correctionRequests  AttendanceCorrectionRequest[]
+
   @@unique([attendanceSessionId, studentId])
+}
+
+model AttendanceCorrectionRequest {
+  id                  String                     @id @default(uuid())
+  tenantId            String
+  attendanceRecordId  String?
+  attendanceSessionId String?
+  studentId           String
+  attendanceDate      DateTime
+  requestedStatus     AttendanceStatus
+  reason              String
+  status              AttendanceCorrectionStatus @default(PENDING)
+  requestedById       String
+  requestedAt         DateTime                   @default(now())
+  reviewedById        String?
+  reviewedAt          DateTime?
+  reviewNote          String?
+  metadata            Json?
+
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  record      AttendanceRecord? @relation(fields: [attendanceRecordId], references: [id], onDelete: SetNull)
+  session     AttendanceSession? @relation(fields: [attendanceSessionId], references: [id], onDelete: SetNull)
+  student     Student           @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  requestedBy User              @relation("RequestedAttendanceCorrections", fields: [requestedById], references: [id], onDelete: Restrict)
+  reviewedBy  User?             @relation("ReviewedAttendanceCorrections", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([tenantId, studentId, attendanceDate])
 }
 
 model StaffAttendance {
@@ -1505,6 +1598,7 @@ model Invoice {
   libraryIssues LibraryIssue[]
 
   @@unique([tenantId, invoiceNumber])
+  @@index([tenantId, status, dueDate])
 }
 
 model InvoiceLine {
@@ -1531,23 +1625,31 @@ model Payment {
   invoiceId       String
   collectedById   String?
   method          PaymentMethod
+  status          PaymentStatus @default(SUCCESS)
   referenceNumber String?
   amount          Decimal       @db.Decimal(12, 2)
   isAdvance       Boolean       @default(false)
   recognizedAt    DateTime?
+  reversedAt      DateTime?
+  reversedById    String?
+  reversalReason  String?
   metadata        Json?
   paidAt          DateTime
   narration       String?
+  idempotencyKey  String?
   createdAt       DateTime      @default(now())
 
   tenant      Tenant          @relation(fields: [tenantId], references: [id])
   student     Student         @relation(fields: [studentId], references: [id])
   invoice     Invoice         @relation(fields: [invoiceId], references: [id])
   collectedBy User?           @relation("CollectedPayments", fields: [collectedById], references: [id])
+  reversedBy  User?           @relation("ReversedPayments", fields: [reversedById], references: [id])
   receipt     Receipt?
   refunds     PaymentRefund[]
 
-  @@index([tenantId, paidAt])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, method, referenceNumber])
+  @@index([tenantId, paidAt, status])
 }
 
 model PaymentRefund {
@@ -1719,7 +1821,7 @@ model JournalEntry {
   corrections  JournalEntry[] @relation("JournalEntryCorrection")
   lines        JournalLine[]
 
-  @@unique([tenantId, entryNumber])
+  @@unique([tenantId, fiscalYearId, entryNumber])
   @@unique([tenantId, sourceModule, sourceType, sourceId, postingType])
   @@index([tenantId, reversalOfId])
   @@index([tenantId, fiscalYearId])
@@ -1839,25 +1941,88 @@ model Event {
 }
 
 model StudentDocument {
-  id           String              @id @default(uuid())
+  id           String                @id @default(uuid())
   tenantId     String
   studentId    String
+  fileId       String?
   kind         StudentDocumentKind
+  status       StudentDocumentStatus @default(ACTIVE)
   title        String
   fileName     String
   contentType  String
   sizeBytes    Int
-  provider     StorageProvider     @default(LOCAL)
+  provider     StorageProvider       @default(LOCAL)
   objectKey    String
   publicUrl    String?
   signedUrl    String?
+  notes        String?
+  expiryDate   DateTime?
+  verifiedAt   DateTime?
+  verifiedById String?
   uploadedById String?
-  createdAt    DateTime            @default(now())
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt @default(now())
+
+  tenant  Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  file    FileAsset? @relation("DocumentFile", fields: [fileId], references: [id])
+  history StudentDocumentHistory[]
+
+  @@index([tenantId, studentId])
+  @@index([tenantId, fileId])
+}
+
+model StudentMergeHistory {
+  id              String   @id @default(uuid())
+  tenantId        String
+  sourceStudentId String
+  targetStudentId String
+  mergedById      String?
+  mergedAt        DateTime @default(now())
+  reason          String?
+  metadata        Json?
+
+  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  sourceStudent Student @relation("SourceStudentMerge", fields: [sourceStudentId], references: [id], onDelete: Cascade)
+  targetStudent Student @relation("TargetStudentMerge", fields: [targetStudentId], references: [id], onDelete: Cascade)
+  mergedBy      User?   @relation("MergedBy", fields: [mergedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, sourceStudentId])
+  @@index([tenantId, targetStudentId])
+}
+
+model StudentIdentity {
+  id           String   @id @default(uuid())
+  tenantId     String
+  studentId    String
+  identityCode String   @unique
+  status       String   @default("ACTIVE") // ACTIVE, REVOKED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  revokedAt    DateTime?
+  revokedById  String?
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, studentId])
+  @@index([tenantId, identityCode])
+}
+
+model StudentDocumentHistory {
+  id          String   @id @default(uuid())
+  tenantId    String
+  documentId  String?
+  action      String // UPLOAD, DELETE, VIEW, MOVE_MERGE
+  documentTitle String?
+  documentKind  String?
+  performedBy String
+  reason      String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  document StudentDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
 }
 
 model GeneratedStudentDocument {
@@ -1892,7 +2057,7 @@ model StudentLifecycleTransition {
   id                 String                 @id @default(uuid())
   tenantId           String
   studentId          String
-  fromStatus         StudentLifecycleStatus
+  fromStatus         StudentLifecycleStatus?
   toStatus           StudentLifecycleStatus
   reason             String
   changedById        String?
@@ -2251,8 +2416,9 @@ model ExamTerm {
   name           String
   startsOn       DateTime
   endsOn         DateTime
-  weightPercent  Decimal  @default(100) @db.Decimal(5, 2)
-  isLocked       Boolean  @default(false)
+  weightPercent  Decimal        @default(100) @db.Decimal(5, 2)
+  status         ExamTermStatus @default(ACTIVE)
+  isLocked       Boolean        @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -2289,9 +2455,12 @@ model AssessmentComponent {
 }
 
 enum MarkEntryStatus {
-  SUBMITTED
+  PRESENT
   ABSENT
+  EXCUSED
+  MISSING
   WITHHELD
+  SUBMITTED
 }
 
 model MarkEntry {

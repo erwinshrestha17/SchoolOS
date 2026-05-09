@@ -73,6 +73,7 @@ export class AcademicsFoundationService {
         startsOn,
         endsOn,
         weightPercent: requestedWeight,
+        status: dto.status || 'ACTIVE',
       },
       include: {
         academicYear: true,
@@ -150,6 +151,7 @@ export class AcademicsFoundationService {
         startsOn,
         endsOn,
         weightPercent,
+        status: dto.status ?? existing.status,
       },
       include: {
         academicYear: true,
@@ -236,6 +238,32 @@ export class AcademicsFoundationService {
     });
 
     return { deleted: true, examTermId };
+  }
+
+  async archiveExamTerm(examTermId: string, actor: AuthContext) {
+    const existing = await this.prisma.examTerm.findFirst({
+      where: { id: examTermId, tenantId: actor.tenantId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Exam term not found in this tenant');
+    }
+
+    const updated = await this.prisma.examTerm.update({
+      where: { id: existing.id },
+      data: { status: 'ARCHIVED' },
+    });
+
+    await this.auditService.record({
+      action: 'archive',
+      resource: 'exam_term',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      after: { status: 'ARCHIVED' },
+    });
+
+    return updated;
   }
 
   async listSubjects(actor: AuthContext, filters: SubjectFilters = {}) {

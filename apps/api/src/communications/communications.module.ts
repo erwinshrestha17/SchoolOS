@@ -12,8 +12,10 @@ import { M10HardeningService } from './m10-hardening.service';
 import { NoticeDetailController } from './notice-detail.controller';
 import { NoticeDetailService } from './notice-detail.service';
 import { NoticeUnreadRecipientsService } from './notice-unread-recipients.service';
+import { NotificationCenterAliasController } from './notification-center-alias.controller';
 import { NotificationCenterController } from './notification-center.controller';
 import { NotificationCenterService } from './notification-center.service';
+import { NotificationDeliveriesAliasController } from './notification-deliveries-alias.controller';
 import { NoticesController } from './notices.controller';
 
 @Module({
@@ -25,7 +27,8 @@ import { NoticesController } from './notices.controller';
     DeliveriesController,
     ConsentsController,
     NotificationCenterController,
-    M10HardeningController,
+    NotificationCenterAliasController,
+    NotificationDeliveriesAliasController,
   ],
   providers: [
     CommunicationsService,

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Patch,
   Post,
@@ -13,6 +14,7 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { ArchiveLibraryBookDto } from './dto/archive-library-book.dto';
 import { CreateLibraryBookDto } from './dto/create-library-book.dto';
 import { CreateLibraryCopyDto } from './dto/create-library-copy.dto';
 import { IssueLibraryCopyDto } from './dto/issue-library-copy.dto';
@@ -20,12 +22,16 @@ import { MarkLibraryCopyStatusDto } from './dto/mark-library-copy-status.dto';
 import { ReturnLibraryCopyDto } from './dto/return-library-copy.dto';
 import { UpdateLibraryBookDto } from './dto/update-library-book.dto';
 import { UpdateLibraryCopyDto } from './dto/update-library-copy.dto';
+import { LibraryHardeningService } from './library-hardening.service';
 import { LibraryService } from './library.service';
 
 @Controller('library')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class LibraryController {
-  constructor(private readonly libraryService: LibraryService) {}
+  constructor(
+    private readonly libraryService: LibraryService,
+    private readonly libraryHardeningService: LibraryHardeningService,
+  ) {}
 
   @Get('books')
   @Permissions('library:books:read')
@@ -55,6 +61,16 @@ export class LibraryController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.libraryService.updateBook(bookId, dto, auth);
+  }
+
+  @Post('books/:id/archive')
+  @Permissions('library:books:update')
+  archiveBook(
+    @Param('id') bookId: string,
+    @Body() dto: ArchiveLibraryBookDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.libraryHardeningService.archiveBook(bookId, dto, auth);
   }
 
   @Get('copies')
@@ -145,13 +161,73 @@ export class LibraryController {
 
   @Get('overdue')
   @Permissions('library:reports:read')
-  listOverdue(@CurrentAuth() auth: AuthContext) {
-    return this.libraryService.listOverdue(auth);
+  listOverdue(
+    @CurrentAuth() auth: AuthContext,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.libraryService.listOverdue(auth, { page, limit });
   }
 
   @Post('overdue/reminders')
   @Permissions('library:reports:read')
   sendOverdueReminders(@CurrentAuth() auth: AuthContext) {
-    return this.libraryService.sendOverdueReminders(auth);
+    return this.libraryHardeningService.sendOverdueRemindersIdempotent(auth);
+  }
+
+  @Get('reports/issued')
+  @Permissions('library:reports:read')
+  getIssuedBooksReport(
+    @CurrentAuth() auth: AuthContext,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.libraryHardeningService.getIssuedBooksReport(auth, {
+      page,
+      limit,
+    });
+  }
+
+  @Get('reports/overdue')
+  @Permissions('library:reports:read')
+  getOverdueBooksReport(@CurrentAuth() auth: AuthContext) {
+    return this.libraryHardeningService.getOverdueBooksReport(auth);
+  }
+
+  @Get('reports/lost-damaged')
+  @Permissions('library:reports:read')
+  getLostDamagedReport(@CurrentAuth() auth: AuthContext) {
+    return this.libraryHardeningService.getLostDamagedReport(auth);
+  }
+
+  @Get('reports/fines')
+  @Permissions('library:reports:read')
+  getFineSummary(@CurrentAuth() auth: AuthContext) {
+    return this.libraryHardeningService.getFineSummary(auth);
+  }
+
+  @Get('reports/borrower-history')
+  @Permissions('library:reports:read')
+  getBorrowerHistory(
+    @CurrentAuth() auth: AuthContext,
+    @Query('studentId') studentId?: string,
+    @Query('staffId') staffId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.libraryHardeningService.getBorrowerHistory(auth, {
+      studentId,
+      staffId,
+      page,
+      limit,
+    });
+  }
+
+  @Get('reports/issued.csv')
+  @Header('Content-Type', 'text/csv')
+  @Header('Content-Disposition', 'attachment; filename="library-issued-books.csv"')
+  @Permissions('library:reports:read')
+  exportIssuedBooksCsv(@CurrentAuth() auth: AuthContext) {
+    return this.libraryHardeningService.exportIssuedBooksCsv(auth);
   }
 }

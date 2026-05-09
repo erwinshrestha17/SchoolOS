@@ -125,8 +125,12 @@ export class GradeCalculatorService {
       this.validateComponent(component);
 
       const isWithheld =
-        component.status === MarkEntryStatus.WITHHELD || component.isMissing;
-      const isAbsent = component.status === MarkEntryStatus.ABSENT;
+        component.status === MarkEntryStatus.WITHHELD ||
+        component.status === MarkEntryStatus.MISSING ||
+        component.isMissing;
+      const isAbsent =
+        component.status === MarkEntryStatus.ABSENT ||
+        component.status === MarkEntryStatus.EXCUSED;
 
       if (isWithheld) {
         missingComponentCount += 1;
@@ -231,6 +235,10 @@ export class GradeCalculatorService {
       failedSubjectCount,
       incompleteSubjectCount,
     };
+  }
+
+  getPromotionStatus(percentage: number): 'READY' | 'REVIEW' {
+    return percentage >= 35 ? 'READY' : 'REVIEW';
   }
 
   getGradeScale() {

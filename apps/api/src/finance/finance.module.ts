@@ -3,6 +3,8 @@ import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { CommunicationsModule } from '../communications/communications.module';
 import { FeesController } from './fees.controller';
+import { FinanceCompatController } from './finance-compat.controller';
+import { FinanceCompatService } from './finance-compat.service';
 import { FinanceService } from './finance.service';
 import { LedgerController } from './ledger.controller';
 import { PaymentsController } from './payments.controller';
@@ -26,11 +28,17 @@ import { AccountingPostingModule } from '../accounting/accounting-posting.module
   ],
   controllers: [
     FeesController,
+    FinanceCompatController,
     PaymentsController,
     LedgerController,
     ReceiptsController,
   ],
-  providers: [FinanceService, FinanceProcessor, FinanceCron],
-  exports: [FinanceService],
+  providers: [
+    FinanceService,
+    FinanceCompatService,
+    FinanceProcessor,
+    FinanceCron,
+  ],
+  exports: [FinanceService, FinanceCompatService],
 })
 export class FinanceModule {}

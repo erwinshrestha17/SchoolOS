@@ -91,6 +91,8 @@ export class SettingsService {
     'audit_log_retention_days',
     'session_timeout_minutes',
     'require_reason_for_sensitive_reveal',
+    'block_report_card_on_dues',
+    'block_publishing_on_dues',
   ];
 
   private readonly publicKeys: TenantSettingKey[] = [

@@ -20,6 +20,7 @@ import { AcademicsService, PromotionReadinessRow } from './academics.service';
 import { AssessmentComponentsService } from './assessment-components.service';
 import { CasRecordsService } from './cas-records.service';
 import { MarkLockWorkflowService } from './mark-lock-workflow.service';
+import { MarksEntryService } from './marks-entry.service';
 import { ReportCardPdfService } from './report-card-pdf.service';
 import { ReportCardsService } from './report-cards.service';
 import {
@@ -58,6 +59,7 @@ export class AcademicsController {
     private readonly markLockWorkflowService: MarkLockWorkflowService,
     private readonly reportCardPdfService: ReportCardPdfService,
     private readonly reportCardsService: ReportCardsService,
+    private readonly marksEntryService: MarksEntryService,
     private readonly resultPublishingService: ResultPublishingService,
   ) {}
 
@@ -193,24 +195,39 @@ export class AcademicsController {
     @Query('classId') classId?: string,
     @Query('sectionId') sectionId?: string,
     @Query('subjectId') subjectId?: string,
+    @Query('studentId') studentId?: string,
   ) {
-    if (examTermId || assessmentComponentId || classId || subjectId) {
-      return this.academicsService.listMarksByFilters(auth, {
-        examTermId,
-        assessmentComponentId,
-        classId,
-        sectionId,
-        subjectId,
-      });
-    }
+    return this.marksEntryService.list(auth, {
+      examTermId,
+      assessmentComponentId,
+      classId,
+      sectionId,
+      subjectId,
+      studentId,
+    });
+  }
 
-    return this.academicsService.listMarks(auth);
+  @Get('marks/roster')
+  @Permissions('academics:read')
+  getMarksRoster(
+    @CurrentAuth() auth: AuthContext,
+    @Query('examTermId') examTermId: string,
+    @Query('assessmentComponentId') assessmentComponentId: string,
+    @Query('classId') classId: string,
+    @Query('sectionId') sectionId?: string,
+  ) {
+    return this.marksEntryService.getMarksRoster(auth, {
+      examTermId,
+      assessmentComponentId,
+      classId,
+      sectionId,
+    });
   }
 
   @Post('marks')
   @Permissions('academics:enter_marks')
   enterMark(@Body() dto: EnterMarkDto, @CurrentAuth() auth: AuthContext) {
-    return this.academicsService.enterMark(dto, auth);
+    return this.marksEntryService.enterMark(dto, auth);
   }
 
   @Post('marks/batch')
@@ -219,7 +236,7 @@ export class AcademicsController {
     @Body() dto: BatchEnterMarksDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.academicsService.batchEnterMarks(dto, auth);
+    return this.marksEntryService.batchEnterMarks(dto, auth);
   }
 
   @Get('marks/lock-requests')
@@ -272,6 +289,25 @@ export class AcademicsController {
       sectionId,
       subjectId,
       studentId,
+    });
+  }
+
+  @Get('cas/roster')
+  @Permissions('academics:read')
+  getCasRoster(
+    @CurrentAuth() auth: AuthContext,
+    @Query('academicYearId') academicYearId: string,
+    @Query('classId') classId: string,
+    @Query('sectionId') sectionId?: string,
+    @Query('subjectId') subjectId: string,
+    @Query('category') category?: string,
+  ) {
+    return this.casRecordsService.getCasRoster(auth, {
+      academicYearId,
+      classId,
+      sectionId,
+      subjectId,
+      category,
     });
   }
 

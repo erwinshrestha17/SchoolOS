@@ -26,6 +26,17 @@ export interface ActivityMediaFile {
   sizeBytes: number;
 }
 
+export interface ActivityMediaAccessUrl {
+  url: string;
+  expiresInSeconds: number;
+  mediaId: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+}
+
+const ACTIVITY_MEDIA_ACCESS_TTL_SECONDS = 60;
+
 @Injectable()
 export class ActivityMediaService {
   constructor(
@@ -39,6 +50,76 @@ export class ActivityMediaService {
     attachmentId: string,
     action: 'preview' | 'download',
   ): Promise<ActivityMediaFile> {
+    const attachment = await this.findVisibleAttachmentOrThrow(
+      actor,
+      attachmentId,
+      action,
+    );
+
+    const fileAsset = attachment.fileAsset;
+
+    if (!fileAsset || fileAsset.softDeletedAt) {
+      throw new NotFoundException('Activity media file not found');
+    }
+
+    if (fileAsset.tenantId !== actor.tenantId) {
+      throw new ForbiddenException('Activity media is outside this tenant');
+    }
+
+    if (
+      attachment.provider === StorageProvider.R2 &&
+      fileAsset.objectKey.startsWith('http')
+    ) {
+      return {
+        redirectUrl: fileAsset.objectKey,
+        fileName: attachment.fileName,
+        contentType: attachment.contentType,
+        sizeBytes: attachment.sizeBytes,
+      };
+    }
+
+    const absolutePath = this.resolveLocalObjectPath(fileAsset.objectKey);
+    await access(absolutePath);
+
+    return {
+      stream: createReadStream(absolutePath),
+      fileName: attachment.fileName,
+      contentType: attachment.contentType,
+      sizeBytes: attachment.sizeBytes,
+    };
+  }
+
+  async getAttachmentAccessUrl(
+    actor: AuthContext,
+    attachmentId: string,
+    action: 'preview' | 'download',
+  ): Promise<ActivityMediaAccessUrl> {
+    const attachment = await this.findVisibleAttachmentOrThrow(
+      actor,
+      attachmentId,
+      `${action}_url`,
+    );
+
+    const urlPath =
+      action === 'preview'
+        ? `/activity-feed/attachments/${encodeURIComponent(attachment.id)}/preview`
+        : `/activity-feed/attachments/${encodeURIComponent(attachment.id)}/download`;
+
+    return {
+      url: `${this.apiBaseUrl}${urlPath}`,
+      expiresInSeconds: ACTIVITY_MEDIA_ACCESS_TTL_SECONDS,
+      mediaId: attachment.id,
+      fileName: attachment.fileName,
+      contentType: attachment.contentType,
+      sizeBytes: attachment.sizeBytes,
+    };
+  }
+
+  private async findVisibleAttachmentOrThrow(
+    actor: AuthContext,
+    attachmentId: string,
+    action: string,
+  ) {
     const attachment = await this.prisma.activityAttachment.findFirst({
       where: {
         id: attachmentId,
@@ -88,27 +169,7 @@ export class ActivityMediaService {
       },
     });
 
-    if (
-      attachment.provider === StorageProvider.R2 &&
-      fileAsset.objectKey.startsWith('http')
-    ) {
-      return {
-        redirectUrl: fileAsset.objectKey,
-        fileName: attachment.fileName,
-        contentType: attachment.contentType,
-        sizeBytes: attachment.sizeBytes,
-      };
-    }
-
-    const absolutePath = this.resolveLocalObjectPath(fileAsset.objectKey);
-    await access(absolutePath);
-
-    return {
-      stream: createReadStream(absolutePath),
-      fileName: attachment.fileName,
-      contentType: attachment.contentType,
-      sizeBytes: attachment.sizeBytes,
-    };
+    return attachment;
   }
 
   private resolveLocalObjectPath(objectKey: string) {
@@ -120,6 +181,16 @@ export class ActivityMediaService {
     }
 
     return absolutePath;
+  }
+
+  private get apiBaseUrl() {
+    const configuredBaseUrl = process.env.API_PUBLIC_BASE_URL?.trim();
+
+    if (configuredBaseUrl) {
+      return configuredBaseUrl.replace(/\/$/, '');
+    }
+
+    return `http://localhost:${this.configService.port}/api/v1`;
   }
 
   private async ensureAttachmentVisibleToActor(
