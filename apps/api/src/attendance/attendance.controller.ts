@@ -245,6 +245,34 @@ export class AttendanceController {
     @Body() dto: ReviewAttendanceCorrectionDto,
     @CurrentAuth() auth: AuthContext,
   ) {
+    return this.attendanceService.approveCorrectionRequest(
+      id,
+      { ...dto, status: 'APPROVED' },
+      auth,
+    );
+  }
+
+  @Patch('corrections/:id/reject')
+  @Permissions('attendance:review_conflicts')
+  rejectCorrectionRequest(
+    @Param('id') id: string,
+    @Body() dto: ReviewAttendanceCorrectionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.approveCorrectionRequest(
+      id,
+      { ...dto, status: 'REJECTED' },
+      auth,
+    );
+  }
+
+  @Patch('corrections/:id/review')
+  @Permissions('attendance:review_conflicts')
+  reviewCorrectionRequest(
+    @Param('id') id: string,
+    @Body() dto: ReviewAttendanceCorrectionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.attendanceService.approveCorrectionRequest(id, dto, auth);
   }
 

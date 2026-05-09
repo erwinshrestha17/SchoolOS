@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
 } from 'class-validator';
 
 export class CreateAttendanceCorrectionDto {
@@ -38,5 +39,6 @@ export class CreateAttendanceCorrectionDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @MaxLength(500)
   reason!: string;
 }
