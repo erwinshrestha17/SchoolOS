@@ -22,12 +22,16 @@ import { DuesQueryDto } from './dto/dues-query.dto';
 import { ListCashierClosesDto } from './dto/list-cashier-closes.dto';
 import { ReprintReceiptDto } from './dto/reprint-receipt.dto';
 import { SendDefaulterRemindersDto } from './dto/send-defaulter-reminders.dto';
+import { FinanceCompatService } from './finance-compat.service';
 import { FinanceService } from './finance.service';
 
 @Controller('finance')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class FinanceCompatController {
-  constructor(private readonly financeService: FinanceService) {}
+  constructor(
+    private readonly financeService: FinanceService,
+    private readonly financeCompatService: FinanceCompatService,
+  ) {}
 
   @Get('dues')
   @Permissions('fees:manage')
@@ -131,7 +135,7 @@ export class FinanceCompatController {
     @Param('id') receiptId: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.financeService.getReceiptReprintHistory(receiptId, auth);
+    return this.financeCompatService.getReceiptReprintHistory(receiptId, auth);
   }
 
   @Post('receipts/:id/reprint')
@@ -161,7 +165,7 @@ export class FinanceCompatController {
     @Param('studentId') studentId: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.financeService.exportStudentFeeLedgerCsv(studentId, auth);
+    return this.financeCompatService.exportStudentFeeLedgerCsv(studentId, auth);
   }
 }
 
