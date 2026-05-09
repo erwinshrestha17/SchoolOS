@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class ReviewAttendanceCorrectionDto {
   @ApiProperty({ enum: ['APPROVED', 'REJECTED'] })
@@ -10,5 +10,6 @@ export class ReviewAttendanceCorrectionDto {
   @ApiProperty()
   @IsString()
   @IsOptional()
+  @MaxLength(500)
   reviewNote?: string;
 }
