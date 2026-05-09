@@ -167,20 +167,6 @@ export class HrAttendanceController {
     );
   }
 
-  @Post('leaves/:id/cancel')
-  @Permissions('hr:leave:request')
-  cancelLeave(
-    @Param('id') id: string,
-    @Body() dto: ReviewStaffLeaveRequestDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.attendanceService.reviewLeaveRequest(
-      id,
-      { ...dto, status: 'CANCELLED' },
-      auth,
-    );
-  }
-
   @Patch('leave-requests/:id/review')
   @Permissions('hr:leave:approve')
   reviewLeaveRequest(
