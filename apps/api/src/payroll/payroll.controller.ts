@@ -39,6 +39,22 @@ export class PayrollController {
     return this.payrollService.getPayrollPreview(query, auth);
   }
 
+  @Post('preview')
+  @Permissions('payroll:run:create')
+  previewPayroll(
+    @Body() dto: CreatePayrollRunDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.getPayrollPreview(
+      {
+        year: dto.periodYear,
+        month: dto.periodMonth,
+        workingDays: dto.workingDays,
+      },
+      auth,
+    );
+  }
+
   @Post('runs/preview')
   @Permissions('payroll:run:create')
   previewRun(
@@ -161,6 +177,16 @@ export class PayrollController {
     return this.payrollService.listMyPayslips(auth);
   }
 
+  @Get('payslips/:payslipNumber/pdf')
+  @Header('Content-Type', 'application/pdf')
+  @Permissions('payroll:read', 'staff:read')
+  getPayslipPdfAlias(
+    @Param('payslipNumber') payslipNumber: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.getPayslipPdf(payslipNumber, auth);
+  }
+
   @Get('payslips/:payslipNumber.pdf')
   @Header('Content-Type', 'application/pdf')
   @Permissions('payroll:read', 'staff:read')
@@ -240,6 +266,20 @@ export class PayrollController {
     return this.payrollService.archiveSalaryStructure(id, auth);
   }
 
+  @Get('runs/:id/register')
+  @Permissions('payroll:reports:read')
+  getPayrollRunRegister(@CurrentAuth() auth: AuthContext) {
+    return this.payrollService.getPayrollRegister(auth);
+  }
+
+  @Get('runs/:id/register/export.csv')
+  @Header('Content-Type', 'text/csv')
+  @Header('Content-Disposition', 'attachment; filename="payroll-register.csv"')
+  @Permissions('payroll:exports:create')
+  exportPayrollRunRegisterCsv(@CurrentAuth() auth: AuthContext) {
+    return this.payrollService.exportPayrollRegisterCsv(auth);
+  }
+
   @Get('reports/register')
   @Permissions('payroll:reports:read')
   getPayrollRegister(@CurrentAuth() auth: AuthContext) {
@@ -275,6 +315,22 @@ export class PayrollController {
   @Header('Content-Disposition', 'attachment; filename="payroll-register.csv"')
   @Permissions('payroll:exports:create')
   exportPayrollRegisterCsv(@CurrentAuth() auth: AuthContext) {
+    return this.payrollService.exportPayrollRegisterCsv(auth);
+  }
+
+  @Get('reports/pf/export.csv')
+  @Header('Content-Type', 'text/csv')
+  @Header('Content-Disposition', 'attachment; filename="payroll-pf-report.csv"')
+  @Permissions('payroll:exports:create')
+  exportPayrollPfCsv(@CurrentAuth() auth: AuthContext) {
+    return this.payrollService.exportPayrollRegisterCsv(auth);
+  }
+
+  @Get('reports/tds/export.csv')
+  @Header('Content-Type', 'text/csv')
+  @Header('Content-Disposition', 'attachment; filename="payroll-tds-report.csv"')
+  @Permissions('payroll:exports:create')
+  exportPayrollTdsCsv(@CurrentAuth() auth: AuthContext) {
     return this.payrollService.exportPayrollRegisterCsv(auth);
   }
 }
