@@ -26,6 +26,7 @@ import { ReviewGuardianIdentityVerificationDto } from './dto/review-guardian-ide
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { UpdateStudentGuardianDto } from './dto/update-student-guardian.dto';
 import { AttendanceHistoryQueryDto } from './dto/attendance-history.dto';
+import { sanitizeStudentProfileResponse } from './student-profile-sanitizer';
 import { StudentsService } from './students.service';
 
 @Controller('students')
@@ -41,11 +42,12 @@ export class StudentsController {
 
   @Get(':id')
   @Permissions('students:read')
-  getStudentProfile(
+  async getStudentProfile(
     @Param('id') studentId: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.studentsService.getStudentProfile(studentId, auth);
+    const profile = await this.studentsService.getStudentProfile(studentId, auth);
+    return sanitizeStudentProfileResponse(profile);
   }
 
   @Post()
