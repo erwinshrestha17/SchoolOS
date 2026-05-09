@@ -32,6 +32,15 @@ export class HrAttendanceController {
     return this.attendanceService.listStaffAttendance(auth);
   }
 
+  @Post('staff-attendance')
+  @Permissions('hr:attendance:write')
+  submitStaffAttendance(
+    @Body() dto: SubmitStaffAttendanceDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.submitStaffAttendance(dto, auth);
+  }
+
   @Post('staff-attendance/mark')
   @Permissions('hr:attendance:write')
   markStaffAttendance(
@@ -39,6 +48,16 @@ export class HrAttendanceController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.attendanceService.submitStaffAttendance(dto, auth);
+  }
+
+  @Patch('staff-attendance/:id')
+  @Permissions('hr:attendance:correct')
+  updateStaffAttendance(
+    @Param('id') id: string,
+    @Body() dto: CorrectStaffAttendanceDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.correctStaffAttendance(id, dto, auth);
   }
 
   @Patch('staff-attendance/:id/correct')
@@ -49,6 +68,15 @@ export class HrAttendanceController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.attendanceService.correctStaffAttendance(id, dto, auth);
+  }
+
+  @Get('staff/:staffId/attendance')
+  @Permissions('hr:attendance:read')
+  staffAttendance(
+    @Param('staffId') staffId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.getStaffAttendanceHistory(staffId, auth);
   }
 
   @Get('staff/:staffId/attendance-history')
@@ -69,6 +97,15 @@ export class HrAttendanceController {
     return this.attendanceService.listStaffAttendanceSummary(query, auth);
   }
 
+  @Post('leaves')
+  @Permissions('hr:leave:request')
+  createLeave(
+    @Body() dto: CreateStaffLeaveRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.createLeaveRequest(dto, auth);
+  }
+
   @Post('leave-requests')
   @Permissions('hr:leave:request')
   createLeaveRequest(
@@ -78,16 +115,70 @@ export class HrAttendanceController {
     return this.attendanceService.createLeaveRequest(dto, auth);
   }
 
+  @Get('leaves')
+  @Permissions('hr:leave:read')
+  listLeaves(@CurrentAuth() auth: AuthContext) {
+    return this.attendanceService.listLeaveRequests(auth);
+  }
+
   @Get('leave-requests')
   @Permissions('hr:leave:read')
   listLeaveRequests(@CurrentAuth() auth: AuthContext) {
     return this.attendanceService.listLeaveRequests(auth);
   }
 
+  @Get('leaves/:id')
+  @Permissions('hr:leave:read')
+  getLeave(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+    return this.attendanceService.getLeaveRequest(id, auth);
+  }
+
   @Get('leave-requests/:id')
   @Permissions('hr:leave:read')
   getLeaveRequest(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.attendanceService.getLeaveRequest(id, auth);
+  }
+
+  @Post('leaves/:id/approve')
+  @Permissions('hr:leave:approve')
+  approveLeave(
+    @Param('id') id: string,
+    @Body() dto: ReviewStaffLeaveRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.reviewLeaveRequest(
+      id,
+      { ...dto, status: 'APPROVED' },
+      auth,
+    );
+  }
+
+  @Post('leaves/:id/reject')
+  @Permissions('hr:leave:approve')
+  rejectLeave(
+    @Param('id') id: string,
+    @Body() dto: ReviewStaffLeaveRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.reviewLeaveRequest(
+      id,
+      { ...dto, status: 'REJECTED' },
+      auth,
+    );
+  }
+
+  @Post('leaves/:id/cancel')
+  @Permissions('hr:leave:request')
+  cancelLeave(
+    @Param('id') id: string,
+    @Body() dto: ReviewStaffLeaveRequestDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.reviewLeaveRequest(
+      id,
+      { ...dto, status: 'CANCELLED' },
+      auth,
+    );
   }
 
   @Patch('leave-requests/:id/review')
