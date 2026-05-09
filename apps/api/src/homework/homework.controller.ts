@@ -28,12 +28,16 @@ import {
   UpdateHomeworkSubmissionStatusDto,
 } from './dto/submission.dto';
 import { UpdateHomeworkDto } from './dto/update-homework.dto';
+import { HomeworkAttachmentAccessService } from './homework-attachment-access.service';
 import { HomeworkService } from './homework.service';
 
 @Controller('homework')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class HomeworkController {
-  constructor(private readonly homeworkService: HomeworkService) {}
+  constructor(
+    private readonly homeworkService: HomeworkService,
+    private readonly homeworkAttachmentAccessService: HomeworkAttachmentAccessService,
+  ) {}
 
   @Get()
   @Permissions('homework:read')
@@ -167,6 +171,32 @@ export class HomeworkController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.homeworkService.legacySubmit(dto, auth);
+  }
+
+  @Get('attachments/:attachmentId/preview-url')
+  @Permissions('homework:read')
+  getAttachmentPreviewUrl(
+    @Param('attachmentId') attachmentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.homeworkAttachmentAccessService.getAttachmentAccessUrl(
+      attachmentId,
+      auth,
+      'preview',
+    );
+  }
+
+  @Get('attachments/:attachmentId/download-url')
+  @Permissions('homework:read')
+  getAttachmentDownloadUrl(
+    @Param('attachmentId') attachmentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.homeworkAttachmentAccessService.getAttachmentAccessUrl(
+      attachmentId,
+      auth,
+      'download',
+    );
   }
 
   @Get(':id')
