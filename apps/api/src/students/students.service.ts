@@ -295,7 +295,7 @@ export class StudentsService {
         student.id,
       )) || [];
 
-    const latestEnrollment = student.enrollments[0] ?? null;
+    const latestEnrollment = (student.enrollments || [])[0] ?? null;
 
     let photoUrl = student.photoUrl;
     if (photoUrl && !photoUrl.startsWith('http')) {
@@ -310,7 +310,7 @@ export class StudentsService {
       }
     }
 
-    const guardians = student.guardianLinks.map((link) => ({
+    const guardians = (student.guardianLinks || []).map((link) => ({
       id: link.guardian.id,
       fullName: link.guardian.fullName,
       relation: link.relation || link.guardian.relation,
@@ -326,7 +326,7 @@ export class StudentsService {
         null,
     }));
 
-    const identities = student.identities.filter(
+    const identities = (student.identities || []).filter(
       (id) => id.status === 'ACTIVE',
     );
 
@@ -368,7 +368,7 @@ export class StudentsService {
         activeIdentity: identities[0]?.identityCode ?? null,
       },
       guardians,
-      enrollments: student.enrollments.map((enrollment) => ({
+      enrollments: (student.enrollments || []).map((enrollment) => ({
         id: enrollment.id,
         academicYearId: enrollment.academicYearId,
         academicYear: enrollment.academicYear.name,
@@ -381,7 +381,7 @@ export class StudentsService {
         admissionDate: enrollment.admissionDate.toISOString(),
       })),
       documents: [
-        ...student.documents.map((document) => ({
+        ...(student.documents || []).map((document) => ({
           id: document.id,
           studentId: document.studentId,
           kind: document.kind,
@@ -413,25 +413,27 @@ export class StudentsService {
           };
         }),
       ],
-      generatedDocuments: student.generatedDocuments.map((document) => ({
-        id: document.id,
-        studentId: document.studentId,
-        kind: document.kind,
-        title: document.title,
-        fileName: document.fileName,
-        contentType: document.contentType,
-        sizeBytes: document.sizeBytes,
-        pdfUrl: document.pdfUrl,
-        generatedById: document.generatedById,
-        generatedAt: document.generatedAt.toISOString(),
-        checksumSha256: document.checksumSha256,
-        storageObjectKey: document.storageObjectKey,
-        signedAt: document.signedAt?.toISOString() ?? null,
-        version: document.version,
-        retentionUntil: document.retentionUntil?.toISOString() ?? null,
-        revokedAt: document.revokedAt?.toISOString() ?? null,
-      })),
-      invoices: student.invoices.map((invoice) => {
+      generatedDocuments: (student.generatedDocuments || []).map(
+        (document) => ({
+          id: document.id,
+          studentId: document.studentId,
+          kind: document.kind,
+          title: document.title,
+          fileName: document.fileName,
+          contentType: document.contentType,
+          sizeBytes: document.sizeBytes,
+          pdfUrl: document.pdfUrl,
+          generatedById: document.generatedById,
+          generatedAt: document.generatedAt.toISOString(),
+          checksumSha256: document.checksumSha256,
+          storageObjectKey: document.storageObjectKey,
+          signedAt: document.signedAt?.toISOString() ?? null,
+          version: document.version,
+          retentionUntil: document.retentionUntil?.toISOString() ?? null,
+          revokedAt: document.revokedAt?.toISOString() ?? null,
+        }),
+      ),
+      invoices: (student.invoices || []).map((invoice) => {
         const paidAmount = sumStudentProfileNetPaidAmount(invoice.payments);
 
         return {
@@ -459,7 +461,7 @@ export class StudentsService {
           })),
         };
       }),
-      attendanceRecords: student.attendanceRecords.map((record) => ({
+      attendanceRecords: (student.attendanceRecords || []).map((record) => ({
         id: record.id,
         attendanceDate: record.attendanceSession.attendanceDate
           .toISOString()
@@ -3095,6 +3097,7 @@ function ensureAllowedLifecycleTransition(
       StudentLifecycleStatus.TRANSFERRED,
       StudentLifecycleStatus.EXITED,
       StudentLifecycleStatus.ALUMNI,
+      StudentLifecycleStatus.MERGED,
       StudentLifecycleStatus.DELETED,
     ],
     [StudentLifecycleStatus.TRANSFERRED]: [
@@ -3108,7 +3111,7 @@ function ensureAllowedLifecycleTransition(
     [StudentLifecycleStatus.ALUMNI]: [StudentLifecycleStatus.DELETED],
     [StudentLifecycleStatus.DELETED]: [StudentLifecycleStatus.ACTIVE],
     [StudentLifecycleStatus.ARCHIVED]: [StudentLifecycleStatus.ACTIVE],
-    [StudentLifecycleStatus.MERGED]: [],
+    [StudentLifecycleStatus.MERGED]: [StudentLifecycleStatus.ACTIVE],
   };
 
   if (!allowedTransitions[currentStatus].includes(nextStatus)) {

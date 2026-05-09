@@ -196,12 +196,17 @@ describe('LibraryController M8A contracts', () => {
       deliveryCount: 1,
     });
 
-    expect(controller.listOverdue(actor)).toEqual([{ id: 'issue-1' }]);
+    expect(controller.listOverdue(actor, '1', '20')).toEqual([
+      { id: 'issue-1' },
+    ]);
     expect(controller.sendOverdueReminders(actor)).toEqual({
       skipped: false,
       deliveryCount: 1,
     });
-    expect(libraryService.listOverdue).toHaveBeenCalledWith(actor);
+    expect(libraryService.listOverdue).toHaveBeenCalledWith(actor, {
+      page: '1',
+      limit: '20',
+    });
     expect(
       libraryHardeningService.sendOverdueRemindersIdempotent,
     ).toHaveBeenCalledWith(actor);

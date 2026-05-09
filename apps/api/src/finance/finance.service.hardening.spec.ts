@@ -5,7 +5,13 @@ import { AuditService } from '../audit/audit.service';
 import { CommunicationsService } from '../communications/communications.service';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { AuthMethod, Prisma, InvoiceStatus } from '@prisma/client';
+import {
+  AuthMethod,
+  Prisma,
+  InvoiceStatus,
+  PaymentStatus,
+  JournalSourceType,
+} from '@prisma/client';
 import { ConflictException, BadRequestException } from '@nestjs/common';
 
 describe('FinanceService - Hardening', () => {
@@ -27,7 +33,11 @@ describe('FinanceService - Hardening', () => {
         {
           provide: PrismaService,
           useValue: {
-            payment: { findFirst: jest.fn() },
+            payment: {
+              findFirst: jest.fn(),
+              findMany: jest.fn(),
+              update: jest.fn(),
+            },
             paymentRefund: { count: jest.fn(), create: jest.fn() },
             invoice: { findUnique: jest.fn(), update: jest.fn() },
             cashierClose: { findFirst: jest.fn(), create: jest.fn() },
@@ -39,7 +49,10 @@ describe('FinanceService - Hardening', () => {
         { provide: CommunicationsService, useValue: {} },
         {
           provide: AccountingPostingService,
-          useValue: { postPaymentRefund: jest.fn() },
+          useValue: {
+            postPaymentRefund: jest.fn(),
+            postReversal: jest.fn().mockResolvedValue({ id: 'rev-1' }),
+          },
         },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
@@ -95,6 +108,66 @@ describe('FinanceService - Hardening', () => {
           actor as any,
         ),
       ).rejects.toThrow('CC-001 already overlaps the selected window');
+    });
+  });
+
+  describe('reversePayment', () => {
+    it('prevents reversal of already refunded payments', async () => {
+      const mockPayment = {
+        id: 'p1',
+        amount: new Prisma.Decimal(1000),
+        refunds: [{ id: 'r1', amount: new Prisma.Decimal(100) }],
+        tenantId: 't1',
+        invoiceId: 'i1',
+      };
+
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
+
+      await expect(
+        service.reversePayment('p1', { reason: 'Error' }, actor as any),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('correctly updates statuses and posts to ledger on valid reversal', async () => {
+      const mockPayment = {
+        id: 'p1',
+        amount: new Prisma.Decimal(1000),
+        refunds: [],
+        tenantId: 't1',
+        invoiceId: 'i1',
+        invoice: { id: 'i1', totalAmount: new Prisma.Decimal(1000) },
+      };
+
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
+      (prisma.journalEntry.findFirst as jest.Mock).mockResolvedValue({
+        id: 'j1',
+        entryNumber: 'JE-001',
+        lines: [],
+      });
+      (prisma.payment.findMany as jest.Mock).mockResolvedValue([]); // No remaining payments
+
+      const result = await service.reversePayment(
+        'p1',
+        { reason: 'Incorrect charge' },
+        actor as any,
+      );
+
+      expect(prisma.payment.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'p1' },
+          data: expect.objectContaining({
+            status: PaymentStatus.REVERSED,
+          }),
+        }),
+      );
+      expect(prisma.invoice.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'i1' },
+          data: expect.objectContaining({
+            status: InvoiceStatus.ISSUED,
+          }),
+        }),
+      );
     });
   });
 });

@@ -210,7 +210,11 @@ function buildService(options: {
 
   const prisma = {
     staff: {
-      findFirst: jest.fn().mockResolvedValue(options.staff ?? buildStaff()),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(
+          options.staff === null ? null : (options.staff ?? buildStaff()),
+        ),
       findMany: jest.fn().mockResolvedValue([buildStaff()]),
     },
     staffContract: {

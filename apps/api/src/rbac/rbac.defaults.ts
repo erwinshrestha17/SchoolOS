@@ -193,6 +193,11 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Delete academic setup records',
   },
   {
+    resource: 'academics:cas',
+    action: 'manage',
+    description: 'Manage CAS assessments and records',
+  },
+  {
     resource: 'timetable',
     action: 'manage',
     description:
@@ -278,6 +283,7 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     ['hr:staff', 'create', 'Create HR staff profiles'],
     ['hr:staff', 'update', 'Update HR staff profiles'],
     ['hr:staff', 'lifecycle', 'Manage staff lifecycle transitions'],
+    ['hr:staff', 'archive', 'Archive staff profiles'],
     ['hr:attendance', 'read', 'Read staff attendance'],
     ['hr:attendance', 'write', 'Mark staff attendance'],
     ['hr:attendance', 'correct', 'Correct staff attendance with audit reason'],
@@ -423,6 +429,11 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Read activity feed posts and mood logs',
   },
   {
+    resource: 'activity_feed',
+    action: 'moderate',
+    description: 'Moderate classroom activity feed posts and comments',
+  },
+  {
     resource: 'notices',
     action: 'create',
     description: 'Create and publish school notices',
@@ -536,6 +547,11 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     resource: 'library:reports',
     action: 'read',
     description: 'Read library overdue and circulation reports',
+  },
+  {
+    resource: 'library:reports',
+    action: 'export',
+    description: 'Export library overdue and circulation reports',
   },
   {
     resource: 'transport:routes',

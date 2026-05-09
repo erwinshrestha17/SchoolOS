@@ -92,7 +92,7 @@ describe('pagination hardening gate', () => {
 
         if (!hasBound) {
           const methodName =
-            block.match(/(?:async\s+)?([A-Za-z0-9_]+)\s*\(/)?.[1] ??
+            /(?:async\s+)?([A-Za-z0-9_]+)\s*\(/.exec(block)?.[1] ??
             'unknownMethod';
           violations.push(`${normalizePath(file)}:${methodName}`);
         }

@@ -17,6 +17,7 @@ import { CollectPaymentDto } from './dto/collect-payment.dto';
 import { CreateCashierCloseDto } from './dto/create-cashier-close.dto';
 import { CreatePaymentRefundDto } from './dto/create-payment-refund.dto';
 import { ListCashierClosesDto } from './dto/list-cashier-closes.dto';
+import { ReversePaymentDto } from './dto/reverse-payment.dto';
 import { FinanceService } from './finance.service';
 
 @Controller('payments')
@@ -74,5 +75,15 @@ export class PaymentsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.financeService.refundPayment(paymentId, dto, auth);
+  }
+
+  @Post(':id/reverse')
+  @Permissions('payments:reverse')
+  reversePayment(
+    @Param('id') paymentId: string,
+    @Body() dto: ReversePaymentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.reversePayment(paymentId, dto, auth);
   }
 }

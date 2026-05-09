@@ -208,14 +208,15 @@ describe('students lifecycle hardening', () => {
       },
       data: { studentId: targetStudent.id },
     });
-    expect(prisma.transaction.student.update).toHaveBeenCalledWith({
-      where: { id: sourceStudent.id },
-      data: {
-        lifecycleStatus: StudentLifecycleStatus.DELETED,
-        exitReason: 'Duplicate record confirmed by registrar',
-        exitedAt: expect.any(Date),
-      },
-    });
+    expect(prisma.transaction.student.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: sourceStudent.id },
+        data: expect.objectContaining({
+          lifecycleStatus: StudentLifecycleStatus.MERGED,
+          exitReason: `Merged into ${targetStudent.studentSystemId}: Duplicate record confirmed by registrar`,
+        }),
+      }),
+    );
     expect(
       prisma.transaction.studentLifecycleTransition.create,
     ).toHaveBeenCalledWith({
@@ -223,7 +224,7 @@ describe('students lifecycle hardening', () => {
         tenantId: actor.tenantId,
         studentId: sourceStudent.id,
         fromStatus: StudentLifecycleStatus.ACTIVE,
-        toStatus: StudentLifecycleStatus.DELETED,
+        toStatus: StudentLifecycleStatus.MERGED,
         reason: 'Duplicate record confirmed by registrar',
         changedById: actor.userId,
         metadata: expect.objectContaining({
@@ -1264,6 +1265,11 @@ function buildStudent(
     generatedDocuments: unknown[];
     invoices: unknown[];
     attendanceRecords: unknown[];
+    _count?: {
+      invoices: number;
+      payments: number;
+      studentFeeAssignments: number;
+    };
   }> = {},
 ) {
   return {
@@ -1303,7 +1309,13 @@ function buildStudent(
     generatedDocuments: overrides.generatedDocuments ?? [],
     invoices: overrides.invoices ?? [],
     attendanceRecords: overrides.attendanceRecords ?? [],
+    identities: overrides.identities ?? [],
     tenant: overrides.tenant ?? { name: 'Everest Academy' },
+    _count: overrides._count ?? {
+      invoices: 0,
+      payments: 0,
+      studentFeeAssignments: 0,
+    },
   };
 }
 
@@ -1384,6 +1396,7 @@ function buildPrisma(options: {
       update: jest.fn().mockResolvedValue({ id: 'guardian-updated' }),
     },
     studentDocument: {
+      findMany: jest.fn().mockResolvedValue([]),
       updateMany: jest.fn().mockResolvedValue({ count: 2 }),
     },
     generatedStudentDocument: {
@@ -1426,6 +1439,9 @@ function buildPrisma(options: {
     studentLifecycleTransition: {
       create: jest.fn().mockResolvedValue({ id: 'transition-merge' }),
     },
+    studentMergeHistory: {
+      create: jest.fn().mockResolvedValue({ id: 'merge-history-1' }),
+    },
     guardianIdentityVerification: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       update: jest
@@ -1454,6 +1470,10 @@ function buildPrisma(options: {
       findMany: jest
         .fn()
         .mockResolvedValue(options.studentFindManyResult ?? []),
+      findUnique: jest.fn().mockImplementation(async () => {
+        const queue = options.studentFindFirstQueue ?? [];
+        return queue.length > 0 ? queue[0] : null;
+      }),
     },
     class: {
       findFirst: jest

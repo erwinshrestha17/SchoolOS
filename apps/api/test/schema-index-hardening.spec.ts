@@ -36,9 +36,9 @@ function readMigrations() {
 }
 
 function modelBlock(schema: string, modelName: string) {
-  const match = schema.match(
-    new RegExp(`model\\s+${modelName}\\s+\\{([\\s\\S]*?)\\n\\}`),
-  );
+  const match = new RegExp(
+    `model\\s+${modelName}\\s+\\{([\\s\\S]*?)\\n\\}`,
+  ).exec(schema);
 
   if (!match) {
     throw new Error(`Model ${modelName} not found`);

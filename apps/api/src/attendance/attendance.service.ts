@@ -846,7 +846,7 @@ export class AttendanceService {
         const session = sessionByDate.get(dateKey);
         const calendar = calendarByDate.get(dateKey);
 
-        let status: string = 'NOT_MARKED';
+        let status = 'NOT_MARKED';
         if (calendar && !calendar.isWorkingDay) {
           status = 'HOLIDAY';
         } else if (session) {
@@ -1096,13 +1096,13 @@ export class AttendanceService {
         await tx.attendanceRecord.upsert({
           where: {
             attendanceSessionId_studentId: {
-              attendanceSessionId: sessionId!,
+              attendanceSessionId: sessionId,
               studentId: request.studentId,
             },
           },
           create: {
             tenantId: actor.tenantId,
-            attendanceSessionId: sessionId!,
+            attendanceSessionId: sessionId,
             studentId: request.studentId,
             status: request.requestedStatus,
             remark: `Corrected: ${request.reason}`,

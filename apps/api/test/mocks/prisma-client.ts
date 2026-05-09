@@ -186,6 +186,12 @@ export const InvoiceStatus = {
   VOID: 'VOID',
 } as const;
 
+export const PaymentStatus = {
+  SUCCESS: 'SUCCESS',
+  REVERSED: 'REVERSED',
+  FAILED: 'FAILED',
+} as const;
+
 export const PaymentMethod = {
   CASH: 'CASH',
   BANK: 'BANK',
@@ -216,6 +222,8 @@ export const StudentLifecycleStatus = {
   TRANSFERRED: 'TRANSFERRED',
   EXITED: 'EXITED',
   ALUMNI: 'ALUMNI',
+  ARCHIVED: 'ARCHIVED',
+  MERGED: 'MERGED',
   DELETED: 'DELETED',
 } as const;
 
