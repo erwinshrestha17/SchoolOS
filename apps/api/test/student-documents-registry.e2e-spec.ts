@@ -31,12 +31,14 @@ describe('Student Documents Registry Integration (E2E)', () => {
       }),
     };
     storageService = {
-      saveBase64Object: jest.fn(async (input: { tenantId: string; fileName: string }) => ({
-        provider: StorageProvider.LOCAL,
-        objectKey: `${input.tenantId}/students/student-a/documents/${input.fileName}`,
-        publicUrl: null,
-        sizeBytes: 10,
-      })),
+      saveBase64Object: jest.fn(
+        async (input: { tenantId: string; fileName: string }) => ({
+          provider: StorageProvider.LOCAL,
+          objectKey: `${input.tenantId}/students/student-a/documents/${input.fileName}`,
+          publicUrl: null,
+          sizeBytes: 10,
+        }),
+      ),
     };
 
     fileRegistryService = new FileRegistryService(
@@ -106,7 +108,9 @@ describe('Student Documents Registry Integration (E2E)', () => {
       assetId,
       'preview',
     );
-    expect(preview.url).toBe(`http://localhost:4000/api/v1/files/${assetId}/preview`);
+    expect(preview.url).toBe(
+      `http://localhost:4000/api/v1/files/${assetId}/preview`,
+    );
 
     await expect(
       studentRecordsService.getSignedUrl(actorB, assetId, 'preview'),
