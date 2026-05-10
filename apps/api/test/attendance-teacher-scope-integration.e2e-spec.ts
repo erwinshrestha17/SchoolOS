@@ -13,7 +13,7 @@ import { SettingsService } from '../src/settings/settings.service';
 import { createAuthContextMock } from './test-helpers';
 
 describe('Attendance teacher scope integration', () => {
-  it('submits only assigned active roster records and blocks unrelated teachers', async () => {
+  it('submits only assigned active roster records and blocks unassigned teacher accounts', async () => {
     const prisma = makePrisma();
     const auditService = { record: jest.fn() };
     const eventEmitter = { emit: jest.fn() };
@@ -32,9 +32,9 @@ describe('Attendance teacher scope integration', () => {
       roles: ['teacher'],
       permissions: ['attendance:read', 'attendance:mark'],
     });
-    const unrelatedTeacher = createAuthContextMock({
+    const unassignedTeacher = createAuthContextMock({
       tenantId: 'tenant-attendance-scope',
-      userId: 'unrelated-teacher-user',
+      userId: 'unassigned-teacher-user',
       roles: ['teacher'],
       permissions: ['attendance:read', 'attendance:mark'],
     });
@@ -82,7 +82,7 @@ describe('Attendance teacher scope integration', () => {
           attendanceDate: '2026-05-11',
           exceptions: [],
         },
-        unrelatedTeacher,
+        unassignedTeacher,
       ),
     ).rejects.toThrow(ForbiddenException);
   });
@@ -115,11 +115,7 @@ function makePrisma() {
     },
     staff: {
       findUnique: jest.fn(async ({ where }) =>
-        where.userId === 'teacher-user'
-          ? { id: 'staff-1' }
-          : where.userId === 'unrelated-teacher-user'
-            ? { id: 'staff-2' }
-            : null,
+        where.userId === 'teacher-user' ? { id: 'staff-1' } : null,
       ),
     },
     subjectTeacherAssignment: {
