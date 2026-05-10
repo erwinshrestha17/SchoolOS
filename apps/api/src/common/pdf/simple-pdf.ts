@@ -41,7 +41,11 @@ export function buildCertificatePdf(input: {
 }) {
   const issuedDate = formatIsoDate(input.issuedAt);
   const contentParts = [
-    ...pageFrame('CERTIFICATE', input.schoolName, input.subtitle ?? 'Official school record'),
+    ...pageFrame(
+      'CERTIFICATE',
+      input.schoolName,
+      input.subtitle ?? 'Official school record',
+    ),
     pill(390, 694, 150, 34),
     text('REFERENCE', 402, 716, 7, 'F2'),
     text(input.referenceNumber, 402, 703, 9, 'F1'),
@@ -51,6 +55,7 @@ export function buildCertificatePdf(input: {
     ...input.fields.flatMap((field, index) => {
       const x = index % 2 === 0 ? 72 : 318;
       const y = 602 - Math.floor(index / 2) * 40;
+
       return [
         sectionLabel(field.label, x, y),
         text(String(field.value ?? 'N/A'), x, y - 15, 11, 'F1'),
@@ -97,7 +102,11 @@ export function buildReceiptPdf(input: {
   isReprint?: boolean;
 }) {
   const contentParts = [
-    ...pageFrame('FEE RECEIPT', input.schoolName, input.panNumber ? `PAN: ${input.panNumber}` : 'Official payment receipt'),
+    ...pageFrame(
+      'FEE RECEIPT',
+      input.schoolName,
+      input.panNumber ? `PAN: ${input.panNumber}` : 'Official payment receipt',
+    ),
     input.isReprint ? stamp('REPRINT', 456, 688) : '',
     infoBox(48, 628, 228, 54),
     sectionLabel('Receipt Details', 60, 664),
@@ -129,7 +138,7 @@ export function buildReceiptPdf(input: {
   }
 
   y = Math.max(y - 12, 236);
-  contentParts.push('336 ' + (y + 18) + ' m 540 ' + (y + 18) + ' l S');
+  contentParts.push(`336 ${y + 18} m 540 ${y + 18} l S`);
 
   if (input.discount > 0 || input.subtotal !== input.total) {
     contentParts.push(
@@ -137,6 +146,7 @@ export function buildReceiptPdf(input: {
       moneyText(input.subtotal, 482, y, 'F1'),
     );
     y -= 18;
+
     if (input.discount > 0) {
       contentParts.push(
         text('Discount', 350, y, 9, 'F1'),
@@ -165,7 +175,13 @@ export function buildReceiptPdf(input: {
     text(`Cashier: ${input.cashierName}`, 48, 102, 9, 'F1'),
     text(`Printed: ${formatDateTime(new Date())}`, 342, 102, 8, 'F1'),
     text('Thank you for your payment.', 214, 72, 11, 'F2'),
-    text('This receipt is system generated and valid only with official SchoolOS records.', 116, 52, 8, 'F1'),
+    text(
+      'This receipt is system generated and valid only with official SchoolOS records.',
+      116,
+      52,
+      8,
+      'F1',
+    ),
   );
 
   return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
@@ -194,7 +210,11 @@ export function buildSalarySlipPdf(input: {
   };
 }) {
   const contentParts = [
-    ...pageFrame('SALARY SLIP', input.schoolName, input.panNumber ? `PAN: ${input.panNumber}` : input.period),
+    ...pageFrame(
+      'SALARY SLIP',
+      input.schoolName,
+      input.panNumber ? `PAN: ${input.panNumber}` : input.period,
+    ),
     infoBox(48, 622, 492, 62),
     sectionLabel('Employee', 60, 666),
     text(input.staff.name, 60, 650, 12, 'F2'),
@@ -203,7 +223,12 @@ export function buildSalarySlipPdf(input: {
     text(`Bank A/C: ${input.staff.bankAccount ?? 'N/A'}`, 260, 634, 9, 'F1'),
     text(`PAN: ${input.staff.panNumber ?? 'N/A'}`, 420, 650, 9, 'F1'),
     text(`Payslip: ${input.payslipNumber}`, 420, 634, 9, 'F1'),
-    tableHeader(48, 592, ['Earnings', 'Amount', 'Deductions', 'Amount'], [170, 92, 170, 92]),
+    tableHeader(
+      48,
+      592,
+      ['Earnings', 'Amount', 'Deductions', 'Amount'],
+      [170, 92, 170, 92],
+    ),
     '306 580 m 306 300 l S',
   ];
 
@@ -214,11 +239,19 @@ export function buildSalarySlipPdf(input: {
     const deduction = input.deductions[i];
 
     if (earning) {
-      contentParts.push(text(earning.name, 60, y, 9, 'F1'), moneyText(earning.amount, 222, y, 'F1'));
+      contentParts.push(
+        text(earning.name, 60, y, 9, 'F1'),
+        moneyText(earning.amount, 222, y, 'F1'),
+      );
     }
+
     if (deduction) {
-      contentParts.push(text(deduction.name, 318, y, 9, 'F1'), moneyText(deduction.amount, 482, y, 'F1'));
+      contentParts.push(
+        text(deduction.name, 318, y, 9, 'F1'),
+        moneyText(deduction.amount, 482, y, 'F1'),
+      );
     }
+
     y -= 18;
   }
 
@@ -231,12 +264,24 @@ export function buildSalarySlipPdf(input: {
     infoBox(306, 220, 234, 44),
     text('NET SALARY', 318, 248, 11, 'F2'),
     moneyText(input.netSalary, 456, 248, 'F2'),
-    text(`Attendance: ${input.attendance.present} / ${input.attendance.working} Days`, 60, 248, 10, 'F1'),
+    text(
+      `Attendance: ${input.attendance.present} / ${input.attendance.working} Days`,
+      60,
+      248,
+      10,
+      'F1',
+    ),
     '72 118 m 212 118 l S',
     text('Employer Signature', 86, 100, 9, 'F1'),
     '380 118 m 520 118 l S',
     text('Employee Signature', 396, 100, 9, 'F1'),
-    text('Computer generated document. Physical signature may be added after review.', 118, 54, 8, 'F1'),
+    text(
+      'Computer generated document. Physical signature may be added after review.',
+      118,
+      54,
+      8,
+      'F1',
+    ),
   );
 
   return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
@@ -268,14 +313,26 @@ export function buildIdCardPdf(input: {
     text('PHOTO', left + 48, bottom + 220, 9, 'F1'),
     text(fitText(input.studentName, 24), left + 20, bottom + 152, 13, 'F2'),
     text(`ID: ${input.studentId}`, left + 20, bottom + 132, 9, 'F1'),
-    text(`Class: ${input.className}${input.sectionName ? ' - ' + input.sectionName : ''}`, left + 20, bottom + 116, 9, 'F1'),
-    input.rollNumber ? text(`Roll No: ${input.rollNumber}`, left + 20, bottom + 100, 9, 'F1') : '',
-    input.bloodGroup ? text(`Blood: ${input.bloodGroup}`, left + 124, bottom + 100, 9, 'F2') : '',
+    text(
+      `Class: ${input.className}${input.sectionName ? ' - ' + input.sectionName : ''}`,
+      left + 20,
+      bottom + 116,
+      9,
+      'F1',
+    ),
+    input.rollNumber
+      ? text(`Roll No: ${input.rollNumber}`, left + 20, bottom + 100, 9, 'F1')
+      : '',
+    input.bloodGroup
+      ? text(`Blood: ${input.bloodGroup}`, left + 124, bottom + 100, 9, 'F2')
+      : '',
     `${left + 14} ${bottom + 76} m ${left + width - 14} ${bottom + 76} l S`,
     sectionLabel('Emergency Contact', left + 20, bottom + 60),
     text(fitText(input.guardianName ?? 'N/A', 22), left + 20, bottom + 45, 8, 'F1'),
     text(input.guardianPhone ?? 'N/A', left + 122, bottom + 45, 8, 'F1'),
-    input.academicYear ? text(`Valid for: ${input.academicYear}`, left + 20, bottom + 26, 7, 'F1') : '',
+    input.academicYear
+      ? text(`Valid for: ${input.academicYear}`, left + 20, bottom + 26, 7, 'F1')
+      : '',
   ];
 
   return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
@@ -310,7 +367,11 @@ export function buildReportCardPdf(input: {
   };
 }) {
   const contentParts = [
-    ...pageFrame('PROGRESS REPORT', input.schoolName, input.panNumber ? `PAN: ${input.panNumber}` : `${input.examName} - ${input.academicYear}`),
+    ...pageFrame(
+      'PROGRESS REPORT',
+      input.schoolName,
+      input.panNumber ? `PAN: ${input.panNumber}` : `${input.examName} - ${input.academicYear}`,
+    ),
     infoBox(48, 626, 492, 58),
     sectionLabel('Student', 60, 666),
     text(input.student.name, 60, 650, 12, 'F2'),
@@ -318,15 +379,34 @@ export function buildReportCardPdf(input: {
     text(`Class: ${input.student.className}`, 300, 650, 9, 'F1'),
     text(`Section: ${input.student.sectionName ?? 'N/A'}`, 300, 634, 9, 'F1'),
     text(`Roll No: ${input.student.rollNumber ?? '—'}`, 430, 634, 9, 'F1'),
-    tableHeader(48, 596, ['Subject', 'Theory', 'Practical', 'Grade', 'GP'], [150, 100, 110, 82, 50]),
+    tableHeader(
+      48,
+      596,
+      ['Subject', 'Theory', 'Practical', 'Grade', 'GP'],
+      [150, 100, 110, 82, 50],
+    ),
   ];
 
   let y = 572;
   for (const subject of input.subjects.slice(0, 18)) {
     contentParts.push(
       text(subject.name, 60, y, 9, 'F1'),
-      text(subject.theory ? `${subject.theory.obtained}/${subject.theory.max}` : '—', 204, y, 9, 'F1'),
-      text(subject.practical ? `${subject.practical.obtained}/${subject.practical.max}` : '—', 304, y, 9, 'F1'),
+      text(
+        subject.theory ? `${subject.theory.obtained}/${subject.theory.max}` : '—',
+        204,
+        y,
+        9,
+        'F1',
+      ),
+      text(
+        subject.practical
+          ? `${subject.practical.obtained}/${subject.practical.max}`
+          : '—',
+        304,
+        y,
+        9,
+        'F1',
+      ),
       text(subject.totalGrade, 424, y, 10, 'F2'),
       text(subject.gradePoint.toFixed(2), 506, y, 9, 'F1'),
     );
@@ -335,7 +415,7 @@ export function buildReportCardPdf(input: {
 
   const summaryY = Math.max(y - 10, 170);
   contentParts.push(
-    '48 ' + (summaryY + 16) + ' m 540 ' + (summaryY + 16) + ' l S',
+    `48 ${summaryY + 16} m 540 ${summaryY + 16} l S`,
     text('Percentage', 344, summaryY, 10, 'F2'),
     text(`${input.summary.percentage.toFixed(2)}%`, 474, summaryY, 10, 'F1'),
     text('Final Grade', 344, summaryY - 20, 10, 'F2'),
@@ -371,9 +451,24 @@ export function buildRosterPdf(input: {
   rows: Array<Record<string, unknown>>;
 }) {
   const contentParts = [
-    ...pageFrame('CLASS ROSTER', input.schoolName, input.academicYear ? `Academic Year: ${input.academicYear}` : 'Student directory export'),
-    text(`${input.className}${input.sectionName ? ' - ' + input.sectionName : ''}`, 48, 660, 11, 'F2'),
-    tableHeader(48, 632, input.headers, input.headers.map(() => 492 / input.headers.length)),
+    ...pageFrame(
+      'CLASS ROSTER',
+      input.schoolName,
+      input.academicYear ? `Academic Year: ${input.academicYear}` : 'Student directory export',
+    ),
+    text(
+      `${input.className}${input.sectionName ? ' - ' + input.sectionName : ''}`,
+      48,
+      660,
+      11,
+      'F2',
+    ),
+    tableHeader(
+      48,
+      632,
+      input.headers,
+      input.headers.map(() => 492 / input.headers.length),
+    ),
   ];
 
   let y = 608;
@@ -470,17 +565,24 @@ function pill(x: number, y: number, width: number, height: number) {
   return `${x} ${y} ${width} ${height} re S`;
 }
 
+function stamp(value: string, x: number, y: number) {
+  return [`${x} ${y} 82 22 re S`, text(value, x + 16, y + 7, 9, 'F2')].join('\n');
+}
+
 function sectionLabel(value: string, x: number, y: number) {
   return text(value.toUpperCase(), x, y, 7, 'F2');
 }
 
 function tableHeader(x: number, y: number, labels: string[], widths: number[]) {
-  const parts = [`${x} ${y - 12} ${widths.reduce((sum, width) => sum + width, 0)} 26 re S`];
+  const width = widths.reduce((sum, current) => sum + current, 0);
+  const parts = [`${x} ${y - 12} ${width} 26 re S`];
   let currentX = x + 12;
+
   labels.forEach((label, index) => {
     parts.push(text(label.toUpperCase(), currentX, y, 8, 'F2'));
     currentX += widths[index] ?? 100;
   });
+
   return parts;
 }
 
@@ -502,7 +604,9 @@ function formatDateTime(value: Date) {
 }
 
 function fitText(value: string, maxLength: number) {
-  return value.length > maxLength ? `${value.slice(0, Math.max(0, maxLength - 1))}…` : value;
+  return value.length > maxLength
+    ? `${value.slice(0, Math.max(0, maxLength - 1))}...`
+    : value;
 }
 
 function wrapPdfLine(
