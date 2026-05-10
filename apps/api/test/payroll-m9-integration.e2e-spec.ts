@@ -33,6 +33,11 @@ type JournalCreateInput = {
 
 type PayrollRunRecord = ReturnType<typeof buildPayrollRun>;
 type PayrollLineRecord = ReturnType<typeof buildPayrollLine>;
+type ChartAccountUpsertInput = {
+  where?: { tenantId_code?: { code?: string } };
+  create?: { code?: string };
+  update?: { code?: string };
+};
 type TransactionMock = {
   journalEntry: PayrollM9PrismaMock['journalEntry'];
   fiscalPeriod: PayrollM9PrismaMock['fiscalPeriod'];
@@ -85,6 +90,7 @@ type PayrollM9PrismaMock = {
   chartAccount: {
     findUnique: jest.Mock;
     findUniqueOrThrow: jest.Mock;
+    upsert: jest.Mock;
     create: jest.Mock;
   };
   $transaction: jest.Mock;
@@ -412,6 +418,11 @@ function buildPrismaMock(): PayrollM9PrismaMock {
       findUniqueOrThrow: jest.fn(
         (q: { where?: { tenantId_code?: { code?: string } } }) =>
           Promise.resolve(chartAccountForCode(q.where?.tenantId_code?.code)),
+      ),
+      upsert: jest.fn((q: ChartAccountUpsertInput) =>
+        Promise.resolve(
+          chartAccountForCode(q.where?.tenantId_code?.code ?? q.create?.code),
+        ),
       ),
       create: jest.fn((q: { data?: { code?: string } }) =>
         Promise.resolve(chartAccountForCode(q.data?.code)),
