@@ -33,8 +33,12 @@ test.describe('Public route smoke', () => {
     await page.goto('/register');
 
     await expect(page).toHaveURL(/\/register(?:$|[?#])/);
-    await expect(page.getByText(/Create school workspace/i)).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /^Create school workspace$/i }),
+    ).toBeVisible();
     await expect(page.getByText(/Enter your school details/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /Create workspace/i })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /^Create school workspace$/i }),
+    ).toBeVisible();
   });
 });
