@@ -5,10 +5,7 @@ import {
 } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  StudentDocumentKind,
-  StudentLifecycleStatus,
-} from '@prisma/client';
+import { StudentDocumentKind, StudentLifecycleStatus } from '@prisma/client';
 import { ActivityMediaProcessor } from '../src/activity-feed/processors/activity-media.processor';
 import { AppModule } from '../src/app.module';
 import { FinanceProcessor } from '../src/finance/finance.processor';
@@ -157,7 +154,9 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
       actor,
     );
 
-    const updated = await prisma.student.findUnique({ where: { id: student.id } });
+    const updated = await prisma.student.findUnique({
+      where: { id: student.id },
+    });
     expect(updated?.lifecycleStatus).toBe(StudentLifecycleStatus.TRANSFERRED);
     expect(updated?.feeClearanceWaivedAt).toBeDefined();
 
@@ -321,7 +320,12 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
 
   it('blocks duplicate merge across tenant boundaries', async () => {
     const source = await createStudent('Tenant', 'Source');
-    const target = await createStudent('Tenant', 'Target', otherActor, otherClassId);
+    const target = await createStudent(
+      'Tenant',
+      'Target',
+      otherActor,
+      otherClassId,
+    );
 
     await expect(
       studentsService.mergeDuplicateStudent(
@@ -430,7 +434,8 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
     for (const key of Object.keys(state)) {
       state[key] = state[key].filter(
         (item) =>
-          typeof item.tenantId !== 'string' || !tenantIds.includes(item.tenantId),
+          typeof item.tenantId !== 'string' ||
+          !tenantIds.includes(item.tenantId),
       );
     }
   }
