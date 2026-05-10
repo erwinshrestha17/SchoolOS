@@ -414,7 +414,10 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
             email: `${input.guardianId}@schoolos.test`,
             primaryPhone: input.phone,
             receivesAlerts: true,
-            user: { id: input.guardianUserId, email: `${input.guardianId}@schoolos.test` },
+            user: {
+              id: input.guardianUserId,
+              email: `${input.guardianId}@schoolos.test`,
+            },
           },
         },
       ],
@@ -434,7 +437,9 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
 
   function seedDelivery(overrides: Record<string, unknown>) {
     prisma.__state.notificationDeliveries.push({
-      id: overrides.id ?? `delivery-${prisma.__state.notificationDeliveries.length + 1}`,
+      id:
+        overrides.id ??
+        `delivery-${prisma.__state.notificationDeliveries.length + 1}`,
       tenantId: overrides.tenantId ?? tenantId,
       channel: overrides.channel ?? NotificationChannel.PUSH,
       status: overrides.status ?? NotificationStatus.FAILED,
@@ -480,11 +485,13 @@ function buildPrismaMock() {
         state.notices.push(notice);
         return notice;
       }),
-      findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) =>
-        state.notices.find(
-          (notice) =>
-            notice.id === q.where?.id && notice.tenantId === q.where?.tenantId,
-        ) ?? null,
+      findFirst: jest.fn(
+        async (q: { where?: Record<string, unknown> }) =>
+          state.notices.find(
+            (notice) =>
+              notice.id === q.where?.id &&
+              notice.tenantId === q.where?.tenantId,
+          ) ?? null,
       ),
     },
     class: {
@@ -507,25 +514,30 @@ function buildPrismaMock() {
       }),
     },
     guardian: {
-      findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) =>
-        state.guardians.find(
-          (guardian) =>
-            guardian.tenantId === q.where?.tenantId &&
-            (!q.where?.userId || guardian.userId === q.where.userId),
-        ) ?? null,
+      findFirst: jest.fn(
+        async (q: { where?: Record<string, unknown> }) =>
+          state.guardians.find(
+            (guardian) =>
+              guardian.tenantId === q.where?.tenantId &&
+              (!q.where?.userId || guardian.userId === q.where.userId),
+          ) ?? null,
       ),
     },
     guardianConsent: {
       findMany: jest.fn(async (q: { where?: Record<string, unknown> }) => {
-        const guardianIn = (q.where?.guardianId as { in?: string[] } | undefined)
-          ?.in;
-        const consentIn = (q.where?.consentType as { in?: ConsentType[] } | undefined)
-          ?.in;
+        const guardianIn = (
+          q.where?.guardianId as { in?: string[] } | undefined
+        )?.in;
+        const consentIn = (
+          q.where?.consentType as { in?: ConsentType[] } | undefined
+        )?.in;
         return state.guardianConsents.filter(
           (consent) =>
             consent.tenantId === q.where?.tenantId &&
-            (!guardianIn || guardianIn.includes(consent.guardianId as string)) &&
-            (!consentIn || consentIn.includes(consent.consentType as ConsentType)),
+            (!guardianIn ||
+              guardianIn.includes(consent.guardianId as string)) &&
+            (!consentIn ||
+              consentIn.includes(consent.consentType as ConsentType)),
         );
       }),
     },
@@ -539,24 +551,29 @@ function buildPrismaMock() {
         state.notificationDeliveries.push(delivery);
         return delivery;
       }),
-      findMany: jest.fn(async (q: { where?: Record<string, unknown>; take?: number }) => {
-        const where = q.where ?? {};
-        const guardianIn = (where.guardianId as { in?: string[] } | undefined)?.in;
-        const recipientIn = (where.recipientUserId as { in?: string[] } | undefined)
-          ?.in;
-        const rows = state.notificationDeliveries.filter(
-          (delivery) =>
-            delivery.tenantId === where.tenantId &&
-            (!where.sourceType || delivery.sourceType === where.sourceType) &&
-            (!where.sourceId || delivery.sourceId === where.sourceId) &&
-            (!where.noticeId || delivery.noticeId === where.noticeId) &&
-            (!where.status || delivery.status === where.status) &&
-            (!guardianIn || guardianIn.includes(delivery.guardianId as string)) &&
-            (!recipientIn ||
-              recipientIn.includes(delivery.recipientUserId as string)),
-        );
-        return typeof q.take === 'number' ? rows.slice(0, q.take) : rows;
-      }),
+      findMany: jest.fn(
+        async (q: { where?: Record<string, unknown>; take?: number }) => {
+          const where = q.where ?? {};
+          const guardianIn = (where.guardianId as { in?: string[] } | undefined)
+            ?.in;
+          const recipientIn = (
+            where.recipientUserId as { in?: string[] } | undefined
+          )?.in;
+          const rows = state.notificationDeliveries.filter(
+            (delivery) =>
+              delivery.tenantId === where.tenantId &&
+              (!where.sourceType || delivery.sourceType === where.sourceType) &&
+              (!where.sourceId || delivery.sourceId === where.sourceId) &&
+              (!where.noticeId || delivery.noticeId === where.noticeId) &&
+              (!where.status || delivery.status === where.status) &&
+              (!guardianIn ||
+                guardianIn.includes(delivery.guardianId as string)) &&
+              (!recipientIn ||
+                recipientIn.includes(delivery.recipientUserId as string)),
+          );
+          return typeof q.take === 'number' ? rows.slice(0, q.take) : rows;
+        },
+      ),
       findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) => {
         const where = q.where ?? {};
         return (
@@ -570,16 +587,18 @@ function buildPrismaMock() {
           ) ?? null
         );
       }),
-      update: jest.fn(async (q: { where: { id: string }; data: Record<string, unknown> }) => {
-        const delivery = state.notificationDeliveries.find(
-          (item) => item.id === q.where.id,
-        );
-        if (!delivery) {
-          return null;
-        }
-        Object.assign(delivery, q.data);
-        return delivery;
-      }),
+      update: jest.fn(
+        async (q: { where: { id: string }; data: Record<string, unknown> }) => {
+          const delivery = state.notificationDeliveries.find(
+            (item) => item.id === q.where.id,
+          );
+          if (!delivery) {
+            return null;
+          }
+          Object.assign(delivery, q.data);
+          return delivery;
+        },
+      ),
     },
     $executeRaw: jest.fn(async (...args: unknown[]) => {
       state.executeRawCalls.push(args);
