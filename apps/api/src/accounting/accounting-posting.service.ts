@@ -741,13 +741,23 @@ export class AccountingPostingService {
         amount: input.paymentAmount,
         description: `Fee collection via ${input.paymentMethod}: ${input.receiptNumber}`,
       },
-      {
-        tenantId: input.tenantId,
-        chartAccountId: receivableAccount.id,
-        side: JournalLineSide.CREDIT,
-        amount: input.paymentAmount,
-        description: `Payment applied to ${input.invoiceNumber}`,
-      },
+      ...(input.lines?.length > 0
+        ? input.lines.map((l) => ({
+            tenantId: input.tenantId,
+            chartAccountId: l.chartAccountId,
+            side: JournalLineSide.CREDIT,
+            amount: l.amount,
+            description: l.description,
+          }))
+        : [
+            {
+              tenantId: input.tenantId,
+              chartAccountId: receivableAccount.id,
+              side: JournalLineSide.CREDIT,
+              amount: input.paymentAmount,
+              description: `Payment applied to ${input.invoiceNumber}`,
+            },
+          ]),
     ];
 
     this.ensureBalanced(lines);
@@ -1404,17 +1414,26 @@ export class AccountingPostingService {
   }
 
   private ensureBalanced(
-    lines: Array<{ side: JournalLineSide; amount: Prisma.Decimal }>,
+    lines: Array<{
+      side?: JournalLineSide;
+      amount?: Prisma.Decimal | number | string;
+      debit?: Prisma.Decimal | number | string;
+      credit?: Prisma.Decimal | number | string;
+    }>,
   ) {
     const totals = lines.reduce(
       (acc, line) => {
-        const amount = toDecimal(line.amount);
-
-        if (line.side === JournalLineSide.DEBIT) {
-          return { ...acc, debit: acc.debit.add(amount) };
-        }
-
-        return { ...acc, credit: acc.credit.add(amount) };
+        const debit = toDecimal(
+          line.debit ?? (line.side === JournalLineSide.DEBIT ? line.amount : 0),
+        );
+        const credit = toDecimal(
+          line.credit ??
+            (line.side === JournalLineSide.CREDIT ? line.amount : 0),
+        );
+        return {
+          debit: acc.debit.add(debit),
+          credit: acc.credit.add(credit),
+        };
       },
       { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(0) },
     );
@@ -1439,7 +1458,10 @@ export class AccountingPostingService {
   }
 }
 
-function toDecimal(value: Prisma.Decimal | number | string) {
+function toDecimal(value: any) {
+  if (value === null || value === undefined) {
+    return new Prisma.Decimal(0);
+  }
   return new Prisma.Decimal(value);
 }
 

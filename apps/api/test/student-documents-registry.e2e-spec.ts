@@ -13,6 +13,7 @@ import {
   createQueueMock,
   createAuthContextMock,
   createPrismaMock,
+  mockBullQueues,
 } from './test-helpers';
 
 describe('Student Documents Registry Integration (E2E)', () => {
@@ -23,7 +24,7 @@ describe('Student Documents Registry Integration (E2E)', () => {
 
   beforeEach(async () => {
     prisma = createPrismaMock();
-    moduleRef = await Test.createTestingModule({
+    const moduleBuilder = Test.createTestingModule({
       imports: [AppModule],
     })
       .overrideProvider(PrismaService)
@@ -33,14 +34,14 @@ describe('Student Documents Registry Integration (E2E)', () => {
         ping: jest.fn(() => Promise.resolve('PONG')),
         onModuleDestroy: jest.fn(),
       })
+      .overrideProvider(NotificationsService)
+      .useValue({ sendAuthCodeEmail: jest.fn(), sendEmail: jest.fn() });
+
+    moduleRef = await mockBullQueues(moduleBuilder)
       .overrideProvider(getQueueToken('finance'))
-      .useValue(createQueueMock())
-      .overrideProvider(getQueueToken('notifications'))
       .useValue(createQueueMock())
       .overrideProvider(getQueueToken('payroll'))
       .useValue(createQueueMock())
-      .overrideProvider(NotificationsService)
-      .useValue({ sendAuthCodeEmail: jest.fn(), sendEmail: jest.fn() })
       .compile();
 
     studentRecordsService = moduleRef.get(StudentRecordsService);

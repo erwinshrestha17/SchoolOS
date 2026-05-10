@@ -27,6 +27,17 @@ export interface MockState {
   timetableSubstitutions: Record<string, unknown>[];
   homeworkAssignments: Record<string, unknown>[];
   homeworkSubmissions: Record<string, unknown>[];
+  journalEntries: Record<string, unknown>[];
+  journalLines: Record<string, unknown>[];
+  fiscalYears: Record<string, unknown>[];
+  fiscalPeriods: Record<string, unknown>[];
+  payments: Record<string, unknown>[];
+  invoices: Record<string, unknown>[];
+  studentDocumentHistory: Record<string, unknown>[];
+  cashierCloses: Record<string, unknown>[];
+  receipts: Record<string, unknown>[];
+  paymentRefunds: Record<string, unknown>[];
+  feeWaivers: Record<string, unknown>[];
   [key: string]: Record<string, unknown>[];
 }
 
@@ -105,6 +116,16 @@ export function createQueueMock(): Record<string, unknown> {
     off: jest.fn(),
     removeAllListeners: jest.fn(),
   };
+}
+
+import { getQueueToken } from '@nestjs/bullmq';
+
+export function mockBullQueues(moduleBuilder: any) {
+  return moduleBuilder
+    .overrideProvider(getQueueToken('notifications'))
+    .useValue(createQueueMock())
+    .overrideProvider(getQueueToken('activity-media'))
+    .useValue(createQueueMock());
 }
 
 export function applyMockUpdate(
@@ -198,6 +219,17 @@ export function createPrismaMock() {
     timetableSubstitutions: [] as Record<string, unknown>[],
     homeworkAssignments: [] as Record<string, unknown>[],
     homeworkSubmissions: [] as Record<string, unknown>[],
+    journalEntries: [] as Record<string, unknown>[],
+    journalLines: [] as Record<string, unknown>[],
+    fiscalYears: [] as Record<string, unknown>[],
+    fiscalPeriods: [] as Record<string, unknown>[],
+    payments: [] as Record<string, unknown>[],
+    invoices: [] as Record<string, unknown>[],
+    studentDocumentHistory: [] as Record<string, unknown>[],
+    cashierCloses: [] as Record<string, unknown>[],
+    receipts: [] as Record<string, unknown>[],
+    paymentRefunds: [] as Record<string, unknown>[],
+    feeWaivers: [] as Record<string, unknown>[],
   };
 
   const nextId = (prefix: string) =>
@@ -254,8 +286,14 @@ export function createPrismaMock() {
 
   ensureTenantDefaults('tenant-default');
 
-  return {
+  const prisma = {
     __state: state,
+    $transaction: jest.fn(async (arg: any) => {
+      if (typeof arg === 'function') {
+        return arg(prisma);
+      }
+      return Promise.all(arg);
+    }),
     tenant: {
       findUnique: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
@@ -414,6 +452,15 @@ export function createPrismaMock() {
         state.roles.push(role as Record<string, unknown>);
         return Promise.resolve(role);
       }),
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.roles.find(
+            (role) =>
+              (!q.where?.tenantId || role.tenantId === q.where.tenantId) &&
+              (!q.where?.name || role.name === q.where.name),
+          ),
+        ),
+      ),
     },
     permission: {
       findUnique: jest.fn((q: PrismaQuery) => {
@@ -659,6 +706,53 @@ export function createPrismaMock() {
         state.chartAccounts.push(account as Record<string, unknown>);
         return Promise.resolve(account);
       }),
+      findUnique: jest.fn((q: PrismaQuery) => {
+        const tenantIdCode = q.where?.tenantId_code as
+          | { tenantId?: string; code?: string }
+          | undefined;
+        return Promise.resolve(
+          state.chartAccounts.find(
+            (account) =>
+              (account.tenantId === tenantIdCode?.tenantId &&
+                account.code === tenantIdCode?.code) ||
+              account.id === q.where?.id,
+          ),
+        );
+      }),
+      findUniqueOrThrow: jest.fn((q: PrismaQuery) => {
+        const tenantIdCode = q.where?.tenantId_code as
+          | { tenantId?: string; code?: string }
+          | undefined;
+        const account = state.chartAccounts.find(
+          (account) =>
+            (account.tenantId === tenantIdCode?.tenantId &&
+              account.code === tenantIdCode?.code) ||
+            account.id === q.where?.id,
+        );
+        if (!account) throw new Error('Account not found');
+        return Promise.resolve(account);
+      }),
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.chartAccounts
+            .filter(
+              (account) =>
+                !q.where?.tenantId || account.tenantId === q.where.tenantId,
+            )
+            .map((account) => ({
+              journalLines: [],
+              ...account,
+            })),
+        ),
+      ),
+      count: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.chartAccounts.filter(
+            (account) =>
+              !q.where?.tenantId || account.tenantId === q.where.tenantId,
+          ).length,
+        ),
+      ),
     },
     feeHead: {
       upsert: jest.fn((q: PrismaQuery) => {
@@ -805,6 +899,50 @@ export function createPrismaMock() {
           ),
         ),
       ),
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.studentDocuments.find(
+            (item) =>
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
+              (!q.where?.id || item.id === q.where.id) &&
+              (!q.where?.studentId || item.studentId === q.where.studentId),
+          ),
+        ),
+      ),
+      update: jest.fn((q: PrismaQuery) => {
+        const item = state.studentDocuments.find(
+          (doc) =>
+            doc.id === q.where?.id ||
+            (doc.tenantId === q.where?.tenantId && doc.id === q.where?.id),
+        );
+
+        if (item) {
+          Object.assign(item, q.data ?? {}, { updatedAt: new Date() });
+        }
+
+        return Promise.resolve(item);
+      }),
+      deleteMany: jest.fn((q: PrismaQuery) => {
+        const before = state.studentDocuments.length;
+        state.studentDocuments = state.studentDocuments.filter(
+          (doc) =>
+            (!q.where?.tenantId || doc.tenantId === q.where.tenantId) &&
+            (!q.where?.studentId || doc.studentId === q.where.studentId),
+        );
+        return Promise.resolve({ count: before - state.studentDocuments.length });
+      }),
+    },
+    studentDocumentHistory: {
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
+        const item = {
+          id: nextId('doc-hist'),
+          ...data,
+          createdAt: new Date(),
+        };
+        state.studentDocumentHistory.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
+      }),
     },
     fileAsset: {
       create: jest.fn((q: PrismaQuery) => {
@@ -822,6 +960,17 @@ export function createPrismaMock() {
       findUnique: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
           state.fileAssets.find((item) => item.id === q.where?.id),
+        ),
+      ),
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.fileAssets.find(
+            (item) =>
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
+              (!q.where?.id || item.id === q.where.id) &&
+              (!q.where?.module || item.module === q.where.module) &&
+              (!q.where?.entityId || item.entityId === q.where.entityId),
+          ),
         ),
       ),
       findMany: jest.fn((q: PrismaQuery) =>
@@ -1017,7 +1166,285 @@ export function createPrismaMock() {
       findFirst: jest.fn(() => Promise.resolve(null)),
     },
     invoice: {
-      count: jest.fn(() => Promise.resolve(0)),
+      count: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.invoices.filter(
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ).length,
+        ),
+      ),
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.invoices.filter(
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ),
+        ),
+      ),
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.invoices.find(
+            (item) =>
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
+              (!q.where?.id || item.id === q.where.id),
+          ),
+        ),
+      ),
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
+        const item = {
+          id: nextId('inv'),
+          ...data,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        state.invoices.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
+      }),
+      update: jest.fn((q: PrismaQuery) => {
+        const item = state.invoices.find((i) => i.id === q.where?.id);
+        if (item) Object.assign(item, q.data ?? {}, { updatedAt: new Date() });
+        return Promise.resolve(item);
+      }),
+    },
+    payment: {
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.payments.find(
+            (item) =>
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
+              (!q.where?.idempotencyKey ||
+                item.idempotencyKey === q.where.idempotencyKey),
+          ),
+        ),
+      ),
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
+        const item = {
+          id: data.id ?? nextId('payment'),
+          ...data,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        state.payments.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
+      }),
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.payments.filter(
+            (item) =>
+              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ),
+        ),
+      ),
+      count: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.payments.filter(
+            (item) =>
+              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ).length,
+        ),
+      ),
+      update: jest.fn((q: PrismaQuery) => {
+        const item = state.payments.find((i) => i.id === q.where?.id);
+        if (item) Object.assign(item, q.data ?? {}, { updatedAt: new Date() });
+        return Promise.resolve(item);
+      }),
+    },
+    journalEntry: {
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
+        const item = {
+          id: data.id ?? `journal-${Date.now()}`,
+          ...data,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        state.journalEntries.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
+      }),
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.journalEntries.find(
+            (item) =>
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
+              (!q.where?.id || item.id === q.where.id),
+          ),
+        ),
+      ),
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.journalEntries.filter(
+            (item) =>
+              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ),
+        ),
+      ),
+      update: jest.fn((q: PrismaQuery) => {
+        const item = state.journalEntries.find((i) => i.id === q.where?.id);
+        if (item) Object.assign(item, q.data ?? {}, { updatedAt: new Date() });
+        return Promise.resolve(item);
+      }),
+      count: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.journalEntries.filter(
+            (item) =>
+              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ).length,
+        ),
+      ),
+    },
+    journalLine: {
+      createMany: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? [];
+        state.journalLines.push(
+          ...(data as unknown as Record<string, unknown>[]),
+        );
+        return Promise.resolve({
+          count: Array.isArray(data) ? data.length : 0,
+        });
+      }),
+    },
+    fiscalYear: {
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.fiscalYears.find(
+            (item) =>
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
+              (!q.where?.status || item.status === q.where.status),
+          ),
+        ),
+      ),
+    },
+    fiscalPeriod: {
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.fiscalPeriods.find(
+            (item) =>
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
+              (!q.where?.status || item.status === q.where.status) &&
+              (!q.where?.fiscalYearId ||
+                item.fiscalYearId === q.where.fiscalYearId),
+          ),
+        ),
+      ),
+    },
+    accountingPeriod: {
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.fiscalPeriods.find(
+            (item) =>
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
+              (!q.where?.status || item.status === q.where.status),
+          ),
+        ),
+      ),
+    },
+    cashierClose: {
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.cashierCloses.find(
+            (item) =>
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
+              (!q.where?.id || item.id === q.where.id),
+          ),
+        ),
+      ),
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
+        const item = {
+          id: nextId('close'),
+          ...data,
+          createdAt: new Date(),
+        };
+        state.cashierCloses.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
+      }),
+      count: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.cashierCloses.filter(
+            (item) =>
+              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ).length,
+        ),
+      ),
+    },
+    receipt: {
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.receipts.find(
+            (item) =>
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
+              (!q.where?.id || item.id === q.where.id),
+          ),
+        ),
+      ),
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
+        const item = {
+          id: nextId('receipt'),
+          ...data,
+          createdAt: new Date(),
+        };
+        state.receipts.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
+      }),
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.receipts.filter(
+            (item) =>
+              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ),
+        ),
+      ),
+      count: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.receipts.filter(
+            (item) =>
+              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ).length,
+        ),
+      ),
+      deleteMany: jest.fn(() => Promise.resolve({ count: 1 })),
+    },
+    paymentRefund: {
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.paymentRefunds.filter(
+            (item) =>
+              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ),
+        ),
+      ),
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
+        const item = {
+          id: nextId('refund'),
+          ...data,
+          createdAt: new Date(),
+        };
+        state.paymentRefunds.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
+      }),
+    },
+    feeWaiver: {
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.feeWaivers.filter(
+            (item) =>
+              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ),
+        ),
+      ),
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
+        const item = {
+          id: nextId('waiver'),
+          ...data,
+          createdAt: new Date(),
+        };
+        state.feeWaivers.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
+      }),
     },
     timetableVersion: {
       findUnique: jest.fn((q: PrismaQuery) =>
@@ -1155,6 +1582,8 @@ export function createPrismaMock() {
       findFirst: jest.fn(() => Promise.resolve(null)),
     },
   };
+
+  return prisma;
 }
 
 export function ensureTenantDefaultsWithState(

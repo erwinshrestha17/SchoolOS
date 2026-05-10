@@ -13,10 +13,12 @@ import { AccountingPostingService } from '../src/accounting/accounting-posting.s
 import { AppModule } from '../src/app.module';
 import { AuthContext } from '../src/auth/auth.types';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { RedisService } from '../src/redis/redis.service';
 import {
   createAuthContextMock,
   createPrismaMock,
   PrismaMock,
+  mockBullQueues,
 } from './test-helpers';
 
 describe('Accounting M9 Hardening (E2E)', () => {
@@ -31,42 +33,18 @@ describe('Accounting M9 Hardening (E2E)', () => {
   beforeEach(async () => {
     prisma = createPrismaMock() as unknown as PrismaMock;
 
-    // Ensure model mocks have all necessary functions
-    const ensureMock = (model: any) => {
-      if (!model.findMany) model.findMany = jest.fn().mockResolvedValue([]);
-      if (!model.findFirst) model.findFirst = jest.fn();
-      if (!model.findUnique) model.findUnique = jest.fn();
-      if (!model.findUniqueOrThrow)
-        model.findUniqueOrThrow = jest
-          .fn()
-          .mockResolvedValue({ id: 'mock-id', code: 'mock-code' });
-      if (!model.create) model.create = jest.fn();
-      if (!model.count) model.count = jest.fn();
-      if (!model.upsert) model.upsert = jest.fn();
-      if (!model.update) model.update = jest.fn();
-    };
-
-    if (!(prisma as any).chartAccount) (prisma as any).chartAccount = {};
-    if (!(prisma as any).fiscalPeriod) (prisma as any).fiscalPeriod = {};
-    if (!(prisma as any).accountingPeriod)
-      (prisma as any).accountingPeriod = {};
-    if (!(prisma as any).journalEntry) (prisma as any).journalEntry = {};
-    if (!(prisma as any).journalLine) (prisma as any).journalLine = {};
-    if (!(prisma as any).auditLog) (prisma as any).auditLog = {};
-
-    ensureMock((prisma as any).chartAccount);
-    ensureMock((prisma as any).fiscalPeriod);
-    ensureMock((prisma as any).accountingPeriod);
-    ensureMock((prisma as any).journalEntry);
-    ensureMock((prisma as any).journalLine);
-    ensureMock((prisma as any).auditLog);
-
-    moduleRef = await Test.createTestingModule({
+    const moduleBuilder = Test.createTestingModule({
       imports: [AppModule],
     })
       .overrideProvider(PrismaService)
       .useValue(prisma)
-      .compile();
+      .overrideProvider(RedisService)
+      .useValue({
+        ping: jest.fn(() => Promise.resolve('PONG')),
+        onModuleDestroy: jest.fn(),
+      });
+
+    moduleRef = await mockBullQueues(moduleBuilder).compile();
 
     accountingService = moduleRef.get(AccountingService);
     postingService = moduleRef.get(AccountingPostingService);
@@ -201,6 +179,7 @@ describe('Accounting M9 Hardening (E2E)', () => {
             receiptNumber: 'RCP-1',
             paymentAmount: new Prisma.Decimal(100),
             paymentMethod: 'CASH',
+            paymentAccountCode: '1000',
             lines: [
               {
                 chartAccountId: 'acc-revenue',
@@ -212,6 +191,23 @@ describe('Accounting M9 Hardening (E2E)', () => {
           actor,
         ),
       ).rejects.toThrow(/balanced/i);
+    });
+
+    it('should reject zero-value balanced journals', async () => {
+      await expect(
+        postingService.postManualJournal(
+          {
+            tenantId,
+            entryDate: new Date(),
+            narration: 'Zero value',
+            lines: [
+              { chartAccountId: 'acc-cash', debit: 0, credit: 0 },
+              { chartAccountId: 'acc-revenue', debit: 0, credit: 0 },
+            ],
+          },
+          actor,
+        ),
+      ).rejects.toThrow(/non-zero/i);
     });
   });
 

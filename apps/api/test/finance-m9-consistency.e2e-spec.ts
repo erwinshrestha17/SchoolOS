@@ -16,10 +16,12 @@ import { AccountingPostingService } from '../src/accounting/accounting-posting.s
 import { AppModule } from '../src/app.module';
 import { AuthContext } from '../src/auth/auth.types';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { RedisService } from '../src/redis/redis.service';
 import {
   createAuthContextMock,
   createPrismaMock,
   PrismaMock,
+  mockBullQueues,
 } from './test-helpers';
 
 describe('Finance M9 Consistency (E2E)', () => {
@@ -33,43 +35,6 @@ describe('Finance M9 Consistency (E2E)', () => {
   beforeEach(async () => {
     prisma = createPrismaMock() as unknown as PrismaMock;
 
-    const ensureMock = (model: any) => {
-      if (!model.findMany) model.findMany = jest.fn().mockResolvedValue([]);
-      if (!model.findFirst) model.findFirst = jest.fn();
-      if (!model.findUnique) model.findUnique = jest.fn();
-      if (!model.findUniqueOrThrow) model.findUniqueOrThrow = jest.fn();
-      if (!model.create)
-        model.create = jest.fn().mockResolvedValue({ id: 'mock-id' });
-      if (!model.count) model.count = jest.fn();
-      if (!model.upsert) model.upsert = jest.fn();
-      if (!model.update) model.update = jest.fn();
-      if (!model.delete) model.delete = jest.fn();
-      if (!model.deleteMany) model.deleteMany = jest.fn();
-    };
-
-    [
-      'invoice',
-      'payment',
-      'receipt',
-      'paymentRefund',
-      'chartAccount',
-      'journalEntry',
-      'journalLine',
-      'feeWaiver',
-      'student',
-      'tenant',
-      'cashierClose',
-      'auditLog',
-      'fiscalPeriod',
-      'fiscalYear',
-      'accountingPeriod',
-    ].forEach((m) => {
-      if (!(prisma as any)[m]) (prisma as any)[m] = {};
-      ensureMock((prisma as any)[m]);
-    });
-
-    prisma.$transaction = jest.fn().mockImplementation((cb) => cb(prisma));
-
     (prisma.fiscalPeriod.findFirst as jest.Mock).mockResolvedValue({
       id: 'p1',
       status: 'OPEN',
@@ -81,12 +46,18 @@ describe('Finance M9 Consistency (E2E)', () => {
       status: 'OPEN',
     });
 
-    moduleRef = await Test.createTestingModule({
+    const moduleBuilder = Test.createTestingModule({
       imports: [AppModule],
     })
       .overrideProvider(PrismaService)
       .useValue(prisma)
-      .compile();
+      .overrideProvider(RedisService)
+      .useValue({
+        ping: jest.fn(() => Promise.resolve('PONG')),
+        onModuleDestroy: jest.fn(),
+      });
+
+    moduleRef = await mockBullQueues(moduleBuilder).compile();
 
     financeService = moduleRef.get(FinanceService);
   });
@@ -145,7 +116,7 @@ describe('Finance M9 Consistency (E2E)', () => {
         actor,
       );
 
-      expect(result.paymentId).toBe('payment-1');
+      expect(result.paymentId).toBe(existingPayment.id);
       expect(prisma.payment.create).not.toHaveBeenCalled();
     });
   });

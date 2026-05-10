@@ -719,8 +719,8 @@ export class AccountingService {
         narration: dto.narration ?? `Correction of ${original.entryNumber}`,
         lines: original.lines.map((l) => ({
           chartAccountId: l.chartAccountId,
-          debit: l.debit,
-          credit: l.credit,
+          debit: l.debit ?? (l.side === JournalLineSide.DEBIT ? l.amount : 0),
+          credit: l.credit ?? (l.side === JournalLineSide.CREDIT ? l.amount : 0),
           description: l.description,
         })),
       },
