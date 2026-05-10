@@ -533,8 +533,7 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
       findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) =>
         state.sections.find(
           (section) =>
-            section.id === q.where?.id &&
-            section.tenantId === q.where?.tenantId,
+            section.id === q.where?.id && section.tenantId === q.where?.tenantId,
         ) ?? null,
       ),
     },
@@ -561,8 +560,7 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
       findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) =>
         state.students.find(
           (student) =>
-            student.id === q.where?.id &&
-            student.tenantId === q.where?.tenantId,
+            student.id === q.where?.id && student.tenantId === q.where?.tenantId,
         ) ?? null,
       ),
     },
@@ -698,13 +696,13 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
       return [];
     }
 
-    if (sqlText.includes('UPDATE') && sqlText.includes('softDeletedAt')) {
+    if (isSoftDeleteQuery(sqlText)) {
       post.softDeletedAt = new Date();
       post.moderationStatus = 'REJECTED';
       return [toLifecycleRow(post)];
     }
 
-    if (sqlText.includes('UPDATE') && sqlText.includes('moderationStatus')) {
+    if (isModerationQuery(sqlText)) {
       post.moderationStatus = sqlText.includes('REJECTED') ? 'REJECTED' : 'APPROVED';
       return [toLifecycleRow(post)];
     }
@@ -755,6 +753,23 @@ function toLifecycleRow(post: ActivityPostRecord): ActivityPostLifecycleRow {
 
 function extractPostId(sqlText: string, posts: ActivityPostRecord[]) {
   return posts.find((post) => sqlText.includes(post.id))?.id;
+}
+
+function isSoftDeleteQuery(sqlText: string) {
+  return (
+    sqlText.includes('UPDATE') &&
+    (sqlText.includes('softDeletedAt') ||
+      sqlText.includes('soft_deleted') ||
+      sqlText.includes('Remove rejected media'))
+  );
+}
+
+function isModerationQuery(sqlText: string) {
+  return (
+    sqlText.includes('UPDATE') &&
+    (sqlText.includes('moderationStatus') ||
+      sqlText.includes('Contains unrelated child photo'))
+  );
 }
 
 function createActor(overrides: Partial<AuthContext>): AuthContext {
