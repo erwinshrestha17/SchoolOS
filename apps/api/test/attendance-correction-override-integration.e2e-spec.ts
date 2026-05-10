@@ -25,7 +25,9 @@ describe('Attendance Correction + Locked Session Override Integration (E2E)', ()
       { recordDeliveryRecords: jest.fn() } as unknown as CommunicationsService,
       { record: jest.fn() } as unknown as AuditService,
       { emit: jest.fn() } as unknown as EventEmitter2,
-      { getSetting: jest.fn().mockResolvedValue(true) } as unknown as SettingsService,
+      {
+        getSetting: jest.fn().mockResolvedValue(true),
+      } as unknown as SettingsService,
     );
     jest
       .spyOn(
@@ -64,7 +66,9 @@ describe('Attendance Correction + Locked Session Override Integration (E2E)', ()
       { recordDeliveryRecords: jest.fn() } as unknown as CommunicationsService,
       auditService as unknown as AuditService,
       { emit: jest.fn() } as unknown as EventEmitter2,
-      { getSetting: jest.fn().mockResolvedValue(true) } as unknown as SettingsService,
+      {
+        getSetting: jest.fn().mockResolvedValue(true),
+      } as unknown as SettingsService,
     );
     const admin = createAuthContextMock({
       tenantId: 'tenant-attendance-correction',
