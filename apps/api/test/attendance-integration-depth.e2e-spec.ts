@@ -163,7 +163,9 @@ describe('Attendance Reliability + Reports Integration Depth (E2E)', () => {
       { recordDeliveryRecords: jest.fn() } as unknown as CommunicationsService,
       auditService as unknown as AuditService,
       eventEmitter as unknown as EventEmitter2,
-      { getSetting: jest.fn().mockResolvedValue(true) } as unknown as SettingsService,
+      {
+        getSetting: jest.fn().mockResolvedValue(true),
+      } as unknown as SettingsService,
     );
   });
 
@@ -201,7 +203,9 @@ describe('Attendance Reliability + Reports Integration Depth (E2E)', () => {
       'student-2',
     ]);
     expect(prisma.__state.records).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ studentId: 'student-inactive' })]),
+      expect.arrayContaining([
+        expect.objectContaining({ studentId: 'student-inactive' }),
+      ]),
     );
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'attendance.student.absent',
@@ -241,7 +245,9 @@ describe('Attendance Reliability + Reports Integration Depth (E2E)', () => {
         classId,
         sectionId,
         attendanceDate: '2026-05-10',
-        exceptions: [{ studentId: 'student-1', status: AttendanceStatus.ABSENT }],
+        exceptions: [
+          { studentId: 'student-1', status: AttendanceStatus.ABSENT },
+        ],
       },
       assignedTeacherActor,
     );
@@ -278,7 +284,9 @@ describe('Attendance Reliability + Reports Integration Depth (E2E)', () => {
         attendanceDate: '2026-05-12',
         deviceTimestamp: new Date().toISOString(),
         deviceId: 'teacher-phone-1',
-        exceptions: [{ studentId: 'student-2', status: AttendanceStatus.ABSENT }],
+        exceptions: [
+          { studentId: 'student-2', status: AttendanceStatus.ABSENT },
+        ],
       },
       assignedTeacherActor,
     );
@@ -291,7 +299,9 @@ describe('Attendance Reliability + Reports Integration Depth (E2E)', () => {
         attendanceDate: '2026-05-12',
         deviceTimestamp: new Date().toISOString(),
         deviceId: 'teacher-phone-1',
-        exceptions: [{ studentId: 'student-2', status: AttendanceStatus.ABSENT }],
+        exceptions: [
+          { studentId: 'student-2', status: AttendanceStatus.ABSENT },
+        ],
       },
       assignedTeacherActor,
     );
@@ -427,10 +437,21 @@ function buildPrismaMock(input: {
     students: [
       createStudent(input, 'student-1', 'Aarav', 'Shrestha', '1', true),
       createStudent(input, 'student-2', 'Sita', 'Thapa', '2', true),
-      createStudent(input, 'student-inactive', 'Inactive', 'Student', '3', false),
+      createStudent(
+        input,
+        'student-inactive',
+        'Inactive',
+        'Student',
+        '3',
+        false,
+      ),
     ],
     staff: [
-      { id: 'staff-teacher-1', tenantId: input.tenantId, userId: 'teacher-user' },
+      {
+        id: 'staff-teacher-1',
+        tenantId: input.tenantId,
+        userId: 'teacher-user',
+      },
       {
         id: 'staff-teacher-2',
         tenantId: input.tenantId,
@@ -476,8 +497,9 @@ function buildPrismaMock(input: {
       callback(prisma),
     ),
     staff: {
-      findUnique: jest.fn(async (q: { where?: Record<string, unknown> }) =>
-        state.staff.find((staff) => staff.userId === q.where?.userId) ?? null,
+      findUnique: jest.fn(
+        async (q: { where?: Record<string, unknown> }) =>
+          state.staff.find((staff) => staff.userId === q.where?.userId) ?? null,
       ),
     },
     subjectTeacherAssignment: {
@@ -521,47 +543,56 @@ function buildPrismaMock(input: {
               )),
         );
       }),
-      findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) =>
-        state.students.find(
-          (student) =>
-            student.tenantId === q.where?.tenantId &&
-            (student.id === q.where?.id || student.id === q.where?.studentId || student.id === q.where?.userId),
-        ) ?? null,
+      findFirst: jest.fn(
+        async (q: { where?: Record<string, unknown> }) =>
+          state.students.find(
+            (student) =>
+              student.tenantId === q.where?.tenantId &&
+              (student.id === q.where?.id ||
+                student.id === q.where?.studentId ||
+                student.id === q.where?.userId),
+          ) ?? null,
       ),
     },
     guardian: {
-      findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) =>
-        state.guardians.find(
-          (guardian) =>
-            guardian.tenantId === q.where?.tenantId && guardian.userId === q.where?.userId,
-        ) ?? null,
+      findFirst: jest.fn(
+        async (q: { where?: Record<string, unknown> }) =>
+          state.guardians.find(
+            (guardian) =>
+              guardian.tenantId === q.where?.tenantId &&
+              guardian.userId === q.where?.userId,
+          ) ?? null,
       ),
     },
     schoolCalendarDay: {
-      findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) =>
-        findCalendarDay(state, q.where) ?? null,
+      findFirst: jest.fn(
+        async (q: { where?: Record<string, unknown> }) =>
+          findCalendarDay(state, q.where) ?? null,
       ),
       findMany: jest.fn(async (q: { where?: Record<string, unknown> }) =>
         state.calendarDays.filter((day) => day.tenantId === q.where?.tenantId),
       ),
     },
     attendanceSession: {
-      findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) =>
-        findSession(state, q.where) ?? null,
+      findFirst: jest.fn(
+        async (q: { where?: Record<string, unknown> }) =>
+          findSession(state, q.where) ?? null,
       ),
       create: jest.fn(async (q: { data: Record<string, unknown> }) => {
         const session = createSession(input, q.data);
         state.sessions.push(session);
         return session;
       }),
-      update: jest.fn(async (q: { where: { id: string }; data: Record<string, unknown> }) => {
-        const session = state.sessions.find((item) => item.id === q.where.id);
-        if (!session) {
-          throw new Error('Attendance session not found');
-        }
-        Object.assign(session, q.data);
-        return session;
-      }),
+      update: jest.fn(
+        async (q: { where: { id: string }; data: Record<string, unknown> }) => {
+          const session = state.sessions.find((item) => item.id === q.where.id);
+          if (!session) {
+            throw new Error('Attendance session not found');
+          }
+          Object.assign(session, q.data);
+          return session;
+        },
+      ),
       findUniqueOrThrow: jest.fn(async (q: { where: { id: string } }) => {
         const session = state.sessions.find((item) => item.id === q.where.id);
         if (!session) {
@@ -586,7 +617,8 @@ function buildPrismaMock(input: {
       deleteMany: jest.fn(async (q: { where?: Record<string, unknown> }) => {
         const before = state.records.length;
         state.records = state.records.filter(
-          (record) => record.attendanceSessionId !== q.where?.attendanceSessionId,
+          (record) =>
+            record.attendanceSessionId !== q.where?.attendanceSessionId,
         );
         const session = state.sessions.find(
           (item) => item.id === q.where?.attendanceSessionId,
@@ -613,8 +645,9 @@ function buildPrismaMock(input: {
       }),
       findMany: jest.fn(async (q: { where?: Record<string, unknown> }) => {
         const where = q.where ?? {};
-        const dateFilter = (where.attendanceSession as { attendanceDate?: unknown } | undefined)
-          ?.attendanceDate;
+        const dateFilter = (
+          where.attendanceSession as { attendanceDate?: unknown } | undefined
+        )?.attendanceDate;
         return state.records
           .filter(
             (record) =>
@@ -625,12 +658,16 @@ function buildPrismaMock(input: {
             const session = state.sessions.find(
               (item) => item.id === record.attendanceSessionId,
             );
-            return session ? inDateRange(session.attendanceDate, dateFilter) : false;
+            return session
+              ? inDateRange(session.attendanceDate, dateFilter)
+              : false;
           })
           .map((record) => ({
             ...record,
             attendanceSession: {
-              ...state.sessions.find((item) => item.id === record.attendanceSessionId),
+              ...state.sessions.find(
+                (item) => item.id === record.attendanceSessionId,
+              ),
               submittedBy: { email: 'teacher@schoolos.test' },
             },
           }));
@@ -647,12 +684,13 @@ function buildPrismaMock(input: {
         state.conflicts.push(conflict);
         return conflict;
       }),
-      findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) =>
-        state.conflicts.find(
-          (conflict) =>
-            conflict.tenantId === q.where?.tenantId &&
-            conflict.attendanceSessionId === q.where?.attendanceSessionId,
-        ) ?? null,
+      findFirst: jest.fn(
+        async (q: { where?: Record<string, unknown> }) =>
+          state.conflicts.find(
+            (conflict) =>
+              conflict.tenantId === q.where?.tenantId &&
+              conflict.attendanceSessionId === q.where?.attendanceSessionId,
+          ) ?? null,
       ),
     },
     attendanceSyncSubmission: {
@@ -668,14 +706,18 @@ function buildPrismaMock(input: {
           ) ?? null
         );
       }),
-      update: jest.fn(async (q: { where: { id: string }; data: Record<string, unknown> }) => {
-        const sync = state.syncSubmissions.find((item) => item.id === q.where.id);
-        if (!sync) {
-          throw new Error('Sync submission not found');
-        }
-        sync.syncAttemptCount = Number(sync.syncAttemptCount ?? 0) + 1;
-        return sync;
-      }),
+      update: jest.fn(
+        async (q: { where: { id: string }; data: Record<string, unknown> }) => {
+          const sync = state.syncSubmissions.find(
+            (item) => item.id === q.where.id,
+          );
+          if (!sync) {
+            throw new Error('Sync submission not found');
+          }
+          sync.syncAttemptCount = Number(sync.syncAttemptCount ?? 0) + 1;
+          return sync;
+        },
+      ),
       create: jest.fn(async (q: { data: Record<string, unknown> }) => {
         const sync = {
           id: `sync-${state.syncSubmissions.length + 1}`,
@@ -693,7 +735,12 @@ function buildPrismaMock(input: {
 }
 
 function createStudent(
-  input: { tenantId: string; academicYearId: string; classId: string; sectionId: string },
+  input: {
+    tenantId: string;
+    academicYearId: string;
+    classId: string;
+    sectionId: string;
+  },
   id: string,
   firstNameEn: string,
   lastNameEn: string,
@@ -812,7 +859,8 @@ function findSession(state: AttendanceState, where?: Record<string, unknown>) {
         (!where?.id || session.id === where.id) &&
         (!where?.classId || session.classId === where.classId) &&
         (!where?.sectionId || session.sectionId === where.sectionId) &&
-        (!where?.attendanceDate || sameDate(session.attendanceDate, where.attendanceDate as Date)),
+        (!where?.attendanceDate ||
+          sameDate(session.attendanceDate, where.attendanceDate as Date)),
     );
 }
 
@@ -832,7 +880,10 @@ function inDateRange(date: Date, range: unknown) {
     return true;
   }
   const filters = range as { gte?: Date; lte?: Date };
-  return (!filters.gte || date >= filters.gte) && (!filters.lte || date <= filters.lte);
+  return (
+    (!filters.gte || date >= filters.gte) &&
+    (!filters.lte || date <= filters.lte)
+  );
 }
 
 function sameDate(left: Date, right: Date) {
