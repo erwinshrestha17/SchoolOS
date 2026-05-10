@@ -52,7 +52,7 @@ describe('Attendance teacher scope integration', () => {
 
     expect(result.conflictStatus).toBe(AttendanceConflictStatus.NONE);
     expect(result.totals).toEqual(
-      expect.objectContaining({ total: 2, late: 1, present: 1 }),
+      expect.objectContaining({ totalStudents: 2, late: 1, present: 1 }),
     );
     expect(prisma.state.records.map((record: any) => record.studentId)).toEqual(
       ['student-1', 'student-2'],
