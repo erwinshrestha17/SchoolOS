@@ -140,7 +140,9 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
     eventEmitter = { emit: jest.fn() };
     fileRegistryService = {
       registerFile: jest.fn().mockResolvedValue({ id: 'file-asset-1' }),
-      getSignedUrl: jest.fn().mockResolvedValue('signed://activity/file-asset-1'),
+      getSignedUrl: jest
+        .fn()
+        .mockResolvedValue('signed://activity/file-asset-1'),
       auditAccess: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -430,7 +432,9 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
       },
       data: { processingStatus: 'READY' },
     });
-    expect(prisma.__state.activityAttachments[0].processingStatus).toBe('READY');
+    expect(prisma.__state.activityAttachments[0].processingStatus).toBe(
+      'READY',
+    );
   });
 
   function seedPost(input: {
@@ -463,13 +467,18 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
       title: input.title ?? input.id,
       caption: 'Caption',
       category: ActivityCategory.GENERAL,
-      audienceType: input.studentIds.length ? AudienceType.ALL : AudienceType.SECTION,
+      audienceType: input.studentIds.length
+        ? AudienceType.ALL
+        : AudienceType.SECTION,
       publishedAt: new Date(),
       createdAt: new Date(),
       moderationStatus: 'APPROVED',
       softDeletedAt: null,
       attachments: [attachment],
-      studentTags: input.studentIds.map((studentId) => ({ tenantId, studentId })),
+      studentTags: input.studentIds.map((studentId) => ({
+        tenantId,
+        studentId,
+      })),
       reactions: [],
     };
     attachment.activityPost = post;
@@ -515,26 +524,31 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
     rawQueries: [],
   };
 
-  const queryRawMock: jest.Mock<Promise<ActivityPostLifecycleRow[]>, unknown[]> =
-    jest.fn(async () => []);
+  const queryRawMock: jest.Mock<
+    Promise<ActivityPostLifecycleRow[]>,
+    unknown[]
+  > = jest.fn(async () => []);
 
   const prisma = {
     __state: state,
     class: {
-      findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) =>
-        state.classes.find(
-          (classroom) =>
-            classroom.id === q.where?.id &&
-            classroom.tenantId === q.where?.tenantId,
-        ) ?? null,
+      findFirst: jest.fn(
+        async (q: { where?: Record<string, unknown> }) =>
+          state.classes.find(
+            (classroom) =>
+              classroom.id === q.where?.id &&
+              classroom.tenantId === q.where?.tenantId,
+          ) ?? null,
       ),
     },
     section: {
-      findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) =>
-        state.sections.find(
-          (section) =>
-            section.id === q.where?.id && section.tenantId === q.where?.tenantId,
-        ) ?? null,
+      findFirst: jest.fn(
+        async (q: { where?: Record<string, unknown> }) =>
+          state.sections.find(
+            (section) =>
+              section.id === q.where?.id &&
+              section.tenantId === q.where?.tenantId,
+          ) ?? null,
       ),
     },
     staff: {
@@ -557,32 +571,39 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
             (!idIn || idIn.includes(student.id as string)),
         );
       }),
-      findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) =>
-        state.students.find(
-          (student) =>
-            student.id === q.where?.id && student.tenantId === q.where?.tenantId,
-        ) ?? null,
+      findFirst: jest.fn(
+        async (q: { where?: Record<string, unknown> }) =>
+          state.students.find(
+            (student) =>
+              student.id === q.where?.id &&
+              student.tenantId === q.where?.tenantId,
+          ) ?? null,
       ),
     },
     guardian: {
-      findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) =>
-        state.guardians.find(
-          (guardian) =>
-            guardian.tenantId === q.where?.tenantId &&
-            guardian.userId === q.where?.userId,
-        ) ?? null,
+      findFirst: jest.fn(
+        async (q: { where?: Record<string, unknown> }) =>
+          state.guardians.find(
+            (guardian) =>
+              guardian.tenantId === q.where?.tenantId &&
+              guardian.userId === q.where?.userId,
+          ) ?? null,
       ),
     },
     activityPost: {
       create: jest.fn(
         async (q: { data: Record<string, unknown>; include?: unknown }) => {
           const data = q.data;
-          const attachmentsCreate = ((data.attachments as
-            | { create?: Record<string, unknown>[] }
-            | undefined)?.create ?? []) as Record<string, unknown>[];
-          const studentTagsCreate = ((data.studentTags as
-            | { create?: Record<string, unknown>[] }
-            | undefined)?.create ?? []) as Record<string, unknown>[];
+          const attachmentsCreate = ((
+            data.attachments as
+              | { create?: Record<string, unknown>[] }
+              | undefined
+          )?.create ?? []) as Record<string, unknown>[];
+          const studentTagsCreate = ((
+            data.studentTags as
+              | { create?: Record<string, unknown>[] }
+              | undefined
+          )?.create ?? []) as Record<string, unknown>[];
           const postId = `post-${state.activityPosts.length + 1}`;
           const attachments = attachmentsCreate.map((attachment, index) => ({
             id: `attachment-${postId}-${index + 1}`,
@@ -623,7 +644,9 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
         return state.activityPosts
           .filter((post) => post.tenantId === where.tenantId)
           .filter((post) => !where.classId || post.classId === where.classId)
-          .filter((post) => !where.sectionId || post.sectionId === where.sectionId)
+          .filter(
+            (post) => !where.sectionId || post.sectionId === where.sectionId,
+          )
           .filter((post) =>
             matchesVisibility(
               post,
@@ -637,7 +660,8 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
         return (
           state.activityPosts
             .filter(
-              (post) => post.id === where.id && post.tenantId === where.tenantId,
+              (post) =>
+                post.id === where.id && post.tenantId === where.tenantId,
             )
             .find((post) =>
               matchesVisibility(
@@ -651,12 +675,18 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
     activityAttachment: {
       findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) => {
         const attachment = state.activityAttachments.find(
-          (item) => item.id === q.where?.id && item.tenantId === q.where?.tenantId,
+          (item) =>
+            item.id === q.where?.id && item.tenantId === q.where?.tenantId,
         );
-        return attachment ? { ...attachment, activityPost: attachment.activityPost } : null;
+        return attachment
+          ? { ...attachment, activityPost: attachment.activityPost }
+          : null;
       }),
       updateMany: jest.fn(
-        async (q: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+        async (q: {
+          where: Record<string, unknown>;
+          data: Record<string, unknown>;
+        }) => {
           let count = 0;
           for (const attachment of state.activityAttachments) {
             if (
@@ -703,7 +733,9 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
     }
 
     if (isModerationQuery(sqlText)) {
-      post.moderationStatus = sqlText.includes('REJECTED') ? 'REJECTED' : 'APPROVED';
+      post.moderationStatus = sqlText.includes('REJECTED')
+        ? 'REJECTED'
+        : 'APPROVED';
       return [toLifecycleRow(post)];
     }
 
@@ -723,7 +755,10 @@ function matchesVisibility(
 
   return visibility.some((condition) => {
     const studentTag = condition.studentTags as
-      | { some?: { studentId?: { in?: string[] } }; none?: Record<string, never> }
+      | {
+          some?: { studentId?: { in?: string[] } };
+          none?: Record<string, never>;
+        }
       | undefined;
     if (studentTag?.some?.studentId?.in) {
       return post.studentTags.some((tag) =>
@@ -756,7 +791,9 @@ function extractPostId(sqlText: string, posts: ActivityPostRecord[]) {
 }
 
 function isSoftDeleteQuery(sqlText: string) {
-  return sqlText.includes('UPDATE') && sqlText.includes('Remove rejected media');
+  return (
+    sqlText.includes('UPDATE') && sqlText.includes('Remove rejected media')
+  );
 }
 
 function isModerationQuery(sqlText: string) {
