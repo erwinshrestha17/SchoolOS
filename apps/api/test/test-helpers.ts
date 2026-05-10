@@ -38,6 +38,7 @@ export interface MockState {
   receipts: Record<string, unknown>[];
   paymentRefunds: Record<string, unknown>[];
   feeWaivers: Record<string, unknown>[];
+  studentLifecycleTransitions: Record<string, unknown>[];
   [key: string]: Record<string, unknown>[];
 }
 
@@ -230,6 +231,7 @@ export function createPrismaMock() {
     receipts: [] as Record<string, unknown>[],
     paymentRefunds: [] as Record<string, unknown>[],
     feeWaivers: [] as Record<string, unknown>[],
+    studentLifecycleTransitions: [] as Record<string, unknown>[],
   };
 
   const nextId = (prefix: string) =>
@@ -288,6 +290,10 @@ export function createPrismaMock() {
 
   const prisma = {
     __state: state,
+    $connect: jest.fn(() => Promise.resolve()),
+    $disconnect: jest.fn(() => Promise.resolve()),
+    onModuleInit: jest.fn(() => Promise.resolve()),
+    onModuleDestroy: jest.fn(() => Promise.resolve()),
     $transaction: jest.fn(async (arg: any) => {
       if (typeof arg === 'function') {
         return arg(prisma);
@@ -1581,6 +1587,63 @@ export function createPrismaMock() {
     subjectTeacherAssignment: {
       findFirst: jest.fn(() => Promise.resolve(null)),
     },
+  };
+
+  prisma.studentLifecycleTransition = {
+    create: jest.fn((q: PrismaQuery) => {
+      const data = q.data ?? {};
+      const item = {
+        id: nextId('student-lifecycle'),
+        ...data,
+        createdAt: new Date(),
+      };
+      state.studentLifecycleTransitions.push(item as Record<string, unknown>);
+      return Promise.resolve(item);
+    }),
+
+    findMany: jest.fn((q: PrismaQuery) =>
+      Promise.resolve(
+        state.studentLifecycleTransitions.filter((item) => {
+          const where = q.where ?? {};
+          return (
+            (!where.tenantId || item.tenantId === where.tenantId) &&
+            (!where.studentId || item.studentId === where.studentId) &&
+            (!where.toStatus || item.toStatus === where.toStatus)
+          );
+        }),
+      ),
+    ),
+
+    findFirst: jest.fn((q: PrismaQuery) =>
+      Promise.resolve(
+        state.studentLifecycleTransitions.find((item) => {
+          const where = q.where ?? {};
+          return (
+            (!where.tenantId || item.tenantId === where.tenantId) &&
+            (!where.studentId || item.studentId === where.studentId) &&
+            (!where.toStatus || item.toStatus === where.toStatus)
+          );
+        }),
+      ),
+    ),
+
+    deleteMany: jest.fn((q: PrismaQuery) => {
+      const before = state.studentLifecycleTransitions.length;
+      const where = q.where ?? {};
+
+      state.studentLifecycleTransitions =
+        state.studentLifecycleTransitions.filter(
+          (item) =>
+            !(
+              (!where.tenantId || item.tenantId === where.tenantId) &&
+              (!where.studentId || item.studentId === where.studentId)
+            ),
+        );
+
+      return Promise.resolve({
+        count: before - state.studentLifecycleTransitions.length,
+      });
+    }),
   };
 
   return prisma;
