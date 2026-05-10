@@ -172,6 +172,10 @@ function makePrisma() {
         state.records.push(...data);
         return { count: data.length };
       }),
+      findMany: jest.fn(async () => []),
+    },
+    attendanceConflict: {
+      create: jest.fn(async () => ({ id: 'conflict-1' })),
     },
   };
   return prisma;
