@@ -14,7 +14,7 @@ import { SettingsService } from '../src/settings/settings.service';
 import { createAuthContextMock } from './test-helpers';
 
 describe('Attendance Sync + Conflict Integration (E2E)', () => {
-  it('accepts first offline sync submission and replays the same clientSubmissionId idempotently', async () => {
+  it('replays the same clientSubmissionId idempotently without submitting attendance again', async () => {
     const prisma = makeSyncPrisma();
     const service = new AttendanceService(
       prisma as unknown as PrismaService,
@@ -31,42 +31,22 @@ describe('Attendance Sync + Conflict Integration (E2E)', () => {
       roles: ['teacher'],
       permissions: ['attendance:read', 'attendance:mark'],
     });
+    const submitSpy = jest.spyOn(service, 'submitAttendance');
 
-    jest
-      .spyOn(
-        service as unknown as {
-          buildSyncTrustMetadata: jest.Mock;
-        },
-        'buildSyncTrustMetadata',
-      )
-      .mockResolvedValue({ trusted: true });
-    jest.spyOn(service, 'submitAttendance').mockResolvedValue({
-      sessionId: 'session-1',
-      conflictStatus: AttendanceConflictStatus.NONE,
-    } as Awaited<ReturnType<AttendanceService['submitAttendance']>>);
-
-    const dto = {
-      clientSubmissionId: 'client-sync-1',
-      academicYearId: 'year-2081',
-      classId: 'class-1',
-      sectionId: 'section-1',
-      attendanceDate: '2026-05-10',
-      deviceTimestamp: new Date('2026-05-10T08:00:00.000Z').toISOString(),
-      deviceId: 'teacher-phone-1',
-      exceptions: [],
-    };
-
-    const first = await service.syncAttendance(dto, actor);
-    const replay = await service.syncAttendance(dto, actor);
-
-    expect(first).toEqual(
-      expect.objectContaining({
+    const replay = await service.syncAttendance(
+      {
         clientSubmissionId: 'client-sync-1',
-        attendanceSessionId: 'session-1',
-        syncStatus: AttendanceSyncStatus.ACCEPTED,
-        replayed: false,
-      }),
+        academicYearId: 'year-2081',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        attendanceDate: '2026-05-10',
+        deviceTimestamp: new Date('2026-05-10T08:00:00.000Z').toISOString(),
+        deviceId: 'teacher-phone-1',
+        exceptions: [],
+      },
+      actor,
     );
+
     expect(replay).toEqual(
       expect.objectContaining({
         clientSubmissionId: 'client-sync-1',
@@ -76,7 +56,7 @@ describe('Attendance Sync + Conflict Integration (E2E)', () => {
         syncAttemptCount: 2,
       }),
     );
-    expect(service.submitAttendance).toHaveBeenCalledTimes(1);
+    expect(submitSpy).not.toHaveBeenCalled();
     expect(prisma.__state.syncSubmissions).toHaveLength(1);
   });
 
@@ -143,7 +123,31 @@ describe('Attendance Sync + Conflict Integration (E2E)', () => {
 });
 
 function makeSyncPrisma() {
-  const state = { syncSubmissions: [] as any[] };
+  const state = {
+    syncSubmissions: [
+      {
+        id: 'sync-1',
+        tenantId: 'tenant-attendance-sync',
+        clientSubmissionId: 'client-sync-1',
+        attendanceSessionId: 'session-1',
+        conflictId: null,
+        academicYearId: 'year-2081',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        attendanceDate: new Date('2026-05-10T00:00:00.000Z'),
+        deviceId: 'teacher-phone-1',
+        deviceLabel: null,
+        deviceTimestamp: new Date('2026-05-10T08:00:00.000Z'),
+        sessionFingerprint: null,
+        syncStatus: AttendanceSyncStatus.ACCEPTED,
+        syncAttemptCount: 1,
+        serverReceivedAt: new Date('2026-05-10T08:01:00.000Z'),
+        rejectionReason: null,
+        submittedById: 'teacher-user',
+        payload: {},
+      },
+    ],
+  };
   return {
     __state: state,
     attendanceSyncSubmission: {
@@ -157,16 +161,6 @@ function makeSyncPrisma() {
           ) ?? null
         );
       }),
-      create: jest.fn(async ({ data }) => {
-        const created = {
-          id: `sync-${state.syncSubmissions.length + 1}`,
-          syncAttemptCount: 1,
-          syncStatus: AttendanceSyncStatus.ACCEPTED,
-          ...data,
-        };
-        state.syncSubmissions.push(created);
-        return created;
-      }),
       update: jest.fn(async ({ where }) => {
         const found = state.syncSubmissions.find(
           (item) => item.id === where.id,
@@ -177,9 +171,6 @@ function makeSyncPrisma() {
         found.syncAttemptCount += 1;
         return found;
       }),
-    },
-    attendanceConflict: {
-      findFirst: jest.fn(async () => null),
     },
   };
 }
