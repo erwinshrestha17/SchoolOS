@@ -28,7 +28,12 @@ describe('Attendance Correction + Locked Session Override Integration (E2E)', ()
       { getSetting: jest.fn().mockResolvedValue(true) } as unknown as SettingsService,
     );
     jest
-      .spyOn(service as unknown as { getAttendanceLockAt: jest.Mock }, 'getAttendanceLockAt')
+      .spyOn(
+        service as unknown as {
+          getAttendanceLockAt: jest.Mock;
+        },
+        'getAttendanceLockAt',
+      )
       .mockResolvedValue(new Date('2099-01-01T00:00:00.000Z'));
 
     const teacher = createAuthContextMock({
@@ -86,7 +91,7 @@ describe('Attendance Correction + Locked Session Override Integration (E2E)', ()
         sessionId: 'session-1',
         conflictStatus: AttendanceConflictStatus.REVIEWED,
         affectedSyncSubmissionCount: 1,
-        totals: expect.objectContaining({ total: 2, present: 2 }),
+        totals: expect.objectContaining({ totalStudents: 2, present: 2 }),
       }),
     );
     expect(prisma.attendanceRecord.update).toHaveBeenCalledWith({
@@ -155,7 +160,7 @@ function makeOverridePrisma() {
       attendanceSessionId: 'session-1',
       studentId: 'student-1',
       status: AttendanceStatus.LATE,
-      remark: 'Late in original sync',
+      remark: 'Late in original sync' as string | null,
       lateAt: null,
     },
     {
@@ -164,7 +169,7 @@ function makeOverridePrisma() {
       attendanceSessionId: 'session-1',
       studentId: 'student-2',
       status: AttendanceStatus.PRESENT,
-      remark: null,
+      remark: null as string | null,
       lateAt: null,
     },
   ];
@@ -195,6 +200,9 @@ function makeOverridePrisma() {
           (item) =>
             item.studentId === where.attendanceSessionId_studentId.studentId,
         );
+        if (!record) {
+          throw new Error('Attendance record not found');
+        }
         Object.assign(record, data);
         return record;
       }),
