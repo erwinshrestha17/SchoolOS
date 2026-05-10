@@ -1510,7 +1510,9 @@ export function createPrismaMock() {
         ),
       ),
       delete: jest.fn((q: PrismaQuery) => {
-        const index = state.journalEntries.findIndex((i) => i.id === q.where?.id);
+        const index = state.journalEntries.findIndex(
+          (i) => i.id === q.where?.id,
+        );
         if (index !== -1) state.journalEntries.splice(index, 1);
         return Promise.resolve({ id: q.where?.id });
       }),

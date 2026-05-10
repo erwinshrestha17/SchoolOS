@@ -223,10 +223,7 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
       );
     });
 
-    it.each([
-      AccountingPeriodStatus.CLOSED,
-      AccountingPeriodStatus.LOCKED,
-    ])(
+    it.each([AccountingPeriodStatus.CLOSED, AccountingPeriodStatus.LOCKED])(
       'rejects fee payment posting into %s fiscal period',
       async (status) => {
         (prisma.fiscalPeriod.findFirst as jest.Mock).mockResolvedValue({
@@ -236,9 +233,7 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
         seedInvoice();
         (prisma.payment.create as jest.Mock).mockResolvedValue({ id: 'pay-1' });
 
-        await expect(collectCashPayment()).rejects.toThrow(
-          ConflictException,
-        );
+        await expect(collectCashPayment()).rejects.toThrow(ConflictException);
         expect(prisma.journalEntry.create).not.toHaveBeenCalled();
       },
     );
@@ -294,9 +289,9 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
         payments: [{ amount: new Prisma.Decimal(800), refunds: [] }],
       });
 
-      await expect(
-        collectCashPayment({ amount: 300 }),
-      ).rejects.toThrow(/exceeds the remaining balance/i);
+      await expect(collectCashPayment({ amount: 300 })).rejects.toThrow(
+        /exceeds the remaining balance/i,
+      );
     });
   });
 
