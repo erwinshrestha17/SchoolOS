@@ -98,6 +98,20 @@ function makePrisma() {
   const prisma: any = {
     state,
     $transaction: jest.fn((callback) => callback(prisma)),
+    academicYear: {
+      findFirst: jest.fn(async ({ where }) =>
+        where.id === 'year-2081' && where.tenantId === tenantId
+          ? { id: 'year-2081', tenantId }
+          : null,
+      ),
+    },
+    class: {
+      findFirst: jest.fn(async ({ where }) =>
+        where.id === 'class-1' && where.tenantId === tenantId
+          ? { id: 'class-1', tenantId, name: 'Class 1' }
+          : null,
+      ),
+    },
     staff: {
       findUnique: jest.fn(async ({ where }) =>
         where.userId === 'teacher-user'
@@ -113,6 +127,11 @@ function makePrisma() {
       ),
     },
     section: {
+      findFirst: jest.fn(async ({ where }) =>
+        where.id === 'section-1' && where.tenantId === tenantId
+          ? { id: 'section-1', tenantId, classId: 'class-1', name: 'A' }
+          : null,
+      ),
       findMany: jest.fn(async () => []),
     },
     schoolCalendarDay: {
