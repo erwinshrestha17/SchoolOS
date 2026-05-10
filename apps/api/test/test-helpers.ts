@@ -322,6 +322,20 @@ export function createPrismaMock() {
         ),
       ),
       findMany: jest.fn(() => Promise.resolve(state.tenants)),
+      findUniqueOrThrow: jest.fn((q: PrismaQuery) => {
+        const tenant = state.tenants.find(
+          (t) => t.id === q.where?.id || t.slug === q.where?.slug,
+        );
+        if (!tenant) throw new Error('Tenant not found');
+        return Promise.resolve(tenant);
+      }),
+      findFirstOrThrow: jest.fn((q: PrismaQuery) => {
+        const tenant = state.tenants.find(
+          (t) => t.id === q.where?.id || t.slug === q.where?.slug,
+        );
+        if (!tenant) throw new Error('Tenant not found');
+        return Promise.resolve(tenant);
+      }),
       update: jest.fn((q: PrismaQuery) => {
         const tenant = state.tenants.find((t) => t.id === q.where?.id);
         if (tenant) {
@@ -849,6 +863,18 @@ export function createPrismaMock() {
               (!where.qrCode || item.qrCode === where.qrCode),
           ),
         );
+      }),
+      findFirstOrThrow: jest.fn((q: PrismaQuery) => {
+        const where = q.where ?? {};
+        const student = state.students.find(
+          (item) =>
+            (!where.tenantId || item.tenantId === where.tenantId) &&
+            (!where.id || item.id === where.id) &&
+            (!where.userId || item.userId === where.userId) &&
+            (!where.qrCode || item.qrCode === where.qrCode),
+        );
+        if (!student) throw new Error('Student not found');
+        return Promise.resolve(student);
       }),
       count: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
@@ -1483,6 +1509,11 @@ export function createPrismaMock() {
           ).length,
         ),
       ),
+      delete: jest.fn((q: PrismaQuery) => {
+        const index = state.journalEntries.findIndex((i) => i.id === q.where?.id);
+        if (index !== -1) state.journalEntries.splice(index, 1);
+        return Promise.resolve({ id: q.where?.id });
+      }),
     },
     journalLine: {
       createMany: jest.fn((q: PrismaQuery) => {
