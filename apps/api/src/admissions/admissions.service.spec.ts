@@ -7,14 +7,14 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuthMethod, EnrollmentStatus, Gender } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { ConfigService } from '../config/config.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { FinanceService } from '../finance/finance.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { StudentRecordsService } from '../student-records/student-records.service';
 import { StudentsService } from '../students/students.service';
 import { UsersService } from '../users/users.service';
-import { StorageService } from '../storage/storage.service';
-import { FileRegistryService } from '../file-registry/file-registry.service';
 import { AdmissionsService } from './admissions.service';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
 
@@ -32,6 +32,7 @@ const academicYear = {
   id: 'ay-1',
   startsOn: new Date('2026-04-01T00:00:00.000Z'),
 };
+
 const classroom = { id: 'class-1', name: 'Class 1' };
 const section = { id: 'section-1', name: 'A', classId: 'class-1' };
 
@@ -40,6 +41,7 @@ describe('AdmissionsService production hardening', () => {
     const prisma = buildPrisma();
     const tx = buildTransaction();
     prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+
     const { service, financeService, notificationsService, eventEmitter } =
       buildService(prisma);
 
@@ -49,20 +51,24 @@ describe('AdmissionsService production hardening', () => {
       where: { id: 'ay-1', tenantId: actor.tenantId },
       select: { id: true, startsOn: true },
     });
+
     expect(prisma.class.findFirst).toHaveBeenCalledWith({
       where: { id: 'class-1', tenantId: actor.tenantId },
       select: { id: true, name: true },
     });
+
     expect(prisma.section.findFirst).toHaveBeenCalledWith({
       where: { id: 'section-1', tenantId: actor.tenantId },
       select: { id: true, name: true, classId: true },
     });
+
     expect(tx.student.count).toHaveBeenCalledWith({
       where: {
         tenantId: actor.tenantId,
         studentSystemId: { startsWith: 'SCH-2026-' },
       },
     });
+
     expect(tx.student.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         tenantId: actor.tenantId,
@@ -71,6 +77,7 @@ describe('AdmissionsService production hardening', () => {
         sectionId: 'section-1',
       }),
     });
+
     expect(tx.guardian.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -81,6 +88,7 @@ describe('AdmissionsService production hardening', () => {
         },
       }),
     );
+
     expect(tx.enrollment.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         tenantId: actor.tenantId,
@@ -91,6 +99,7 @@ describe('AdmissionsService production hardening', () => {
         rollNumber: 4,
       }),
     });
+
     expect(tx.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         action: 'create',
@@ -99,12 +108,14 @@ describe('AdmissionsService production hardening', () => {
         resourceId: 'enrollment-1',
       }),
     });
+
     expect(financeService.assignFeePlansForEnrollment).toHaveBeenCalledWith({
       tenantId: actor.tenantId,
       studentId: 'student-1',
       academicYearId: 'ay-1',
       classId: 'class-1',
     });
+
     expect(financeService.createInitialInvoice).toHaveBeenCalledWith({
       actor,
       studentId: 'student-1',
@@ -112,7 +123,9 @@ describe('AdmissionsService production hardening', () => {
       enrollmentId: 'enrollment-1',
       dueDate: new Date('2026-04-15'),
     });
+
     expect(notificationsService.sendSms).not.toHaveBeenCalled();
+
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'student.admitted',
       expect.objectContaining({
@@ -120,6 +133,7 @@ describe('AdmissionsService production hardening', () => {
         studentId: 'student-1',
       }),
     );
+
     expect(result.student.studentSystemId).toBe('SCH-2026-0001');
   });
 
@@ -132,6 +146,7 @@ describe('AdmissionsService production hardening', () => {
     await expect(
       service.createAdmission(buildAdmissionDto(), actor),
     ).rejects.toThrow(BadRequestException);
+
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
@@ -154,6 +169,7 @@ describe('AdmissionsService production hardening', () => {
         actor,
       ),
     ).rejects.toThrow(BadRequestException);
+
     expect(prisma.academicYear.findFirst).not.toHaveBeenCalled();
   });
 
@@ -194,7 +210,9 @@ describe('AdmissionsService production hardening', () => {
         sectionRef: true,
       },
       orderBy: [{ createdAt: 'desc' }],
+      take: 100,
     });
+
     expect(result.hasWarnings).toBe(true);
   });
 
@@ -218,6 +236,7 @@ describe('AdmissionsService production hardening', () => {
     await expect(
       service.createAdmission(buildAdmissionDto(), actor),
     ).rejects.toThrow(ConflictException);
+
     expect(prisma.enrollment.findFirst).toHaveBeenCalledWith({
       where: {
         tenantId: actor.tenantId,
@@ -239,6 +258,7 @@ describe('AdmissionsService production hardening', () => {
     const prisma = buildPrisma();
     const tx = buildTransaction();
     prisma.$transaction.mockImplementation(async (callback) => callback(tx));
+
     const { service, auditService } = buildService(prisma);
 
     const result = await service.bulkImport(
@@ -263,6 +283,7 @@ describe('AdmissionsService production hardening', () => {
         errors: expect.arrayContaining(['guardianPhone is required']),
       }),
     );
+
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'bulk_import_validate',
@@ -279,6 +300,7 @@ describe('AdmissionsService production hardening', () => {
     await expect(
       service.createAdmission(buildAdmissionDto(), actor),
     ).rejects.toThrow(NotFoundException);
+
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });
@@ -309,6 +331,7 @@ function buildAdmissionDto(): CreateAdmissionDto {
 
 function buildService(prisma = buildPrisma()) {
   const usersService = { createManagedUser: jest.fn() };
+
   const financeService = {
     assignFeePlansForEnrollment: jest.fn().mockResolvedValue(undefined),
     createInitialInvoice: jest.fn().mockResolvedValue({
@@ -317,13 +340,19 @@ function buildService(prisma = buildPrisma()) {
       totalAmount: 1000,
     }),
   };
+
   const studentRecordsService = { uploadDocument: jest.fn() };
+
   const notificationsService = {
     sendSms: jest.fn().mockResolvedValue(undefined),
   };
+
   const auditService = { record: jest.fn().mockResolvedValue(undefined) };
+
   const configService = { medicalEncryptionKey: 'test-key' };
+
   const eventEmitter = { emit: jest.fn() };
+
   const studentsService = {
     generateStudentDocumentPdf: jest.fn().mockResolvedValue(Buffer.from('pdf')),
     requestTransfer: jest.fn(),
@@ -336,6 +365,7 @@ function buildService(prisma = buildPrisma()) {
     saveBase64Object: jest.fn(),
     saveBufferObject: jest.fn(),
   };
+
   const fileRegistryService = {
     registerFile: jest.fn(),
     getSignedUrl: jest.fn(),

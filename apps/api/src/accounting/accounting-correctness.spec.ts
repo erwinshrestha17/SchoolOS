@@ -32,14 +32,12 @@ describe('Accounting Correctness Hardening', () => {
       },
       chartAccount: {
         findUniqueOrThrow: jest.fn(),
-        upsert: jest
-          .fn()
-          .mockImplementation((args) =>
-            Promise.resolve({
-              id: args.where.tenantId_code.code,
-              ...args.create,
-            }),
-          ),
+        upsert: jest.fn().mockImplementation((args) =>
+          Promise.resolve({
+            id: args.where.tenantId_code.code,
+            ...args.create,
+          }),
+        ),
       },
     };
 
