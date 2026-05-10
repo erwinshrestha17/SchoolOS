@@ -727,7 +727,8 @@ export class AccountingService {
         lines: original.lines.map((l) => ({
           chartAccountId: l.chartAccountId,
           debit: l.debit ?? (l.side === JournalLineSide.DEBIT ? l.amount : 0),
-          credit: l.credit ?? (l.side === JournalLineSide.CREDIT ? l.amount : 0),
+          credit:
+            l.credit ?? (l.side === JournalLineSide.CREDIT ? l.amount : 0),
           description: l.description,
         })),
       },

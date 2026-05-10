@@ -27,6 +27,7 @@ export class StudentRecordsService {
         ...(studentId ? { studentId } : {}),
       },
       orderBy: [{ createdAt: 'desc' }],
+      take: 100,
     });
   }
 
@@ -138,6 +139,7 @@ export class StudentRecordsService {
         },
       },
       orderBy: [{ createdAt: 'desc' }],
+      take: 100,
     });
   }
 

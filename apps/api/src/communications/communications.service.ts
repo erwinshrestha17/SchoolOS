@@ -32,6 +32,7 @@ export class CommunicationsService {
     return this.prisma.notice.findMany({
       where: { tenantId: actor.tenantId },
       orderBy: [{ createdAt: 'desc' }],
+      take: 100,
     });
   }
 
@@ -94,6 +95,7 @@ export class CommunicationsService {
     return this.prisma.event.findMany({
       where: { tenantId: actor.tenantId },
       orderBy: [{ startsAt: 'asc' }],
+      take: 100,
     });
   }
 
@@ -254,6 +256,7 @@ export class CommunicationsService {
         guardian: true,
       },
       orderBy: [{ capturedAt: 'desc' }],
+      take: 100,
     });
   }
 

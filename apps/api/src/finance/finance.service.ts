@@ -324,6 +324,7 @@ export class FinanceService {
     return this.prisma.feeHead.findMany({
       where: { tenantId: actor.tenantId },
       orderBy: [{ code: 'asc' }],
+      take: 100,
     });
   }
 
@@ -380,6 +381,7 @@ export class FinanceService {
         },
       },
       orderBy: [{ createdAt: 'desc' }],
+      take: 100,
     });
   }
 
@@ -465,6 +467,7 @@ export class FinanceService {
         invoices: true,
       },
       orderBy: [{ generatedAt: 'desc' }],
+      take: 100,
     });
   }
 
@@ -607,6 +610,7 @@ export class FinanceService {
         feePlan: true,
       },
       orderBy: [{ createdAt: 'desc' }],
+      take: 100,
     });
   }
 
@@ -661,6 +665,7 @@ export class FinanceService {
         approvedBy: true,
       },
       orderBy: [{ createdAt: 'desc' }],
+      take: 100,
     });
   }
 
@@ -784,6 +789,7 @@ export class FinanceService {
         feePlan: true,
       },
       orderBy: [{ dueDate: 'asc' }],
+      take: 100,
     });
   }
 
@@ -1429,6 +1435,7 @@ export class FinanceService {
         },
       },
       orderBy: [{ issuedAt: 'desc' }],
+      take: 100,
     });
 
     return invoices.map((invoice) => {
@@ -2187,6 +2194,7 @@ export class FinanceService {
         },
       },
       orderBy: [{ dueDate: 'asc' }],
+      take: 100,
     });
 
     return invoices.map((invoice) => {
@@ -2982,6 +2990,7 @@ export class FinanceService {
         closedBy: true,
       },
       orderBy: [{ closedAt: 'desc' }, { createdAt: 'desc' }],
+      take: 100,
     });
 
     return closes.map((close) => this.buildCashierCloseResponse(close));
@@ -3198,6 +3207,7 @@ export class FinanceService {
         refunds: true,
       },
       orderBy: [{ paidAt: 'desc' }],
+      take: 100,
     });
 
     return payments.map((payment) => ({
@@ -3230,6 +3240,7 @@ export class FinanceService {
         },
       },
       orderBy: [{ issuedAt: 'desc' }],
+      take: 100,
     });
 
     return receipts.map((receipt) => ({
@@ -3335,6 +3346,7 @@ export class FinanceService {
         },
       },
       orderBy: [{ entryDate: 'desc' }],
+      take: 100,
     });
   }
 
@@ -3342,6 +3354,7 @@ export class FinanceService {
     return this.prisma.chartAccount.findMany({
       where: { tenantId: actor.tenantId },
       orderBy: [{ code: 'asc' }],
+      take: 100,
     });
   }
 
@@ -3837,7 +3850,14 @@ export class FinanceService {
     actor: AuthContext,
     tx: Prisma.TransactionClient,
   ) {
-    const invoiceLines = (invoice as { lines: Array<{ feeHead: { code: string, name: string }, totalAmount: Prisma.Decimal }> }).lines.map((line) => ({
+    const invoiceLines = (
+      invoice as {
+        lines: Array<{
+          feeHead: { code: string; name: string };
+          totalAmount: Prisma.Decimal;
+        }>;
+      }
+    ).lines.map((line) => ({
       accountCode: resolveIncomeAccountCode(line.feeHead.code),
       accountName: line.feeHead.name,
       accountType: ChartAccountType.REVENUE,

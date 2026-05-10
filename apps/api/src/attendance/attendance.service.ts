@@ -1017,6 +1017,7 @@ export class AttendanceService {
         reviewedBy: true,
       },
       orderBy: { requestedAt: 'desc' },
+      take: 100,
     });
   }
 
@@ -1194,6 +1195,7 @@ export class AttendanceService {
     return this.prisma.schoolCalendarDay.findMany({
       where: { tenantId: actor.tenantId },
       orderBy: [{ calendarDate: 'asc' }],
+      take: 100,
     });
   }
 
@@ -1276,6 +1278,7 @@ export class AttendanceService {
         reviewedBy: true,
       },
       orderBy: { createdAt: 'desc' },
+      take: 100,
     });
   }
 
@@ -1327,6 +1330,7 @@ export class AttendanceService {
         include: {
           staff: true,
         },
+        take: 1000, // Monthly summary can be larger but should be bounded
       }),
       this.prisma.staffLeaveRequest.findMany({
         where: {
@@ -1338,6 +1342,7 @@ export class AttendanceService {
         include: {
           staff: true,
         },
+        take: 1000,
       }),
     ]);
 
@@ -1561,6 +1566,7 @@ export class AttendanceService {
       where: { tenantId: actor.tenantId },
       include: { staff: true },
       orderBy: [{ year: 'desc' }, { leaveType: 'asc' }],
+      take: 100,
     });
   }
 
@@ -2254,29 +2260,31 @@ export class AttendanceService {
       'HOLIDAY',
     ];
 
-    const rows = data.matrix.map((student: {
-      rollNumber?: number | string | null;
-      name: string;
-      attendance: Array<{ status: string }>;
-      totals: Record<string, number | string>;
-    }) => [
-      student.rollNumber?.toString() ?? '',
-      student.name,
-      ...student.attendance.map((a: { status: string }) => {
-        if (a.status === 'PRESENT') return 'P';
-        if (a.status === 'ABSENT') return 'A';
-        if (a.status === 'LATE') return 'L';
-        if (a.status === 'HOLIDAY') return 'H';
-        if (a.status === 'LEAVE') return 'Lv';
-        if (a.status === 'HALF_DAY') return '0.5';
-        return '-';
-      }),
-      student.totals.PRESENT.toString(),
-      student.totals.ABSENT.toString(),
-      student.totals.LATE.toString(),
-      student.totals.LEAVE.toString(),
-      student.totals.HOLIDAY.toString(),
-    ]);
+    const rows = data.matrix.map(
+      (student: {
+        rollNumber?: number | string | null;
+        name: string;
+        attendance: Array<{ status: string }>;
+        totals: Record<string, number | string>;
+      }) => [
+        student.rollNumber?.toString() ?? '',
+        student.name,
+        ...student.attendance.map((a: { status: string }) => {
+          if (a.status === 'PRESENT') return 'P';
+          if (a.status === 'ABSENT') return 'A';
+          if (a.status === 'LATE') return 'L';
+          if (a.status === 'HOLIDAY') return 'H';
+          if (a.status === 'LEAVE') return 'Lv';
+          if (a.status === 'HALF_DAY') return '0.5';
+          return '-';
+        }),
+        student.totals.PRESENT.toString(),
+        student.totals.ABSENT.toString(),
+        student.totals.LATE.toString(),
+        student.totals.LEAVE.toString(),
+        student.totals.HOLIDAY.toString(),
+      ],
+    );
 
     const escapeCsv = (str: string) => `"${str.replace(/"/g, '""')}"`;
 

@@ -376,6 +376,7 @@ export class StaffService {
         },
       },
       orderBy: [{ joiningDate: 'desc' }, { firstName: 'asc' }],
+      take: 100,
     });
 
     return staff.map((member) => ({

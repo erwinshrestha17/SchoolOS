@@ -78,7 +78,10 @@ export class PrismaClient {
 
 export const Prisma = {
   Decimal,
-  sql: (strings: TemplateStringsArray, ...values: any[]) => ({ strings, values }),
+  sql: (strings: TemplateStringsArray, ...values: any[]) => ({
+    strings,
+    values,
+  }),
 };
 
 export const Mode = {
@@ -385,9 +388,12 @@ export const GradeLockStatus = {
 } as const;
 
 export const MarkEntryStatus = {
-  SUBMITTED: 'SUBMITTED',
+  PRESENT: 'PRESENT',
   ABSENT: 'ABSENT',
+  EXCUSED: 'EXCUSED',
+  MISSING: 'MISSING',
   WITHHELD: 'WITHHELD',
+  SUBMITTED: 'SUBMITTED',
 } as const;
 
 export const HomeworkAssignmentStatus = {

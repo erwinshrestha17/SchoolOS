@@ -1422,7 +1422,9 @@ export class AccountingPostingService {
     }>,
   ) {
     if (lines.length < 2) {
-      throw new ConflictException('Journal entry must have at least two lines.');
+      throw new ConflictException(
+        'Journal entry must have at least two lines.',
+      );
     }
 
     const totals = lines.reduce(
@@ -1470,7 +1472,15 @@ export class AccountingPostingService {
   }
 }
 
-function toDecimal(value: Prisma.Decimal | number | string | Prisma.DecimalJsLike | null | undefined) {
+function toDecimal(
+  value:
+    | Prisma.Decimal
+    | number
+    | string
+    | Prisma.DecimalJsLike
+    | null
+    | undefined,
+) {
   if (value === null || value === undefined) {
     return new Prisma.Decimal(0);
   }

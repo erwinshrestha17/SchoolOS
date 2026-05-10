@@ -230,7 +230,10 @@ function buildService(options: {
   const prisma = {
     journalEntry: {
       findFirst: jest.fn().mockImplementation(({ where }) => {
-        if (where.id === (options.original as any)?.id || where.id === 'journal-original') {
+        if (
+          where.id === (options.original as any)?.id ||
+          where.id === 'journal-original'
+        ) {
           return Promise.resolve(options.original);
         }
         if (where.reversalOfId) {

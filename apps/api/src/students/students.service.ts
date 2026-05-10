@@ -171,6 +171,7 @@ export class StudentsService {
         user: true,
       },
       orderBy: [{ createdAt: 'desc' }, { firstNameEn: 'asc' }],
+      take: 100,
     });
 
     return students.map((student) => ({
@@ -1713,6 +1714,7 @@ export class StudentsService {
         guardianId,
       },
       orderBy: [{ createdAt: 'desc' }],
+      take: 100,
     });
   }
 

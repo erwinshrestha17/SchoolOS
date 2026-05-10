@@ -156,20 +156,36 @@ describe('Accounting M9 Hardening (E2E)', () => {
 
   describe('Double-Entry Enforcement', () => {
     it('should reject imbalanced postings from all sources', async () => {
-      // Manual Journal
+      // Manual Journal - Fewer than two lines
+      await expect(
+        postingService.postManualJournal(
+          {
+            tenantId,
+            entryDate: new Date(),
+            narration: 'Single line',
+            lines: [{ chartAccountId: 'acc-cash', debit: 100, credit: 0 }],
+          },
+          actor,
+        ),
+      ).rejects.toThrow(/at least two lines/i);
+
+      // Manual Journal - Imbalanced
       await expect(
         postingService.postManualJournal(
           {
             tenantId,
             entryDate: new Date(),
             narration: 'Imbalanced',
-            lines: [{ chartAccountId: 'acc-cash', debit: 100, credit: 0 }],
+            lines: [
+              { chartAccountId: 'acc-cash', debit: 100, credit: 0 },
+              { chartAccountId: 'acc-revenue', debit: 0, credit: 90 },
+            ],
           },
           actor,
         ),
       ).rejects.toThrow(/balanced/i);
 
-      // Fee Payment
+      // Fee Payment - Imbalanced
       await expect(
         postingService.postFeePayment(
           {
@@ -191,6 +207,9 @@ describe('Accounting M9 Hardening (E2E)', () => {
           actor,
         ),
       ).rejects.toThrow(/balanced/i);
+      // Actually postFeePayment adds one debit account line.
+      // So if input.lines has 1 line, total lines = 2.
+      // Let's check postFeePayment logic.
     });
 
     it('should reject zero-value balanced journals', async () => {

@@ -15,6 +15,7 @@ export class AcademicYearsService {
     return this.prisma.academicYear.findMany({
       where: { tenantId: actor.tenantId },
       orderBy: [{ isCurrent: 'desc' }, { startsOn: 'desc' }],
+      take: 100,
     });
   }
 

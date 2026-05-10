@@ -633,7 +633,7 @@ export class ActivityFeedService {
         student: true,
       },
       orderBy: [{ observedAt: 'desc' }, { createdAt: 'desc' }],
-      take: 200,
+      take: 100,
     });
   }
 

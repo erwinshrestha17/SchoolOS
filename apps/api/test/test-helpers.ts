@@ -1006,7 +1006,9 @@ export function createPrismaMock() {
             (!q.where?.tenantId || doc.tenantId === q.where.tenantId) &&
             (!q.where?.studentId || doc.studentId === q.where.studentId),
         );
-        return Promise.resolve({ count: before - state.studentDocuments.length });
+        return Promise.resolve({
+          count: before - state.studentDocuments.length,
+        });
       }),
       delete: jest.fn((q: PrismaQuery) => {
         const id = q.where?.id;
@@ -1025,8 +1027,10 @@ export function createPrismaMock() {
       updateMany: jest.fn((q: PrismaQuery) => {
         let count = 0;
         for (const doc of state.studentDocuments) {
-          const matchTenant = !q.where?.tenantId || doc.tenantId === q.where.tenantId;
-          const matchStudent = !q.where?.studentId || doc.studentId === q.where.studentId;
+          const matchTenant =
+            !q.where?.tenantId || doc.tenantId === q.where.tenantId;
+          const matchStudent =
+            !q.where?.studentId || doc.studentId === q.where.studentId;
           if (matchTenant && matchStudent) {
             Object.assign(doc, q.data ?? {});
             count += 1;
@@ -1061,7 +1065,8 @@ export function createPrismaMock() {
           state.studentDocumentHistory.find(
             (item) =>
               (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
-              (!q.where?.documentId || item.documentId === q.where.documentId) &&
+              (!q.where?.documentId ||
+                item.documentId === q.where.documentId) &&
               (!q.where?.action || item.action === q.where.action),
           ),
         ),
@@ -1078,7 +1083,8 @@ export function createPrismaMock() {
           if (orderBy.createdAt === 'desc') {
             results = [...results].sort(
               (a, b) =>
-                (b.createdAt as Date).getTime() - (a.createdAt as Date).getTime(),
+                (b.createdAt as Date).getTime() -
+                (a.createdAt as Date).getTime(),
             );
           }
         }
@@ -1407,16 +1413,14 @@ export function createPrismaMock() {
       findMany: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
           state.payments.filter(
-            (item) =>
-              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
           ),
         ),
       ),
       count: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
           state.payments.filter(
-            (item) =>
-              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
           ).length,
         ),
       ),
@@ -1463,8 +1467,7 @@ export function createPrismaMock() {
       findMany: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
           state.journalEntries.filter(
-            (item) =>
-              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
           ),
         ),
       ),
@@ -1476,8 +1479,7 @@ export function createPrismaMock() {
       count: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
           state.journalEntries.filter(
-            (item) =>
-              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
           ).length,
         ),
       ),
@@ -1551,8 +1553,7 @@ export function createPrismaMock() {
       count: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
           state.cashierCloses.filter(
-            (item) =>
-              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
           ).length,
         ),
       ),
@@ -1580,16 +1581,14 @@ export function createPrismaMock() {
       findMany: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
           state.receipts.filter(
-            (item) =>
-              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
           ),
         ),
       ),
       count: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
           state.receipts.filter(
-            (item) =>
-              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
           ).length,
         ),
       ),
@@ -1599,8 +1598,7 @@ export function createPrismaMock() {
       findMany: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
           state.paymentRefunds.filter(
-            (item) =>
-              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
           ),
         ),
       ),
@@ -1619,8 +1617,7 @@ export function createPrismaMock() {
       findMany: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
           state.feeWaivers.filter(
-            (item) =>
-              !q.where?.tenantId || item.tenantId === q.where.tenantId,
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
           ),
         ),
       ),

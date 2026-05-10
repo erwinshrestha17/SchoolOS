@@ -43,6 +43,7 @@ export class PayrollService {
         },
       },
       orderBy: [{ createdAt: 'desc' }],
+      take: 100,
     });
   }
 
@@ -149,6 +150,7 @@ export class PayrollService {
       where: { tenantId: actor.tenantId },
       include: { staff: true, components: true },
       orderBy: [{ effectiveFrom: 'desc' }],
+      take: 100,
     });
   }
 
@@ -347,6 +349,7 @@ export class PayrollService {
         payslips: true,
       },
       orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
+      take: 100,
     });
   }
 
@@ -993,6 +996,7 @@ export class PayrollService {
         payrollRun: true,
       },
       orderBy: { createdAt: 'desc' },
+      take: 100,
     });
   }
 

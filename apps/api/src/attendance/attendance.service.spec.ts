@@ -893,8 +893,12 @@ function buildService(options: {
     },
     staff: {
       count: jest.fn().mockResolvedValue(1),
-      findUnique: jest.fn().mockResolvedValue({ id: 'staff-1', userId: 'user-1' }),
-      findFirst: jest.fn().mockResolvedValue({ id: 'staff-1', userId: 'user-1' }),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue({ id: 'staff-1', userId: 'user-1' }),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue({ id: 'staff-1', userId: 'user-1' }),
     },
     staffAttendance: {
       upsert: jest.fn().mockResolvedValue({}),

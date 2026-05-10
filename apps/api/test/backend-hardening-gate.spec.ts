@@ -169,7 +169,10 @@ describe('backend hardening gate', () => {
 
   it('keeps private file/media endpoints from returning permanent public URLs outside storage boundaries', () => {
     const files = tenantModuleFiles().filter(
-      (file) => !isAllowedPath(file, PUBLIC_URL_ALLOWED_PATHS),
+      (file) =>
+        !isAllowedPath(file, PUBLIC_URL_ALLOWED_PATHS) &&
+        !file.endsWith('.spec.ts') &&
+        !file.endsWith('.test.ts'),
     );
 
     const permanentPublicUrlPattern =

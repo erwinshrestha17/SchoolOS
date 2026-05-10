@@ -48,6 +48,7 @@ export class AcademicsFoundationService {
         },
       },
       orderBy: [{ startsOn: 'desc' }, { name: 'asc' }],
+      take: 100,
     });
   }
 
@@ -287,6 +288,7 @@ export class AcademicsFoundationService {
         },
       },
       orderBy: [{ class: { level: 'asc' } }, { code: 'asc' }],
+      take: 100,
     });
   }
 

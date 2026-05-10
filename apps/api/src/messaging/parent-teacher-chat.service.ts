@@ -457,6 +457,7 @@ export class ParentTeacherChatService {
     const rules = await this.prisma.chatAvailabilityRule.findMany({
       where: { tenantId: actor.tenantId },
       orderBy: [{ dayOfWeek: 'asc' }, { appliesToRole: 'asc' }],
+      take: 100,
     });
 
     return rules.length > 0

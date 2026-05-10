@@ -92,6 +92,7 @@ export class AcademicsService {
         },
       },
       orderBy: [{ class: { level: 'asc' } }, { code: 'asc' }],
+      take: 100,
     });
   }
 
@@ -109,6 +110,7 @@ export class AcademicsService {
         },
       },
       orderBy: [{ code: 'asc' }],
+      take: 100,
     });
   }
 
@@ -159,6 +161,7 @@ export class AcademicsService {
         section: true,
       },
       orderBy: [{ createdAt: 'desc' }],
+      take: 100,
     });
   }
 
@@ -231,6 +234,7 @@ export class AcademicsService {
         },
       },
       orderBy: [{ startsOn: 'desc' }],
+      take: 100,
     });
   }
 
@@ -364,6 +368,7 @@ export class AcademicsService {
         section: true,
       },
       orderBy: [{ startsAt: 'asc' }],
+      take: 100,
     });
   }
 
@@ -511,6 +516,7 @@ export class AcademicsService {
         examTerm: true,
       },
       orderBy: [{ subject: { code: 'asc' } }, { name: 'asc' }],
+      take: 100,
     });
   }
 
@@ -523,6 +529,7 @@ export class AcademicsService {
         reviewedBy: true,
       },
       orderBy: [{ createdAt: 'desc' }],
+      take: 100,
     });
   }
 

@@ -86,6 +86,7 @@ export class AdmissionsService {
         },
       },
       orderBy: [{ createdAt: 'desc' }],
+      take: 100,
     });
 
     return students.map((student) => ({
@@ -509,6 +510,7 @@ export class AdmissionsService {
         sectionRef: true,
       },
       orderBy: [{ createdAt: 'desc' }],
+      take: 100,
     });
 
     const normalizedFirstName = normalizeAdmissionName(dto.firstNameEn);

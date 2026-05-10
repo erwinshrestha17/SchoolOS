@@ -92,6 +92,7 @@ export class UsersService {
       where: { tenantId: actor.tenantId },
       include: this.userInclude,
       orderBy: { createdAt: 'desc' },
+      take: 100,
     });
 
     return users.map((user) => this.toUserSummary(user));

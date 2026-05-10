@@ -24,11 +24,22 @@ describe('Accounting Correctness Hardening', () => {
       journalEntry: {
         count: jest.fn().mockResolvedValue(0),
         findFirst: jest.fn().mockResolvedValue(null),
-        create: jest.fn().mockImplementation((args) => Promise.resolve({ id: 'new-je', ...args.data })),
+        create: jest
+          .fn()
+          .mockImplementation((args) =>
+            Promise.resolve({ id: 'new-je', ...args.data }),
+          ),
       },
       chartAccount: {
         findUniqueOrThrow: jest.fn(),
-        upsert: jest.fn().mockImplementation((args) => Promise.resolve({ id: args.where.tenantId_code.code, ...args.create })),
+        upsert: jest
+          .fn()
+          .mockImplementation((args) =>
+            Promise.resolve({
+              id: args.where.tenantId_code.code,
+              ...args.create,
+            }),
+          ),
       },
     };
 
@@ -59,9 +70,9 @@ describe('Accounting Correctness Hardening', () => {
         ],
       };
 
-      await expect(service.postManualJournal(unbalancedInput, authContext, mockPrisma)).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(
+        service.postManualJournal(unbalancedInput, authContext, mockPrisma),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('should reject a journal with only one line', async () => {
@@ -75,9 +86,7 @@ describe('Accounting Correctness Hardening', () => {
         tenantId: 'tenant-1',
         entryDate: new Date(),
         narration: 'Single Line',
-        lines: [
-          { chartAccountId: 'acc-1', debit: 100, credit: 100 },
-        ],
+        lines: [{ chartAccountId: 'acc-1', debit: 100, credit: 100 }],
       };
 
       // Since postManualJournal converts this to ONE line with side DEBIT and amount 100,
@@ -86,14 +95,14 @@ describe('Accounting Correctness Hardening', () => {
       // But ensureBalanced is called after processing lines.
       // Let's adjust the test to use two lines that sum to 0 but are fewer than 2? No, that's impossible.
       // Wait, if I have TWO lines but they are both processed into the SAME line? No.
-      
+
       // Actually, let's just test that it fails balance check if only one side is provided.
       // And for "at least two lines", I'll add a test case that has one line that is somehow balanced?
       // Actually, postManualJournal ALWAYS creates lines.
-      
-      await expect(service.postManualJournal(singleLineInput, authContext, mockPrisma)).rejects.toThrow(
-        ConflictException,
-      );
+
+      await expect(
+        service.postManualJournal(singleLineInput, authContext, mockPrisma),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('should reject a journal with zero amounts', async () => {
@@ -113,9 +122,9 @@ describe('Accounting Correctness Hardening', () => {
         ],
       };
 
-      await expect(service.postManualJournal(zeroInput, authContext, mockPrisma)).rejects.toThrow(
-        /non-zero balanced amount/,
-      );
+      await expect(
+        service.postManualJournal(zeroInput, authContext, mockPrisma),
+      ).rejects.toThrow(/non-zero balanced amount/);
     });
 
     it('should accept a balanced journal with Decimal precision (0.1 + 0.2 = 0.3)', async () => {
@@ -130,12 +139,24 @@ describe('Accounting Correctness Hardening', () => {
         entryDate: new Date(),
         narration: 'Balanced Decimal',
         lines: [
-          { chartAccountId: 'acc-1', debit: new Prisma.Decimal('0.1').add('0.2'), credit: 0 },
-          { chartAccountId: 'acc-2', debit: 0, credit: new Prisma.Decimal('0.3') },
+          {
+            chartAccountId: 'acc-1',
+            debit: new Prisma.Decimal('0.1').add('0.2'),
+            credit: 0,
+          },
+          {
+            chartAccountId: 'acc-2',
+            debit: 0,
+            credit: new Prisma.Decimal('0.3'),
+          },
         ],
       };
 
-      const result = await service.postManualJournal(balancedInput, authContext, mockPrisma);
+      const result = await service.postManualJournal(
+        balancedInput,
+        authContext,
+        mockPrisma,
+      );
       expect(result).toBeDefined();
     });
   });
@@ -159,9 +180,9 @@ describe('Accounting Correctness Hardening', () => {
         ],
       };
 
-      await expect(service.postManualJournal(input, authContext, mockPrisma)).rejects.toThrow(
-        /closed fiscal period/,
-      );
+      await expect(
+        service.postManualJournal(input, authContext, mockPrisma),
+      ).rejects.toThrow(/closed fiscal period/);
     });
 
     it('should reject posting into a LOCKED fiscal period', async () => {
@@ -182,9 +203,9 @@ describe('Accounting Correctness Hardening', () => {
         ],
       };
 
-      await expect(service.postManualJournal(input, authContext, mockPrisma)).rejects.toThrow(
-        /locked for posting/,
-      );
+      await expect(
+        service.postManualJournal(input, authContext, mockPrisma),
+      ).rejects.toThrow(/locked for posting/);
     });
 
     it('should reject posting into a fiscal period where the fiscal year is CLOSED', async () => {
@@ -205,9 +226,9 @@ describe('Accounting Correctness Hardening', () => {
         ],
       };
 
-      await expect(service.postManualJournal(input, authContext, mockPrisma)).rejects.toThrow(
-        /closed fiscal year/,
-      );
+      await expect(
+        service.postManualJournal(input, authContext, mockPrisma),
+      ).rejects.toThrow(/closed fiscal year/);
     });
   });
 
@@ -234,11 +255,13 @@ describe('Accounting Correctness Hardening', () => {
         lines: [],
       };
 
-      mockPrisma.chartAccount.findUniqueOrThrow.mockResolvedValue({ id: 'cash-acc' });
+      mockPrisma.chartAccount.findUniqueOrThrow.mockResolvedValue({
+        id: 'cash-acc',
+      });
 
-      await expect(service.postFeePayment(input, authContext, mockPrisma)).rejects.toThrow(
-        /Source document already posted/,
-      );
+      await expect(
+        service.postFeePayment(input, authContext, mockPrisma),
+      ).rejects.toThrow(/Source document already posted/);
     });
   });
 });
