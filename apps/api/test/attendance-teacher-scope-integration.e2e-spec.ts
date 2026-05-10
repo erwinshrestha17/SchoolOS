@@ -22,7 +22,9 @@ describe('Attendance teacher scope integration', () => {
       { recordDeliveryRecords: jest.fn() } as unknown as CommunicationsService,
       auditService as unknown as AuditService,
       eventEmitter as unknown as EventEmitter2,
-      { getSetting: jest.fn().mockResolvedValue(24) } as unknown as SettingsService,
+      {
+        getSetting: jest.fn().mockResolvedValue(24),
+      } as unknown as SettingsService,
     );
     const teacher = createAuthContextMock({
       tenantId: 'tenant-attendance-scope',
@@ -52,10 +54,9 @@ describe('Attendance teacher scope integration', () => {
     expect(result.totals).toEqual(
       expect.objectContaining({ total: 2, late: 1, present: 1 }),
     );
-    expect(prisma.state.records.map((record: any) => record.studentId)).toEqual([
-      'student-1',
-      'student-2',
-    ]);
+    expect(prisma.state.records.map((record: any) => record.studentId)).toEqual(
+      ['student-1', 'student-2'],
+    );
     expect(eventEmitter.emit).toHaveBeenCalledWith(
       'attendance.student.late',
       expect.objectContaining({
