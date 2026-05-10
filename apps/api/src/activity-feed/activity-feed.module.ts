@@ -26,6 +26,11 @@ import { MediaAccessController } from './media-access.controller';
     }),
   ],
   controllers: [ActivityFeedController, MediaAccessController],
-  providers: [ActivityFeedService, ActivityMediaService],
+  providers: [
+    ActivityFeedService,
+    ActivityMediaService,
+    ActivityPostLifecycleService,
+    ActivityMediaProcessor,
+  ],
 })
 export class ActivityFeedModule {}
