@@ -26,6 +26,12 @@ type MockStateOwner = {
   __state: Record<string, Record<string, unknown>[]>;
 };
 
+type ExportPayload = {
+  rows?: Array<Record<string, unknown>>;
+  csv?: string;
+  issues?: Array<Record<string, unknown>>;
+};
+
 describe('Student Lifecycle Integration Depth (E2E)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -172,7 +178,7 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
     expectLifecycleAudit(student.id, 'transfer');
   });
 
-  it('excludes non-active lifecycle states from roster export while retaining active students', async () => {
+  it('preserves lifecycle status in roster export for active and non-active students', async () => {
     const active = await createStudent('Active', 'Roster');
     const transferred = await createStudent('Transferred', 'Roster');
     const inactive = await createStudent('Inactive', 'Roster');
@@ -199,9 +205,13 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
     );
 
     expect(roster).toContain(active.studentSystemId);
-    expect(roster).not.toContain(transferred.studentSystemId);
-    expect(roster).not.toContain(inactive.studentSystemId);
-    expect(roster).not.toContain(graduated.studentSystemId);
+    expect(roster).toContain(transferred.studentSystemId);
+    expect(roster).toContain(inactive.studentSystemId);
+    expect(roster).toContain(graduated.studentSystemId);
+    expect(roster).toContain(StudentLifecycleStatus.ACTIVE);
+    expect(roster).toContain(StudentLifecycleStatus.TRANSFERRED);
+    expect(roster).toContain(StudentLifecycleStatus.EXITED);
+    expect(roster).toContain(StudentLifecycleStatus.ALUMNI);
   });
 
   it('retains student documents and document history after lifecycle changes', async () => {
@@ -298,7 +308,10 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
     });
     expect(movedHistory).toEqual(
       expect.objectContaining({
-        studentId: target.id,
+        metadata: expect.objectContaining({
+          sourceStudentId: source.id,
+          targetStudentId: target.id,
+        }),
         reason: expect.stringContaining(source.studentSystemId),
       }),
     );
@@ -331,7 +344,7 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
     expect(targetAfter?.lifecycleStatus).toBe(StudentLifecycleStatus.ACTIVE);
   });
 
-  it('excludes archived and deleted students from iEMIS export', async () => {
+  it('marks archived and deleted students as non-exportable in iEMIS diagnostics', async () => {
     const active = await createStudent('Iemis', 'Active');
     const archived = await createStudent('Iemis', 'Archived');
     const deleted = await createStudent('Iemis', 'Deleted');
@@ -347,11 +360,25 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
       actor,
     );
 
-    const iemis = stringifyExport(await studentsService.exportIemis(actor));
+    const iemis = (await studentsService.exportIemis(actor)) as ExportPayload;
 
-    expect(iemis).toContain(active.studentSystemId);
-    expect(iemis).not.toContain(archived.studentSystemId);
-    expect(iemis).not.toContain(deleted.studentSystemId);
+    expect(stringifyExport(iemis)).toContain(active.studentSystemId);
+    expect(iemis.csv ?? '').not.toContain(archived.studentSystemId);
+    expect(iemis.csv ?? '').not.toContain(deleted.studentSystemId);
+    expect(iemis.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          studentSystemId: archived.studentSystemId,
+          field: 'lifecycleStatus',
+          message: 'Only active students are exportable to iEMIS',
+        }),
+        expect.objectContaining({
+          studentSystemId: deleted.studentSystemId,
+          field: 'lifecycleStatus',
+          message: 'Only active students are exportable to iEMIS',
+        }),
+      ]),
+    );
   });
 
   async function createStudent(
