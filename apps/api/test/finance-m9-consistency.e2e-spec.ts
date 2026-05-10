@@ -1,30 +1,43 @@
-import {
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
+  AccountingPeriodStatus,
   InvoiceStatus,
-  PaymentMethod,
+  JournalLineSide,
   JournalSourceType,
+  PaymentMethod,
   PaymentStatus,
   Prisma,
-  AccountingPeriodStatus,
-  JournalLineSide,
 } from '@prisma/client';
-import { FinanceService } from '../src/finance/finance.service';
 import { AccountingPostingService } from '../src/accounting/accounting-posting.service';
+import { AuditService } from '../src/audit/audit.service';
 import { AppModule } from '../src/app.module';
-import { AuthContext } from '../src/auth/auth.types';
+import { FinanceService } from '../src/finance/finance.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.service';
-import { AuditService } from '../src/audit/audit.service';
 import {
   createAuthContextMock,
   createPrismaMock,
-  PrismaMock,
   mockBullQueues,
+  PrismaMock,
 } from './test-helpers';
+
+type JournalCreateInput = {
+  data: {
+    tenantId: string;
+    sourceModule?: string | null;
+    sourceType?: JournalSourceType | null;
+    sourceId?: string | null;
+    postingType?: string | null;
+    reversalOfId?: string | null;
+    lines: {
+      create: Array<{
+        side: JournalLineSide;
+        amount: Prisma.Decimal | number | string;
+      }>;
+    };
+  };
+};
 
 describe('Finance + M9 Accounting Integration (E2E)', () => {
   let moduleRef: TestingModule;
@@ -39,16 +52,14 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
   beforeEach(async () => {
     prisma = createPrismaMock() as unknown as PrismaMock;
 
-    // Mock successful period check by default
-    (prisma.fiscalPeriod.findFirst as jest.Mock).mockResolvedValue({
-      id: 'p-open',
-      tenantId,
-      status: AccountingPeriodStatus.OPEN,
-      fiscalYearId: 'fy-2026',
-      fiscalYear: { status: 'OPEN', name: 'FY 2026' },
+    (prisma.fiscalPeriod.findFirst as jest.Mock).mockResolvedValue(
+      openFiscalPeriod(),
+    );
+    (prisma.fiscalYear.findFirst as jest.Mock).mockResolvedValue({
+      id: 'fy-2026',
+      status: 'OPEN',
     });
 
-    // Seed state
     prisma.__state.tenants.push({
       id: tenantId,
       name: 'Integration Test School',
@@ -62,27 +73,16 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
       firstNameEn: 'Integration',
       lastNameEn: 'Student',
     });
-    (prisma.fiscalYear.findFirst as jest.Mock).mockResolvedValue({
-      id: 'fy-2026',
-      status: 'OPEN',
-    });
 
-    // Mock chart accounts for posting
-    (prisma.chartAccount.findUnique as jest.Mock).mockImplementation((q) => {
-      const code = q.where?.tenantId_code?.code || '1010';
-      return Promise.resolve({
-        id: `acc-${code}`,
-        code,
-        tenantId,
-      });
-    });
-    (prisma.chartAccount.findUniqueOrThrow as jest.Mock).mockImplementation((q) => {
-      const code = q.where?.tenantId_code?.code || '1010';
-      return Promise.resolve({
-        id: `acc-${code}`,
-        code,
-        tenantId,
-      });
+    (prisma.chartAccount.findUnique as jest.Mock).mockImplementation((q) =>
+      Promise.resolve(chartAccountForCode(q.where?.tenantId_code?.code)),
+    );
+    (prisma.chartAccount.findUniqueOrThrow as jest.Mock).mockImplementation(
+      (q) => Promise.resolve(chartAccountForCode(q.where?.tenantId_code?.code)),
+    );
+    (prisma.tenant.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+      id: tenantId,
+      panNumber: 'PAN123',
     });
 
     const moduleBuilder = Test.createTestingModule({
@@ -107,292 +107,214 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
     await moduleRef?.close();
   });
 
-  describe('Posting Boundaries & Correctness', () => {
-    it('1. should post fee payment only through AccountingPostingService', async () => {
+  describe('Posting boundaries and correctness', () => {
+    it('posts fee payment through AccountingPostingService and creates one finance journal', async () => {
       const postingSpy = jest.spyOn(postingService, 'postFeePayment');
-      const directCreateSpy = jest.spyOn(prisma.journalEntry, 'create');
-
-      (prisma.invoice.findFirst as jest.Mock).mockResolvedValue({
-        id: 'inv-1',
-        tenantId,
-        totalAmount: new Prisma.Decimal(1000),
-        vatAmount: new Prisma.Decimal(0),
-        payments: [],
-        invoiceNumber: 'INV-001',
-        fiscalYear: '2026',
-        studentId: 'student-1',
-        lines: [
-          { id: 'l1', totalAmount: new Prisma.Decimal(1000), feeHead: { code: 'TUI' }, description: 'Tuition' }
-        ],
-      });
-
-      (prisma.tenant.findUniqueOrThrow as jest.Mock).mockResolvedValue({ id: tenantId, panNumber: 'PAN123' });
+      seedInvoice();
       (prisma.payment.create as jest.Mock).mockResolvedValue({ id: 'pay-1' });
 
-      await financeService.collectPayment(
-        {
-          invoiceId: 'inv-1',
-          amount: 1000,
-          method: PaymentMethod.CASH,
-        },
+      await collectCashPayment();
+
+      expect(postingSpy).toHaveBeenCalledTimes(1);
+      expect(postingSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId,
+          paymentId: 'pay-1',
+          invoiceNumber: 'INV-001',
+          paymentAmount: new Prisma.Decimal(1000),
+        }),
         actor,
+        expect.any(Object),
       );
 
-      expect(postingSpy).toHaveBeenCalled();
-      // Ensure that although journalEntry.create is called, it is called BY the posting service, 
-      // which we verify by checking the call stack if needed, but here we just ensure postFeePayment was the entry point.
-      // A stricter test would be to ensure FinanceService does not have direct access to journalEntry model if we used a real modular boundary, 
-      // but in this modular monolith, we check that the service method is used.
+      const journal = latestJournalCreateInput();
+      expect(journal.data).toEqual(
+        expect.objectContaining({
+          tenantId,
+          sourceModule: 'FINANCE',
+          sourceType: JournalSourceType.FEE_PAYMENT,
+          sourceId: 'pay-1',
+          postingType: 'RECEIPT',
+        }),
+      );
+      expect(prisma.journalEntry.create).toHaveBeenCalledTimes(1);
     });
 
-    it('2. should ensure posted journal is double-entry balanced', async () => {
-      // This is primarily tested in AccountingPostingService, but we verify it here via FinanceService call
-      (prisma.invoice.findFirst as jest.Mock).mockResolvedValue({
-        id: 'inv-1',
-        tenantId,
-        totalAmount: new Prisma.Decimal(1000),
-        vatAmount: new Prisma.Decimal(0),
-        payments: [],
-        invoiceNumber: 'INV-001',
-        fiscalYear: '2026',
-        studentId: 'student-1',
-        lines: [
-          { id: 'l1', totalAmount: new Prisma.Decimal(1000), feeHead: { code: 'TUI' }, description: 'Tuition' }
-        ],
-      });
-
-      (prisma.tenant.findUniqueOrThrow as jest.Mock).mockResolvedValue({ id: tenantId, panNumber: 'PAN123' });
+    it('creates a balanced double-entry journal for fee payment', async () => {
+      seedInvoice();
       (prisma.payment.create as jest.Mock).mockResolvedValue({ id: 'pay-1' });
 
-      await financeService.collectPayment(
-        {
-          invoiceId: 'inv-1',
-          amount: 1000,
-          method: PaymentMethod.CASH,
-        },
-        actor,
-      );
+      await collectCashPayment();
 
-      const journalCreateCall = (prisma.journalEntry.create as jest.Mock).mock.calls[0][0];
-      const lines = journalCreateCall.data.lines.create;
-      
-      const totalDebit = lines
-        .filter((l: any) => l.side === JournalLineSide.DEBIT)
-        .reduce((sum: Prisma.Decimal, l: any) => sum.add(l.amount), new Prisma.Decimal(0));
-      const totalCredit = lines
-        .filter((l: any) => l.side === JournalLineSide.CREDIT)
-        .reduce((sum: Prisma.Decimal, l: any) => sum.add(l.amount), new Prisma.Decimal(0));
+      const { totalDebit, totalCredit } = summarizeJournalLines(
+        latestJournalCreateInput().data.lines.create,
+      );
 
       expect(totalDebit.equals(totalCredit)).toBe(true);
-      expect(totalDebit.toNumber()).toBe(1000);
+      expect(totalDebit.equals(new Prisma.Decimal(1000))).toBe(true);
+      expect(totalCredit.equals(new Prisma.Decimal(1000))).toBe(true);
     });
 
-    it('3. should store payment source document linkage', async () => {
-      (prisma.invoice.findFirst as jest.Mock).mockResolvedValue({
-        id: 'inv-1',
-        tenantId,
-        totalAmount: new Prisma.Decimal(1000),
-        vatAmount: new Prisma.Decimal(0),
-        payments: [],
-        invoiceNumber: 'INV-001',
-        fiscalYear: '2026',
-        studentId: 'student-1',
-        lines: [{ id: 'l1', totalAmount: new Prisma.Decimal(1000), feeHead: { code: 'TUI' } }],
-      });
+    it('stores payment source document linkage on the posted journal', async () => {
+      seedInvoice();
       (prisma.payment.create as jest.Mock).mockResolvedValue({ id: 'pay-1' });
 
-      await financeService.collectPayment(
-        { invoiceId: 'inv-1', amount: 1000, method: PaymentMethod.CASH },
-        actor,
-      );
+      await collectCashPayment();
 
-      const journalCreateCall = (prisma.journalEntry.create as jest.Mock).mock.calls[0][0];
-      expect(journalCreateCall.data.sourceType).toBe(JournalSourceType.FEE_PAYMENT);
-      expect(journalCreateCall.data.sourceId).toBe('pay-1');
+      expect(latestJournalCreateInput().data).toEqual(
+        expect.objectContaining({
+          sourceType: JournalSourceType.FEE_PAYMENT,
+          sourceId: 'pay-1',
+        }),
+      );
     });
 
-    it('4. should prevent duplicate journal creation via idempotency key', async () => {
-      const existingPayment = {
+    it('returns existing idempotent payment without creating a duplicate journal', async () => {
+      seedInvoice();
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
         id: 'pay-existing',
         invoiceId: 'inv-1',
         amount: new Prisma.Decimal(1000),
         method: PaymentMethod.CASH,
         paidAt: new Date(),
         receipt: { receiptNumber: 'RCP-123' },
-      };
-
-      (prisma.invoice.findFirst as jest.Mock).mockResolvedValue({
-        id: 'inv-1',
-        tenantId,
-        totalAmount: new Prisma.Decimal(1000),
-        vatAmount: new Prisma.Decimal(0),
-        payments: [],
-        fiscalYear: '2026',
-        studentId: 'student-1',
-        lines: [{ id: 'l1', totalAmount: new Prisma.Decimal(1000), feeHead: { code: 'TUI' }, description: 'Tuition' }],
       });
-      
-      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(existingPayment);
 
-      const result = await financeService.collectPayment(
-        {
-          invoiceId: 'inv-1',
-          amount: 1000,
-          method: PaymentMethod.CASH,
-          idempotencyKey: 'idem-key-1',
-        },
-        actor,
-      );
+      const result = await collectCashPayment({ idempotencyKey: 'idem-key-1' });
 
       expect(result.paymentId).toBe('pay-existing');
       expect(prisma.payment.create).not.toHaveBeenCalled();
       expect(prisma.journalEntry.create).not.toHaveBeenCalled();
     });
 
-    it('5. should create reversal journal instead of mutating during payment reversal', async () => {
-      const payment = {
-        id: 'pay-1',
-        invoiceId: 'inv-1',
-        amount: new Prisma.Decimal(1000),
-        refunds: [],
-        receipt: { receiptNumber: 'RCP-1' },
-      };
-
-      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(payment);
-      (prisma.journalEntry.findFirst as jest.Mock).mockResolvedValue({
-        id: 'je-1',
-        entryNumber: 'JE-1',
-        lines: [
-          { chartAccountId: 'acc-cash', side: 'DEBIT', amount: new Prisma.Decimal(1000) },
-          { chartAccountId: 'acc-rev', side: 'CREDIT', amount: new Prisma.Decimal(1000) },
-        ],
+    it('rejects duplicate payment reference before journal posting', async () => {
+      seedInvoice();
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+        id: 'pay-with-reference',
+        referenceNumber: 'BANK-REF-001',
+        status: PaymentStatus.SUCCESS,
       });
+
+      await expect(
+        collectCashPayment({ referenceNumber: 'BANK-REF-001' }),
+      ).rejects.toThrow(/already been used/i);
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+      expect(prisma.journalEntry.create).not.toHaveBeenCalled();
+    });
+
+    it('creates reversal journal instead of mutating original posted journal', async () => {
+      seedPaymentForReversal();
+      seedOriginalPaymentJournal();
 
       await financeService.reversePayment('pay-1', { reason: 'Refund' }, actor);
 
-      // Verify original journal was NOT updated/deleted
       expect(prisma.journalEntry.update).not.toHaveBeenCalled();
       expect(prisma.journalEntry.delete).not.toHaveBeenCalled();
-
-      // Verify reversal entry was created
       expect(prisma.journalEntry.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
+            tenantId,
             reversalOfId: 'je-1',
             sourceType: JournalSourceType.REVERSAL,
+            sourceId: 'je-1',
+            postingType: 'REVERSAL',
           }),
         }),
       );
     });
 
-    it('6. should reject posting into CLOSED or LOCKED fiscal period', async () => {
-      // Mock period as CLOSED
-      (prisma.fiscalPeriod.findFirst as jest.Mock).mockResolvedValue({
-        id: 'p-closed',
-        status: AccountingPeriodStatus.CLOSED,
-      });
+    it.each([
+      AccountingPeriodStatus.CLOSED,
+      AccountingPeriodStatus.LOCKED,
+    ])(
+      'rejects fee payment posting into %s fiscal period',
+      async (status) => {
+        (prisma.fiscalPeriod.findFirst as jest.Mock).mockResolvedValue({
+          ...openFiscalPeriod(),
+          status,
+        });
+        seedInvoice();
+        (prisma.payment.create as jest.Mock).mockResolvedValue({ id: 'pay-1' });
 
-      (prisma.invoice.findFirst as jest.Mock).mockResolvedValue({
-        id: 'inv-1',
-        tenantId,
-        totalAmount: new Prisma.Decimal(1000),
-        vatAmount: new Prisma.Decimal(0),
-        payments: [],
-        fiscalYear: '2026',
-        studentId: 'student-1',
-        lines: [{ id: 'l1', totalAmount: new Prisma.Decimal(1000), feeHead: { code: 'TUI' }, description: 'Tuition' }],
-      });
+        await expect(collectCashPayment()).rejects.toThrow(
+          ConflictException,
+        );
+        expect(prisma.journalEntry.create).not.toHaveBeenCalled();
+      },
+    );
 
-      await expect(
-        financeService.collectPayment(
-          { invoiceId: 'inv-1', amount: 1000, method: PaymentMethod.CASH },
-          actor,
-        ),
-      ).rejects.toThrow(/closed/i);
-    });
-
-    it('7. should reject cross-tenant invoice access', async () => {
-      (prisma.invoice.findFirst as jest.Mock).mockResolvedValue(null); // Not found because of tenant filter
+    it('rejects cross-tenant invoice source access before payment or journal creation', async () => {
+      (prisma.invoice.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(
-        financeService.collectPayment(
-          { invoiceId: 'inv-other-tenant', amount: 1000, method: PaymentMethod.CASH },
-          actor,
-        ),
+        collectCashPayment({ invoiceId: 'inv-other-tenant' }),
       ).rejects.toThrow(NotFoundException);
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+      expect(prisma.journalEntry.create).not.toHaveBeenCalled();
     });
 
-    it('8. should write audit records for payment posting and reversal', async () => {
+    it('writes audit records for payment posting and reversal', async () => {
       const auditSpy = jest.spyOn(auditService, 'record');
-
-      (prisma.invoice.findFirst as jest.Mock).mockResolvedValue({
-        id: 'inv-1',
-        tenantId,
-        totalAmount: new Prisma.Decimal(1000),
-        vatAmount: new Prisma.Decimal(0),
-        payments: [],
-        studentId: 'student-1',
-        fiscalYear: '2026',
-        lines: [{ id: 'l1', totalAmount: new Prisma.Decimal(1000), feeHead: { code: 'TUI' } }],
-      });
+      seedInvoice();
       (prisma.payment.create as jest.Mock).mockResolvedValue({ id: 'pay-1' });
 
-      // Posting
-      await financeService.collectPayment(
-        { invoiceId: 'inv-1', amount: 1000, method: PaymentMethod.CASH },
-        actor,
-      );
-      expect(auditSpy).toHaveBeenCalledWith(expect.objectContaining({ action: 'post', resource: 'journal_entry' }));
+      await collectCashPayment();
 
-      // Reversal
-      (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
-        id: 'pay-1',
-        invoiceId: 'inv-1',
-        amount: new Prisma.Decimal(1000),
-        refunds: [],
-      });
-      (prisma.journalEntry.findFirst as jest.Mock).mockResolvedValue({
-        id: 'je-1',
-        lines: [{ chartAccountId: 'acc-1', side: 'DEBIT', amount: new Prisma.Decimal(1000) }],
-      });
+      expect(auditSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'post',
+          resource: 'journal_entry',
+          tenantId,
+          resourceId: expect.any(String),
+        }),
+      );
+
+      seedPaymentForReversal();
+      seedOriginalPaymentJournal();
 
       await financeService.reversePayment('pay-1', { reason: 'Test' }, actor);
-      expect(auditSpy).toHaveBeenCalledWith(expect.objectContaining({ action: 'reverse', resource: 'journal_entry' }));
+
+      expect(auditSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'reverse',
+          resource: 'journal_entry',
+          tenantId,
+          resourceId: expect.any(String),
+        }),
+      );
     });
   });
 
-  describe('Overpayment Protection', () => {
-    it('should reject payment if it exceeds remaining balance', async () => {
+  describe('Overpayment protection', () => {
+    it('rejects payment if it exceeds remaining balance', async () => {
       (prisma.invoice.findFirst as jest.Mock).mockResolvedValue({
         id: 'inv-1',
+        tenantId,
         totalAmount: new Prisma.Decimal(1000),
         payments: [{ amount: new Prisma.Decimal(800), refunds: [] }],
       });
 
       await expect(
-        financeService.collectPayment(
-          {
-            invoiceId: 'inv-1',
-            amount: 300, // 800 + 300 > 1000
-            method: PaymentMethod.CASH,
-          },
-          actor,
-        ),
+        collectCashPayment({ amount: 300 }),
       ).rejects.toThrow(/exceeds the remaining balance/i);
     });
   });
 
-  describe('Cashier Close & Reconciliation', () => {
-    it('should finalize cashier close and verify consistency', async () => {
+  describe('Cashier close and reconciliation', () => {
+    it('finalizes cashier close and verifies finance/accounting consistency', async () => {
       (prisma.cashierClose.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.cashierClose.create as jest.Mock).mockResolvedValue({
         id: 'close-1',
         closeNumber: 'CC-001',
       });
 
-      // Mock buildCashierCloseSummary return
       jest
-        .spyOn(financeService as any, 'buildCashierCloseSummary')
+        .spyOn(
+          financeService as unknown as {
+            buildCashierCloseSummary: FinanceService['buildCashierCloseSummary'];
+          },
+          'buildCashierCloseSummary',
+        )
         .mockResolvedValue({
           grossCollected: 1000,
           totalRefunded: 0,
@@ -400,7 +322,17 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
           expectedCashAmount: 1000,
           paymentCount: 1,
           refundCount: 0,
-          methodBreakdown: {},
+          methodBreakdown: [],
+          firstReceiptNumber: 'RCP-001',
+          lastReceiptNumber: 'RCP-001',
+          openedAt: new Date(Date.now() - 3600000),
+          closedAt: new Date(),
+          collectorUserId: null,
+          paymentMethod: null,
+          actualCashAmount: null,
+          varianceAmount: null,
+          varianceReason: null,
+          denominationBreakdown: null,
         });
 
       const close = await financeService.finalizeCashierClose(
@@ -415,7 +347,6 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
       expect(close).toBeDefined();
       expect(prisma.cashierClose.create).toHaveBeenCalled();
 
-      // Test Consistency Check
       (prisma.payment.findMany as jest.Mock).mockResolvedValue([
         { amount: new Prisma.Decimal(1000), status: PaymentStatus.SUCCESS },
       ]);
@@ -434,4 +365,123 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
       expect(consistency.journalTotal).toBe(1000);
     });
   });
+
+  function seedInvoice() {
+    (prisma.invoice.findFirst as jest.Mock).mockResolvedValue({
+      id: 'inv-1',
+      tenantId,
+      totalAmount: new Prisma.Decimal(1000),
+      vatAmount: new Prisma.Decimal(0),
+      payments: [],
+      invoiceNumber: 'INV-001',
+      fiscalYear: '2026',
+      studentId: 'student-1',
+      lines: [
+        {
+          id: 'line-1',
+          totalAmount: new Prisma.Decimal(1000),
+          feeHead: { code: 'TUI' },
+          description: 'Tuition',
+        },
+      ],
+    });
+  }
+
+  function seedPaymentForReversal() {
+    (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
+      id: 'pay-1',
+      invoiceId: 'inv-1',
+      amount: new Prisma.Decimal(1000),
+      refunds: [],
+      receipt: { receiptNumber: 'RCP-1' },
+    });
+  }
+
+  function seedOriginalPaymentJournal() {
+    (prisma.journalEntry.findFirst as jest.Mock).mockResolvedValue({
+      id: 'je-1',
+      entryNumber: 'JE-1',
+      lines: [
+        {
+          chartAccountId: 'acc-cash',
+          side: JournalLineSide.DEBIT,
+          amount: new Prisma.Decimal(1000),
+        },
+        {
+          chartAccountId: 'acc-rev',
+          side: JournalLineSide.CREDIT,
+          amount: new Prisma.Decimal(1000),
+        },
+      ],
+    });
+  }
+
+  async function collectCashPayment(
+    overrides: Partial<{
+      invoiceId: string;
+      amount: number;
+      idempotencyKey: string;
+      referenceNumber: string;
+    }> = {},
+  ) {
+    return financeService.collectPayment(
+      {
+        invoiceId: overrides.invoiceId ?? 'inv-1',
+        amount: overrides.amount ?? 1000,
+        method: PaymentMethod.CASH,
+        ...(overrides.idempotencyKey
+          ? { idempotencyKey: overrides.idempotencyKey }
+          : {}),
+        ...(overrides.referenceNumber
+          ? { referenceNumber: overrides.referenceNumber }
+          : {}),
+      },
+      actor,
+    );
+  }
+
+  function latestJournalCreateInput() {
+    const calls = (prisma.journalEntry.create as jest.Mock).mock.calls;
+    return calls[calls.length - 1][0] as JournalCreateInput;
+  }
 });
+
+function openFiscalPeriod() {
+  return {
+    id: 'p-open',
+    tenantId: 'tenant-finance-integration',
+    status: AccountingPeriodStatus.OPEN,
+    fiscalYearId: 'fy-2026',
+    fiscalYear: { status: 'OPEN', name: 'FY 2026' },
+  };
+}
+
+function chartAccountForCode(code = '1010') {
+  return {
+    id: `acc-${code}`,
+    code,
+    tenantId: 'tenant-finance-integration',
+  };
+}
+
+function summarizeJournalLines(
+  lines: Array<{
+    side: JournalLineSide;
+    amount: Prisma.Decimal | number | string;
+  }>,
+) {
+  return lines.reduce(
+    (summary, line) => {
+      const amount = new Prisma.Decimal(line.amount);
+      if (line.side === JournalLineSide.DEBIT) {
+        return { ...summary, totalDebit: summary.totalDebit.add(amount) };
+      }
+
+      return { ...summary, totalCredit: summary.totalCredit.add(amount) };
+    },
+    {
+      totalDebit: new Prisma.Decimal(0),
+      totalCredit: new Prisma.Decimal(0),
+    },
+  );
+}
