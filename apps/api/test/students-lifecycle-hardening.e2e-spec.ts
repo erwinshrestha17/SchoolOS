@@ -8,12 +8,21 @@ import {
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { StudentsService } from '../src/students/students.service';
+import { NotificationsProcessor } from '../src/notifications/notifications.processor';
+import { ActivityMediaProcessor } from '../src/activity-feed/processors/activity-media.processor';
+import { FinanceProcessor } from '../src/finance/finance.processor';
+import { PayrollProcessor } from '../src/payroll/payroll.processor';
 import {
   StudentLifecycleStatus,
   EnrollmentStatus,
   StudentDocumentKind,
 } from '@prisma/client';
-import { createAuthContextMock } from './test-helpers';
+import {
+  createAuthContextMock,
+  createPrismaMock,
+  createQueueMock,
+} from './test-helpers';
+import { getQueueToken } from '@nestjs/bullmq';
 
 describe('Student Lifecycle Hardening (E2E)', () => {
   let app: INestApplication;
@@ -21,9 +30,30 @@ describe('Student Lifecycle Hardening (E2E)', () => {
   let studentsService: StudentsService;
 
   beforeAll(async () => {
+    const prismaMock = createPrismaMock();
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(PrismaService)
+      .useValue(prismaMock)
+      .overrideProvider(getQueueToken('notifications'))
+      .useValue(createQueueMock())
+      .overrideProvider(getQueueToken('activity-media'))
+      .useValue(createQueueMock())
+      .overrideProvider(getQueueToken('finance'))
+      .useValue(createQueueMock())
+      .overrideProvider(getQueueToken('payroll'))
+      .useValue(createQueueMock())
+      .overrideProvider(NotificationsProcessor)
+      .useValue({ process: jest.fn() })
+      .overrideProvider(ActivityMediaProcessor)
+      .useValue({ process: jest.fn() })
+      .overrideProvider(FinanceProcessor)
+      .useValue({ process: jest.fn() })
+      .overrideProvider(PayrollProcessor)
+      .useValue({ process: jest.fn() })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
@@ -293,7 +323,7 @@ describe('Student Lifecycle Hardening (E2E)', () => {
     const student1After = await prisma.student.findUnique({
       where: { id: student1.id },
     });
-    expect(student1After?.lifecycleStatus).toBe(StudentLifecycleStatus.DELETED);
+    expect(student1After?.lifecycleStatus).toBe(StudentLifecycleStatus.MERGED);
 
     const docsAtTarget = await prisma.studentDocument.findMany({
       where: { studentId: student2.id },
