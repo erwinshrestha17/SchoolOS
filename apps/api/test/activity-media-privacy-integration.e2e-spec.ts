@@ -57,6 +57,14 @@ type ActivityAttachmentRecord = {
   activityPost?: ActivityPostRecord;
 };
 
+type ActivityPostLifecycleRow = {
+  id: string;
+  tenantId: string;
+  createdById: string;
+  moderationStatus: string;
+  softDeletedAt: Date | null;
+};
+
 type ActivityPrivacyState = {
   classes: Record<string, unknown>[];
   sections: Record<string, unknown>[];
@@ -507,13 +515,17 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
     rawQueries: [],
   };
 
+  const queryRawMock: jest.Mock<Promise<ActivityPostLifecycleRow[]>, unknown[]> =
+    jest.fn(async () => []);
+
   const prisma = {
     __state: state,
     class: {
       findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) =>
         state.classes.find(
           (classroom) =>
-            classroom.id === q.where?.id && classroom.tenantId === q.where?.tenantId,
+            classroom.id === q.where?.id &&
+            classroom.tenantId === q.where?.tenantId,
         ) ?? null,
       ),
     },
@@ -521,7 +533,8 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
       findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) =>
         state.sections.find(
           (section) =>
-            section.id === q.where?.id && section.tenantId === q.where?.tenantId,
+            section.id === q.where?.id &&
+            section.tenantId === q.where?.tenantId,
         ) ?? null,
       ),
     },
@@ -548,7 +561,8 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
       findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) =>
         state.students.find(
           (student) =>
-            student.id === q.where?.id && student.tenantId === q.where?.tenantId,
+            student.id === q.where?.id &&
+            student.tenantId === q.where?.tenantId,
         ) ?? null,
       ),
     },
@@ -556,66 +570,83 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
       findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) =>
         state.guardians.find(
           (guardian) =>
-            guardian.tenantId === q.where?.tenantId && guardian.userId === q.where?.userId,
+            guardian.tenantId === q.where?.tenantId &&
+            guardian.userId === q.where?.userId,
         ) ?? null,
       ),
     },
     activityPost: {
-      create: jest.fn(async (q: { data: Record<string, unknown>; include?: unknown }) => {
-        const data = q.data;
-        const attachmentsCreate = ((data.attachments as { create?: Record<string, unknown>[] } | undefined)
-          ?.create ?? []) as Record<string, unknown>[];
-        const studentTagsCreate = ((data.studentTags as { create?: Record<string, unknown>[] } | undefined)
-          ?.create ?? []) as Record<string, unknown>[];
-        const postId = `post-${state.activityPosts.length + 1}`;
-        const attachments = attachmentsCreate.map((attachment, index) => ({
-          id: `attachment-${postId}-${index + 1}`,
-          activityPostId: postId,
-          ...attachment,
-        })) as ActivityAttachmentRecord[];
-        const post: ActivityPostRecord = {
-          id: postId,
-          tenantId: data.tenantId as string,
-          classId: data.classId as string,
-          sectionId: (data.sectionId as string | null) ?? null,
-          createdById: data.createdById as string,
-          title: data.title as string,
-          caption: data.caption as string,
-          category: data.category as ActivityCategory,
-          audienceType: data.audienceType as AudienceType,
-          publishedAt: data.publishedAt as Date,
-          createdAt: new Date(),
-          moderationStatus: 'APPROVED',
-          softDeletedAt: null,
-          attachments,
-          studentTags: studentTagsCreate.map((tag) => ({
-            tenantId: tag.tenantId as string,
-            studentId: tag.studentId as string,
-          })),
-          reactions: [],
-        };
-        for (const attachment of attachments) {
-          attachment.activityPost = post;
-        }
-        state.activityPosts.push(post);
-        state.activityAttachments.push(...attachments);
-        return post;
-      }),
+      create: jest.fn(
+        async (q: { data: Record<string, unknown>; include?: unknown }) => {
+          const data = q.data;
+          const attachmentsCreate = ((data.attachments as
+            | { create?: Record<string, unknown>[] }
+            | undefined)?.create ?? []) as Record<string, unknown>[];
+          const studentTagsCreate = ((data.studentTags as
+            | { create?: Record<string, unknown>[] }
+            | undefined)?.create ?? []) as Record<string, unknown>[];
+          const postId = `post-${state.activityPosts.length + 1}`;
+          const attachments = attachmentsCreate.map((attachment, index) => ({
+            id: `attachment-${postId}-${index + 1}`,
+            activityPostId: postId,
+            ...attachment,
+          })) as ActivityAttachmentRecord[];
+          const post: ActivityPostRecord = {
+            id: postId,
+            tenantId: data.tenantId as string,
+            classId: data.classId as string,
+            sectionId: (data.sectionId as string | null) ?? null,
+            createdById: data.createdById as string,
+            title: data.title as string,
+            caption: data.caption as string,
+            category: data.category as ActivityCategory,
+            audienceType: data.audienceType as AudienceType,
+            publishedAt: data.publishedAt as Date,
+            createdAt: new Date(),
+            moderationStatus: 'APPROVED',
+            softDeletedAt: null,
+            attachments,
+            studentTags: studentTagsCreate.map((tag) => ({
+              tenantId: tag.tenantId as string,
+              studentId: tag.studentId as string,
+            })),
+            reactions: [],
+          };
+          for (const attachment of attachments) {
+            attachment.activityPost = post;
+          }
+          state.activityPosts.push(post);
+          state.activityAttachments.push(...attachments);
+          return post;
+        },
+      ),
       findMany: jest.fn(async (q: { where?: Record<string, unknown> }) => {
         const where = q.where ?? {};
         return state.activityPosts
           .filter((post) => post.tenantId === where.tenantId)
           .filter((post) => !where.classId || post.classId === where.classId)
           .filter((post) => !where.sectionId || post.sectionId === where.sectionId)
-          .filter((post) => matchesVisibility(post, where.OR as Record<string, unknown>[] | undefined))
+          .filter((post) =>
+            matchesVisibility(
+              post,
+              where.OR as Record<string, unknown>[] | undefined,
+            ),
+          )
           .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       }),
       findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) => {
         const where = q.where ?? {};
         return (
           state.activityPosts
-            .filter((post) => post.id === where.id && post.tenantId === where.tenantId)
-            .find((post) => matchesVisibility(post, where.OR as Record<string, unknown>[] | undefined)) ?? null
+            .filter(
+              (post) => post.id === where.id && post.tenantId === where.tenantId,
+            )
+            .find((post) =>
+              matchesVisibility(
+                post,
+                where.OR as Record<string, unknown>[] | undefined,
+              ),
+            ) ?? null
         );
       }),
     },
@@ -626,31 +657,35 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
         );
         return attachment ? { ...attachment, activityPost: attachment.activityPost } : null;
       }),
-      updateMany: jest.fn(async (q: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
-        let count = 0;
-        for (const attachment of state.activityAttachments) {
-          if (
-            attachment.id === q.where.id &&
-            attachment.tenantId === q.where.tenantId &&
-            attachment.fileAssetId === q.where.fileAssetId
-          ) {
-            Object.assign(attachment, q.data);
-            count += 1;
+      updateMany: jest.fn(
+        async (q: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+          let count = 0;
+          for (const attachment of state.activityAttachments) {
+            if (
+              attachment.id === q.where.id &&
+              attachment.tenantId === q.where.tenantId &&
+              attachment.fileAssetId === q.where.fileAssetId
+            ) {
+              Object.assign(attachment, q.data);
+              count += 1;
+            }
           }
-        }
-        return { count };
-      }),
+          return { count };
+        },
+      ),
     },
     activityReaction: {
       groupBy: jest.fn(async () => []),
     },
     fileAsset: {
-      update: jest.fn(async (q: { where: { id: string }; data: Record<string, unknown> }) => {
-        state.fileAssets.push({ id: q.where.id, ...q.data });
-        return { id: q.where.id, ...q.data };
-      }),
+      update: jest.fn(
+        async (q: { where: { id: string }; data: Record<string, unknown> }) => {
+          state.fileAssets.push({ id: q.where.id, ...q.data });
+          return { id: q.where.id, ...q.data };
+        },
+      ),
     },
-    $queryRaw: jest.fn(async () => []),
+    $queryRaw: queryRawMock,
   };
 
   prisma.$queryRaw.mockImplementation(async (...args: unknown[]) => {
@@ -663,11 +698,7 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
       return [];
     }
 
-    if (sqlText.includes('softDeletedAt') && sqlText.includes('moderationStatus')) {
-      return [toLifecycleRow(post)];
-    }
-
-    if (sqlText.includes('UPDATE') && sqlText.includes('soft_delete')) {
+    if (sqlText.includes('UPDATE') && sqlText.includes('softDeletedAt')) {
       post.softDeletedAt = new Date();
       post.moderationStatus = 'REJECTED';
       return [toLifecycleRow(post)];
@@ -712,7 +743,7 @@ function matchesVisibility(
   });
 }
 
-function toLifecycleRow(post: ActivityPostRecord) {
+function toLifecycleRow(post: ActivityPostRecord): ActivityPostLifecycleRow {
   return {
     id: post.id,
     tenantId: post.tenantId,
