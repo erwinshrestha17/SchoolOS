@@ -128,7 +128,9 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
   });
 
   it('approves a payroll run without creating accounting journals', async () => {
-    prisma.__currentRun = buildPayrollRun({ status: PayrollRunStatus.GENERATED });
+    prisma.__currentRun = buildPayrollRun({
+      status: PayrollRunStatus.GENERATED,
+    });
 
     const approved = await payrollService.approvePayrollRun('run-1', actor);
 
@@ -150,8 +152,13 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
   });
 
   it('posts approved payroll through AccountingPostingService as a balanced accrual journal', async () => {
-    const postingSpy = jest.spyOn(accountingPostingService, 'postPayrollAccrual');
-    prisma.__currentRun = buildPayrollRun({ status: PayrollRunStatus.APPROVED });
+    const postingSpy = jest.spyOn(
+      accountingPostingService,
+      'postPayrollAccrual',
+    );
+    prisma.__currentRun = buildPayrollRun({
+      status: PayrollRunStatus.APPROVED,
+    });
 
     const posted = await payrollService.postPayrollRun('run-1', actor);
 
@@ -223,19 +230,21 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
     expect(prisma.journalEntry.create).not.toHaveBeenCalled();
   });
 
-  it.each([
-    AccountingPeriodStatus.CLOSED,
-    AccountingPeriodStatus.LOCKED,
-  ])('rejects payroll posting into %s fiscal period', async (status) => {
-    prisma.__currentRun = buildPayrollRun({ status: PayrollRunStatus.APPROVED });
-    prisma.__periodStatus = status;
+  it.each([AccountingPeriodStatus.CLOSED, AccountingPeriodStatus.LOCKED])(
+    'rejects payroll posting into %s fiscal period',
+    async (status) => {
+      prisma.__currentRun = buildPayrollRun({
+        status: PayrollRunStatus.APPROVED,
+      });
+      prisma.__periodStatus = status;
 
-    await expect(payrollService.postPayrollRun('run-1', actor)).rejects.toThrow(
-      ConflictException,
-    );
-    expect(prisma.journalEntry.create).not.toHaveBeenCalled();
-    expect(prisma.__tx?.payrollRun.update).not.toHaveBeenCalled();
-  });
+      await expect(
+        payrollService.postPayrollRun('run-1', actor),
+      ).rejects.toThrow(ConflictException);
+      expect(prisma.journalEntry.create).not.toHaveBeenCalled();
+      expect(prisma.__tx?.payrollRun.update).not.toHaveBeenCalled();
+    },
+  );
 
   it('marks posted payroll as paid through a balanced disbursement journal', async () => {
     const disbursementSpy = jest.spyOn(
@@ -412,8 +421,9 @@ function buildPrismaMock(): PayrollM9PrismaMock {
       findFirst: jest.fn(() => Promise.resolve(null)),
     },
     chartAccount: {
-      findUnique: jest.fn((q: { where?: { tenantId_code?: { code?: string } } }) =>
-        Promise.resolve(chartAccountForCode(q.where?.tenantId_code?.code)),
+      findUnique: jest.fn(
+        (q: { where?: { tenantId_code?: { code?: string } } }) =>
+          Promise.resolve(chartAccountForCode(q.where?.tenantId_code?.code)),
       ),
       findUniqueOrThrow: jest.fn(
         (q: { where?: { tenantId_code?: { code?: string } } }) =>
