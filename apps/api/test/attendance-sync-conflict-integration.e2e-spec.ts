@@ -142,6 +142,7 @@ function makeSyncPrisma() {
         syncStatus: AttendanceSyncStatus.ACCEPTED,
         syncAttemptCount: 1,
         serverReceivedAt: new Date('2026-05-10T08:01:00.000Z'),
+        createdAt: new Date('2026-05-10T08:01:00.000Z'),
         rejectionReason: null,
         submittedById: 'teacher-user',
         payload: {},
