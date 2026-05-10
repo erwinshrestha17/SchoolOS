@@ -893,8 +893,8 @@ function buildService(options: {
     },
     staff: {
       count: jest.fn().mockResolvedValue(1),
-      findUnique: jest.fn().mockResolvedValue(null),
-      findFirst: jest.fn().mockResolvedValue(null),
+      findUnique: jest.fn().mockResolvedValue({ id: 'staff-1', userId: 'user-1' }),
+      findFirst: jest.fn().mockResolvedValue({ id: 'staff-1', userId: 'user-1' }),
     },
     staffAttendance: {
       upsert: jest.fn().mockResolvedValue({}),
@@ -905,6 +905,10 @@ function buildService(options: {
       findMany: jest
         .fn()
         .mockResolvedValue(options.approvedLeaveRequests ?? []),
+    },
+    subjectTeacherAssignment: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'assign-1' }),
+      findMany: jest.fn().mockResolvedValue([{ id: 'assign-1' }]),
     },
     $transaction: jest.fn().mockImplementation(async (input: unknown) => {
       if (Array.isArray(input)) {

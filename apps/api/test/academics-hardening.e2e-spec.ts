@@ -12,6 +12,8 @@ import { AuthContext } from '../src/auth/auth.types';
 import { createPrismaMock, PrismaMock } from './test-helpers';
 import { CommunicationsService } from '../src/communications/communications.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { FinanceService } from '../src/finance/finance.service';
+import { SettingsService } from '../src/settings/settings.service';
 
 describe('Academics Hardening (Service Layer)', () => {
   let academicsService: AcademicsService;
@@ -41,6 +43,21 @@ describe('Academics Hardening (Service Layer)', () => {
         { provide: AuditService, useValue: { record: jest.fn() } },
         { provide: CommunicationsService, useValue: {} },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        {
+          provide: FinanceService,
+          useValue: {
+            getStudentFeeLedger: jest.fn().mockResolvedValue({
+              outstandingBalance: 0,
+            }),
+          },
+        },
+        {
+          provide: SettingsService,
+          useValue: {
+            get: jest.fn(),
+            getTenantSettings: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

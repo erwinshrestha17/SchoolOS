@@ -1823,6 +1823,7 @@ model JournalEntry {
 
   @@unique([tenantId, fiscalYearId, entryNumber])
   @@unique([tenantId, sourceModule, sourceType, sourceId, postingType])
+  @@index([tenantId, status, entryDate])
   @@index([tenantId, reversalOfId])
   @@index([tenantId, fiscalYearId])
   @@index([tenantId, fiscalPeriodId])

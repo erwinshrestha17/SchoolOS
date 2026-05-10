@@ -126,6 +126,22 @@ describe('accounting reversals', () => {
   });
 });
 
+describe('AccountingService Immutability', () => {
+  it('blocks direct updates to journal entries', async () => {
+    const { service } = buildService({});
+    await expect(service.updateJournalEntry()).rejects.toThrow(
+      'Journal entries are immutable. Use correction or reversal workflows.',
+    );
+  });
+
+  it('blocks direct deletions of journal entries', async () => {
+    const { service } = buildService({});
+    await expect(service.deleteJournalEntry()).rejects.toThrow(
+      'Journal entries are immutable and cannot be deleted once posted.',
+    );
+  });
+});
+
 describe('fiscal period status updates', () => {
   it('allows locking a period without a reason', async () => {
     const period = { id: 'p1', status: 'OPEN', label: '2026-04' };
@@ -213,10 +229,15 @@ function buildService(options: {
 }) {
   const prisma = {
     journalEntry: {
-      findFirst: jest
-        .fn()
-        .mockResolvedValueOnce(options.original)
-        .mockResolvedValueOnce(options.existingReversal),
+      findFirst: jest.fn().mockImplementation(({ where }) => {
+        if (where.id === (options.original as any)?.id || where.id === 'journal-original') {
+          return Promise.resolve(options.original);
+        }
+        if (where.reversalOfId) {
+          return Promise.resolve(options.existingReversal);
+        }
+        return Promise.resolve(null);
+      }),
       count: jest.fn().mockResolvedValue(options.journalCount ?? 0),
       create: jest.fn().mockResolvedValue(options.createdReversal),
     },

@@ -33,7 +33,9 @@ describe('Student Lifecycle Hardening (E2E)', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   const tenantId = 'test-tenant-lifecycle';
@@ -66,6 +68,8 @@ describe('Student Lifecycle Hardening (E2E)', () => {
   });
 
   afterEach(async () => {
+    if (!prisma) return;
+
     // Clean up
     await prisma.studentLifecycleTransition.deleteMany({ where: { tenantId } });
     await prisma.studentDocumentHistory.deleteMany({ where: { tenantId } });

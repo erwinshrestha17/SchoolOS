@@ -297,6 +297,7 @@ export class AccountingPostingService {
         entryNumber: await this.generateJournalEntryNumber(
           tx,
           input.tenantId,
+          period?.fiscalYearId ?? null,
           entryDate,
         ),
         entryDate,
@@ -400,6 +401,7 @@ export class AccountingPostingService {
         entryNumber: await this.generateJournalEntryNumber(
           tx,
           input.tenantId,
+          period?.fiscalYearId ?? null,
           entryDate,
         ),
         entryDate,
@@ -484,6 +486,7 @@ export class AccountingPostingService {
         entryNumber: await this.generateJournalEntryNumber(
           tx,
           input.tenantId,
+          period?.fiscalYearId ?? null,
           input.entryDate,
         ),
         entryDate: input.entryDate,
@@ -649,6 +652,7 @@ export class AccountingPostingService {
         entryNumber: await this.generateJournalEntryNumber(
           tx,
           input.tenantId,
+          period?.fiscalYearId ?? null,
           input.reversalDate,
         ),
         entryDate: input.reversalDate,
@@ -756,6 +760,7 @@ export class AccountingPostingService {
         entryNumber: await this.generateJournalEntryNumber(
           tx,
           input.tenantId,
+          period?.fiscalYearId ?? null,
           entryDate,
         ),
         entryDate,
@@ -867,6 +872,7 @@ export class AccountingPostingService {
         entryNumber: await this.generateJournalEntryNumber(
           tx,
           input.tenantId,
+          period?.fiscalYearId ?? null,
           entryDate,
         ),
         entryDate,
@@ -955,6 +961,7 @@ export class AccountingPostingService {
         entryNumber: await this.generateJournalEntryNumber(
           tx,
           input.tenantId,
+          period?.fiscalYearId ?? null,
           entryDate,
         ),
         entryDate,
@@ -1041,6 +1048,7 @@ export class AccountingPostingService {
         entryNumber: await this.generateJournalEntryNumber(
           tx,
           input.tenantId,
+          period?.fiscalYearId ?? null,
           entryDate,
         ),
         entryDate,
@@ -1141,6 +1149,7 @@ export class AccountingPostingService {
         entryNumber: await this.generateJournalEntryNumber(
           tx,
           input.tenantId,
+          period?.fiscalYearId ?? null,
           entryDate,
         ),
         entryDate,
@@ -1226,6 +1235,7 @@ export class AccountingPostingService {
         entryNumber: await this.generateJournalEntryNumber(
           tx,
           input.tenantId,
+          period?.fiscalYearId ?? null,
           entryDate,
         ),
         entryDate,
@@ -1348,20 +1358,14 @@ export class AccountingPostingService {
   private async generateJournalEntryNumber(
     tx: PostingClient,
     tenantId: string,
+    fiscalYearId: string | null,
     entryDate: Date = new Date(),
   ) {
     const year = entryDate.getUTCFullYear();
-
-    // We use a transaction-safe way to get the count by using a row-level lock or just a robust retry.
-    // For now, we will use a more descriptive prefix and ensure we include the year.
-    // In a high-concurrency production system, this should ideally use a Postgres SEQUENCE.
     const count = await tx.journalEntry.count({
       where: {
         tenantId,
-        entryDate: {
-          gte: new Date(Date.UTC(year, 0, 1)),
-          lte: new Date(Date.UTC(year, 11, 31, 23, 59, 59)),
-        },
+        fiscalYearId,
       },
     });
 
@@ -1407,29 +1411,29 @@ export class AccountingPostingService {
         const amount = toDecimal(line.amount);
 
         if (line.side === JournalLineSide.DEBIT) {
-          return { ...acc, debit: toDecimal(acc.debit).add(amount) };
+          return { ...acc, debit: acc.debit.add(amount) };
         }
 
-        return { ...acc, credit: toDecimal(acc.credit).add(amount) };
+        return { ...acc, credit: acc.credit.add(amount) };
       },
       { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(0) },
     );
 
-    if (decimalText(totals.debit) !== decimalText(totals.credit)) {
+    if (!totals.debit.equals(totals.credit)) {
       throw new ConflictException(
-        `Accounting posting must be balanced. Total Debit: ${decimalText(totals.debit)}, Total Credit: ${decimalText(totals.credit)}`,
+        `Journal entry is not balanced. Total Debit: ${totals.debit.toFixed(2)}, Total Credit: ${totals.credit.toFixed(2)}. Difference: ${totals.debit.sub(totals.credit).toFixed(2)}`,
       );
     }
 
     if (totals.debit.lte(0) && totals.credit.lte(0)) {
       throw new ConflictException(
-        'Accounting posting must have non-zero amounts',
+        'Journal entry must have a non-zero balanced amount.',
       );
     }
 
-    if (lines.length === 0) {
+    if (lines.length < 2) {
       throw new ConflictException(
-        'Accounting posting must have at least one line',
+        'Journal entry must have at least two lines for double-entry.',
       );
     }
   }

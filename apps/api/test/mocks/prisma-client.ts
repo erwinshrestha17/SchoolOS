@@ -7,7 +7,8 @@ class Decimal {
   }
 
   eq(value: number | string | Decimal) {
-    return this.numericValue === decimalToNumber(value);
+    const other = decimalToNumber(value);
+    return Math.abs(this.numericValue - other) < 1e-10;
   }
 
   equals(value: number | string | Decimal) {
@@ -56,6 +57,10 @@ class Decimal {
 
   toString() {
     return String(this.numericValue);
+  }
+
+  toFixed(places: number) {
+    return this.numericValue.toFixed(places);
   }
 
   valueOf() {
