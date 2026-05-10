@@ -78,6 +78,7 @@ export class PrismaClient {
 
 export const Prisma = {
   Decimal,
+  sql: (strings: TemplateStringsArray, ...values: any[]) => ({ strings, values }),
 };
 
 export const Mode = {

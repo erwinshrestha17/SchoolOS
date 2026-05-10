@@ -151,6 +151,11 @@ export const permissionCatalog = [
     description: 'Read staff accounts and profiles inside a tenant',
   },
   {
+    resource: 'staff',
+    action: 'update',
+    description: 'Update staff accounts and profiles inside a tenant',
+  },
+  {
     resource: 'academics',
     action: 'manage',
     description: 'Manage subjects, exams, CAS, marks, and report cards',
@@ -368,6 +373,11 @@ export const permissionCatalog = [
     description: 'Preview and finalize cashier close snapshots',
   },
   {
+    resource: 'payments',
+    action: 'reverse',
+    description: 'Reverse collected payments',
+  },
+  {
     resource: 'receipts',
     action: 'read',
     description: 'Read payment receipts and receipt PDFs',
@@ -439,6 +449,16 @@ export const permissionCatalog = [
     resource: 'communications',
     action: 'read_deliveries',
     description: 'Read notification delivery records',
+  },
+  {
+    resource: 'communications',
+    action: 'retry_deliveries',
+    description: 'Retry failed notification deliveries',
+  },
+  {
+    resource: 'communications',
+    action: 'manage_consent',
+    description: 'Manage communication consent settings',
   },
   {
     resource: 'messaging',
@@ -664,6 +684,11 @@ export const permissionCatalog = [
     resource: 'canteen:serving',
     action: 'read',
     description: 'Read canteen servings',
+  },
+  {
+    resource: 'canteen:serving',
+    action: 'update',
+    description: 'Update canteen servings',
   },
   {
     resource: 'canteen:wallets',

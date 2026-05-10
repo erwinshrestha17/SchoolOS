@@ -1265,6 +1265,7 @@ function buildStudent(
     generatedDocuments: unknown[];
     invoices: unknown[];
     attendanceRecords: unknown[];
+    identities: unknown[];
     _count?: {
       invoices: number;
       payments: number;

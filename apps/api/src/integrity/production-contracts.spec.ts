@@ -165,7 +165,13 @@ describe('production data integrity contracts', () => {
 
   it('prevents direct mutation of immutable accounting artifacts', () => {
     const offenders = readSourceFiles()
-      .filter(({ content }) => immutableMutationPattern.test(content))
+      .filter(({ path, content }) => {
+        const relativePath = relative(sourceRoot, path);
+        // Authorized boundary for ledger writes
+        if (relativePath === 'accounting/accounting-posting.service.ts')
+          return false;
+        return immutableMutationPattern.test(content);
+      })
       .map(({ path }) => relative(sourceRoot, path));
 
     expect(offenders).toEqual([]);

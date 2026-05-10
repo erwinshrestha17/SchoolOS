@@ -1354,7 +1354,7 @@ export function createPrismaMock() {
           lines: [],
           payments: [],
           ...data,
-          totalAmount: new Prisma.Decimal(data.totalAmount ?? 0),
+          totalAmount: new Prisma.Decimal(String(data.totalAmount ?? 0)),
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -1397,7 +1397,7 @@ export function createPrismaMock() {
           id: data.id ?? nextId('payment'),
           refunds: [],
           ...data,
-          amount: new Prisma.Decimal(data.amount ?? 0),
+          amount: new Prisma.Decimal(String(data.amount ?? 0)),
           createdAt: new Date(),
           updatedAt: new Date(),
         };

@@ -10,7 +10,7 @@ import { AccountingPostingService } from './accounting-posting.service';
 
 function createPostingClient(overrides?: {
   existingJournal?: { entryNumber: string } | null;
-  closedPeriod?: { name: string } | null;
+  closedPeriod?: { name: string; status?: AccountingPeriodStatus } | null;
 }) {
   const upsertedAccounts = new Map([
     ['5010', { id: 'salary-expense', type: ChartAccountType.EXPENSE }],
@@ -135,7 +135,10 @@ describe('AccountingPostingService payroll posting', () => {
 
   it('blocks payroll posting into a closed accounting period', async () => {
     const client = createPostingClient({
-      closedPeriod: { name: 'FY 2026 Closed' },
+      closedPeriod: {
+        name: 'FY 2026 Closed',
+        status: AccountingPeriodStatus.CLOSED,
+      },
     });
     const auditService = { record: jest.fn() };
     const service = new AccountingPostingService(

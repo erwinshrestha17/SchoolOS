@@ -825,11 +825,11 @@ export class AttendanceService {
 
     const daysCount = endDate.getDate();
     const matrix = students.map((student) => {
-      const row: any = {
+      const row = {
         studentId: student.id,
         rollNumber: student.rollNumber,
         name: `${student.firstNameEn} ${student.lastNameEn}`,
-        attendance: [],
+        attendance: [] as Array<{ day: number; status: string }>,
         totals: {
           PRESENT: 0,
           ABSENT: 0,
@@ -2254,10 +2254,15 @@ export class AttendanceService {
       'HOLIDAY',
     ];
 
-    const rows = data.matrix.map((student: any) => [
+    const rows = data.matrix.map((student: {
+      rollNumber?: number | string | null;
+      name: string;
+      attendance: Array<{ status: string }>;
+      totals: Record<string, number | string>;
+    }) => [
       student.rollNumber?.toString() ?? '',
       student.name,
-      ...student.attendance.map((a: any) => {
+      ...student.attendance.map((a: { status: string }) => {
         if (a.status === 'PRESENT') return 'P';
         if (a.status === 'ABSENT') return 'A';
         if (a.status === 'LATE') return 'L';

@@ -370,6 +370,13 @@ export class AccountingService {
     const reversalDate = dto.reversalDate
       ? new Date(dto.reversalDate)
       : new Date();
+
+    await this.postingService.ensurePostingPeriodIsOpen(
+      this.prisma,
+      actor.tenantId,
+      reversalDate,
+    );
+
     const reversal = await this.postingService.postReversal(
       {
         tenantId: actor.tenantId,

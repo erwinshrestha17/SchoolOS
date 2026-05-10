@@ -1,4 +1,5 @@
 import { IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { ExamTermStatus } from '@prisma/client';
 
 export class UpdateExamTermDto {
   @IsOptional()
@@ -25,5 +26,5 @@ export class UpdateExamTermDto {
 
   @IsOptional()
   @IsString()
-  status?: any;
+  status?: ExamTermStatus;
 }

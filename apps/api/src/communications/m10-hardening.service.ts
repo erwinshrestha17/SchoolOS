@@ -204,7 +204,7 @@ export class M10HardeningService {
       take: 100,
     });
 
-    const results: any[] = [];
+    const results: unknown[] = [];
     for (const delivery of failed) {
       results.push(
         await this.retryDeliveryWithMetadata(

@@ -4,8 +4,22 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
+import { Prisma } from '@prisma/client';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
+
+type FullAttachment = Prisma.HomeworkAttachmentGetPayload<{
+  include: {
+    fileAsset: true;
+    submission: {
+      include: {
+        homework: true;
+        student: true;
+      };
+    };
+    assignment: true;
+  };
+}>;
 
 @Injectable()
 export class HomeworkAttachmentAccessService {
@@ -19,7 +33,7 @@ export class HomeworkAttachmentAccessService {
     actor: AuthContext,
     action: 'preview' | 'download',
   ) {
-    const attachment = (await this.prisma.homeworkAttachment.findFirst({
+    const attachment = await this.prisma.homeworkAttachment.findFirst({
       where: {
         id: attachmentId,
         tenantId: actor.tenantId,
@@ -33,8 +47,8 @@ export class HomeworkAttachmentAccessService {
           },
         },
         assignment: true,
-      } as any,
-    })) as any;
+      },
+    });
 
     if (!attachment) {
       throw new NotFoundException(
@@ -112,7 +126,7 @@ export class HomeworkAttachmentAccessService {
 
   private async ensureHomeworkAttachmentVisibleToActor(
     actor: AuthContext,
-    attachment: any,
+    attachment: FullAttachment,
   ) {
     if (!actor.roles.includes('student') && !actor.roles.includes('parent')) {
       return;

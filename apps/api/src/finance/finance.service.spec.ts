@@ -151,7 +151,7 @@ describe('finance production controls', () => {
         actor,
       ),
     ).rejects.toThrow(
-      'Payment reference was already recorded for this invoice',
+      'has already been used for an active payment in this tenant',
     );
   });
 

@@ -836,7 +836,7 @@ export class AccountingPostingService {
       type: ChartAccountType.ASSET,
     });
 
-    const lines: any[] = [
+    const lines: Prisma.JournalLineUncheckedCreateWithoutJournalEntryInput[] = [
       {
         tenantId: input.tenantId,
         chartAccountId: receivableAccount.id,
@@ -1269,7 +1269,7 @@ export class AccountingPostingService {
     });
   }
 
-  private async ensurePostingPeriodIsOpen(
+  public async ensurePostingPeriodIsOpen(
     tx: PostingClient,
     tenantId: string,
     entryDate: Date,
@@ -1416,31 +1416,49 @@ export class AccountingPostingService {
   private ensureBalanced(
     lines: Array<{
       side?: JournalLineSide;
-      amount?: Prisma.Decimal | number | string;
-      debit?: Prisma.Decimal | number | string;
-      credit?: Prisma.Decimal | number | string;
+      amount?: Prisma.Decimal | number | string | Prisma.DecimalJsLike;
+      debit?: Prisma.Decimal | number | string | Prisma.DecimalJsLike;
+      credit?: Prisma.Decimal | number | string | Prisma.DecimalJsLike;
     }>,
   ) {
+    if (lines.length < 2) {
+      throw new ConflictException('Journal entry must have at least two lines.');
+    }
+
     const totals = lines.reduce(
-      (acc, line) => {
-        const debit = toDecimal(
-          line.debit ?? (line.side === JournalLineSide.DEBIT ? line.amount : 0),
-        );
-        const credit = toDecimal(
-          line.credit ??
-            (line.side === JournalLineSide.CREDIT ? line.amount : 0),
-        );
+      (acc: { debit: Prisma.Decimal; credit: Prisma.Decimal }, line) => {
+        const debit =
+          line.debit !== undefined
+            ? toDecimal(line.debit)
+            : line.side === JournalLineSide.DEBIT
+              ? toDecimal(line.amount ?? 0)
+              : new Prisma.Decimal(0);
+
+        const credit =
+          line.credit !== undefined
+            ? toDecimal(line.credit)
+            : line.side === JournalLineSide.CREDIT
+              ? toDecimal(line.amount ?? 0)
+              : new Prisma.Decimal(0);
+
         return {
           debit: acc.debit.add(debit),
           credit: acc.credit.add(credit),
         };
       },
-      { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(0) },
+      {
+        debit: new Prisma.Decimal(0),
+        credit: new Prisma.Decimal(0),
+      },
     );
 
     if (!totals.debit.equals(totals.credit)) {
       throw new ConflictException(
-        `Journal entry is not balanced. Total Debit: ${totals.debit.toFixed(2)}, Total Credit: ${totals.credit.toFixed(2)}. Difference: ${totals.debit.sub(totals.credit).toFixed(2)}`,
+        `Journal entry is not balanced. Total Debit: ${totals.debit.toFixed(
+          2,
+        )}, Total Credit: ${totals.credit.toFixed(2)}. Difference: ${totals.debit
+          .sub(totals.credit)
+          .toFixed(2)}`,
       );
     }
 
@@ -1449,20 +1467,14 @@ export class AccountingPostingService {
         'Journal entry must have a non-zero balanced amount.',
       );
     }
-
-    if (lines.length < 2) {
-      throw new ConflictException(
-        'Journal entry must have at least two lines for double-entry.',
-      );
-    }
   }
 }
 
-function toDecimal(value: any) {
+function toDecimal(value: Prisma.Decimal | number | string | Prisma.DecimalJsLike | null | undefined) {
   if (value === null || value === undefined) {
     return new Prisma.Decimal(0);
   }
-  return new Prisma.Decimal(value);
+  return new Prisma.Decimal(value as string | number);
 }
 
 function decimalText(value: Prisma.Decimal | number | string) {

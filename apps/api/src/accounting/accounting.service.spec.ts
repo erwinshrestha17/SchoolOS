@@ -255,6 +255,12 @@ function buildService(options: {
   const postingService = {
     postManualJournal: jest.fn().mockResolvedValue(options.createdReversal),
     postReversal: jest.fn().mockResolvedValue(options.createdReversal),
+    ensurePostingPeriodIsOpen: jest.fn().mockImplementation(() => {
+      if (options.closedPeriod) {
+        throw new ConflictException('Closed period');
+      }
+      return Promise.resolve();
+    }),
   };
 
   return {

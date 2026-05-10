@@ -3833,25 +3833,32 @@ export class FinanceService {
   }
 
   private async postInvoiceToLedger(
-    invoice: any,
+    invoice: unknown,
     actor: AuthContext,
     tx: Prisma.TransactionClient,
   ) {
-    const invoiceLines = invoice.lines.map((line: any) => ({
+    const invoiceLines = (invoice as { lines: Array<{ feeHead: { code: string, name: string }, totalAmount: Prisma.Decimal }> }).lines.map((line) => ({
       accountCode: resolveIncomeAccountCode(line.feeHead.code),
       accountName: line.feeHead.name,
       accountType: ChartAccountType.REVENUE,
       amount: line.totalAmount,
-      description: line.description,
+      description: `Revenue from ${line.feeHead.name}`,
     }));
+
+    const inv = invoice as {
+      id: string;
+      invoiceNumber: string;
+      studentId: string;
+      totalAmount: Prisma.Decimal;
+    };
 
     await this.accountingPostingService.postInvoice(
       {
         tenantId: actor.tenantId,
-        invoiceId: invoice.id,
-        invoiceNumber: invoice.invoiceNumber,
-        studentId: invoice.studentId,
-        totalAmount: invoice.totalAmount,
+        invoiceId: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        studentId: inv.studentId,
+        totalAmount: inv.totalAmount,
         entryDate: new Date(),
         lines: invoiceLines,
       },
@@ -4259,8 +4266,8 @@ export function resolveInvoiceStatusAfterAdjustment(
   return InvoiceStatus.ISSUED;
 }
 
-function toCsv(rows: any[], headers: string[]) {
-  const escape = (val: any) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+function toCsv(rows: Record<string, unknown>[], headers: string[]) {
+  const escape = (val: unknown) => `"${String(val ?? '').replace(/"/g, '""')}"`;
   const headerLine = headers.map(escape).join(',');
   const rowLines = rows.map((row) =>
     headers.map((h) => escape(row[h])).join(','),
