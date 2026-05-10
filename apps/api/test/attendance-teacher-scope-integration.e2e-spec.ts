@@ -136,7 +136,14 @@ function makePrisma() {
       findMany: jest.fn(async () => []),
     },
     schoolCalendarDay: {
-      findFirst: jest.fn(async () => ({ isWorkingDay: true })),
+      findFirst: jest.fn(async () => ({
+        id: 'calendar-working-day',
+        tenantId,
+        calendarDate: new Date('2026-05-10T00:00:00.000Z'),
+        isWorkingDay: true,
+        label: null,
+        holidayType: null,
+      })),
       findMany: jest.fn(async () => []),
     },
     student: {
