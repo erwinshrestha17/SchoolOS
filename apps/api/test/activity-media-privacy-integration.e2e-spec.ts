@@ -756,19 +756,13 @@ function extractPostId(sqlText: string, posts: ActivityPostRecord[]) {
 }
 
 function isSoftDeleteQuery(sqlText: string) {
-  return (
-    sqlText.includes('UPDATE') &&
-    (sqlText.includes('softDeletedAt') ||
-      sqlText.includes('soft_deleted') ||
-      sqlText.includes('Remove rejected media'))
-  );
+  return sqlText.includes('UPDATE') && sqlText.includes('Remove rejected media');
 }
 
 function isModerationQuery(sqlText: string) {
   return (
     sqlText.includes('UPDATE') &&
-    (sqlText.includes('moderationStatus') ||
-      sqlText.includes('Contains unrelated child photo'))
+    sqlText.includes('Contains unrelated child photo')
   );
 }
 
