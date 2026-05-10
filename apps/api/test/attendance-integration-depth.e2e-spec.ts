@@ -14,7 +14,9 @@ describe('Attendance report integration depth', () => {
       { recordDeliveryRecords: jest.fn() } as unknown as CommunicationsService,
       { record: jest.fn() } as unknown as AuditService,
       { emit: jest.fn() } as unknown as EventEmitter2,
-      { getSetting: jest.fn().mockResolvedValue(true) } as unknown as SettingsService,
+      {
+        getSetting: jest.fn().mockResolvedValue(true),
+      } as unknown as SettingsService,
     );
     const actor = createAuthContextMock({
       tenantId: 'tenant-attendance-depth',
@@ -44,8 +46,9 @@ describe('Attendance report integration depth', () => {
 
     const csv = await service.exportMonthlyRegister(query, actor);
 
-    expect(csv).toContain('student-1');
-    expect(csv).toContain('student-2');
+    expect(csv).toContain('"Roll No","Student Name"');
+    expect(csv).toContain('"1","Aarav Shrestha"');
+    expect(csv).toContain('"2","Sita Thapa"');
     expect(csv).toContain('PRESENT');
     expect(csv).toContain('LATE');
   });
