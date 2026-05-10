@@ -21,27 +21,7 @@ export function buildSimplePdf(lines: string[]) {
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
   ];
 
-  const chunks = ['%PDF-1.4\n'];
-  const offsets = [0];
-
-  for (const [index, object] of objects.entries()) {
-    offsets.push(Buffer.byteLength(chunks.join('')));
-    chunks.push(`${index + 1} 0 obj\n${object}\nendobj\n`);
-  }
-
-  const xrefOffset = Buffer.byteLength(chunks.join(''));
-  chunks.push(`xref\n0 ${objects.length + 1}\n`);
-  chunks.push('0000000000 65535 f \n');
-
-  for (const offset of offsets.slice(1)) {
-    chunks.push(`${String(offset).padStart(10, '0')} 00000 n \n`);
-  }
-
-  chunks.push(
-    `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`,
-  );
-
-  return Buffer.from(chunks.join(''));
+  return buildPdfObjects(objects);
 }
 
 export function buildCertificatePdf(input: {
@@ -59,37 +39,30 @@ export function buildCertificatePdf(input: {
     verificationText: string;
   };
 }) {
+  const issuedDate = formatIsoDate(input.issuedAt);
   const contentParts = [
-    '0.12 w',
-    '44 44 524 704 re S',
-    '52 52 508 688 re S',
-    text(input.schoolName, 72, 716, 18, 'F2'),
-    text(input.title.toUpperCase(), 72, 690, 15, 'F2'),
-    ...(input.subtitle ? [text(input.subtitle, 72, 670, 10, 'F1')] : []),
-    text(`Reference: ${input.referenceNumber}`, 386, 716, 9, 'F1'),
-    text(
-      `Issued: ${input.issuedAt.toISOString().slice(0, 10)}`,
-      386,
-      702,
-      9,
-      'F1',
-    ),
-    '72 650 m 540 650 l S',
+    ...pageFrame('CERTIFICATE', input.schoolName, input.subtitle ?? 'Official school record'),
+    pill(390, 694, 150, 34),
+    text('REFERENCE', 402, 716, 7, 'F2'),
+    text(input.referenceNumber, 402, 703, 9, 'F1'),
+    text(`Issued: ${issuedDate}`, 402, 689, 8, 'F1'),
+    text(input.title.toUpperCase(), 72, 646, 20, 'F2'),
+    '72 632 m 540 632 l S',
     ...input.fields.flatMap((field, index) => {
       const x = index % 2 === 0 ? 72 : 318;
-      const y = 622 - Math.floor(index / 2) * 32;
-
+      const y = 602 - Math.floor(index / 2) * 40;
       return [
-        text(field.label.toUpperCase(), x, y, 7, 'F2'),
-        text(String(field.value ?? 'N/A'), x, y - 14, 10, 'F1'),
+        sectionLabel(field.label, x, y),
+        text(String(field.value ?? 'N/A'), x, y - 15, 11, 'F1'),
       ];
     }),
+    '72 468 m 540 468 l S',
     ...input.body.flatMap((line, index) =>
-      wrapPdfLine(line, 72, 462 - index * 38, 468, 10),
+      wrapPdfLine(line, 86, 438 - index * 42, 438, 11),
     ),
-    '72 178 m 250 178 l S',
-    text(input.signature.signerName, 72, 160, 10, 'F2'),
-    text(input.signature.signerRole, 72, 146, 9, 'F1'),
+    '72 178 m 252 178 l S',
+    text(input.signature.signerName, 72, 158, 11, 'F2'),
+    text(input.signature.signerRole, 72, 143, 9, 'F1'),
     text(input.signature.verificationText, 72, 116, 8, 'F1'),
     '72 100 m 540 100 l S',
     ...input.footer.flatMap((line, index) =>
@@ -97,7 +70,7 @@ export function buildCertificatePdf(input: {
     ),
   ];
 
-  return buildPdfFromContent(contentParts.join('\n'));
+  return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
 }
 
 export function buildReceiptPdf(input: {
@@ -124,97 +97,75 @@ export function buildReceiptPdf(input: {
   isReprint?: boolean;
 }) {
   const contentParts = [
-    '0.5 w',
-    '36 36 540 720 re S', // Outer border
-    text(input.schoolName, 48, 726, 16, 'F2'),
-    input.panNumber ? text(`PAN: ${input.panNumber}`, 48, 712, 10, 'F1') : '',
-    text('FEE RECEIPT', 460, 726, 14, 'F2'),
-    input.isReprint ? text('*** REPRINT ***', 460, 710, 10, 'F2') : '',
-    '36 696 m 576 696 l S',
-
-    // Receipt Info
-    text('Receipt No:', 48, 670, 10, 'F2'),
-    text(input.receiptNumber, 120, 670, 10, 'F1'),
-    text('Date:', 380, 670, 10, 'F2'),
-    text(input.paymentDate.toISOString().slice(0, 10), 420, 670, 10, 'F1'),
-    text('Invoice Ref:', 48, 650, 10, 'F2'),
-    text(input.invoiceNumber, 120, 650, 10, 'F1'),
-    text('Method:', 380, 650, 10, 'F2'),
-    text(input.method, 420, 650, 10, 'F1'),
-
-    '36 630 m 576 630 l S',
-
-    // Student Info
-    text('Student ID:', 48, 604, 10, 'F2'),
-    text(input.student.id, 120, 604, 10, 'F1'),
-    text('Name:', 48, 584, 10, 'F2'),
-    text(input.student.name, 120, 584, 10, 'F1'),
-    text('Class:', 380, 604, 10, 'F2'),
-    text(input.student.className, 420, 604, 10, 'F1'),
-    text('Section:', 380, 584, 10, 'F2'),
-    text(input.student.sectionName ?? 'N/A', 420, 584, 10, 'F1'),
-
-    '36 558 m 576 558 l S',
-
-    // Line Items Header
-    text('Description', 48, 532, 10, 'F2'),
-    text('Amount', 500, 532, 10, 'F2'),
-    '36 520 m 576 520 l S',
+    ...pageFrame('FEE RECEIPT', input.schoolName, input.panNumber ? `PAN: ${input.panNumber}` : 'Official payment receipt'),
+    input.isReprint ? stamp('REPRINT', 456, 688) : '',
+    infoBox(48, 628, 228, 54),
+    sectionLabel('Receipt Details', 60, 664),
+    text(`Receipt No: ${input.receiptNumber}`, 60, 648, 9, 'F1'),
+    text(`Invoice Ref: ${input.invoiceNumber}`, 60, 634, 9, 'F1'),
+    infoBox(336, 628, 204, 54),
+    sectionLabel('Payment Details', 348, 664),
+    text(`Date: ${formatIsoDate(input.paymentDate)}`, 348, 648, 9, 'F1'),
+    text(`Method: ${input.method}`, 348, 634, 9, 'F1'),
+    infoBox(48, 548, 492, 58),
+    sectionLabel('Student', 60, 588),
+    text(input.student.name, 60, 572, 12, 'F2'),
+    text(`ID: ${input.student.id}`, 60, 556, 9, 'F1'),
+    text(`Class: ${input.student.className}`, 314, 572, 9, 'F1'),
+    text(`Section: ${input.student.sectionName ?? 'N/A'}`, 314, 558, 9, 'F1'),
+    input.student.rollNumber
+      ? text(`Roll No: ${input.student.rollNumber}`, 430, 558, 9, 'F1')
+      : '',
+    tableHeader(48, 512, ['Description', 'Amount'], [372, 120]),
   ];
 
-  let y = 496;
-  for (const line of input.lines) {
+  let y = 488;
+  for (const line of input.lines.slice(0, 12)) {
     contentParts.push(
-      text(line.name, 48, y, 10, 'F1'),
-      text(line.amount.toFixed(2), 500, y, 10, 'F1'),
+      text(line.name, 60, y, 9, 'F1'),
+      moneyText(line.amount, 482, y, 'F1'),
     );
-    y -= 20;
+    y -= 18;
   }
 
-  y -= 10;
-  contentParts.push('300 ' + (y + 16) + ' m 576 ' + (y + 16) + ' l S');
+  y = Math.max(y - 12, 236);
+  contentParts.push('336 ' + (y + 18) + ' m 540 ' + (y + 18) + ' l S');
 
   if (input.discount > 0 || input.subtotal !== input.total) {
     contentParts.push(
-      text('Subtotal:', 380, y, 10, 'F1'),
-      text(input.subtotal.toFixed(2), 500, y, 10, 'F1'),
+      text('Subtotal', 350, y, 9, 'F1'),
+      moneyText(input.subtotal, 482, y, 'F1'),
     );
-    y -= 20;
+    y -= 18;
     if (input.discount > 0) {
       contentParts.push(
-        text('Discount:', 380, y, 10, 'F1'),
-        text('-' + input.discount.toFixed(2), 500, y, 10, 'F1'),
+        text('Discount', 350, y, 9, 'F1'),
+        moneyText(-input.discount, 482, y, 'F1'),
       );
-      y -= 20;
+      y -= 18;
     }
   }
 
   contentParts.push(
-    text('Total:', 380, y, 10, 'F2'),
-    text(input.total.toFixed(2), 500, y, 10, 'F2'),
-    text('Paid Amount:', 380, y - 20, 10, 'F2'),
-    text(input.paidAmount.toFixed(2), 500, y - 20, 10, 'F1'),
+    text('Total', 350, y, 11, 'F2'),
+    moneyText(input.total, 482, y, 'F2'),
+    text('Paid Amount', 350, y - 20, 10, 'F2'),
+    moneyText(input.paidAmount, 482, y - 20, 'F2'),
   );
 
-  y -= 40;
   if (input.balance > 0) {
     contentParts.push(
-      text('Balance Due:', 380, y, 10, 'F2'),
-      text(input.balance.toFixed(2), 500, y, 10, 'F2'),
+      text('Balance Due', 350, y - 40, 10, 'F2'),
+      moneyText(input.balance, 482, y - 40, 'F2'),
     );
   }
 
   contentParts.push(
-    '36 120 m 576 120 l S',
-    text('Cashier: ' + input.cashierName, 48, 90, 10, 'F1'),
-    text(
-      'Printed: ' + new Date().toISOString().replace('T', ' ').slice(0, 19),
-      380,
-      90,
-      8,
-      'F1',
-    ),
-    text('Thank you for your payment.', 220, 60, 10, 'F2'),
+    '48 128 m 540 128 l S',
+    text(`Cashier: ${input.cashierName}`, 48, 102, 9, 'F1'),
+    text(`Printed: ${formatDateTime(new Date())}`, 342, 102, 8, 'F1'),
+    text('Thank you for your payment.', 214, 72, 11, 'F2'),
+    text('This receipt is system generated and valid only with official SchoolOS records.', 116, 52, 8, 'F1'),
   );
 
   return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
@@ -243,90 +194,49 @@ export function buildSalarySlipPdf(input: {
   };
 }) {
   const contentParts = [
-    '0.5 w',
-    '36 36 540 720 re S',
-    text(input.schoolName, 48, 726, 16, 'F2'),
-    input.panNumber ? text(`PAN: ${input.panNumber}`, 48, 712, 10, 'F1') : '',
-    text('SALARY SLIP', 460, 726, 14, 'F2'),
-    text(input.period, 460, 710, 10, 'F1'),
-    '36 696 m 576 696 l S',
-
-    // Staff Info
-    text('Employee Name:', 48, 670, 10, 'F2'),
-    text(input.staff.name, 140, 670, 10, 'F1'),
-    text('Employee ID:', 380, 670, 10, 'F2'),
-    text(input.staff.id, 460, 670, 10, 'F1'),
-    text('Designation:', 48, 650, 10, 'F2'),
-    text(input.staff.designation ?? 'N/A', 140, 650, 10, 'F1'),
-    text('Bank A/C:', 380, 650, 10, 'F2'),
-    text(input.staff.bankAccount ?? 'N/A', 460, 650, 10, 'F1'),
-    text('PAN:', 48, 630, 10, 'F2'),
-    text(input.staff.panNumber ?? 'N/A', 140, 630, 10, 'F1'),
-    text('Payslip No:', 380, 630, 10, 'F2'),
-    text(input.payslipNumber, 460, 630, 10, 'F1'),
-
-    '36 610 m 576 610 l S',
-
-    // Earnings vs Deductions Table
-    text('EARNINGS', 48, 590, 10, 'F2'),
-    text('AMOUNT', 220, 590, 10, 'F2'),
-    text('DEDUCTIONS', 310, 590, 10, 'F2'),
-    text('AMOUNT', 500, 590, 10, 'F2'),
-    '36 580 m 576 580 l S',
-    '300 580 m 300 300 l S', // Vertical line
+    ...pageFrame('SALARY SLIP', input.schoolName, input.panNumber ? `PAN: ${input.panNumber}` : input.period),
+    infoBox(48, 622, 492, 62),
+    sectionLabel('Employee', 60, 666),
+    text(input.staff.name, 60, 650, 12, 'F2'),
+    text(`Employee ID: ${input.staff.id}`, 60, 634, 9, 'F1'),
+    text(`Designation: ${input.staff.designation ?? 'N/A'}`, 260, 650, 9, 'F1'),
+    text(`Bank A/C: ${input.staff.bankAccount ?? 'N/A'}`, 260, 634, 9, 'F1'),
+    text(`PAN: ${input.staff.panNumber ?? 'N/A'}`, 420, 650, 9, 'F1'),
+    text(`Payslip: ${input.payslipNumber}`, 420, 634, 9, 'F1'),
+    tableHeader(48, 592, ['Earnings', 'Amount', 'Deductions', 'Amount'], [170, 92, 170, 92]),
+    '306 580 m 306 300 l S',
   ];
 
   let y = 560;
   const maxRows = Math.max(input.earnings.length, input.deductions.length);
-  for (let i = 0; i < maxRows; i++) {
+  for (let i = 0; i < maxRows && y >= 318; i++) {
     const earning = input.earnings[i];
     const deduction = input.deductions[i];
 
     if (earning) {
-      contentParts.push(
-        text(earning.name, 48, y, 10, 'F1'),
-        text(earning.amount.toFixed(2), 220, y, 10, 'F1'),
-      );
+      contentParts.push(text(earning.name, 60, y, 9, 'F1'), moneyText(earning.amount, 222, y, 'F1'));
     }
     if (deduction) {
-      contentParts.push(
-        text(deduction.name, 310, y, 10, 'F1'),
-        text(deduction.amount.toFixed(2), 500, y, 10, 'F1'),
-      );
+      contentParts.push(text(deduction.name, 318, y, 9, 'F1'), moneyText(deduction.amount, 482, y, 'F1'));
     }
-    y -= 20;
-    if (y < 320) break;
+    y -= 18;
   }
 
   contentParts.push(
-    '36 300 m 576 300 l S',
-    text('Gross Earnings:', 48, 280, 10, 'F2'),
-    text(input.grossSalary.toFixed(2), 220, 280, 10, 'F2'),
-    text('Total Deductions:', 310, 280, 10, 'F2'),
-    text(input.totalDeductions.toFixed(2), 500, 280, 10, 'F2'),
-
-    '36 260 m 576 260 l S',
-    text('NET SALARY:', 310, 240, 12, 'F2'),
-    text(`Rs. ${input.netSalary.toFixed(2)}`, 500, 240, 12, 'F2'),
-
-    text(
-      `Attendance: ${input.attendance.present} / ${input.attendance.working} Days`,
-      48,
-      240,
-      10,
-      'F1',
-    ),
-
-    '36 120 m 576 120 l S',
-    text('Employer Signature', 48, 80, 10, 'F1'),
-    text('Employee Signature', 400, 80, 10, 'F1'),
-    text(
-      'This is a computer generated document and does not require a physical signature.',
-      120,
-      40,
-      8,
-      'F1',
-    ),
+    '48 300 m 540 300 l S',
+    text('Gross Earnings', 60, 278, 10, 'F2'),
+    moneyText(input.grossSalary, 222, 278, 'F2'),
+    text('Total Deductions', 318, 278, 10, 'F2'),
+    moneyText(input.totalDeductions, 482, 278, 'F2'),
+    infoBox(306, 220, 234, 44),
+    text('NET SALARY', 318, 248, 11, 'F2'),
+    moneyText(input.netSalary, 456, 248, 'F2'),
+    text(`Attendance: ${input.attendance.present} / ${input.attendance.working} Days`, 60, 248, 10, 'F1'),
+    '72 118 m 212 118 l S',
+    text('Employer Signature', 86, 100, 9, 'F1'),
+    '380 118 m 520 118 l S',
+    text('Employee Signature', 396, 100, 9, 'F1'),
+    text('Computer generated document. Physical signature may be added after review.', 118, 54, 8, 'F1'),
   );
 
   return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
@@ -344,51 +254,28 @@ export function buildIdCardPdf(input: {
   guardianPhone?: string | null;
   academicYear?: string | null;
 }) {
-  // CR80 standard ID card size (2.125" x 3.375") rotated portrait: ~ 153 x 243 points
-  // But since we print on A4, we'll draw a bounding box in the center of the page to represent the ID card
-
+  const left = 200;
+  const bottom = 432;
+  const width = 212;
+  const height = 337;
   const contentParts = [
-    '0.5 w',
-    '200 450 212 337 re S', // 2.125 * 100 x 3.375 * 100 -> roughly ID card size
-
-    // Header
-    '200 750 m 412 750 l S',
-    text(input.schoolName.substring(0, 30), 210, 765, 12, 'F2'),
-    text('STUDENT ID', 270, 730, 12, 'F2'),
-
-    // Photo Placeholder
-    '0.2 w',
-    '256 610 100 100 re S',
-    text('[ PHOTO ]', 280, 656, 10, 'F1'),
-
-    // Student Details
-    text(input.studentName, 210, 580, 14, 'F2'),
-    text(`ID: ${input.studentId}`, 210, 560, 10, 'F1'),
-    text(
-      `Class: ${input.className} ${input.sectionName ? '- ' + input.sectionName : ''}`,
-      210,
-      545,
-      10,
-      'F1',
-    ),
-
-    ...(input.rollNumber
-      ? [text(`Roll No: ${input.rollNumber}`, 210, 530, 10, 'F1')]
-      : []),
-    ...(input.bloodGroup
-      ? [text(`Blood: ${input.bloodGroup}`, 320, 530, 10, 'F1')]
-      : []),
-
-    // Footer / Emergency
-    '200 490 m 412 490 l S',
-    text('Emergency Contact:', 210, 475, 8, 'F2'),
-    text(input.guardianName ?? 'N/A', 210, 465, 8, 'F1'),
-    text(input.guardianPhone ?? 'N/A', 310, 465, 8, 'F1'),
-
-    // Year
-    ...(input.academicYear
-      ? [text(`Valid for: ${input.academicYear}`, 210, 455, 7, 'F1')]
-      : []),
+    '0.8 w',
+    `${left} ${bottom} ${width} ${height} re S`,
+    `${left + 8} ${bottom + 8} ${width - 16} ${height - 16} re S`,
+    text(fitText(input.schoolName, 29), left + 14, bottom + height - 28, 11, 'F2'),
+    text('STUDENT ID CARD', left + 50, bottom + height - 48, 10, 'F2'),
+    `${left + 20} ${bottom + 176} 88 96 re S`,
+    text('PHOTO', left + 48, bottom + 220, 9, 'F1'),
+    text(fitText(input.studentName, 24), left + 20, bottom + 152, 13, 'F2'),
+    text(`ID: ${input.studentId}`, left + 20, bottom + 132, 9, 'F1'),
+    text(`Class: ${input.className}${input.sectionName ? ' - ' + input.sectionName : ''}`, left + 20, bottom + 116, 9, 'F1'),
+    input.rollNumber ? text(`Roll No: ${input.rollNumber}`, left + 20, bottom + 100, 9, 'F1') : '',
+    input.bloodGroup ? text(`Blood: ${input.bloodGroup}`, left + 124, bottom + 100, 9, 'F2') : '',
+    `${left + 14} ${bottom + 76} m ${left + width - 14} ${bottom + 76} l S`,
+    sectionLabel('Emergency Contact', left + 20, bottom + 60),
+    text(fitText(input.guardianName ?? 'N/A', 22), left + 20, bottom + 45, 8, 'F1'),
+    text(input.guardianPhone ?? 'N/A', left + 122, bottom + 45, 8, 'F1'),
+    input.academicYear ? text(`Valid for: ${input.academicYear}`, left + 20, bottom + 26, 7, 'F1') : '',
   ];
 
   return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
@@ -423,94 +310,53 @@ export function buildReportCardPdf(input: {
   };
 }) {
   const contentParts = [
-    '0.5 w',
-    '36 36 540 720 re S', // Outer border
-    text(input.schoolName, 48, 726, 18, 'F2'),
-    input.panNumber ? text(`PAN: ${input.panNumber}`, 48, 710, 10, 'F1') : '',
-    text('PROGRESS REPORT', 420, 726, 14, 'F2'),
-    text(`${input.examName} — ${input.academicYear}`, 420, 710, 10, 'F1'),
-    '36 696 m 576 696 l S',
-
-    // Student Info
-    text('Student Name:', 48, 670, 10, 'F2'),
-    text(input.student.name, 140, 670, 10, 'F1'),
-    text('Student ID:', 380, 670, 10, 'F2'),
-    text(input.student.id, 460, 670, 10, 'F1'),
-    text('Class:', 48, 650, 10, 'F2'),
-    text(input.student.className, 140, 650, 10, 'F1'),
-    text('Section:', 240, 650, 10, 'F2'),
-    text(input.student.sectionName ?? 'N/A', 300, 650, 10, 'F1'),
-    text('Roll No:', 380, 650, 10, 'F2'),
-    text(String(input.student.rollNumber ?? '—'), 460, 650, 10, 'F1'),
-
-    '36 630 m 576 630 l S',
-
-    // Table Header
-    text('SUBJECT', 48, 610, 10, 'F2'),
-    text('THEORY', 200, 610, 10, 'F2'),
-    text('PRAC', 300, 610, 10, 'F2'),
-    text('GRADE', 420, 610, 10, 'F2'),
-    text('GP', 500, 610, 10, 'F2'),
-    '36 600 m 576 600 l S',
+    ...pageFrame('PROGRESS REPORT', input.schoolName, input.panNumber ? `PAN: ${input.panNumber}` : `${input.examName} - ${input.academicYear}`),
+    infoBox(48, 626, 492, 58),
+    sectionLabel('Student', 60, 666),
+    text(input.student.name, 60, 650, 12, 'F2'),
+    text(`ID: ${input.student.id}`, 60, 634, 9, 'F1'),
+    text(`Class: ${input.student.className}`, 300, 650, 9, 'F1'),
+    text(`Section: ${input.student.sectionName ?? 'N/A'}`, 300, 634, 9, 'F1'),
+    text(`Roll No: ${input.student.rollNumber ?? '—'}`, 430, 634, 9, 'F1'),
+    tableHeader(48, 596, ['Subject', 'Theory', 'Practical', 'Grade', 'GP'], [150, 100, 110, 82, 50]),
   ];
 
-  let y = 580;
-  for (const sub of input.subjects) {
+  let y = 572;
+  for (const subject of input.subjects.slice(0, 18)) {
     contentParts.push(
-      text(sub.name, 48, y, 10, 'F1'),
-      sub.theory
-        ? text(`${sub.theory.obtained}/${sub.theory.max}`, 200, y, 9, 'F1')
-        : text('—', 200, y, 9, 'F1'),
-      sub.practical
-        ? text(
-            `${sub.practical.obtained}/${sub.practical.max}`,
-            300,
-            y,
-            9,
-            'F1',
-          )
-        : text('—', 300, y, 9, 'F1'),
-      text(sub.totalGrade, 420, y, 10, 'F2'),
-      text(sub.gradePoint.toFixed(2), 500, y, 10, 'F1'),
+      text(subject.name, 60, y, 9, 'F1'),
+      text(subject.theory ? `${subject.theory.obtained}/${subject.theory.max}` : '—', 204, y, 9, 'F1'),
+      text(subject.practical ? `${subject.practical.obtained}/${subject.practical.max}` : '—', 304, y, 9, 'F1'),
+      text(subject.totalGrade, 424, y, 10, 'F2'),
+      text(subject.gradePoint.toFixed(2), 506, y, 9, 'F1'),
     );
-    y -= 22;
-
-    if (y < 120) break; // Simple page break prevention for now
+    y -= 20;
   }
 
-  y -= 10;
-  contentParts.push('36 ' + (y + 12) + ' m 576 ' + (y + 12) + ' l S');
-
-  // Summary
+  const summaryY = Math.max(y - 10, 170);
   contentParts.push(
-    text('Percentage:', 380, y - 10, 10, 'F2'),
-    text(`${input.summary.percentage.toFixed(2)}%`, 500, y - 10, 10, 'F1'),
-    text('Final Grade:', 380, y - 30, 10, 'F2'),
-    text(input.summary.finalGrade, 500, y - 30, 12, 'F2'),
-    text('GPA:', 380, y - 50, 10, 'F2'),
-    text(input.summary.finalGpa.toFixed(2), 500, y - 50, 12, 'F2'),
+    '48 ' + (summaryY + 16) + ' m 540 ' + (summaryY + 16) + ' l S',
+    text('Percentage', 344, summaryY, 10, 'F2'),
+    text(`${input.summary.percentage.toFixed(2)}%`, 474, summaryY, 10, 'F1'),
+    text('Final Grade', 344, summaryY - 20, 10, 'F2'),
+    text(input.summary.finalGrade, 474, summaryY - 20, 12, 'F2'),
+    text('GPA', 344, summaryY - 40, 10, 'F2'),
+    text(input.summary.finalGpa.toFixed(2), 474, summaryY - 40, 12, 'F2'),
   );
 
   if (input.summary.remarks) {
     contentParts.push(
-      text('Remarks:', 48, y - 10, 10, 'F2'),
-      ...wrapPdfLine(input.summary.remarks, 48, y - 28, 280, 10),
+      sectionLabel('Remarks', 60, summaryY),
+      ...wrapPdfLine(input.summary.remarks, 60, summaryY - 16, 250, 9),
     );
   }
 
-  // Footer Signatures
   contentParts.push(
-    '72 80 m 200 80 l S',
-    text('Class Teacher', 90, 65, 10, 'F1'),
-    '380 80 m 508 80 l S',
-    text('Principal', 420, 65, 10, 'F1'),
-    text(
-      `Printed on: ${new Date().toISOString().slice(0, 10)}`,
-      240,
-      20,
-      8,
-      'F1',
-    ),
+    '72 86 m 206 86 l S',
+    text('Class Teacher', 92, 68, 9, 'F1'),
+    '376 86 m 510 86 l S',
+    text('Principal', 422, 68, 9, 'F1'),
+    text(`Printed on: ${formatIsoDate(new Date())}`, 238, 36, 8, 'F1'),
   );
 
   return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
@@ -525,54 +371,25 @@ export function buildRosterPdf(input: {
   rows: Array<Record<string, unknown>>;
 }) {
   const contentParts = [
-    '0.5 w',
-    '36 36 540 720 re S',
-    text(input.schoolName, 48, 726, 16, 'F2'),
-    text('CLASS ROSTER', 460, 726, 14, 'F2'),
-    text(
-      `${input.className} ${input.sectionName ? '- ' + input.sectionName : ''}`,
-      48,
-      712,
-      10,
-      'F1',
-    ),
-    input.academicYear
-      ? text(`Academic Year: ${input.academicYear}`, 48, 700, 9, 'F1')
-      : '',
-    '36 690 m 576 690 l S',
+    ...pageFrame('CLASS ROSTER', input.schoolName, input.academicYear ? `Academic Year: ${input.academicYear}` : 'Student directory export'),
+    text(`${input.className}${input.sectionName ? ' - ' + input.sectionName : ''}`, 48, 660, 11, 'F2'),
+    tableHeader(48, 632, input.headers, input.headers.map(() => 492 / input.headers.length)),
   ];
 
-  // Header
-  let x = 48;
-  const colWidth = 520 / input.headers.length;
-  for (const header of input.headers) {
-    contentParts.push(text(header, x, 675, 9, 'F2'));
-    x += colWidth;
-  }
-  contentParts.push('36 670 m 576 670 l S');
-
-  // Rows
-  let y = 655;
-  for (const row of input.rows) {
-    x = 48;
+  let y = 608;
+  const colWidth = 492 / input.headers.length;
+  for (const row of input.rows.slice(0, 34)) {
+    let x = 60;
     for (const header of input.headers) {
-      const val = row[header];
-      contentParts.push(text(String(val ?? ''), x, y, 8, 'F1'));
+      contentParts.push(text(fitText(String(row[header] ?? ''), 18), x, y, 8, 'F1'));
       x += colWidth;
     }
     y -= 16;
-    if (y < 60) break; // Simplification: single page
   }
 
   contentParts.push(
     text(`Total Students: ${input.rows.length}`, 48, 45, 9, 'F2'),
-    text(
-      `Generated: ${new Date().toISOString().slice(0, 10)}`,
-      460,
-      45,
-      8,
-      'F1',
-    ),
+    text(`Generated: ${formatIsoDate(new Date())}`, 430, 45, 8, 'F1'),
   );
 
   return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
@@ -596,6 +413,10 @@ function buildPdfFromContent(content: string) {
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
   ];
 
+  return buildPdfObjects(objects);
+}
+
+function buildPdfObjects(objects: string[]) {
   const chunks = ['%PDF-1.4\n'];
   const offsets = [0];
 
@@ -627,6 +448,61 @@ function text(
   font: 'F1' | 'F2',
 ) {
   return `BT /${font} ${size} Tf ${x} ${y} Td (${escapePdfText(value)}) Tj ET`;
+}
+
+function pageFrame(title: string, schoolName: string, subtitle: string) {
+  return [
+    '0.6 w',
+    '36 36 540 720 re S',
+    '44 44 524 704 re S',
+    text(fitText(schoolName, 46), 58, 724, 17, 'F2'),
+    text(subtitle, 58, 706, 9, 'F1'),
+    text(title, 390, 724, 15, 'F2'),
+    '58 690 m 540 690 l S',
+  ];
+}
+
+function infoBox(x: number, y: number, width: number, height: number) {
+  return `${x} ${y} ${width} ${height} re S`;
+}
+
+function pill(x: number, y: number, width: number, height: number) {
+  return `${x} ${y} ${width} ${height} re S`;
+}
+
+function sectionLabel(value: string, x: number, y: number) {
+  return text(value.toUpperCase(), x, y, 7, 'F2');
+}
+
+function tableHeader(x: number, y: number, labels: string[], widths: number[]) {
+  const parts = [`${x} ${y - 12} ${widths.reduce((sum, width) => sum + width, 0)} 26 re S`];
+  let currentX = x + 12;
+  labels.forEach((label, index) => {
+    parts.push(text(label.toUpperCase(), currentX, y, 8, 'F2'));
+    currentX += widths[index] ?? 100;
+  });
+  return parts;
+}
+
+function moneyText(amount: number, x: number, y: number, font: 'F1' | 'F2') {
+  return text(formatMoney(amount), x, y, font === 'F2' ? 10 : 9, font);
+}
+
+function formatMoney(amount: number) {
+  const sign = amount < 0 ? '-' : '';
+  return `${sign}Rs. ${Math.abs(amount).toFixed(2)}`;
+}
+
+function formatIsoDate(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
+function formatDateTime(value: Date) {
+  return value.toISOString().replace('T', ' ').slice(0, 19);
+}
+
+function fitText(value: string, maxLength: number) {
+  return value.length > maxLength ? `${value.slice(0, Math.max(0, maxLength - 1))}…` : value;
 }
 
 function wrapPdfLine(
