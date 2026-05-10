@@ -1,10 +1,10 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   AttendanceConflictDecision,
   AttendanceConflictStatus,
   AttendanceSyncRejectionReason,
   AttendanceSyncStatus,
 } from '@prisma/client';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../src/audit/audit.service';
 import { AttendanceService } from '../src/attendance/attendance.service';
 import { AttendanceConflictReviewDecision } from '../src/attendance/dto/review-attendance-conflict.dto';
@@ -31,7 +31,12 @@ describe('Attendance Sync + Conflict Integration (E2E)', () => {
     });
 
     jest
-      .spyOn(service as unknown as { buildSyncTrustMetadata: jest.Mock }, 'buildSyncTrustMetadata')
+      .spyOn(
+        service as unknown as {
+          buildSyncTrustMetadata: jest.Mock;
+        },
+        'buildSyncTrustMetadata',
+      )
       .mockResolvedValue({ trusted: true });
     jest.spyOn(service, 'submitAttendance').mockResolvedValue({
       sessionId: 'session-1',
@@ -152,6 +157,7 @@ function makeSyncPrisma() {
         const created = {
           id: `sync-${state.syncSubmissions.length + 1}`,
           syncAttemptCount: 1,
+          syncStatus: AttendanceSyncStatus.ACCEPTED,
           ...data,
         };
         state.syncSubmissions.push(created);
@@ -159,6 +165,9 @@ function makeSyncPrisma() {
       }),
       update: jest.fn(async ({ where }) => {
         const found = state.syncSubmissions.find((item) => item.id === where.id);
+        if (!found) {
+          throw new Error('Sync submission not found');
+        }
         found.syncAttemptCount += 1;
         return found;
       }),
