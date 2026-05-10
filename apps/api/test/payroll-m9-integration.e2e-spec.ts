@@ -31,6 +31,65 @@ type JournalCreateInput = {
   };
 };
 
+type PayrollRunRecord = ReturnType<typeof buildPayrollRun>;
+type PayrollLineRecord = ReturnType<typeof buildPayrollLine>;
+type TransactionMock = {
+  journalEntry: PayrollM9PrismaMock['journalEntry'];
+  fiscalPeriod: PayrollM9PrismaMock['fiscalPeriod'];
+  fiscalYear: PayrollM9PrismaMock['fiscalYear'];
+  accountingPeriod: PayrollM9PrismaMock['accountingPeriod'];
+  chartAccount: PayrollM9PrismaMock['chartAccount'];
+  payrollLine: {
+    updateMany: jest.Mock;
+  };
+  payslip: {
+    updateMany: jest.Mock;
+  };
+  payrollRun: {
+    update: jest.Mock;
+  };
+};
+
+type PayrollM9PrismaMock = {
+  __periodStatus: AccountingPeriodStatus;
+  __currentRun: PayrollRunRecord;
+  __journalSequence: number;
+  __tx?: TransactionMock;
+  payrollRun: {
+    findFirst: jest.Mock<Promise<PayrollRunRecord>, []>;
+    update: jest.Mock;
+  };
+  payrollLine: {
+    updateMany: jest.Mock;
+    findMany: jest.Mock<Promise<PayrollLineRecord[]>, []>;
+  };
+  payslip: {
+    createMany: jest.Mock;
+  };
+  journalEntry: {
+    findFirst: jest.Mock;
+    count: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+    delete: jest.Mock;
+  };
+  fiscalPeriod: {
+    findFirst: jest.Mock;
+  };
+  fiscalYear: {
+    findFirst: jest.Mock;
+  };
+  accountingPeriod: {
+    findFirst: jest.Mock;
+  };
+  chartAccount: {
+    findUnique: jest.Mock;
+    findUniqueOrThrow: jest.Mock;
+    create: jest.Mock;
+  };
+  $transaction: jest.Mock;
+};
+
 describe('Payroll + M9 Accounting Integration (E2E)', () => {
   const tenantId = 'tenant-payroll-integration';
   const actor: AuthContext = {
@@ -43,7 +102,7 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
     permissions: ['payroll:run:approve', 'payroll:run:post'],
   };
 
-  let prisma: ReturnType<typeof buildPrismaMock>;
+  let prisma: PayrollM9PrismaMock;
   let auditService: { record: jest.Mock };
   let accountingPostingService: AccountingPostingService;
   let payrollService: PayrollService;
@@ -118,7 +177,7 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
       totalDebit: new Prisma.Decimal(50000),
       totalCredit: new Prisma.Decimal(50000),
     });
-    expect(prisma.payrollLine.updateMany).toHaveBeenCalledWith({
+    expect(prisma.__tx?.payrollLine.updateMany).toHaveBeenCalledWith({
       where: { tenantId, payrollRunId: 'run-1' },
       data: { status: PayrollLineStatus.POSTED },
     });
@@ -169,7 +228,7 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
       ConflictException,
     );
     expect(prisma.journalEntry.create).not.toHaveBeenCalled();
-    expect(prisma.__tx.payrollRun.update).not.toHaveBeenCalled();
+    expect(prisma.__tx?.payrollRun.update).not.toHaveBeenCalled();
   });
 
   it('marks posted payroll as paid through a balanced disbursement journal', async () => {
@@ -213,11 +272,11 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
       totalDebit: new Prisma.Decimal(49000),
       totalCredit: new Prisma.Decimal(49000),
     });
-    expect(prisma.__tx.payrollLine.updateMany).toHaveBeenCalledWith({
+    expect(prisma.__tx?.payrollLine.updateMany).toHaveBeenCalledWith({
       where: { tenantId, payrollRunId: 'run-1' },
       data: { paymentStatus: PayrollPaymentStatus.PAID },
     });
-    expect(prisma.__tx.payslip.updateMany).toHaveBeenCalledWith({
+    expect(prisma.__tx?.payslip.updateMany).toHaveBeenCalledWith({
       where: { tenantId, payrollRunId: 'run-1' },
       data: { paymentStatus: PayrollPaymentStatus.PAID },
     });
@@ -260,7 +319,7 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
       payrollService.markPayrollRunPaid('run-1', { reason: 'Pay now' }, actor),
     ).rejects.toThrow(ConflictException);
     expect(prisma.journalEntry.create).not.toHaveBeenCalled();
-    expect(prisma.__tx.payrollRun.update).not.toHaveBeenCalled();
+    expect(prisma.__tx?.payrollRun.update).not.toHaveBeenCalled();
   });
 
   it('blocks direct rejection/void-style mutation after payroll is paid', async () => {
@@ -282,15 +341,23 @@ describe('Payroll + M9 Accounting Integration (E2E)', () => {
   });
 });
 
-function buildPrismaMock() {
+function buildPrismaMock(): PayrollM9PrismaMock {
   const mock = {
     __periodStatus: AccountingPeriodStatus.OPEN,
     __currentRun: buildPayrollRun(),
     __journalSequence: 0,
-    __tx: undefined as unknown as ReturnType<typeof buildTransactionMock>,
+    __tx: undefined,
     payrollRun: {
       findFirst: jest.fn(() => Promise.resolve(mock.__currentRun)),
-      update: jest.fn(),
+      update: jest.fn((q: { data?: Record<string, unknown> }) => {
+        mock.__currentRun = {
+          ...mock.__currentRun,
+          ...q.data,
+          lines: [buildPayrollLine()],
+          payslips: [],
+        };
+        return Promise.resolve(mock.__currentRun);
+      }),
     },
     payrollLine: {
       updateMany: jest.fn(() => Promise.resolve({ count: 1 })),
@@ -335,6 +402,9 @@ function buildPrismaMock() {
         Promise.resolve({ id: 'fy-2026', status: 'OPEN' }),
       ),
     },
+    accountingPeriod: {
+      findFirst: jest.fn(() => Promise.resolve(null)),
+    },
     chartAccount: {
       findUnique: jest.fn((q: { where?: { tenantId_code?: { code?: string } } }) =>
         Promise.resolve(chartAccountForCode(q.where?.tenantId_code?.code)),
@@ -352,19 +422,20 @@ function buildPrismaMock() {
         return Promise.all(input as Promise<unknown>[]);
       }
 
-      mock.__tx = buildTransactionMock(mock);
-      return (input as (tx: typeof mock.__tx) => Promise<unknown>)(mock.__tx);
+      mock.__tx = buildTransactionMock(mock as PayrollM9PrismaMock);
+      return (input as (tx: TransactionMock) => Promise<unknown>)(mock.__tx);
     }),
-  };
+  } as PayrollM9PrismaMock;
 
   return mock;
 }
 
-function buildTransactionMock(root: ReturnType<typeof buildPrismaMock>) {
+function buildTransactionMock(root: PayrollM9PrismaMock): TransactionMock {
   return {
     journalEntry: root.journalEntry,
     fiscalPeriod: root.fiscalPeriod,
     fiscalYear: root.fiscalYear,
+    accountingPeriod: root.accountingPeriod,
     chartAccount: root.chartAccount,
     payrollLine: {
       updateMany: jest.fn(() => Promise.resolve({ count: 1 })),
@@ -442,7 +513,7 @@ function chartAccountForCode(code = '1010') {
   };
 }
 
-function latestJournalCreateInput(prisma: ReturnType<typeof buildPrismaMock>) {
+function latestJournalCreateInput(prisma: PayrollM9PrismaMock) {
   const calls = (prisma.journalEntry.create as jest.Mock).mock.calls;
   return calls[calls.length - 1][0] as JournalCreateInput;
 }
