@@ -22,6 +22,10 @@ import {
   createQueueMock,
 } from './test-helpers';
 
+type MockStateOwner = {
+  __state: Record<string, Record<string, unknown>[]>;
+};
+
 describe('Student Lifecycle Integration Depth (E2E)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -107,29 +111,8 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
     otherClassId = otherClass.id;
   });
 
-  afterEach(async () => {
-    await prisma.studentLifecycleTransition.deleteMany({
-      where: { tenantId },
-    });
-    await prisma.studentLifecycleTransition.deleteMany({
-      where: { tenantId: otherTenantId },
-    });
-    await prisma.studentDocumentHistory.deleteMany({ where: { tenantId } });
-    await prisma.studentDocumentHistory.deleteMany({
-      where: { tenantId: otherTenantId },
-    });
-    await prisma.studentDocument.deleteMany({ where: { tenantId } });
-    await prisma.studentDocument.deleteMany({ where: { tenantId: otherTenantId } });
-    await prisma.invoice.deleteMany({ where: { tenantId } });
-    await prisma.invoice.deleteMany({ where: { tenantId: otherTenantId } });
-    await prisma.student.deleteMany({ where: { tenantId } });
-    await prisma.student.deleteMany({ where: { tenantId: otherTenantId } });
-    await prisma.class.deleteMany({ where: { tenantId } });
-    await prisma.class.deleteMany({ where: { tenantId: otherTenantId } });
-    await prisma.academicYear.deleteMany({ where: { tenantId } });
-    await prisma.academicYear.deleteMany({ where: { tenantId: otherTenantId } });
-    await prisma.auditLog.deleteMany({ where: { tenantId } });
-    await prisma.auditLog.deleteMany({ where: { tenantId: otherTenantId } });
+  afterEach(() => {
+    resetTenantState(tenantId, otherTenantId);
   });
 
   it('requires fee clearance for transfer, writes transition history, and audits lifecycle action', async () => {
@@ -253,7 +236,7 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
     ]);
 
     const history = await prisma.studentDocumentHistory.findMany({
-      where: { tenantId, studentId: student.id },
+      where: { tenantId, documentId: document.id },
     });
     expect(history).toEqual(
       expect.arrayContaining([
@@ -267,8 +250,8 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
   });
 
   it('preserves document history and audits duplicate merge into canonical student', async () => {
-    const source = await createStudent('Duplicate', 'Source');
-    const target = await createStudent('Duplicate', 'Target');
+    const source = await createStudent('Duplicate', 'Student');
+    const target = await createStudent('Duplicate', 'Student');
 
     const document = await studentsService.uploadStudentDocument(
       source.id,
@@ -385,7 +368,6 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
         gender: 'OTHER',
         admissionDate: '2024-04-20',
         classId: targetClassId,
-        confirmNoDisability: true,
       },
       auth,
     );
@@ -404,10 +386,7 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
   }
 
   function expectLifecycleAudit(studentId: string, actionFragment: string) {
-    expect(
-      (prisma as unknown as { __state: { auditLogs: Record<string, unknown>[] } })
-        .__state.auditLogs,
-    ).toEqual(
+    expect(getMockState().auditLogs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           tenantId,
@@ -417,5 +396,19 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
         }),
       ]),
     );
+  }
+
+  function resetTenantState(...tenantIds: string[]) {
+    const state = getMockState();
+    for (const key of Object.keys(state)) {
+      state[key] = state[key].filter(
+        (item) =>
+          typeof item.tenantId !== 'string' || !tenantIds.includes(item.tenantId),
+      );
+    }
+  }
+
+  function getMockState() {
+    return (prisma as unknown as MockStateOwner).__state;
   }
 });
