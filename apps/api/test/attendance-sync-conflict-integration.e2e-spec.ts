@@ -21,7 +21,9 @@ describe('Attendance Sync + Conflict Integration (E2E)', () => {
       { recordDeliveryRecords: jest.fn() } as unknown as CommunicationsService,
       { record: jest.fn() } as unknown as AuditService,
       { emit: jest.fn() } as unknown as EventEmitter2,
-      { getSetting: jest.fn().mockResolvedValue(true) } as unknown as SettingsService,
+      {
+        getSetting: jest.fn().mockResolvedValue(true),
+      } as unknown as SettingsService,
     );
     const actor = createAuthContextMock({
       tenantId: 'tenant-attendance-sync',
@@ -86,7 +88,9 @@ describe('Attendance Sync + Conflict Integration (E2E)', () => {
       { recordDeliveryRecords: jest.fn() } as unknown as CommunicationsService,
       auditService as unknown as AuditService,
       { emit: jest.fn() } as unknown as EventEmitter2,
-      { getSetting: jest.fn().mockResolvedValue(true) } as unknown as SettingsService,
+      {
+        getSetting: jest.fn().mockResolvedValue(true),
+      } as unknown as SettingsService,
     );
     const actor = createAuthContextMock({
       tenantId: 'tenant-attendance-sync',
@@ -164,7 +168,9 @@ function makeSyncPrisma() {
         return created;
       }),
       update: jest.fn(async ({ where }) => {
-        const found = state.syncSubmissions.find((item) => item.id === where.id);
+        const found = state.syncSubmissions.find(
+          (item) => item.id === where.id,
+        );
         if (!found) {
           throw new Error('Sync submission not found');
         }
