@@ -1,55 +1,55 @@
 import { NotFoundException } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
-import { AppModule } from '../src/app.module';
+import { StudentDocumentKind, StorageProvider } from '@prisma/client';
+import { AuditService } from '../src/audit/audit.service';
+import { ConfigService } from '../src/config/config.service';
 import { FileRegistryService } from '../src/file-registry/file-registry.service';
-import { StudentRecordsService } from '../src/student-records/student-records.service';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { RedisService } from '../src/redis/redis.service';
-import { NotificationsService } from '../src/notifications/notifications.service';
-import { getQueueToken } from '@nestjs/bullmq';
-import { StudentDocumentKind } from '@prisma/client';
+import { StorageService } from '../src/storage/storage.service';
+import { StudentRecordsService } from '../src/student-records/student-records.service';
 import {
   PrismaMock,
-  createQueueMock,
   createAuthContextMock,
   createPrismaMock,
-  mockBullQueues,
 } from './test-helpers';
 
 describe('Student Documents Registry Integration (E2E)', () => {
-  let moduleRef: TestingModule;
   let prisma: PrismaMock;
   let studentRecordsService: StudentRecordsService;
   let fileRegistryService: FileRegistryService;
+  let auditService: { record: jest.Mock };
+  let storageService: { saveBase64Object: jest.Mock };
 
-  beforeEach(async () => {
+  beforeEach(() => {
     prisma = createPrismaMock();
-    const moduleBuilder = Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(PrismaService)
-      .useValue(prisma)
-      .overrideProvider(RedisService)
-      .useValue({
-        ping: jest.fn(() => Promise.resolve('PONG')),
-        onModuleDestroy: jest.fn(),
-      })
-      .overrideProvider(NotificationsService)
-      .useValue({ sendAuthCodeEmail: jest.fn(), sendEmail: jest.fn() });
+    auditService = {
+      record: jest.fn(async (entry: Record<string, unknown>) => {
+        prisma.__state.auditLogs.push({
+          id: `audit-${prisma.__state.auditLogs.length + 1}`,
+          ...entry,
+          createdAt: new Date(),
+        });
+      }),
+    };
+    storageService = {
+      saveBase64Object: jest.fn(async (input: { tenantId: string; fileName: string }) => ({
+        provider: StorageProvider.LOCAL,
+        objectKey: `${input.tenantId}/students/student-a/documents/${input.fileName}`,
+        publicUrl: null,
+        sizeBytes: 10,
+      })),
+    };
 
-    moduleRef = await mockBullQueues(moduleBuilder)
-      .overrideProvider(getQueueToken('finance'))
-      .useValue(createQueueMock())
-      .overrideProvider(getQueueToken('payroll'))
-      .useValue(createQueueMock())
-      .compile();
-
-    studentRecordsService = moduleRef.get(StudentRecordsService);
-    fileRegistryService = moduleRef.get(FileRegistryService);
-  });
-
-  afterEach(async () => {
-    await moduleRef?.close();
+    fileRegistryService = new FileRegistryService(
+      prisma as unknown as PrismaService,
+      auditService as unknown as AuditService,
+      { port: 4000 } as ConfigService,
+    );
+    studentRecordsService = new StudentRecordsService(
+      prisma as unknown as PrismaService,
+      storageService as unknown as StorageService,
+      auditService as unknown as AuditService,
+      fileRegistryService,
+    );
   });
 
   it('wires student documents to file registry and enforces security', async () => {
@@ -67,7 +67,6 @@ describe('Student Documents Registry Integration (E2E)', () => {
       userId: 'user-b',
     });
 
-    // 1. Upload a document for Student A
     await studentRecordsService.uploadDocument(
       {
         studentId: studentAId,
@@ -80,7 +79,15 @@ describe('Student Documents Registry Integration (E2E)', () => {
       actorA,
     );
 
-    // 2. Verify it's in the FileRegistry
+    expect(storageService.saveBase64Object).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: tenantAId,
+        prefix: `students/${studentAId}/documents`,
+        fileName: 'birth.pdf',
+        contentType: 'application/pdf',
+      }),
+    );
+
     const registryFiles = await fileRegistryService.listFilesByEntity(
       tenantAId,
       'students',
@@ -94,20 +101,17 @@ describe('Student Documents Registry Integration (E2E)', () => {
 
     const assetId = registryFiles[0].id;
 
-    // 3. Tenant A can get signed URL (preview)
     const preview = await studentRecordsService.getSignedUrl(
       actorA,
       assetId,
       'preview',
     );
-    expect(preview.url).toBeDefined();
+    expect(preview.url).toBe(`http://localhost:4000/api/v1/files/${assetId}/preview`);
 
-    // 4. Tenant B CANNOT get signed URL (Tenant Isolation)
     await expect(
       studentRecordsService.getSignedUrl(actorB, assetId, 'preview'),
     ).rejects.toBeInstanceOf(NotFoundException);
 
-    // 5. Deletion removes from registry
     await studentRecordsService.deleteDocument(actorA, assetId);
     const registryFilesAfter = await fileRegistryService.listFilesByEntity(
       tenantAId,
@@ -116,7 +120,6 @@ describe('Student Documents Registry Integration (E2E)', () => {
     );
     expect(registryFilesAfter).toHaveLength(0);
 
-    // 6. Verify Auditing
     expect(prisma.__state.auditLogs).toContainEqual(
       expect.objectContaining({
         action: 'file_preview',
