@@ -360,7 +360,7 @@ describe('AcademicsController M4 contracts', () => {
     );
   });
 
-  it('delegates results preview to ResultsService', () => {
+  it('delegates results preview to ResultsService', async () => {
     const { controller, resultsService } = createController();
     const studentId = 's1';
     const dto = { examTermId: 'term-1', includeCas: true };
@@ -369,9 +369,13 @@ describe('AcademicsController M4 contracts', () => {
       summary: { percentage: 85 },
     } as never);
 
-    expect(
-      controller.previewStudentResult(studentId, dto as never, actor),
-    ).toEqual({
+    const result = await controller.previewStudentResult(
+      studentId,
+      dto as never,
+      actor,
+    );
+
+    expect(result).toEqual({
       student: { name: 'John Doe' },
       summary: { percentage: 85 },
     });
