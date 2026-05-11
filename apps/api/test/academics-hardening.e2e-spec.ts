@@ -40,7 +40,11 @@ describe('Academics Hardening (Service Layer)', () => {
       examTerm: { findFirst: jest.Mock };
       assessmentComponent: { findFirst: jest.Mock };
       student: { findMany: jest.Mock };
-      markEntry: { findMany: jest.Mock; upsert: jest.Mock; findFirst: jest.Mock };
+      markEntry: {
+        findMany: jest.Mock;
+        upsert: jest.Mock;
+        findFirst: jest.Mock;
+      };
       $transaction: jest.Mock;
     };
 
@@ -84,7 +88,9 @@ describe('Academics Hardening (Service Layer)', () => {
             assessmentComponentId: 'comp-1',
             classId: 'class-1',
             subjectId: 'sub-1',
-            entries: [{ studentId: 'student-from-tenant-b', marksObtained: 80 }],
+            entries: [
+              { studentId: 'student-from-tenant-b', marksObtained: 80 },
+            ],
           },
           actor,
         ),
@@ -151,7 +157,9 @@ describe('Academics Hardening (Service Layer)', () => {
 
     it('prevents editing locked marks', async () => {
       const p = mockValidScope();
-      p.markEntry.findMany.mockResolvedValue([{ id: 'mark-1', isLocked: true }]);
+      p.markEntry.findMany.mockResolvedValue([
+        { id: 'mark-1', isLocked: true },
+      ]);
 
       await expect(
         marksService.bulkUpsert(
