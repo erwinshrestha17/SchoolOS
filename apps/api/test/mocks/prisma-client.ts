@@ -75,13 +75,6 @@ class Decimal {
     return this.numericValue === 0;
   }
 
-  gt(value: number | string | Decimal) {
-    return this.numericValue > decimalToNumber(value);
-  }
-
-  lt(value: number | string | Decimal) {
-    return this.numericValue < decimalToNumber(value);
-  }
 
   toNumber() {
     return this.numericValue;
@@ -110,10 +103,11 @@ export class PrismaClient {
 
 export const Prisma = {
   Decimal,
-  sql: (strings: TemplateStringsArray, ...values: any[]) => ({
+  sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
     strings,
     values,
   }),
+  validator: <T>() => (val: T) => val,
 };
 
 export const Mode = {

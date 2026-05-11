@@ -1,9 +1,4 @@
-import {
-  IsDateString,
-  IsOptional,
-  IsString,
-  IsBoolean,
-} from 'class-validator';
+import { IsDateString, IsOptional, IsString, IsBoolean } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class BalanceSheetQueryDto {

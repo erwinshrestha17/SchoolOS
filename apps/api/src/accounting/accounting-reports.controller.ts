@@ -1,5 +1,10 @@
 import { Controller, Get, Put, Body, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiCookieAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiCookieAuth,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
@@ -24,7 +29,11 @@ export class AccountingReportsController {
 
   @Get('trial-balance')
   @ApiOperation({ summary: 'Get trial balance report' })
-  @Permissions('accounting:reports:trial-balance', 'accounting:read', 'accounting:reports:read')
+  @Permissions(
+    'accounting:reports:trial-balance',
+    'accounting:read',
+    'accounting:reports:read',
+  )
   async getTrialBalance(
     @CurrentAuth() auth: AuthContext,
     @Query() query: TrialBalanceQueryDto,
@@ -34,7 +43,11 @@ export class AccountingReportsController {
 
   @Get('general-ledger')
   @ApiOperation({ summary: 'Get general ledger report' })
-  @Permissions('accounting:reports:general-ledger', 'accounting:read', 'accounting:reports:read')
+  @Permissions(
+    'accounting:reports:general-ledger',
+    'accounting:read',
+    'accounting:reports:read',
+  )
   async getGeneralLedger(
     @CurrentAuth() auth: AuthContext,
     @Query() query: GeneralLedgerQueryDto,
@@ -44,7 +57,11 @@ export class AccountingReportsController {
 
   @Get('cash-book')
   @ApiOperation({ summary: 'Get cash book report' })
-  @Permissions('accounting:reports:cash-book', 'accounting:read', 'accounting:reports:read')
+  @Permissions(
+    'accounting:reports:cash-book',
+    'accounting:read',
+    'accounting:reports:read',
+  )
   async getCashBook(
     @CurrentAuth() auth: AuthContext,
     @Query() query: CashBookQueryDto,
@@ -54,7 +71,11 @@ export class AccountingReportsController {
 
   @Get('income-statement')
   @ApiOperation({ summary: 'Get income statement report' })
-  @Permissions('accounting:reports:income-statement', 'accounting:read', 'accounting:reports:read')
+  @Permissions(
+    'accounting:reports:income-statement',
+    'accounting:read',
+    'accounting:reports:read',
+  )
   async getIncomeStatement(
     @CurrentAuth() auth: AuthContext,
     @Query() query: IncomeStatementQueryDto,
@@ -64,7 +85,11 @@ export class AccountingReportsController {
 
   @Get('balance-sheet')
   @ApiOperation({ summary: 'Get balance sheet report' })
-  @Permissions('accounting:reports:balance-sheet', 'accounting:read', 'accounting:reports:read')
+  @Permissions(
+    'accounting:reports:balance-sheet',
+    'accounting:read',
+    'accounting:reports:read',
+  )
   async getBalanceSheet(
     @CurrentAuth() auth: AuthContext,
     @Query() query: BalanceSheetQueryDto,
@@ -74,7 +99,11 @@ export class AccountingReportsController {
 
   @Get('tax-summary')
   @ApiOperation({ summary: 'Get tax summary report' })
-  @Permissions('accounting:reports:tax-summary', 'accounting:read', 'accounting:reports:read')
+  @Permissions(
+    'accounting:reports:tax-summary',
+    'accounting:read',
+    'accounting:reports:read',
+  )
   async getTaxSummary(
     @CurrentAuth() auth: AuthContext,
     @Query() query: TaxSummaryQueryDto,
@@ -96,6 +125,10 @@ export class AccountingReportsController {
     @CurrentAuth() auth: AuthContext,
     @Body() dto: UpdateAccountingReportMappingsDto,
   ) {
-    return this.reportsService.updateReportMappings(auth.tenantId, auth.userId, dto);
+    return this.reportsService.updateReportMappings(
+      auth.tenantId,
+      auth.userId,
+      dto,
+    );
   }
 }

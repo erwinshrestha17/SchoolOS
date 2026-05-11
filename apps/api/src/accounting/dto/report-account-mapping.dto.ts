@@ -1,4 +1,10 @@
-import { IsArray, IsEnum, IsString, ValidateNested, IsNotEmpty } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsString,
+  ValidateNested,
+  IsNotEmpty,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { AccountingReportMappingType } from '@prisma/client';
 

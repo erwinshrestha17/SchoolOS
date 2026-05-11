@@ -187,8 +187,6 @@ export class AccountingController {
     return this.accountingService.buildReports(auth, query);
   }
 
-
-
   @Get('accounts/:accountId/ledger')
   @Permissions('accounting:reports:read')
   accountLedger(

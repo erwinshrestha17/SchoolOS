@@ -25,7 +25,10 @@ describe('accounting reversals', () => {
       id: 'journal-reversal',
       entryNumber: 'JE-2026-00002',
       reversalOfId: original.id,
-      lines: [{ side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) }, { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) }],
+      lines: [
+        { side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) },
+        { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) },
+      ],
     };
     const { service, prisma, postingService, auditService } = buildService({
       original,
@@ -340,7 +343,10 @@ describe('Manual Journal Approval Workflow', () => {
       id: 'journal-1',
       status: JournalEntryStatus.SUBMITTED,
       entryDate: new Date('2026-05-01'),
-      lines: [{ side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) }, { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) }],
+      lines: [
+        { side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) },
+        { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) },
+      ],
     };
     const { service, postingService } = buildService({ original: journal });
 
@@ -355,7 +361,10 @@ describe('Manual Journal Approval Workflow', () => {
       status: JournalEntryStatus.SUBMITTED,
       entryDate: new Date('2026-05-01'),
       createdById: 'different-user',
-      lines: [{ side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) }, { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) }],
+      lines: [
+        { side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) },
+        { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) },
+      ],
     };
     const { service, prisma, postingService } = buildService({
       original: journal,
@@ -385,7 +394,10 @@ describe('Manual Journal Approval Workflow', () => {
       status: JournalEntryStatus.SUBMITTED,
       entryDate: new Date('2026-05-01'),
       createdById: actor.userId,
-      lines: [{ side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) }, { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) }],
+      lines: [
+        { side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) },
+        { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) },
+      ],
     };
     const { service, postingService } = buildService({ original: journal });
 
@@ -399,7 +411,10 @@ describe('Manual Journal Approval Workflow', () => {
       id: 'journal-1',
       status: JournalEntryStatus.SUBMITTED,
       entryDate: new Date('2026-05-01'),
-      lines: [{ side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) }, { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) }],
+      lines: [
+        { side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) },
+        { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) },
+      ],
     };
     const { service, prisma, postingService } = buildService({
       original: journal,
@@ -428,7 +443,10 @@ describe('Manual Journal Approval Workflow', () => {
       id: 'journal-1',
       status: JournalEntryStatus.APPROVED,
       entryDate: new Date('2026-05-01'),
-      lines: [{ side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) }, { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) }],
+      lines: [
+        { side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) },
+        { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) },
+      ],
     };
     const { service, prisma, postingService } = buildService({
       original: journal,
@@ -458,7 +476,10 @@ describe('Manual Journal Approval Workflow', () => {
       id: 'journal-1',
       status: JournalEntryStatus.DRAFT,
       entryDate: new Date('2026-05-01'),
-      lines: [{ side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) }, { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) }],
+      lines: [
+        { side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) },
+        { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) },
+      ],
     };
     const { service, prisma, postingService } = buildService({
       original: journal,

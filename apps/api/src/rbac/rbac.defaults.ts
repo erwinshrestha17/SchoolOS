@@ -435,7 +435,11 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     ['accounting:reports', 'balance-sheet', 'View Balance Sheet report'],
     ['accounting:reports', 'tax-summary', 'View Tax Summary report'],
     ['accounting:settings', 'read', 'Read accounting settings'],
-    ['accounting:settings', 'update', 'Update accounting settings and mappings'],
+    [
+      'accounting:settings',
+      'update',
+      'Update accounting settings and mappings',
+    ],
     ['accounting:exports', 'create', 'Create accounting exports'],
   ].map(([resource, action, description]) => ({
     resource,

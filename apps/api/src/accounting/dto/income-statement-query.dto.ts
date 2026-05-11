@@ -3,7 +3,7 @@ import {
   IsOptional,
   IsString,
   IsBoolean,
-  IsEnum
+  IsEnum,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 

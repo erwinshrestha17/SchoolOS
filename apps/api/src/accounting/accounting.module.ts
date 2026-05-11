@@ -12,6 +12,10 @@ import { AccountingReportsService } from './accounting-reports.service';
   imports: [AuthModule, AuditModule, FinanceModule, AccountingPostingModule],
   controllers: [AccountingController, AccountingReportsController],
   providers: [AccountingService, AccountingReportsService],
-  exports: [AccountingService, AccountingPostingModule, AccountingReportsService],
+  exports: [
+    AccountingService,
+    AccountingPostingModule,
+    AccountingReportsService,
+  ],
 })
 export class AccountingModule {}

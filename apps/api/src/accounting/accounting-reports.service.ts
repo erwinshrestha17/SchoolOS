@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TrialBalanceQueryDto } from './dto/trial-balance-query.dto';
@@ -19,9 +23,37 @@ import {
 import { CashBookQueryDto } from './dto/cash-book-query.dto';
 import { IncomeStatementQueryDto } from './dto/income-statement-query.dto';
 import { BalanceSheetQueryDto } from './dto/balance-sheet-query.dto';
-import { TaxSummaryQueryDto, TaxSummaryType } from './dto/tax-summary-query.dto';
+import {
+  TaxSummaryQueryDto,
+  TaxSummaryType,
+} from './dto/tax-summary-query.dto';
 import { UpdateAccountingReportMappingsDto } from './dto/report-account-mapping.dto';
-import { ChartAccountType, JournalLineSide, Prisma, AccountingReportMappingType } from '@prisma/client';
+import {
+  ChartAccountType,
+  JournalLineSide,
+  Prisma,
+} from '@prisma/client';
+
+const cashBookLineInclude = Prisma.validator<Prisma.JournalLineInclude>()({
+  chartAccount: {
+    select: { id: true, code: true, name: true },
+  },
+  journalEntry: {
+    include: {
+      lines: {
+        include: {
+          chartAccount: {
+            select: { id: true, code: true, name: true },
+          },
+        },
+      },
+    },
+  },
+});
+
+type CashBookJournalLine = Prisma.JournalLineGetPayload<{
+  include: typeof cashBookLineInclude;
+}>;
 
 @Injectable()
 export class AccountingReportsService {
@@ -113,7 +145,9 @@ export class AccountingReportsService {
     ];
 
     for (const account of accounts) {
-      const lineData = linesGrouped.find((l) => l.chartAccountId === account.id);
+      const lineData = linesGrouped.find(
+        (l) => l.chartAccountId === account.id,
+      );
 
       const pDebit = this.toDecimal(lineData?._sum.debit);
       const pCredit = this.toDecimal(lineData?._sum.credit);
@@ -467,13 +501,16 @@ export class AccountingReportsService {
       });
 
       if (accounts.length !== new Set(accountIds).size) {
-        throw new BadRequestException('One or more accounts do not exist or belong to another tenant');
+        throw new BadRequestException(
+          'One or more accounts do not exist or belong to another tenant',
+        );
       }
     }
 
-    const existingMappings = await this.prisma.accountingReportAccountMapping.findMany({
-      where: { tenantId },
-    });
+    const existingMappings =
+      await this.prisma.accountingReportAccountMapping.findMany({
+        where: { tenantId },
+      });
 
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.accountingReportAccountMapping.deleteMany({
@@ -541,13 +578,14 @@ export class AccountingReportsService {
       throw new BadRequestException('fromDate cannot be after toDate');
     }
 
-    const cashBankMappings = await this.prisma.accountingReportAccountMapping.findMany({
-      where: {
-        tenantId,
-        mappingType: { in: ['CASH', 'BANK'] },
-      },
-      include: { account: true },
-    });
+    const cashBankMappings =
+      await this.prisma.accountingReportAccountMapping.findMany({
+        where: {
+          tenantId,
+          mappingType: { in: ['CASH', 'BANK'] },
+        },
+        include: { account: true },
+      });
 
     let targetAccounts: Array<{ id: string; code: string; name: string }> = [];
     let setupWarnings: string[] = [];
@@ -563,7 +601,9 @@ export class AccountingReportsService {
 
       if (!account) throw new NotFoundException('Account not found');
       if (account.type !== ChartAccountType.ASSET) {
-        throw new BadRequestException('Cash Book account must be of type ASSET');
+        throw new BadRequestException(
+          'Cash Book account must be of type ASSET',
+        );
       }
 
       const isMapped = cashBankMappings.some((m) => m.accountId === account.id);
@@ -660,16 +700,18 @@ export class AccountingReportsService {
     const totalPages = Math.ceil(totalLines / limit);
     const skip = (page - 1) * limit;
 
-    const lines = await this.prisma.journalLine.findMany({
-      where: lineWhere,
-      include: { journalEntry: true },
-      orderBy: [
-        { journalEntry: { entryDate: 'asc' } },
-        { journalEntry: { entryNumber: 'asc' } },
-      ],
-      skip,
-      take: limit,
-    });
+    const lines: CashBookJournalLine[] = await this.prisma.journalLine.findMany(
+      {
+        where: lineWhere,
+        include: cashBookLineInclude,
+        orderBy: [
+          { journalEntry: { entryDate: 'asc' } },
+          { journalEntry: { entryNumber: 'asc' } },
+        ],
+        skip,
+        take: limit,
+      },
+    );
 
     let runningSignedBalance = openingBalance;
     const rows: CashBookRow[] = [];
@@ -677,7 +719,9 @@ export class AccountingReportsService {
     let totalPayments = new Prisma.Decimal(0);
 
     for (const line of lines) {
-      runningSignedBalance = runningSignedBalance.plus(line.debit).minus(line.credit);
+      runningSignedBalance = runningSignedBalance
+        .plus(line.debit)
+        .minus(line.credit);
 
       totalReceipts = totalReceipts.plus(line.debit);
       totalPayments = totalPayments.plus(line.credit);
@@ -690,9 +734,11 @@ export class AccountingReportsService {
         lineRunSide = JournalLineSide.CREDIT;
       }
 
-      const rowAccount = targetAccounts.find((a) => a.id === line.chartAccountId)!;
+      const rowAccount = targetAccounts.find(
+        (a) => a.id === line.chartAccountId,
+      )!;
 
-      const otherAccount = (line.journalEntry.lines as { chartAccountId: string; chartAccount?: { id: string; code: string; name: string } }[]).find(
+      const otherAccount = line.journalEntry.lines.find(
         (l) => l.chartAccountId !== line.chartAccountId,
       )?.chartAccount;
 
@@ -732,11 +778,14 @@ export class AccountingReportsService {
       fiscalPeriodId,
       fromDate,
       toDate,
-      account: targetAccounts.length === 1 ? {
-        id: targetAccounts[0].id,
-        code: targetAccounts[0].code,
-        name: targetAccounts[0].name,
-      } : undefined,
+      account:
+        targetAccounts.length === 1
+          ? {
+              id: targetAccounts[0].id,
+              code: targetAccounts[0].code,
+              name: targetAccounts[0].name,
+            }
+          : undefined,
       openingBalance: absoluteOpeningBalance,
       openingBalanceSide,
       totalReceipts,
@@ -759,7 +808,13 @@ export class AccountingReportsService {
     tenantId: string,
     query: IncomeStatementQueryDto,
   ): Promise<IncomeStatementResponse> {
-    const { fiscalYearId, fiscalPeriodId, fromDate, toDate, includeZeroBalances } = query;
+    const {
+      fiscalYearId,
+      fiscalPeriodId,
+      fromDate,
+      toDate,
+      includeZeroBalances,
+    } = query;
 
     const fiscalYear = await this.prisma.fiscalYear.findUnique({
       where: { id: fiscalYearId, tenantId },
@@ -814,7 +869,9 @@ export class AccountingReportsService {
     let totalExpense = new Prisma.Decimal(0);
 
     for (const account of accounts) {
-      const lineData = linesGrouped.find((l) => l.chartAccountId === account.id);
+      const lineData = linesGrouped.find(
+        (l) => l.chartAccountId === account.id,
+      );
       const debit = this.toDecimal(lineData?._sum.debit);
       const credit = this.toDecimal(lineData?._sum.credit);
 
@@ -881,7 +938,8 @@ export class AccountingReportsService {
     tenantId: string,
     query: BalanceSheetQueryDto,
   ): Promise<BalanceSheetResponse> {
-    const { fiscalYearId, fiscalPeriodId, asOfDate, includeZeroBalances } = query;
+    const { fiscalYearId, fiscalPeriodId, asOfDate, includeZeroBalances } =
+      query;
 
     const fiscalYear = await this.prisma.fiscalYear.findUnique({
       where: { id: fiscalYearId, tenantId },
@@ -927,7 +985,9 @@ export class AccountingReportsService {
     let currentYearExpense = new Prisma.Decimal(0);
 
     for (const account of accounts) {
-      const lineData = linesGrouped.find((l) => l.chartAccountId === account.id);
+      const lineData = linesGrouped.find(
+        (l) => l.chartAccountId === account.id,
+      );
       const debit = this.toDecimal(lineData?._sum.debit);
       const credit = this.toDecimal(lineData?._sum.credit);
 
@@ -993,7 +1053,11 @@ export class AccountingReportsService {
       asOfDate: asOfDate ? new Date(asOfDate) : fiscalYear.endDate,
       sections: [
         { section: 'ASSETS', total: totalAssets, accounts: assetAccounts },
-        { section: 'LIABILITIES', total: totalLiabilities, accounts: liabilityAccounts },
+        {
+          section: 'LIABILITIES',
+          total: totalLiabilities,
+          accounts: liabilityAccounts,
+        },
         { section: 'EQUITY', total: totalEquity, accounts: equityAccounts },
       ],
       totalAssets,
@@ -1050,7 +1114,9 @@ export class AccountingReportsService {
     });
 
     const getAccountsByMapping = (types: string[]) => {
-      const mappedIds = mappings.filter((m) => types.includes(m.mappingType)).map((m) => m.accountId);
+      const mappedIds = mappings
+        .filter((m) => types.includes(m.mappingType))
+        .map((m) => m.accountId);
       return accounts.filter((a) => mappedIds.includes(a.id));
     };
 
@@ -1094,7 +1160,10 @@ export class AccountingReportsService {
     let vatNet = new Prisma.Decimal(0);
     let vatStatus: 'PAYABLE' | 'RECEIVABLE' | 'ZERO' = 'ZERO';
 
-    if (summaryType === TaxSummaryType.ALL || summaryType === TaxSummaryType.VAT) {
+    if (
+      summaryType === TaxSummaryType.ALL ||
+      summaryType === TaxSummaryType.VAT
+    ) {
       if (vatPayableAccounts.length === 0)
         setupWarnings.push('VAT_OUTPUT account mapping is missing');
       if (vatInputAccounts.length === 0)
@@ -1109,10 +1178,13 @@ export class AccountingReportsService {
 
     let tdsDeducted = new Prisma.Decimal(0);
     let tdsPaid = new Prisma.Decimal(0);
-    if (summaryType === TaxSummaryType.ALL || summaryType === TaxSummaryType.TDS) {
+    if (
+      summaryType === TaxSummaryType.ALL ||
+      summaryType === TaxSummaryType.TDS
+    ) {
       if (tdsPayableAccounts.length === 0)
         setupWarnings.push('TDS_PAYABLE account mapping is missing');
-      
+
       let tdsCredits = new Prisma.Decimal(0);
       let tdsDebits = new Prisma.Decimal(0);
       for (const a of tdsPayableAccounts) {
@@ -1130,10 +1202,13 @@ export class AccountingReportsService {
     let pfEmpr = new Prisma.Decimal(0);
     let pfPaid = new Prisma.Decimal(0);
     let netPfPayable = new Prisma.Decimal(0);
-    if (summaryType === TaxSummaryType.ALL || summaryType === TaxSummaryType.PF) {
+    if (
+      summaryType === TaxSummaryType.ALL ||
+      summaryType === TaxSummaryType.PF
+    ) {
       if (pfPayableAccounts.length === 0)
         setupWarnings.push('PF_PAYABLE account mapping is missing');
-      
+
       let pfCredits = new Prisma.Decimal(0);
       let pfDebits = new Prisma.Decimal(0);
       for (const a of pfPayableAccounts) {
@@ -1143,14 +1218,16 @@ export class AccountingReportsService {
           pfDebits = pfDebits.plus(this.toDecimal(line._sum.debit));
         }
       }
-      
+
       pfPaid = pfDebits;
       netPfPayable = pfCredits.minus(pfDebits);
-      
+
       pfEmp = pfCredits.dividedBy(2);
       pfEmpr = pfCredits.dividedBy(2);
-      if (pfEmployeeAccounts.length > 0) pfEmp = getNetCredit(pfEmployeeAccounts);
-      if (pfEmployerAccounts.length > 0) pfEmpr = getNetCredit(pfEmployerAccounts);
+      if (pfEmployeeAccounts.length > 0)
+        pfEmp = getNetCredit(pfEmployeeAccounts);
+      if (pfEmployerAccounts.length > 0)
+        pfEmpr = getNetCredit(pfEmployerAccounts);
     }
 
     return {
@@ -1158,7 +1235,8 @@ export class AccountingReportsService {
       fiscalPeriodId,
       fromDate,
       toDate,
-      ...(summaryType === TaxSummaryType.ALL || summaryType === TaxSummaryType.VAT
+      ...(summaryType === TaxSummaryType.ALL ||
+      summaryType === TaxSummaryType.VAT
         ? {
             vat: {
               outputVat: vatOutput,
@@ -1168,7 +1246,8 @@ export class AccountingReportsService {
             },
           }
         : {}),
-      ...(summaryType === TaxSummaryType.ALL || summaryType === TaxSummaryType.TDS
+      ...(summaryType === TaxSummaryType.ALL ||
+      summaryType === TaxSummaryType.TDS
         ? {
             tds: {
               deductedPayable: tdsDeducted,
@@ -1177,7 +1256,8 @@ export class AccountingReportsService {
             },
           }
         : {}),
-      ...(summaryType === TaxSummaryType.ALL || summaryType === TaxSummaryType.PF
+      ...(summaryType === TaxSummaryType.ALL ||
+      summaryType === TaxSummaryType.PF
         ? {
             pf: {
               employeeContribution: pfEmp,
