@@ -74,7 +74,9 @@ describe('Phase 2A backend flow contracts', () => {
   it('prevents incomplete or withheld calculations from becoming report cards', () => {
     const reportCardsService = readAcademicsFile('report-cards.service.ts');
 
-    expect(reportCardsService).toContain("overall.resultStatus === 'INCOMPLETE'");
+    expect(reportCardsService).toContain(
+      "overall.resultStatus === 'INCOMPLETE'",
+    );
     expect(reportCardsService).toContain("overall.resultStatus === 'WITHHELD'");
     expect(reportCardsService).toContain('totalObtained');
     expect(reportCardsService).toContain('totalFullMarks');
@@ -82,7 +84,9 @@ describe('Phase 2A backend flow contracts', () => {
   });
 
   it('makes promotion readiness depend on locked report cards instead of raw marks', () => {
-    const promotionService = readAcademicsFile('promotion-readiness.service.ts');
+    const promotionService = readAcademicsFile(
+      'promotion-readiness.service.ts',
+    );
 
     expect(promotionService).toContain('MISSING_REPORT_CARD');
     expect(promotionService).toContain('REPORT_CARD_NOT_LOCKED');
