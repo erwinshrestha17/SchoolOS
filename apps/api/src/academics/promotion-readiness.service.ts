@@ -398,7 +398,8 @@ export class PromotionReadinessService {
     const year = await this.prisma.academicYear.findFirst({
       where: { id, tenantId: actor.tenantId },
     });
-    if (!year) throw new NotFoundException('Academic year not found in this tenant');
+    if (!year)
+      throw new NotFoundException('Academic year not found in this tenant');
   }
 
   private async ensureExamTerm(
@@ -409,20 +410,23 @@ export class PromotionReadinessService {
     const term = await this.prisma.examTerm.findFirst({
       where: { id, tenantId: actor.tenantId, academicYearId },
     });
-    if (!term) throw new NotFoundException('Exam term not found in this academic year');
+    if (!term)
+      throw new NotFoundException('Exam term not found in this academic year');
   }
 
   private async ensureClass(actor: AuthContext, id: string) {
     const classroom = await this.prisma.class.findFirst({
       where: { id, tenantId: actor.tenantId },
     });
-    if (!classroom) throw new NotFoundException('Class not found in this tenant');
+    if (!classroom)
+      throw new NotFoundException('Class not found in this tenant');
   }
 
   private async ensureSection(actor: AuthContext, id: string, classId: string) {
     const section = await this.prisma.section.findFirst({
       where: { id, tenantId: actor.tenantId, classId },
     });
-    if (!section) throw new NotFoundException('Section not found in this class');
+    if (!section)
+      throw new NotFoundException('Section not found in this class');
   }
 }
