@@ -11,7 +11,7 @@
     "dev": "nest start --watch --entryFile apps/api/src/main",
     "prisma:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
-    "db:seed": "prisma db seed && prisma db execute --schema prisma/schema.prisma --file prisma/migrations/20260511093000_principal_tenant_admin/migration.sql",
+    "db:seed": "prisma db seed",
     "db:seed:platform": "tsx prisma/platform-seed.ts",
     "start": "node dist/apps/api/src/main.js",
     "start:dev": "nest start --watch --entryFile apps/api/src/main",

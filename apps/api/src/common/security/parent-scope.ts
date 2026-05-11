@@ -4,11 +4,11 @@ import type { PrismaService } from '../../prisma/prisma.service';
 
 /**
  * Determines if the authenticated user is a parent-only role
- * (i.e., they do NOT have admin, teacher, principal, super_admin, accountant, etc.)
+ * (i.e., they do NOT have admin, teacher, principal, platform_super_admin, accountant, etc.)
  */
 export function isParentOnly(actor: AuthContext): boolean {
   const staffRoles = [
-    'super_admin',
+    'platform_super_admin',
     'admin',
     'teacher',
     'principal',
@@ -29,7 +29,7 @@ export function isParentOnly(actor: AuthContext): boolean {
  */
 export function isStudentOnly(actor: AuthContext): boolean {
   const staffRoles = [
-    'super_admin',
+    'platform_super_admin',
     'admin',
     'teacher',
     'principal',

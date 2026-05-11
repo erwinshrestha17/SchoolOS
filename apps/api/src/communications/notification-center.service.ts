@@ -210,7 +210,7 @@ export class NotificationCenterService {
 
 function canReadAllTenantNotifications(actor: AuthContext) {
   return (
-    actor.roles.includes('super_admin') ||
+    actor.roles.includes('platform_super_admin') ||
     actor.roles.includes('admin') ||
     actor.roles.includes('principal') ||
     actor.permissions.includes('communications:read_deliveries')

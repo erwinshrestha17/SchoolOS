@@ -116,12 +116,7 @@ export class RolesPermissionsGuard implements CanActivate {
       throw new UnauthorizedException('Authentication required');
     }
 
-    if (auth.roles.includes('super_admin')) {
-      request.auth = {
-        ...auth,
-        roles: Array.from(new Set(auth.roles)),
-        permissions: Array.from(new Set(auth.permissions)),
-      };
+    if (auth.roles.includes('platform_super_admin')) {
       return true;
     }
 

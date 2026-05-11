@@ -236,9 +236,11 @@ export class UsersService {
   }
 
   async deactivateTenant(tenantId: string, actor: AuthContext) {
-    // Only super_admin can deactivate a tenant
-    if (!actor.roles.includes('super_admin')) {
-      throw new ConflictException('Only super admins can deactivate tenants');
+    // Only platform_super_admin can deactivate a tenant
+    if (!actor.roles.includes('platform_super_admin')) {
+      throw new ConflictException(
+        'Only platform super admins can deactivate tenants',
+      );
     }
 
     const tenant = await this.prisma.tenant.findUnique({

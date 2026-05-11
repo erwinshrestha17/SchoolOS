@@ -35,7 +35,7 @@ export class FinanceCron {
       try {
         // Construct a system-level auth context since this is automated
         const adminUser = await this.prisma.user.findFirst({
-          where: { tenantId: schedule.tenantId }, // Ideally find the tenant super_admin
+          where: { tenantId: schedule.tenantId }, // Ideally find the tenant principal or admin
         });
 
         if (!adminUser) continue;
@@ -51,7 +51,7 @@ export class FinanceCron {
             tenantSlug: 'system',
             email: adminUser.email ?? 'system@schoolos.com',
             authMethod: adminUser.authMethod,
-            roles: ['super_admin'],
+            roles: ['platform_super_admin'],
             permissions: [],
           },
         );

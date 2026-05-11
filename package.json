@@ -14,6 +14,7 @@
     "db:validate": "pnpm --filter @schoolos/api exec prisma validate --schema prisma/schema.prisma",
     "db:migrate": "pnpm --filter @schoolos/api db:migrate",
     "db:seed": "pnpm --filter @schoolos/api db:seed",
+    "db:seed:platform": "pnpm --filter @schoolos/api db:seed:platform",
     "test:web:e2e": "pnpm --filter @schoolos/web test:e2e",
     "verify:env:deploy": "node scripts/check-deploy-env.mjs",
     "verify:tracked-artifacts": "node scripts/check-tracked-artifacts.mjs",

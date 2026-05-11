@@ -98,7 +98,7 @@ export class MessagingHardeningService {
   ): 'PARENT' | 'TEACHER' | 'ADMIN' {
     if (
       actor.roles.some((role) =>
-        ['super_admin', 'admin', 'principal'].includes(role),
+        ['platform_super_admin', 'admin', 'principal'].includes(role),
       )
     ) {
       return 'ADMIN';

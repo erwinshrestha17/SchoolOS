@@ -104,7 +104,7 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
   {
     resource: 'tenants',
     action: 'manage',
-    description: 'Deactivate or manage tenants (super_admin only)',
+    description: 'Deactivate or manage tenants (platform admins only)',
   },
   {
     resource: 'guardians',
@@ -824,11 +824,21 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
   },
 ];
 
+const ALL_PERMISSION_KEYS = PERMISSION_CATALOG.map(({ resource, action }) =>
+  buildPermissionKey(resource, action),
+);
+
+const PLATFORM_PERMISSION_KEYS = [
+  'platform:read',
+  'platform:manage',
+  'tenants:manage',
+];
+
+const TENANT_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(
+  (key) => !PLATFORM_PERMISSION_KEYS.includes(key),
+);
+
 export const SYSTEM_ROLE_DEFINITIONS = [
-  {
-    name: 'super_admin',
-    description: 'System preset role with every SchoolOS permission',
-  },
   {
     name: 'platform_super_admin',
     description:
@@ -885,14 +895,7 @@ export const SYSTEM_ROLE_DEFINITIONS = [
 ] as const;
 
 export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
-  super_admin: PERMISSION_CATALOG.map(({ resource, action }) =>
-    buildPermissionKey(resource, action),
-  ),
-  admin: [
-    ...PERMISSION_CATALOG.map(({ resource, action }) =>
-      buildPermissionKey(resource, action),
-    ),
-  ],
+  admin: [...TENANT_PERMISSION_KEYS],
   teacher: [
     'roles:read',
     'classes:read',
@@ -923,20 +926,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'hr:leave:request',
     'payroll:payslip:read',
   ],
-  principal: [
-    ...PERMISSION_CATALOG.map(({ resource, action }) =>
-      buildPermissionKey(resource, action),
-    ).filter(
-      (permission) =>
-        ![
-          'roles:manage_permissions',
-          'accounting:close',
-          'accounting:reverse',
-          'tenants:manage',
-          'settings:manage',
-        ].includes(permission),
-    ),
-  ],
+  principal: [...TENANT_PERMISSION_KEYS],
   subject_teacher: [
     'roles:read',
     'classes:read',
@@ -1069,13 +1059,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'transport:operate',
     'settings:read_public',
   ],
-  platform_super_admin: [
-    'platform:read',
-    'platform:manage',
-    ...PERMISSION_CATALOG.map(({ resource, action }) =>
-      buildPermissionKey(resource, action),
-    ),
-  ],
+  platform_super_admin: [...ALL_PERMISSION_KEYS],
   platform_support: [
     'platform:read',
     'students:read',

@@ -940,7 +940,7 @@ export class ParentTeacherChatService {
 
   private isModerator(actor: AuthContext) {
     return actor.roles.some((role) =>
-      ['super_admin', 'admin', 'principal'].includes(role),
+      ['platform_super_admin', 'admin', 'principal'].includes(role),
     );
   }
 

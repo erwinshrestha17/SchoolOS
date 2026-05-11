@@ -669,6 +669,7 @@ model Tenant {
   developmentalMilestones       DevelopmentalMilestone[]
   moodLogs                      MoodLog[]
   notificationDeliveries        NotificationDelivery[]
+  notificationReadReceipts      NotificationReadReceipt[]
   guardianConsents              GuardianConsent[]
   guardianIdentityVerifications GuardianIdentityVerification[]
   generatedStudentDocuments     GeneratedStudentDocument[]
@@ -762,6 +763,7 @@ model User {
 
   userRoles                   UserRole[]
   refreshTokens               RefreshToken[]
+  notificationReadReceipts    NotificationReadReceipt[]
   otpCodes                    OtpCode[]
   auditLogs                   AuditLog[]
   student                     Student?                     @relation("StudentUser")
@@ -961,6 +963,7 @@ model AcademicYear {
   timetablePeriods      TimetablePeriod[]
   timetableVersions     TimetableVersion[]
   homeworkAssignments   HomeworkAssignment[]
+  conversations         Conversation[]
 
   @@unique([tenantId, name])
 }
@@ -2441,9 +2444,27 @@ model NotificationDelivery {
   notice        Notice?       @relation(fields: [noticeId], references: [id], onDelete: Cascade)
   event         Event?        @relation(fields: [eventId], references: [id], onDelete: Cascade)
   activityPost  ActivityPost? @relation(fields: [activityPostId], references: [id], onDelete: Cascade)
+  readReceipts  NotificationReadReceipt[]
 
   @@index([tenantId, sourceType, sourceId])
+  @@index([tenantId, recipientUserId])
+  @@index([tenantId, status, createdAt])
   @@index([tenantId, status, channel])
+}
+
+model NotificationReadReceipt {
+  tenantId               String
+  notificationDeliveryId String
+  userId                 String
+  readAt                 DateTime @default(now())
+
+  tenant               Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  notificationDelivery NotificationDelivery @relation(fields: [notificationDeliveryId], references: [id], onDelete: Cascade)
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, notificationDeliveryId, userId])
+  @@index([tenantId, userId, readAt])
+  @@index([tenantId, notificationDeliveryId, userId])
 }
 
 model GuardianConsent {
@@ -2792,6 +2813,7 @@ model TimetableSlot {
   @@index([tenantId, academicYearId, classId, sectionId, dayOfWeek])
   @@index([tenantId, staffId, dayOfWeek])
   @@index([tenantId, roomId, dayOfWeek])
+  @@index([tenantId, classId, sectionId])
   @@index([tenantId, versionId])
 }
 
@@ -2907,8 +2929,9 @@ model HomeworkAssignment {
   attachments     HomeworkAttachment[]
 
   @@index([tenantId, academicYearId, classId, sectionId, status])
+  @@index([tenantId, status, dueDate])
+  @@index([tenantId, classId, sectionId])
   @@index([tenantId, subjectId, assignedByStaffId, status])
-  @@index([tenantId, dueDate, status])
 }
 
 model HomeworkSubmission {
@@ -2939,6 +2962,7 @@ model HomeworkSubmission {
   @@unique([tenantId, homeworkId, studentId])
   @@index([tenantId, homeworkId, status])
   @@index([tenantId, studentId, status])
+  @@index([tenantId, studentId])
 }
 
 model HomeworkAttachment {
@@ -2956,6 +2980,7 @@ model HomeworkAttachment {
 
   @@index([tenantId, submissionId])
   @@index([tenantId, assignmentId])
+  @@index([tenantId, fileAssetId])
 }
 
 model SyllabusTopic {
@@ -3173,9 +3198,10 @@ model Conversation {
   title       String?
   classId     String?
   sectionId   String?
-  studentId   String?
-  guardianId  String?
-  createdById String?
+  studentId      String?
+  guardianId     String?
+  academicYearId String?
+  createdById    String?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
@@ -3186,8 +3212,10 @@ model Conversation {
   guardian     Guardian?                 @relation(fields: [guardianId], references: [id], onDelete: SetNull)
   participants ConversationParticipant[]
   messages     Message[]
+  academicYear AcademicYear?           @relation(fields: [academicYearId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, type, classId, sectionId])
+  @@index([tenantId, studentId, academicYearId])
 }
 
 model ConversationParticipant {
@@ -3209,6 +3237,7 @@ model ConversationParticipant {
   student      Student?     @relation(fields: [studentId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, conversationId])
+  @@index([tenantId, conversationId, createdAt])
 }
 
 model Message {

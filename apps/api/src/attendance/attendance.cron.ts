@@ -45,7 +45,7 @@ export class AttendanceCron {
             tenantSlug: tenant.slug,
             email: actorUser.email,
             authMethod: actorUser.authMethod,
-            roles: ['super_admin'],
+            roles: ['platform_super_admin'],
             permissions: [],
           });
 

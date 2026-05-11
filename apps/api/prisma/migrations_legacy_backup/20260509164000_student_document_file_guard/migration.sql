@@ -16,7 +16,7 @@ DECLARE
   file_entity_id text;
 BEGIN
   row_data := to_jsonb(NEW);
-  document_file_id := COALESCE(row_data ->> 'fileAssetId', row_data ->> 'documentFileId');
+  document_file_id := COALESCE(row_data ->> 'fileId', row_data ->> 'fileAssetId', row_data ->> 'documentFileId');
   document_tenant_id := row_data ->> 'tenantId';
   document_student_id := row_data ->> 'studentId';
 

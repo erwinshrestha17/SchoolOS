@@ -31,7 +31,7 @@ export class MessagingService {
     // Restrict parents/guardians to their own conversations
     const isParentOnly =
       actor.roles.includes('parent') &&
-      !actor.roles.includes('super_admin') &&
+      !actor.roles.includes('platform_super_admin') &&
       !actor.roles.includes('admin') &&
       !actor.roles.includes('teacher') &&
       !actor.roles.includes('principal');

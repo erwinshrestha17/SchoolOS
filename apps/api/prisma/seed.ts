@@ -28,19 +28,14 @@ type SeedUser = {
 
 const seedUsers: SeedUser[] = [
   {
-    roleName: 'super_admin',
-    email: 'superadmin@schoolos.com',
-    password: 'superadmin123',
+    roleName: 'principal',
+    email: 'principal@schoolos.com',
+    password: 'principal123',
   },
   {
     roleName: 'admin',
     email: 'admin@schoolos.com',
     password: 'admin123',
-  },
-  {
-    roleName: 'principal',
-    email: 'principal@schoolos.com',
-    password: 'principal123',
   },
   {
     roleName: 'accountant',
@@ -97,6 +92,8 @@ async function main() {
   await seedPermissions();
   await seedRolePermissions(tenant.id);
 
+  await cleanupLegacyData(tenant.id);
+
   await seedChartAccounts(tenant.id);
   await seedFeeHeads(tenant.id);
 
@@ -113,18 +110,33 @@ async function main() {
   console.log(`- Academic Year: ${academicYear.name}`);
   console.log('');
   console.log('Local/dev test logins:');
+  console.log('- School Code: default-school');
 
   for (const seedUser of seedUsers) {
     console.log(
       `- ${seedUser.roleName}: ${seedUser.email} / ${seedUser.password}`,
     );
   }
+}
 
-  console.log('');
-  console.log('Next recommended seed upgrade:');
-  console.log(
-    '- Add real demo students, guardians, admissions, invoices, attendance records, and payments once the exact Prisma model fields are confirmed.',
-  );
+async function cleanupLegacyData(tenantId: string) {
+  console.log('Cleaning up legacy seed data...');
+
+  // Delete legacy superadmin user
+  await prisma.user.deleteMany({
+    where: {
+      tenantId,
+      email: 'superadmin@schoolos.com',
+    },
+  });
+
+  // Delete legacy super_admin role if it exists as a tenant role
+  await prisma.role.deleteMany({
+    where: {
+      tenantId,
+      name: 'super_admin',
+    },
+  });
 }
 
 async function seedTenantSettings(tenantId: string) {
@@ -179,12 +191,14 @@ async function seedTenant() {
       name: 'Everest Academy Secondary School',
       mode: Mode.SINGLE,
       plan: 'Standard',
+      isActive: true,
     },
     create: {
       name: 'Everest Academy Secondary School',
       slug: 'default-school',
       mode: Mode.SINGLE,
       plan: 'Standard',
+      isActive: true,
     },
   });
 }
@@ -481,7 +495,7 @@ async function ensureSeedUserWithRole({
     },
   });
 
-  await prisma.userRole.deleteMany({
+  const existingRole = await prisma.userRole.findFirst({
     where: {
       tenantId,
       userId: user.id,
@@ -490,14 +504,16 @@ async function ensureSeedUserWithRole({
     },
   });
 
-  await prisma.userRole.create({
-    data: {
-      tenantId,
-      userId: user.id,
-      roleId,
-      scopeId: null,
-    },
-  });
+  if (!existingRole) {
+    await prisma.userRole.create({
+      data: {
+        tenantId,
+        userId: user.id,
+        roleId,
+        scopeId: null,
+      },
+    });
+  }
 }
 
 main()

@@ -809,10 +809,6 @@ export type PermissionKey =
 
 export const systemRoleDefinitions = [
   {
-    name: 'super_admin',
-    description: 'System preset role with every SchoolOS permission',
-  },
-  {
     name: 'platform_super_admin',
     description:
       'Global platform role with full access to all tenants and settings',
@@ -847,15 +843,23 @@ export function buildPermissionKey(resource: string, action: string) {
   return `${resource}:${action}`;
 }
 
+const ALL_PERMISSION_KEYS = permissionCatalog.map(({ resource, action }) =>
+  buildPermissionKey(resource, action),
+);
+
+const PLATFORM_PERMISSION_KEYS = [
+  'platform:read',
+  'platform:manage',
+  'tenants:manage',
+];
+
+const TENANT_PERMISSION_KEYS = ALL_PERMISSION_KEYS.filter(
+  (key) => !PLATFORM_PERMISSION_KEYS.includes(key),
+);
+
 export const systemRolePermissions: Record<string, string[]> = {
-  super_admin: permissionCatalog.map(({ resource, action }) =>
-    buildPermissionKey(resource, action),
-  ),
-  admin: [
-    ...permissionCatalog.map(({ resource, action }) =>
-      buildPermissionKey(resource, action),
-    ),
-  ],
+  admin: [...TENANT_PERMISSION_KEYS],
+  principal: [...TENANT_PERMISSION_KEYS],
   teacher: [
     'roles:read',
     'classes:read',
@@ -886,18 +890,6 @@ export const systemRolePermissions: Record<string, string[]> = {
     'hr:leave:request',
     'payroll:payslip:read',
   ],
-  principal: permissionCatalog
-    .map(({ resource, action }) => buildPermissionKey(resource, action))
-    .filter(
-      (permission) =>
-        ![
-          'roles:manage_permissions',
-          'accounting:close',
-          'accounting:reverse',
-          'tenants:manage',
-          'settings:manage',
-        ].includes(permission),
-    ),
   subject_teacher: [
     'roles:read',
     'classes:read',
@@ -1031,8 +1023,6 @@ export const systemRolePermissions: Record<string, string[]> = {
     'settings:read_public',
   ],
   platform_super_admin: [
-    'platform:read',
-    'platform:manage',
     ...permissionCatalog.map(({ resource, action }) =>
       buildPermissionKey(resource, action),
     ),

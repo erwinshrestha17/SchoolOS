@@ -970,7 +970,7 @@ export class HomeworkService {
     return (
       actor.roles.includes('subject_teacher') &&
       !actor.roles.some((role) =>
-        ['super_admin', 'admin', 'principal'].includes(role),
+        ['platform_super_admin', 'admin', 'principal'].includes(role),
       )
     );
   }

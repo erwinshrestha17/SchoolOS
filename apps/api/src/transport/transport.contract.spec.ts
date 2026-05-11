@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 describe('Phase 3C Transport backend contracts', () => {
@@ -56,9 +56,19 @@ describe('Phase 3C Transport backend contracts', () => {
   });
 
   it('adds transport trip, student status, and latest-location persistence schema', () => {
-    const migration = read(
-      'prisma/migrations/20260506141000_phase3c_transport_trip_foundation/migration.sql',
-    );
+    const migrationsRoot = join(root, 'prisma', 'migrations');
+    const chunks: string[] = [];
+
+    if (existsSync(migrationsRoot)) {
+      for (const dir of readdirSync(migrationsRoot)) {
+        const sqlPath = join(migrationsRoot, dir, 'migration.sql');
+        if (existsSync(sqlPath) && statSync(sqlPath).isFile()) {
+          chunks.push(readFileSync(sqlPath, 'utf8'));
+        }
+      }
+    }
+
+    const migration = chunks.join('\n');
 
     for (const model of [
       'TransportStudentAssignment',
