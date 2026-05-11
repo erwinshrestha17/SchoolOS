@@ -2757,7 +2757,11 @@ export class AttendanceService {
   }
 
   private ensureAttendanceReviewAuthority(actor: AuthContext) {
-    const allowedRoles = new Set(['platform_super_admin', 'admin', 'principal']);
+    const allowedRoles = new Set([
+      'platform_super_admin',
+      'admin',
+      'principal',
+    ]);
 
     if (!actor.roles.some((role) => allowedRoles.has(role))) {
       throw new ForbiddenException(

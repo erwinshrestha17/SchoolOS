@@ -170,13 +170,13 @@ export function PayrollPreview() {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right text-gray-600 font-mono">
+                    <td className="px-6 py-4 text-right text-gray-600">
                       {row.baseSalary.toLocaleString()}
                     </td>
-                    <td className="px-6 py-4 text-right text-gray-600 font-mono">
+                    <td className="px-6 py-4 text-right text-gray-600">
                       {row.allowances.toLocaleString()}
                     </td>
-                    <td className="px-6 py-4 text-right font-bold text-gray-900 font-mono">
+                    <td className="px-6 py-4 text-right font-bold text-gray-900">
                       {row.grossPay.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 text-center">
@@ -193,11 +193,11 @@ export function PayrollPreview() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right text-danger-600 font-mono">
+                    <td className="px-6 py-4 text-right text-danger-600">
                       -{row.deductions.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <span className="text-lg font-bold text-primary-700 font-mono">
+                      <span className="text-lg font-bold text-primary-700">
                         {row.netPay.toLocaleString()}
                       </span>
                     </td>

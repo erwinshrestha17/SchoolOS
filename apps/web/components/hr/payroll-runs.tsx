@@ -402,9 +402,9 @@ export function PayrollRuns() {
                           </p>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-gray-700">{formatMoney(row.grossPay)}</td>
-                      <td className="px-4 py-3 text-right font-mono text-danger-600">-{formatMoney(row.deductions)}</td>
-                      <td className="px-4 py-3 text-right font-mono font-bold text-primary-700">{formatMoney(row.netPay)}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{formatMoney(row.grossPay)}</td>
+                      <td className="px-4 py-3 text-right text-danger-600">-{formatMoney(row.deductions)}</td>
+                      <td className="px-4 py-3 text-right font-bold text-primary-700">{formatMoney(row.netPay)}</td>
                       <td className="px-4 py-3 text-center text-xs font-bold text-gray-600">
                         {row.presentDays + row.approvedPaidLeaveDays}/{row.workingDays}
                       </td>
@@ -471,9 +471,9 @@ export function PayrollRuns() {
                           {run.status}
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-right font-mono text-gray-700">{formatMoney(run.grossAmount)}</td>
-                      <td className="px-5 py-4 text-right font-mono text-danger-600">-{formatMoney(run.deductionAmount)}</td>
-                      <td className="px-5 py-4 text-right font-mono font-bold text-primary-700">{formatMoney(run.netAmount)}</td>
+                      <td className="px-5 py-4 text-right text-gray-700">{formatMoney(run.grossAmount)}</td>
+                      <td className="px-5 py-4 text-right text-danger-600">-{formatMoney(run.deductionAmount)}</td>
+                      <td className="px-5 py-4 text-right font-bold text-primary-700">{formatMoney(run.netAmount)}</td>
                       <td className="px-5 py-4 text-right">
                         <button
                           type="button"

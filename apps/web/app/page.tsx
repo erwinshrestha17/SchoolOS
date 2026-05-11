@@ -306,7 +306,7 @@ export default function LandingPage() {
             <div className="absolute inset-0 bg-gradient-to-r from-amber-100 to-indigo-100 transform skew-y-3 rounded-3xl opacity-50" />
             <div className="relative bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-slate-800">
               <div className="bg-slate-800 px-4 py-3 flex justify-between items-center border-b border-slate-700">
-                <span className="text-xs text-slate-400 font-mono">M3 Fees → M9 Accounting</span>
+                <span className="text-xs text-slate-400">M3 Fees → M9 Accounting</span>
                 <div className="flex gap-1.5">
                   <div className="w-3 h-3 rounded-full bg-red-500" />
                   <div className="w-3 h-3 rounded-full bg-amber-500" />
@@ -321,7 +321,7 @@ export default function LandingPage() {
                   </div>
                   <div className="text-sm text-slate-500 flex justify-between">
                     <span>Student: Aarav Sharma (Class 5)</span>
-                    <span className="font-mono text-slate-800">Rs. 15,000</span>
+                    <span className="font-bold text-slate-800">Rs. 15,000</span>
                   </div>
                 </div>
 
@@ -336,7 +336,7 @@ export default function LandingPage() {
                     <span className="font-bold text-amber-400 text-sm tracking-wide uppercase">Auto-Journal Entry</span>
                     <span className="text-xs text-slate-400">System Generated</span>
                   </div>
-                  <div className="space-y-2 text-sm font-mono text-slate-300">
+                  <div className="space-y-2 text-sm text-slate-300">
                     <div className="flex justify-between border-b border-slate-700 pb-1">
                       <span>Dr. Cash in Hand</span>
                       <span className="text-green-400">15,000</span>
@@ -534,7 +534,7 @@ export default function LandingPage() {
             {pricingPlans.map((plan) => (
               <div key={plan.name} className={`rounded-3xl p-8 border ${plan.highlighted ? 'border-amber-500 bg-slate-900' : 'border-slate-800 bg-slate-900/50'}`}>
                 <h3 className="text-2xl font-bold text-white">{plan.name}</h3>
-                <p className="text-sm font-mono text-amber-400 mt-2">{plan.phase}</p>
+                <p className="text-sm font-semibold text-amber-400 mt-2">{plan.phase}</p>
                 <p className="text-slate-400 mt-4 text-sm">{plan.desc}</p>
                 <ul className="mt-8 space-y-4 mb-8">
                   {plan.features.map((feature) => (

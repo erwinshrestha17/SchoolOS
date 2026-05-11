@@ -120,7 +120,7 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
                   <Input
                     type="number"
                     step="0.01"
-                    className="text-right font-mono"
+                    className="text-right"
                     value={line.amount}
                     onChange={(e) => {
                       const newLines = [...lines];
@@ -155,18 +155,18 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
           <div className="mt-4 rounded-2xl bg-slate-50 p-4 space-y-2 border border-slate-100 shadow-inner">
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Total Debit:</span>
-              <span className="font-bold font-mono text-slate-900">{totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              <span className="font-bold text-slate-900">{totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Total Credit:</span>
-              <span className="font-bold font-mono text-slate-900">{totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              <span className="font-bold text-slate-900">{totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
             </div>
             <div className={cn(
               "flex justify-between pt-2 border-t border-slate-200 text-base font-bold",
               Math.abs(diff) < 0.001 ? "text-emerald-600" : "text-rose-600"
             )}>
               <span>Difference:</span>
-              <span className="font-mono">
+              <span>
                 {Math.abs(diff) < 0.001 ? "BALANCED" : diff.toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </span>
             </div>
