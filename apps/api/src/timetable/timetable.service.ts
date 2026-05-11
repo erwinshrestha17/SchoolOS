@@ -12,7 +12,10 @@ import {
   TimetableVersionStatus,
   Prisma,
 } from '@prisma/client';
-import { ConflictSlotInput, TimetableConflictService } from './timetable-conflict.service';
+import {
+  ConflictSlotInput,
+  TimetableConflictService,
+} from './timetable-conflict.service';
 import { TimetableLifecycleService } from './timetable-lifecycle.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -526,7 +529,9 @@ export class TimetableService {
       where: {
         tenantId: actor.tenantId,
         ...(query.staffId ? { staffId: query.staffId } : {}),
-        ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
+        ...(query.academicYearId
+          ? { academicYearId: query.academicYearId }
+          : {}),
       },
       include: {
         staff: true,
@@ -577,7 +582,9 @@ export class TimetableService {
       },
     });
     if (duplicate) {
-      throw new ConflictException('Identical availability window already exists');
+      throw new ConflictException(
+        'Identical availability window already exists',
+      );
     }
 
     const availability = await this.prisma.teacherAvailability.create({
@@ -663,7 +670,9 @@ export class TimetableService {
     return this.prisma.teacherWorkloadLimit.findMany({
       where: {
         tenantId: actor.tenantId,
-        ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
+        ...(query.academicYearId
+          ? { academicYearId: query.academicYearId }
+          : {}),
       },
       include: {
         staff: true,
@@ -728,10 +737,17 @@ export class TimetableService {
         where: { id: existing.id },
         data: {
           maxPeriodsPerDay: dto.maxPeriodsPerDay ?? existing.maxPeriodsPerDay,
-          maxPeriodsPerWeek: dto.maxPeriodsPerWeek ?? existing.maxPeriodsPerWeek,
+          maxPeriodsPerWeek:
+            dto.maxPeriodsPerWeek ?? existing.maxPeriodsPerWeek,
         },
       });
-      await this.audit('update', 'teacher_workload_limit', rule.id, actor, rule);
+      await this.audit(
+        'update',
+        'teacher_workload_limit',
+        rule.id,
+        actor,
+        rule,
+      );
     } else {
       rule = await this.prisma.teacherWorkloadLimit.create({
         data: {
@@ -742,7 +758,13 @@ export class TimetableService {
           maxPeriodsPerWeek: dto.maxPeriodsPerWeek ?? null,
         },
       });
-      await this.audit('create', 'teacher_workload_limit', rule.id, actor, rule);
+      await this.audit(
+        'create',
+        'teacher_workload_limit',
+        rule.id,
+        actor,
+        rule,
+      );
     }
     return rule;
   }
@@ -778,7 +800,9 @@ export class TimetableService {
     return this.prisma.subjectWeeklyRequirement.findMany({
       where: {
         tenantId: actor.tenantId,
-        ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
+        ...(query.academicYearId
+          ? { academicYearId: query.academicYearId }
+          : {}),
         ...(query.classId ? { classId: query.classId } : {}),
         ...(query.sectionId ? { sectionId: query.sectionId } : {}),
         ...(query.subjectId ? { subjectId: query.subjectId } : {}),
@@ -1013,9 +1037,10 @@ export class TimetableService {
     // 1. Validation: Slot version status
     if (
       !slot.version ||
-      ![TimetableVersionStatus.PUBLISHED, TimetableVersionStatus.LOCKED].includes(
-        slot.version.status,
-      )
+      ![
+        TimetableVersionStatus.PUBLISHED,
+        TimetableVersionStatus.LOCKED,
+      ].includes(slot.version.status)
     ) {
       throw new ConflictException(
         'Substitutions can only be created for PUBLISHED or LOCKED timetable versions',

@@ -1832,7 +1832,9 @@ export function createPrismaMock() {
         return Promise.resolve(item);
       }),
       update: jest.fn((q: PrismaQuery) => {
-        const item = state.homeworkAssignments.find((i) => i.id === q.where?.id);
+        const item = state.homeworkAssignments.find(
+          (i) => i.id === q.where?.id,
+        );
         if (item) Object.assign(item, q.data);
         return Promise.resolve(item);
       }),
@@ -1867,7 +1869,9 @@ export function createPrismaMock() {
         return Promise.resolve(item);
       }),
       update: jest.fn((q: PrismaQuery) => {
-        const item = state.homeworkSubmissions.find((i) => i.id === q.where?.id);
+        const item = state.homeworkSubmissions.find(
+          (i) => i.id === q.where?.id,
+        );
         if (item) Object.assign(item, q.data);
         return Promise.resolve(item);
       }),
@@ -1879,7 +1883,11 @@ export function createPrismaMock() {
           Object.assign(item, q.update ?? {});
           return Promise.resolve(item);
         }
-        const newItem = { id: nextId('sub'), ...q.create, createdAt: new Date() };
+        const newItem = {
+          id: nextId('sub'),
+          ...q.create,
+          createdAt: new Date(),
+        };
         state.homeworkSubmissions.push(newItem as Record<string, unknown>);
         return Promise.resolve(newItem);
       }),

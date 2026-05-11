@@ -1,4 +1,8 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   AuthMethod,
@@ -49,16 +53,36 @@ describe('Homework Workflow', () => {
       homeworkAssignment: {
         findFirst: jest.fn(),
         findUnique: jest.fn(),
-        create: jest.fn().mockImplementation((q) => Promise.resolve({ id: 'hw-1', ...q.data })),
-        update: jest.fn().mockImplementation((q) => Promise.resolve({ id: 'hw-1', ...q.data })),
+        create: jest
+          .fn()
+          .mockImplementation((q) =>
+            Promise.resolve({ id: 'hw-1', ...q.data }),
+          ),
+        update: jest
+          .fn()
+          .mockImplementation((q) =>
+            Promise.resolve({ id: 'hw-1', ...q.data }),
+          ),
         delete: jest.fn(),
         findMany: jest.fn(),
       },
       homeworkSubmission: {
         findFirst: jest.fn(),
-        create: jest.fn().mockImplementation((q) => Promise.resolve({ id: 'sub-1', ...q.data })),
-        update: jest.fn().mockImplementation((q) => Promise.resolve({ id: 'sub-1', ...q.data })),
-        upsert: jest.fn().mockImplementation((q) => Promise.resolve({ id: 'sub-1', ...q.create })),
+        create: jest
+          .fn()
+          .mockImplementation((q) =>
+            Promise.resolve({ id: 'sub-1', ...q.data }),
+          ),
+        update: jest
+          .fn()
+          .mockImplementation((q) =>
+            Promise.resolve({ id: 'sub-1', ...q.data }),
+          ),
+        upsert: jest
+          .fn()
+          .mockImplementation((q) =>
+            Promise.resolve({ id: 'sub-1', ...q.create }),
+          ),
         createMany: jest.fn(),
         findMany: jest.fn(),
       },
@@ -70,19 +94,27 @@ describe('Homework Workflow', () => {
         findMany: jest.fn(),
         updateMany: jest.fn(),
       },
-      academicYear: { findFirst: jest.fn().mockResolvedValue({ id: 'year-1' }) },
+      academicYear: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'year-1' }),
+      },
       class: { findFirst: jest.fn().mockResolvedValue({ id: 'class-1' }) },
       section: { findFirst: jest.fn() },
       subject: { findFirst: jest.fn().mockResolvedValue({ id: 'sub-1' }) },
       staff: { findFirst: jest.fn().mockResolvedValue({ id: 'staff-1' }) },
       student: { findFirst: jest.fn(), findMany: jest.fn() },
-      subjectTeacherAssignment: { findFirst: jest.fn().mockResolvedValue({ id: 'assign-1' }) },
+      subjectTeacherAssignment: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'assign-1' }),
+      },
       homeworkReminderBatch: {
         findFirst: jest.fn(),
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
-        upsert: jest.fn().mockImplementation((q) => Promise.resolve({ id: 'batch-1', ...q.create })),
+        upsert: jest
+          .fn()
+          .mockImplementation((q) =>
+            Promise.resolve({ id: 'batch-1', ...q.create }),
+          ),
       },
       $transaction: jest.fn((cb) => cb(prisma)),
     };
@@ -94,7 +126,11 @@ describe('Homework Workflow', () => {
         { provide: AuditService, useValue: { record: jest.fn() } },
         {
           provide: CommunicationsService,
-          useValue: { recordDeliveryRecords: jest.fn().mockResolvedValue({ sentCount: 1 }) },
+          useValue: {
+            recordDeliveryRecords: jest
+              .fn()
+              .mockResolvedValue({ sentCount: 1 }),
+          },
         },
         {
           provide: getQueueToken('homework'),
@@ -113,8 +149,14 @@ describe('Homework Workflow', () => {
       prisma.subject.findFirst.mockResolvedValue({ id: 'sub-1' });
       prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
       prisma.fileAsset.findMany.mockResolvedValue([{ id: 'file-1' }]);
-      prisma.homeworkAssignment.create.mockResolvedValue({ ...mockAssignment, id: 'new-hw' });
-      prisma.homeworkAssignment.findFirst.mockResolvedValue({ ...mockAssignment, id: 'new-hw' });
+      prisma.homeworkAssignment.create.mockResolvedValue({
+        ...mockAssignment,
+        id: 'new-hw',
+      });
+      prisma.homeworkAssignment.findFirst.mockResolvedValue({
+        ...mockAssignment,
+        id: 'new-hw',
+      });
 
       const dto = {
         academicYearId: 'year-1',
@@ -154,7 +196,9 @@ describe('Homework Workflow', () => {
         attachmentFileIds: ['file-from-other-tenant'],
       };
 
-      await expect(service.createAssignment(dto, mockActor)).rejects.toThrow(ConflictException);
+      await expect(service.createAssignment(dto, mockActor)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('should publish draft homework and emit notification', async () => {
@@ -170,12 +214,16 @@ describe('Homework Workflow', () => {
 
       expect(prisma.homeworkAssignment.update).toHaveBeenCalledWith({
         where: { id: 'hw-1' },
-        data: expect.objectContaining({ status: HomeworkAssignmentStatus.ASSIGNED }),
+        data: expect.objectContaining({
+          status: HomeworkAssignmentStatus.ASSIGNED,
+        }),
         include: expect.anything(),
       });
-      expect(comms.recordDeliveryRecords).toHaveBeenCalledWith(expect.objectContaining({
-        sourceType: 'homework_published',
-      }));
+      expect(comms.recordDeliveryRecords).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceType: 'homework_published',
+        }),
+      );
     });
   });
 
@@ -188,13 +236,25 @@ describe('Homework Workflow', () => {
       };
       prisma.homeworkAssignment.findFirst.mockResolvedValue(pastAssignment);
       prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
-      prisma.homeworkSubmission.upsert.mockResolvedValue({ id: 'sub-1', status: HomeworkSubmissionStatus.LATE });
-      prisma.homeworkSubmission.findFirst.mockResolvedValueOnce(null).mockResolvedValue({ id: 'sub-1', status: HomeworkSubmissionStatus.LATE });
+      prisma.homeworkSubmission.upsert.mockResolvedValue({
+        id: 'sub-1',
+        status: HomeworkSubmissionStatus.LATE,
+      });
+      prisma.homeworkSubmission.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValue({
+          id: 'sub-1',
+          status: HomeworkSubmissionStatus.LATE,
+        });
 
-      const result = await service.createSubmission('hw-1', {
-        studentId: 'student-1',
-        submissionText: 'Too late',
-      }, mockActor);
+      const result = await service.createSubmission(
+        'hw-1',
+        {
+          studentId: 'student-1',
+          submissionText: 'Too late',
+        },
+        mockActor,
+      );
 
       expect(result.status).toBe(HomeworkSubmissionStatus.LATE);
     });
@@ -214,10 +274,14 @@ describe('Homework Workflow', () => {
         status: HomeworkSubmissionStatus.NEEDS_CORRECTION,
       });
 
-      const result = await service.reviewSubmission('sub-1', {
-        status: HomeworkSubmissionStatus.NEEDS_CORRECTION,
-        correctionRemarks: 'Fix this',
-      }, mockActor);
+      const result = await service.reviewSubmission(
+        'sub-1',
+        {
+          status: HomeworkSubmissionStatus.NEEDS_CORRECTION,
+          correctionRemarks: 'Fix this',
+        },
+        mockActor,
+      );
 
       expect(result.status).toBe(HomeworkSubmissionStatus.NEEDS_CORRECTION);
       expect(prisma.homeworkSubmission.update).toHaveBeenCalledWith({
@@ -231,30 +295,36 @@ describe('Homework Workflow', () => {
     });
 
     it('should notify student when correction is requested', async () => {
-        const submission = {
-          id: 'sub-1',
-          tenantId: 'tenant-1',
-          homeworkId: 'hw-1',
-          homework: mockAssignment,
-          status: HomeworkSubmissionStatus.SUBMITTED,
-          studentId: 'student-1',
-        };
-        prisma.homeworkSubmission.findFirst.mockResolvedValue(submission);
-        prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
-        prisma.homeworkSubmission.update.mockResolvedValue({
-          ...submission,
-          status: HomeworkSubmissionStatus.NEEDS_CORRECTION,
-        });
-        const comms = service['communicationsService'];
-  
-        await service.reviewSubmission('sub-1', {
+      const submission = {
+        id: 'sub-1',
+        tenantId: 'tenant-1',
+        homeworkId: 'hw-1',
+        homework: mockAssignment,
+        status: HomeworkSubmissionStatus.SUBMITTED,
+        studentId: 'student-1',
+      };
+      prisma.homeworkSubmission.findFirst.mockResolvedValue(submission);
+      prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+      prisma.homeworkSubmission.update.mockResolvedValue({
+        ...submission,
+        status: HomeworkSubmissionStatus.NEEDS_CORRECTION,
+      });
+      const comms = service['communicationsService'];
+
+      await service.reviewSubmission(
+        'sub-1',
+        {
           status: HomeworkSubmissionStatus.NEEDS_CORRECTION,
           correctionRemarks: 'Fix this',
-        }, mockActor);
-  
-        expect(comms.recordDeliveryRecords).toHaveBeenCalledWith(expect.objectContaining({
+        },
+        mockActor,
+      );
+
+      expect(comms.recordDeliveryRecords).toHaveBeenCalledWith(
+        expect.objectContaining({
           sourceType: 'homework_returned_for_correction',
-        }));
-      });
+        }),
+      );
+    });
   });
 });

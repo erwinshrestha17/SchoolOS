@@ -123,7 +123,9 @@ export class TimetableConflictService {
     candidate: ConflictSlotInput,
   ): Promise<TimetableConflictValidationResult> {
     if (!this.prisma) {
-      throw new Error('PrismaService is required for database-backed validation');
+      throw new Error(
+        'PrismaService is required for database-backed validation',
+      );
     }
 
     const candidateScopes = [
@@ -256,7 +258,8 @@ export class TimetableConflictService {
         (slot) =>
           slot.subjectId === req.subjectId &&
           slot.classId === req.classId &&
-          normalizeNullable(slot.sectionId) === normalizeNullable(req.sectionId),
+          normalizeNullable(slot.sectionId) ===
+            normalizeNullable(req.sectionId),
       );
       const actual = matchingSlots.length;
       if (actual < req.requiredPeriodsPerWeek) {
@@ -362,7 +365,8 @@ export class TimetableConflictService {
       .map((slot) => ({
         type: 'CLASS_SECTION_OVERLAP',
         severity: 'BLOCKING',
-        message: 'Class/section already has another period during this time slot.',
+        message:
+          'Class/section already has another period during this time slot.',
         affectedPeriodIds: [candidate.id, slot.id],
         classId: candidate.classId,
         sectionId: candidate.sectionId ?? null,
@@ -496,7 +500,9 @@ export function rangesOverlap(
   startB: string,
   endB: string,
 ): boolean {
-  return toMinutes(startA) < toMinutes(endB) && toMinutes(startB) < toMinutes(endA);
+  return (
+    toMinutes(startA) < toMinutes(endB) && toMinutes(startB) < toMinutes(endA)
+  );
 }
 
 function toMinutes(value: string): number {
@@ -518,7 +524,9 @@ function normalizeNullable(value?: string | null): string {
   return value ?? '';
 }
 
-function dedupeIssues(issues: TimetableConflictIssue[]): TimetableConflictIssue[] {
+function dedupeIssues(
+  issues: TimetableConflictIssue[],
+): TimetableConflictIssue[] {
   const seen = new Set<string>();
   return issues.filter((issue) => {
     const key = [

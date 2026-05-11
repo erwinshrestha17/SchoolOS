@@ -329,7 +329,6 @@ export class ListTeacherWorkloadQueryDto extends PaginatedQueryDto {
   academicYearId?: string;
 }
 
-
 export class WorkloadQueryDto {
   @IsOptional()
   @IsString()

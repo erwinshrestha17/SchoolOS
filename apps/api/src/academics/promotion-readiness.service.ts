@@ -202,7 +202,9 @@ export class PromotionReadinessService {
       student.classId === dto.toClassId &&
       student.sectionId === (dto.toSectionId ?? null)
     ) {
-      throw new ConflictException('Student is already in the target class/section');
+      throw new ConflictException(
+        'Student is already in the target class/section',
+      );
     }
 
     const reportCard = await prisma.reportCard.findFirst({

@@ -14,7 +14,7 @@ export class HomeworkProcessor extends WorkerHost {
 
   async process(job: Job<any, void>): Promise<void> {
     const { tenantId, homeworkId, reminderType, actor, force } = job.data;
-    
+
     this.logger.log(
       `Processing homework reminder: ${reminderType} for homework ${homeworkId} (tenant: ${tenantId})`,
     );

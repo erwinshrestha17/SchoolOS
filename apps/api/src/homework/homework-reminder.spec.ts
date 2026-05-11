@@ -67,7 +67,9 @@ describe('Homework Reminders', () => {
     };
 
     communicationsService = {
-      recordDeliveryRecords: jest.fn().mockResolvedValue({ count: 10, sentCount: 8, skippedCount: 2 }),
+      recordDeliveryRecords: jest
+        .fn()
+        .mockResolvedValue({ count: 10, sentCount: 8, skippedCount: 2 }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -95,15 +97,21 @@ describe('Homework Reminders', () => {
       prisma.student.findMany.mockResolvedValue([{ id: 's1' }, { id: 's2' }]);
       prisma.homeworkSubmission.findMany.mockResolvedValue([]);
 
-      const result = await service.sendHomeworkReminder('hw-1', {
-        reminderType: HomeworkReminderType.HOMEWORK_DUE_SOON,
-      }, mockActor);
+      const result = await service.sendHomeworkReminder(
+        'hw-1',
+        {
+          reminderType: HomeworkReminderType.HOMEWORK_DUE_SOON,
+        },
+        mockActor,
+      );
 
       expect(result.id).toBe('batch-1');
-      expect(communicationsService.recordDeliveryRecords).toHaveBeenCalledWith(expect.objectContaining({
-        sourceType: 'homework_due_soon',
-        studentIds: ['s1', 's2'],
-      }));
+      expect(communicationsService.recordDeliveryRecords).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceType: 'homework_due_soon',
+          studentIds: ['s1', 's2'],
+        }),
+      );
       expect(prisma.homeworkReminderBatch.update).toHaveBeenCalledWith({
         where: { id: 'batch-1' },
         data: expect.objectContaining({ status: 'COMPLETED', targetCount: 10 }),
@@ -112,28 +120,46 @@ describe('Homework Reminders', () => {
 
     it('should respect idempotency key', async () => {
       prisma.homeworkAssignment.findFirst.mockResolvedValue(mockHomework);
-      prisma.homeworkReminderBatch.findFirst.mockResolvedValue({ id: 'existing-batch' });
+      prisma.homeworkReminderBatch.findFirst.mockResolvedValue({
+        id: 'existing-batch',
+      });
 
-      const result = await service.sendHomeworkReminder('hw-1', {
-        reminderType: HomeworkReminderType.HOMEWORK_DUE_SOON,
-      }, mockActor);
+      const result = await service.sendHomeworkReminder(
+        'hw-1',
+        {
+          reminderType: HomeworkReminderType.HOMEWORK_DUE_SOON,
+        },
+        mockActor,
+      );
 
       expect(result.id).toBe('existing-batch');
-      expect(communicationsService.recordDeliveryRecords).not.toHaveBeenCalled();
+      expect(
+        communicationsService.recordDeliveryRecords,
+      ).not.toHaveBeenCalled();
     });
 
     it('should allow force resend', async () => {
       prisma.homeworkAssignment.findFirst.mockResolvedValue(mockHomework);
-      prisma.homeworkReminderBatch.findFirst.mockResolvedValue({ id: 'existing-batch' });
-      prisma.homeworkReminderBatch.upsert.mockResolvedValue({ id: 'new-batch' });
-      prisma.homeworkReminderBatch.update.mockResolvedValue({ id: 'new-batch' });
+      prisma.homeworkReminderBatch.findFirst.mockResolvedValue({
+        id: 'existing-batch',
+      });
+      prisma.homeworkReminderBatch.upsert.mockResolvedValue({
+        id: 'new-batch',
+      });
+      prisma.homeworkReminderBatch.update.mockResolvedValue({
+        id: 'new-batch',
+      });
       prisma.student.findMany.mockResolvedValue([{ id: 's1' }]);
       prisma.homeworkSubmission.findMany.mockResolvedValue([]);
 
-      const result = await service.sendHomeworkReminder('hw-1', {
-        reminderType: HomeworkReminderType.HOMEWORK_DUE_SOON,
-        force: true,
-      }, mockActor);
+      const result = await service.sendHomeworkReminder(
+        'hw-1',
+        {
+          reminderType: HomeworkReminderType.HOMEWORK_DUE_SOON,
+          force: true,
+        },
+        mockActor,
+      );
 
       expect(result.id).toBe('new-batch');
       expect(communicationsService.recordDeliveryRecords).toHaveBeenCalled();
@@ -143,8 +169,14 @@ describe('Homework Reminders', () => {
   describe('Target Resolution', () => {
     it('should exclude students who already submitted', async () => {
       prisma.homeworkAssignment.findFirst.mockResolvedValue(mockHomework);
-      prisma.student.findMany.mockResolvedValue([{ id: 's1' }, { id: 's2' }, { id: 's3' }]);
-      prisma.homeworkSubmission.findMany.mockResolvedValue([{ studentId: 's1' }]);
+      prisma.student.findMany.mockResolvedValue([
+        { id: 's1' },
+        { id: 's2' },
+        { id: 's3' },
+      ]);
+      prisma.homeworkSubmission.findMany.mockResolvedValue([
+        { studentId: 's1' },
+      ]);
 
       const targets = await service['resolveHomeworkReminderTargets'](
         mockActor,

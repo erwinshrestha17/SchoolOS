@@ -99,14 +99,20 @@ describe('HomeworkController M6 contracts', () => {
     const { controller, homeworkService } = createController();
     const reminderDto = { reminderType: 'HOMEWORK_DUE_SOON' } as any;
     homeworkService.sendHomeworkReminder.mockReturnValue({ id: 'batch-1' });
-    homeworkService.listHomeworkReminderBatches.mockReturnValue([{ id: 'batch-1' }]);
+    homeworkService.listHomeworkReminderBatches.mockReturnValue([
+      { id: 'batch-1' },
+    ]);
 
     expect(controller.sendReminder('homework-1', reminderDto, actor)).toEqual({
       id: 'batch-1',
     });
-    expect(controller.listAssignmentReminders('homework-1', {} as any, actor)).toEqual([{
-      id: 'batch-1',
-    }]);
+    expect(
+      controller.listAssignmentReminders('homework-1', {} as any, actor),
+    ).toEqual([
+      {
+        id: 'batch-1',
+      },
+    ]);
     expect(homeworkService.sendHomeworkReminder).toHaveBeenCalledWith(
       'homework-1',
       reminderDto,

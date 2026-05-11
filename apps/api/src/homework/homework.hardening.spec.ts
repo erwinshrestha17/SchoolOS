@@ -41,7 +41,11 @@ describe('Homework Hardening', () => {
         { provide: AuditService, useValue: { record: jest.fn() } },
         {
           provide: CommunicationsService,
-          useValue: { recordDeliveryRecords: jest.fn().mockResolvedValue({ sentCount: 1 }) },
+          useValue: {
+            recordDeliveryRecords: jest
+              .fn()
+              .mockResolvedValue({ sentCount: 1 }),
+          },
         },
         {
           provide: getQueueToken('homework'),

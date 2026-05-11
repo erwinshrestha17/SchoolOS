@@ -227,7 +227,10 @@ describe('ResultPublishingService', () => {
       reportCard({ publishStatus: 'PUBLISHED' }),
     ]);
 
-    const result = await service.notifyResults({ reportCardIds: ['rc-1'] }, actor);
+    const result = await service.notifyResults(
+      { reportCardIds: ['rc-1'] },
+      actor,
+    );
 
     expect(result.notified).toBe(1);
     expect(communicationsService.recordDeliveryRecords).toHaveBeenCalledWith(
@@ -249,7 +252,10 @@ describe('ResultPublishingService', () => {
   it('skips notification for unpublished report cards', async () => {
     prisma.reportCard.findMany.mockResolvedValue([reportCard()]);
 
-    const result = await service.notifyResults({ reportCardIds: ['rc-1'] }, actor);
+    const result = await service.notifyResults(
+      { reportCardIds: ['rc-1'] },
+      actor,
+    );
 
     expect(result.notified).toBe(0);
     expect(result.skipped).toBe(1);

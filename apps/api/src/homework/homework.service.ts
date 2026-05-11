@@ -93,7 +93,9 @@ export class HomeworkService {
 
   async createAssignment(dto: CreateHomeworkDto, actor: AuthContext) {
     // 1. Validate Dates
-    const assignedDate = dto.assignedDate ? new Date(dto.assignedDate) : new Date();
+    const assignedDate = dto.assignedDate
+      ? new Date(dto.assignedDate)
+      : new Date();
     const dueDate = new Date(dto.dueDate);
 
     if (dueDate < assignedDate) {
@@ -247,7 +249,8 @@ export class HomeworkService {
         title: updated.title,
         dueDate: updated.dueDate,
         status: updated.status,
-        attachmentCount: dto.attachmentFileIds?.length ?? assignment.attachments.length,
+        attachmentCount:
+          dto.attachmentFileIds?.length ?? assignment.attachments.length,
         submissionRequired: updated.submissionRequired,
       },
     });
@@ -476,7 +479,8 @@ export class HomeworkService {
 
     await this.auditSubmission('update', updated.id, actor, {
       homeworkId: submission.homeworkId,
-      attachmentCount: dto.attachmentFileIds?.length ?? submission.attachments.length,
+      attachmentCount:
+        dto.attachmentFileIds?.length ?? submission.attachments.length,
     });
 
     return this.findSubmissionOrThrow(actor, updated.id);
@@ -793,7 +797,9 @@ export class HomeworkService {
           result = await this.sendHomeworkOverdueReminder(actor, homework.id);
           break;
         default:
-          throw new ConflictException(`Unsupported reminder type: ${dto.reminderType}`);
+          throw new ConflictException(
+            `Unsupported reminder type: ${dto.reminderType}`,
+          );
       }
 
       batch = await this.prisma.homeworkReminderBatch.update({
@@ -989,20 +995,22 @@ export class HomeworkService {
       reminderType === HomeworkReminderType.HOMEWORK_OVERDUE
     ) {
       // Exclude students who already submitted
-      const submittedStudentIds = await this.prisma.homeworkSubmission.findMany({
-        where: {
-          homeworkId: homework.id,
-          status: {
-            in: [
-              HomeworkSubmissionStatus.SUBMITTED,
-              HomeworkSubmissionStatus.LATE,
-              HomeworkSubmissionStatus.REVIEWED,
-              HomeworkSubmissionStatus.EXCUSED,
-            ],
+      const submittedStudentIds = await this.prisma.homeworkSubmission.findMany(
+        {
+          where: {
+            homeworkId: homework.id,
+            status: {
+              in: [
+                HomeworkSubmissionStatus.SUBMITTED,
+                HomeworkSubmissionStatus.LATE,
+                HomeworkSubmissionStatus.REVIEWED,
+                HomeworkSubmissionStatus.EXCUSED,
+              ],
+            },
           },
+          select: { studentId: true },
         },
-        select: { studentId: true },
-      });
+      );
 
       const submittedIds = new Set(submittedStudentIds.map((s) => s.studentId));
       studentIds = studentIds.filter((id) => !submittedIds.has(id));
@@ -1188,7 +1196,11 @@ export class HomeworkService {
       return link?.studentId ?? null;
     }
 
-    if (actor.roles.includes('staff') || actor.roles.includes('teacher') || actor.roles.includes('admin')) {
+    if (
+      actor.roles.includes('staff') ||
+      actor.roles.includes('teacher') ||
+      actor.roles.includes('admin')
+    ) {
       if (!requestedStudentId) return null;
       const student = await this.prisma.student.findFirst({
         where: { id: requestedStudentId, tenantId: actor.tenantId },

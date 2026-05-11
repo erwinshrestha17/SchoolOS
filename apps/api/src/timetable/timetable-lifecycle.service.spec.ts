@@ -124,17 +124,27 @@ describe('TimetableLifecycleService', () => {
   });
 
   it('allows locking only published versions', () => {
-    expect(() => service.assertCanLock(TimetableVersionStatus.PUBLISHED)).not.toThrow();
+    expect(() =>
+      service.assertCanLock(TimetableVersionStatus.PUBLISHED),
+    ).not.toThrow();
     expect(() => service.assertCanLock(TimetableVersionStatus.DRAFT)).toThrow(
       'Only published timetable versions can be locked',
     );
   });
 
   it('blocks direct archive of locked timetable versions', () => {
-    expect(() => service.assertCanArchive(TimetableVersionStatus.DRAFT)).not.toThrow();
-    expect(() => service.assertCanArchive(TimetableVersionStatus.PUBLISHED)).not.toThrow();
-    expect(() => service.assertCanArchive(TimetableVersionStatus.ARCHIVED)).not.toThrow();
-    expect(() => service.assertCanArchive(TimetableVersionStatus.LOCKED)).toThrow(
+    expect(() =>
+      service.assertCanArchive(TimetableVersionStatus.DRAFT),
+    ).not.toThrow();
+    expect(() =>
+      service.assertCanArchive(TimetableVersionStatus.PUBLISHED),
+    ).not.toThrow();
+    expect(() =>
+      service.assertCanArchive(TimetableVersionStatus.ARCHIVED),
+    ).not.toThrow();
+    expect(() =>
+      service.assertCanArchive(TimetableVersionStatus.LOCKED),
+    ).toThrow(
       'Locked timetable versions cannot be archived without an explicit elevated workflow',
     );
   });

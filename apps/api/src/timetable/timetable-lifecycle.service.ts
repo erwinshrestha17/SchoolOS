@@ -82,7 +82,9 @@ export class TimetableLifecycleService {
     }
 
     if (version.status !== TimetableVersionStatus.DRAFT) {
-      throw new ConflictException('Only draft timetable versions can be published');
+      throw new ConflictException(
+        'Only draft timetable versions can be published',
+      );
     }
 
     if (version.slots.length === 0) {
@@ -101,7 +103,9 @@ export class TimetableLifecycleService {
     }
 
     const staffIds = Array.from(new Set(version.slots.map((s) => s.staffId)));
-    const subjectIds = Array.from(new Set(version.slots.map((s) => s.subjectId)));
+    const subjectIds = Array.from(
+      new Set(version.slots.map((s) => s.subjectId)),
+    );
 
     const [availability, workloadLimits, requirements] = await Promise.all([
       this.prisma.teacherAvailability.findMany({
@@ -163,7 +167,8 @@ export class TimetableLifecycleService {
     const validation = await this.validateVersionForPublish(actor, versionId);
     if (!validation.valid) {
       throw new ConflictException(
-        validation.errors[0]?.message ?? 'Timetable version has blocking conflicts',
+        validation.errors[0]?.message ??
+          'Timetable version has blocking conflicts',
       );
     }
     return validation;
@@ -171,7 +176,9 @@ export class TimetableLifecycleService {
 
   assertCanLock(status: TimetableVersionStatus): void {
     if (status !== TimetableVersionStatus.PUBLISHED) {
-      throw new ConflictException('Only published timetable versions can be locked');
+      throw new ConflictException(
+        'Only published timetable versions can be locked',
+      );
     }
   }
 

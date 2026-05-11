@@ -21,7 +21,7 @@ export class HomeworkCron {
 
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
 
@@ -59,9 +59,15 @@ export class HomeworkCron {
     );
   }
 
-  private async queueReminder(homework: any, reminderType: HomeworkReminderType) {
+  private async queueReminder(
+    homework: any,
+    reminderType: HomeworkReminderType,
+  ) {
     const adminUser = await this.prisma.user.findFirst({
-      where: { tenantId: homework.tenantId, userRoles: { some: { role: { name: 'admin' } } } },
+      where: {
+        tenantId: homework.tenantId,
+        userRoles: { some: { role: { name: 'admin' } } },
+      },
     });
 
     if (!adminUser) return;

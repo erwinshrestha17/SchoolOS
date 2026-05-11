@@ -27,14 +27,20 @@ describe('Timetable Requirements and Availability', () => {
   beforeEach(async () => {
     prisma = createPrismaMock();
     const conflictService = new TimetableConflictService(prisma as any);
-    const lifecycleService = new TimetableLifecycleService(prisma as any, conflictService);
+    const lifecycleService = new TimetableLifecycleService(
+      prisma as any,
+      conflictService,
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TimetableService,
         { provide: PrismaService, useValue: prisma },
         { provide: AuditService, useValue: { record: jest.fn() } },
-        { provide: CommunicationsService, useValue: { recordDeliveryRecords: jest.fn() } },
+        {
+          provide: CommunicationsService,
+          useValue: { recordDeliveryRecords: jest.fn() },
+        },
         { provide: TimetableLifecycleService, useValue: lifecycleService },
         { provide: TimetableConflictService, useValue: conflictService },
       ],
@@ -46,16 +52,26 @@ describe('Timetable Requirements and Availability', () => {
   describe('Teacher Availability', () => {
     it('should create teacher availability', async () => {
       const p = prisma as any;
-      p.staff.findFirst.mockResolvedValue({ id: 'staff-1', tenantId: 'tenant-a' });
+      p.staff.findFirst.mockResolvedValue({
+        id: 'staff-1',
+        tenantId: 'tenant-a',
+      });
       p.teacherAvailability.findFirst.mockResolvedValue(null);
-      p.teacherAvailability.create.mockResolvedValue({ id: 'avail-1', staffId: 'staff-1' });
+      p.teacherAvailability.create.mockResolvedValue({
+        id: 'avail-1',
+        staffId: 'staff-1',
+      });
 
-      const result = await service.createTeacherAvailability('staff-1', {
-        dayOfWeek: 1,
-        startsAt: '09:00',
-        endsAt: '10:00',
-        type: TeacherAvailabilityType.AVAILABLE,
-      }, actor);
+      const result = await service.createTeacherAvailability(
+        'staff-1',
+        {
+          dayOfWeek: 1,
+          startsAt: '09:00',
+          endsAt: '10:00',
+          type: TeacherAvailabilityType.AVAILABLE,
+        },
+        actor,
+      );
 
       expect(result).toBeDefined();
       expect(p.teacherAvailability.create).toHaveBeenCalled();
@@ -63,52 +79,92 @@ describe('Timetable Requirements and Availability', () => {
 
     it('should reject invalid time range', async () => {
       const p = prisma as any;
-      p.staff.findFirst.mockResolvedValue({ id: 'staff-1', tenantId: 'tenant-a' });
+      p.staff.findFirst.mockResolvedValue({
+        id: 'staff-1',
+        tenantId: 'tenant-a',
+      });
 
-      await expect(service.createTeacherAvailability('staff-1', {
-        dayOfWeek: 1,
-        startsAt: '10:00',
-        endsAt: '09:00',
-      }, actor)).rejects.toThrow(ConflictException);
+      await expect(
+        service.createTeacherAvailability(
+          'staff-1',
+          {
+            dayOfWeek: 1,
+            startsAt: '10:00',
+            endsAt: '09:00',
+          },
+          actor,
+        ),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
   describe('Subject Weekly Requirements', () => {
     it('should create subject weekly requirement', async () => {
       const p = prisma as any;
-      p.academicYear.findFirst.mockResolvedValue({ id: 'year-1', tenantId: 'tenant-a' });
-      p.class.findFirst.mockResolvedValue({ id: 'class-1', tenantId: 'tenant-a' });
-      p.subject.findFirst.mockResolvedValue({ id: 'sub-1', tenantId: 'tenant-a' });
+      p.academicYear.findFirst.mockResolvedValue({
+        id: 'year-1',
+        tenantId: 'tenant-a',
+      });
+      p.class.findFirst.mockResolvedValue({
+        id: 'class-1',
+        tenantId: 'tenant-a',
+      });
+      p.subject.findFirst.mockResolvedValue({
+        id: 'sub-1',
+        tenantId: 'tenant-a',
+      });
       p.subjectWeeklyRequirement.findFirst.mockResolvedValue(null);
-      p.subjectWeeklyRequirement.create.mockResolvedValue({ id: 'req-1', requiredPeriodsPerWeek: 5 });
-
-      const result = await service.createSubjectWeeklyRequirement({
-        academicYearId: 'year-1',
-        classId: 'class-1',
-        subjectId: 'sub-1',
+      p.subjectWeeklyRequirement.create.mockResolvedValue({
+        id: 'req-1',
         requiredPeriodsPerWeek: 5,
-      }, actor);
+      });
+
+      const result = await service.createSubjectWeeklyRequirement(
+        {
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          subjectId: 'sub-1',
+          requiredPeriodsPerWeek: 5,
+        },
+        actor,
+      );
 
       expect(result).toBeDefined();
-      expect(p.subjectWeeklyRequirement.create).toHaveBeenCalledWith(expect.objectContaining({
-        data: expect.objectContaining({
-          requiredPeriodsPerWeek: 5,
+      expect(p.subjectWeeklyRequirement.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            requiredPeriodsPerWeek: 5,
+          }),
         }),
-      }));
+      );
     });
 
     it('should reject negative required periods', async () => {
       const p = prisma as any;
-      p.academicYear.findFirst.mockResolvedValue({ id: 'year-1', tenantId: 'tenant-a' });
-      p.class.findFirst.mockResolvedValue({ id: 'class-1', tenantId: 'tenant-a' });
-      p.subject.findFirst.mockResolvedValue({ id: 'sub-1', tenantId: 'tenant-a' });
+      p.academicYear.findFirst.mockResolvedValue({
+        id: 'year-1',
+        tenantId: 'tenant-a',
+      });
+      p.class.findFirst.mockResolvedValue({
+        id: 'class-1',
+        tenantId: 'tenant-a',
+      });
+      p.subject.findFirst.mockResolvedValue({
+        id: 'sub-1',
+        tenantId: 'tenant-a',
+      });
 
-      await expect(service.createSubjectWeeklyRequirement({
-        academicYearId: 'year-1',
-        classId: 'class-1',
-        subjectId: 'sub-1',
-        requiredPeriodsPerWeek: -1,
-      }, actor)).rejects.toThrow(ConflictException);
+      await expect(
+        service.createSubjectWeeklyRequirement(
+          {
+            academicYearId: 'year-1',
+            classId: 'class-1',
+            subjectId: 'sub-1',
+            requiredPeriodsPerWeek: -1,
+          },
+          actor,
+        ),
+      ).rejects.toThrow(ConflictException);
     });
   });
 });
