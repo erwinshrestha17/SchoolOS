@@ -6,7 +6,6 @@ import { api } from '../../../lib/api';
 import type {
   AcademicYearSummary,
   ClassSummary,
-  RoomSummary,
   SectionSummary,
   StaffSummary,
   SubjectSummary,
@@ -20,18 +19,21 @@ import { StatCard } from '../../ui/stat-card';
 import { Badge } from '../../ui/badge';
 import { EmptyState } from '../../ui/empty-state';
 import { LoadingState } from '../../ui/loading-state';
-import { 
-  FormField, 
-  Input, 
-  Select 
+import { FilterBar } from '../../ui/filter-bar';
+import { PageState } from '../../ui/page-state';
+import { AuditInfo } from '../../ui/audit-info';
+import { ConfirmDialog } from '../../ui/confirm-dialog';
+import {
+  FormField,
+  Input,
+  Select
 } from '../../ui/form-field';
-import { 
-  Plus, 
-  CheckCircle2, 
-  AlertCircle, 
-  History, 
-  Lock, 
-  Archive, 
+import {
+  Plus,
+  CheckCircle2,
+  AlertCircle,
+  Lock,
+  Archive,
   Zap,
   Clock
 } from 'lucide-react';
@@ -47,6 +49,8 @@ type Props = {
   classId: string;
   setClassId: (id: string) => void;
 };
+
+type VersionAction = 'publish' | 'lock' | 'archive';
 
 const daysOfWeek = [
   { value: 1, label: 'Monday' },
@@ -73,6 +77,7 @@ export function TimetableBuilderTab({
   const currentYear = academicYears.find((year) => year.isCurrent) ?? academicYears[0];
   const [selectedVersionId, setSelectedVersionId] = useState('');
   const [validationResult, setValidationResult] = useState<TimetableValidationResult | null>(null);
+  const [confirmAction, setConfirmAction] = useState<VersionAction | null>(null);
 
   const [slot, setSlot] = useState({
     academicYearId: currentYear?.id ?? '',
@@ -90,7 +95,6 @@ export function TimetableBuilderTab({
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['timetable', classId] });
       void queryClient.invalidateQueries({ queryKey: ['teacher-workload'] });
-      // Reset some fields to make rapid entry easier
       setSlot((c) => ({ ...c, subjectId: '', startsAt: c.endsAt, endsAt: calculateNextEnd(c.endsAt) }));
     },
   });
@@ -143,20 +147,28 @@ export function TimetableBuilderTab({
 
   const publishVersionMut = useMutation({
     mutationFn: api.publishTimetableVersion,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['timetable-versions'] }),
+    onSuccess: () => {
+      setConfirmAction(null);
+      void queryClient.invalidateQueries({ queryKey: ['timetable-versions'] });
+    },
   });
 
   const lockVersionMut = useMutation({
     mutationFn: api.lockTimetableVersion,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['timetable-versions'] }),
+    onSuccess: () => {
+      setConfirmAction(null);
+      void queryClient.invalidateQueries({ queryKey: ['timetable-versions'] });
+    },
   });
 
   const archiveVersionMut = useMutation({
     mutationFn: api.archiveTimetableVersion,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['timetable-versions'] }),
+    onSuccess: () => {
+      setConfirmAction(null);
+      void queryClient.invalidateQueries({ queryKey: ['timetable-versions'] });
+    },
   });
 
-  // Helper to add 45 minutes to a time string (HH:MM)
   const calculateNextEnd = (time: string) => {
     if (!time) return '';
     const [h, m] = time.split(':').map(Number);
@@ -169,70 +181,142 @@ export function TimetableBuilderTab({
   const rooms = roomsQuery.data ?? [];
   const versions = versionsQuery.data ?? [];
   const activeVersionId = selectedVersionId || versions[0]?.id || '';
+  const activeVersion = versions.find((version) => version.id === activeVersionId);
+  const versionActionError =
+    publishVersionMut.error?.message ||
+    lockVersionMut.error?.message ||
+    archiveVersionMut.error?.message ||
+    createVersionMut.error?.message ||
+    validateVersionMut.error?.message;
 
-  // Group timetable by day
   const gridByDay = daysOfWeek.reduce((acc, day) => {
     acc[day.value] = timetable
       .filter((entry) => entry.dayOfWeek === day.value)
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
     return acc;
-  }, {} as Record<number, any[]>);
+  }, {} as Record<number, TimetableSlotSummary[]>);
+
+  const confirmCopy = {
+    publish: {
+      title: 'Publish timetable version?',
+      description: 'Publishing makes this timetable active for school operations. Backend validation remains the source of truth and will reject blocking conflicts.',
+      confirmLabel: 'Publish',
+      variant: 'default' as const,
+    },
+    lock: {
+      title: 'Lock timetable version?',
+      description: 'Locked timetable versions cannot be edited through normal workflows. Continue only after review is complete.',
+      confirmLabel: 'Lock Version',
+      variant: 'warning' as const,
+    },
+    archive: {
+      title: 'Archive timetable version?',
+      description: 'Archived versions are removed from normal active workflows. This action should be used for obsolete drafts or superseded versions.',
+      confirmLabel: 'Archive',
+      variant: 'destructive' as const,
+    },
+  };
+
+  function runConfirmedAction() {
+    if (!activeVersionId || !confirmAction) return;
+    if (confirmAction === 'publish') publishVersionMut.mutate(activeVersionId);
+    if (confirmAction === 'lock') lockVersionMut.mutate(activeVersionId);
+    if (confirmAction === 'archive') archiveVersionMut.mutate(activeVersionId);
+  }
 
   return (
     <div className="space-y-8">
-      {/* Class Context Selector */}
-      <SectionCard className="bg-white/90 backdrop-blur-md">
-        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <FormField label="Target Class" className="flex-1 max-w-md">
-            <Select 
-              value={classId} 
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setClassId(e.target.value)}
-            >
-              <option value="">Choose a class to view/build timetable</option>
-              {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </FormField>
+      <FilterBar
+        label="Timetable Context"
+        description="Select the class and academic year context before building or validating schedules."
+        className="bg-white/90"
+        actions={
+          <Badge variant="outline" className="py-1.5 text-[10px] font-black uppercase tracking-widest">
+            {currentYear?.name ?? 'No active year'}
+          </Badge>
+        }
+      >
+        <FormField label="Target Class" className="min-w-[260px] flex-1 max-w-md">
+          <Select
+            value={classId}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setClassId(e.target.value)}
+          >
+            <option value="">Choose a class to view/build timetable</option>
+            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </Select>
+        </FormField>
+      </FilterBar>
 
-          <div className="flex items-center gap-3">
-             <Badge variant="outline" className="font-black uppercase tracking-widest text-[10px] py-1.5">
-               {currentYear?.name ?? 'No active year'}
-             </Badge>
-          </div>
-        </div>
-      </SectionCard>
+      {!classId && (
+        <PageState
+          tone="info"
+          title="Choose a class to start"
+          description="Timetable builder, version workflow, conflict validation, and substitution records will appear after selecting a class."
+        />
+      )}
 
       {classId && (
         <div className="space-y-6">
+          <AuditInfo>
+            Timetable conflicts, publish eligibility, and lock/archive rules are validated by the backend. Frontend warnings are only a productivity aid.
+          </AuditInfo>
+
+          {versionActionError && (
+            <PageState
+              tone="danger"
+              title="Timetable action failed"
+              description={versionActionError}
+              className="min-h-0 py-5"
+            />
+          )}
+
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             <StatCard
               title="Periods"
               value={periodsQuery.data?.length ?? 0}
               icon={<Clock className="h-5 w-5" />}
+              loading={periodsQuery.isLoading}
             />
             <StatCard
               title="Rooms"
               value={rooms.length}
               icon={<CheckCircle2 className="h-5 w-5" />}
+              loading={roomsQuery.isLoading}
             />
-            
+
             <SectionCard title="Version Workflow" className="lg:col-span-2">
               <div className="space-y-4">
-                <Select 
-                  value={activeVersionId} 
-                  onChange={(event: React.ChangeEvent<HTMLSelectElement>) => setSelectedVersionId(event.target.value)}
-                >
-                  <option value="">Select version</option>
-                  {versions.map((version) => (
-                    <option key={version.id} value={version.id}>
-                      {version.versionName} · {version.status}
-                    </option>
-                  ))}
-                </Select>
-                
+                {versionsQuery.isError ? (
+                  <PageState
+                    tone="danger"
+                    title="Unable to load versions"
+                    description={versionsQuery.error?.message ?? 'Timetable versions could not be loaded.'}
+                    className="min-h-0 py-5"
+                  />
+                ) : (
+                  <Select
+                    value={activeVersionId}
+                    onChange={(event: React.ChangeEvent<HTMLSelectElement>) => setSelectedVersionId(event.target.value)}
+                  >
+                    <option value="">Select version</option>
+                    {versions.map((version) => (
+                      <option key={version.id} value={version.id}>
+                        {version.versionName} · {version.status}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+
+                {activeVersion && (
+                  <Badge variant="secondary" className="text-[10px] font-black uppercase tracking-widest">
+                    Current: {activeVersion.status}
+                  </Badge>
+                )}
+
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    className="h-9 px-4 rounded-full bg-slate-100 text-slate-900 text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-colors flex items-center gap-2"
+                    className="flex h-9 items-center gap-2 rounded-full bg-slate-100 px-4 text-[10px] font-black uppercase tracking-widest text-slate-900 transition-colors hover:bg-slate-200"
                     onClick={() => createVersionMut.mutate()}
                     disabled={createVersionMut.isPending || !currentYear?.id}
                   >
@@ -241,7 +325,7 @@ export function TimetableBuilderTab({
                   </button>
                   <button
                     type="button"
-                    className="h-9 px-4 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-colors flex items-center gap-2"
+                    className="flex h-9 items-center gap-2 rounded-full bg-indigo-50 px-4 text-[10px] font-black uppercase tracking-widest text-indigo-700 transition-colors hover:bg-indigo-100"
                     onClick={() => activeVersionId && validateVersionMut.mutate(activeVersionId)}
                     disabled={!activeVersionId || validateVersionMut.isPending}
                   >
@@ -250,8 +334,8 @@ export function TimetableBuilderTab({
                   </button>
                   <button
                     type="button"
-                    className="h-9 px-4 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-colors flex items-center gap-2"
-                    onClick={() => activeVersionId && publishVersionMut.mutate(activeVersionId)}
+                    className="flex h-9 items-center gap-2 rounded-full bg-emerald-50 px-4 text-[10px] font-black uppercase tracking-widest text-emerald-700 transition-colors hover:bg-emerald-100"
+                    onClick={() => setConfirmAction('publish')}
                     disabled={!activeVersionId || publishVersionMut.isPending}
                   >
                     <CheckCircle2 className="h-3 w-3" />
@@ -259,8 +343,8 @@ export function TimetableBuilderTab({
                   </button>
                   <button
                     type="button"
-                    className="h-9 px-4 rounded-full bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-colors flex items-center gap-2"
-                    onClick={() => activeVersionId && lockVersionMut.mutate(activeVersionId)}
+                    className="flex h-9 items-center gap-2 rounded-full bg-slate-900 px-4 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-slate-800"
+                    onClick={() => setConfirmAction('lock')}
                     disabled={!activeVersionId || lockVersionMut.isPending}
                   >
                     <Lock className="h-3 w-3" />
@@ -268,8 +352,8 @@ export function TimetableBuilderTab({
                   </button>
                   <button
                     type="button"
-                    className="h-9 px-4 rounded-full bg-red-50 text-red-700 text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-colors flex items-center gap-2"
-                    onClick={() => activeVersionId && archiveVersionMut.mutate(activeVersionId)}
+                    className="flex h-9 items-center gap-2 rounded-full bg-red-50 px-4 text-[10px] font-black uppercase tracking-widest text-red-700 transition-colors hover:bg-red-100"
+                    onClick={() => setConfirmAction('archive')}
                     disabled={!activeVersionId || archiveVersionMut.isPending}
                   >
                     <Archive className="h-3 w-3" />
@@ -281,9 +365,9 @@ export function TimetableBuilderTab({
           </div>
 
           {validationResult && (
-            <SectionCard 
-              title="Conflict Validation" 
-              className={cn("border-2", validationResult.valid ? "border-emerald-100" : "border-red-100")}
+            <SectionCard
+              title="Conflict Validation"
+              className={cn('border-2', validationResult.valid ? 'border-emerald-100' : 'border-red-100')}
             >
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
@@ -292,14 +376,14 @@ export function TimetableBuilderTab({
                   ) : (
                     <AlertCircle className="h-5 w-5 text-red-500" />
                   )}
-                  <p className={cn("text-sm font-black uppercase tracking-widest", validationResult.valid ? 'text-emerald-700' : 'text-red-700')}>
+                  <p className={cn('text-sm font-black uppercase tracking-widest', validationResult.valid ? 'text-emerald-700' : 'text-red-700')}>
                     {validationResult.valid ? 'No blocking conflicts' : `${validationResult.errors.length} conflict(s) found`}
                   </p>
                 </div>
                 {!validationResult.valid && (
                   <div className="grid gap-2">
                     {validationResult.errors.slice(0, 3).map((issue) => (
-                      <div key={`${issue.type}-${issue.conflictingSlotId ?? issue.message}`} className="rounded-xl bg-red-50/50 p-3 border border-red-100 text-xs text-red-700 font-medium">
+                      <div key={`${issue.type}-${issue.conflictingSlotId ?? issue.message}`} className="rounded-xl border border-red-100 bg-red-50/50 p-3 text-xs font-medium text-red-700">
                         {issue.message}
                       </div>
                     ))}
@@ -309,30 +393,38 @@ export function TimetableBuilderTab({
             </SectionCard>
           )}
 
-          <SectionCard 
-            title="Absent Teacher Substitution Management" 
+          <SectionCard
+            title="Absent Teacher Substitution Management"
             description="Manage substitutions for missing teachers."
             headerAction={
-              <Badge variant="secondary" className="font-black uppercase tracking-widest text-[10px]">
+              <Badge variant="secondary" className="text-[10px] font-black uppercase tracking-widest">
                 {substitutionsQuery.data?.length ?? 0} Records
               </Badge>
             }
           >
-            {substitutionsQuery.data?.length ? (
+            {substitutionsQuery.isLoading ? (
+              <LoadingState />
+            ) : substitutionsQuery.isError ? (
+              <PageState
+                tone="danger"
+                title="Unable to load substitutions"
+                description={substitutionsQuery.error?.message ?? 'Substitution records could not be loaded.'}
+              />
+            ) : substitutionsQuery.data?.length ? (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {substitutionsQuery.data.slice(0, 6).map((item) => (
-                  <div key={item.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-1">
+                  <div key={item.id} className="space-y-1 rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
                     <p className="text-xs font-black uppercase tracking-tight text-slate-900">{item.status}</p>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                       {new Date(item.date).toLocaleDateString()} · {item.reason}
                     </p>
                   </div>
                 ))}
               </div>
             ) : (
-              <EmptyState 
-                title="No substitutions" 
-                description="No teacher substitutions recorded for this class." 
+              <EmptyState
+                title="No substitutions"
+                description="No teacher substitutions recorded for this class."
                 className="bg-slate-50/50"
               />
             )}
@@ -387,7 +479,7 @@ export function TimetableBuilderTab({
                 <FormField label="Room">
                   <div className="space-y-3">
                     <Input type="text" placeholder="Custom room name" value={slot.room} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSlot((c) => ({ ...c, room: e.target.value }))} />
-                    <Select value="" onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSlot((c) => ({ ...c, room: rooms.find((room: any) => room.id === e.target.value)?.name ?? c.room }))}>
+                    <Select value="" onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSlot((c) => ({ ...c, room: rooms.find((room) => room.id === e.target.value)?.name ?? c.room }))}>
                       <option value="">Or use room record</option>
                       {rooms.map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}
                     </Select>
@@ -395,18 +487,17 @@ export function TimetableBuilderTab({
                 </FormField>
 
                 {slotMut.isError && (
-                  <div className="rounded-2xl bg-red-50 p-4 border border-red-100 flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-widest text-red-700">Conflict Detected</p>
-                      <p className="text-[11px] text-red-600 mt-1 font-medium leading-relaxed">{slotMut.error.message}</p>
-                    </div>
-                  </div>
+                  <PageState
+                    tone="danger"
+                    title="Slot could not be saved"
+                    description={slotMut.error.message}
+                    className="min-h-0 py-5"
+                  />
                 )}
 
                 <button
                   type="button"
-                  className="w-full h-14 rounded-2xl bg-slate-900 text-white font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-slate-200 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0"
+                  className="h-14 w-full rounded-2xl bg-slate-900 text-xs font-black uppercase tracking-[0.2em] text-white shadow-xl shadow-slate-200 transition-all hover:-translate-y-1 disabled:translate-y-0 disabled:opacity-50"
                   disabled={!slot.academicYearId || !slot.subjectId || !slot.staffId || slot.startsAt >= slot.endsAt || slotMut.isPending}
                   onClick={() => slotMut.mutate({ ...slot, classId, sectionId: slot.sectionId || null })}
                 >
@@ -419,9 +510,9 @@ export function TimetableBuilderTab({
               {isLoadingTimetable ? (
                 <LoadingState />
               ) : timetable.length === 0 ? (
-                <EmptyState 
-                  title="No schedule created" 
-                  description="Start by adding slots using the form on the left." 
+                <EmptyState
+                  title="No schedule created"
+                  description="Start by adding slots using the form on the left."
                   className="bg-slate-50/50"
                 />
               ) : (
@@ -429,22 +520,22 @@ export function TimetableBuilderTab({
                   {daysOfWeek.map((day) => {
                     const daySlots = gridByDay[day.value];
                     if (!daySlots || daySlots.length === 0) return null;
-                    
+
                     return (
                       <div key={day.value} className="flex gap-6 border-b border-slate-100 pb-6 last:border-0 last:pb-0">
                         <div className="w-28 shrink-0 pt-1">
-                           <p className="text-xs font-black uppercase tracking-widest text-slate-400">{day.label}</p>
+                          <p className="text-xs font-black uppercase tracking-widest text-slate-400">{day.label}</p>
                         </div>
                         <div className="flex flex-1 flex-wrap gap-3">
                           {daySlots.map((s) => (
-                            <div key={s.id} className="rounded-2xl border border-indigo-100 bg-indigo-50/30 p-4 w-48 flex-shrink-0 space-y-2 group/slot hover:bg-indigo-50 transition-colors">
+                            <div key={s.id} className="w-48 flex-shrink-0 space-y-2 rounded-2xl border border-indigo-100 bg-indigo-50/30 p-4 transition-colors hover:bg-indigo-50">
                               <div className="flex items-start justify-between gap-2">
-                                <p className="font-black text-indigo-900 uppercase tracking-tight text-xs leading-tight">{s.subject?.code ?? 'SUB'}</p>
-                                <Badge variant="outline" className="text-[8px] font-black uppercase py-0 px-1 border-indigo-200 text-indigo-400">
+                                <p className="text-xs font-black uppercase leading-tight tracking-tight text-indigo-900">{s.subject?.code ?? 'SUB'}</p>
+                                <Badge variant="outline" className="border-indigo-200 px-1 py-0 text-[8px] font-black uppercase text-indigo-400">
                                   {s.startsAt}
                                 </Badge>
                               </div>
-                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest truncate">
+                              <p className="truncate text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                 {s.staff?.firstName} {s.staff?.lastName}
                               </p>
                               {(s.section?.name || s.room) && (
@@ -465,16 +556,20 @@ export function TimetableBuilderTab({
           </div>
         </div>
       )}
-    </div>
-  );
-}
 
-function SetupColumn({ title, body, detail }: { title: string; body: string; detail: string }) {
-  return (
-    <div className="rounded-2xl border border-[var(--line)] p-4">
-      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{title}</p>
-      <p className="mt-2 text-lg font-bold text-gray-950">{body}</p>
-      <p className="mt-1 text-xs leading-5 text-gray-500">{detail}</p>
+      {confirmAction && (
+        <ConfirmDialog
+          isOpen={Boolean(confirmAction)}
+          title={confirmCopy[confirmAction].title}
+          description={confirmCopy[confirmAction].description}
+          confirmLabel={confirmCopy[confirmAction].confirmLabel}
+          variant={confirmCopy[confirmAction].variant}
+          destructive={confirmAction === 'archive'}
+          isConfirming={publishVersionMut.isPending || lockVersionMut.isPending || archiveVersionMut.isPending}
+          onConfirm={runConfirmedAction}
+          onClose={() => setConfirmAction(null)}
+        />
+      )}
     </div>
   );
 }
