@@ -26,8 +26,9 @@ Keep this file only as a compatibility pointer for older prompts that still refe
 Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
+Phase 2A M4 Academics backend: Complete / contract-protected
 Phase 2D M9 Accounting: Production Candidate Complete
-Current stage: Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
+Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
 ```
 
 ---
@@ -37,7 +38,7 @@ Current stage: Phase 2 foundations + M9 production-candidate completion + Phase 
 | Phase | Name | Goal | Status |
 |---|---|---|---|
 | Phase 1 | Pilot-Ready Core School System | Make the system usable for real live-school daily operations and polish it for pilot use. | Completed |
-| Phase 2 | Academic, HR, Timetable, and Accounting Expansion | Add academic depth, timetable/homework, HR/payroll, full M9 accounting, controlled parent communication expansion, and cross-module hardening such as QR-based Student Identity. | Foundations implemented; M9 Accounting production-candidate complete |
+| Phase 2 | Academic, HR, Timetable, and Accounting Expansion | Add academic depth, timetable/homework, HR/payroll, full M9 accounting, controlled parent communication expansion, and cross-module hardening such as QR-based Student Identity. | Phase 2A backend complete; M9 Accounting production-candidate complete; other foundations implemented |
 | Phase 3 | Extended School Operations | Add library, transport, canteen, and parent/mobile expansion using shared foundations such as Student QR Identity. | Admin foundations implemented for Library/Transport/Canteen; parent/mobile later |
 | Phase 4 | AI, Analytics, Scale, and Enterprise SaaS | Add M11 School Intelligence & Analytics, AI/ML features, analytics platform, scale optimizations, and enterprise SaaS controls. | Roadmap documented; implementation later |
 
@@ -45,12 +46,72 @@ Current stage: Phase 2 foundations + M9 production-candidate completion + Phase 
 
 ## Phase 2 Sub-Phases
 
-- 2A Academics, Exams, CAS, and Report Cards — foundation implemented.
+- 2A Academics, Exams, CAS, and Report Cards — **backend complete / contract-protected**.
 - 2B Homework and Timetable — foundation implemented.
 - 2C HR and Payroll — foundation implemented.
 - 2D Full M9 Accounting and Finance — **Production Candidate Complete**.
 - 2E Parent Communication Expansion — foundation implemented / further hardening later.
 - 2F Student Identity QR Foundation — foundation documented / staged for vertical reuse.
+
+### Phase 2A — M4 Academics, Exams, CAS, and Report Cards
+
+Status: **Backend Complete / Contract-Protected**.
+
+Completed backend sequence:
+
+```text
+Step 1 — Exam Terms + Assessment Components foundation
+Step 2 — Subject Marks Entry
+Step 3 — CAS Records
+Step 4 — Nepal Grading/GPA Result Preview
+Step 5 — Marks Lock/Unlock Workflow Hardening
+Step 6 — Report Card Generation Backend Hardening
+Step 7 — Promotion Readiness Backend Hardening
+Step 8 — Result Publishing + Parent Notification Backend Hardening
+Step 9 — Backend Final Hardening + Phase 2A Flow Contract
+```
+
+Completed backend scope:
+
+```text
+- Tenant-scoped exam term and assessment component APIs.
+- Transactional marks bulk upsert with max-mark, absent, withheld, and lock validation.
+- CAS create/list/update/delete and bulk upsert.
+- Server-side Nepal grading/GPA result preview for student/class results.
+- Marks lock request/review/unlock workflow with audit logs.
+- Report card generation requiring locked marks and rejecting incomplete/withheld outcomes.
+- Promotion readiness based on generated/locked report cards instead of raw marks.
+- Result publishing, unpublishing, and parent notification hardening.
+- Consent-aware result notification through CommunicationsService.
+- Phase 2A flow contract test covering the full backend chain.
+```
+
+Latest verified results:
+
+```text
+pnpm --filter @schoolos/api test src/academics/phase2a-flow.contract.spec.ts
+  PASS: 1 suite / 9 tests
+
+pnpm --filter @schoolos/api test src/integrity/production-contracts.spec.ts
+  PASS: 1 suite / 11 tests
+
+pnpm typecheck
+  PASS: API + web
+
+pnpm test
+  PASS: API 76 suites / 494 tests
+  PASS: Web 71 tests
+```
+
+Next Phase 2A work:
+
+```text
+- Phase 2A frontend/admin UI wired to real APIs.
+- Browser smoke/Playwright contracts for the full Phase 2A workflow.
+- Report card PDF visual polish.
+- Future locked report-card correction/regeneration workflow.
+- Deeper academic reports and exports.
+```
 
 ### Phase 2D — Full M9 Accounting and Finance
 
@@ -126,7 +187,7 @@ Recommended next work:
 
 ```text
 Harden one existing vertical at a time.
-Priority: seeded Accounting browser workflow tests, production seed review for default COA/report mappings, and continued module hardening for Academics, Homework/Timetable, HR/Payroll, Library, Transport, and Canteen.
+Priority: Phase 2A frontend/admin UI, seeded Accounting browser workflow tests, production seed review for default COA/report mappings, and continued module hardening for Homework/Timetable, HR/Payroll, Library, Transport, and Canteen.
 ```
 
 ---
