@@ -1,10 +1,11 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthMethod, TeacherAvailabilityType } from '@prisma/client';
 import { TimetableService } from './timetable.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CommunicationsService } from '../communications/communications.service';
+import { AttendanceService } from '../attendance/attendance.service';
 import { AuthContext } from '../auth/auth.types';
 import { createPrismaMock, PrismaMock } from '../../test/test-helpers';
 import { TimetableLifecycleService } from './timetable-lifecycle.service';
@@ -26,9 +27,9 @@ describe('Timetable Requirements and Availability', () => {
 
   beforeEach(async () => {
     prisma = createPrismaMock();
-    const conflictService = new TimetableConflictService(prisma as any);
+    const conflictService = new TimetableConflictService(prisma as never);
     const lifecycleService = new TimetableLifecycleService(
-      prisma as any,
+      prisma as never,
       conflictService,
     );
 
@@ -43,6 +44,7 @@ describe('Timetable Requirements and Availability', () => {
         },
         { provide: TimetableLifecycleService, useValue: lifecycleService },
         { provide: TimetableConflictService, useValue: conflictService },
+        { provide: AttendanceService, useValue: {} },
       ],
     }).compile();
 
