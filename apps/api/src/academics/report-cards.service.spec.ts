@@ -1,10 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  GradeLockStatus,
-  MarkEntryStatus,
-  Prisma,
-} from '@prisma/client';
+import { GradeLockStatus, MarkEntryStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { FinanceService } from '../finance/finance.service';
