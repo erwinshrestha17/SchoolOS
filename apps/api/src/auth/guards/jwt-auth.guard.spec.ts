@@ -103,7 +103,11 @@ describe('JwtAuthGuard', () => {
     expect(cls.set).not.toHaveBeenCalled();
   });
 
-  it('rejects tenant override attempts from non-super-admin users', async () => {
+  it('rejects tenant override attempts from tenant users including principals', async () => {
+    jwtService.verifyAsync.mockResolvedValueOnce({
+      ...basePayload,
+      roles: ['principal'],
+    });
     const { context } = createContext({
       'x-schoolos-tenant-id': 'tenant-2',
     });
@@ -116,10 +120,10 @@ describe('JwtAuthGuard', () => {
     expect(auditService.record).not.toHaveBeenCalled();
   });
 
-  it('allows super admins to override to an active tenant and audits it', async () => {
+  it('allows platform super admins to override to an active tenant and audits it', async () => {
     jwtService.verifyAsync.mockResolvedValueOnce({
       ...basePayload,
-      roles: ['super_admin'],
+      roles: ['platform_super_admin'],
     });
     prisma.tenant.findUnique.mockResolvedValueOnce({
       id: 'tenant-2',
@@ -149,10 +153,10 @@ describe('JwtAuthGuard', () => {
     });
   });
 
-  it('rejects super-admin overrides to missing or inactive tenants', async () => {
+  it('rejects platform super admin overrides to missing or inactive tenants', async () => {
     jwtService.verifyAsync.mockResolvedValue({
       ...basePayload,
-      roles: ['super_admin'],
+      roles: ['platform_super_admin'],
     });
     prisma.tenant.findUnique.mockResolvedValueOnce(null);
     const missingTenant = createContext({ 'x-schoolos-tenant-id': 'missing' });
