@@ -1,9 +1,9 @@
 # SchoolOS Remaining Implementation Plan
 
 **Status source:** `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md`  
-**Current stage:** Phase 2 implemented foundations + Phase 3 operations admin foundations  
+**Current stage:** Phase 2A backend complete + Phase 2 implemented foundations + Phase 3 operations admin foundations  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard  
-**Last updated:** 2026-05-06
+**Last updated:** 2026-05-11
 
 ---
 
@@ -14,13 +14,14 @@ Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation Depth: Completed
-M9 Accounting Ledger Hardening: Completed
-Phase 2: Foundations implemented; production hardening in progress
+Phase 2A M4 Academics backend: Completed / contract-protected
+M9 Accounting Ledger Hardening: Production Candidate Complete
+Phase 2: Foundations implemented; frontend/admin UI and vertical hardening in progress
 Phase 3: Operations admin foundations implemented; parent/mobile/driver/live UX deferred
 Phase 4: Not started
 ```
 
-SchoolOS is no longer a Phase 1-only system. The repo now contains real backend and web foundations for Phase 2 modules and admin foundations for Phase 3 operations modules.
+SchoolOS is no longer a Phase 1-only system. The repo now contains real backend and web foundations for Phase 2 modules and admin foundations for Phase 3 operations modules. Phase 2A backend for M4 Academics, Exams, CAS, Report Cards, Promotion Readiness, Result Publishing, and parent notification is now complete and protected by a dedicated Phase 2A flow contract.
 
 Current practical readiness:
 
@@ -35,8 +36,9 @@ Full SchoolOS product complete: No
 Estimated completion:
 
 ```text
-Full SchoolOS vision: around 60–70% implemented
+Full SchoolOS vision: around 70–80% implemented
 Phase 1 pilot product: around 90–95% implemented
+Phase 2A backend: 100% for current backend scope; frontend/admin UI remains
 ```
 
 Near-term rule:
@@ -44,7 +46,7 @@ Near-term rule:
 ```text
 Do not start broad new modules.
 Harden existing Phase 2 and Phase 3 foundations one vertical at a time.
-Highest priority: M9 accounting correctness, tenant isolation, reports/exports, and production verification.
+Highest priority: Phase 2A admin UI wired to completed backend APIs, then browser smoke tests and vertical hardening.
 ```
 
 Explicitly deferred unless requested:
@@ -70,14 +72,14 @@ Microservices
 | M1 Admissions & Student Profiles | Pilot-ready | 90–95% |
 | M2 Smart Attendance | Pilot-ready | 85–90% |
 | M3 Fees & Receipts | Pilot-ready | 85–90% |
-| M4 Academics / Exams / CAS / Report Cards | Phase 2 foundation implemented | 70–80% |
+| M4 Academics / Exams / CAS / Report Cards | Backend complete / contract-protected; admin UI next | 80–90% |
 | M5 Activity Feed & Milestones | Strong Phase 1 foundation | 75–85% |
 | M6 Homework & Timetable | Phase 2 foundation implemented | 60–70% |
 | M7 HR & Payroll | Phase 2 foundation implemented | 65–75% |
 | M8A Library Management | Phase 3 admin foundation implemented | 45–55% |
 | M8B Transport Management | Phase 3 admin foundation implemented | 45–55% |
 | M8C Canteen Management | Phase 3 admin foundation implemented | 45–55% |
-| M9 Accounting & Finance | Completed Ledger Hardening | 75–85% |
+| M9 Accounting & Finance | Production Candidate Complete | 95–100% |
 | M10 Notices & Communication | Strong Phase 1 + chat foundation | 85–90% |
 | Parent / Mobile Portal | Mostly deferred | 5–10% |
 | Driver App | Deferred | 0–5% |
@@ -182,7 +184,7 @@ Remaining:
 
 ### Status
 
-Foundations implemented; production hardening in progress.
+Phase 2 foundations are implemented. Phase 2A backend is complete and contract-protected. Remaining work is mostly frontend/admin UI, browser smoke tests, vertical hardening, and deeper reports/exports.
 
 Modules:
 
@@ -198,25 +200,58 @@ M10 Parent Communication Expansion
 
 ### 5.1 Phase 2A — M4 Academics, Exams, CAS, Report Cards
 
-Current estimate: 70–80% implemented.
+Current estimate: 80–90% implemented.
+
+Backend status: **Complete / contract-protected**.
+
+Completed backend sequence:
+
+```text
+Step 1 — Exam Terms + Assessment Components foundation
+Step 2 — Subject Marks Entry
+Step 3 — CAS Records
+Step 4 — Nepal Grading/GPA Result Preview
+Step 5 — Marks Lock/Unlock Workflow Hardening
+Step 6 — Report Card Generation Backend Hardening
+Step 7 — Promotion Readiness Backend Hardening
+Step 8 — Result Publishing + Parent Notification Backend Hardening
+Step 9 — Backend Final Hardening + Phase 2A Flow Contract
+```
+
+Verified backend results:
+
+```text
+pnpm --filter @schoolos/api test src/academics/phase2a-flow.contract.spec.ts
+  PASS: 1 suite / 9 tests
+
+pnpm --filter @schoolos/api test src/integrity/production-contracts.spec.ts
+  PASS: 1 suite / 11 tests
+
+pnpm typecheck
+  PASS: API + web
+
+pnpm test
+  PASS: API 76 suites / 494 tests
+  PASS: Web 71 tests
+```
 
 Remaining:
 
-- Exam setup polish.
-- Assessment component UI and validation hardening.
-- CAS workflow depth.
-- Marks lock/unlock hardening.
-- Marks review and approval workflow.
-- Missing marks validation.
-- Report card batch generation.
-- Report card PDF queue/background generation.
-- Promotion workflow polish.
-- Result publishing audit hardening.
-- Parent result notification polish.
-- Academic reports/export.
-- Class/section/term/subject index review.
-- Cross-tenant academic tests.
-- Playwright coverage for academics.
+- Academics workspace/dashboard UI.
+- Exam term setup UI.
+- Assessment component setup UI.
+- Marks entry UI.
+- CAS records UI.
+- Result preview UI.
+- Marks lock/review UI.
+- Report card generation UI.
+- Promotion readiness UI.
+- Result publishing and notification UI.
+- Browser smoke / Playwright coverage for the full Phase 2A workflow.
+- Report card PDF visual polish.
+- Locked report-card correction/regeneration workflow.
+- Deeper academic reports/export.
+- Final class/section/term/subject index review after UI usage patterns stabilize.
 
 ---
 
@@ -270,29 +305,37 @@ Remaining:
 
 ### 5.4 Phase 2D — M9 Accounting and Finance
 
-Current estimate: 75–85% implemented.
+Current estimate: 95–100% implemented for the current backend/admin scope.
 
-This is the highest-priority remaining module because accounting correctness affects fees, payroll, canteen, library fines, expenses, audit, and future commercial rollout.
+Status: **Production Candidate Complete**.
 
-**Completed:**
-- AccountingPostingModule added
-- AccountingPostingService centralized as ledger write boundary
-- FinanceModule and AccountingModule wired through AccountingPostingModule
-- FinanceService delegates ledger postings to AccountingPostingService
-- ledger boundary production contracts added/updated
-- audit logging required for ledger mutations
+Completed:
 
-**Remaining:**
-- Trial balance polish
-- General ledger polish
-- Cash book polish
-- Income statement
-- Balance sheet
-- Fiscal period close/lock/reopen UI
-- Bank reconciliation depth
-- VAT/TDS/PF reports
-- Audit-ready accounting exports
-- Accounting Playwright/admin UI polish
+- AccountingPostingModule added.
+- AccountingPostingService centralized as ledger write boundary.
+- FinanceModule and AccountingModule wired through AccountingPostingModule.
+- FinanceService delegates ledger postings to AccountingPostingService.
+- Ledger boundary production contracts added/updated.
+- Audit logging required for ledger mutations.
+- Trial Balance backend.
+- General Ledger backend.
+- Cash Book backend.
+- Income Statement backend.
+- Balance Sheet backend.
+- VAT/TDS/PF summaries.
+- CSV report exports.
+- Fiscal period close/lock/reopen workflows.
+- Bank reconciliation foundation.
+- Frontend Accounting workspace.
+
+Remaining:
+
+- PDF accounting exports.
+- Saved report snapshots and File Registry integration.
+- Advanced bank auto-match rules.
+- Accounting audit log viewer UI.
+- Seeded Playwright accounting workflow tests.
+- Production seed review for default Chart of Accounts and report mappings.
 
 Non-negotiable M9 rules:
 
@@ -537,26 +580,28 @@ M0 cuts across all phases.
 
 Current estimate: 65–75% implemented.
 
-**Completed:**
-- platform tenant server-side pagination
-- tenant status reason workflow
-- platform audit log UI
-- centralized usage service
-- plans/limits foundation
-- tenant settings validation depth
-- file registry lifecycle hardening
-- reports foundation hardening
+Completed:
 
-**Remaining:**
-- SaaS subscription billing
-- API key management
-- Webhook system
-- Advanced provider configuration
-- Full platform health dashboard
-- Queue failure dashboard
-- Full usage enforcement
-- Full file registry migration across all modules
-- Full report migration across all modules
+- platform tenant server-side pagination.
+- tenant status reason workflow.
+- platform audit log UI.
+- centralized usage service.
+- plans/limits foundation.
+- tenant settings validation depth.
+- file registry lifecycle hardening.
+- reports foundation hardening.
+
+Remaining:
+
+- SaaS subscription billing.
+- API key management.
+- Webhook system.
+- Advanced provider configuration.
+- Full platform health dashboard.
+- Queue failure dashboard.
+- Full usage enforcement.
+- Full file registry migration across all modules.
+- Full report migration across all modules.
 
 Important boundary:
 
@@ -617,10 +662,15 @@ Feature -> tenant isolation -> indexes -> pagination -> queue slow work -> audit
 
 ## 10. UI/UX Remaining Work
 
-Web admin UI is now broadly implemented across Phase 1, Phase 2 foundations, and Phase 3 admin foundations.
+Web admin UI is now broadly implemented across Phase 1, Phase 2 foundations, and Phase 3 admin foundations. Phase 2A backend is complete, so the next UI/UX priority is an Academics admin workflow wired to real APIs.
 
 Remaining UI/UX:
 
+- Phase 2A Academics admin workspace.
+- Exam term and assessment component setup screens.
+- Marks entry and CAS workflow screens.
+- Result preview, lock/review, report-card generation, promotion readiness, and publishing screens.
+- Browser smoke/Playwright coverage for Phase 2A.
 - Parent/mobile portal.
 - Student mobile/PWA portal.
 - Teacher mobile workflows.
@@ -651,16 +701,17 @@ Full UI/UX roadmap: 60–70%
 
 Do next:
 
-1. Harden M9 Accounting correctness and immutability.
-2. Fix production verification and contract-test drift.
-3. Add tenant isolation tests across Phase 2 and Phase 3.
-4. Harden reports and exports.
-5. Complete File Registry and storage-backed uploads.
-6. Polish Phase 2 admin UX.
-7. Harden Library, Transport, and Canteen admin foundations.
-8. Start parent/mobile portal only after backend ownership and permissions are stable.
-9. Add driver app and live transport map/WebSocket after transport APIs are hardened.
-10. Start AI/ML only after real production data exists.
+1. Build Phase 2A Academics frontend/admin UI against the completed backend APIs.
+2. Add browser smoke/Playwright contracts for the full Phase 2A workflow.
+3. Stabilize and browser-test the completed Accounting UI.
+4. Review production seeds for default Chart of Accounts and report mappings.
+5. Add tenant isolation tests across Phase 2 and Phase 3.
+6. Harden reports and exports.
+7. Complete File Registry and storage-backed uploads.
+8. Harden Library, Transport, and Canteen admin foundations.
+9. Start parent/mobile portal only after backend ownership and permissions are stable.
+10. Add driver app and live transport map/WebSocket after transport APIs are hardened.
+11. Start AI/ML only after real production data exists.
 
 Avoid now:
 
@@ -680,10 +731,12 @@ Canteen inventory/vendor workflows before wallet/accounting boundaries are harde
 
 ```text
 Phase 1: Completed; only hardening remains.
-Phase 2: Foundations implemented; needs production hardening.
+Phase 2A backend: Completed / contract-protected; frontend/admin UI next.
+Phase 2B/2C/2E: Foundations implemented; needs vertical hardening.
+Phase 2D M9: Production Candidate Complete.
 Phase 3: Admin foundations implemented; parent/mobile/driver/live tracking/inventory remain.
 Phase 4: Not started.
 M0 Platform Core: Partially implemented; SaaS/platform depth remains.
 ```
 
-SchoolOS should now prioritize production hardening over broad feature expansion.
+SchoolOS should now prioritize production hardening and Phase 2A frontend/admin UI over broad feature expansion.
