@@ -11,10 +11,11 @@ import { AssessmentComponentsService } from './assessment-components.service';
 import { CasRecordsService } from './cas-records.service';
 import { GradeCalculatorService } from './grade-calculator.service';
 import { MarkLockWorkflowService } from './mark-lock-workflow.service';
-import { MarksEntryService } from './marks-entry.service';
+import { MarksService } from './marks.service';
 import { ReportCardPdfService } from './report-card-pdf.service';
 import { ReportCardsService } from './report-cards.service';
 import { ResultPublishingService } from './result-publishing.service';
+import { ResultsService } from './results.service';
 import {
   SubjectsController,
   TeacherAssignmentsController,
@@ -40,10 +41,11 @@ import {
     CasRecordsService,
     GradeCalculatorService,
     MarkLockWorkflowService,
-    MarksEntryService,
+    MarksService,
     ReportCardPdfService,
     ReportCardsService,
     ResultPublishingService,
+    ResultsService,
   ],
   exports: [
     AcademicsService,
@@ -52,10 +54,12 @@ import {
     CasRecordsService,
     GradeCalculatorService,
     MarkLockWorkflowService,
-    MarksEntryService,
+    MarksService,
     ReportCardPdfService,
     ReportCardsService,
     ResultPublishingService,
+    ResultsService,
   ],
 })
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class AcademicsModule {}

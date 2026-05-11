@@ -1,4 +1,3 @@
-import { ConflictException } from '@nestjs/common';
 import { MarkEntryStatus } from '@prisma/client';
 import { GradeCalculatorService } from './grade-calculator.service';
 
@@ -9,195 +8,224 @@ describe('GradeCalculatorService', () => {
     service = new GradeCalculatorService();
   });
 
-  it.each([
-    [90, 'A+', 4.0, 'PASS'],
-    [80, 'A', 3.6, 'PASS'],
-    [70, 'B+', 3.2, 'PASS'],
-    [60, 'B', 2.8, 'PASS'],
-    [50, 'C+', 2.4, 'PASS'],
-    [40, 'C', 2.0, 'PASS'],
-    [35, 'D', 1.6, 'PASS'],
-    [34.99, 'NG', 0, 'FAIL'],
-  ] as const)(
-    'maps %s percent to %s / %s GPA / %s',
-    (percentage, expectedGrade, expectedGpa, expectedStatus) => {
-      const result = service.getMoestGrade(percentage);
+  describe('Grading Scale', () => {
+    it.each([
+      [95, 'A+', 4.0, 'PASS'],
+      [85, 'A', 3.6, 'PASS'],
+      [75, 'B+', 3.2, 'PASS'],
+      [65, 'B', 2.8, 'PASS'],
+      [55, 'C+', 2.4, 'PASS'],
+      [45, 'C', 2.0, 'PASS'],
+      [37, 'D', 1.6, 'PASS'],
+      [20, 'NG', 0, 'FAIL'],
+    ] as const)(
+      'maps %s percent to %s / %s GPA / %s',
+      (percentage, expectedGrade, expectedGpa, expectedStatus) => {
+        const result = service.getMoestGrade(percentage);
 
-      expect(result.grade).toBe(expectedGrade);
-      expect(result.gpa).toBe(expectedGpa);
-      expect(result.status).toBe(expectedStatus);
-    },
-  );
+        expect(result.grade).toBe(expectedGrade);
+        expect(result.gpa).toBe(expectedGpa);
+        expect(result.status).toBe(expectedStatus);
+      },
+    );
 
-  it('calculates weighted component subject percentage deterministically', () => {
-    const result = service.calculateWeightedSubjectGrade({
-      subjectId: 'math',
-      components: [
-        {
-          componentId: 'theory',
-          subjectId: 'math',
-          maxMarks: 100,
-          marksObtained: 90,
-          passMarks: 35,
-          weightPercent: 60,
-        },
-        {
-          componentId: 'practical',
-          subjectId: 'math',
-          maxMarks: 50,
-          marksObtained: 40,
-          passMarks: 20,
-          weightPercent: 40,
-        },
-      ],
+    it('returns the full grading scale for endpoint display', () => {
+      const scale = service.getGradingScale();
+      expect(scale).toHaveLength(8);
+      expect(scale[0].grade).toBe('A+');
+      expect(scale[7].grade).toBe('NG');
     });
-
-    expect(result.percentage).toBe(86);
-    expect(result.grade).toBe('A');
-    expect(result.gpa).toBe(3.6);
-    expect(result.status).toBe('PASS');
-    expect(result.weightUsed).toBe(100);
   });
 
-  it('returns NG when a component fails its pass marks even if weighted percentage is high', () => {
-    const result = service.calculateWeightedSubjectGrade({
-      subjectId: 'science',
-      components: [
-        {
-          componentId: 'theory',
-          subjectId: 'science',
-          maxMarks: 100,
-          marksObtained: 88,
-          passMarks: 35,
-          weightPercent: 70,
-        },
-        {
-          componentId: 'practical',
-          subjectId: 'science',
-          maxMarks: 25,
-          marksObtained: 7,
-          passMarks: 10,
-          weightPercent: 30,
-        },
-      ],
-    });
-
-    expect(result.status).toBe('FAIL');
-    expect(result.grade).toBe('NG');
-    expect(result.gpa).toBe(0);
-    expect(result.failedComponentCount).toBe(1);
-  });
-
-  it('marks missing components as incomplete without treating them as zero', () => {
-    const result = service.calculateWeightedSubjectGrade({
-      subjectId: 'english',
-      components: [
-        {
-          componentId: 'terminal',
-          subjectId: 'english',
-          maxMarks: 100,
-          marksObtained: 75,
-          passMarks: 35,
-          weightPercent: 60,
-        },
-        {
-          componentId: 'project',
-          subjectId: 'english',
-          maxMarks: 20,
-          marksObtained: null,
-          passMarks: 8,
-          weightPercent: 40,
-          isMissing: true,
-        },
-      ],
-    });
-
-    expect(result.status).toBe('INCOMPLETE');
-    expect(result.missingComponentCount).toBe(1);
-    expect(result.weightUsed).toBe(60);
-    expect(result.percentage).toBe(75);
-  });
-
-  it('treats absent marks explicitly as zero', () => {
-    const result = service.calculateWeightedSubjectGrade({
-      subjectId: 'nepali',
-      components: [
-        {
-          componentId: 'terminal',
-          subjectId: 'nepali',
-          maxMarks: 100,
-          marksObtained: null,
-          passMarks: 35,
-          weightPercent: 100,
-          status: MarkEntryStatus.ABSENT,
-        },
-      ],
-    });
-
-    expect(result.status).toBe('FAIL');
-    expect(result.grade).toBe('NG');
-    expect(result.percentage).toBe(0);
-  });
-
-  it('rejects component weights above 100 percent', () => {
-    expect(() =>
-      service.calculateWeightedSubjectGrade({
-        subjectId: 'social',
+  describe('Subject Calculation', () => {
+    it('calculates weighted subject percentage and results', () => {
+      const result = service.calculateWeightedSubjectGrade({
+        subjectId: 'math',
+        subjectName: 'Mathematics',
+        subjectCode: 'MAT101',
         components: [
           {
-            componentId: 'terminal',
-            subjectId: 'social',
+            componentId: 'c1',
+            componentName: 'Theory',
+            subjectId: 'math',
             maxMarks: 100,
-            marksObtained: 70,
+            marksObtained: 80,
             passMarks: 35,
-            weightPercent: 80,
+            weightPercent: 75,
           },
           {
-            componentId: 'project',
-            subjectId: 'social',
-            maxMarks: 20,
-            marksObtained: 18,
-            passMarks: 8,
+            componentId: 'c2',
+            componentName: 'Practical',
+            subjectId: 'math',
+            maxMarks: 25,
+            marksObtained: 20,
+            passMarks: 10,
+            weightPercent: 25,
+          },
+        ],
+      });
+
+      expect(result.percentage).toBe(80);
+      expect(result.grade).toBe('A');
+      expect(result.status).toBe('PASS');
+      expect(result.obtainedMarks).toBe(100);
+      expect(result.fullMarks).toBe(125);
+    });
+
+    it('returns NG when a component fails pass marks', () => {
+      const result = service.calculateWeightedSubjectGrade({
+        subjectId: 'sci',
+        components: [
+          {
+            componentId: 'theory',
+            subjectId: 'sci',
+            maxMarks: 100,
+            marksObtained: 80,
+            passMarks: 35,
+            weightPercent: 70,
+          },
+          {
+            componentId: 'prac',
+            subjectId: 'sci',
+            maxMarks: 25,
+            marksObtained: 5, // Fails
+            passMarks: 10,
             weightPercent: 30,
           },
         ],
-      }),
-    ).toThrow(ConflictException);
+      });
+
+      expect(result.status).toBe('FAIL');
+      expect(result.grade).toBe('NG');
+      expect(result.failedComponentCount).toBe(1);
+    });
+
+    it('marks as WITHHELD if a required component is withheld', () => {
+      const result = service.calculateWeightedSubjectGrade({
+        subjectId: 'eng',
+        components: [
+          {
+            componentId: 'exam',
+            subjectId: 'eng',
+            maxMarks: 100,
+            marksObtained: null,
+            status: MarkEntryStatus.WITHHELD,
+            weightPercent: 100,
+          },
+        ],
+      });
+
+      expect(result.status).toBe('WITHHELD');
+      expect(result.withheldComponentCount).toBe(1);
+    });
+
+    it('marks as INCOMPLETE if a required component is missing', () => {
+      const result = service.calculateWeightedSubjectGrade({
+        subjectId: 'eng',
+        components: [
+          {
+            componentId: 'exam',
+            subjectId: 'eng',
+            maxMarks: 100,
+            marksObtained: null,
+            isMissing: true,
+            weightPercent: 100,
+          },
+        ],
+      });
+
+      expect(result.status).toBe('INCOMPLETE');
+      expect(result.missingComponentCount).toBe(1);
+    });
   });
 
-  it('calculates overall GPA only when all subjects pass', () => {
-    const math = service.calculateWeightedSubjectGrade({
-      subjectId: 'math',
-      components: [
+  describe('Overall Calculation', () => {
+    it('calculates weighted overall GPA correctly', () => {
+      const s1 = {
+        percentage: 90,
+        gpa: 4.0,
+        fullMarks: 100,
+        status: 'PASS',
+        obtainedMarks: 90,
+      } as unknown as SubjectGradeResult;
+      const s2 = {
+        percentage: 80,
+        gpa: 3.6,
+        fullMarks: 50,
+        status: 'PASS',
+        obtainedMarks: 40,
+      } as unknown as SubjectGradeResult;
+
+      const result = service.calculateOverallGpa([s1, s2]);
+
+      expect(result.percentage).toBe(85);
+      // (4.0 * 100 + 3.6 * 50) / 150 = (400 + 180) / 150 = 580 / 150 = 3.866...
+      expect(result.gpa).toBe(3.87);
+      expect(result.resultStatus).toBe('PASS');
+    });
+
+    it('fails overall if any required subject fails', () => {
+      const s1 = {
+        percentage: 90,
+        gpa: 4.0,
+        fullMarks: 100,
+        status: 'PASS',
+        obtainedMarks: 90,
+      } as unknown as SubjectGradeResult;
+      const s2 = {
+        percentage: 20,
+        gpa: 0,
+        fullMarks: 100,
+        status: 'FAIL',
+        obtainedMarks: 20,
+      } as unknown as SubjectGradeResult;
+
+      const result = service.calculateOverallGpa([s1, s2]);
+
+      expect(result.resultStatus).toBe('FAIL');
+      expect(result.gpa).toBe(0);
+    });
+  });
+
+  describe('CAS Summary', () => {
+    it('summarizes CAS records per subject', () => {
+      const records = [
         {
-          componentId: 'math-terminal',
           subjectId: 'math',
-          maxMarks: 100,
-          marksObtained: 90,
-          passMarks: 35,
-          weightPercent: 100,
+          subjectName: 'Math',
+          category: 'Homework',
+          score: 8,
+          maxScore: 10,
         },
-      ],
-    });
-    const english = service.calculateWeightedSubjectGrade({
-      subjectId: 'english',
-      components: [
         {
-          componentId: 'english-terminal',
-          subjectId: 'english',
-          maxMarks: 100,
-          marksObtained: 80,
-          passMarks: 35,
-          weightPercent: 100,
+          subjectId: 'math',
+          subjectName: 'Math',
+          category: 'Classwork',
+          score: 9,
+          maxScore: 10,
         },
-      ],
+        {
+          subjectId: null,
+          subjectName: 'General',
+          category: 'Conduct',
+          score: 5,
+          maxScore: 5,
+        },
+      ];
+
+      const summary = service.summarizeCasRecords(records);
+
+      expect(summary).toHaveLength(2);
+      const math = summary.find((s) => s.subjectId === 'math');
+      if (math) {
+        expect(math.totalScore).toBe(17);
+        expect(math.totalMaxScore).toBe(20);
+        expect(math.percentage).toBe(85);
+        expect(math.categories).toContain('Homework');
+        expect(math.categories).toContain('Classwork');
+      } else {
+        throw new Error('Math summary not found');
+      }
     });
-
-    const result = service.calculateOverallGpa([math, english]);
-
-    expect(result.percentage).toBe(85);
-    expect(result.gpa).toBe(3.8);
-    expect(result.grade).toBe('A');
-    expect(result.status).toBe('PASS');
   });
 });

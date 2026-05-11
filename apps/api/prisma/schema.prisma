@@ -2589,7 +2589,7 @@ model CasRecord {
   id             String   @id @default(uuid())
   tenantId       String
   academicYearId String
-  subjectId      String
+  subjectId      String?
   studentId      String
   classId        String
   sectionId      String?
@@ -2602,12 +2602,16 @@ model CasRecord {
 
   tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
-  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  subject      Subject?     @relation(fields: [subjectId], references: [id], onDelete: Restrict)
   student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
   class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
   section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
 
-  @@index([tenantId, academicYearId, studentId])
+  @@index([tenantId, academicYearId])
+  @@index([tenantId, classId, sectionId])
+  @@index([tenantId, subjectId])
+  @@index([tenantId, studentId])
+  @@index([tenantId, observedOn])
 }
 
 model ReportCard {

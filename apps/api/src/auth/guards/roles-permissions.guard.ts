@@ -14,6 +14,8 @@ const permissionAliases: Record<string, string[]> = {
   'academics:create': ['academics:manage'],
   'academics:update': ['academics:manage'],
   'academics:delete': ['academics:manage'],
+  'cas-records:read': ['academics:read'],
+  'cas-records:manage': ['academics:manage'],
   'hr:staff:read': ['staff:read', 'hr:read'],
   'hr:staff:create': ['staff:create', 'hr:manage'],
   'hr:staff:update': ['hr:manage'],

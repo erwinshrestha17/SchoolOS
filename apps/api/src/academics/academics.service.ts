@@ -8,7 +8,6 @@ import {
   AudienceType,
   ConsentType,
   GradeLockStatus,
-  MarkEntryStatus,
   NotificationChannel,
   Prisma,
 } from '@prisma/client';
@@ -16,20 +15,16 @@ import {
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
-import { buildReportCardPdf, buildSimplePdf } from '../common/pdf/simple-pdf';
+import { buildReportCardPdf } from '../common/pdf/simple-pdf';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssignTeacherDto } from './dto/assign-teacher.dto';
-import { BatchGenerateReportCardsDto } from './dto/batch-generate-report-cards.dto';
 import { CreateAssessmentComponentDto } from './dto/create-assessment-component.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
 import { CreateExamTermDto } from './dto/create-exam-term.dto';
 import { CreateExamTimetableSlotDto } from './dto/create-exam-timetable-slot.dto';
 import { CreateSubjectDto } from './dto/create-subject.dto';
-import { EnterMarkDto } from './dto/enter-mark.dto';
-import { GenerateReportCardDto } from './dto/generate-report-card.dto';
 import { PromoteStudentDto } from './dto/promote-student.dto';
 import { BatchPromoteDto } from './dto/batch-promote.dto';
-import { BatchEnterMarksDto } from './dto/batch-enter-marks.dto';
 import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';

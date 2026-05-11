@@ -1,28 +1,16 @@
-import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsDateString,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class UpdateCasRecordDto {
   @IsOptional()
   @IsString()
-  academicYearId?: string;
-
-  @IsOptional()
-  @IsString()
-  subjectId?: string;
-
-  @IsOptional()
-  @IsString()
-  studentId?: string;
-
-  @IsOptional()
-  @IsString()
-  classId?: string;
-
-  @IsOptional()
-  @IsString()
-  sectionId?: string | null;
-
-  @IsOptional()
-  @IsString()
+  @MaxLength(100)
   category?: string;
 
   @IsOptional()
@@ -37,9 +25,24 @@ export class UpdateCasRecordDto {
 
   @IsOptional()
   @IsString()
-  observedOn?: string;
+  @MaxLength(100)
+  grade?: string;
 
   @IsOptional()
   @IsString()
-  note?: string | null;
+  @MaxLength(500)
+  observation?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  remarks?: string;
+
+  @IsOptional()
+  @IsDateString()
+  observedOn?: string;
+
+  @IsOptional()
+  @IsDateString()
+  recordedAt?: string;
 }

@@ -9,6 +9,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAssessmentComponentDto } from './dto/create-assessment-component.dto';
 import { UpdateAssessmentComponentDto } from './dto/update-assessment-component.dto';
+import { ListAssessmentComponentsDto } from './dto/list-assessment-components.dto';
 
 @Injectable()
 export class AssessmentComponentsService {
@@ -17,37 +18,87 @@ export class AssessmentComponentsService {
     private readonly auditService: AuditService,
   ) {}
 
-  async listByExamTerm(
-    actor: AuthContext,
-    examTermId: string,
-    subjectId?: string,
-  ) {
-    await this.ensureExamTerm(actor, examTermId);
-
-    if (subjectId) {
-      await this.ensureSubject(actor, subjectId);
+  async list(actor: AuthContext, dto: ListAssessmentComponentsDto = {}) {
+    if (dto.examTermId) {
+      await this.ensureExamTerm(actor, dto.examTermId);
     }
 
-    return this.prisma.assessmentComponent.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        examTermId,
-        ...(subjectId ? { subjectId } : {}),
+    if (dto.subjectId) {
+      await this.ensureSubject(actor, dto.subjectId);
+    }
+
+    const page = dto.page ?? 1;
+    const limit = dto.limit ?? 100;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.AssessmentComponentWhereInput = {
+      tenantId: actor.tenantId,
+      ...(dto.examTermId ? { examTermId: dto.examTermId } : {}),
+      ...(dto.subjectId ? { subjectId: dto.subjectId } : {}),
+      ...(dto.type ? { type: dto.type } : {}),
+      ...(dto.search
+        ? {
+            name: { contains: dto.search, mode: 'insensitive' },
+          }
+        : {}),
+    };
+
+    if (dto.classId) {
+      where.subject = {
+        classId: dto.classId,
+      };
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.assessmentComponent.findMany({
+        where,
+        include: {
+          subject: {
+            include: {
+              class: true,
+            },
+          },
+          examTerm: true,
+        },
+        orderBy: [{ subject: { code: 'asc' } }, { name: 'asc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.assessmentComponent.count({ where }),
+    ]);
+
+    return {
+      items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  async getById(id: string, actor: AuthContext) {
+    const existing = await this.prisma.assessmentComponent.findFirst({
+      where: { id, tenantId: actor.tenantId },
       include: {
         subject: {
-          include: {
-            class: true,
-          },
+          include: { class: true },
         },
         examTerm: true,
       },
-      orderBy: [{ subject: { code: 'asc' } }, { name: 'asc' }],
     });
+
+    if (!existing) {
+      throw new NotFoundException(
+        'Assessment component not found in this tenant',
+      );
+    }
+    return existing;
   }
 
   async create(dto: CreateAssessmentComponentDto, actor: AuthContext) {
-    const [term, subject] = await Promise.all([
+    const [term] = await Promise.all([
       this.ensureExamTerm(actor, dto.examTermId),
       this.ensureSubject(actor, dto.subjectId),
     ]);

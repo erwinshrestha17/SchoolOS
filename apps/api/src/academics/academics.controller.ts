@@ -20,7 +20,7 @@ import { AcademicsService, PromotionReadinessRow } from './academics.service';
 import { AssessmentComponentsService } from './assessment-components.service';
 import { CasRecordsService } from './cas-records.service';
 import { MarkLockWorkflowService } from './mark-lock-workflow.service';
-import { MarksEntryService } from './marks-entry.service';
+import { MarksService } from './marks.service';
 import { ReportCardPdfService } from './report-card-pdf.service';
 import { ReportCardsService } from './report-cards.service';
 import {
@@ -31,13 +31,15 @@ import { CreateAssessmentComponentDto } from './dto/create-assessment-component.
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
 import { CreateExamTermDto } from './dto/create-exam-term.dto';
 import { CreateExamTimetableSlotDto } from './dto/create-exam-timetable-slot.dto';
-import { EnterMarkDto } from './dto/enter-mark.dto';
+import { BulkUpsertMarksDto } from './dto/bulk-upsert-marks.dto';
+import { ListMarksDto } from './dto/list-marks.dto';
+import { UpdateMarkDto } from './dto/update-mark.dto';
 import { GenerateReportCardDto } from './dto/generate-report-card.dto';
 import { PromoteStudentDto } from './dto/promote-student.dto';
 import { BatchPromoteDto } from './dto/batch-promote.dto';
-import { BatchEnterMarksDto } from './dto/batch-enter-marks.dto';
+import { ListCasRecordsDto } from './dto/list-cas-records.dto';
+import { BulkUpsertCasRecordsDto } from './dto/bulk-upsert-cas-records.dto';
 import { BatchGenerateReportCardsDto } from './dto/batch-generate-report-cards.dto';
-import { BatchCasRecordsDto } from './dto/batch-cas-records.dto';
 import { RequestMarkLockDto } from './dto/request-mark-lock.dto';
 import { ReviewMarkLockDto } from './dto/review-mark-lock.dto';
 import { UnlockExamTermDto } from './dto/unlock-exam-term.dto';
@@ -47,6 +49,12 @@ import { PublishResultsDto } from './dto/publish-results.dto';
 import { UnpublishResultsDto } from './dto/unpublish-results.dto';
 import { NotifyResultsDto } from './dto/notify-results.dto';
 import { UpdateCasRecordDto } from './dto/update-cas-record.dto';
+import { ListExamTermsDto } from './dto/list-exam-terms.dto';
+import { ListAssessmentComponentsDto } from './dto/list-assessment-components.dto';
+import { PreviewStudentResultDto } from './dto/preview-student-result.dto';
+import { PreviewClassResultsDto } from './dto/preview-class-results.dto';
+import { GradeCalculatorService } from './grade-calculator.service';
+import { ResultsService } from './results.service';
 
 @Controller('academics')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -59,23 +67,29 @@ export class AcademicsController {
     private readonly markLockWorkflowService: MarkLockWorkflowService,
     private readonly reportCardPdfService: ReportCardPdfService,
     private readonly reportCardsService: ReportCardsService,
-    private readonly marksEntryService: MarksEntryService,
+    private readonly marksService: MarksService,
     private readonly resultPublishingService: ResultPublishingService,
+    private readonly gradeCalculatorService: GradeCalculatorService,
+    private readonly resultsService: ResultsService,
   ) {}
 
-  @Get('exams')
-  @Permissions('academics:read')
+  @Get('exam-terms')
+  @Permissions('exam-terms:read', 'academics:read')
   listExamTerms(
     @CurrentAuth() auth: AuthContext,
-    @Query('academicYearId') academicYearId?: string,
+    @Query() dto: ListExamTermsDto,
   ) {
-    return this.academicsFoundationService.listExamTerms(auth, {
-      academicYearId,
-    });
+    return this.academicsFoundationService.listExamTerms(auth, dto);
   }
 
-  @Post('exams')
-  @Permissions('academics:create')
+  @Get('exam-terms/:id')
+  @Permissions('exam-terms:read', 'academics:read')
+  getExamTerm(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+    return this.academicsFoundationService.getExamTermById(id, auth);
+  }
+
+  @Post('exam-terms')
+  @Permissions('exam-terms:manage', 'academics:create')
   createExamTerm(
     @Body() dto: CreateExamTermDto,
     @CurrentAuth() auth: AuthContext,
@@ -83,8 +97,8 @@ export class AcademicsController {
     return this.academicsFoundationService.createExamTerm(dto, auth);
   }
 
-  @Patch('exams/:id')
-  @Permissions('academics:update')
+  @Patch('exam-terms/:id')
+  @Permissions('exam-terms:manage', 'academics:update')
   updateExamTerm(
     @Param('id') examTermId: string,
     @Body() dto: UpdateExamTermDto,
@@ -97,8 +111,21 @@ export class AcademicsController {
     );
   }
 
-  @Delete('exams/:id')
-  @Permissions('academics:delete')
+  @Patch('exam-terms/:id/status')
+  @Permissions('exam-terms:manage', 'academics:update')
+  updateExamTermStatus(
+    @Param('id') examTermId: string,
+    @Body() dto: { status: 'ARCHIVED' },
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    if (dto.status === 'ARCHIVED') {
+      return this.academicsFoundationService.archiveExamTerm(examTermId, auth);
+    }
+    // other statuses handled by updateExamTerm
+  }
+
+  @Delete('exam-terms/:id')
+  @Permissions('exam-terms:manage', 'academics:delete')
   deleteExamTerm(
     @Param('id') examTermId: string,
     @CurrentAuth() auth: AuthContext,
@@ -106,8 +133,8 @@ export class AcademicsController {
     return this.academicsFoundationService.deleteExamTerm(examTermId, auth);
   }
 
-  @Patch('exams/:id/unlock')
-  @Permissions('academics:manage')
+  @Patch('exam-terms/:id/unlock')
+  @Permissions('exam-terms:manage', 'academics:manage')
   unlockExamTerm(
     @Param('id') examTermId: string,
     @Body() dto: UnlockExamTermDto,
@@ -116,8 +143,29 @@ export class AcademicsController {
     return this.markLockWorkflowService.unlockExamTerm(examTermId, dto, auth);
   }
 
-  @Post('exams/components')
-  @Permissions('academics:create')
+  @Get('assessment-components')
+  @Permissions('assessment-components:read', 'academics:read')
+  listComponents(
+    @Query() dto: ListAssessmentComponentsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.assessmentComponentsService.list(auth, dto);
+  }
+
+  @Get('assessment-components/:id')
+  @Permissions('assessment-components:read', 'academics:read')
+  getComponent(
+    @Param('id') assessmentComponentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.assessmentComponentsService.getById(
+      assessmentComponentId,
+      auth,
+    );
+  }
+
+  @Post('assessment-components')
+  @Permissions('assessment-components:manage', 'academics:create')
   createComponent(
     @Body() dto: CreateAssessmentComponentDto,
     @CurrentAuth() auth: AuthContext,
@@ -125,22 +173,8 @@ export class AcademicsController {
     return this.assessmentComponentsService.create(dto, auth);
   }
 
-  @Get('exams/:id/components')
-  @Permissions('academics:read')
-  listComponentsByExamTerm(
-    @Param('id') examTermId: string,
-    @Query('subjectId') subjectId: string | undefined,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.assessmentComponentsService.listByExamTerm(
-      auth,
-      examTermId,
-      subjectId,
-    );
-  }
-
-  @Patch('exams/components/:id')
-  @Permissions('academics:update')
+  @Patch('assessment-components/:id')
+  @Permissions('assessment-components:manage', 'academics:update')
   updateComponent(
     @Param('id') assessmentComponentId: string,
     @Body() dto: UpdateAssessmentComponentDto,
@@ -153,8 +187,8 @@ export class AcademicsController {
     );
   }
 
-  @Delete('exams/components/:id')
-  @Permissions('academics:delete')
+  @Delete('assessment-components/:id')
+  @Permissions('assessment-components:manage', 'academics:delete')
   deleteComponent(
     @Param('id') assessmentComponentId: string,
     @CurrentAuth() auth: AuthContext,
@@ -187,56 +221,48 @@ export class AcademicsController {
   }
 
   @Get('marks')
-  @Permissions('academics:read')
-  listMarks(
+  @Permissions('marks:read', 'academics:read')
+  listMarks(@CurrentAuth() auth: AuthContext, @Query() dto: ListMarksDto) {
+    return this.marksService.listMarks(auth, dto);
+  }
+
+  @Get('marks/student/:studentId')
+  @Permissions('marks:read', 'academics:read')
+  getStudentHistory(
+    @Param('studentId') studentId: string,
+    @Query('academicYearId') academicYearId: string | undefined,
+    @Query('examTermId') examTermId: string | undefined,
+    @Query('subjectId') subjectId: string | undefined,
+    @Query('page') page: string | undefined,
+    @Query('limit') limit: string | undefined,
     @CurrentAuth() auth: AuthContext,
-    @Query('examTermId') examTermId?: string,
-    @Query('assessmentComponentId') assessmentComponentId?: string,
-    @Query('classId') classId?: string,
-    @Query('sectionId') sectionId?: string,
-    @Query('subjectId') subjectId?: string,
-    @Query('studentId') studentId?: string,
   ) {
-    return this.marksEntryService.list(auth, {
+    return this.marksService.getStudentHistory(studentId, auth, {
+      academicYearId,
       examTermId,
-      assessmentComponentId,
-      classId,
-      sectionId,
       subjectId,
-      studentId,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
     });
   }
 
-  @Get('marks/roster')
-  @Permissions('academics:read')
-  getMarksRoster(
-    @CurrentAuth() auth: AuthContext,
-    @Query('examTermId') examTermId: string,
-    @Query('assessmentComponentId') assessmentComponentId: string,
-    @Query('classId') classId: string,
-    @Query('sectionId') sectionId?: string,
-  ) {
-    return this.marksEntryService.getMarksRoster(auth, {
-      examTermId,
-      assessmentComponentId,
-      classId,
-      sectionId,
-    });
-  }
-
-  @Post('marks')
-  @Permissions('academics:enter_marks')
-  enterMark(@Body() dto: EnterMarkDto, @CurrentAuth() auth: AuthContext) {
-    return this.marksEntryService.enterMark(dto, auth);
-  }
-
-  @Post('marks/batch')
-  @Permissions('academics:enter_marks')
-  batchEnterMarks(
-    @Body() dto: BatchEnterMarksDto,
+  @Post('marks/bulk-upsert')
+  @Permissions('marks:manage', 'academics:enter_marks')
+  bulkUpsertMarks(
+    @Body() dto: BulkUpsertMarksDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.marksEntryService.batchEnterMarks(dto, auth);
+    return this.marksService.bulkUpsert(dto, auth);
+  }
+
+  @Patch('marks/:id')
+  @Permissions('marks:manage', 'academics:enter_marks')
+  updateMark(
+    @Param('id') markId: string,
+    @Body() dto: UpdateMarkDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.marksService.updateMark(markId, dto, auth);
   }
 
   @Get('marks/lock-requests')
@@ -273,61 +299,35 @@ export class AcademicsController {
     return this.markLockWorkflowService.review(requestId, dto, auth);
   }
 
-  @Get('cas')
-  @Permissions('academics:read')
-  listCas(
-    @CurrentAuth() auth: AuthContext,
-    @Query('academicYearId') academicYearId?: string,
-    @Query('classId') classId?: string,
-    @Query('sectionId') sectionId?: string,
-    @Query('subjectId') subjectId?: string,
-    @Query('studentId') studentId?: string,
-  ) {
-    return this.casRecordsService.list(auth, {
-      academicYearId,
-      classId,
-      sectionId,
-      subjectId,
-      studentId,
-    });
+  @Get('cas-records')
+  @Permissions('cas-records:read', 'academics:read')
+  listCas(@CurrentAuth() auth: AuthContext, @Query() dto: ListCasRecordsDto) {
+    return this.casRecordsService.list(auth, dto);
   }
 
-  @Get('cas/roster')
-  @Permissions('academics:read')
-  getCasRoster(
-    @CurrentAuth() auth: AuthContext,
-    @Query('academicYearId') academicYearId: string,
-    @Query('classId') classId: string,
-    @Query('subjectId') subjectId: string,
-    @Query('sectionId') sectionId?: string,
-    @Query('category') category?: string,
-  ) {
-    return this.casRecordsService.getCasRoster(auth, {
-      academicYearId,
-      classId,
-      sectionId,
-      subjectId,
-      category,
-    });
+  @Get('cas-records/:id')
+  @Permissions('cas-records:read', 'academics:read')
+  getCasDetail(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+    return this.casRecordsService.findOne(id, auth);
   }
 
-  @Post('cas')
-  @Permissions('academics:enter_marks')
+  @Post('cas-records')
+  @Permissions('cas-records:manage', 'academics:enter_marks')
   createCas(@Body() dto: CreateCasRecordDto, @CurrentAuth() auth: AuthContext) {
     return this.casRecordsService.create(dto, auth);
   }
 
-  @Post('cas/batch')
-  @Permissions('academics:enter_marks')
-  batchCreateCas(
-    @Body() dto: BatchCasRecordsDto,
+  @Post('cas-records/bulk-upsert')
+  @Permissions('cas-records:manage', 'academics:enter_marks')
+  bulkUpsertCas(
+    @Body() dto: BulkUpsertCasRecordsDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.casRecordsService.batchCreate(dto, auth);
+    return this.casRecordsService.bulkUpsert(dto, auth);
   }
 
-  @Patch('cas/:id')
-  @Permissions('academics:update')
+  @Patch('cas-records/:id')
+  @Permissions('cas-records:manage', 'academics:update')
   updateCas(
     @Param('id') casRecordId: string,
     @Body() dto: UpdateCasRecordDto,
@@ -336,8 +336,8 @@ export class AcademicsController {
     return this.casRecordsService.update(casRecordId, dto, auth);
   }
 
-  @Delete('cas/:id')
-  @Permissions('academics:delete')
+  @Delete('cas-records/:id')
+  @Permissions('cas-records:manage', 'academics:delete')
   deleteCas(
     @Param('id') casRecordId: string,
     @CurrentAuth() auth: AuthContext,
@@ -501,5 +501,42 @@ export class AcademicsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.resultPublishingService.notifyResults(dto, auth);
+  }
+
+  @Get('grading-scale')
+  @Permissions('academics:read')
+  getGradingScale() {
+    return this.gradeCalculatorService.getGradingScale();
+  }
+
+  @Get('results/preview/student/:studentId')
+  @Permissions('results:read', 'academics:read')
+  previewStudentResult(
+    @Param('studentId') studentId: string,
+    @Query() dto: PreviewStudentResultDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.resultsService.previewStudentResult(studentId, auth, {
+      examTermId: dto.examTermId,
+      classId: dto.classId,
+      sectionId: dto.sectionId,
+      includeCas: dto.includeCas,
+    });
+  }
+
+  @Get('results/preview')
+  @Permissions('results:read', 'academics:read')
+  previewClassResults(
+    @Query() dto: PreviewClassResultsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.resultsService.previewClassResults(auth, {
+      examTermId: dto.examTermId,
+      classId: dto.classId,
+      sectionId: dto.sectionId,
+      includeCas: dto.includeCas,
+      page: dto.page,
+      limit: dto.limit,
+    });
   }
 }

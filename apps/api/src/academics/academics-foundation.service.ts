@@ -11,10 +11,7 @@ import { CreateExamTermDto } from './dto/create-exam-term.dto';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateExamTermDto } from './dto/update-exam-term.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
-
-interface ExamTermFilters {
-  academicYearId?: string;
-}
+import { ListExamTermsDto } from './dto/list-exam-terms.dto';
 
 interface SubjectFilters {
   classId?: string;
@@ -27,29 +24,71 @@ export class AcademicsFoundationService {
     private readonly auditService: AuditService,
   ) {}
 
-  async listExamTerms(actor: AuthContext, filters: ExamTermFilters = {}) {
-    if (filters.academicYearId) {
-      await this.ensureAcademicYear(actor, filters.academicYearId);
+  async listExamTerms(actor: AuthContext, dto: ListExamTermsDto = {}) {
+    if (dto.academicYearId) {
+      await this.ensureAcademicYear(actor, dto.academicYearId);
     }
 
-    return this.prisma.examTerm.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        ...(filters.academicYearId
-          ? { academicYearId: filters.academicYearId }
-          : {}),
+    const page = dto.page ?? 1;
+    const limit = dto.limit ?? 100;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ExamTermWhereInput = {
+      tenantId: actor.tenantId,
+      ...(dto.academicYearId ? { academicYearId: dto.academicYearId } : {}),
+      ...(dto.status ? { status: dto.status } : {}),
+      ...(dto.search
+        ? {
+            name: { contains: dto.search, mode: 'insensitive' },
+          }
+        : {}),
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.examTerm.findMany({
+        where,
+        include: {
+          academicYear: true,
+          components: {
+            include: {
+              subject: true,
+            },
+          },
+        },
+        orderBy: [{ startsOn: 'desc' }, { name: 'asc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.examTerm.count({ where }),
+    ]);
+
+    return {
+      items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  async getExamTermById(examTermId: string, actor: AuthContext) {
+    const existing = await this.prisma.examTerm.findFirst({
+      where: { id: examTermId, tenantId: actor.tenantId },
       include: {
         academicYear: true,
         components: {
-          include: {
-            subject: true,
-          },
+          include: { subject: true },
         },
       },
-      orderBy: [{ startsOn: 'desc' }, { name: 'asc' }],
-      take: 100,
     });
+
+    if (!existing) {
+      throw new NotFoundException('Exam term not found in this tenant');
+    }
+
+    return existing;
   }
 
   async createExamTerm(dto: CreateExamTermDto, actor: AuthContext) {

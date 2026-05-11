@@ -268,7 +268,7 @@ function buildPolishedReportCardPdf(input: {
 
   y -= 8;
   parts.push(
-    '36 ' + (y + 12) + ' m 576 ' + (y + 12) + ' l S',
+    `36 ${y + 12} m 576 ${y + 12} l S`,
     text('RESULT SUMMARY', 54, y - 8, 10, 'F2'),
     labelValue(
       'Total',

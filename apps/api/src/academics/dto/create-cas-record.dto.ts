@@ -12,11 +12,9 @@ export class CreateCasRecordDto {
   @IsUUID()
   academicYearId!: string;
 
+  @IsOptional()
   @IsUUID()
-  subjectId!: string;
-
-  @IsUUID()
-  studentId!: string;
+  examTermId?: string; // Optional if CAS is term-linked, not in schema but for future
 
   @IsUUID()
   classId!: string;
@@ -25,23 +23,47 @@ export class CreateCasRecordDto {
   @IsUUID()
   sectionId?: string;
 
+  @IsOptional()
+  @IsUUID()
+  subjectId?: string;
+
+  @IsUUID()
+  studentId!: string;
+
   @IsString()
   @MaxLength(100)
   category!: string;
 
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  score!: number;
+  score?: number;
 
+  @IsOptional()
   @IsNumber()
   @Min(1)
-  maxScore!: number;
+  maxScore?: number;
 
-  @IsDateString()
-  observedOn!: string;
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  grade?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(500)
-  note?: string;
+  observation?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  remarks?: string;
+
+  @IsOptional()
+  @IsDateString()
+  observedOn?: string;
+
+  @IsOptional()
+  @IsDateString()
+  recordedAt?: string; // Alias for observedOn if needed
 }

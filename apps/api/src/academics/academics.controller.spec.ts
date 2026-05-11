@@ -37,6 +37,7 @@ function createController() {
     deleteExamTerm: jest.fn(),
   };
   const assessmentComponentsService = {
+    $transaction: jest.fn((promises: unknown[]) => Promise.all(promises)),
     create: jest.fn(),
     listByExamTerm: jest.fn(),
     update: jest.fn(),
@@ -44,8 +45,9 @@ function createController() {
   };
   const casRecordsService = {
     list: jest.fn(),
+    findOne: jest.fn(),
     create: jest.fn(),
-    batchCreate: jest.fn(),
+    bulkUpsert: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
   };
@@ -69,12 +71,18 @@ function createController() {
     notifyResults: jest.fn(),
   };
 
-  const marksEntryService = {
-    list: jest.fn(),
-    enterMark: jest.fn(),
-    batchEnterMarks: jest.fn(),
-    listLockRequests: jest.fn(),
-    reviewLockRequest: jest.fn(),
+  const marksService = {
+    listMarks: jest.fn(),
+    getStudentHistory: jest.fn(),
+    bulkUpsert: jest.fn(),
+    updateMark: jest.fn(),
+  };
+  const resultsService = {
+    previewStudentResult: jest.fn(),
+    previewClassResults: jest.fn(),
+  };
+  const gradeCalculatorService = {
+    getGradingScale: jest.fn(),
   };
   return {
     controller: new AcademicsController(
@@ -85,8 +93,10 @@ function createController() {
       markLockWorkflowService as never,
       reportCardPdfService as never,
       reportCardsService as never,
-      marksEntryService as never,
+      marksService as never,
       resultPublishingService as never,
+      gradeCalculatorService as never,
+      resultsService as never,
     ),
     academicsService,
     academicsFoundationService,
@@ -95,112 +105,91 @@ function createController() {
     markLockWorkflowService,
     reportCardPdfService,
     reportCardsService,
-    marksEntryService,
+    marksService,
     resultPublishingService,
+    gradeCalculatorService,
+    resultsService,
   };
 }
 
 describe('AcademicsController M4 contracts', () => {
   it('delegates filtered mark listing with tenant actor context', () => {
-    const { controller, marksEntryService } = createController();
-    (marksEntryService.list as any).mockReturnValue([{ id: 'mark-1' }]);
-
-    const result = controller.listMarks(
-      actor,
-      'term-1',
-      'component-1',
-      'class-1',
-      'section-1',
-      'subject-1',
-    );
-
-    expect(marksEntryService.list).toHaveBeenCalledWith(actor, {
+    const { controller, marksService } = createController();
+    const dto = {
       examTermId: 'term-1',
       assessmentComponentId: 'component-1',
       classId: 'class-1',
       sectionId: 'section-1',
       subjectId: 'subject-1',
-      studentId: undefined,
-    });
+    };
+    marksService.listMarks.mockReturnValue([{ id: 'mark-1' }]);
+
+    const result = controller.listMarks(actor, dto as never);
+
+    expect(marksService.listMarks).toHaveBeenCalledWith(actor, dto);
     expect(result).toEqual([{ id: 'mark-1' }]);
   });
 
-  it('delegates single mark entry with current actor', () => {
-    const { controller, marksEntryService } = createController();
+  it('delegates single mark update with current actor', () => {
+    const { controller, marksService } = createController();
     const dto = {
-      examTermId: 'term-1',
-      assessmentComponentId: 'component-1',
-      studentId: 'student-1',
       marksObtained: 89,
       remarks: 'Good',
     };
-    (marksEntryService.enterMark as any).mockReturnValue({ id: 'mark-1' });
+    marksService.updateMark.mockReturnValue({ id: 'mark-1' });
 
-    const result = controller.enterMark(dto as never, actor);
+    const result = controller.updateMark('mark-1', dto as never, actor);
 
-    expect(marksEntryService.enterMark).toHaveBeenCalledWith(dto, actor);
+    expect(marksService.updateMark).toHaveBeenCalledWith('mark-1', dto, actor);
     expect(result).toEqual({ id: 'mark-1' });
   });
 
-  it('delegates transactional batch marks entry with current actor', () => {
-    const { controller, marksEntryService } = createController();
+  it('delegates transactional bulk marks upsert with current actor', () => {
+    const { controller, marksService } = createController();
     const dto = {
       examTermId: 'term-1',
       assessmentComponentId: 'component-1',
+      classId: 'class-1',
+      subjectId: 'subject-1',
       entries: [{ studentId: 'student-1', marksObtained: 90 }],
     };
-    (marksEntryService.batchEnterMarks as any).mockReturnValue({ updated: 1 });
+    marksService.bulkUpsert.mockReturnValue({ updated: 1 });
 
-    const result = controller.batchEnterMarks(dto as never, actor);
+    const result = controller.bulkUpsertMarks(dto as never, actor);
 
-    expect(marksEntryService.batchEnterMarks).toHaveBeenCalledWith(dto, actor);
+    expect(marksService.bulkUpsert).toHaveBeenCalledWith(dto, actor);
     expect(result).toEqual({ updated: 1 });
   });
 
-  it('delegates CAS list filters with tenant actor context', () => {
-    const { controller, casRecordsService } = createController();
-    casRecordsService.list.mockReturnValue([{ id: 'cas-1' }]);
-
-    const result = controller.listCas(
-      actor,
-      'year-1',
-      'class-1',
-      'section-1',
-      'subject-1',
-      'student-1',
-    );
-
-    expect(casRecordsService.list).toHaveBeenCalledWith(actor, {
-      academicYearId: 'year-1',
-      classId: 'class-1',
-      sectionId: 'section-1',
-      subjectId: 'subject-1',
-      studentId: 'student-1',
-    });
-    expect(result).toEqual([{ id: 'cas-1' }]);
-  });
-
-  it('delegates CAS batch create with current actor', () => {
+  it('delegates CAS list with tenant actor context', () => {
     const { controller, casRecordsService } = createController();
     const dto = {
-      records: [
-        {
-          academicYearId: 'year-1',
-          subjectId: 'subject-1',
-          studentId: 'student-1',
-          classId: 'class-1',
-          category: 'Participation',
-          score: 4,
-          maxScore: 5,
-          observedOn: '2026-05-09',
-        },
-      ],
+      academicYearId: 'year-1',
+      classId: 'class-1',
     };
-    casRecordsService.batchCreate.mockReturnValue({ created: 1 });
+    casRecordsService.list.mockReturnValue({ items: [{ id: 'cas-1' }] });
 
-    const result = controller.batchCreateCas(dto as never, actor);
+    const result = controller.listCas(actor, dto as never);
 
-    expect(casRecordsService.batchCreate).toHaveBeenCalledWith(dto, actor);
+    expect(casRecordsService.list).toHaveBeenCalledWith(actor, dto);
+    expect(result).toEqual({ items: [{ id: 'cas-1' }] });
+  });
+
+  it('delegates CAS bulk upsert with current actor', () => {
+    const { controller, casRecordsService } = createController();
+    const dto = {
+      academicYearId: 'year-1',
+      classId: 'class-1',
+      category: 'Participation',
+      maxScore: 5,
+      observedOn: '2026-05-09',
+      entries: [{ studentId: 'student-1', score: 4 }],
+    };
+    casRecordsService.bulkUpsert.mockReturnValue({ created: 1 });
+
+    const result = controller.bulkUpsertCas(dto as never, actor);
+
+    expect(casRecordsService.bulkUpsert).toHaveBeenCalledWith(dto, actor);
     expect(result).toEqual({ created: 1 });
   });
 
@@ -369,5 +358,58 @@ describe('AcademicsController M4 contracts', () => {
         status: 'READY',
       },
     );
+  });
+
+  it('delegates results preview to ResultsService', () => {
+    const { controller, resultsService } = createController();
+    const studentId = 's1';
+    const dto = { examTermId: 'term-1', includeCas: true };
+    jest.spyOn(resultsService, 'previewStudentResult').mockResolvedValue({
+      student: { name: 'John Doe' },
+      summary: { percentage: 85 },
+    } as never);
+
+    expect(
+      controller.previewStudentResult(studentId, dto as never, actor),
+    ).toEqual({
+      student: { name: 'John Doe' },
+      summary: { percentage: 85 },
+    });
+    expect(resultsService.previewStudentResult).toHaveBeenCalledWith(
+      studentId,
+      actor,
+      {
+        examTermId: 'term-1',
+        includeCas: true,
+        classId: undefined,
+        sectionId: undefined,
+      },
+    );
+  });
+
+  it('delegates class results preview to ResultsService', () => {
+    const { controller, resultsService } = createController();
+    const dto = { examTermId: 'term-1', classId: 'c1', includeCas: true };
+    resultsService.previewClassResults.mockReturnValue({ items: [] });
+
+    expect(controller.previewClassResults(dto as never, actor)).toEqual({
+      items: [],
+    });
+    expect(resultsService.previewClassResults).toHaveBeenCalledWith(actor, {
+      examTermId: 'term-1',
+      classId: 'c1',
+      includeCas: true,
+      sectionId: undefined,
+      page: undefined,
+      limit: undefined,
+    });
+  });
+
+  it('delegates grading scale to GradeCalculatorService', () => {
+    const { controller, gradeCalculatorService } = createController();
+    gradeCalculatorService.getGradingScale.mockReturnValue([{ grade: 'A+' }]);
+
+    expect(controller.getGradingScale()).toEqual([{ grade: 'A+' }]);
+    expect(gradeCalculatorService.getGradingScale).toHaveBeenCalled();
   });
 });

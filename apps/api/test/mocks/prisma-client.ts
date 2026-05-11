@@ -421,10 +421,18 @@ export const DevelopmentalMilestoneStatus = {
 } as const;
 
 export const AssessmentType = {
-  TERMINAL: 'TERMINAL',
-  CAS: 'CAS',
+  THEORY: 'THEORY',
   PRACTICAL: 'PRACTICAL',
+  CAS: 'CAS',
   PROJECT: 'PROJECT',
+  INTERNAL: 'INTERNAL',
+  TERMINAL: 'TERMINAL',
+} as const;
+
+export const ExamTermStatus = {
+  DRAFT: 'DRAFT',
+  ACTIVE: 'ACTIVE',
+  ARCHIVED: 'ARCHIVED',
 } as const;
 
 export const GradeLockStatus = {
