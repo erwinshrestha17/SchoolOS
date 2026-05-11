@@ -126,7 +126,6 @@ export class AcademicsController {
     if (dto.status === 'ARCHIVED') {
       return this.academicsFoundationService.archiveExamTerm(examTermId, auth);
     }
-    // other statuses handled by updateExamTerm
   }
 
   @Delete('exam-terms/:id')
@@ -458,7 +457,7 @@ export class AcademicsController {
   promoteStudent(
     @Body() dto: PromoteStudentDto,
     @CurrentAuth() auth: AuthContext,
-  ) {
+  ): Promise<unknown> {
     return this.promotionReadinessService.promoteStudent(dto, auth);
   }
 
@@ -492,7 +491,7 @@ export class AcademicsController {
   publishResults(
     @Body() dto: PublishResultsDto,
     @CurrentAuth() auth: AuthContext,
-  ) {
+  ): Promise<unknown> {
     return this.resultPublishingService.publishResults(dto, auth);
   }
 
@@ -501,7 +500,7 @@ export class AcademicsController {
   unpublishResults(
     @Body() dto: UnpublishResultsDto,
     @CurrentAuth() auth: AuthContext,
-  ) {
+  ): Promise<unknown> {
     return this.resultPublishingService.unpublishResults(dto, auth);
   }
 
@@ -510,7 +509,7 @@ export class AcademicsController {
   notifyResults(
     @Body() dto: NotifyResultsDto,
     @CurrentAuth() auth: AuthContext,
-  ) {
+  ): Promise<unknown> {
     return this.resultPublishingService.notifyResults(dto, auth);
   }
 
