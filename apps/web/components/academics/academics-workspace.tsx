@@ -25,7 +25,13 @@ const sections = [
   { id: 'Result Publishing', icon: FileText },
 ] as const;
 
-export function AcademicsWorkspace() {
+type AcademicSection = (typeof sections)[number]['id'];
+
+type AcademicsWorkspaceProps = {
+  initialSection?: AcademicSection;
+};
+
+export function AcademicsWorkspace({ initialSection = 'Subjects' }: AcademicsWorkspaceProps = {}) {
   const academicYearsQuery = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
   const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
@@ -43,7 +49,6 @@ export function AcademicsWorkspace() {
 
   return (
     <div className="space-y-10">
-      {/* Hero Header */}
       <section className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 p-10 text-white shadow-2xl">
         <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
@@ -69,13 +74,11 @@ export function AcademicsWorkspace() {
           </div>
         </div>
 
-        {/* Decorative elements */}
         <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-primary-500/10 blur-3xl" />
         <div className="absolute -bottom-20 left-1/2 h-60 w-60 -translate-x-1/2 rounded-full bg-blue-500/10 blur-3xl" />
       </section>
 
-      <Tabs defaultValue="Subjects" className="space-y-8">
-        {/* Navigation Bar */}
+      <Tabs defaultValue={initialSection} className="space-y-8">
         <section className="sticky top-4 z-20 rounded-[28px] border border-slate-200 bg-white/85 p-3 shadow-sm backdrop-blur-xl">
           <TabsList className="flex h-auto gap-2 overflow-x-auto pb-1 bg-transparent rounded-none p-0 w-full justify-start border-none">
             {sections.map((section) => {
@@ -94,7 +97,6 @@ export function AcademicsWorkspace() {
           </TabsList>
         </section>
 
-        {/* Dynamic Content Sections */}
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
           <TabsContent value="Subjects" className="mt-0">
             <SubjectsTab
