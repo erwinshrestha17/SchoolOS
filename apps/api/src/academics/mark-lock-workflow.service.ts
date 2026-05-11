@@ -370,7 +370,6 @@ export class MarkLockWorkflowService {
       where: {
         tenantId: actor.tenantId,
         examTermId: scope.examTermId,
-        isRequired: true,
       },
       select: { id: true, name: true },
       take: 500,
@@ -378,7 +377,7 @@ export class MarkLockWorkflowService {
 
     if (components.length === 0) {
       throw new ConflictException(
-        'Cannot lock marks before required assessment components are configured',
+        'Cannot lock marks before assessment components are configured',
       );
     }
 
@@ -402,7 +401,7 @@ export class MarkLockWorkflowService {
 
     if (missing.length > 0) {
       throw new ConflictException(
-        `Cannot lock marks; missing marks for required component(s): ${missing
+        `Cannot lock marks; missing marks for component(s): ${missing
           .map((component) => component.name)
           .join(', ')}`,
       );
