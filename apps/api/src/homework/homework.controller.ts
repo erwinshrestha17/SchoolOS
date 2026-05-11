@@ -1,36 +1,15 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import type { AuthContext } from '../auth/auth.types';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
-import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { HomeworkQueryDto } from './dto/homework-query.dto';
-import {
-  LegacyReviewHomeworkSubmissionDto,
-  LegacySubmitHomeworkDto,
-} from './dto/legacy-submit-homework.dto';
-import {
-  CreateHomeworkSubmissionDto,
-  RequestCorrectionDto,
-  ReviewHomeworkSubmissionDto,
-  UpdateHomeworkSubmissionDto,
-  UpdateHomeworkSubmissionStatusDto,
-} from './dto/submission.dto';
-import {
-  HomeworkReminderQueryDto,
-  SendHomeworkReminderDto,
-} from './dto/reminder.dto';
+import { HomeworkSubmissionQueryDto } from './dto/homework-submission-query.dto';
+import { LegacyReviewHomeworkSubmissionDto, LegacySubmitHomeworkDto } from './dto/legacy-submit-homework.dto';
+import { HomeworkReminderQueryDto, SendHomeworkReminderDto } from './dto/reminder.dto';
+import { CreateHomeworkSubmissionDto, RequestCorrectionDto, ReviewHomeworkSubmissionDto, UpdateHomeworkSubmissionDto, UpdateHomeworkSubmissionStatusDto } from './dto/submission.dto';
 import { UpdateHomeworkDto } from './dto/update-homework.dto';
 import { HomeworkAttachmentAccessService } from './homework-attachment-access.service';
 import { HomeworkService } from './homework.service';
@@ -45,28 +24,19 @@ export class HomeworkController {
 
   @Get()
   @Permissions('homework:read')
-  listHomework(
-    @CurrentAuth() auth: AuthContext,
-    @Query() query: HomeworkQueryDto,
-  ) {
+  listHomework(@CurrentAuth() auth: AuthContext, @Query() query: HomeworkQueryDto) {
     return this.homeworkService.listAssignments(auth, query);
   }
 
   @Get('assignments')
   @Permissions('homework:read')
-  listAssignments(
-    @CurrentAuth() auth: AuthContext,
-    @Query() query: HomeworkQueryDto,
-  ) {
+  listAssignments(@CurrentAuth() auth: AuthContext, @Query() query: HomeworkQueryDto) {
     return this.homeworkService.listAssignments(auth, query);
   }
 
   @Post('assignments')
   @Permissions('homework:create')
-  createAssignment(
-    @Body() dto: CreateHomeworkDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  createAssignment(@Body() dto: CreateHomeworkDto, @CurrentAuth() auth: AuthContext) {
     return this.homeworkService.createAssignment(dto, auth);
   }
 
@@ -78,11 +48,7 @@ export class HomeworkController {
 
   @Patch('assignments/:id')
   @Permissions('homework:update')
-  updateAssignment(
-    @Param('id') id: string,
-    @Body() dto: UpdateHomeworkDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  updateAssignment(@Param('id') id: string, @Body() dto: UpdateHomeworkDto, @CurrentAuth() auth: AuthContext) {
     return this.homeworkService.updateAssignment(id, dto, auth);
   }
 
@@ -106,142 +72,68 @@ export class HomeworkController {
 
   @Post('assignments/:id/reminders')
   @Permissions('homework:update')
-  sendReminder(
-    @Param('id') id: string,
-    @Body() dto: SendHomeworkReminderDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  sendReminder(@Param('id') id: string, @Body() dto: SendHomeworkReminderDto, @CurrentAuth() auth: AuthContext) {
     return this.homeworkService.sendHomeworkReminder(id, dto, auth);
   }
 
   @Get('assignments/:id/reminders')
   @Permissions('homework:read')
-  listAssignmentReminders(
-    @Param('id') id: string,
-    @Query() query: HomeworkReminderQueryDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.homeworkService.listHomeworkReminderBatches(auth, {
-      ...query,
-      homeworkId: id,
-    });
+  listAssignmentReminders(@Param('id') id: string, @Query() query: HomeworkReminderQueryDto, @CurrentAuth() auth: AuthContext) {
+    return this.homeworkService.listHomeworkReminderBatches(auth, { ...query, homeworkId: id });
   }
 
   @Get('reminder-batches')
   @Permissions('homework:read')
-  listReminderBatches(
-    @Query() query: HomeworkReminderQueryDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  listReminderBatches(@Query() query: HomeworkReminderQueryDto, @CurrentAuth() auth: AuthContext) {
     return this.homeworkService.listHomeworkReminderBatches(auth, query);
   }
 
   @Post('reminder-batches/:id/retry')
   @Permissions('homework:update')
-  retryReminderBatch(
-    @Param('id') id: string,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  retryReminderBatch(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.homeworkService.retryHomeworkReminderBatch(id, auth);
   }
 
   @Get('assignments/:id/submissions')
   @Permissions('homework:read')
-  listAssignmentSubmissions(
-    @Param('id') id: string,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.homeworkService.listSubmissions(auth, id);
+  listAssignmentSubmissions(@Param('id') id: string, @Query() query: HomeworkSubmissionQueryDto, @CurrentAuth() auth: AuthContext) {
+    return this.homeworkService.listSubmissions(auth, id, query);
   }
 
   @Post('assignments/:id/submissions')
   @Permissions('homework:submit')
-  createAssignmentSubmission(
-    @Param('id') id: string,
-    @Body() dto: CreateHomeworkSubmissionDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  createAssignmentSubmission(@Param('id') id: string, @Body() dto: CreateHomeworkSubmissionDto, @CurrentAuth() auth: AuthContext) {
     return this.homeworkService.createSubmission(id, dto, auth);
-  }
-
-  @Post('submissions/:submissionId/review')
-  @Permissions('homework:review')
-  reviewSubmissionPost(
-    @Param('submissionId') submissionId: string,
-    @Body() dto: ReviewHomeworkSubmissionDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.homeworkService.reviewSubmission(submissionId, dto, auth);
-  }
-
-  @Post('submissions/:submissionId/correction-request')
-  @Permissions('homework:review')
-  requestCorrectionPost(
-    @Param('submissionId') submissionId: string,
-    @Body() dto: RequestCorrectionDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.homeworkService.requestCorrection(submissionId, dto, auth);
-  }
-
-  @Post('submissions/:submissionId/resubmit')
-  @Permissions('homework:submit')
-  resubmitCorrection(
-    @Param('submissionId') submissionId: string,
-    @Body() dto: UpdateHomeworkSubmissionDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.homeworkService.updateSubmission(submissionId, dto, auth);
   }
 
   @Get('submissions')
   @Permissions('homework:read')
-  listLegacySubmissions(@CurrentAuth() auth: AuthContext) {
-    return this.homeworkService.listSubmissions(auth);
+  listLegacySubmissions(@Query() query: HomeworkSubmissionQueryDto, @CurrentAuth() auth: AuthContext) {
+    return this.homeworkService.listSubmissions(auth, undefined, query);
   }
 
   @Post('submissions')
   @Permissions('homework:review')
-  legacyReviewSubmission(
-    @Body() dto: LegacyReviewHomeworkSubmissionDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  legacyReviewSubmission(@Body() dto: LegacyReviewHomeworkSubmissionDto, @CurrentAuth() auth: AuthContext) {
     return this.homeworkService.legacyReview(dto, auth);
   }
 
   @Post('submit')
   @Permissions('homework:submit')
-  legacySubmitHomework(
-    @Body() dto: LegacySubmitHomeworkDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  legacySubmitHomework(@Body() dto: LegacySubmitHomeworkDto, @CurrentAuth() auth: AuthContext) {
     return this.homeworkService.legacySubmit(dto, auth);
   }
 
   @Get('attachments/:attachmentId/preview-url')
   @Permissions('homework:read')
-  getAttachmentPreviewUrl(
-    @Param('attachmentId') attachmentId: string,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.homeworkAttachmentAccessService.getAttachmentAccessUrl(
-      attachmentId,
-      auth,
-      'preview',
-    );
+  getAttachmentPreviewUrl(@Param('attachmentId') attachmentId: string, @CurrentAuth() auth: AuthContext) {
+    return this.homeworkAttachmentAccessService.getAttachmentAccessUrl(attachmentId, auth, 'preview');
   }
 
   @Get('attachments/:attachmentId/download-url')
   @Permissions('homework:read')
-  getAttachmentDownloadUrl(
-    @Param('attachmentId') attachmentId: string,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.homeworkAttachmentAccessService.getAttachmentAccessUrl(
-      attachmentId,
-      auth,
-      'download',
-    );
+  getAttachmentDownloadUrl(@Param('attachmentId') attachmentId: string, @CurrentAuth() auth: AuthContext) {
+    return this.homeworkAttachmentAccessService.getAttachmentAccessUrl(attachmentId, auth, 'download');
   }
 
   @Get(':id')
@@ -252,20 +144,13 @@ export class HomeworkController {
 
   @Post()
   @Permissions('homework:create')
-  createHomework(
-    @Body() dto: CreateHomeworkDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  createHomework(@Body() dto: CreateHomeworkDto, @CurrentAuth() auth: AuthContext) {
     return this.homeworkService.createAssignment(dto, auth);
   }
 
   @Patch(':id')
   @Permissions('homework:update')
-  updateHomework(
-    @Param('id') id: string,
-    @Body() dto: UpdateHomeworkDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  updateHomework(@Param('id') id: string, @Body() dto: UpdateHomeworkDto, @CurrentAuth() auth: AuthContext) {
     return this.homeworkService.updateAssignment(id, dto, auth);
   }
 
@@ -307,57 +192,45 @@ export class HomeworkController {
 
   @Get(':id/submissions')
   @Permissions('homework:read')
-  listSubmissions(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
-    return this.homeworkService.listSubmissions(auth, id);
+  listSubmissions(@Param('id') id: string, @Query() query: HomeworkSubmissionQueryDto, @CurrentAuth() auth: AuthContext) {
+    return this.homeworkService.listSubmissions(auth, id, query);
   }
 
   @Post(':id/submissions')
   @Permissions('homework:submit')
-  createSubmission(
-    @Param('id') id: string,
-    @Body() dto: CreateHomeworkSubmissionDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  createSubmission(@Param('id') id: string, @Body() dto: CreateHomeworkSubmissionDto, @CurrentAuth() auth: AuthContext) {
     return this.homeworkService.createSubmission(id, dto, auth);
   }
 
   @Patch('submissions/:submissionId')
   @Permissions('homework:submit')
-  updateSubmission(
-    @Param('submissionId') submissionId: string,
-    @Body() dto: UpdateHomeworkSubmissionDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  updateSubmission(@Param('submissionId') submissionId: string, @Body() dto: UpdateHomeworkSubmissionDto, @CurrentAuth() auth: AuthContext) {
     return this.homeworkService.updateSubmission(submissionId, dto, auth);
+  }
+
+  @Post('submissions/:submissionId/review')
+  @Patch('submissions/:submissionId/review')
+  @Permissions('homework:review')
+  reviewSubmission(@Param('submissionId') submissionId: string, @Body() dto: ReviewHomeworkSubmissionDto, @CurrentAuth() auth: AuthContext) {
+    return this.homeworkService.reviewSubmission(submissionId, dto, auth);
   }
 
   @Patch('submissions/:submissionId/status')
   @Permissions('homework:update')
-  updateSubmissionStatus(
-    @Param('submissionId') submissionId: string,
-    @Body() dto: UpdateHomeworkSubmissionStatusDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  updateSubmissionStatus(@Param('submissionId') submissionId: string, @Body() dto: UpdateHomeworkSubmissionStatusDto, @CurrentAuth() auth: AuthContext) {
     return this.homeworkService.updateSubmissionStatus(submissionId, dto, auth);
   }
 
-  @Patch('submissions/:submissionId/review')
-  @Permissions('homework:review')
-  reviewSubmission(
-    @Param('submissionId') submissionId: string,
-    @Body() dto: ReviewHomeworkSubmissionDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.homeworkService.reviewSubmission(submissionId, dto, auth);
-  }
-
+  @Post('submissions/:submissionId/correction-request')
   @Patch('submissions/:submissionId/request-correction')
   @Permissions('homework:review')
-  requestCorrection(
-    @Param('submissionId') submissionId: string,
-    @Body() dto: RequestCorrectionDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  requestCorrection(@Param('submissionId') submissionId: string, @Body() dto: RequestCorrectionDto, @CurrentAuth() auth: AuthContext) {
     return this.homeworkService.requestCorrection(submissionId, dto, auth);
+  }
+
+  @Post('submissions/:submissionId/resubmit')
+  @Permissions('homework:submit')
+  resubmitCorrection(@Param('submissionId') submissionId: string, @Body() dto: UpdateHomeworkSubmissionDto, @CurrentAuth() auth: AuthContext) {
+    return this.homeworkService.updateSubmission(submissionId, dto, auth);
   }
 }
