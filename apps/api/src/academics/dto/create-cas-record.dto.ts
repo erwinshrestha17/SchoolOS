@@ -14,7 +14,7 @@ export class CreateCasRecordDto {
 
   @IsOptional()
   @IsUUID()
-  examTermId?: string; // Optional if CAS is term-linked, not in schema but for future
+  examTermId?: string;
 
   @IsUUID()
   classId!: string;
@@ -23,9 +23,8 @@ export class CreateCasRecordDto {
   @IsUUID()
   sectionId?: string;
 
-  @IsOptional()
   @IsUUID()
-  subjectId?: string;
+  subjectId!: string;
 
   @IsUUID()
   studentId!: string;
@@ -34,15 +33,13 @@ export class CreateCasRecordDto {
   @MaxLength(100)
   category!: string;
 
-  @IsOptional()
   @IsNumber()
   @Min(0)
-  score?: number;
+  score!: number;
 
-  @IsOptional()
   @IsNumber()
   @Min(1)
-  maxScore?: number;
+  maxScore!: number;
 
   @IsOptional()
   @IsString()
@@ -59,11 +56,16 @@ export class CreateCasRecordDto {
   @MaxLength(500)
   remarks?: string;
 
-  @IsOptional()
   @IsDateString()
-  observedOn?: string;
+  observedOn!: string;
 
   @IsOptional()
   @IsDateString()
-  recordedAt?: string; // Alias for observedOn if needed
+  recordedAt?: string;
+
+  /** Compatibility alias for legacy AcademicsService CAS helpers. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
 }

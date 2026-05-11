@@ -13,7 +13,7 @@ import {
 export class BulkUpsertMarksEntryDto {
   @IsString()
   @IsNotEmpty()
-  studentId: string;
+  studentId!: string;
 
   @IsOptional()
   @IsNumber()
@@ -36,15 +36,15 @@ export class BulkUpsertMarksEntryDto {
 export class BulkUpsertMarksDto {
   @IsString()
   @IsNotEmpty()
-  examTermId: string;
+  examTermId!: string;
 
   @IsString()
   @IsNotEmpty()
-  assessmentComponentId: string;
+  assessmentComponentId!: string;
 
   @IsString()
   @IsNotEmpty()
-  classId: string;
+  classId!: string;
 
   @IsOptional()
   @IsString()
@@ -52,10 +52,10 @@ export class BulkUpsertMarksDto {
 
   @IsString()
   @IsNotEmpty()
-  subjectId: string;
+  subjectId!: string;
 
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => BulkUpsertMarksEntryDto)
-  entries: BulkUpsertMarksEntryDto[];
+  entries!: BulkUpsertMarksEntryDto[];
 }

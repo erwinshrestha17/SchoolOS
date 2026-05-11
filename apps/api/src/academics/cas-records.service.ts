@@ -9,8 +9,8 @@ import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { BulkUpsertCasRecordsDto } from './dto/bulk-upsert-cas-records.dto';
 import { CreateCasRecordDto } from './dto/create-cas-record.dto';
-import { UpdateCasRecordDto } from './dto/update-cas-record.dto';
 import { ListCasRecordsDto } from './dto/list-cas-records.dto';
+import { UpdateCasRecordDto } from './dto/update-cas-record.dto';
 
 @Injectable()
 export class CasRecordsService {
@@ -137,13 +137,15 @@ export class CasRecordsService {
         ? new Date(dto.observedOn)
         : new Date();
 
-    const note = [dto.observation, dto.remarks].filter(Boolean).join(' | ');
+    const note = [dto.observation, dto.remarks, dto.note]
+      .filter(Boolean)
+      .join(' | ');
 
     const record = await this.prisma.casRecord.create({
       data: {
         tenantId: actor.tenantId,
         academicYearId: dto.academicYearId,
-        subjectId: dto.subjectId || '', // Schema says required, but prompt says optional. Using empty string if not provided.
+        subjectId: dto.subjectId ?? null,
         studentId: dto.studentId,
         classId: dto.classId,
         sectionId: dto.sectionId ?? null,
@@ -162,13 +164,12 @@ export class CasRecordsService {
     });
 
     await this.auditService.record({
-      action: 'create',
+      action: 'ACADEMICS_CAS_RECORD_CREATED',
       resource: 'cas_record',
       tenantId: actor.tenantId,
       userId: actor.userId,
       resourceId: record.id,
       after: this.toAuditPayload(record),
-      metadata: { event: 'ACADEMICS_CAS_RECORD_CREATED' },
     });
 
     return record;
@@ -209,14 +210,13 @@ export class CasRecordsService {
     });
 
     await this.auditService.record({
-      action: 'update',
+      action: 'ACADEMICS_CAS_RECORD_UPDATED',
       resource: 'cas_record',
       tenantId: actor.tenantId,
       userId: actor.userId,
       resourceId: updated.id,
       before: this.toAuditPayload(existing),
       after: this.toAuditPayload(updated),
-      metadata: { event: 'ACADEMICS_CAS_RECORD_UPDATED' },
     });
 
     return updated;
@@ -234,7 +234,6 @@ export class CasRecordsService {
       entries,
     } = dto;
 
-    // Validate scope
     await Promise.all([
       this.ensureAcademicYear(actor, academicYearId),
       this.ensureClass(actor, classId),
@@ -280,7 +279,7 @@ export class CasRecordsService {
             academicYearId,
             classId,
             sectionId: sectionId ?? null,
-            subjectId: subjectId || '',
+            subjectId: subjectId ?? null,
             studentId: entry.studentId,
             category: notePrefix,
             score: new Prisma.Decimal(entry.score ?? 0),
@@ -293,7 +292,7 @@ export class CasRecordsService {
     );
 
     await this.auditService.record({
-      action: 'create',
+      action: 'ACADEMICS_CAS_RECORDS_BULK_UPSERTED',
       resource: 'cas_record',
       tenantId: actor.tenantId,
       userId: actor.userId,
@@ -304,7 +303,6 @@ export class CasRecordsService {
         subjectId,
         category,
       },
-      metadata: { event: 'ACADEMICS_CAS_RECORDS_BULK_UPSERTED' },
     });
 
     return { count: results.length, items: results };

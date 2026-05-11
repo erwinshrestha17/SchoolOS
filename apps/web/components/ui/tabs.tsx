@@ -62,6 +62,7 @@ type TabsListProps = {
 
 const TabsList = ({ children, className = '' }: TabsListProps) => (
   <div
+    role="tablist"
     className={`inline-flex h-10 items-center justify-center rounded-lg bg-gray-100 p-1 text-gray-500 ${className}`}
   >
     {children}
@@ -81,9 +82,11 @@ const TabsTrigger = ({ value, children, className = '' }: TabsTriggerProps) => {
   return (
     <button
       type="button"
+      role="tab"
       onClick={() => setValue(value)}
       data-state={isActive ? 'active' : 'inactive'}
       aria-selected={isActive}
+      tabIndex={isActive ? 0 : -1}
       className={`inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ring-offset-white transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-950 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
         isActive
           ? 'bg-white text-gray-950 shadow-sm'
@@ -110,6 +113,7 @@ const TabsContent = ({ value, children, className = '' }: TabsContentProps) => {
 
   return (
     <div
+      role="tabpanel"
       data-state="active"
       className={`mt-2 ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-950 focus-visible:ring-offset-2 ${className}`}
     >
