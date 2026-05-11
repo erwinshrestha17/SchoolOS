@@ -1,5 +1,8 @@
 import { MarkEntryStatus } from '@prisma/client';
-import { GradeCalculatorService } from './grade-calculator.service';
+import {
+  GradeCalculatorService,
+  type SubjectGradeResult,
+} from './grade-calculator.service';
 
 describe('GradeCalculatorService', () => {
   let service: GradeCalculatorService;
@@ -88,7 +91,7 @@ describe('GradeCalculatorService', () => {
             componentId: 'prac',
             subjectId: 'sci',
             maxMarks: 25,
-            marksObtained: 5, // Fails
+            marksObtained: 5,
             passMarks: 10,
             weightPercent: 30,
           },
@@ -159,7 +162,6 @@ describe('GradeCalculatorService', () => {
       const result = service.calculateOverallGpa([s1, s2]);
 
       expect(result.percentage).toBe(85);
-      // (4.0 * 100 + 3.6 * 50) / 150 = (400 + 180) / 150 = 580 / 150 = 3.866...
       expect(result.gpa).toBe(3.87);
       expect(result.resultStatus).toBe('PASS');
     });
