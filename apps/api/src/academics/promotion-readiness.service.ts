@@ -78,7 +78,11 @@ export class PromotionReadinessService {
     await this.ensureAcademicYear(actor, filters.academicYearId);
 
     if (filters.examTermId) {
-      await this.ensureExamTerm(actor, filters.examTermId, filters.academicYearId);
+      await this.ensureExamTerm(
+        actor,
+        filters.examTermId,
+        filters.academicYearId,
+      );
     }
 
     if (filters.classId) {
@@ -87,7 +91,9 @@ export class PromotionReadinessService {
 
     if (filters.sectionId) {
       if (!filters.classId) {
-        throw new ConflictException('classId is required when sectionId is provided');
+        throw new ConflictException(
+          'classId is required when sectionId is provided',
+        );
       }
       await this.ensureSection(actor, filters.sectionId, filters.classId);
     }
@@ -157,7 +163,9 @@ export class PromotionReadinessService {
     ]);
 
     if (dto.academicYearId === dto.targetAcademicYearId) {
-      throw new ConflictException('Target academic year must differ from source academic year');
+      throw new ConflictException(
+        'Target academic year must differ from source academic year',
+      );
     }
 
     if (dto.toSectionId) {
@@ -172,11 +180,13 @@ export class PromotionReadinessService {
       reportCard: {
         findFirst: (args: unknown) => Promise<ReportCardLike | null>;
       };
-      $transaction: <T>(callback: (tx: {
-        student: {
-          update: (args: unknown) => Promise<StudentWithScope>;
-        };
-      }) => Promise<T>) => Promise<T>;
+      $transaction: <T>(
+        callback: (tx: {
+          student: {
+            update: (args: unknown) => Promise<StudentWithScope>;
+          };
+        }) => Promise<T>,
+      ) => Promise<T>;
     };
 
     const student = await prisma.student.findFirst({
@@ -188,7 +198,10 @@ export class PromotionReadinessService {
       throw new NotFoundException('Student not found in this tenant');
     }
 
-    if (student.classId === dto.toClassId && student.sectionId === (dto.toSectionId ?? null)) {
+    if (
+      student.classId === dto.toClassId &&
+      student.sectionId === (dto.toSectionId ?? null)
+    ) {
       throw new ConflictException('Student is already in the target class/section');
     }
 
@@ -215,7 +228,9 @@ export class PromotionReadinessService {
           reasons: readiness.reasons,
         },
       });
-      throw new ConflictException(`Student is not promotion-ready: ${readiness.reasons.join(', ')}`);
+      throw new ConflictException(
+        `Student is not promotion-ready: ${readiness.reasons.join(', ')}`,
+      );
     }
 
     const promoted = await prisma.$transaction(async (tx) => {
@@ -257,10 +272,13 @@ export class PromotionReadinessService {
     ]);
 
     if (dto.academicYearId === dto.targetAcademicYearId) {
-      throw new ConflictException('Target academic year must differ from source academic year');
+      throw new ConflictException(
+        'Target academic year must differ from source academic year',
+      );
     }
 
-    const seen = new Set<string>();
+    this.assertNoDuplicateBatchStudents(dto);
+
     const results: unknown[] = [];
 
     for (const mapping of dto.classMappings) {
@@ -270,10 +288,6 @@ export class PromotionReadinessService {
       }
 
       for (const studentId of mapping.studentIds ?? []) {
-        if (seen.has(studentId)) {
-          throw new ConflictException('Duplicate student IDs are not allowed in batch promotion');
-        }
-        seen.add(studentId);
         results.push(
           await this.promoteStudent(
             {
@@ -303,6 +317,21 @@ export class PromotionReadinessService {
     });
 
     return { promoted: results.length, results };
+  }
+
+  private assertNoDuplicateBatchStudents(dto: BatchPromoteDto) {
+    const seen = new Set<string>();
+
+    for (const mapping of dto.classMappings) {
+      for (const studentId of mapping.studentIds ?? []) {
+        if (seen.has(studentId)) {
+          throw new ConflictException(
+            'Duplicate student IDs are not allowed in batch promotion',
+          );
+        }
+        seen.add(studentId);
+      }
+    }
   }
 
   private buildReadinessRow(
