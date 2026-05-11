@@ -5,11 +5,13 @@ import { FinanceModule } from '../finance/finance.module';
 import { AccountingController } from './accounting.controller';
 import { AccountingService } from './accounting.service';
 import { AccountingPostingModule } from './accounting-posting.module';
+import { AccountingReportsController } from './accounting-reports.controller';
+import { AccountingReportsService } from './accounting-reports.service';
 
 @Module({
   imports: [AuthModule, AuditModule, FinanceModule, AccountingPostingModule],
-  controllers: [AccountingController],
-  providers: [AccountingService],
-  exports: [AccountingService, AccountingPostingModule],
+  controllers: [AccountingController, AccountingReportsController],
+  providers: [AccountingService, AccountingReportsService],
+  exports: [AccountingService, AccountingPostingModule, AccountingReportsService],
 })
 export class AccountingModule {}

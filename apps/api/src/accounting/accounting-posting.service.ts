@@ -1442,7 +1442,7 @@ export class AccountingPostingService {
     return null;
   }
 
-  private async generateJournalEntryNumber(
+  async generateJournalEntryNumber(
     tx: PostingClient,
     tenantId: string,
     fiscalYearId: string | null,
@@ -1574,7 +1574,7 @@ export class AccountingPostingService {
     }
   }
 
-  private ensureBalanced(
+  ensureBalanced(
     lines: Array<{
       side?: JournalLineSide;
       amount?: Prisma.Decimal | number | string | Prisma.DecimalJsLike;

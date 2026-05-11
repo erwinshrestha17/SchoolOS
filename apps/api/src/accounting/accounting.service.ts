@@ -27,6 +27,11 @@ import { LockFiscalPeriodDto } from './dto/lock-fiscal-period.dto';
 import { UnlockFiscalPeriodDto } from './dto/unlock-fiscal-period.dto';
 import { CloseFiscalPeriodDto } from './dto/close-fiscal-period.dto';
 import { ReopenFiscalPeriodDto } from './dto/reopen-fiscal-period.dto';
+import { SubmitJournalDto } from './dto/submit-journal.dto';
+import { ApproveJournalDto } from './dto/approve-journal.dto';
+import { RejectJournalDto } from './dto/reject-journal.dto';
+import { PostJournalDto } from './dto/post-journal.dto';
+import { CancelJournalDto } from './dto/cancel-journal.dto';
 import { AccountingPostingService } from './accounting-posting.service';
 
 @Injectable()
@@ -291,23 +296,261 @@ export class AccountingService {
       );
     }
 
-    const entry = await this.postingService.postManualJournal(
-      {
-        tenantId: actor.tenantId,
-        entryDate: new Date(dto.entryDate),
-        narration: dto.narration,
-        sourceId: dto.sourceId,
-        lines: dto.lines.map((line) => ({
-          chartAccountId: line.chartAccountId,
-          debit: line.side === JournalLineSide.DEBIT ? line.amount : 0,
-          credit: line.side === JournalLineSide.CREDIT ? line.amount : 0,
-          description: line.description,
-        })),
-      },
-      actor,
+    const period = await this.postingService.ensurePostingPeriodIsOpen(
+      this.prisma,
+      actor.tenantId,
+      new Date(dto.entryDate),
     );
 
+    const entry = await this.prisma.journalEntry.create({
+      data: {
+        tenantId: actor.tenantId,
+        fiscalYearId: period?.fiscalYearId ?? null,
+        fiscalPeriodId: period?.id ?? null,
+        entryNumber: null as any, // assigned when posted (or omit if optional)
+        entryDate: new Date(dto.entryDate),
+        status: 'DRAFT' as any,
+        narration: dto.narration,
+        sourceModule: 'ACCOUNTING',
+        sourceType: JournalSourceType.MANUAL,
+        sourceId: dto.sourceId ?? null,
+        postingType: 'MANUAL',
+        createdById: actor.userId,
+        lines: {
+          create: dto.lines.map((line, index) => ({
+            tenantId: actor.tenantId,
+            chartAccountId: line.chartAccountId,
+            side: line.side,
+            debit: line.side === JournalLineSide.DEBIT ? line.amount : 0,
+            credit: line.side === JournalLineSide.CREDIT ? line.amount : 0,
+            amount: line.amount,
+            lineNumber: index + 1,
+            description: line.description ?? dto.narration,
+          })),
+        },
+      },
+      include: { lines: true },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'journal_entry',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: entry.id,
+      after: {
+        status: entry.status,
+      },
+    });
+
     return entry;
+  }
+
+  async submitManualJournal(
+    id: string,
+    dto: SubmitJournalDto,
+    actor: AuthContext,
+  ) {
+    const entry = await this.getJournalEntry(id, actor);
+    if ((entry.status as any) !== 'DRAFT') {
+      throw new ConflictException('Only DRAFT journals can be submitted');
+    }
+
+    const totals = sumJournalSides(
+      entry.lines.map((l) => ({ side: l.side, amount: Number(l.amount) })),
+    );
+    if (!totals.debit.eq(totals.credit)) {
+      throw new ConflictException('Journal must be balanced before submission');
+    }
+
+    if (entry.lines.length < 2) {
+      throw new ConflictException('Journal must have at least two lines');
+    }
+
+    await this.postingService.ensurePostingPeriodIsOpen(
+      this.prisma,
+      actor.tenantId,
+      entry.entryDate,
+    );
+
+    const updated = await this.prisma.journalEntry.update({
+      where: { id },
+      data: {
+        status: 'SUBMITTED' as any,
+        submittedAt: new Date(),
+        submittedById: actor.userId,
+        submissionNote: dto.reason,
+      } as any,
+      include: { lines: true },
+    });
+
+    await this.auditService.record({
+      action: 'submit',
+      resource: 'journal_entry',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      after: { status: updated.status, reason: dto.reason },
+    });
+
+    return updated;
+  }
+
+  async approveManualJournal(
+    id: string,
+    dto: ApproveJournalDto,
+    actor: AuthContext,
+  ) {
+    const entry = await this.getJournalEntry(id, actor);
+    if ((entry.status as any) !== 'SUBMITTED') {
+      throw new ConflictException('Only SUBMITTED journals can be approved');
+    }
+
+    if (entry.createdById === actor.userId) {
+      throw new ConflictException(
+        'Approver cannot be the same user as creator',
+      );
+    }
+
+    await this.postingService.ensurePostingPeriodIsOpen(
+      this.prisma,
+      actor.tenantId,
+      entry.entryDate,
+    );
+
+    const updated = await this.prisma.journalEntry.update({
+      where: { id },
+      data: {
+        status: 'APPROVED' as any,
+        approvedAt: new Date(),
+        approvedById: actor.userId,
+        approvalNote: dto.reason,
+      } as any,
+      include: { lines: true },
+    });
+
+    await this.auditService.record({
+      action: 'approve',
+      resource: 'journal_entry',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      after: { status: updated.status, reason: dto.reason },
+    });
+
+    return updated;
+  }
+
+  async rejectManualJournal(
+    id: string,
+    dto: RejectJournalDto,
+    actor: AuthContext,
+  ) {
+    const entry = await this.getJournalEntry(id, actor);
+    if ((entry.status as any) !== 'SUBMITTED') {
+      throw new ConflictException('Only SUBMITTED journals can be rejected');
+    }
+
+    const updated = await this.prisma.journalEntry.update({
+      where: { id },
+      data: {
+        status: 'REJECTED' as any,
+        rejectedAt: new Date(),
+        rejectedById: actor.userId,
+        rejectionReason: dto.reason,
+      } as any,
+      include: { lines: true },
+    });
+
+    await this.auditService.record({
+      action: 'reject',
+      resource: 'journal_entry',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      after: { status: updated.status, reason: dto.reason },
+    });
+
+    return updated;
+  }
+
+  async postApprovedManualJournal(
+    id: string,
+    dto: PostJournalDto,
+    actor: AuthContext,
+  ) {
+    const entry = await this.getJournalEntry(id, actor);
+    if ((entry.status as any) !== 'APPROVED') {
+      throw new ConflictException('Only APPROVED journals can be posted');
+    }
+
+    const period = await this.postingService.ensurePostingPeriodIsOpen(
+      this.prisma,
+      actor.tenantId,
+      entry.entryDate,
+    );
+
+    const entryNumber = await this.postingService.generateJournalEntryNumber(
+      this.prisma,
+      actor.tenantId,
+      period?.fiscalYearId ?? null,
+      entry.entryDate,
+    );
+
+    const updated = await this.prisma.journalEntry.update({
+      where: { id },
+      data: {
+        status: JournalEntryStatus.POSTED,
+        postedAt: new Date(),
+        postedById: actor.userId,
+        entryNumber,
+      } as any,
+      include: { lines: true },
+    });
+
+    await this.auditService.record({
+      action: 'post',
+      resource: 'journal_entry',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      after: { status: updated.status, entryNumber },
+    });
+
+    return updated;
+  }
+
+  async cancelManualJournal(
+    id: string,
+    dto: CancelJournalDto,
+    actor: AuthContext,
+  ) {
+    const entry = await this.getJournalEntry(id, actor);
+    if ((entry.status as any) !== 'DRAFT') {
+      throw new ConflictException('Only DRAFT journals can be cancelled');
+    }
+
+    const updated = await this.prisma.journalEntry.update({
+      where: { id },
+      data: {
+        status: 'CANCELLED' as any,
+        cancelledAt: new Date(),
+        cancelledById: actor.userId,
+        cancellationReason: dto.reason,
+      } as any,
+      include: { lines: true },
+    });
+
+    await this.auditService.record({
+      action: 'cancel',
+      resource: 'journal_entry',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      after: { status: updated.status, reason: dto.reason },
+    });
+
+    return updated;
   }
 
   async getJournalEntry(id: string, actor: AuthContext) {
@@ -673,7 +916,7 @@ export class AccountingService {
         lockedAt: new Date(),
         lockedById: actor.userId,
         lockReason: dto.reason,
-      },
+      } as any,
     });
 
     await this.auditService.record({
@@ -717,7 +960,7 @@ export class AccountingService {
         unlockedAt: new Date(),
         unlockedById: actor.userId,
         unlockReason: dto.reason,
-      },
+      } as any,
     });
 
     await this.auditService.record({
@@ -781,7 +1024,7 @@ export class AccountingService {
         closedAt: new Date(),
         closedById: actor.userId,
         closeReason: dto.reason,
-      },
+      } as any,
     });
 
     await this.auditService.record({
@@ -824,7 +1067,7 @@ export class AccountingService {
         reopenedAt: new Date(),
         reopenedById: actor.userId,
         reopenReason: dto.reason,
-      },
+      } as any,
     });
 
     await this.auditService.record({

@@ -30,6 +30,11 @@ import { LockFiscalPeriodDto } from './dto/lock-fiscal-period.dto';
 import { UnlockFiscalPeriodDto } from './dto/unlock-fiscal-period.dto';
 import { CloseFiscalPeriodDto } from './dto/close-fiscal-period.dto';
 import { ReopenFiscalPeriodDto } from './dto/reopen-fiscal-period.dto';
+import { SubmitJournalDto } from './dto/submit-journal.dto';
+import { ApproveJournalDto } from './dto/approve-journal.dto';
+import { RejectJournalDto } from './dto/reject-journal.dto';
+import { PostJournalDto } from './dto/post-journal.dto';
+import { CancelJournalDto } from './dto/cancel-journal.dto';
 
 @Controller('accounting')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -182,23 +187,7 @@ export class AccountingController {
     return this.accountingService.buildReports(auth, query);
   }
 
-  @Get('reports/trial-balance')
-  @Permissions('accounting:reports:read')
-  trialBalance(
-    @Query() query: ReportsQueryDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.accountingService.getTrialBalance(auth, query);
-  }
 
-  @Get('reports/general-ledger')
-  @Permissions('accounting:reports:read')
-  generalLedger(
-    @Query() query: ReportsQueryDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.accountingService.getGeneralLedger(auth, query);
-  }
 
   @Get('accounts/:accountId/ledger')
   @Permissions('accounting:reports:read')
@@ -276,7 +265,7 @@ export class AccountingController {
   }
 
   @Post('journals')
-  @Permissions('accounting:journals:manual')
+  @Permissions('accounting:journals:create')
   createManualJournal(
     @Body() dto: CreateManualJournalDto,
     @CurrentAuth() auth: AuthContext,
@@ -285,12 +274,62 @@ export class AccountingController {
   }
 
   @Post('journals/manual')
-  @Permissions('accounting:journals:manual')
+  @Permissions('accounting:journals:create')
   createManualJournalCanonical(
     @Body() dto: CreateManualJournalDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.accountingService.createManualJournal(dto, auth);
+  }
+
+  @Post('journals/:id/submit')
+  @Permissions('accounting:journals:submit')
+  submitManualJournal(
+    @Param('id') id: string,
+    @Body() dto: SubmitJournalDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.submitManualJournal(id, dto, auth);
+  }
+
+  @Post('journals/:id/approve')
+  @Permissions('accounting:journals:approve')
+  approveManualJournal(
+    @Param('id') id: string,
+    @Body() dto: ApproveJournalDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.approveManualJournal(id, dto, auth);
+  }
+
+  @Post('journals/:id/reject')
+  @Permissions('accounting:journals:reject')
+  rejectManualJournal(
+    @Param('id') id: string,
+    @Body() dto: RejectJournalDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.rejectManualJournal(id, dto, auth);
+  }
+
+  @Post('journals/:id/post')
+  @Permissions('accounting:journals:post')
+  postApprovedManualJournal(
+    @Param('id') id: string,
+    @Body() dto: PostJournalDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.postApprovedManualJournal(id, dto, auth);
+  }
+
+  @Post('journals/:id/cancel')
+  @Permissions('accounting:journals:cancel')
+  cancelManualJournal(
+    @Param('id') id: string,
+    @Body() dto: CancelJournalDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.cancelManualJournal(id, dto, auth);
   }
 
   @Get('journals/:id')

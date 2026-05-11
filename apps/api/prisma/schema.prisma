@@ -119,7 +119,12 @@ enum ChartAccountType {
 }
 
 enum JournalEntryStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
   POSTED
+  REJECTED
+  CANCELLED
   REVERSED
 }
 
@@ -1796,10 +1801,10 @@ model JournalEntry {
   tenantId       String
   fiscalYearId   String?
   fiscalPeriodId String?
-  entryNumber    String
+  entryNumber    String?
   entryDate      DateTime
   narration      String
-  status         JournalEntryStatus @default(POSTED)
+  status         JournalEntryStatus @default(DRAFT)
   sourceModule   String?
   sourceType     JournalSourceType
   sourceId       String?
@@ -1807,7 +1812,26 @@ model JournalEntry {
   reversalOfId   String?
   correctionOfId String?
   createdById    String?
-  postedAt       DateTime           @default(now())
+  
+  submittedAt    DateTime?
+  submittedById  String?
+  submissionNote String?
+
+  approvedAt     DateTime?
+  approvedById   String?
+  approvalNote   String?
+
+  rejectedAt     DateTime?
+  rejectedById   String?
+  rejectionReason String?
+
+  cancelledAt    DateTime?
+  cancelledById  String?
+  cancellationReason String?
+
+  postedAt       DateTime?
+  postedById     String?
+
   reversedById   String?
   reversedAt     DateTime?
   reversalReason String?
@@ -1828,8 +1852,10 @@ model JournalEntry {
   @@unique([tenantId, sourceModule, sourceType, sourceId, postingType])
   @@index([tenantId, status, entryDate])
   @@index([tenantId, status, postedAt])
+  @@index([tenantId, status, submittedAt])
   @@index([tenantId, reversalOfId])
   @@index([tenantId, fiscalYearId, fiscalPeriodId, postedAt])
+  @@index([tenantId, fiscalYearId, fiscalPeriodId, status])
   @@index([tenantId, fiscalYearId])
   @@index([tenantId, fiscalPeriodId])
 }
