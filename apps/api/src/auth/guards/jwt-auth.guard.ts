@@ -41,10 +41,12 @@ export class JwtAuthGuard implements CanActivate {
     const overrideTenantId = resolveHeader(
       request.headers['x-schoolos-tenant-id'],
     );
-    const canOverrideTenant = payload.roles.includes('super_admin');
+    const canOverrideTenant = payload.roles.includes('platform_super_admin');
 
     if (overrideTenantId && !canOverrideTenant) {
-      throw new ForbiddenException('Tenant override requires super admin');
+      throw new ForbiddenException(
+        'Tenant override requires platform super admin',
+      );
     }
 
     const effectiveTenantId = overrideTenantId
