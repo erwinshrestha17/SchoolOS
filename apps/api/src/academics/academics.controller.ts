@@ -16,11 +16,15 @@ import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { AcademicsFoundationService } from './academics-foundation.service';
-import { AcademicsService, PromotionReadinessRow } from './academics.service';
+import { AcademicsService } from './academics.service';
 import { AssessmentComponentsService } from './assessment-components.service';
 import { CasRecordsService } from './cas-records.service';
 import { MarkLockWorkflowService } from './mark-lock-workflow.service';
 import { MarksService } from './marks.service';
+import {
+  PromotionReadinessRow,
+  PromotionReadinessService,
+} from './promotion-readiness.service';
 import { ReportCardPdfService } from './report-card-pdf.service';
 import { ReportCardsService } from './report-cards.service';
 import {
@@ -71,6 +75,7 @@ export class AcademicsController {
     private readonly resultPublishingService: ResultPublishingService,
     private readonly gradeCalculatorService: GradeCalculatorService,
     private readonly resultsService: ResultsService,
+    private readonly promotionReadinessService: PromotionReadinessService,
   ) {}
 
   @Get('exam-terms')
@@ -430,15 +435,21 @@ export class AcademicsController {
   listPromotions(
     @CurrentAuth() auth: AuthContext,
     @Query('academicYearId') academicYearId: string,
+    @Query('examTermId') examTermId?: string,
     @Query('classId') classId?: string,
     @Query('sectionId') sectionId?: string,
     @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ): Promise<PromotionReadinessRow[]> {
-    return this.academicsService.listPromotionReadiness(auth, {
+    return this.promotionReadinessService.listPromotionReadiness(auth, {
       academicYearId,
+      examTermId,
       classId,
       sectionId,
       status,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
     });
   }
 
@@ -448,13 +459,13 @@ export class AcademicsController {
     @Body() dto: PromoteStudentDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.academicsService.promoteStudent(dto, auth);
+    return this.promotionReadinessService.promoteStudent(dto, auth);
   }
 
   @Post('promotions/batch')
   @Permissions('academics:update')
   batchPromote(@Body() dto: BatchPromoteDto, @CurrentAuth() auth: AuthContext) {
-    return this.academicsService.batchPromote(dto, auth);
+    return this.promotionReadinessService.batchPromote(dto, auth);
   }
 
   @Get('results/publishing')
