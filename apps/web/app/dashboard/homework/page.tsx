@@ -11,7 +11,7 @@ export default function HomeworkPage() {
         description="Create assignments, track submissions, and review student work."
       />
 
-      <TimetableWorkspace />
+      <TimetableWorkspace initialSection="Homework" />
     </div>
   );
 }
