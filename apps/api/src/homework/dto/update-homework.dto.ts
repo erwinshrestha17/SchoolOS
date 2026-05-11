@@ -1,5 +1,7 @@
 import { HomeworkAssignmentStatus } from '@prisma/client';
 import {
+  IsArray,
+  IsBoolean,
   IsEnum,
   IsISO8601,
   IsNumber,
@@ -44,6 +46,15 @@ export class UpdateHomeworkDto {
   @IsOptional()
   @IsEnum(HomeworkAssignmentStatus)
   status?: HomeworkAssignmentStatus;
+
+  @IsOptional()
+  @IsBoolean()
+  submissionRequired?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attachmentFileIds?: string[];
 
   @IsOptional()
   @IsObject()

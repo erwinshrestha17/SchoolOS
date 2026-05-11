@@ -23,7 +23,7 @@ export class CreateHomeworkSubmissionDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  attachmentIds?: string[];
+  attachmentFileIds?: string[];
 
   @IsOptional()
   @IsObject()
@@ -43,7 +43,7 @@ export class UpdateHomeworkSubmissionDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  attachmentIds?: string[];
+  attachmentFileIds?: string[];
 
   @IsOptional()
   @IsObject()
@@ -56,6 +56,9 @@ export class UpdateHomeworkSubmissionStatusDto {
 }
 
 export class ReviewHomeworkSubmissionDto {
+  @IsEnum(HomeworkSubmissionStatus)
+  status!: HomeworkSubmissionStatus;
+
   @IsOptional()
   @IsNumber()
   @Min(0)

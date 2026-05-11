@@ -2941,6 +2941,7 @@ model HomeworkAssignment {
   dueDate            DateTime
   dueAt              DateTime
   status             HomeworkAssignmentStatus @default(DRAFT)
+  submissionRequired Boolean                  @default(true)
   attachmentMetadata Json?
   maxScore           Decimal?                 @db.Decimal(8, 2)
   createdAt          DateTime                 @default(now())
@@ -2960,6 +2961,8 @@ model HomeworkAssignment {
   @@index([tenantId, status, dueDate])
   @@index([tenantId, classId, sectionId])
   @@index([tenantId, subjectId, assignedByStaffId, status])
+  @@index([tenantId, dueDate, status])
+  @@index([tenantId, classId, sectionId, dueDate])
 }
 
 model HomeworkSubmission {

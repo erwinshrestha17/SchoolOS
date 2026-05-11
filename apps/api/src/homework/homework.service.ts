@@ -111,27 +111,43 @@ export class HomeworkService {
       assignedByStaffId,
     );
 
-    const assignment = await this.prisma.homeworkAssignment.create({
-      data: {
-        tenantId: actor.tenantId,
-        academicYearId: dto.academicYearId,
-        classId: dto.classId,
-        sectionId: dto.sectionId ?? null,
-        subjectId: dto.subjectId,
-        assignedByStaffId,
-        title: dto.title,
-        instructions: dto.instructions,
-        assignedDate,
-        dueDate,
-        dueAt: dueDate,
-        status: dto.status ?? HomeworkAssignmentStatus.DRAFT,
-        attachmentMetadata: dto.attachmentMetadata as
-          | Prisma.InputJsonValue
-          | undefined,
-        maxScore:
-          dto.maxScore === undefined ? null : new Prisma.Decimal(dto.maxScore),
-      },
-      include: homeworkAssignmentInclude(),
+    const assignment = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.homeworkAssignment.create({
+        data: {
+          tenantId: actor.tenantId,
+          academicYearId: dto.academicYearId,
+          classId: dto.classId,
+          sectionId: dto.sectionId ?? null,
+          subjectId: dto.subjectId,
+          assignedByStaffId,
+          title: dto.title,
+          instructions: dto.instructions,
+          assignedDate,
+          dueDate,
+          dueAt: dueDate,
+          status: dto.status ?? HomeworkAssignmentStatus.DRAFT,
+          submissionRequired: dto.submissionRequired ?? true,
+          attachmentMetadata: dto.attachmentMetadata as
+            | Prisma.InputJsonValue
+            | undefined,
+          maxScore:
+            dto.maxScore === undefined
+              ? null
+              : new Prisma.Decimal(dto.maxScore),
+        },
+      });
+
+      if (dto.attachmentFileIds?.length) {
+        await this.linkAttachments(
+          actor.tenantId,
+          created.id,
+          null,
+          dto.attachmentFileIds,
+          tx,
+        );
+      }
+
+      return created;
     });
 
     await this.auditService.record({
@@ -146,6 +162,8 @@ export class HomeworkService {
         sectionId: assignment.sectionId,
         subjectId: assignment.subjectId,
         status: assignment.status,
+        attachmentCount: dto.attachmentFileIds?.length ?? 0,
+        submissionRequired: assignment.submissionRequired,
       },
     });
 
@@ -199,21 +217,44 @@ export class HomeworkService {
       assignedDate,
       dueDate,
       dueAt: dueDate,
+      submissionRequired:
+        dto.submissionRequired ?? assignment.submissionRequired,
       maxScore:
         dto.maxScore === undefined
           ? assignment.maxScore
           : new Prisma.Decimal(dto.maxScore),
     };
+
     if (dto.attachmentMetadata !== undefined) {
       updateData.attachmentMetadata =
         dto.attachmentMetadata as Prisma.InputJsonValue;
     }
 
-    const updated = await this.prisma.homeworkAssignment.update({
-      where: { id: assignment.id },
-      data: updateData,
-      include: homeworkAssignmentInclude(),
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.homeworkAssignment.update({
+        where: { id: assignment.id },
+        data: updateData,
+      });
+
+      if (dto.attachmentFileIds !== undefined) {
+        await tx.homeworkAttachment.deleteMany({
+          where: { tenantId: actor.tenantId, assignmentId: assignment.id },
+        });
+        if (dto.attachmentFileIds.length > 0) {
+          await this.linkAttachments(
+            actor.tenantId,
+            assignment.id,
+            null,
+            dto.attachmentFileIds,
+            tx,
+          );
+        }
+      }
+
+      return result;
     });
+
+    const fullUpdated = await this.findAssignmentOrThrow(actor, updated.id);
 
     await this.auditService.record({
       action: 'update',
@@ -230,6 +271,8 @@ export class HomeworkService {
         title: updated.title,
         dueDate: updated.dueDate,
         status: updated.status,
+        attachmentCount: dto.attachmentFileIds?.length ?? assignment.attachments.length,
+        submissionRequired: updated.submissionRequired,
       },
     });
 
@@ -470,24 +513,23 @@ export class HomeworkService {
         },
       });
 
-      if (dto.attachmentIds?.length) {
-        await tx.homeworkAttachment.createMany({
-          data: dto.attachmentIds.map((fileAssetId) => ({
-            tenantId: actor.tenantId,
-            submissionId: created.id,
-            fileAssetId,
-          })),
-          skipDuplicates: true,
-        });
-      }
-
       return created;
     });
+
+    if (dto.attachmentFileIds?.length) {
+      await this.linkAttachments(
+        actor.tenantId,
+        null,
+        submission.id,
+        dto.attachmentFileIds,
+      );
+    }
 
     await this.auditSubmission('create', submission.id, actor, {
       homeworkId,
       studentId: dto.studentId,
       status,
+      attachmentCount: dto.attachmentFileIds?.length ?? 0,
     });
 
     return this.findSubmissionOrThrow(actor, submission.id);
@@ -511,7 +553,7 @@ export class HomeworkService {
       {
         studentId,
         submissionText: dto.content,
-        attachmentIds: dto.attachmentIds,
+        attachmentFileIds: dto.attachmentIds,
       },
       actor,
     );
@@ -538,9 +580,24 @@ export class HomeworkService {
       include: homeworkSubmissionInclude(),
     });
 
+    if (dto.attachmentFileIds !== undefined) {
+      await this.prisma.homeworkAttachment.deleteMany({
+        where: { tenantId: actor.tenantId, submissionId: submission.id },
+      });
+      if (dto.attachmentFileIds.length > 0) {
+        await this.linkAttachments(
+          actor.tenantId,
+          null,
+          submission.id,
+          dto.attachmentFileIds,
+        );
+      }
+    }
+
     await this.auditSubmission('update', updated.id, actor, {
       homeworkId: updated.homeworkId,
       status: updated.status,
+      attachmentCount: dto.attachmentFileIds?.length ?? submission.attachments.length,
     });
 
     return updated;
@@ -588,7 +645,7 @@ export class HomeworkService {
     const updated = await this.prisma.homeworkSubmission.update({
       where: { id: submission.id },
       data: {
-        status: HomeworkSubmissionStatus.REVIEWED,
+        status: dto.status,
         score:
           dto.score === undefined
             ? submission.score
@@ -599,16 +656,25 @@ export class HomeworkService {
         feedback: dto.teacherRemarks ?? submission.feedback,
         reviewedById: actor.userId,
         reviewedAt: new Date(),
+        returnedAt:
+          dto.status === HomeworkSubmissionStatus.NEEDS_CORRECTION
+            ? new Date()
+            : submission.returnedAt,
       },
       include: homeworkSubmissionInclude(),
     });
 
+    const isCorrection =
+      updated.status === HomeworkSubmissionStatus.NEEDS_CORRECTION;
+
     await this.notifySubmissionStudent(
       updated,
       actor,
-      'homework_reviewed',
-      'Homework reviewed',
-      `Your homework "${updated.homework.title}" has been reviewed.`,
+      isCorrection ? 'homework_returned_for_correction' : 'homework_reviewed',
+      isCorrection ? 'Correction requested' : 'Homework reviewed',
+      isCorrection
+        ? `Please correct and resubmit "${updated.homework.title}".`
+        : `Your homework "${updated.homework.title}" has been reviewed.`,
     );
     await this.auditSubmission('review', updated.id, actor, {
       homeworkId: updated.homeworkId,
@@ -637,6 +703,7 @@ export class HomeworkService {
     return this.reviewSubmission(
       dto.submissionId,
       {
+        status: HomeworkSubmissionStatus.REVIEWED,
         score: Number(dto.score ?? 0),
         teacherRemarks: dto.feedback,
       },
@@ -670,7 +737,7 @@ export class HomeworkService {
     await this.notifySubmissionStudent(
       updated,
       actor,
-      'homework_correction_requested',
+      'homework_returned_for_correction',
       'Correction requested',
       `Please correct and resubmit "${updated.homework.title}".`,
     );
@@ -881,7 +948,7 @@ export class HomeworkService {
     const assignment = await this.findAssignmentOrThrow(actor, homeworkId);
     await this.communicationsService.recordDeliveryRecords({
       actor,
-      sourceType: 'homework_assigned',
+      sourceType: 'homework_published',
       sourceId: assignment.id,
       audienceType: assignment.sectionId
         ? AudienceType.SECTION
@@ -973,6 +1040,53 @@ export class HomeworkService {
         ['platform_super_admin', 'admin', 'principal'].includes(role),
       )
     );
+  }
+
+  private async linkAttachments(
+    tenantId: string,
+    assignmentId: string | null,
+    submissionId: string | null,
+    fileAssetIds: string[],
+    tx?: Prisma.TransactionClient,
+  ) {
+    if (fileAssetIds.length === 0) return;
+
+    const prisma = tx ?? this.prisma;
+
+    // Verify file existence and tenant ownership
+    const files = await prisma.fileAsset.findMany({
+      where: {
+        id: { in: fileAssetIds },
+        tenantId,
+        status: 'UPLOADED',
+      },
+      select: { id: true },
+    });
+
+    if (files.length !== fileAssetIds.length) {
+      throw new ConflictException(
+        'Some attachment files were not found or do not belong to this tenant',
+      );
+    }
+
+    await prisma.homeworkAttachment.createMany({
+      data: fileAssetIds.map((fileAssetId) => ({
+        tenantId,
+        assignmentId,
+        submissionId,
+        fileAssetId,
+      })),
+      skipDuplicates: true,
+    });
+
+    // Update FileAsset entity reference
+    await prisma.fileAsset.updateMany({
+      where: { id: { in: fileAssetIds }, tenantId },
+      data: {
+        module: 'homework',
+        entityId: submissionId ?? assignmentId,
+      },
+    });
   }
 }
 
