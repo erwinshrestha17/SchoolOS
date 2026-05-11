@@ -220,7 +220,8 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
         }),
       );
 
-      const updateCall = (prisma.journalEntry.update as jest.Mock).mock.calls[0]?.[0];
+      const updateCall = (prisma.journalEntry.update as jest.Mock).mock
+        .calls[0]?.[0];
       expect(updateCall?.data?.lines).toBeUndefined();
       expect(updateCall?.data?.entryDate).toBeUndefined();
       expect(updateCall?.data?.fiscalYearId).toBeUndefined();
