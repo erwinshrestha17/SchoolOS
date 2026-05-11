@@ -9,21 +9,19 @@ import { TeacherWorkloadTab } from './tabs/teacher-workload-tab';
 import { HomeworkTab } from './tabs/homework-tab';
 import { StudentHomeworkTab } from './tabs/student-homework-tab';
 import { StudentTimetableTab } from './tabs/student-timetable-tab';
-import { 
-  StatCard 
-} from '../ui/stat-card';
-import { 
-  Tabs, 
-  TabsList, 
-  TabsTrigger, 
-  TabsContent 
+import { StatCard } from '../ui/stat-card';
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
 } from '../ui/tabs';
-import { 
-  Calendar, 
-  Users, 
-  BookOpen, 
-  GraduationCap, 
-  Clock 
+import {
+  Calendar,
+  Users,
+  BookOpen,
+  GraduationCap,
+  Clock,
 } from 'lucide-react';
 
 const adminSections = [
@@ -37,7 +35,13 @@ const studentSections = [
   'My Timetable',
 ] as const;
 
-type Section = (typeof adminSections)[number] | (typeof studentSections)[number];
+type AdminSection = (typeof adminSections)[number];
+type StudentSection = (typeof studentSections)[number];
+type Section = AdminSection | StudentSection;
+
+type TimetableWorkspaceProps = {
+  initialSection?: Section;
+};
 
 const sectionMeta: Record<Section, { title: string; description: string; icon: any }> = {
   'Timetable Builder': {
@@ -67,12 +71,15 @@ const sectionMeta: Record<Section, { title: string; description: string; icon: a
   },
 };
 
-export function TimetableWorkspace() {
+export function TimetableWorkspace({ initialSection }: TimetableWorkspaceProps = {}) {
   const { session } = useSession();
   const isStudent = session?.user.roles.includes('student');
   const sections = isStudent ? studentSections : adminSections;
-  
-  const [activeSection, setActiveSection] = useState<Section>(sections[0]);
+  const defaultSection = sections.includes(initialSection as never)
+    ? (initialSection as Section)
+    : sections[0];
+
+  const [activeSection, setActiveSection] = useState<Section>(defaultSection);
   const [classId, setClassId] = useState('');
   const activeMeta = sectionMeta[activeSection];
 
@@ -99,7 +106,6 @@ export function TimetableWorkspace() {
 
   return (
     <div className="space-y-8">
-      {/* Hero header */}
       <section className="relative overflow-hidden rounded-[2.5rem] border border-slate-200 bg-slate-900 p-8 text-white shadow-xl">
         <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-indigo-500/10 blur-[100px]" />
         <div className="absolute bottom-0 left-1/4 h-64 w-64 rounded-full bg-amber-500/10 blur-[100px]" />
@@ -136,15 +142,15 @@ export function TimetableWorkspace() {
         </div>
       </section>
 
-      <Tabs 
-        value={activeSection} 
-        onValueChange={(val) => setActiveSection(val as Section)} 
+      <Tabs
+        value={activeSection}
+        onValueChange={(val) => setActiveSection(val as Section)}
         className="space-y-8"
       >
         <TabsList className="bg-slate-100 p-1.5 rounded-[1.5rem] inline-flex h-auto">
           {sections.map((section) => (
-            <TabsTrigger 
-              key={section} 
+            <TabsTrigger
+              key={section}
               value={section}
               className="rounded-[1.2rem] px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 font-black uppercase tracking-widest text-[10px]"
             >
@@ -194,17 +200,6 @@ export function TimetableWorkspace() {
           <StudentTimetableTab />
         </TabsContent>
       </Tabs>
-    </div>
-  );
-}
-
-function MetricCard({ label, value, tone }: { label: string; value: string; tone: 'info' | 'warning' | 'success' }) {
-  const bg = tone === 'success' ? 'bg-emerald-500/15' : tone === 'warning' ? 'bg-amber-500/15' : 'bg-violet-500/15';
-  const text = tone === 'success' ? 'text-emerald-200' : tone === 'warning' ? 'text-amber-200' : 'text-violet-200';
-  return (
-    <div className={`rounded-2xl ${bg} px-4 py-3 backdrop-blur-sm`}>
-      <p className="text-xs font-medium text-white/60">{label}</p>
-      <p className={`mt-1 text-2xl font-bold ${text}`}>{value}</p>
     </div>
   );
 }
