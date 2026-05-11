@@ -240,6 +240,7 @@ describe('PromotionReadinessService', () => {
 
   it('rejects duplicate student IDs in batch promotion', async () => {
     prisma.academicYear.findFirst.mockResolvedValue({ id: 'year-1' });
+    prisma.class.findFirst.mockResolvedValue({ id: 'class-2' });
 
     await expect(
       service.batchPromote(
