@@ -1530,7 +1530,9 @@ export class FinanceService {
     ]);
     const paymentEntryBySourceId = new Map<string, string>(
       journalEntries.flatMap((entry) =>
-        entry.sourceId ? ([[entry.sourceId, entry.entryNumber]] as const) : [],
+        entry.sourceId && entry.entryNumber
+          ? ([[entry.sourceId, entry.entryNumber]] as const)
+          : [],
       ),
     );
     const paidAmount = sumNetPaidAmount(invoice.payments);
@@ -3565,12 +3567,14 @@ export class FinanceService {
             orderBy: [{ entryDate: 'asc' }, { createdAt: 'asc' }],
           });
     const paymentEntryBySourceId = new Map(
-      paymentEntryRecords.map((entry) => [entry.sourceId, entry.entryNumber]),
+      paymentEntryRecords
+        .filter((e) => e.sourceId && e.entryNumber)
+        .map((entry) => [entry.sourceId!, entry.entryNumber!]),
     );
     const refundEntriesBySourceId = new Map<string, string[]>();
 
     for (const entry of refundEntryRecords) {
-      if (!entry.sourceId) {
+      if (!entry.sourceId || !entry.entryNumber) {
         continue;
       }
 

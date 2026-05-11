@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ChartAccountType, JournalLineSide } from '@prisma/client';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
 
 describe('AccountingReportsService', () => {
   let service: AccountingReportsService;
@@ -15,12 +16,19 @@ describe('AccountingReportsService', () => {
       fiscalPeriod: { findUnique: jest.fn() },
       chartAccount: { findMany: jest.fn(), findFirst: jest.fn() },
       journalLine: { groupBy: jest.fn(), count: jest.fn(), findMany: jest.fn() },
+      accountingReportAccountMapping: { findMany: jest.fn(), createMany: jest.fn(), deleteMany: jest.fn() },
+      $transaction: jest.fn((cb) => cb(prisma)),
+    };
+
+    const auditService = {
+      record: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AccountingReportsService,
         { provide: PrismaService, useValue: prisma },
+        { provide: AuditService, useValue: auditService },
       ],
     }).compile();
 
@@ -111,13 +119,16 @@ describe('AccountingReportsService', () => {
   describe('getCashBook', () => {
     it('returns cash receipts and payments', async () => {
       prisma.fiscalYear.findUnique.mockResolvedValue({ id: 'fy1' });
+      prisma.accountingReportAccountMapping.findMany.mockResolvedValue([
+        { accountId: 'a1', mappingType: 'CASH', account: { id: 'a1', code: '1000', name: 'Cash' } }
+      ]);
       prisma.chartAccount.findFirst.mockResolvedValue({ id: 'a1', code: '1000', name: 'Cash', type: ChartAccountType.ASSET });
       prisma.journalLine.count.mockResolvedValue(2);
       prisma.journalLine.findMany.mockResolvedValue([
         {
           id: 'l1',
-          debit: new Decimal(200),
-          credit: new Decimal(0),
+          debit: new Prisma.Decimal(200),
+          credit: new Prisma.Decimal(0),
           journalEntryId: 'je1',
           journalEntry: {
             entryDate: new Date('2023-01-01'),
@@ -127,8 +138,8 @@ describe('AccountingReportsService', () => {
         },
         {
           id: 'l2',
-          debit: new Decimal(0),
-          credit: new Decimal(50),
+          debit: new Prisma.Decimal(0),
+          credit: new Prisma.Decimal(50),
           journalEntryId: 'je2',
           journalEntry: {
             entryDate: new Date('2023-01-02'),
@@ -148,6 +159,9 @@ describe('AccountingReportsService', () => {
 
     it('rejects if account is not ASSET', async () => {
       prisma.fiscalYear.findUnique.mockResolvedValue({ id: 'fy1' });
+      prisma.accountingReportAccountMapping.findMany.mockResolvedValue([
+        { accountId: 'a1', mappingType: 'CASH', account: { id: 'a1', code: '4000', name: 'Sales' } }
+      ]);
       prisma.chartAccount.findFirst.mockResolvedValue({ id: 'a1', code: '4000', name: 'Sales', type: ChartAccountType.REVENUE });
       await expect(service.getCashBook('tenant1', { fiscalYearId: 'fy1', accountId: 'a1' })).rejects.toThrow(BadRequestException);
     });
@@ -161,8 +175,8 @@ describe('AccountingReportsService', () => {
         { id: 'a2', code: '5000', name: 'Rent', type: ChartAccountType.EXPENSE },
       ]);
       prisma.journalLine.groupBy.mockResolvedValue([
-        { chartAccountId: 'a1', _sum: { debit: new Decimal(0), credit: new Decimal(500) } },
-        { chartAccountId: 'a2', _sum: { debit: new Decimal(200), credit: new Decimal(0) } },
+        { chartAccountId: 'a1', _sum: { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(500) } },
+        { chartAccountId: 'a2', _sum: { debit: new Prisma.Decimal(200), credit: new Prisma.Decimal(0) } },
       ]);
 
       const result = await service.getIncomeStatement('tenant1', { fiscalYearId: 'fy1' });
@@ -184,10 +198,10 @@ describe('AccountingReportsService', () => {
         { id: 'a4', code: '4000', name: 'Sales', type: ChartAccountType.REVENUE }, // for surplus
       ]);
       prisma.journalLine.groupBy.mockResolvedValue([
-        { chartAccountId: 'a1', _sum: { debit: new Decimal(1000), credit: new Decimal(0) } },
-        { chartAccountId: 'a2', _sum: { debit: new Decimal(0), credit: new Decimal(300) } },
-        { chartAccountId: 'a3', _sum: { debit: new Decimal(0), credit: new Decimal(200) } },
-        { chartAccountId: 'a4', _sum: { debit: new Decimal(0), credit: new Decimal(500) } }, // 500 surplus
+        { chartAccountId: 'a1', _sum: { debit: new Prisma.Decimal(1000), credit: new Prisma.Decimal(0) } },
+        { chartAccountId: 'a2', _sum: { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(300) } },
+        { chartAccountId: 'a3', _sum: { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(200) } },
+        { chartAccountId: 'a4', _sum: { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(500) } }, // 500 surplus
       ]);
 
       const result = await service.getBalanceSheet('tenant1', { fiscalYearId: 'fy1' });
@@ -205,13 +219,17 @@ describe('AccountingReportsService', () => {
   describe('getTaxSummary', () => {
     it('calculates VAT and returns setup warnings if missing mappings', async () => {
       prisma.fiscalYear.findUnique.mockResolvedValue({ id: 'fy1' });
+      prisma.accountingReportAccountMapping.findMany.mockResolvedValue([
+        { mappingType: 'VAT', accountId: 'a1', account: { id: 'a1', code: 'VAT-PAY-1', name: 'VAT Payable' } },
+        { mappingType: 'VAT', accountId: 'a2', account: { id: 'a2', code: 'VAT-IN-1', name: 'VAT Input' } },
+      ]);
       prisma.chartAccount.findMany.mockResolvedValue([
         { id: 'a1', code: 'VAT-PAY-1', name: 'VAT Payable' },
         { id: 'a2', code: 'VAT-IN-1', name: 'VAT Input' },
       ]);
       prisma.journalLine.groupBy.mockResolvedValue([
-        { chartAccountId: 'a1', _sum: { debit: new Decimal(0), credit: new Decimal(100) } }, // 100 Output
-        { chartAccountId: 'a2', _sum: { debit: new Decimal(60), credit: new Decimal(0) } }, // 60 Input
+        { chartAccountId: 'a1', _sum: { debit: new Prisma.Decimal(0), credit: new Prisma.Decimal(100) } }, // 100 Output
+        { chartAccountId: 'a2', _sum: { debit: new Prisma.Decimal(60), credit: new Prisma.Decimal(0) } }, // 60 Input
       ]);
 
       const result = await service.getTaxSummary('tenant1', { fiscalYearId: 'fy1' } as any);

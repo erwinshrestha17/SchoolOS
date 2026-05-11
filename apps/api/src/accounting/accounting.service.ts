@@ -302,35 +302,23 @@ export class AccountingService {
       new Date(dto.entryDate),
     );
 
-    const entry = await this.prisma.journalEntry.create({
-      data: {
+    const entry = await this.postingService.createDraftJournal(
+      {
         tenantId: actor.tenantId,
-        fiscalYearId: period?.fiscalYearId ?? null,
-        fiscalPeriodId: period?.id ?? null,
-        entryNumber: null as any, // assigned when posted (or omit if optional)
         entryDate: new Date(dto.entryDate),
-        status: 'DRAFT' as any,
         narration: dto.narration,
         sourceModule: 'ACCOUNTING',
         sourceType: JournalSourceType.MANUAL,
         sourceId: dto.sourceId ?? null,
-        postingType: 'MANUAL',
-        createdById: actor.userId,
-        lines: {
-          create: dto.lines.map((line, index) => ({
-            tenantId: actor.tenantId,
-            chartAccountId: line.chartAccountId,
-            side: line.side,
-            debit: line.side === JournalLineSide.DEBIT ? line.amount : 0,
-            credit: line.side === JournalLineSide.CREDIT ? line.amount : 0,
-            amount: line.amount,
-            lineNumber: index + 1,
-            description: line.description ?? dto.narration,
-          })),
-        },
+        lines: dto.lines.map((line) => ({
+          chartAccountId: line.chartAccountId,
+          side: line.side,
+          amount: line.amount,
+          description: line.description,
+        })),
       },
-      include: { lines: true },
-    });
+      actor,
+    );
 
     await this.auditService.record({
       action: 'create',
@@ -352,7 +340,7 @@ export class AccountingService {
     actor: AuthContext,
   ) {
     const entry = await this.getJournalEntry(id, actor);
-    if ((entry.status as any) !== 'DRAFT') {
+    if (entry.status !== JournalEntryStatus.DRAFT) {
       throw new ConflictException('Only DRAFT journals can be submitted');
     }
 
@@ -373,16 +361,17 @@ export class AccountingService {
       entry.entryDate,
     );
 
-    const updated = await this.prisma.journalEntry.update({
-      where: { id },
-      data: {
-        status: 'SUBMITTED' as any,
+    const updated = await this.postingService.updateJournalStatus(
+      id,
+      actor.tenantId,
+      JournalEntryStatus.SUBMITTED,
+      actor,
+      {
         submittedAt: new Date(),
         submittedById: actor.userId,
         submissionNote: dto.reason,
-      } as any,
-      include: { lines: true },
-    });
+      },
+    );
 
     await this.auditService.record({
       action: 'submit',
@@ -402,7 +391,7 @@ export class AccountingService {
     actor: AuthContext,
   ) {
     const entry = await this.getJournalEntry(id, actor);
-    if ((entry.status as any) !== 'SUBMITTED') {
+    if (entry.status !== JournalEntryStatus.SUBMITTED) {
       throw new ConflictException('Only SUBMITTED journals can be approved');
     }
 
@@ -418,16 +407,17 @@ export class AccountingService {
       entry.entryDate,
     );
 
-    const updated = await this.prisma.journalEntry.update({
-      where: { id },
-      data: {
-        status: 'APPROVED' as any,
+    const updated = await this.postingService.updateJournalStatus(
+      id,
+      actor.tenantId,
+      JournalEntryStatus.APPROVED,
+      actor,
+      {
         approvedAt: new Date(),
         approvedById: actor.userId,
         approvalNote: dto.reason,
-      } as any,
-      include: { lines: true },
-    });
+      },
+    );
 
     await this.auditService.record({
       action: 'approve',
@@ -447,20 +437,21 @@ export class AccountingService {
     actor: AuthContext,
   ) {
     const entry = await this.getJournalEntry(id, actor);
-    if ((entry.status as any) !== 'SUBMITTED') {
+    if (entry.status !== JournalEntryStatus.SUBMITTED) {
       throw new ConflictException('Only SUBMITTED journals can be rejected');
     }
 
-    const updated = await this.prisma.journalEntry.update({
-      where: { id },
-      data: {
-        status: 'REJECTED' as any,
+    const updated = await this.postingService.updateJournalStatus(
+      id,
+      actor.tenantId,
+      JournalEntryStatus.REJECTED,
+      actor,
+      {
         rejectedAt: new Date(),
         rejectedById: actor.userId,
         rejectionReason: dto.reason,
-      } as any,
-      include: { lines: true },
-    });
+      },
+    );
 
     await this.auditService.record({
       action: 'reject',
@@ -480,7 +471,7 @@ export class AccountingService {
     actor: AuthContext,
   ) {
     const entry = await this.getJournalEntry(id, actor);
-    if ((entry.status as any) !== 'APPROVED') {
+    if (entry.status !== JournalEntryStatus.APPROVED) {
       throw new ConflictException('Only APPROVED journals can be posted');
     }
 
@@ -497,16 +488,17 @@ export class AccountingService {
       entry.entryDate,
     );
 
-    const updated = await this.prisma.journalEntry.update({
-      where: { id },
-      data: {
-        status: JournalEntryStatus.POSTED,
+    const updated = await this.postingService.updateJournalStatus(
+      id,
+      actor.tenantId,
+      JournalEntryStatus.POSTED,
+      actor,
+      {
         postedAt: new Date(),
         postedById: actor.userId,
         entryNumber,
-      } as any,
-      include: { lines: true },
-    });
+      },
+    );
 
     await this.auditService.record({
       action: 'post',
@@ -530,16 +522,17 @@ export class AccountingService {
       throw new ConflictException('Only DRAFT journals can be cancelled');
     }
 
-    const updated = await this.prisma.journalEntry.update({
-      where: { id },
-      data: {
-        status: 'CANCELLED' as any,
+    const updated = await this.postingService.updateJournalStatus(
+      id,
+      actor.tenantId,
+      JournalEntryStatus.CANCELLED,
+      actor,
+      {
         cancelledAt: new Date(),
         cancelledById: actor.userId,
         cancellationReason: dto.reason,
-      } as any,
-      include: { lines: true },
-    });
+      },
+    );
 
     await this.auditService.record({
       action: 'cancel',

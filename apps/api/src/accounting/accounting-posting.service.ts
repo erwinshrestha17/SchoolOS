@@ -142,6 +142,100 @@ export class AccountingPostingService {
     private readonly auditService: AuditService,
   ) {}
 
+  async createDraftJournal(
+    input: {
+      tenantId: string;
+      entryDate: Date;
+      narration: string;
+      sourceModule?: string | null;
+      sourceType?: JournalSourceType;
+      sourceId?: string | null;
+      lines: Array<{
+        chartAccountId: string;
+        side: JournalLineSide;
+        amount: Prisma.Decimal | number;
+        description?: string | null;
+      }>;
+    },
+    actor: AuthContext,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const period = await this.ensurePostingPeriodIsOpen(
+      tx,
+      input.tenantId,
+      input.entryDate,
+    );
+
+    const entry = await tx.journalEntry.create({
+      data: {
+        tenantId: input.tenantId,
+        fiscalYearId: period?.fiscalYearId ?? null,
+        fiscalPeriodId: period?.id ?? null,
+        entryDate: input.entryDate,
+        status: 'DRAFT' as any,
+        narration: input.narration,
+        sourceModule: input.sourceModule ?? 'ACCOUNTING',
+        sourceType: input.sourceType ?? JournalSourceType.MANUAL,
+        sourceId: input.sourceId ?? null,
+        postingType: 'MANUAL',
+        createdById: actor.userId,
+        lines: {
+          create: input.lines.map((line, index) => ({
+            tenantId: input.tenantId,
+            chartAccountId: line.chartAccountId,
+            side: line.side,
+            debit: line.side === JournalLineSide.DEBIT ? line.amount : 0,
+            credit: line.side === JournalLineSide.CREDIT ? line.amount : 0,
+            amount: line.amount,
+            lineNumber: index + 1,
+            description: line.description ?? input.narration,
+          })),
+        },
+      },
+      include: { lines: true },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'journal_entry',
+      tenantId: input.tenantId,
+      userId: actor.userId,
+      resourceId: entry.id,
+      after: { status: entry.status },
+    });
+
+    return entry;
+  }
+
+  async updateJournalStatus(
+    id: string,
+    tenantId: string,
+    status: JournalEntryStatus | string,
+    actor: AuthContext,
+    extraData: Prisma.JournalEntryUpdateInput = {},
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const updated = await tx.journalEntry.update({
+      where: { id, tenantId },
+      data: {
+        status: status as any,
+        ...extraData,
+      },
+      include: { lines: true },
+    });
+
+    await this.auditService.record({
+      action: 'update_status',
+      resource: 'journal_entry',
+      tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      after: { status: updated.status, ...extraData },
+    });
+
+    return updated;
+  }
+
   async postPayrollAccrual(
     input: PayrollPostingInput,
     actor: AuthContext,

@@ -102,7 +102,10 @@ export class AccountingReportsService {
     let totalClosingDebit = new Prisma.Decimal(0);
     let totalClosingCredit = new Prisma.Decimal(0);
 
-    const normalDebitTypes = [ChartAccountType.ASSET, ChartAccountType.EXPENSE];
+    const normalDebitTypes: ChartAccountType[] = [
+      ChartAccountType.ASSET,
+      ChartAccountType.EXPENSE,
+    ];
 
     for (const account of accounts) {
       const lineData = linesGrouped.find((l) => l.chartAccountId === account.id);
@@ -255,7 +258,10 @@ export class AccountingReportsService {
     if (sourceType) journalWhere.sourceType = sourceType;
     if (sourceId) journalWhere.sourceId = sourceId;
 
-    const normalDebitTypes = [ChartAccountType.ASSET, ChartAccountType.EXPENSE];
+    const normalDebitTypes: ChartAccountType[] = [
+      ChartAccountType.ASSET,
+      ChartAccountType.EXPENSE,
+    ];
     const normalSide = normalDebitTypes.includes(account.type)
       ? JournalLineSide.DEBIT
       : JournalLineSide.CREDIT;
@@ -289,7 +295,7 @@ export class AccountingReportsService {
 
     const openingNet = openingDebitTotal.minus(openingCreditTotal);
     let openingBalance = new Prisma.Decimal(0);
-    let openingBalanceSide = normalSide;
+    let openingBalanceSide: JournalLineSide = normalSide;
 
     if (normalSide === JournalLineSide.DEBIT) {
       if (openingNet.gte(0)) {
@@ -350,7 +356,7 @@ export class AccountingReportsService {
       pageCreditTotal = pageCreditTotal.plus(line.credit);
 
       let lineRunBalance = new Prisma.Decimal(0);
-      let lineRunSide = JournalLineSide.DEBIT;
+      let lineRunSide: JournalLineSide = JournalLineSide.DEBIT;
 
       if (normalSide === JournalLineSide.DEBIT) {
         if (runningSignedBalance.gte(0)) {
@@ -486,18 +492,15 @@ export class AccountingReportsService {
       return true;
     });
 
-    if (this.auditService) {
-      await this.auditService.log({
-        tenantId,
-        userId,
-        action: 'UPDATE_REPORT_MAPPINGS',
-        resource: 'ACCOUNTING_REPORT_MAPPING',
-        metadata: {
-          previous: existingMappings.map((m) => ({ mappingType: m.mappingType, accountId: m.accountId })),
-          new: dto.mappings,
-        },
-      });
-    }
+    await this.auditService.record({
+      action: 'update',
+      resource: 'accounting_report_mapping',
+      tenantId,
+      userId,
+      after: {
+        mappings: dto.mappings,
+      },
+    });
 
     return { success: true, count: dto.mappings.length };
   }
@@ -543,7 +546,7 @@ export class AccountingReportsService {
       include: { account: true },
     });
 
-    let targetAccounts: any[] = [];
+    let targetAccounts: Array<{ id: string; code: string; name: string }> = [];
     let setupWarnings: string[] = [];
 
     if (accountId || accountCode) {
@@ -628,7 +631,7 @@ export class AccountingReportsService {
       }
     }
 
-    let openingBalanceSide = JournalLineSide.DEBIT;
+    let openingBalanceSide: JournalLineSide = JournalLineSide.DEBIT;
     let absoluteOpeningBalance = openingBalance;
     if (openingBalance.lt(0)) {
       absoluteOpeningBalance = openingBalance.abs();
@@ -670,7 +673,7 @@ export class AccountingReportsService {
       totalPayments = totalPayments.plus(line.credit);
 
       let lineRunBalance = runningSignedBalance;
-      let lineRunSide = JournalLineSide.DEBIT;
+      let lineRunSide: JournalLineSide = JournalLineSide.DEBIT;
 
       if (runningSignedBalance.lt(0)) {
         lineRunBalance = runningSignedBalance.abs();
@@ -701,7 +704,7 @@ export class AccountingReportsService {
     }
 
     let closingBalance = absoluteOpeningBalance;
-    let closingBalanceSide = openingBalanceSide;
+    let closingBalanceSide: JournalLineSide = openingBalanceSide;
 
     if (rows.length > 0) {
       closingBalance = rows[rows.length - 1].runningBalance;
@@ -1044,7 +1047,7 @@ export class AccountingReportsService {
 
     const setupWarnings: string[] = [];
 
-    const getNetCredit = (accs: any[]) => {
+    const getNetCredit = (accs: Array<{ id: string }>) => {
       let total = new Prisma.Decimal(0);
       for (const a of accs) {
         const line = linesGrouped.find((l) => l.chartAccountId === a.id);
@@ -1055,7 +1058,7 @@ export class AccountingReportsService {
       return total;
     };
 
-    const getNetDebit = (accs: any[]) => {
+    const getNetDebit = (accs: Array<{ id: string }>) => {
       let total = new Prisma.Decimal(0);
       for (const a of accs) {
         const line = linesGrouped.find((l) => l.chartAccountId === a.id);

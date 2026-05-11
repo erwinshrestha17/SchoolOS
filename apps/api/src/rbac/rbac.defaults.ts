@@ -422,7 +422,9 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     ['accounting:journals', 'manual', 'Create manual journals'],
     ['accounting:journals', 'reverse', 'Reverse or correct journals'],
     ['accounting:reports', 'read', 'Read accounting reports'],
+    ['accounting:reports', 'manage', 'Manage accounting report mappings'],
     ['accounting:exports', 'create', 'Create accounting exports'],
+    ['accounting:journals', 'manage', 'Manage journal entry lifecycle'],
   ].map(([resource, action, description]) => ({
     resource,
     action,
@@ -1017,7 +1019,9 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<string, string[]> = {
     'accounting:journals:manual',
     'accounting:journals:reverse',
     'accounting:reports:read',
+    'accounting:reports:manage',
     'accounting:exports:create',
+    'accounting:journals:manage',
   ],
   librarian: [
     'roles:read',
