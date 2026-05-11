@@ -23,6 +23,10 @@ import {
   Lock,
   School,
   Utensils,
+  ClipboardList,
+  FileCheck2,
+  Trophy,
+  CalendarDays,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -42,6 +46,10 @@ export type NavGroup = {
   label: string;
   items: NavItem[];
 };
+
+const academicPermissions: PermissionKey[] = ['academics:read', 'academics:manage'];
+const timetablePermissions: PermissionKey[] = ['timetable:read'];
+const homeworkPermissions: PermissionKey[] = ['homework:read'];
 
 export const dashboardNavGroups: NavGroup[] = [
   {
@@ -82,15 +90,81 @@ export const dashboardNavGroups: NavGroup[] = [
       },
       {
         href: '/dashboard/academics',
-        label: 'Exams & Marks',
+        label: 'Academics',
         icon: GraduationCap,
-        permissions: ['academics:read', 'academics:manage'],
+        permissions: academicPermissions,
+      },
+      {
+        href: '/dashboard/academics/exams',
+        label: 'Exams',
+        icon: ClipboardList,
+        permissions: academicPermissions,
+      },
+      {
+        href: '/dashboard/academics/marks',
+        label: 'Marks Entry',
+        icon: FileCheck2,
+        permissions: academicPermissions,
+      },
+      {
+        href: '/dashboard/academics/report-cards',
+        label: 'Report Cards',
+        icon: BookOpen,
+        permissions: academicPermissions,
+      },
+      {
+        href: '/dashboard/academics/promotions',
+        label: 'Promotions',
+        icon: Trophy,
+        permissions: academicPermissions,
+      },
+      {
+        href: '/dashboard/academics/results',
+        label: 'Result Publishing',
+        icon: Megaphone,
+        permissions: academicPermissions,
       },
       {
         href: '/dashboard/timetable',
-        label: 'Timetable & HW',
+        label: 'Timetable',
+        icon: CalendarDays,
+        permissions: timetablePermissions,
+      },
+      {
+        href: '/dashboard/timetable/builder',
+        label: 'Timetable Builder',
         icon: CalendarCheck,
-        permissions: ['timetable:read', 'homework:read'],
+        permissions: timetablePermissions,
+      },
+      {
+        href: '/dashboard/timetable/versions',
+        label: 'Timetable Versions',
+        icon: Settings,
+        permissions: ['timetable:read', 'timetable:manage'],
+      },
+      {
+        href: '/dashboard/timetable/substitutions',
+        label: 'Substitutions',
+        icon: Users,
+        permissions: ['timetable:read', 'timetable:substitute'],
+      },
+      {
+        href: '/dashboard/homework',
+        label: 'Homework',
+        icon: BookOpen,
+        permissions: homeworkPermissions,
+      },
+      {
+        href: '/dashboard/homework/new',
+        label: 'Create Homework',
+        icon: ClipboardList,
+        permissions: ['homework:manage', 'homework:publish'],
+      },
+      {
+        href: '/dashboard/homework/review',
+        label: 'Homework Review',
+        icon: FileCheck2,
+        permissions: ['homework:review', 'homework:manage'],
       },
     ],
   },
@@ -271,7 +345,6 @@ export function Sidebar({
 
   return (
     <>
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div
           className="sidebar-overlay lg:hidden"
@@ -287,7 +360,6 @@ export function Sidebar({
         />
       )}
 
-      {/* Mobile sidebar */}
       <aside
         className={cn(
           'fixed inset-y-0 left-0 z-50 lg:hidden sidebar-transition',
@@ -303,7 +375,6 @@ export function Sidebar({
         />
       </aside>
 
-      {/* Desktop sidebar */}
       <aside className="hidden lg:flex h-screen sticky top-0 z-30">
         <SidebarContent
           collapsed={collapsed}
