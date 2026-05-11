@@ -6,7 +6,9 @@ import {
 import { GradeLockStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
+import { FinanceService } from '../finance/finance.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import { BatchGenerateReportCardsDto } from './dto/batch-generate-report-cards.dto';
 import { GenerateReportCardDto } from './dto/generate-report-card.dto';
 import {
@@ -14,8 +16,6 @@ import {
   type ComponentScoreInput,
   type SubjectGradeResult,
 } from './grade-calculator.service';
-import { FinanceService } from '../finance/finance.service';
-import { SettingsService } from '../settings/settings.service';
 
 type MarkWithComponent = Prisma.MarkEntryGetPayload<{
   include: {
@@ -142,7 +142,11 @@ export class ReportCardsService {
         percentage: new Prisma.Decimal(overall.percentage),
         grade: overall.grade,
         gpa: new Prisma.Decimal(overall.gpa),
-        remarks: this.buildRemarks(dto.remarks, subjectGrades, overall.status),
+        remarks: this.buildRemarks(
+          dto.remarks,
+          subjectGrades,
+          overall.resultStatus,
+        ),
         status,
         lockedAt: status === GradeLockStatus.LOCKED ? new Date() : null,
       },
@@ -154,7 +158,11 @@ export class ReportCardsService {
         percentage: new Prisma.Decimal(overall.percentage),
         grade: overall.grade,
         gpa: new Prisma.Decimal(overall.gpa),
-        remarks: this.buildRemarks(dto.remarks, subjectGrades, overall.status),
+        remarks: this.buildRemarks(
+          dto.remarks,
+          subjectGrades,
+          overall.resultStatus,
+        ),
         status,
         lockedAt: status === GradeLockStatus.LOCKED ? new Date() : null,
       },
@@ -180,7 +188,7 @@ export class ReportCardsService {
         percentage: overall.percentage,
         grade: overall.grade,
         gpa: overall.gpa,
-        resultStatus: overall.status,
+        resultStatus: overall.resultStatus,
         subjectCount: overall.subjectCount,
         failedSubjectCount: overall.failedSubjectCount,
         incompleteSubjectCount: overall.incompleteSubjectCount,
