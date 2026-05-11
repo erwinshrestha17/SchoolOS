@@ -172,7 +172,7 @@ export class AccountingPostingService {
         fiscalYearId: period?.fiscalYearId ?? null,
         fiscalPeriodId: period?.id ?? null,
         entryDate: input.entryDate,
-        status: 'DRAFT' as any,
+        status: JournalEntryStatus.DRAFT,
         narration: input.narration,
         sourceModule: input.sourceModule ?? 'ACCOUNTING',
         sourceType: input.sourceType ?? JournalSourceType.MANUAL,
@@ -218,7 +218,7 @@ export class AccountingPostingService {
     const updated = await tx.journalEntry.update({
       where: { id, tenantId },
       data: {
-        status: status as any,
+        status: status as JournalEntryStatus,
         ...extraData,
       },
       include: { lines: true },

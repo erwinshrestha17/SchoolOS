@@ -51,6 +51,38 @@ class Decimal {
     return new Decimal(Number(this.numericValue.toFixed(places)));
   }
 
+  abs() {
+    return new Decimal(Math.abs(this.numericValue));
+  }
+
+  plus(value: number | string | Decimal) {
+    return this.add(value);
+  }
+
+  minus(value: number | string | Decimal) {
+    return this.sub(value);
+  }
+
+  times(value: number | string | Decimal) {
+    return this.mul(value);
+  }
+
+  dividedBy(value: number | string | Decimal) {
+    return this.div(value);
+  }
+
+  isZero() {
+    return this.numericValue === 0;
+  }
+
+  gt(value: number | string | Decimal) {
+    return this.numericValue > decimalToNumber(value);
+  }
+
+  lt(value: number | string | Decimal) {
+    return this.numericValue < decimalToNumber(value);
+  }
+
   toNumber() {
     return this.numericValue;
   }
@@ -265,8 +297,13 @@ export const ChartAccountType = {
 } as const;
 
 export const JournalEntryStatus = {
+  DRAFT: 'DRAFT',
+  SUBMITTED: 'SUBMITTED',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
   POSTED: 'POSTED',
   REVERSED: 'REVERSED',
+  CANCELLED: 'CANCELLED',
 } as const;
 
 export const StorageProvider = {

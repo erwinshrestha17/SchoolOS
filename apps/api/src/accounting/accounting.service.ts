@@ -518,7 +518,7 @@ export class AccountingService {
     actor: AuthContext,
   ) {
     const entry = await this.getJournalEntry(id, actor);
-    if ((entry.status as any) !== 'DRAFT') {
+    if (entry.status !== JournalEntryStatus.DRAFT) {
       throw new ConflictException('Only DRAFT journals can be cancelled');
     }
 
@@ -909,7 +909,7 @@ export class AccountingService {
         lockedAt: new Date(),
         lockedById: actor.userId,
         lockReason: dto.reason,
-      } as any,
+      },
     });
 
     await this.auditService.record({
@@ -953,7 +953,7 @@ export class AccountingService {
         unlockedAt: new Date(),
         unlockedById: actor.userId,
         unlockReason: dto.reason,
-      } as any,
+      },
     });
 
     await this.auditService.record({
@@ -1017,7 +1017,7 @@ export class AccountingService {
         closedAt: new Date(),
         closedById: actor.userId,
         closeReason: dto.reason,
-      } as any,
+      },
     });
 
     await this.auditService.record({
@@ -1060,7 +1060,7 @@ export class AccountingService {
         reopenedAt: new Date(),
         reopenedById: actor.userId,
         reopenReason: dto.reason,
-      } as any,
+      },
     });
 
     await this.auditService.record({

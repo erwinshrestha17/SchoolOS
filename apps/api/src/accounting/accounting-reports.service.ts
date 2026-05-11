@@ -30,6 +30,11 @@ export class AccountingReportsService {
     private readonly auditService: AuditService,
   ) {}
 
+  private toDecimal(value: unknown): Prisma.Decimal {
+    const val = value === null || value === undefined ? 0 : value;
+    return new Prisma.Decimal(val.toString());
+  }
+
   async getTrialBalance(
     tenantId: string,
     query: TrialBalanceQueryDto,
@@ -110,8 +115,8 @@ export class AccountingReportsService {
     for (const account of accounts) {
       const lineData = linesGrouped.find((l) => l.chartAccountId === account.id);
 
-      const pDebit = lineData?._sum.debit || new Prisma.Decimal(0);
-      const pCredit = lineData?._sum.credit || new Prisma.Decimal(0);
+      const pDebit = this.toDecimal(lineData?._sum.debit);
+      const pCredit = this.toDecimal(lineData?._sum.credit);
 
       const net = pDebit.minus(pCredit);
       const normalSide = normalDebitTypes.includes(account.type)
@@ -286,10 +291,8 @@ export class AccountingReportsService {
       });
 
       if (priorLinesGrouped.length > 0) {
-        openingDebitTotal =
-          priorLinesGrouped[0]._sum.debit || new Prisma.Decimal(0);
-        openingCreditTotal =
-          priorLinesGrouped[0]._sum.credit || new Prisma.Decimal(0);
+        openingDebitTotal = this.toDecimal(priorLinesGrouped[0]._sum.debit);
+        openingCreditTotal = this.toDecimal(priorLinesGrouped[0]._sum.credit);
       }
     }
 
@@ -559,15 +562,22 @@ export class AccountingReportsService {
       });
 
       if (!account) throw new NotFoundException('Account not found');
+      if (account.type !== ChartAccountType.ASSET) {
+        throw new BadRequestException('Cash Book account must be of type ASSET');
+      }
 
       const isMapped = cashBankMappings.some((m) => m.accountId === account.id);
       if (!isMapped) {
-        throw new BadRequestException('Account is not explicitly mapped as CASH or BANK in report settings.');
+        throw new BadRequestException(
+          'Account is not explicitly mapped as CASH or BANK in report settings.',
+        );
       }
       targetAccounts = [account];
     } else {
       if (cashBankMappings.length === 0) {
-        setupWarnings.push('No cash or bank accounts are mapped. Configure Accounting report account mappings.');
+        setupWarnings.push(
+          'No cash or bank accounts are mapped. Configure Accounting report account mappings.',
+        );
       } else {
         targetAccounts = cashBankMappings.map((m) => m.account);
       }
@@ -589,7 +599,7 @@ export class AccountingReportsService {
         pagination: { page, limit, total: 0, totalPages: 0 },
         generatedAt: new Date(),
         setupWarnings,
-      } as any;
+      };
     }
 
     const targetAccountIds = targetAccounts.map((a) => a.id);
@@ -625,8 +635,8 @@ export class AccountingReportsService {
       });
 
       for (const group of priorLinesGrouped) {
-        const pDebit = group._sum.debit || new Prisma.Decimal(0);
-        const pCredit = group._sum.credit || new Prisma.Decimal(0);
+        const pDebit = this.toDecimal(group._sum.debit);
+        const pCredit = this.toDecimal(group._sum.credit);
         openingBalance = openingBalance.plus(pDebit.minus(pCredit));
       }
     }
@@ -682,15 +692,21 @@ export class AccountingReportsService {
 
       const rowAccount = targetAccounts.find((a) => a.id === line.chartAccountId)!;
 
+      const otherAccount = (line.journalEntry.lines as { chartAccountId: string; chartAccount?: { id: string; code: string; name: string } }[]).find(
+        (l) => l.chartAccountId !== line.chartAccountId,
+      )?.chartAccount;
+
+      const displayAccount = otherAccount || rowAccount;
+
       rows.push({
         journalEntryId: line.journalEntryId,
         journalLineId: line.id,
         entryDate: line.journalEntry.entryDate,
         postedAt: line.journalEntry.postedAt,
         entryNumber: line.journalEntry.entryNumber,
-        accountId: rowAccount.id,
-        accountCode: rowAccount.code,
-        accountName: rowAccount.name,
+        accountId: displayAccount?.id || line.chartAccountId,
+        accountCode: displayAccount?.code || 'UNKNOWN',
+        accountName: displayAccount?.name || 'Other Side',
         narration: line.description || line.journalEntry.narration,
         sourceModule: line.journalEntry.sourceModule,
         sourceType: line.journalEntry.sourceType,
@@ -799,8 +815,8 @@ export class AccountingReportsService {
 
     for (const account of accounts) {
       const lineData = linesGrouped.find((l) => l.chartAccountId === account.id);
-      const debit = lineData?._sum.debit || new Prisma.Decimal(0);
-      const credit = lineData?._sum.credit || new Prisma.Decimal(0);
+      const debit = this.toDecimal(lineData?._sum.debit);
+      const credit = this.toDecimal(lineData?._sum.credit);
 
       if (!includeZeroBalances && debit.isZero() && credit.isZero()) continue;
 
@@ -912,8 +928,8 @@ export class AccountingReportsService {
 
     for (const account of accounts) {
       const lineData = linesGrouped.find((l) => l.chartAccountId === account.id);
-      const debit = lineData?._sum.debit || new Prisma.Decimal(0);
-      const credit = lineData?._sum.credit || new Prisma.Decimal(0);
+      const debit = this.toDecimal(lineData?._sum.debit);
+      const credit = this.toDecimal(lineData?._sum.credit);
 
       if (account.type === ChartAccountType.REVENUE) {
         currentYearIncome = currentYearIncome.plus(credit.minus(debit));
@@ -1052,7 +1068,9 @@ export class AccountingReportsService {
       for (const a of accs) {
         const line = linesGrouped.find((l) => l.chartAccountId === a.id);
         if (line) {
-          total = total.plus(line._sum.credit || 0).minus(line._sum.debit || 0);
+          total = total
+            .plus(this.toDecimal(line._sum.credit))
+            .minus(this.toDecimal(line._sum.debit));
         }
       }
       return total;
@@ -1063,7 +1081,9 @@ export class AccountingReportsService {
       for (const a of accs) {
         const line = linesGrouped.find((l) => l.chartAccountId === a.id);
         if (line) {
-          total = total.plus(line._sum.debit || 0).minus(line._sum.credit || 0);
+          total = total
+            .plus(this.toDecimal(line._sum.debit))
+            .minus(this.toDecimal(line._sum.credit));
         }
       }
       return total;
@@ -1098,8 +1118,8 @@ export class AccountingReportsService {
       for (const a of tdsPayableAccounts) {
         const line = linesGrouped.find((l) => l.chartAccountId === a.id);
         if (line) {
-          tdsCredits = tdsCredits.plus(line._sum.credit || 0);
-          tdsDebits = tdsDebits.plus(line._sum.debit || 0);
+          tdsCredits = tdsCredits.plus(this.toDecimal(line._sum.credit));
+          tdsDebits = tdsDebits.plus(this.toDecimal(line._sum.debit));
         }
       }
       tdsDeducted = tdsCredits;
@@ -1119,8 +1139,8 @@ export class AccountingReportsService {
       for (const a of pfPayableAccounts) {
         const line = linesGrouped.find((l) => l.chartAccountId === a.id);
         if (line) {
-          pfCredits = pfCredits.plus(line._sum.credit || 0);
-          pfDebits = pfDebits.plus(line._sum.debit || 0);
+          pfCredits = pfCredits.plus(this.toDecimal(line._sum.credit));
+          pfDebits = pfDebits.plus(this.toDecimal(line._sum.debit));
         }
       }
       

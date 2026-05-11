@@ -1,6 +1,7 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import {
   AuthMethod,
+  JournalEntryStatus,
   JournalLineSide,
   JournalSourceType,
   Prisma,
@@ -24,7 +25,7 @@ describe('accounting reversals', () => {
       id: 'journal-reversal',
       entryNumber: 'JE-2026-00002',
       reversalOfId: original.id,
-      lines: [],
+      lines: [{ side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) }, { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) }],
     };
     const { service, prisma, postingService, auditService } = buildService({
       original,
@@ -289,14 +290,16 @@ describe('Manual Journal Approval Workflow', () => {
   it('submits a DRAFT journal successfully', async () => {
     const journal = {
       id: 'journal-1',
-      status: 'DRAFT',
+      status: JournalEntryStatus.DRAFT,
       entryDate: new Date('2026-05-01'),
       lines: [
         { side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) },
         { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) },
       ],
     };
-    const { service, prisma } = buildService({ original: journal });
+    const { service, prisma, postingService } = buildService({
+      original: journal,
+    });
 
     await service.submitManualJournal(
       'journal-1',
@@ -304,13 +307,13 @@ describe('Manual Journal Approval Workflow', () => {
       actor,
     );
 
-    expect(prisma.journalEntry.update).toHaveBeenCalledWith(
+    expect(postingService.updateJournalStatus).toHaveBeenCalledWith(
+      'journal-1',
+      actor.tenantId,
+      JournalEntryStatus.SUBMITTED,
+      actor,
       expect.objectContaining({
-        where: { id: 'journal-1' },
-        data: expect.objectContaining({
-          status: 'SUBMITTED',
-          submissionNote: 'Ready for review',
-        }),
+        submissionNote: 'Ready for review',
       }),
     );
   });
@@ -318,14 +321,14 @@ describe('Manual Journal Approval Workflow', () => {
   it('rejects submitting a journal that is not balanced', async () => {
     const journal = {
       id: 'journal-1',
-      status: 'DRAFT',
+      status: JournalEntryStatus.DRAFT,
       entryDate: new Date('2026-05-01'),
       lines: [
         { side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) },
         { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(90) },
       ],
     };
-    const { service } = buildService({ original: journal });
+    const { service, postingService } = buildService({ original: journal });
 
     await expect(
       service.submitManualJournal('journal-1', {}, actor),
@@ -335,11 +338,11 @@ describe('Manual Journal Approval Workflow', () => {
   it('rejects submitting a non-DRAFT journal', async () => {
     const journal = {
       id: 'journal-1',
-      status: 'SUBMITTED',
+      status: JournalEntryStatus.SUBMITTED,
       entryDate: new Date('2026-05-01'),
-      lines: [],
+      lines: [{ side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) }, { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) }],
     };
-    const { service } = buildService({ original: journal });
+    const { service, postingService } = buildService({ original: journal });
 
     await expect(
       service.submitManualJournal('journal-1', {}, actor),
@@ -349,12 +352,14 @@ describe('Manual Journal Approval Workflow', () => {
   it('approves a SUBMITTED journal', async () => {
     const journal = {
       id: 'journal-1',
-      status: 'SUBMITTED',
+      status: JournalEntryStatus.SUBMITTED,
       entryDate: new Date('2026-05-01'),
       createdById: 'different-user',
-      lines: [],
+      lines: [{ side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) }, { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) }],
     };
-    const { service, prisma } = buildService({ original: journal });
+    const { service, prisma, postingService } = buildService({
+      original: journal,
+    });
 
     await service.approveManualJournal(
       'journal-1',
@@ -362,13 +367,14 @@ describe('Manual Journal Approval Workflow', () => {
       actor,
     );
 
-    expect(prisma.journalEntry.update).toHaveBeenCalledWith(
+    expect(postingService.updateJournalStatus).toHaveBeenCalledWith(
+      'journal-1',
+      actor.tenantId,
+      JournalEntryStatus.APPROVED,
+      actor,
       expect.objectContaining({
-        where: { id: 'journal-1' },
-        data: expect.objectContaining({
-          status: 'APPROVED',
-          approvalNote: 'Looks good',
-        }),
+        approvalNote: 'Looks good',
+        approvedById: actor.userId,
       }),
     );
   });
@@ -376,12 +382,12 @@ describe('Manual Journal Approval Workflow', () => {
   it('rejects approval if approver is the creator', async () => {
     const journal = {
       id: 'journal-1',
-      status: 'SUBMITTED',
+      status: JournalEntryStatus.SUBMITTED,
       entryDate: new Date('2026-05-01'),
       createdById: actor.userId,
-      lines: [],
+      lines: [{ side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) }, { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) }],
     };
-    const { service } = buildService({ original: journal });
+    const { service, postingService } = buildService({ original: journal });
 
     await expect(
       service.approveManualJournal('journal-1', {}, actor),
@@ -391,11 +397,13 @@ describe('Manual Journal Approval Workflow', () => {
   it('rejects a SUBMITTED journal', async () => {
     const journal = {
       id: 'journal-1',
-      status: 'SUBMITTED',
+      status: JournalEntryStatus.SUBMITTED,
       entryDate: new Date('2026-05-01'),
-      lines: [],
+      lines: [{ side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) }, { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) }],
     };
-    const { service, prisma } = buildService({ original: journal });
+    const { service, prisma, postingService } = buildService({
+      original: journal,
+    });
 
     await service.rejectManualJournal(
       'journal-1',
@@ -403,13 +411,14 @@ describe('Manual Journal Approval Workflow', () => {
       actor,
     );
 
-    expect(prisma.journalEntry.update).toHaveBeenCalledWith(
+    expect(postingService.updateJournalStatus).toHaveBeenCalledWith(
+      'journal-1',
+      actor.tenantId,
+      JournalEntryStatus.REJECTED,
+      actor,
       expect.objectContaining({
-        where: { id: 'journal-1' },
-        data: expect.objectContaining({
-          status: 'REJECTED',
-          rejectionReason: 'Needs correction',
-        }),
+        rejectionReason: 'Needs correction',
+        rejectedById: actor.userId,
       }),
     );
   });
@@ -417,9 +426,9 @@ describe('Manual Journal Approval Workflow', () => {
   it('posts an APPROVED journal', async () => {
     const journal = {
       id: 'journal-1',
-      status: 'APPROVED',
+      status: JournalEntryStatus.APPROVED,
       entryDate: new Date('2026-05-01'),
-      lines: [],
+      lines: [{ side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) }, { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) }],
     };
     const { service, prisma, postingService } = buildService({
       original: journal,
@@ -432,13 +441,14 @@ describe('Manual Journal Approval Workflow', () => {
     await service.postApprovedManualJournal('journal-1', {}, actor);
 
     expect(postingService.generateJournalEntryNumber).toHaveBeenCalled();
-    expect(prisma.journalEntry.update).toHaveBeenCalledWith(
+    expect(postingService.updateJournalStatus).toHaveBeenCalledWith(
+      'journal-1',
+      actor.tenantId,
+      JournalEntryStatus.POSTED,
+      actor,
       expect.objectContaining({
-        where: { id: 'journal-1' },
-        data: expect.objectContaining({
-          status: 'POSTED',
-          entryNumber: 'JE-2026-00005',
-        }),
+        entryNumber: 'JE-2026-00005',
+        postedById: actor.userId,
       }),
     );
   });
@@ -446,11 +456,13 @@ describe('Manual Journal Approval Workflow', () => {
   it('cancels a DRAFT journal', async () => {
     const journal = {
       id: 'journal-1',
-      status: 'DRAFT',
+      status: JournalEntryStatus.DRAFT,
       entryDate: new Date('2026-05-01'),
-      lines: [],
+      lines: [{ side: JournalLineSide.DEBIT, amount: new Prisma.Decimal(100) }, { side: JournalLineSide.CREDIT, amount: new Prisma.Decimal(100) }],
     };
-    const { service, prisma } = buildService({ original: journal });
+    const { service, prisma, postingService } = buildService({
+      original: journal,
+    });
 
     await service.cancelManualJournal(
       'journal-1',
@@ -458,13 +470,14 @@ describe('Manual Journal Approval Workflow', () => {
       actor,
     );
 
-    expect(prisma.journalEntry.update).toHaveBeenCalledWith(
+    expect(postingService.updateJournalStatus).toHaveBeenCalledWith(
+      'journal-1',
+      actor.tenantId,
+      JournalEntryStatus.CANCELLED,
+      actor,
       expect.objectContaining({
-        where: { id: 'journal-1' },
-        data: expect.objectContaining({
-          status: 'CANCELLED',
-          cancellationReason: 'Mistake',
-        }),
+        cancellationReason: 'Mistake',
+        cancelledById: actor.userId,
       }),
     );
   });
@@ -518,7 +531,9 @@ function buildService(options: {
       }),
       count: jest.fn().mockResolvedValue(options.journalCount ?? 0),
       create: jest.fn().mockResolvedValue(options.createdReversal),
-      update: jest.fn().mockResolvedValue({ id: 'updated-journal' }),
+      update: jest.fn().mockImplementation(({ where, data }) => {
+        return Promise.resolve({ id: where.id, ...data });
+      }),
     },
     accountingPeriod: {
       findFirst: jest.fn().mockResolvedValue(options.closedPeriod),
@@ -535,6 +550,10 @@ function buildService(options: {
     postManualJournal: jest.fn().mockResolvedValue(options.createdReversal),
     postReversal: jest.fn().mockResolvedValue(options.createdReversal),
     generateJournalEntryNumber: jest.fn().mockResolvedValue('JE-MOCK'),
+    updateJournalStatus: jest.fn().mockResolvedValue({
+      id: 'updated-journal',
+      status: 'UPDATED',
+    }),
     ensurePostingPeriodIsOpen: jest.fn().mockImplementation(() => {
       if (options.closedPeriod) {
         throw new ConflictException('Closed period');
