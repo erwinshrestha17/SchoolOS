@@ -26,9 +26,6 @@ function createController() {
     markTopicComplete: jest.fn(),
     getSyllabusProgress: jest.fn(),
     listRemedialStudents: jest.fn(),
-    listPromotionReadiness: jest.fn(),
-    promoteStudent: jest.fn(),
-    batchPromote: jest.fn(),
   };
   const academicsFoundationService = {
     listExamTerms: jest.fn(),
@@ -84,6 +81,11 @@ function createController() {
   const gradeCalculatorService = {
     getGradingScale: jest.fn(),
   };
+  const promotionReadinessService = {
+    listPromotionReadiness: jest.fn(),
+    promoteStudent: jest.fn(),
+    batchPromote: jest.fn(),
+  };
   return {
     controller: new AcademicsController(
       academicsService as never,
@@ -97,6 +99,7 @@ function createController() {
       resultPublishingService as never,
       gradeCalculatorService as never,
       resultsService as never,
+      promotionReadinessService as never,
     ),
     academicsService,
     academicsFoundationService,
@@ -109,6 +112,7 @@ function createController() {
     resultPublishingService,
     gradeCalculatorService,
     resultsService,
+    promotionReadinessService,
   };
 }
 
@@ -315,17 +319,20 @@ describe('AcademicsController M4 contracts', () => {
   });
 
   it('delegates promotion readiness and promotion actions with current actor', () => {
-    const { controller, academicsService } = createController();
-    academicsService.listPromotionReadiness.mockReturnValue([
+    const { controller, promotionReadinessService } = createController();
+    promotionReadinessService.listPromotionReadiness.mockReturnValue([
       { studentId: 's1' },
     ]);
-    academicsService.promoteStudent.mockReturnValue({ id: 'promotion-1' });
-    academicsService.batchPromote.mockReturnValue({ promoted: 1 });
+    promotionReadinessService.promoteStudent.mockReturnValue({
+      id: 'promotion-1',
+    });
+    promotionReadinessService.batchPromote.mockReturnValue({ promoted: 1 });
 
     expect(
       controller.listPromotions(
         actor,
         'year-1',
+        'term-1',
         'class-1',
         'section-1',
         'READY',
@@ -335,9 +342,8 @@ describe('AcademicsController M4 contracts', () => {
       controller.promoteStudent(
         {
           studentId: 'student-1',
-          fromAcademicYearId: 'year-1',
-          toAcademicYearId: 'year-2',
-          fromClassId: 'class-1',
+          academicYearId: 'year-1',
+          targetAcademicYearId: 'year-2',
           toClassId: 'class-2',
         } as never,
         actor,
@@ -345,17 +351,20 @@ describe('AcademicsController M4 contracts', () => {
     ).toEqual({ id: 'promotion-1' });
     expect(
       controller.batchPromote(
-        { promotions: [{ studentId: 'student-1' }] } as never,
+        { classMappings: [{ studentIds: ['student-1'] }] } as never,
         actor,
       ),
     ).toEqual({ promoted: 1 });
-    expect(academicsService.listPromotionReadiness).toHaveBeenCalledWith(
+    expect(promotionReadinessService.listPromotionReadiness).toHaveBeenCalledWith(
       actor,
       {
         academicYearId: 'year-1',
+        examTermId: 'term-1',
         classId: 'class-1',
         sectionId: 'section-1',
         status: 'READY',
+        page: undefined,
+        limit: undefined,
       },
     );
   });
