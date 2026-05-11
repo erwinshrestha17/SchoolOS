@@ -12,10 +12,13 @@ import {
   TimetableVersionStatus,
   Prisma,
 } from '@prisma/client';
+import { ConflictSlotInput, TimetableConflictService } from './timetable-conflict.service';
+import { TimetableLifecycleService } from './timetable-lifecycle.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AttendanceService } from '../attendance/attendance.service';
 import { CreateTimetableSlotDto } from './dto/create-timetable-slot.dto';
 import {
   AssignSubstitutionDto,
@@ -32,23 +35,14 @@ import {
   UpdateTimetablePeriodDto,
   UpdateVersionSlotDto,
   WorkloadQueryDto,
+  ListTeacherAvailabilityQueryDto,
+  ListTeacherWorkloadQueryDto,
+  ListSubjectWeeklyRequirementQueryDto,
+  UpsertTeacherWorkloadLimitDto,
+  CreateSubjectWeeklyRequirementDto,
+  UpdateSubjectWeeklyRequirementDto,
+  UpdateTeacherAvailabilityDto,
 } from './dto/timetable-setup.dto';
-
-export interface TimetableValidationIssue {
-  type: string;
-  message: string;
-  slotId?: string;
-  conflictingSlotId?: string;
-  classId?: string | null;
-  sectionId?: string | null;
-  subjectId?: string | null;
-  staffId?: string | null;
-  roomId?: string | null;
-  versionId?: string | null;
-  dayOfWeek?: number;
-  startsAt?: string;
-  endsAt?: string;
-}
 
 @Injectable()
 export class TimetableService {
@@ -56,6 +50,8 @@ export class TimetableService {
     private readonly prisma: PrismaService,
     private readonly communicationsService: CommunicationsService,
     private readonly auditService: AuditService,
+    private readonly lifecycleService: TimetableLifecycleService,
+    private readonly attendanceService: AttendanceService,
   ) {}
 
   async listTimetable(actor: AuthContext, classId?: string) {
@@ -422,26 +418,7 @@ export class TimetableService {
   }
 
   async validateVersion(id: string, actor: AuthContext) {
-    const version = await this.findVersionOrThrow(id, actor);
-    const errors: TimetableValidationIssue[] = [];
-    const warnings: TimetableValidationIssue[] = [];
-    for (const slot of version.slots) {
-      const validation = await this.validateCandidateSlot(
-        { ...slot, version },
-        actor,
-      );
-      errors.push(
-        ...validation.errors.filter(
-          (issue) => issue.conflictingSlotId !== slot.id,
-        ),
-      );
-      warnings.push(...validation.warnings);
-    }
-    return {
-      valid: errors.length === 0,
-      errors: dedupeIssues(errors),
-      warnings: dedupeIssues(warnings),
-    };
+    return this.lifecycleService.validateVersionForPublish(actor, id);
   }
 
   async publishVersion(id: string, actor: AuthContext) {
@@ -538,7 +515,30 @@ export class TimetableService {
     return updated;
   }
 
-  async listTeacherAvailability(teacherId: string, actor: AuthContext) {
+  async listTeacherAvailability(
+    actor: AuthContext,
+    query: ListTeacherAvailabilityQueryDto,
+  ) {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 50, 100);
+
+    return this.prisma.teacherAvailability.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        ...(query.staffId ? { staffId: query.staffId } : {}),
+        ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
+      },
+      include: {
+        staff: true,
+        tenant: true,
+      },
+      orderBy: [{ dayOfWeek: 'asc' }, { startsAt: 'asc' }],
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+  }
+
+  async getTeacherAvailability(teacherId: string, actor: AuthContext) {
     await this.ensureStaff(actor, teacherId);
     const [availability, limit] = await Promise.all([
       this.prisma.teacherAvailability.findMany({
@@ -559,7 +559,27 @@ export class TimetableService {
     actor: AuthContext,
   ) {
     await this.ensureStaff(actor, teacherId);
+    if (dto.academicYearId) {
+      await this.ensureAcademicYear(actor, dto.academicYearId);
+    }
     assertTimeRange(dto.startsAt, dto.endsAt);
+
+    // Prevent duplicate identical availability windows
+    const duplicate = await this.prisma.teacherAvailability.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        staffId: teacherId,
+        academicYearId: dto.academicYearId ?? null,
+        dayOfWeek: dto.dayOfWeek,
+        startsAt: dto.startsAt,
+        endsAt: dto.endsAt,
+        type: dto.type ?? TeacherAvailabilityType.AVAILABLE,
+      },
+    });
+    if (duplicate) {
+      throw new ConflictException('Identical availability window already exists');
+    }
+
     const availability = await this.prisma.teacherAvailability.create({
       data: {
         tenantId: actor.tenantId,
@@ -580,12 +600,12 @@ export class TimetableService {
       actor,
       availability,
     );
-    return this.listTeacherAvailability(teacherId, actor);
+    return availability;
   }
 
   async updateTeacherAvailability(
     id: string,
-    dto: TeacherAvailabilityDto,
+    dto: UpdateTeacherAvailabilityDto,
     actor: AuthContext,
   ) {
     const existing = await this.prisma.teacherAvailability.findFirst({
@@ -593,19 +613,31 @@ export class TimetableService {
     });
     if (!existing)
       throw new NotFoundException('Teacher availability not found');
-    assertTimeRange(dto.startsAt, dto.endsAt);
+
+    const startsAt = dto.startsAt ?? existing.startsAt;
+    const endsAt = dto.endsAt ?? existing.endsAt;
+    assertTimeRange(startsAt, endsAt);
+
+    if (dto.academicYearId) {
+      await this.ensureAcademicYear(actor, dto.academicYearId);
+    }
+
     const updated = await this.prisma.teacherAvailability.update({
       where: { id },
       data: {
         academicYearId: dto.academicYearId ?? existing.academicYearId,
-        dayOfWeek: dto.dayOfWeek,
-        startsAt: dto.startsAt,
-        endsAt: dto.endsAt,
+        dayOfWeek: dto.dayOfWeek ?? existing.dayOfWeek,
+        startsAt,
+        endsAt,
         type: dto.type ?? existing.type,
         note: dto.note ?? existing.note,
       },
     });
-    await this.upsertWorkloadLimit(existing.staffId, dto, actor);
+
+    if (dto instanceof TeacherAvailabilityDto) {
+      await this.upsertWorkloadLimit(existing.staffId, dto, actor);
+    }
+
     await this.audit('update', 'teacher_availability', id, actor, updated);
     return updated;
   }
@@ -618,6 +650,241 @@ export class TimetableService {
       throw new NotFoundException('Teacher availability not found');
     await this.prisma.teacherAvailability.delete({ where: { id } });
     await this.audit('delete', 'teacher_availability', id, actor, { id });
+    return { deleted: true, id };
+  }
+
+  async listTeacherWorkloadRules(
+    actor: AuthContext,
+    query: ListTeacherWorkloadQueryDto,
+  ) {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 50, 100);
+
+    return this.prisma.teacherWorkloadLimit.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
+      },
+      include: {
+        staff: true,
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+  }
+
+  async getTeacherWorkloadRule(
+    teacherId: string,
+    actor: AuthContext,
+    academicYearId?: string,
+  ) {
+    await this.ensureStaff(actor, teacherId);
+    return this.prisma.teacherWorkloadLimit.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        staffId: teacherId,
+        ...(academicYearId ? { academicYearId } : {}),
+      },
+    });
+  }
+
+  async upsertTeacherWorkloadRule(
+    teacherId: string,
+    dto: UpsertTeacherWorkloadLimitDto,
+    actor: AuthContext,
+  ) {
+    await this.ensureStaff(actor, teacherId);
+    if (dto.academicYearId) {
+      await this.ensureAcademicYear(actor, dto.academicYearId);
+    }
+
+    if (dto.maxPeriodsPerDay && dto.maxPeriodsPerDay <= 0) {
+      throw new ConflictException('maxPeriodsPerDay must be positive');
+    }
+    if (dto.maxPeriodsPerWeek && dto.maxPeriodsPerWeek <= 0) {
+      throw new ConflictException('maxPeriodsPerWeek must be positive');
+    }
+    if (
+      dto.maxPeriodsPerDay &&
+      dto.maxPeriodsPerWeek &&
+      dto.maxPeriodsPerWeek < dto.maxPeriodsPerDay
+    ) {
+      throw new ConflictException(
+        'maxPeriodsPerWeek should not be less than maxPeriodsPerDay',
+      );
+    }
+
+    const existing = await this.prisma.teacherWorkloadLimit.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        staffId: teacherId,
+        academicYearId: dto.academicYearId ?? null,
+      },
+    });
+
+    let rule;
+    if (existing) {
+      rule = await this.prisma.teacherWorkloadLimit.update({
+        where: { id: existing.id },
+        data: {
+          maxPeriodsPerDay: dto.maxPeriodsPerDay ?? existing.maxPeriodsPerDay,
+          maxPeriodsPerWeek: dto.maxPeriodsPerWeek ?? existing.maxPeriodsPerWeek,
+        },
+      });
+      await this.audit('update', 'teacher_workload_limit', rule.id, actor, rule);
+    } else {
+      rule = await this.prisma.teacherWorkloadLimit.create({
+        data: {
+          tenantId: actor.tenantId,
+          staffId: teacherId,
+          academicYearId: dto.academicYearId ?? null,
+          maxPeriodsPerDay: dto.maxPeriodsPerDay ?? null,
+          maxPeriodsPerWeek: dto.maxPeriodsPerWeek ?? null,
+        },
+      });
+      await this.audit('create', 'teacher_workload_limit', rule.id, actor, rule);
+    }
+    return rule;
+  }
+
+  async updateTeacherWorkloadRule(
+    id: string,
+    dto: UpsertTeacherWorkloadLimitDto,
+    actor: AuthContext,
+  ) {
+    const existing = await this.prisma.teacherWorkloadLimit.findFirst({
+      where: { id, tenantId: actor.tenantId },
+    });
+    if (!existing) throw new NotFoundException('Workload rule not found');
+
+    const updated = await this.prisma.teacherWorkloadLimit.update({
+      where: { id },
+      data: {
+        maxPeriodsPerDay: dto.maxPeriodsPerDay ?? existing.maxPeriodsPerDay,
+        maxPeriodsPerWeek: dto.maxPeriodsPerWeek ?? existing.maxPeriodsPerWeek,
+      },
+    });
+    await this.audit('update', 'teacher_workload_limit', id, actor, updated);
+    return updated;
+  }
+
+  async listSubjectWeeklyRequirements(
+    actor: AuthContext,
+    query: ListSubjectWeeklyRequirementQueryDto,
+  ) {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 50, 100);
+
+    return this.prisma.subjectWeeklyRequirement.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
+        ...(query.classId ? { classId: query.classId } : {}),
+        ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+        ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+      },
+      include: {
+        academicYear: true,
+        class: true,
+        section: true,
+        subject: true,
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+  }
+
+  async createSubjectWeeklyRequirement(
+    dto: CreateSubjectWeeklyRequirementDto,
+    actor: AuthContext,
+  ) {
+    await this.ensureAcademicYear(actor, dto.academicYearId);
+    await this.ensureClass(actor, dto.classId);
+    if (dto.sectionId) {
+      await this.ensureSection(actor, dto.classId, dto.sectionId);
+    }
+    await this.ensureSubject(actor, dto.subjectId);
+
+    if (dto.requiredPeriodsPerWeek <= 0) {
+      throw new ConflictException('requiredPeriodsPerWeek must be positive');
+    }
+
+    const duplicate = await this.prisma.subjectWeeklyRequirement.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        academicYearId: dto.academicYearId,
+        classId: dto.classId,
+        sectionId: dto.sectionId ?? null,
+        subjectId: dto.subjectId,
+      },
+    });
+    if (duplicate) {
+      throw new ConflictException('Subject weekly requirement already exists');
+    }
+
+    const requirement = await this.prisma.subjectWeeklyRequirement.create({
+      data: {
+        tenantId: actor.tenantId,
+        academicYearId: dto.academicYearId,
+        classId: dto.classId,
+        sectionId: dto.sectionId ?? null,
+        subjectId: dto.subjectId,
+        requiredPeriodsPerWeek: dto.requiredPeriodsPerWeek,
+      },
+    });
+    await this.audit(
+      'create',
+      'subject_weekly_requirement',
+      requirement.id,
+      actor,
+      requirement,
+    );
+    return requirement;
+  }
+
+  async updateSubjectWeeklyRequirement(
+    id: string,
+    dto: UpdateSubjectWeeklyRequirementDto,
+    actor: AuthContext,
+  ) {
+    const existing = await this.prisma.subjectWeeklyRequirement.findFirst({
+      where: { id, tenantId: actor.tenantId },
+    });
+    if (!existing)
+      throw new NotFoundException('Subject weekly requirement not found');
+
+    if (
+      dto.requiredPeriodsPerWeek !== undefined &&
+      dto.requiredPeriodsPerWeek <= 0
+    ) {
+      throw new ConflictException('requiredPeriodsPerWeek must be positive');
+    }
+
+    const updated = await this.prisma.subjectWeeklyRequirement.update({
+      where: { id },
+      data: {
+        requiredPeriodsPerWeek:
+          dto.requiredPeriodsPerWeek ?? existing.requiredPeriodsPerWeek,
+      },
+    });
+    await this.audit(
+      'update',
+      'subject_weekly_requirement',
+      id,
+      actor,
+      updated,
+    );
+    return updated;
+  }
+
+  async deleteSubjectWeeklyRequirement(id: string, actor: AuthContext) {
+    const existing = await this.prisma.subjectWeeklyRequirement.findFirst({
+      where: { id, tenantId: actor.tenantId },
+    });
+    if (!existing)
+      throw new NotFoundException('Subject weekly requirement not found');
+    await this.prisma.subjectWeeklyRequirement.delete({ where: { id } });
+    await this.audit('delete', 'subject_weekly_requirement', id, actor, { id });
     return { deleted: true, id };
   }
 
@@ -740,33 +1007,79 @@ export class TimetableService {
   }
 
   async createSubstitution(dto: CreateSubstitutionDto, actor: AuthContext) {
+    const date = stripTime(parseDate(dto.date, 'date'));
     const slot = await this.findSlotOrThrow(dto.timetableSlotId, actor);
-    if (!slot.version || slot.version.status === TimetableVersionStatus.DRAFT) {
+
+    // 1. Validation: Slot version status
+    if (
+      !slot.version ||
+      ![TimetableVersionStatus.PUBLISHED, TimetableVersionStatus.LOCKED].includes(
+        slot.version.status,
+      )
+    ) {
       throw new ConflictException(
-        'Affected slot must belong to a published or locked timetable',
+        'Substitutions can only be created for PUBLISHED or LOCKED timetable versions',
       );
     }
+
+    // 2. Validation: Date matches day of week
+    if (date.getDay() !== slot.dayOfWeek) {
+      throw new ConflictException(
+        `Substitution date ${dto.date} does not fall on the slot's day of week (${slot.dayOfWeek})`,
+      );
+    }
+
+    // 3. Validation: Absent teacher check
     await this.ensureStaff(actor, dto.absentTeacherId);
     if (slot.staffId !== dto.absentTeacherId) {
       throw new ConflictException(
-        'Absent teacher must match the affected slot teacher',
+        'Absent teacher must match the original teacher assigned to this slot',
       );
     }
+
+    // 4. Validation: No duplicate active substitutions
+    const existing = await this.prisma.timetableSubstitution.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        timetableSlotId: dto.timetableSlotId,
+        date,
+        status: {
+          in: [
+            TimetableSubstitutionStatus.DRAFT,
+            TimetableSubstitutionStatus.ASSIGNED,
+          ],
+        },
+      },
+    });
+    if (existing) {
+      throw new ConflictException(
+        'An active substitution already exists for this slot and date',
+      );
+    }
+
+    // 5. Validation: Absence/Leave check (Warning/Context)
+    const absenceContext = await this.getTeacherAbsenceContext(
+      actor,
+      dto.absentTeacherId,
+      date,
+    );
+
     if (dto.substituteTeacherId) {
       await this.ensureSubstituteAllowed(
         slot,
         dto.substituteTeacherId,
-        parseDate(dto.date, 'date'),
+        date,
         actor,
       );
     }
+
     const substitution = await this.prisma.timetableSubstitution.create({
       data: {
         tenantId: actor.tenantId,
         timetableSlotId: dto.timetableSlotId,
         absentTeacherId: dto.absentTeacherId,
         substituteTeacherId: dto.substituteTeacherId ?? null,
-        date: parseDate(dto.date, 'date'),
+        date,
         reason: dto.reason,
         status: dto.substituteTeacherId
           ? TimetableSubstitutionStatus.ASSIGNED
@@ -777,13 +1090,18 @@ export class TimetableService {
       },
       include: substitutionInclude(),
     });
+
     await this.audit(
       'create',
       'timetable_substitution',
       substitution.id,
       actor,
-      substitution,
+      {
+        ...substitution,
+        absenceContext,
+      },
     );
+
     if (substitution.status === TimetableSubstitutionStatus.ASSIGNED) {
       await this.notifySubstitution(
         substitution.id,
@@ -791,6 +1109,7 @@ export class TimetableService {
         actor,
       );
     }
+
     return substitution;
   }
 
@@ -800,9 +1119,13 @@ export class TimetableService {
     actor: AuthContext,
   ) {
     const substitution = await this.findSubstitutionOrThrow(id, actor);
+
     if (substitution.status !== TimetableSubstitutionStatus.DRAFT) {
-      throw new ConflictException('Only draft substitutions can be edited');
+      throw new ConflictException(
+        'Only DRAFT substitutions can be modified. Use the assign endpoint for assignment updates.',
+      );
     }
+
     if (dto.substituteTeacherId) {
       await this.ensureSubstituteAllowed(
         substitution.timetableSlot,
@@ -811,16 +1134,28 @@ export class TimetableService {
         actor,
       );
     }
+
     const updated = await this.prisma.timetableSubstitution.update({
       where: { id },
       data: {
         substituteTeacherId:
           dto.substituteTeacherId ?? substitution.substituteTeacherId,
         reason: dto.reason ?? substitution.reason,
+        status: dto.substituteTeacherId
+          ? TimetableSubstitutionStatus.ASSIGNED
+          : TimetableSubstitutionStatus.DRAFT,
+        assignedAt: dto.substituteTeacherId ? new Date() : null,
+        approvedById: dto.substituteTeacherId ? actor.userId : null,
       },
       include: substitutionInclude(),
     });
+
     await this.audit('update', 'timetable_substitution', id, actor, updated);
+
+    if (updated.status === TimetableSubstitutionStatus.ASSIGNED) {
+      await this.notifySubstitution(id, 'substitution_assigned', actor);
+    }
+
     return updated;
   }
 
@@ -830,12 +1165,23 @@ export class TimetableService {
     actor: AuthContext,
   ) {
     const substitution = await this.findSubstitutionOrThrow(id, actor);
+
+    if (
+      substitution.status === TimetableSubstitutionStatus.CANCELLED ||
+      substitution.status === TimetableSubstitutionStatus.COMPLETED
+    ) {
+      throw new ConflictException(
+        `Cannot assign a substitution that is already ${substitution.status}`,
+      );
+    }
+
     await this.ensureSubstituteAllowed(
       substitution.timetableSlot,
       dto.substituteTeacherId,
       substitution.date,
       actor,
     );
+
     const updated = await this.prisma.timetableSubstitution.update({
       where: { id },
       data: {
@@ -846,12 +1192,22 @@ export class TimetableService {
       },
       include: substitutionInclude(),
     });
+
     await this.audit('assign', 'timetable_substitution', id, actor, updated);
     await this.notifySubstitution(id, 'substitution_assigned', actor);
+
     return updated;
   }
 
   async cancelSubstitution(id: string, actor: AuthContext) {
+    const substitution = await this.findSubstitutionOrThrow(id, actor);
+    if (substitution.status === TimetableSubstitutionStatus.COMPLETED) {
+      throw new ConflictException('Cannot cancel a completed substitution');
+    }
+    if (substitution.status === TimetableSubstitutionStatus.CANCELLED) {
+      return substitution;
+    }
+
     const updated = await this.prisma.timetableSubstitution.update({
       where: { id },
       data: {
@@ -866,6 +1222,13 @@ export class TimetableService {
   }
 
   async completeSubstitution(id: string, actor: AuthContext) {
+    const substitution = await this.findSubstitutionOrThrow(id, actor);
+    if (substitution.status !== TimetableSubstitutionStatus.ASSIGNED) {
+      throw new ConflictException(
+        'Only ASSIGNED substitutions can be marked as COMPLETED',
+      );
+    }
+
     const updated = await this.prisma.timetableSubstitution.update({
       where: { id },
       data: {
@@ -879,195 +1242,38 @@ export class TimetableService {
   }
 
   private async validateCandidateSlot(
-    candidate: {
-      id: string;
-      tenantId: string;
-      versionId: string | null;
-      academicYearId: string;
-      classId: string;
-      sectionId: string | null;
-      subjectId: string;
-      staffId: string;
-      roomId: string | null;
-      dayOfWeek: number;
-      startsAt: string;
-      endsAt: string;
-      version?: {
-        id: string;
-        status: TimetableVersionStatus;
-        effectiveFrom: Date;
-        effectiveTo: Date | null;
-      } | null;
-    },
+    candidate: ConflictSlotInput,
     actor: AuthContext,
   ) {
-    const errors: TimetableValidationIssue[] = [];
-    const warnings: TimetableValidationIssue[] = [];
-    const existingSlots = await this.prisma.timetableSlot.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        academicYearId: candidate.academicYearId,
-        dayOfWeek: candidate.dayOfWeek,
-        id: { not: candidate.id === 'candidate' ? undefined : candidate.id },
-        OR: [
-          { versionId: candidate.versionId },
-          {
-            version: {
-              status: {
-                in: [
-                  TimetableVersionStatus.PUBLISHED,
-                  TimetableVersionStatus.LOCKED,
-                ],
-              },
-            },
-          },
-        ],
-      },
-      include: timetableSlotInclude(),
-    });
-
-    for (const slot of existingSlots) {
-      if (
-        !timesOverlap(
-          candidate.startsAt,
-          candidate.endsAt,
-          slot.startsAt,
-          slot.endsAt,
-        )
-      ) {
-        continue;
-      }
-      if (!versionsOverlap(candidate.version ?? null, slot.version ?? null)) {
-        continue;
-      }
-      if (candidate.staffId === slot.staffId) {
-        errors.push(conflictIssue('TEACHER_CONFLICT', candidate, slot));
-      }
-      if (candidate.roomId && candidate.roomId === slot.roomId) {
-        errors.push(conflictIssue('ROOM_CONFLICT', candidate, slot));
-      }
-      if (
-        candidate.classId === slot.classId &&
-        sectionsConflict(candidate.sectionId, slot.sectionId)
-      ) {
-        errors.push(conflictIssue('CLASS_PERIOD_CONFLICT', candidate, slot));
-      }
-    }
-
-    errors.push(...(await this.validateTeacherAvailability(candidate, actor)));
-    errors.push(...(await this.validateTeacherWorkload(candidate, actor)));
-    return {
-      valid: errors.length === 0,
-      errors: dedupeIssues(errors),
-      warnings,
-    };
+    return this.lifecycleService.validateCandidateSlot(actor, candidate);
   }
 
-  private async validateTeacherAvailability(
-    slot: {
-      staffId: string;
-      academicYearId: string;
-      dayOfWeek: number;
-      startsAt: string;
-      endsAt: string;
-    },
-    actor: AuthContext,
-  ) {
-    const availability = await this.prisma.teacherAvailability.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        staffId: slot.staffId,
-        dayOfWeek: slot.dayOfWeek,
-        OR: [{ academicYearId: null }, { academicYearId: slot.academicYearId }],
-      },
+  private async ensureClass(actor: AuthContext, classId: string) {
+    const record = await this.prisma.class.findFirst({
+      where: { id: classId, tenantId: actor.tenantId },
     });
-    const errors: TimetableValidationIssue[] = [];
-    const availableBlocks = availability.filter(
-      (block) => block.type === TeacherAvailabilityType.AVAILABLE,
-    );
-    const unavailableBlocks = availability.filter(
-      (block) => block.type === TeacherAvailabilityType.UNAVAILABLE,
-    );
-    if (
-      availableBlocks.length > 0 &&
-      !availableBlocks.some(
-        (block) =>
-          block.startsAt <= slot.startsAt && block.endsAt >= slot.endsAt,
-      )
-    ) {
-      errors.push({
-        type: 'TEACHER_AVAILABILITY_CONFLICT',
-        message: 'Teacher is outside available teaching hours for this slot',
-        staffId: slot.staffId,
-        dayOfWeek: slot.dayOfWeek,
-        startsAt: slot.startsAt,
-        endsAt: slot.endsAt,
-      });
-    }
-    if (
-      unavailableBlocks.some((block) =>
-        timesOverlap(slot.startsAt, slot.endsAt, block.startsAt, block.endsAt),
-      )
-    ) {
-      errors.push({
-        type: 'TEACHER_UNAVAILABLE',
-        message: 'Teacher has an unavailable block at this time',
-        staffId: slot.staffId,
-        dayOfWeek: slot.dayOfWeek,
-        startsAt: slot.startsAt,
-        endsAt: slot.endsAt,
-      });
-    }
-    return errors;
+    if (!record) throw new NotFoundException('Class not found');
+    return record;
   }
 
-  private async validateTeacherWorkload(
-    slot: {
-      id: string;
-      staffId: string;
-      academicYearId: string;
-      dayOfWeek: number;
-    },
+  private async ensureSection(
     actor: AuthContext,
+    classId: string,
+    sectionId: string,
   ) {
-    const limit = await this.prisma.teacherWorkloadLimit.findFirst({
-      where: {
-        tenantId: actor.tenantId,
-        staffId: slot.staffId,
-        OR: [{ academicYearId: null }, { academicYearId: slot.academicYearId }],
-      },
-      orderBy: [{ academicYearId: 'desc' }],
+    const record = await this.prisma.section.findFirst({
+      where: { id: sectionId, classId, tenantId: actor.tenantId },
     });
-    if (!limit) return [];
-    const slots = await this.prisma.timetableSlot.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        staffId: slot.staffId,
-        academicYearId: slot.academicYearId,
-        id: { not: slot.id === 'candidate' ? undefined : slot.id },
-      },
-      select: { dayOfWeek: true },
+    if (!record) throw new NotFoundException('Section not found in class');
+    return record;
+  }
+
+  private async ensureSubject(actor: AuthContext, subjectId: string) {
+    const record = await this.prisma.subject.findFirst({
+      where: { id: subjectId, tenantId: actor.tenantId },
     });
-    const weekly = slots.length + 1;
-    const daily =
-      slots.filter((item) => item.dayOfWeek === slot.dayOfWeek).length + 1;
-    const errors: TimetableValidationIssue[] = [];
-    if (limit.maxPeriodsPerWeek !== null && weekly > limit.maxPeriodsPerWeek) {
-      errors.push({
-        type: 'TEACHER_WORKLOAD_WEEKLY_LIMIT',
-        message: 'Teacher weekly workload limit would be exceeded',
-        staffId: slot.staffId,
-      });
-    }
-    if (limit.maxPeriodsPerDay !== null && daily > limit.maxPeriodsPerDay) {
-      errors.push({
-        type: 'TEACHER_WORKLOAD_DAILY_LIMIT',
-        message: 'Teacher daily workload limit would be exceeded',
-        staffId: slot.staffId,
-        dayOfWeek: slot.dayOfWeek,
-      });
-    }
-    return errors;
+    if (!record) throw new NotFoundException('Subject not found');
+    return record;
   }
 
   private async ensureNoPublishedOverlap(
@@ -1106,12 +1312,29 @@ export class TimetableService {
     date: Date,
     actor: AuthContext,
   ) {
+    const targetDate = stripTime(date);
     await this.ensureStaff(actor, substituteTeacherId);
     if (substituteTeacherId === slot.staffId) {
       throw new ConflictException(
         'Substitute teacher cannot be the absent teacher',
       );
     }
+
+    // Check for leave/absence of the substitute teacher
+    const absenceContext = await this.getTeacherAbsenceContext(
+      actor,
+      substituteTeacherId,
+      targetDate,
+    );
+    if (absenceContext.isAbsent) {
+      throw new ConflictException(
+        `Substitute teacher is unavailable on ${date.toDateString()} due to ${
+          absenceContext.leaveType ? 'leave' : 'absence'
+        }`,
+      );
+    }
+
+    // Check for timetable conflicts (double booking, unavailability)
     const validation = await this.validateCandidateSlot(
       {
         id: `substitution:${slot.id}`,
@@ -1130,6 +1353,8 @@ export class TimetableService {
       },
       actor,
     );
+
+    // Check for existing assigned substitutions for this substitute teacher at the same time
     const sameTimeSubstitution =
       await this.prisma.timetableSubstitution.findFirst({
         where: {
@@ -1144,10 +1369,29 @@ export class TimetableService {
           },
         },
       });
+
     if (!validation.valid || sameTimeSubstitution) {
       throw new ConflictException(
-        validation.errors[0]?.message ?? 'Substitute teacher has a conflict',
+        validation.errors[0]?.message ??
+          'Substitute teacher has a conflicting timetable assignment or substitution',
       );
+    }
+  }
+
+  private async getTeacherAbsenceContext(
+    actor: AuthContext,
+    teacherId: string,
+    date: Date,
+  ) {
+    try {
+      return await this.attendanceService.getTeacherAbsenceContext(
+        actor.tenantId,
+        teacherId,
+        date,
+      );
+    } catch (error) {
+      // Fallback if attendance service fails or has issues
+      return { isAbsent: false, attendanceStatus: null, leaveType: null };
     }
   }
 
@@ -1398,6 +1642,12 @@ export class TimetableService {
   }
 }
 
+export function stripTime(date: Date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 export function timesOverlap(
   startA: string,
   endA: string,
@@ -1449,59 +1699,6 @@ function dateRangesOverlap(
   const aEnd = a.effectiveTo ?? new Date('9999-12-31T00:00:00.000Z');
   const bEnd = b.effectiveTo ?? new Date('9999-12-31T00:00:00.000Z');
   return a.effectiveFrom <= bEnd && b.effectiveFrom <= aEnd;
-}
-
-function conflictIssue(
-  type: string,
-  candidate: {
-    id: string;
-    classId: string | null;
-    sectionId: string | null;
-    subjectId: string | null;
-    staffId: string | null;
-    roomId: string | null;
-    versionId: string | null;
-    dayOfWeek: number;
-    startsAt: string;
-    endsAt: string;
-  },
-  slot: {
-    id: string;
-    classId: string | null;
-    sectionId: string | null;
-    subjectId: string | null;
-    staffId: string | null;
-    roomId: string | null;
-    versionId: string | null;
-    startsAt: string;
-    endsAt: string;
-  },
-): TimetableValidationIssue {
-  return {
-    type,
-    message: `${type.replaceAll('_', ' ').toLowerCase()} with ${slot.startsAt}-${slot.endsAt}`,
-    slotId: candidate.id,
-    conflictingSlotId: slot.id,
-    classId: slot.classId,
-    sectionId: slot.sectionId,
-    subjectId: slot.subjectId,
-    staffId: slot.staffId,
-    roomId: slot.roomId,
-    versionId: slot.versionId,
-    dayOfWeek: candidate.dayOfWeek,
-    startsAt: candidate.startsAt,
-    endsAt: candidate.endsAt,
-  };
-}
-
-function dedupeIssues(issues: TimetableValidationIssue[]) {
-  const seen = new Set<string>();
-  return issues.filter((issue) => {
-    const key = `${issue.type}:${issue.slotId}:${issue.conflictingSlotId}:${issue.staffId}:${issue.roomId}:${issue.dayOfWeek}:${issue.startsAt}:${issue.endsAt}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
 }
 
 function timetableSlotInclude() {

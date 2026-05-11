@@ -1853,16 +1853,14 @@ export class AttendanceService {
               data: {
                 leaveType: reviewed.leaveType,
                 note: `Approved leave request ${reviewed.id}`,
-                approvedById: actor.userId,
               },
             });
-            continue;
+          } else {
+            overlapAnomalies.push({
+              date: attendanceDay.toISOString().split('T')[0],
+              existingStatus: existingAttendance.status,
+            });
           }
-
-          overlapAnomalies.push({
-            date: attendanceDay.toISOString(),
-            existingStatus: existingAttendance.status,
-          });
         }
       }
 
@@ -1898,6 +1896,44 @@ export class AttendanceService {
     return {
       ...updated.reviewed,
       overlapAnomalies: updated.overlapAnomalies,
+    };
+  }
+
+  /**
+   * Helper for Timetable substitution to check if a teacher is absent or on leave
+   */
+  async getTeacherAbsenceContext(
+    tenantId: string,
+    staffId: string,
+    date: Date,
+  ) {
+    const targetDate = stripTime(date);
+
+    const [attendance, leave] = await Promise.all([
+      this.prisma.staffAttendance.findUnique({
+        where: {
+          tenantId_staffId_attendanceDate: {
+            tenantId,
+            staffId,
+            attendanceDate: targetDate,
+          },
+        },
+      }),
+      this.prisma.staffLeaveRequest.findFirst({
+        where: {
+          tenantId,
+          staffId,
+          status: 'APPROVED',
+          startsOn: { lte: targetDate },
+          endsOn: { gte: targetDate },
+        },
+      }),
+    ]);
+
+    return {
+      isAbsent: attendance?.status === 'ABSENT' || !!leave,
+      attendanceStatus: attendance?.status ?? null,
+      leaveType: leave?.leaveType ?? null,
     };
   }
 
