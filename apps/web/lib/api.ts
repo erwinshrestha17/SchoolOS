@@ -1183,6 +1183,39 @@ export const api = {
       method: 'POST',
       json: {},
     }),
+  createOpeningBalance: (body: JsonBody) =>
+    request<any>('/accounting/opening-balance', { method: 'POST', json: body }),
+  getOpeningBalance: (fiscalYearId: string) =>
+    request<any>(`/accounting/opening-balance/${fiscalYearId}`),
+  createExpenseVoucher: (body: JsonBody) =>
+    request<any>('/accounting/vouchers/expense', { method: 'POST', json: body }),
+  createPaymentVoucher: (body: JsonBody) =>
+    request<any>('/accounting/vouchers/payment', { method: 'POST', json: body }),
+  createReceiptVoucher: (body: JsonBody) =>
+    request<any>('/accounting/vouchers/receipt', { method: 'POST', json: body }),
+  createContraVoucher: (body: JsonBody) =>
+    request<any>('/accounting/vouchers/contra', { method: 'POST', json: body }),
+  closeFiscalYear: (id: string) =>
+    request<any>(`/accounting/fiscal-years/${id}/close`, { method: 'POST' }),
+  reopenFiscalYear: (id: string, body: JsonBody) =>
+    request<any>(`/accounting/fiscal-years/${id}/reopen`, {
+      method: 'POST',
+      json: body,
+    }),
+  importBankStatement: (accountId: string, lines: any[]) =>
+    request<any>(`/accounting/bank-reconciliation/accounts/${accountId}/import`, {
+      method: 'POST',
+      json: { lines },
+    }),
+  getUnreconciledStatements: (accountId: string) =>
+    request<any[]>(`/accounting/bank-reconciliation/accounts/${accountId}/unreconciled`),
+  reconcileStatement: (statementId: string, journalLineId: string) =>
+    request<any>(`/accounting/bank-reconciliation/statements/${statementId}/reconcile`, {
+      method: 'POST',
+      json: { journalLineId },
+    }),
+  getReconciliationSummary: (accountId: string) =>
+    request<any>(`/accounting/bank-reconciliation/accounts/${accountId}/summary`),
   listConversations: () =>
     request<ConversationSummary[]>('/messaging/conversations'),
   createConversation: (body: JsonBody) =>

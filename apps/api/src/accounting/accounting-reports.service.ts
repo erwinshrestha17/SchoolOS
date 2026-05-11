@@ -28,11 +28,7 @@ import {
   TaxSummaryType,
 } from './dto/tax-summary-query.dto';
 import { UpdateAccountingReportMappingsDto } from './dto/report-account-mapping.dto';
-import {
-  ChartAccountType,
-  JournalLineSide,
-  Prisma,
-} from '@prisma/client';
+import { ChartAccountType, JournalLineSide, Prisma } from '@prisma/client';
 
 const cashBookLineInclude = Prisma.validator<Prisma.JournalLineInclude>()({
   chartAccount: {
@@ -132,8 +128,8 @@ export class AccountingReportsService {
     });
 
     const rows: TrialBalanceRow[] = [];
-    let totalOpeningDebit = new Prisma.Decimal(0);
-    let totalOpeningCredit = new Prisma.Decimal(0);
+    const totalOpeningDebit = new Prisma.Decimal(0);
+    const totalOpeningCredit = new Prisma.Decimal(0);
     let totalPeriodDebit = new Prisma.Decimal(0);
     let totalPeriodCredit = new Prisma.Decimal(0);
     let totalClosingDebit = new Prisma.Decimal(0);
@@ -588,7 +584,7 @@ export class AccountingReportsService {
       });
 
     let targetAccounts: Array<{ id: string; code: string; name: string }> = [];
-    let setupWarnings: string[] = [];
+    const setupWarnings: string[] = [];
 
     if (accountId || accountCode) {
       const account = await this.prisma.chartAccount.findFirst({

@@ -141,14 +141,18 @@ describe('accounting reversals', () => {
 describe('AccountingService Immutability', () => {
   it('blocks direct updates to journal entries', () => {
     const { service } = buildService({});
-    expect(() => service.updateJournalEntry()).toThrow(
+    expect(() => {
+      service.updateJournalEntry();
+    }).toThrow(
       'Journal entries are immutable. Use correction or reversal workflows.',
     );
   });
 
   it('blocks direct deletions of journal entries', () => {
     const { service } = buildService({});
-    expect(() => service.deleteJournalEntry()).toThrow(
+    expect(() => {
+      service.deleteJournalEntry();
+    }).toThrow(
       'Journal entries are immutable and cannot be deleted once posted.',
     );
   });

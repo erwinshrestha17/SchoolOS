@@ -1,8 +1,10 @@
-'use client';
-
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Landmark, RefreshCcw, FileText, BarChart3, PieChart, History, Wallet } from 'lucide-react';
 import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { 
+  Download, Landmark, RefreshCcw, FileText, BarChart3, 
+  PieChart, History, Wallet, Plus, ArrowLeftRight, 
+  Target, Calculator, Lock, Unlock 
+} from 'lucide-react';
 import { api } from '../../lib/api';
 import { SectionCard } from '../ui/section-card';
 import { StatCard } from '../ui/stat-card';
@@ -11,6 +13,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { ReportFilters } from './report-filters';
 import { ReportTable } from './report-table';
 import { FiscalPeriodActions } from './fiscal-period-actions';
+import { VoucherDialog } from './voucher-dialog';
+import { OpeningBalanceDialog } from './opening-balance-dialog';
+import { BankReconciliationWorkspace } from './bank-reconciliation-workspace';
+import { FiscalYearCloseDialog } from './fiscal-year-close-dialog';
 
 type ReportType = 'trial-balance' | 'income-statement' | 'balance-sheet' | 'general-ledger' | 'cash-book';
 
@@ -23,6 +29,12 @@ export function AccountingWorkspace() {
     fiscalYearId?: string;
     fiscalPeriodId?: string;
   }>({});
+
+  const [voucherOpen, setVoucherOpen] = useState(false);
+  const [openingBalOpen, setOpeningBalOpen] = useState(false);
+  const [fyCloseOpen, setFyCloseOpen] = useState(false);
+  const [fyMode, setFyMode] = useState<'CLOSE' | 'REOPEN'>('CLOSE');
+  const [selectedFy, setSelectedFy] = useState<any>(null);
 
   const accountsQuery = useQuery({ queryKey: ['chart-accounts'], queryFn: api.listChartAccounts });
   const fiscalYearsQuery = useQuery({ queryKey: ['fiscal-years'], queryFn: api.listFiscalYears });
@@ -162,9 +174,34 @@ export function AccountingWorkspace() {
 
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={() => setVoucherOpen(true)}
+          className="inline-flex items-center gap-2 rounded-2xl bg-primary-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-primary-600/20 hover:bg-primary-700 transition-all"
+        >
+          <Plus size={18} />
+          Voucher Entry
+        </button>
+        <button
+          onClick={() => {
+            const openFy = (fiscalYearsQuery.data ?? []).find(y => y.status === 'OPEN');
+            if (openFy) {
+              setSelectedFy(openFy);
+              setOpeningBalOpen(true);
+            } else {
+              alert('No open fiscal year found to record opening balance.');
+            }
+          }}
+          className="inline-flex items-center gap-2 rounded-2xl bg-white border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all"
+        >
+          <Target size={18} />
+          Opening Balance
+        </button>
+      </div>
+
       <Tabs defaultValue="reports" className="space-y-5">
         <TabsList className="flex flex-wrap h-auto gap-2 border-b border-slate-200 bg-transparent rounded-none p-0 pb-px w-full justify-start">
-          {(['accounts', 'journals', 'periods', 'reports'] as const).map((item) => (
+          {(['reports', 'reconciliation', 'journals', 'accounts', 'management'] as const).map((item) => (
             <TabsTrigger
               key={item}
               value={item}
@@ -174,103 +211,6 @@ export function AccountingWorkspace() {
             </TabsTrigger>
           ))}
         </TabsList>
-
-        <TabsContent value="accounts" className="mt-0">
-          <SectionCard
-            title="Chart of Accounts"
-            description="Manage your school's financial account structure and system defaults."
-            headerAction={
-              <button
-                type="button"
-                onClick={() => seedMutation.mutate()}
-                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
-              >
-                <Landmark size={16} />
-                Seed defaults
-              </button>
-            }
-          >
-            <ReportTable
-              headers={['Code', 'Name', 'Group', 'Kind']}
-              rows={(accountsQuery.data ?? []).map((account) => ({
-                id: account.id,
-                cells: [
-                  { value: account.code, bold: true },
-                  { value: account.name },
-                  { value: account.type },
-                  { value: account.isSystem ? 'System' : 'Custom' }
-                ],
-              }))}
-            />
-          </SectionCard>
-        </TabsContent>
-
-        <TabsContent value="journals" className="mt-0">
-          <SectionCard
-            title="All Journal Entries"
-            description="Complete list of all financial postings in chronological order."
-          >
-            <ReportTable
-              headers={['Date', 'Number', 'Narration', 'Module', 'Type', 'Amount']}
-              rows={(reportQuery.data as any[] ?? []).map((entry) => ({
-                id: entry.id,
-                cells: [
-                  { value: entry.entryDate, type: 'date' },
-                  { value: entry.entryNumber, bold: true },
-                  { value: entry.narration },
-                  { value: entry.sourceModule },
-                  { value: entry.postingType },
-                  { value: entry.lines?.[0]?.amount ?? 0, type: 'currency' }
-                ],
-              }))}
-            />
-          </SectionCard>
-        </TabsContent>
-
-        <TabsContent value="periods" className="mt-0">
-          <SectionCard
-            title="Fiscal Years & Periods"
-            description="Manage accounting periods and fiscal year status for financial reporting."
-          >
-            <div className="grid gap-4">
-              {(fiscalYearsQuery.data ?? []).map((year) => (
-                <div key={year.id} className="rounded-[2rem] border border-slate-100 bg-slate-50/50 p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-slate-900">{year.name}</p>
-                      <p className="text-sm text-slate-500">
-                        {new Date(year.startDate).toLocaleDateString()} - {new Date(year.endDate).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <span className={cn(
-                      "rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider",
-                      year.status === 'OPEN' ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
-                    )}>
-                      {year.status}
-                    </span>
-                  </div>
-                  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                    {(year.periods ?? []).map((period: any) => (
-                      <div key={period.id} className="flex flex-col gap-1 rounded-2xl bg-white border border-slate-100 p-3 shadow-sm">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{period.label}</span>
-                          <span className={cn(
-                            "h-2 w-2 rounded-full",
-                            period.status === 'OPEN' ? "bg-emerald-500" : period.status === 'LOCKED' ? "bg-amber-500" : "bg-slate-400"
-                          )} />
-                        </div>
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="text-xs font-bold text-slate-700">{period.status}</span>
-                          <FiscalPeriodActions periodId={period.id} status={period.status} label={period.label} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-        </TabsContent>
 
         <TabsContent value="reports" className="mt-0">
           <div className="space-y-4">
@@ -317,7 +257,157 @@ export function AccountingWorkspace() {
             </SectionCard>
           </div>
         </TabsContent>
+
+        <TabsContent value="reconciliation" className="mt-0">
+          <BankReconciliationWorkspace />
+        </TabsContent>
+
+        <TabsContent value="journals" className="mt-0">
+          <SectionCard
+            title="All Journal Entries"
+            description="Complete list of all financial postings in chronological order."
+          >
+            <ReportTable
+              headers={['Date', 'Number', 'Narration', 'Module', 'Type', 'Amount']}
+              rows={(reportQuery.data as any[] ?? []).map((entry) => ({
+                id: entry.id,
+                cells: [
+                  { value: entry.entryDate, type: 'date' },
+                  { value: entry.entryNumber, bold: true },
+                  { value: entry.narration },
+                  { value: entry.sourceModule },
+                  { value: entry.postingType },
+                  { value: entry.lines?.[0]?.amount ?? 0, type: 'currency' }
+                ],
+              }))}
+            />
+          </SectionCard>
+        </TabsContent>
+
+        <TabsContent value="accounts" className="mt-0">
+          <SectionCard
+            title="Chart of Accounts"
+            description="Manage your school's financial account structure and system defaults."
+            headerAction={
+              <button
+                type="button"
+                onClick={() => seedMutation.mutate()}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+              >
+                <Landmark size={16} />
+                Seed defaults
+              </button>
+            }
+          >
+            <ReportTable
+              headers={['Code', 'Name', 'Group', 'Kind']}
+              rows={(accountsQuery.data ?? []).map((account) => ({
+                id: account.id,
+                cells: [
+                  { value: account.code, bold: true },
+                  { value: account.name },
+                  { value: account.type },
+                  { value: account.isSystem ? 'System' : 'Custom' }
+                ],
+              }))}
+            />
+          </SectionCard>
+        </TabsContent>
+
+        <TabsContent value="management" className="mt-0">
+          <div className="grid gap-6">
+            <SectionCard
+              title="Fiscal Years & Periods"
+              description="Manage accounting periods and fiscal year status for financial reporting."
+            >
+              <div className="grid gap-4">
+                {(fiscalYearsQuery.data ?? []).map((year) => (
+                  <div key={year.id} className="rounded-[2rem] border border-slate-100 bg-slate-50/50 p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-bold text-slate-900">{year.name}</p>
+                        <p className="text-sm text-slate-500">
+                          {new Date(year.startDate).toLocaleDateString()} - {new Date(year.endDate).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={cn(
+                          "rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider",
+                          year.status === 'OPEN' ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
+                        )}>
+                          {year.status}
+                        </span>
+                        {year.status === 'OPEN' ? (
+                          <button
+                            onClick={() => {
+                              setSelectedFy(year);
+                              setFyMode('CLOSE');
+                              setFyCloseOpen(true);
+                            }}
+                            className="inline-flex h-8 items-center gap-2 rounded-lg bg-slate-900 px-3 text-xs font-bold text-white hover:bg-slate-800"
+                          >
+                            <Lock size={14} />
+                            Close Year
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setSelectedFy(year);
+                              setFyMode('REOPEN');
+                              setFyCloseOpen(true);
+                            }}
+                            className="inline-flex h-8 items-center gap-2 rounded-lg bg-primary-600 px-3 text-xs font-bold text-white hover:bg-primary-700"
+                          >
+                            <Unlock size={14} />
+                            Reopen
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                      {(year.periods ?? []).map((period: any) => (
+                        <div key={period.id} className="flex flex-col gap-1 rounded-2xl bg-white border border-slate-100 p-3 shadow-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{period.label}</span>
+                            <span className={cn(
+                              "h-2 w-2 rounded-full",
+                              period.status === 'OPEN' ? "bg-emerald-500" : period.status === 'LOCKED' ? "bg-amber-500" : "bg-slate-400"
+                            )} />
+                          </div>
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-xs font-bold text-slate-700">{period.status}</span>
+                            <FiscalPeriodActions periodId={period.id} status={period.status} label={period.label} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          </div>
+        </TabsContent>
       </Tabs>
+
+      <VoucherDialog 
+        isOpen={voucherOpen} 
+        onClose={() => setVoucherOpen(false)} 
+        accounts={accountsQuery.data ?? []} 
+      />
+
+      <OpeningBalanceDialog
+        isOpen={openingBalOpen}
+        onClose={() => setOpeningBalOpen(false)}
+        fiscalYear={selectedFy}
+        accounts={accountsQuery.data ?? []}
+      />
+
+      <FiscalYearCloseDialog
+        isOpen={fyCloseOpen}
+        onClose={() => setFyCloseOpen(false)}
+        fiscalYear={selectedFy}
+        mode={fyMode}
+      />
     </div>
   );
 }

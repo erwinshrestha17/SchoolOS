@@ -22,7 +22,7 @@ import { FileRegistryService } from '../src/file-registry/file-registry.service'
 import { PrismaService } from '../src/prisma/prisma.service';
 import { StorageService } from '../src/storage/storage.service';
 
-type ActivityPostRecord = {
+interface ActivityPostRecord {
   id: string;
   tenantId: string;
   classId: string;
@@ -37,11 +37,11 @@ type ActivityPostRecord = {
   moderationStatus: string;
   softDeletedAt: Date | null;
   attachments: ActivityAttachmentRecord[];
-  studentTags: Array<{ tenantId: string; studentId: string }>;
+  studentTags: { tenantId: string; studentId: string }[];
   reactions: unknown[];
-};
+}
 
-type ActivityAttachmentRecord = {
+interface ActivityAttachmentRecord {
   id: string;
   tenantId: string;
   activityPostId: string;
@@ -55,17 +55,17 @@ type ActivityAttachmentRecord = {
   sortOrder: number;
   processingStatus?: string;
   activityPost?: ActivityPostRecord;
-};
+}
 
-type ActivityPostLifecycleRow = {
+interface ActivityPostLifecycleRow {
   id: string;
   tenantId: string;
   createdById: string;
   moderationStatus: string;
   softDeletedAt: Date | null;
-};
+}
 
-type ActivityPrivacyState = {
+interface ActivityPrivacyState {
   classes: Record<string, unknown>[];
   sections: Record<string, unknown>[];
   students: Record<string, unknown>[];
@@ -75,7 +75,7 @@ type ActivityPrivacyState = {
   fileAssets: Record<string, unknown>[];
   auditLogs: Record<string, unknown>[];
   rawQueries: unknown[];
-};
+}
 
 type ActivityPrismaMock = ReturnType<typeof buildPrismaMock>;
 

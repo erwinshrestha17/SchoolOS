@@ -35,6 +35,13 @@ import { ApproveJournalDto } from './dto/approve-journal.dto';
 import { RejectJournalDto } from './dto/reject-journal.dto';
 import { PostJournalDto } from './dto/post-journal.dto';
 import { CancelJournalDto } from './dto/cancel-journal.dto';
+import { CreateOpeningBalanceDto } from './dto/opening-balance.dto';
+import {
+  ExpenseVoucherDto,
+  PaymentVoucherDto,
+  ReceiptVoucherDto,
+  ContraVoucherDto,
+} from './dto/voucher.dto';
 
 @Controller('accounting')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -379,5 +386,123 @@ export class AccountingController {
   @Permissions('accounting:close')
   closePeriod(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.accountingService.closePeriod(id, auth);
+  }
+
+  // ─── Slice 2: Opening Balance ────────────────────────────────────
+
+  @Post('opening-balance')
+  @Permissions('accounting:journals:create')
+  createOpeningBalance(
+    @Body() dto: CreateOpeningBalanceDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.createOpeningBalance(dto, auth);
+  }
+
+  @Get('opening-balance/:fiscalYearId')
+  @Permissions('accounting:reports:read')
+  getOpeningBalance(
+    @Param('fiscalYearId') fiscalYearId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.getOpeningBalance(fiscalYearId, auth);
+  }
+
+  // ─── Slice 3: Voucher Workflows ──────────────────────────────────
+
+  @Post('vouchers/expense')
+  @Permissions('accounting:journals:create')
+  createExpenseVoucher(
+    @Body() dto: ExpenseVoucherDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.createExpenseVoucher(dto, auth);
+  }
+
+  @Post('vouchers/payment')
+  @Permissions('accounting:journals:create')
+  createPaymentVoucher(
+    @Body() dto: PaymentVoucherDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.createPaymentVoucher(dto, auth);
+  }
+
+  @Post('vouchers/receipt')
+  @Permissions('accounting:journals:create')
+  createReceiptVoucher(
+    @Body() dto: ReceiptVoucherDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.createReceiptVoucher(dto, auth);
+  }
+
+  @Post('vouchers/contra')
+  @Permissions('accounting:journals:create')
+  createContraVoucher(
+    @Body() dto: ContraVoucherDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.createContraVoucher(dto, auth);
+  }
+
+  // ─── Slice 4: Fiscal Year Close ──────────────────────────────────
+
+  @Post('fiscal-years/:id/close-year')
+  @Permissions('accounting:fiscal:manage')
+  closeFiscalYear(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.closeFiscalYear(id, auth);
+  }
+
+  @Post('fiscal-years/:id/reopen-year')
+  @Permissions('accounting:fiscal:reopen')
+  reopenFiscalYear(
+    @Param('id') id: string,
+    @Body() dto: ReopenFiscalPeriodDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.reopenFiscalYear(id, dto, auth);
+  }
+
+  // ─── Slice 5: Bank Reconciliation ────────────────────────────────
+
+  @Post('bank-reconciliation/:accountId/import')
+  @Permissions('accounting:settings:update')
+  importBankStatement(
+    @Param('accountId') accountId: string,
+    @Body() body: { lines: Array<{ statementDate: string; description: string; reference?: string; debitAmount?: number; creditAmount?: number }> },
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.importBankStatement(accountId, body.lines, auth);
+  }
+
+  @Get('bank-reconciliation/:accountId/unreconciled')
+  @Permissions('accounting:reports:read')
+  getUnreconciledStatements(
+    @Param('accountId') accountId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.getUnreconciledStatements(accountId, auth);
+  }
+
+  @Post('bank-reconciliation/reconcile')
+  @Permissions('accounting:settings:update')
+  reconcileStatement(
+    @Body() body: { statementId: string; journalLineId: string },
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.reconcileStatement(body.statementId, body.journalLineId, auth);
+  }
+
+  @Get('bank-reconciliation/:accountId/summary')
+  @Permissions('accounting:reports:read')
+  getReconciliationSummary(
+    @Param('accountId') accountId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.getReconciliationSummary(accountId, auth);
   }
 }

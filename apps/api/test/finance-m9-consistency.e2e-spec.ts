@@ -22,7 +22,7 @@ import {
   PrismaMock,
 } from './test-helpers';
 
-type JournalCreateInput = {
+interface JournalCreateInput {
   data: {
     tenantId: string;
     sourceModule?: string | null;
@@ -31,13 +31,13 @@ type JournalCreateInput = {
     postingType?: string | null;
     reversalOfId?: string | null;
     lines: {
-      create: Array<{
+      create: {
         side: JournalLineSide;
         amount: Prisma.Decimal | number | string;
-      }>;
+      }[];
     };
   };
-};
+}
 
 describe('Finance + M9 Accounting Integration (E2E)', () => {
   let moduleRef: TestingModule;
@@ -460,10 +460,10 @@ function chartAccountForCode(code = '1010') {
 }
 
 function summarizeJournalLines(
-  lines: Array<{
+  lines: {
     side: JournalLineSide;
     amount: Prisma.Decimal | number | string;
-  }>,
+  }[],
 ) {
   return lines.reduce(
     (summary, line) => {

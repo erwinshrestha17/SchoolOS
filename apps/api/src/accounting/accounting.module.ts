@@ -7,15 +7,21 @@ import { AccountingService } from './accounting.service';
 import { AccountingPostingModule } from './accounting-posting.module';
 import { AccountingReportsController } from './accounting-reports.controller';
 import { AccountingReportsService } from './accounting-reports.service';
+import { AccountingReportExportsService } from './accounting-report-exports.service';
 
 @Module({
   imports: [AuthModule, AuditModule, FinanceModule, AccountingPostingModule],
   controllers: [AccountingController, AccountingReportsController],
-  providers: [AccountingService, AccountingReportsService],
+  providers: [
+    AccountingService,
+    AccountingReportsService,
+    AccountingReportExportsService,
+  ],
   exports: [
     AccountingService,
     AccountingPostingModule,
     AccountingReportsService,
   ],
 })
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class AccountingModule {}

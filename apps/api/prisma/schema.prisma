@@ -102,6 +102,12 @@ enum JournalSourceType {
   ADJUSTMENT
   REVERSAL
   CORRECTION
+  OPENING_BALANCE
+  EXPENSE_VOUCHER
+  PAYMENT_VOUCHER
+  RECEIPT_VOUCHER
+  CONTRA_VOUCHER
+  CLOSING_ENTRY
 }
 
 enum JournalLineSide {
@@ -127,6 +133,7 @@ enum AccountingReportMappingType {
   PF_EMPLOYEE_PAYABLE
   PF_EMPLOYER_PAYABLE
   PF_PAYABLE
+  RETAINED_EARNINGS
 }
 
 enum JournalEntryStatus {
@@ -735,6 +742,7 @@ model Tenant {
   studentDocumentHistory        StudentDocumentHistory[]
   attendanceCorrectionRequests   AttendanceCorrectionRequest[]
   accountingReportMappings      AccountingReportAccountMapping[]
+  bankStatements                BankStatement[]
 }
 
 model User {
@@ -790,6 +798,7 @@ model User {
   reviewedAttendanceCorrections  AttendanceCorrectionRequest[] @relation("ReviewedAttendanceCorrections")
   createdAccountMappings         AccountingReportAccountMapping[] @relation("CreatedAccountMappings")
   updatedAccountMappings         AccountingReportAccountMapping[] @relation("UpdatedAccountMappings")
+  reconciledBankStatements       BankStatement[]                  @relation("ReconciledBankStatements")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
@@ -1806,6 +1815,7 @@ model ChartAccount {
   children     ChartAccount[] @relation("ChartAccountTree")
   journalLines JournalLine[]
   accountingReportMappings AccountingReportAccountMapping[]
+  bankStatements           BankStatement[]
 
   @@unique([tenantId, code])
   @@index([tenantId, fiscalYearId])
@@ -3884,4 +3894,29 @@ model AccountingReportAccountMapping {
   @@unique([tenantId, mappingType, accountId])
   @@index([tenantId, mappingType])
   @@index([tenantId, accountId])
+}
+
+model BankStatement {
+  id              String    @id @default(uuid())
+  tenantId        String
+  accountId       String
+  statementDate   DateTime
+  description     String
+  reference       String?
+  debitAmount     Decimal   @default(0) @db.Decimal(12, 2)
+  creditAmount    Decimal   @default(0) @db.Decimal(12, 2)
+  isReconciled    Boolean   @default(false)
+  reconciledAt    DateTime?
+  reconciledById  String?
+  journalLineId   String?
+  importBatchId   String?
+  createdAt       DateTime  @default(now())
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  chartAccount ChartAccount  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  reconciledBy User?         @relation("ReconciledBankStatements", fields: [reconciledById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, accountId, isReconciled])
+  @@index([tenantId, importBatchId])
+  @@index([tenantId, accountId, statementDate])
 }

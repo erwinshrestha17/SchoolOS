@@ -4291,7 +4291,7 @@ export function resolveInvoiceStatusAfterAdjustment(
   return InvoiceStatus.ISSUED;
 }
 
-function toCsv(rows: Record<string, unknown>[], headers: string[]) {
+function toCsv(rows: Array<Record<string, unknown>>, headers: string[]) {
   const escape = (val: unknown) => `"${String(val ?? '').replace(/"/g, '""')}"`;
   const headerLine = headers.map(escape).join(',');
   const rowLines = rows.map((row) =>

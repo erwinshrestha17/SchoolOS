@@ -19,15 +19,15 @@ import {
   createQueueMock,
 } from './test-helpers';
 
-type MockStateOwner = {
+interface MockStateOwner {
   __state: Record<string, Record<string, unknown>[]>;
-};
+}
 
-type ExportPayload = {
-  rows?: Array<Record<string, unknown>>;
+interface ExportPayload {
+  rows?: Record<string, unknown>[];
   csv?: string;
-  issues?: Array<Record<string, unknown>>;
-};
+  issues?: Record<string, unknown>[];
+}
 
 describe('Student Lifecycle Integration Depth (E2E)', () => {
   let app: INestApplication;

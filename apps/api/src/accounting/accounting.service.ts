@@ -7,6 +7,7 @@ import { ReportsQueryDto } from './dto/reports-query.dto';
 
 import {
   AccountingPeriodStatus,
+  AccountingReportMappingType,
   ChartAccountType,
   JournalEntryStatus,
   JournalLineSide,
@@ -33,6 +34,19 @@ import { RejectJournalDto } from './dto/reject-journal.dto';
 import { PostJournalDto } from './dto/post-journal.dto';
 import { CancelJournalDto } from './dto/cancel-journal.dto';
 import { AccountingPostingService } from './accounting-posting.service';
+import { CreateOpeningBalanceDto } from './dto/opening-balance.dto';
+import {
+  ExpenseVoucherDto,
+  PaymentVoucherDto,
+  ReceiptVoucherDto,
+  ContraVoucherDto,
+} from './dto/voucher.dto';
+
+export interface UnsafeBankStatement {
+  id: string;
+  isReconciled: boolean;
+  [key: string]: unknown;
+}
 
 @Injectable()
 export class AccountingService {
@@ -1311,6 +1325,609 @@ export class AccountingService {
     });
 
     return toCsv(Array.isArray(data) ? data : [data]);
+  }
+
+  // ─── Slice 2: Opening Balance ────────────────────────────────────────
+
+  async createOpeningBalance(
+    dto: CreateOpeningBalanceDto,
+    actor: AuthContext,
+  ) {
+    const fiscalYear = await this.prisma.fiscalYear.findFirst({
+      where: { id: dto.fiscalYearId, tenantId: actor.tenantId },
+      include: { periods: { orderBy: { periodNumber: 'asc' } } },
+    });
+
+    if (!fiscalYear) {
+      throw new NotFoundException('Fiscal year not found in this tenant');
+    }
+
+    if (fiscalYear.status === 'CLOSED') {
+      throw new ConflictException('Cannot post opening balance to a closed fiscal year');
+    }
+
+    // Validate balance
+    const totals = sumJournalSides(dto.lines);
+    if (!totals.debit.eq(totals.credit)) {
+      throw new ConflictException(
+        `Opening balance must be balanced. Debit: ${totals.debit.toString()}, Credit: ${totals.credit.toString()}`,
+      );
+    }
+
+    // Validate accounts belong to tenant
+    const accountIds = dto.lines.map((l) => l.chartAccountId);
+    const accounts = await this.prisma.chartAccount.findMany({
+      where: { tenantId: actor.tenantId, id: { in: accountIds } },
+    });
+    if (accounts.length !== new Set(accountIds).size) {
+      throw new NotFoundException('One or more chart accounts not found in this tenant');
+    }
+
+    // Use the fiscal year start date or explicit entryDate
+    const entryDate = dto.entryDate
+      ? new Date(dto.entryDate)
+      : fiscalYear.startDate;
+
+    const entry = await this.postingService.createDraftJournal(
+      {
+        tenantId: actor.tenantId,
+        entryDate,
+        narration: dto.narration ?? `Opening balance for ${fiscalYear.name}`,
+        sourceModule: 'ACCOUNTING',
+        sourceType: 'OPENING_BALANCE' as JournalSourceType,
+        sourceId: dto.fiscalYearId,
+        lines: dto.lines.map((line) => ({
+          chartAccountId: line.chartAccountId,
+          side: line.side,
+          amount: line.amount,
+          description: line.description,
+        })),
+      },
+      actor,
+    );
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'opening_balance',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: entry.id,
+      after: {
+        fiscalYearId: dto.fiscalYearId,
+        status: entry.status,
+        lineCount: dto.lines.length,
+      },
+    });
+
+    return entry;
+  }
+
+  async getOpeningBalance(fiscalYearId: string, actor: AuthContext) {
+    const entry = await this.prisma.journalEntry.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        sourceType: 'OPENING_BALANCE' as JournalSourceType,
+        sourceId: fiscalYearId,
+      },
+      include: { lines: { include: { chartAccount: true } } },
+    });
+
+    if (!entry) {
+      throw new NotFoundException('Opening balance not found for this fiscal year');
+    }
+
+    return entry;
+  }
+
+  // ─── Slice 3: Voucher Workflows ────────────────────────────────────
+
+  async createExpenseVoucher(dto: ExpenseVoucherDto, actor: AuthContext) {
+    return this.createManualJournal(
+      {
+        entryDate: dto.entryDate,
+        narration: dto.narration,
+        sourceId: dto.reference,
+        lines: [
+          {
+            chartAccountId: dto.expenseAccountId,
+            side: JournalLineSide.DEBIT,
+            amount: dto.amount,
+            description: `Expense: ${dto.narration}`,
+          },
+          {
+            chartAccountId: dto.paymentAccountId,
+            side: JournalLineSide.CREDIT,
+            amount: dto.amount,
+            description: dto.reference ?? dto.narration,
+          },
+        ],
+      },
+      actor,
+    );
+  }
+
+  async createPaymentVoucher(dto: PaymentVoucherDto, actor: AuthContext) {
+    return this.createManualJournal(
+      {
+        entryDate: dto.entryDate,
+        narration: dto.narration,
+        sourceId: dto.reference,
+        lines: [
+          {
+            chartAccountId: dto.payeeAccountId,
+            side: JournalLineSide.DEBIT,
+            amount: dto.amount,
+            description: `Payment to payee: ${dto.narration}`,
+          },
+          {
+            chartAccountId: dto.paymentAccountId,
+            side: JournalLineSide.CREDIT,
+            amount: dto.amount,
+            description: dto.reference ?? dto.narration,
+          },
+        ],
+      },
+      actor,
+    );
+  }
+
+  async createReceiptVoucher(dto: ReceiptVoucherDto, actor: AuthContext) {
+    return this.createManualJournal(
+      {
+        entryDate: dto.entryDate,
+        narration: dto.narration,
+        sourceId: dto.reference,
+        lines: [
+          {
+            chartAccountId: dto.depositAccountId,
+            side: JournalLineSide.DEBIT,
+            amount: dto.amount,
+            description: `Receipt deposit: ${dto.narration}`,
+          },
+          {
+            chartAccountId: dto.receiptAccountId,
+            side: JournalLineSide.CREDIT,
+            amount: dto.amount,
+            description: dto.reference ?? dto.narration,
+          },
+        ],
+      },
+      actor,
+    );
+  }
+
+  async createContraVoucher(dto: ContraVoucherDto, actor: AuthContext) {
+    return this.createManualJournal(
+      {
+        entryDate: dto.entryDate,
+        narration: dto.narration,
+        lines: [
+          {
+            chartAccountId: dto.toAccountId,
+            side: JournalLineSide.DEBIT,
+            amount: dto.amount,
+            description: `Contra transfer: ${dto.narration}`,
+          },
+          {
+            chartAccountId: dto.fromAccountId,
+            side: JournalLineSide.CREDIT,
+            amount: dto.amount,
+            description: `Contra transfer: ${dto.narration}`,
+          },
+        ],
+      },
+      actor,
+    );
+  }
+
+  // ─── Slice 4: Fiscal Year Close ────────────────────────────────────
+
+  async closeFiscalYear(fiscalYearId: string, actor: AuthContext) {
+    const fiscalYear = await this.prisma.fiscalYear.findFirst({
+      where: { id: fiscalYearId, tenantId: actor.tenantId },
+      include: { periods: true },
+    });
+
+    if (!fiscalYear) {
+      throw new NotFoundException('Fiscal year not found');
+    }
+
+    if (fiscalYear.status === 'CLOSED') {
+      throw new ConflictException('Fiscal year is already closed');
+    }
+
+    // All periods must be CLOSED
+    const openPeriods = fiscalYear.periods.filter(
+      (p) => p.status !== AccountingPeriodStatus.CLOSED,
+    );
+    if (openPeriods.length > 0) {
+      throw new ConflictException(
+        `All fiscal periods must be closed before closing the fiscal year. Open periods: ${openPeriods.map((p) => p.label).join(', ')}`,
+      );
+    }
+
+    // Calculate net Revenue and Expense balances
+    const linesGrouped = await this.prisma.journalLine.groupBy({
+      by: ['chartAccountId'],
+      _sum: { debit: true, credit: true },
+      where: {
+        tenantId: actor.tenantId,
+        journalEntry: {
+          tenantId: actor.tenantId,
+          status: JournalEntryStatus.POSTED,
+          fiscalYearId,
+        },
+      },
+    });
+
+    const accounts = await this.prisma.chartAccount.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        type: { in: [ChartAccountType.REVENUE, ChartAccountType.EXPENSE] },
+      },
+    });
+
+    // Find retained earnings account via mapping
+    const retainedEarningsMapping =
+      await this.prisma.accountingReportAccountMapping.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          // RETAINED_EARNINGS added to schema; after prisma generate this cast becomes redundant
+          mappingType:
+            'RETAINED_EARNINGS' as unknown as AccountingReportMappingType,
+        },
+      });
+
+    let retainedEarningsAccountId: string;
+    if (retainedEarningsMapping) {
+      retainedEarningsAccountId = retainedEarningsMapping.accountId;
+    } else {
+      // Fallback: use code 3100 (Retained Surplus/Deficit from default chart)
+      const retainedAccount = await this.prisma.chartAccount.findFirst({
+        where: { tenantId: actor.tenantId, code: '3100' },
+      });
+      if (!retainedAccount) {
+        throw new ConflictException(
+          'Retained Earnings account not found. Configure RETAINED_EARNINGS mapping or create account with code 3100.',
+        );
+      }
+      retainedEarningsAccountId = retainedAccount.id;
+    }
+
+    const closingLines: Array<{
+      chartAccountId: string;
+      debit?: Prisma.Decimal | number;
+      credit?: Prisma.Decimal | number;
+      description?: string;
+    }> = [];
+
+    let netResult = new Prisma.Decimal(0);
+
+    for (const account of accounts) {
+      const lineData = linesGrouped.find(
+        (l) => l.chartAccountId === account.id,
+      );
+      if (!lineData) continue;
+
+      const debit = new Prisma.Decimal(
+        (lineData._sum.debit ?? 0) as string | number,
+      );
+      const credit = new Prisma.Decimal(
+        (lineData._sum.credit ?? 0) as string | number,
+      );
+      const net = debit.minus(credit);
+
+      if (net.isZero()) continue;
+
+      if (account.type === ChartAccountType.REVENUE) {
+        // Revenue has credit balance → close by debiting
+        const revenueNet = credit.minus(debit);
+        closingLines.push({
+          chartAccountId: account.id,
+          debit: revenueNet,
+          credit: 0,
+          description: `Close revenue: ${account.name}`,
+        });
+        netResult = netResult.plus(revenueNet);
+      } else if (account.type === ChartAccountType.EXPENSE) {
+        // Expense has debit balance → close by crediting
+        const expenseNet = debit.minus(credit);
+        closingLines.push({
+          chartAccountId: account.id,
+          debit: 0,
+          credit: expenseNet,
+          description: `Close expense: ${account.name}`,
+        });
+        netResult = netResult.minus(expenseNet);
+      }
+    }
+
+    if (closingLines.length === 0) {
+      throw new ConflictException(
+        'No revenue or expense balances to close for this fiscal year',
+      );
+    }
+
+    // Add retained earnings line for the net result
+    if (netResult.gt(0)) {
+      // Surplus → credit retained earnings
+      closingLines.push({
+        chartAccountId: retainedEarningsAccountId,
+        debit: 0,
+        credit: netResult,
+        description: `Net surplus transferred to retained earnings`,
+      });
+    } else if (netResult.lt(0)) {
+      // Deficit → debit retained earnings
+      closingLines.push({
+        chartAccountId: retainedEarningsAccountId,
+        debit: netResult.abs(),
+        credit: 0,
+        description: `Net deficit transferred to retained earnings`,
+      });
+    }
+
+    // Post the closing entry via posting service
+    const closingEntry = await this.postingService.postManualJournal(
+      {
+        tenantId: actor.tenantId,
+        entryDate: fiscalYear.endDate,
+        narration: `Closing entries for fiscal year ${fiscalYear.name}`,
+        sourceModule: 'ACCOUNTING',
+        sourceType: 'CLOSING_ENTRY' as JournalSourceType,
+        sourceId: fiscalYearId,
+        postingType: 'FISCAL_YEAR_CLOSE',
+        lines: closingLines,
+      },
+      actor,
+    );
+
+    // Update fiscal year status
+    await this.prisma.fiscalYear.update({
+      where: { id: fiscalYearId },
+      data: {
+        status: 'CLOSED',
+        closedAt: new Date(),
+        closedById: actor.userId,
+        closeReason: `Fiscal year closed with closing entry ${closingEntry.entryNumber}`,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'close',
+      resource: 'fiscal_year',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: fiscalYearId,
+      after: {
+        closingEntryId: closingEntry.id,
+        closingEntryNumber: closingEntry.entryNumber,
+        netResult: netResult.toString(),
+        retainedEarningsAccountId,
+      },
+    });
+
+    return { fiscalYear: { ...fiscalYear, status: 'CLOSED' }, closingEntry };
+  }
+
+  async reopenFiscalYear(
+    fiscalYearId: string,
+    dto: ReopenFiscalPeriodDto,
+    actor: AuthContext,
+  ) {
+    const fiscalYear = await this.prisma.fiscalYear.findFirst({
+      where: { id: fiscalYearId, tenantId: actor.tenantId },
+    });
+
+    if (!fiscalYear) {
+      throw new NotFoundException('Fiscal year not found');
+    }
+
+    if (fiscalYear.status !== 'CLOSED') {
+      throw new ConflictException('Fiscal year is not closed');
+    }
+
+    const updated = await this.prisma.fiscalYear.update({
+      where: { id: fiscalYearId },
+      data: {
+        status: 'OPEN',
+        reopenedAt: new Date(),
+        reopenedById: actor.userId,
+        reopenReason: dto.reason,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'reopen',
+      resource: 'fiscal_year',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: fiscalYearId,
+      after: { reason: dto.reason },
+    });
+
+    return updated;
+  }
+
+  // ─── Slice 5: Bank Reconciliation ──────────────────────────────────
+
+  /**
+   * BankStatement model accessor — the Prisma client must be regenerated
+   * (prisma generate) after the BankStatement model was added to the schema.
+   * Until then, we access it via bracket notation to avoid TS errors.
+   * After regeneration, replace all usages with this.prisma.bankStatement.
+   */
+  /**
+   * BankStatement model accessor — the Prisma client must be regenerated
+   * (prisma generate) after the BankStatement model was added to the schema.
+   * Until then, we access it via bracket notation to avoid TS errors.
+   * After regeneration, replace all usages with this.prisma.bankStatement.
+   */
+  private get bankStatements(): Record<string, (...args: unknown[]) => any> {
+    const p = this.prisma as unknown as Record<string, unknown>;
+    return p['bankStatement'] as Record<string, (...args: unknown[]) => any>;
+  }
+
+  async importBankStatement(
+    accountId: string,
+    lines: Array<{
+      statementDate: string;
+      description: string;
+      reference?: string;
+      debitAmount?: number;
+      creditAmount?: number;
+    }>,
+    actor: AuthContext,
+  ) {
+    const account = await this.prisma.chartAccount.findFirst({
+      where: { id: accountId, tenantId: actor.tenantId },
+    });
+
+    if (!account) {
+      throw new NotFoundException('Account not found in this tenant');
+    }
+
+    const importBatchId = `IMPORT-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const statements = (await this.prisma.$transaction(
+      lines.map((line) =>
+        this.bankStatements.create({
+          data: {
+            tenantId: actor.tenantId,
+            accountId,
+            statementDate: new Date(line.statementDate),
+            description: line.description,
+            reference: line.reference ?? null,
+            debitAmount: line.debitAmount ?? 0,
+            creditAmount: line.creditAmount ?? 0,
+            importBatchId,
+          },
+        }),
+      ),
+    )) as UnsafeBankStatement[];
+
+    await this.auditService.record({
+      action: 'import',
+      resource: 'bank_statement',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: importBatchId,
+      after: { accountId, lineCount: statements.length },
+    });
+
+    return { importBatchId, count: statements.length, statements };
+  }
+
+  async getUnreconciledStatements(accountId: string, actor: AuthContext) {
+    return this.bankStatements.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        accountId,
+        isReconciled: false,
+      },
+      orderBy: { statementDate: 'asc' },
+    });
+  }
+
+  async reconcileStatement(
+    statementId: string,
+    journalLineId: string,
+    actor: AuthContext,
+  ) {
+    const statement = (await this.bankStatements.findFirst({
+      where: { id: statementId, tenantId: actor.tenantId },
+    })) as UnsafeBankStatement | null;
+
+    if (!statement) {
+      throw new NotFoundException('Bank statement line not found');
+    }
+
+    if (statement.isReconciled) {
+      throw new ConflictException('Statement line is already reconciled');
+    }
+
+    const journalLine = await this.prisma.journalLine.findFirst({
+      where: { id: journalLineId, tenantId: actor.tenantId },
+    });
+
+    if (!journalLine) {
+      throw new NotFoundException('Journal line not found in this tenant');
+    }
+
+    const updated = await this.bankStatements.update({
+      where: { id: statementId },
+      data: {
+        isReconciled: true,
+        reconciledAt: new Date(),
+        reconciledById: actor.userId,
+        journalLineId,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'reconcile',
+      resource: 'bank_statement',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: statementId,
+      after: { journalLineId },
+    });
+
+    return updated;
+  }
+
+  async getReconciliationSummary(accountId: string, actor: AuthContext) {
+    const account = await this.prisma.chartAccount.findFirst({
+      where: { id: accountId, tenantId: actor.tenantId },
+    });
+
+    if (!account) {
+      throw new NotFoundException('Account not found');
+    }
+
+    const [totalStatements, reconciledStatements] = (await Promise.all([
+      this.bankStatements.count({
+        where: { tenantId: actor.tenantId, accountId },
+      }),
+      this.bankStatements.count({
+        where: { tenantId: actor.tenantId, accountId, isReconciled: true },
+      }),
+    ])) as number[];
+
+    const unreconciledStatements = totalStatements - reconciledStatements;
+
+    // Sum up statement amounts
+    const statementAgg = (await this.bankStatements.aggregate({
+      where: { tenantId: actor.tenantId, accountId },
+      _sum: { debitAmount: true, creditAmount: true },
+    })) as { _sum: { debitAmount: Prisma.Decimal; creditAmount: Prisma.Decimal } };
+
+    // Sum up ledger amounts for this account (POSTED only)
+    const ledgerAgg = await this.prisma.journalLine.aggregate({
+      where: {
+        tenantId: actor.tenantId,
+        chartAccountId: accountId,
+        journalEntry: { status: JournalEntryStatus.POSTED },
+      },
+      _sum: { debit: true, credit: true },
+    });
+
+    return {
+      accountId,
+      accountCode: account.code,
+      accountName: account.name,
+      totalStatements,
+      reconciledStatements,
+      unreconciledStatements,
+      statementBalance: {
+        debit: statementAgg._sum.debitAmount ?? new Prisma.Decimal(0),
+        credit: statementAgg._sum.creditAmount ?? new Prisma.Decimal(0),
+      },
+      ledgerBalance: {
+        debit: ledgerAgg._sum.debit ?? new Prisma.Decimal(0),
+        credit: ledgerAgg._sum.credit ?? new Prisma.Decimal(0),
+      },
+    };
   }
 
   private async ensureJournalIsMutable(id: string, tenantId: string) {

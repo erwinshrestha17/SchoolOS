@@ -1,4 +1,8 @@
-import { Prisma, ChartAccountType, JournalLineSide } from '@prisma/client';
+import {
+  type Prisma,
+  type ChartAccountType,
+  type JournalLineSide,
+} from '@prisma/client';
 
 export interface TrialBalanceRow {
   accountId: string;

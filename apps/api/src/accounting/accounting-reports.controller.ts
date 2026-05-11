@@ -1,4 +1,13 @@
-import { Controller, Get, Put, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Put,
+  Body,
+  Query,
+  UseGuards,
+  Res,
+} from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -11,6 +20,8 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { AccountingReportsService } from './accounting-reports.service';
+import { AccountingReportExportsService } from './accounting-report-exports.service';
+import { AuditService } from '../audit/audit.service';
 import { TrialBalanceQueryDto } from './dto/trial-balance-query.dto';
 import { GeneralLedgerQueryDto } from './dto/general-ledger-query.dto';
 import { CashBookQueryDto } from './dto/cash-book-query.dto';
@@ -25,7 +36,11 @@ import { UpdateAccountingReportMappingsDto } from './dto/report-account-mapping.
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 @Controller('accounting/reports')
 export class AccountingReportsController {
-  constructor(private readonly reportsService: AccountingReportsService) {}
+  constructor(
+    private readonly reportsService: AccountingReportsService,
+    private readonly exportsService: AccountingReportExportsService,
+    private readonly auditService: AuditService,
+  ) {}
 
   @Get('trial-balance')
   @ApiOperation({ summary: 'Get trial balance report' })
@@ -109,6 +124,135 @@ export class AccountingReportsController {
     @Query() query: TaxSummaryQueryDto,
   ) {
     return this.reportsService.getTaxSummary(auth.tenantId, query);
+  }
+
+  @Get('trial-balance/export')
+  @ApiOperation({ summary: 'Export trial balance to CSV' })
+  @Permissions('accounting:exports:create', 'accounting:reports:trial-balance')
+  async exportTrialBalance(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: TrialBalanceQueryDto,
+    @Res() res: Response,
+  ) {
+    const csv = await this.exportsService.exportTrialBalanceCsv(
+      auth.tenantId,
+      query,
+    );
+    await this.recordExportAudit(auth, 'Trial Balance', query);
+    this.sendCsvResponse(res, csv, 'trial-balance');
+  }
+
+  @Get('general-ledger/export')
+  @ApiOperation({ summary: 'Export general ledger to CSV' })
+  @Permissions('accounting:exports:create', 'accounting:reports:general-ledger')
+  async exportGeneralLedger(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: GeneralLedgerQueryDto,
+    @Res() res: Response,
+  ) {
+    const csv = await this.exportsService.exportGeneralLedgerCsv(
+      auth.tenantId,
+      query,
+    );
+    await this.recordExportAudit(auth, 'General Ledger', query);
+    this.sendCsvResponse(res, csv, 'general-ledger');
+  }
+
+  @Get('cash-book/export')
+  @ApiOperation({ summary: 'Export cash book to CSV' })
+  @Permissions('accounting:exports:create', 'accounting:reports:cash-book')
+  async exportCashBook(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: CashBookQueryDto,
+    @Res() res: Response,
+  ) {
+    const csv = await this.exportsService.exportCashBookCsv(
+      auth.tenantId,
+      query,
+    );
+    await this.recordExportAudit(auth, 'Cash Book', query);
+    this.sendCsvResponse(res, csv, 'cash-book');
+  }
+
+  @Get('income-statement/export')
+  @ApiOperation({ summary: 'Export income statement to CSV' })
+  @Permissions(
+    'accounting:exports:create',
+    'accounting:reports:income-statement',
+  )
+  async exportIncomeStatement(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: IncomeStatementQueryDto,
+    @Res() res: Response,
+  ) {
+    const csv = await this.exportsService.exportIncomeStatementCsv(
+      auth.tenantId,
+      query,
+    );
+    await this.recordExportAudit(auth, 'Income Statement', query);
+    this.sendCsvResponse(res, csv, 'income-statement');
+  }
+
+  @Get('balance-sheet/export')
+  @ApiOperation({ summary: 'Export balance sheet to CSV' })
+  @Permissions('accounting:exports:create', 'accounting:reports:balance-sheet')
+  async exportBalanceSheet(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: BalanceSheetQueryDto,
+    @Res() res: Response,
+  ) {
+    const csv = await this.exportsService.exportBalanceSheetCsv(
+      auth.tenantId,
+      query,
+    );
+    await this.recordExportAudit(auth, 'Balance Sheet', query);
+    this.sendCsvResponse(res, csv, 'balance-sheet');
+  }
+
+  @Get('tax-summary/export')
+  @ApiOperation({ summary: 'Export tax summary to CSV' })
+  @Permissions('accounting:exports:create', 'accounting:reports:tax-summary')
+  async exportTaxSummary(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: TaxSummaryQueryDto,
+    @Res() res: Response,
+  ) {
+    const csv = await this.exportsService.exportTaxSummaryCsv(
+      auth.tenantId,
+      query,
+    );
+    await this.recordExportAudit(auth, 'Tax Summary', query);
+    this.sendCsvResponse(res, csv, 'tax-summary');
+  }
+
+  private async recordExportAudit(
+    auth: AuthContext,
+    reportName: string,
+    filters: object,
+  ) {
+    await this.auditService.record({
+      action: 'export_accounting_report',
+      resource: 'accounting_report',
+      resourceId: reportName.toLowerCase().replace(/\s+/g, '_'),
+      tenantId: auth.tenantId,
+      userId: auth.userId,
+      after: {
+        reportName,
+        format: 'csv',
+        filters,
+        generatedAt: new Date(),
+      },
+    });
+  }
+
+  private sendCsvResponse(res: Response, csv: string, fileNamePrefix: string) {
+    const date = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${fileNamePrefix}-${date}.csv"`,
+    );
+    res.send(csv);
   }
 
   @Get('mappings')

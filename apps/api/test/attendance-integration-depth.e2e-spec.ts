@@ -116,7 +116,7 @@ function makePrisma() {
 
   function makeSession(
     attendanceDate: Date,
-    rows: Array<[string, AttendanceStatus]>,
+    rows: [string, AttendanceStatus][],
   ) {
     return {
       id: `session-${attendanceDate.getDate()}`,

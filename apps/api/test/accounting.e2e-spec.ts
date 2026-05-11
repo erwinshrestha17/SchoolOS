@@ -277,13 +277,17 @@ describe('Accounting Module Hardening (E2E)', () => {
 
   describe('Immutability', () => {
     it('should not allow direct update of a journal entry', () => {
-      expect(() => accountingService.updateJournalEntry()).toThrow(
+      expect(() => {
+        accountingService.updateJournalEntry();
+      }).toThrow(
         'Journal entries are immutable. Use correction or reversal workflows.',
       );
     });
 
     it('should not allow direct deletion of a journal entry', () => {
-      expect(() => accountingService.deleteJournalEntry()).toThrow(
+      expect(() => {
+        accountingService.deleteJournalEntry();
+      }).toThrow(
         'Journal entries are immutable and cannot be deleted once posted.',
       );
     });

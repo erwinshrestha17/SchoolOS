@@ -14,7 +14,7 @@ import { M10HardeningService } from '../src/communications/m10-hardening.service
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
-type CommunicationState = {
+interface CommunicationState {
   notices: Record<string, unknown>[];
   notificationDeliveries: Record<string, unknown>[];
   guardianConsents: Record<string, unknown>[];
@@ -22,7 +22,7 @@ type CommunicationState = {
   guardians: Record<string, unknown>[];
   auditLogs: Record<string, unknown>[];
   executeRawCalls: unknown[];
-};
+}
 
 type CommunicationPrismaMock = ReturnType<typeof buildPrismaMock>;
 

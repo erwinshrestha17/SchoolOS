@@ -75,7 +75,6 @@ class Decimal {
     return this.numericValue === 0;
   }
 
-
   toNumber() {
     return this.numericValue;
   }
@@ -107,12 +106,27 @@ export const Prisma = {
     strings,
     values,
   }),
-  validator: <T>() => (val: T) => val,
+  validator:
+    <T>() =>
+    (val: T) =>
+      val,
 };
 
 export const Mode = {
   SINGLE: 'SINGLE',
   MULTI: 'MULTI',
+} as const;
+
+export const AccountingReportMappingType = {
+  CASH: 'CASH',
+  BANK: 'BANK',
+  VAT_OUTPUT: 'VAT_OUTPUT',
+  VAT_INPUT: 'VAT_INPUT',
+  TDS_PAYABLE: 'TDS_PAYABLE',
+  TDS_PAID: 'TDS_PAID',
+  PF_EMPLOYEE: 'PF_EMPLOYEE',
+  PF_EMPLOYER: 'PF_EMPLOYER',
+  PF_PAID: 'PF_PAID',
 } as const;
 
 export const UserStatus = {

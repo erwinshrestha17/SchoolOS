@@ -15,7 +15,7 @@ import { AuthContext } from '../src/auth/auth.types';
 import { PayrollService } from '../src/payroll/payroll.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
-type JournalCreateInput = {
+interface JournalCreateInput {
   data: {
     tenantId: string;
     sourceModule?: string | null;
@@ -23,22 +23,22 @@ type JournalCreateInput = {
     sourceId?: string | null;
     postingType?: string | null;
     lines: {
-      create: Array<{
+      create: {
         side: JournalLineSide;
         amount: Prisma.Decimal | number | string;
-      }>;
+      }[];
     };
   };
-};
+}
 
 type PayrollRunRecord = ReturnType<typeof buildPayrollRun>;
 type PayrollLineRecord = ReturnType<typeof buildPayrollLine>;
-type ChartAccountUpsertInput = {
+interface ChartAccountUpsertInput {
   where?: { tenantId_code?: { code?: string } };
   create?: { code?: string };
   update?: { code?: string };
-};
-type TransactionMock = {
+}
+interface TransactionMock {
   journalEntry: PayrollM9PrismaMock['journalEntry'];
   fiscalPeriod: PayrollM9PrismaMock['fiscalPeriod'];
   fiscalYear: PayrollM9PrismaMock['fiscalYear'];
@@ -53,9 +53,9 @@ type TransactionMock = {
   payrollRun: {
     update: jest.Mock;
   };
-};
+}
 
-type PayrollM9PrismaMock = {
+interface PayrollM9PrismaMock {
   __periodStatus: AccountingPeriodStatus;
   __currentRun: PayrollRunRecord;
   __journalSequence: number;
@@ -94,7 +94,7 @@ type PayrollM9PrismaMock = {
     create: jest.Mock;
   };
   $transaction: jest.Mock;
-};
+}
 
 describe('Payroll + M9 Accounting Integration (E2E)', () => {
   const tenantId = 'tenant-payroll-integration';
@@ -540,10 +540,10 @@ function latestJournalCreateInput(prisma: PayrollM9PrismaMock) {
 }
 
 function summarizeJournalLines(
-  lines: Array<{
+  lines: {
     side: JournalLineSide;
     amount: Prisma.Decimal | number | string;
-  }>,
+  }[],
 ) {
   return lines.reduce(
     (summary, line) => {
