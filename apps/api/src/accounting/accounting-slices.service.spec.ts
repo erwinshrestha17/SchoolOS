@@ -50,7 +50,9 @@ describe('AccountingService - Slices 2-5', () => {
       journalLine: {
         findFirst: jest.fn(),
         groupBy: jest.fn().mockResolvedValue([]),
-        aggregate: jest.fn().mockResolvedValue({ _sum: { debit: 0, credit: 0 } }),
+        aggregate: jest
+          .fn()
+          .mockResolvedValue({ _sum: { debit: 0, credit: 0 } }),
       },
       accountingPeriod: {
         findFirst: jest.fn(),
@@ -68,7 +70,9 @@ describe('AccountingService - Slices 2-5', () => {
         findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
         update: jest.fn(),
-        aggregate: jest.fn().mockResolvedValue({ _sum: { debitAmount: 0, creditAmount: 0 } }),
+        aggregate: jest
+          .fn()
+          .mockResolvedValue({ _sum: { debitAmount: 0, creditAmount: 0 } }),
       },
       $transaction: jest.fn(),
     };
@@ -126,8 +130,16 @@ describe('AccountingService - Slices 2-5', () => {
       const dto = {
         fiscalYearId: 'fy-1',
         lines: [
-          { chartAccountId: 'acc-1', side: JournalLineSide.DEBIT, amount: 50000 },
-          { chartAccountId: 'acc-2', side: JournalLineSide.CREDIT, amount: 50000 },
+          {
+            chartAccountId: 'acc-1',
+            side: JournalLineSide.DEBIT,
+            amount: 50000,
+          },
+          {
+            chartAccountId: 'acc-2',
+            side: JournalLineSide.CREDIT,
+            amount: 50000,
+          },
         ],
       };
 
@@ -156,8 +168,16 @@ describe('AccountingService - Slices 2-5', () => {
       const dto = {
         fiscalYearId: 'fy-1',
         lines: [
-          { chartAccountId: 'acc-1', side: JournalLineSide.DEBIT, amount: 50000 },
-          { chartAccountId: 'acc-2', side: JournalLineSide.CREDIT, amount: 30000 },
+          {
+            chartAccountId: 'acc-1',
+            side: JournalLineSide.DEBIT,
+            amount: 50000,
+          },
+          {
+            chartAccountId: 'acc-2',
+            side: JournalLineSide.CREDIT,
+            amount: 30000,
+          },
         ],
       };
 
@@ -177,8 +197,16 @@ describe('AccountingService - Slices 2-5', () => {
       const dto = {
         fiscalYearId: 'fy-1',
         lines: [
-          { chartAccountId: 'acc-1', side: JournalLineSide.DEBIT, amount: 1000 },
-          { chartAccountId: 'acc-2', side: JournalLineSide.CREDIT, amount: 1000 },
+          {
+            chartAccountId: 'acc-1',
+            side: JournalLineSide.DEBIT,
+            amount: 1000,
+          },
+          {
+            chartAccountId: 'acc-2',
+            side: JournalLineSide.CREDIT,
+            amount: 1000,
+          },
         ],
       };
 
@@ -201,8 +229,16 @@ describe('AccountingService - Slices 2-5', () => {
       const dto = {
         fiscalYearId: 'fy-1',
         lines: [
-          { chartAccountId: 'acc-1', side: JournalLineSide.DEBIT, amount: 1000 },
-          { chartAccountId: 'acc-other-tenant', side: JournalLineSide.CREDIT, amount: 1000 },
+          {
+            chartAccountId: 'acc-1',
+            side: JournalLineSide.DEBIT,
+            amount: 1000,
+          },
+          {
+            chartAccountId: 'acc-other-tenant',
+            side: JournalLineSide.CREDIT,
+            amount: 1000,
+          },
         ],
       };
 
@@ -484,8 +520,16 @@ describe('AccountingService - Slices 2-5', () => {
       const result = await service.importBankStatement(
         'bank-acc',
         [
-          { statementDate: '2026-04-01', description: 'Payment received', debitAmount: 5000 },
-          { statementDate: '2026-04-02', description: 'Rent paid', creditAmount: 10000 },
+          {
+            statementDate: '2026-04-01',
+            description: 'Payment received',
+            debitAmount: 5000,
+          },
+          {
+            statementDate: '2026-04-02',
+            description: 'Rent paid',
+            creditAmount: 10000,
+          },
         ],
         actor,
       );
@@ -528,7 +572,11 @@ describe('AccountingService - Slices 2-5', () => {
         journalLineId: 'jl-1',
       });
 
-      const result = (await service.reconcileStatement('bs-1', 'jl-1', actor)) as any;
+      const result = (await service.reconcileStatement(
+        'bs-1',
+        'jl-1',
+        actor,
+      )) as any;
 
       expect(result.isReconciled).toBe(true);
       expect(result.journalLineId).toBe('jl-1');

@@ -1329,10 +1329,7 @@ export class AccountingService {
 
   // ─── Slice 2: Opening Balance ────────────────────────────────────────
 
-  async createOpeningBalance(
-    dto: CreateOpeningBalanceDto,
-    actor: AuthContext,
-  ) {
+  async createOpeningBalance(dto: CreateOpeningBalanceDto, actor: AuthContext) {
     const fiscalYear = await this.prisma.fiscalYear.findFirst({
       where: { id: dto.fiscalYearId, tenantId: actor.tenantId },
       include: { periods: { orderBy: { periodNumber: 'asc' } } },
@@ -1343,7 +1340,9 @@ export class AccountingService {
     }
 
     if (fiscalYear.status === 'CLOSED') {
-      throw new ConflictException('Cannot post opening balance to a closed fiscal year');
+      throw new ConflictException(
+        'Cannot post opening balance to a closed fiscal year',
+      );
     }
 
     // Validate balance
@@ -1360,7 +1359,9 @@ export class AccountingService {
       where: { tenantId: actor.tenantId, id: { in: accountIds } },
     });
     if (accounts.length !== new Set(accountIds).size) {
-      throw new NotFoundException('One or more chart accounts not found in this tenant');
+      throw new NotFoundException(
+        'One or more chart accounts not found in this tenant',
+      );
     }
 
     // Use the fiscal year start date or explicit entryDate
@@ -1413,7 +1414,9 @@ export class AccountingService {
     });
 
     if (!entry) {
-      throw new NotFoundException('Opening balance not found for this fiscal year');
+      throw new NotFoundException(
+        'Opening balance not found for this fiscal year',
+      );
     }
 
     return entry;
@@ -1900,7 +1903,9 @@ export class AccountingService {
     const statementAgg = (await this.bankStatements.aggregate({
       where: { tenantId: actor.tenantId, accountId },
       _sum: { debitAmount: true, creditAmount: true },
-    })) as { _sum: { debitAmount: Prisma.Decimal; creditAmount: Prisma.Decimal } };
+    })) as {
+      _sum: { debitAmount: Prisma.Decimal; creditAmount: Prisma.Decimal };
+    };
 
     // Sum up ledger amounts for this account (POSTED only)
     const ledgerAgg = await this.prisma.journalLine.aggregate({

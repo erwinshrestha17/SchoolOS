@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
-import { toast } from 'sonner';
-import { Loader2, AlertTriangle, Lock, Unlock } from 'lucide-react';
+import { Loader2, AlertTriangle, Lock, Unlock, CheckCircle2 } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 interface FiscalYearCloseDialogProps {
   isOpen: boolean;
@@ -18,6 +18,7 @@ export function FiscalYearCloseDialog({ isOpen, onClose, fiscalYear, mode }: Fis
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
     mutationFn: (data: any) => {
@@ -25,18 +26,18 @@ export function FiscalYearCloseDialog({ isOpen, onClose, fiscalYear, mode }: Fis
       return api.reopenFiscalYear(fiscalYear.id, { reason });
     },
     onSuccess: () => {
-      toast.success(`Fiscal year ${mode === 'CLOSE' ? 'closed' : 'reopened'} successfully`);
       queryClient.invalidateQueries({ queryKey: ['fiscal-years'] });
       onClose();
     },
-    onError: (error: any) => {
-      toast.error(error.message || `Failed to ${mode.toLowerCase()} fiscal year`);
+    onError: (err: any) => {
+      setError(err.message || `Failed to ${mode.toLowerCase()} fiscal year`);
     },
     onSettled: () => setLoading(false),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setLoading(true);
     mutation.mutate({});
   };
@@ -57,6 +58,13 @@ export function FiscalYearCloseDialog({ isOpen, onClose, fiscalYear, mode }: Fis
               : `Reopening ${fiscalYear?.name} will allow further postings. Please provide a reason for the audit trail.`}
           </p>
         </DialogHeader>
+
+        {error && (
+          <div className="mt-4 rounded-xl bg-rose-50 border border-rose-100 p-4 text-sm font-medium text-rose-800 flex items-center gap-2">
+            <AlertTriangle size={16} />
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           {mode === 'CLOSE' && (
@@ -115,6 +123,3 @@ export function FiscalYearCloseDialog({ isOpen, onClose, fiscalYear, mode }: Fis
   );
 }
 
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(' ');
-}

@@ -450,10 +450,7 @@ export class AccountingController {
 
   @Post('fiscal-years/:id/close-year')
   @Permissions('accounting:fiscal:manage')
-  closeFiscalYear(
-    @Param('id') id: string,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  closeFiscalYear(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.accountingService.closeFiscalYear(id, auth);
   }
 
@@ -473,10 +470,23 @@ export class AccountingController {
   @Permissions('accounting:settings:update')
   importBankStatement(
     @Param('accountId') accountId: string,
-    @Body() body: { lines: Array<{ statementDate: string; description: string; reference?: string; debitAmount?: number; creditAmount?: number }> },
+    @Body()
+    body: {
+      lines: Array<{
+        statementDate: string;
+        description: string;
+        reference?: string;
+        debitAmount?: number;
+        creditAmount?: number;
+      }>;
+    },
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.accountingService.importBankStatement(accountId, body.lines, auth);
+    return this.accountingService.importBankStatement(
+      accountId,
+      body.lines,
+      auth,
+    );
   }
 
   @Get('bank-reconciliation/:accountId/unreconciled')
@@ -494,7 +504,11 @@ export class AccountingController {
     @Body() body: { statementId: string; journalLineId: string },
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.accountingService.reconcileStatement(body.statementId, body.journalLineId, auth);
+    return this.accountingService.reconcileStatement(
+      body.statementId,
+      body.journalLineId,
+      auth,
+    );
   }
 
   @Get('bank-reconciliation/:accountId/summary')

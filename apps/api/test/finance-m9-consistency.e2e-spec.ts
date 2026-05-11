@@ -208,7 +208,25 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
 
       await financeService.reversePayment('pay-1', { reason: 'Refund' }, actor);
 
-      expect(prisma.journalEntry.update).not.toHaveBeenCalled();
+      expect(prisma.journalEntry.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'je-1' },
+          data: expect.objectContaining({
+            status: 'REVERSED',
+            reversalReason: 'Refund',
+            reversedById: actor.userId,
+            reversedAt: expect.any(Date),
+          }),
+        }),
+      );
+
+      const updateCall = (prisma.journalEntry.update as jest.Mock).mock.calls[0]?.[0];
+      expect(updateCall?.data?.lines).toBeUndefined();
+      expect(updateCall?.data?.entryDate).toBeUndefined();
+      expect(updateCall?.data?.fiscalYearId).toBeUndefined();
+      expect(updateCall?.data?.fiscalPeriodId).toBeUndefined();
+      expect(updateCall?.data?.sourceId).toBeUndefined();
+
       expect(prisma.journalEntry.delete).not.toHaveBeenCalled();
       expect(prisma.journalEntry.create).toHaveBeenCalledWith(
         expect.objectContaining({

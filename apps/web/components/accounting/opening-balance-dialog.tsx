@@ -4,11 +4,9 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
-import { Label } from '../ui/label';
 import { Input } from '../ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { toast } from 'sonner';
-import { Loader2, Plus, Trash2, AlertCircle } from 'lucide-react';
+import { Select } from '../ui/select';
+import { Loader2, Plus, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface OpeningBalanceDialogProps {
@@ -21,6 +19,8 @@ interface OpeningBalanceDialogProps {
 export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: OpeningBalanceDialogProps) {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [lines, setLines] = useState<any[]>([
     { chartAccountId: '', side: 'DEBIT', amount: 0 },
     { chartAccountId: '', side: 'CREDIT', amount: 0 },
@@ -33,12 +33,11 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
   const mutation = useMutation({
     mutationFn: (data: any) => api.createOpeningBalance(data),
     onSuccess: () => {
-      toast.success('Opening Balance recorded successfully');
       queryClient.invalidateQueries({ queryKey: ['accounting-report'] });
       onClose();
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to record opening balance');
+    onError: (err: any) => {
+      setError(err.message || 'Failed to record opening balance');
     },
     onSettled: () => setLoading(false),
   });
@@ -48,8 +47,9 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (Math.abs(diff) > 0.001) {
-      toast.error('Opening balance must be balanced (Total Debit must equal Total Credit)');
+      setError('Opening balance must be balanced (Total Debit must equal Total Credit)');
       return;
     }
 
@@ -70,6 +70,13 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
           </p>
         </DialogHeader>
 
+        {error && (
+          <div className="mt-4 rounded-xl bg-rose-50 border border-rose-100 p-4 text-sm font-medium text-rose-800 flex items-center gap-2">
+            <AlertCircle size={16} />
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col py-4">
           <div className="flex-1 overflow-y-auto space-y-4 px-1">
             <div className="grid grid-cols-12 gap-2 font-bold text-xs text-slate-500 uppercase tracking-wider pb-2 border-b border-slate-100">
@@ -84,38 +91,29 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
                 <div className="col-span-6">
                   <Select 
                     value={line.chartAccountId} 
-                    onValueChange={(v) => {
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                       const newLines = [...lines];
-                      newLines[index].chartAccountId = v;
+                      newLines[index].chartAccountId = e.target.value;
                       setLines(newLines);
                     }}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map(a => (
-                        <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
-                      ))}
-                    </SelectContent>
+                    <option value="">Select account</option>
+                    {accounts.map(a => (
+                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                    ))}
                   </Select>
                 </div>
                 <div className="col-span-2">
                   <Select 
                     value={line.side} 
-                    onValueChange={(v) => {
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                       const newLines = [...lines];
-                      newLines[index].side = v;
+                      newLines[index].side = e.target.value;
                       setLines(newLines);
                     }}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="DEBIT">Debit</SelectItem>
-                      <SelectItem value="CREDIT">Credit</SelectItem>
-                    </SelectContent>
+                    <option value="DEBIT">Debit</option>
+                    <option value="CREDIT">Credit</option>
                   </Select>
                 </div>
                 <div className="col-span-3">

@@ -4,10 +4,8 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { SectionCard } from '../ui/section-card';
-import { Label } from '../ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { toast } from 'sonner';
-import { Loader2, Upload, CheckCircle2, AlertTriangle, ArrowRightLeft, Search } from 'lucide-react';
+import { Select } from '../ui/select';
+import { Loader2, Upload, CheckCircle2, AlertTriangle, ArrowRightLeft, Search, Landmark } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { ReportTable } from './report-table';
 import { Input } from '../ui/input';
@@ -18,6 +16,8 @@ export function BankReconciliationWorkspace() {
   const [importing, setImporting] = useState(false);
   const [matching, setMatching] = useState<string | null>(null); // statementId being matched
   const [journalFilter, setJournalFilter] = useState('');
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const accountsQuery = useQuery({ 
     queryKey: ['chart-accounts'], 
@@ -49,23 +49,33 @@ export function BankReconciliationWorkspace() {
   const importMutation = useMutation({
     mutationFn: (lines: any[]) => api.importBankStatement(selectedAccountId, lines),
     onSuccess: () => {
-      toast.success('Bank statement imported successfully');
+      setMessage('Bank statement imported successfully');
+      setError(null);
       queryClient.invalidateQueries({ queryKey: ['bank-recon-summary', selectedAccountId] });
       queryClient.invalidateQueries({ queryKey: ['unreconciled-statements', selectedAccountId] });
+      setTimeout(() => setMessage(null), 3000);
     },
-    onError: (error: any) => toast.error(error.message || 'Import failed')
+    onError: (err: any) => {
+      setError(err.message || 'Import failed');
+      setMessage(null);
+    }
   });
 
   const reconcileMutation = useMutation({
     mutationFn: (data: { statementId: string; journalLineId: string }) => 
       api.reconcileStatement(data.statementId, data.journalLineId),
     onSuccess: () => {
-      toast.success('Transaction reconciled');
+      setMessage('Transaction reconciled');
+      setError(null);
       queryClient.invalidateQueries({ queryKey: ['bank-recon-summary', selectedAccountId] });
       queryClient.invalidateQueries({ queryKey: ['unreconciled-statements', selectedAccountId] });
       setMatching(null);
+      setTimeout(() => setMessage(null), 3000);
     },
-    onError: (error: any) => toast.error(error.message || 'Reconciliation failed')
+    onError: (err: any) => {
+      setError(err.message || 'Reconciliation failed');
+      setMessage(null);
+    }
   });
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,7 +102,7 @@ export function BankReconciliationWorkspace() {
         if (lines.length === 0) throw new Error('No valid lines found in CSV');
         importMutation.mutate(lines);
       } catch (err: any) {
-        toast.error(err.message);
+        setError(err.message);
       } finally {
         setImporting(false);
       }
@@ -102,18 +112,31 @@ export function BankReconciliationWorkspace() {
 
   return (
     <div className="space-y-6">
+      {message && (
+        <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4 text-sm font-medium text-emerald-800 flex items-center gap-2">
+          <CheckCircle2 size={16} />
+          {message}
+        </div>
+      )}
+      {error && (
+        <div className="rounded-xl bg-rose-50 border border-rose-100 p-4 text-sm font-medium text-rose-800 flex items-center gap-2">
+          <AlertTriangle size={16} />
+          {error}
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row gap-4 items-end">
         <div className="space-y-2 w-full md:w-80">
-          <Label>Select Bank/Cash Account</Label>
-          <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-            <SelectTrigger className="rounded-2xl border-slate-200">
-              <SelectValue placeholder="Choose account..." />
-            </SelectTrigger>
-            <SelectContent>
-              {bankAccounts.map(a => (
-                <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
-              ))}
-            </SelectContent>
+          <label className="text-sm font-medium text-slate-700">Select Bank/Cash Account</label>
+          <Select 
+            value={selectedAccountId} 
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedAccountId(e.target.value)}
+            className="rounded-2xl border-slate-200"
+          >
+            <option value="">Choose account...</option>
+            {bankAccounts.map(a => (
+              <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+            ))}
           </Select>
         </div>
 

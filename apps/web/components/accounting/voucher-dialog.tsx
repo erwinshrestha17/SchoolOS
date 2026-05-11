@@ -4,11 +4,10 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
-import { Label } from '../ui/label';
 import { Input } from '../ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { toast } from 'sonner';
-import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { Select } from '../ui/select';
+import { Loader2, Plus, Trash2, AlertCircle } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 type VoucherType = 'EXPENSE' | 'PAYMENT' | 'RECEIPT' | 'CONTRA';
 
@@ -22,6 +21,7 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
   const queryClient = useQueryClient();
   const [type, setType] = useState<VoucherType>('EXPENSE');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     expenseAccountId: '',
@@ -45,18 +45,18 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
       return api.createContraVoucher(data);
     },
     onSuccess: () => {
-      toast.success(`${type} Voucher created successfully`);
       queryClient.invalidateQueries({ queryKey: ['accounting-report'] });
       onClose();
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to create voucher');
+    onError: (err: any) => {
+      setError(err.message || 'Failed to create voucher');
     },
     onSettled: () => setLoading(false),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     setLoading(true);
     
     const payload: any = {
@@ -90,25 +90,27 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
           <DialogTitle>Create New Voucher</DialogTitle>
         </DialogHeader>
 
+        {error && (
+          <div className="mt-4 rounded-xl bg-rose-50 border border-rose-100 p-4 text-sm font-medium text-rose-800 flex items-center gap-2">
+            <AlertCircle size={16} />
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2 col-span-2">
-              <Label>Voucher Type</Label>
-              <Select value={type} onValueChange={(v: any) => setType(v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="EXPENSE">Expense Voucher</SelectItem>
-                  <SelectItem value="PAYMENT">Payment Voucher</SelectItem>
-                  <SelectItem value="RECEIPT">Receipt Voucher</SelectItem>
-                  <SelectItem value="CONTRA">Contra (Transfer)</SelectItem>
-                </SelectContent>
+              <label className="text-sm font-medium text-slate-700">Voucher Type</label>
+              <Select value={type} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setType(e.target.value as VoucherType)}>
+                <option value="EXPENSE">Expense Voucher</option>
+                <option value="PAYMENT">Payment Voucher</option>
+                <option value="RECEIPT">Receipt Voucher</option>
+                <option value="CONTRA">Contra (Transfer)</option>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Entry Date</Label>
+              <label className="text-sm font-medium text-slate-700">Entry Date</label>
               <Input
                 type="date"
                 value={formData.entryDate}
@@ -118,7 +120,7 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
             </div>
 
             <div className="space-y-2">
-              <Label>Amount</Label>
+              <label className="text-sm font-medium text-slate-700">Amount</label>
               <Input
                 type="number"
                 step="0.01"
@@ -132,35 +134,27 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
             {type === 'EXPENSE' && (
               <>
                 <div className="space-y-2">
-                  <Label>Expense Account</Label>
+                  <label className="text-sm font-medium text-slate-700">Expense Account</label>
                   <Select 
                     value={formData.expenseAccountId} 
-                    onValueChange={(v) => setFormData({ ...formData, expenseAccountId: v })}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, expenseAccountId: e.target.value })}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.filter(a => a.type === 'EXPENSE').map(a => (
-                        <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
-                      ))}
-                    </SelectContent>
+                    <option value="">Select account</option>
+                    {accounts.filter(a => a.type === 'EXPENSE').map(a => (
+                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                    ))}
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Payment Account (Bank/Cash)</Label>
+                  <label className="text-sm font-medium text-slate-700">Payment Account (Bank/Cash)</label>
                   <Select 
                     value={formData.paymentAccountId} 
-                    onValueChange={(v) => setFormData({ ...formData, paymentAccountId: v })}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, paymentAccountId: e.target.value })}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.filter(a => ['ASSET', 'LIABILITY'].includes(a.type)).map(a => (
-                        <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
-                      ))}
-                    </SelectContent>
+                    <option value="">Select account</option>
+                    {accounts.filter(a => ['ASSET', 'LIABILITY'].includes(a.type)).map(a => (
+                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                    ))}
                   </Select>
                 </div>
               </>
@@ -169,35 +163,27 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
             {type === 'PAYMENT' && (
               <>
                 <div className="space-y-2">
-                  <Label>Payee Account (Vendor/Liability)</Label>
+                  <label className="text-sm font-medium text-slate-700">Payee Account (Vendor/Liability)</label>
                   <Select 
                     value={formData.payeeAccountId} 
-                    onValueChange={(v) => setFormData({ ...formData, payeeAccountId: v })}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, payeeAccountId: e.target.value })}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map(a => (
-                        <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
-                      ))}
-                    </SelectContent>
+                    <option value="">Select account</option>
+                    {accounts.map(a => (
+                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                    ))}
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Payment Account (Bank/Cash)</Label>
+                  <label className="text-sm font-medium text-slate-700">Payment Account (Bank/Cash)</label>
                   <Select 
                     value={formData.paymentAccountId} 
-                    onValueChange={(v) => setFormData({ ...formData, paymentAccountId: v })}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, paymentAccountId: e.target.value })}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.filter(a => ['ASSET', 'LIABILITY'].includes(a.type)).map(a => (
-                        <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
-                      ))}
-                    </SelectContent>
+                    <option value="">Select account</option>
+                    {accounts.filter(a => ['ASSET', 'LIABILITY'].includes(a.type)).map(a => (
+                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                    ))}
                   </Select>
                 </div>
               </>
@@ -206,35 +192,27 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
             {type === 'RECEIPT' && (
               <>
                 <div className="space-y-2">
-                  <Label>Receipt Account (Income/Client)</Label>
+                  <label className="text-sm font-medium text-slate-700">Receipt Account (Income/Client)</label>
                   <Select 
                     value={formData.receiptAccountId} 
-                    onValueChange={(v) => setFormData({ ...formData, receiptAccountId: v })}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, receiptAccountId: e.target.value })}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map(a => (
-                        <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
-                      ))}
-                    </SelectContent>
+                    <option value="">Select account</option>
+                    {accounts.map(a => (
+                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                    ))}
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Deposit Account (Bank/Cash)</Label>
+                  <label className="text-sm font-medium text-slate-700">Deposit Account (Bank/Cash)</label>
                   <Select 
                     value={formData.depositAccountId} 
-                    onValueChange={(v) => setFormData({ ...formData, depositAccountId: v })}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, depositAccountId: e.target.value })}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.filter(a => ['ASSET', 'LIABILITY'].includes(a.type)).map(a => (
-                        <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
-                      ))}
-                    </SelectContent>
+                    <option value="">Select account</option>
+                    {accounts.filter(a => ['ASSET', 'LIABILITY'].includes(a.type)).map(a => (
+                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                    ))}
                   </Select>
                 </div>
               </>
@@ -243,42 +221,34 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
             {type === 'CONTRA' && (
               <>
                 <div className="space-y-2">
-                  <Label>From Account (Source)</Label>
+                  <label className="text-sm font-medium text-slate-700">From Account (Source)</label>
                   <Select 
                     value={formData.fromAccountId} 
-                    onValueChange={(v) => setFormData({ ...formData, fromAccountId: v })}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, fromAccountId: e.target.value })}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.filter(a => ['ASSET', 'LIABILITY'].includes(a.type)).map(a => (
-                        <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
-                      ))}
-                    </SelectContent>
+                    <option value="">Select account</option>
+                    {accounts.filter(a => ['ASSET', 'LIABILITY'].includes(a.type)).map(a => (
+                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                    ))}
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>To Account (Destination)</Label>
+                  <label className="text-sm font-medium text-slate-700">To Account (Destination)</label>
                   <Select 
                     value={formData.toAccountId} 
-                    onValueChange={(v) => setFormData({ ...formData, toAccountId: v })}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormData({ ...formData, toAccountId: e.target.value })}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.filter(a => ['ASSET', 'LIABILITY'].includes(a.type)).map(a => (
-                        <SelectItem key={a.id} value={a.id}>{a.code} - {a.name}</SelectItem>
-                      ))}
-                    </SelectContent>
+                    <option value="">Select account</option>
+                    {accounts.filter(a => ['ASSET', 'LIABILITY'].includes(a.type)).map(a => (
+                      <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                    ))}
                   </Select>
                 </div>
               </>
             )}
 
             <div className="space-y-2 col-span-2">
-              <Label>Narration</Label>
+              <label className="text-sm font-medium text-slate-700">Narration</label>
               <Input
                 value={formData.narration}
                 onChange={(e) => setFormData({ ...formData, narration: e.target.value })}
@@ -288,7 +258,7 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
             </div>
 
             <div className="space-y-2 col-span-2">
-              <Label>Reference (Optional)</Label>
+              <label className="text-sm font-medium text-slate-700">Reference (Optional)</label>
               <Input
                 value={formData.reference}
                 onChange={(e) => setFormData({ ...formData, reference: e.target.value })}

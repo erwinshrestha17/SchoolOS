@@ -298,9 +298,7 @@ describe('AccountingReportExportsService', () => {
     expect(csv).toContain('"TDS","Net Payable","100.00",""');
     expect(csv).toContain('"PF","Employee Contribution","300.00",""');
     expect(csv).toContain('"PF","Net Payable","200.00",""');
-    expect(csv).toContain(
-      '"WARNINGS","Setup Warning","","Missing PF Mapping"',
-    );
+    expect(csv).toContain('"WARNINGS","Setup Warning","","Missing PF Mapping"');
   });
 
   it('calls report service methods with tenantId from auth', async () => {
