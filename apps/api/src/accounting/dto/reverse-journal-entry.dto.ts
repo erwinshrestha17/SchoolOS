@@ -8,4 +8,7 @@ export class ReverseJournalEntryDto {
   @IsOptional()
   @IsString()
   narration?: string;
+
+  @IsString()
+  reason!: string;
 }

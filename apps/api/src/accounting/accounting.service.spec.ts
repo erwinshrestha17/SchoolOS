@@ -39,6 +39,7 @@ describe('accounting reversals', () => {
       {
         reversalDate: '2026-04-27',
         narration: 'Correction for duplicate posting',
+        reason: 'Correction for duplicate posting',
       },
       actor,
     );
@@ -81,7 +82,10 @@ describe('accounting reversals', () => {
     await expect(
       service.reverseJournalEntry(
         original.id,
-        { reversalDate: '2026-04-27' },
+        {
+          reversalDate: '2026-04-27',
+          reason: 'Test reversal into closed period',
+        },
         actor,
       ),
     ).rejects.toThrow(ConflictException);
@@ -98,7 +102,11 @@ describe('accounting reversals', () => {
     });
 
     await expect(
-      service.reverseJournalEntry(original.id, {}, actor),
+      service.reverseJournalEntry(
+        original.id,
+        { reason: 'Test duplicate reversal' },
+        actor,
+      ),
     ).rejects.toThrow('Journal entry already reversed by JE-2026-00009');
   });
 
@@ -112,7 +120,7 @@ describe('accounting reversals', () => {
     });
 
     await expect(
-      service.reverseJournalEntry('missing', {}, actor),
+      service.reverseJournalEntry('missing', { reason: 'Test missing' }, actor),
     ).rejects.toThrow(NotFoundException);
   });
 
@@ -127,71 +135,153 @@ describe('accounting reversals', () => {
 });
 
 describe('AccountingService Immutability', () => {
-  it('blocks direct updates to journal entries', async () => {
+  it('blocks direct updates to journal entries', () => {
     const { service } = buildService({});
-    await expect(service.updateJournalEntry()).rejects.toThrow(
+    expect(() => service.updateJournalEntry()).toThrow(
       'Journal entries are immutable. Use correction or reversal workflows.',
     );
   });
 
-  it('blocks direct deletions of journal entries', async () => {
+  it('blocks direct deletions of journal entries', () => {
     const { service } = buildService({});
-    await expect(service.deleteJournalEntry()).rejects.toThrow(
+    expect(() => service.deleteJournalEntry()).toThrow(
       'Journal entries are immutable and cannot be deleted once posted.',
     );
   });
 });
 
-describe('fiscal period status updates', () => {
-  it('allows locking a period without a reason', async () => {
+describe('fiscal period lifecycle management', () => {
+  it('locks an OPEN fiscal period', async () => {
     const period = { id: 'p1', status: 'OPEN', label: '2026-04' };
     const { service, prisma } = buildService({
       fiscalPeriod: period,
     });
 
-    await service.updateFiscalPeriodStatus(
-      'p1',
-      'LOCKED' as any,
-      {},
-      actor as any,
-    );
+    await service.lockFiscalPeriod('p1', { reason: 'Month end review' }, actor);
 
     expect(prisma.fiscalPeriod.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ status: 'LOCKED' }),
+        data: expect.objectContaining({
+          status: 'LOCKED',
+          lockReason: 'Month end review',
+        }),
       }),
     );
   });
 
-  it('enforces a mandatory reason when reopening a period', async () => {
-    const period = { id: 'p1', status: 'LOCKED', label: '2026-04' };
+  it('rejects locking a CLOSED fiscal period', async () => {
+    const period = { id: 'p1', status: 'CLOSED', label: '2026-04' };
     const { service } = buildService({
       fiscalPeriod: period,
     });
 
     await expect(
-      service.updateFiscalPeriodStatus('p1', 'OPEN' as any, {}, actor as any),
-    ).rejects.toThrow('Reason is mandatory for reopening a fiscal period');
+      service.lockFiscalPeriod('p1', { reason: 'Trying to lock' }, actor),
+    ).rejects.toThrow('Cannot lock a closed fiscal period');
   });
 
-  it('allows reopening with a reason', async () => {
+  it('unlocks a LOCKED fiscal period', async () => {
     const period = { id: 'p1', status: 'LOCKED', label: '2026-04' };
     const { service, prisma } = buildService({
       fiscalPeriod: period,
     });
 
-    await service.updateFiscalPeriodStatus(
+    await service.unlockFiscalPeriod(
       'p1',
-      'OPEN' as any,
-      { reason: 'Correction needed' },
-      actor as any,
+      { reason: 'Correction required' },
+      actor,
     );
 
     expect(prisma.fiscalPeriod.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ status: 'OPEN' }),
+        data: expect.objectContaining({
+          status: 'OPEN',
+          unlockReason: 'Correction required',
+        }),
       }),
     );
+  });
+
+  it('closes a LOCKED fiscal period', async () => {
+    const period = {
+      id: 'p1',
+      status: 'LOCKED',
+      label: '2026-04',
+      periodNumber: 1,
+    };
+    const { service, prisma } = buildService({
+      fiscalPeriod: period,
+    });
+
+    // Mock findFirst to return the current period first, then null for the previous period check
+    (prisma.fiscalPeriod.findFirst as jest.Mock)
+      .mockResolvedValueOnce(period)
+      .mockResolvedValueOnce(null);
+
+    await service.closeFiscalPeriod('p1', { reason: 'Audited' }, actor);
+
+    expect(prisma.fiscalPeriod.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'CLOSED',
+          closeReason: 'Audited',
+        }),
+      }),
+    );
+  });
+
+  it('rejects closing an OPEN fiscal period', async () => {
+    const period = { id: 'p1', status: 'OPEN', label: '2026-04' };
+    const { service } = buildService({
+      fiscalPeriod: period,
+    });
+
+    await expect(
+      service.closeFiscalPeriod('p1', { reason: 'Closing' }, actor),
+    ).rejects.toThrow('Fiscal period must be LOCKED before closing.');
+  });
+
+  it('reopens a CLOSED fiscal period', async () => {
+    const period = {
+      id: 'p1',
+      status: 'CLOSED',
+      label: '2026-04',
+      fiscalYear: { status: 'OPEN' },
+    };
+    const { service, prisma } = buildService({
+      fiscalPeriod: period,
+    });
+
+    await service.reopenFiscalPeriod(
+      'p1',
+      { reason: 'Audit adjustment' },
+      actor,
+    );
+
+    expect(prisma.fiscalPeriod.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'OPEN',
+          reopenReason: 'Audit adjustment',
+        }),
+      }),
+    );
+  });
+
+  it('rejects reopening a period in a CLOSED fiscal year', async () => {
+    const period = {
+      id: 'p1',
+      status: 'CLOSED',
+      label: '2026-04',
+      fiscalYear: { status: 'CLOSED' },
+    };
+    const { service } = buildService({
+      fiscalPeriod: period,
+    });
+
+    await expect(
+      service.reopenFiscalPeriod('p1', { reason: 'Reopening' }, actor),
+    ).rejects.toThrow('Reopen the fiscal year first.');
   });
 });
 

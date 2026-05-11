@@ -23,6 +23,10 @@ import { CreateExpenseDto } from './dto/create-expense.dto';
 import { CreateFiscalYearDto } from './dto/create-fiscal-year.dto';
 import { CreateManualJournalDto } from './dto/create-manual-journal.dto';
 import { ReverseJournalEntryDto } from './dto/reverse-journal-entry.dto';
+import { LockFiscalPeriodDto } from './dto/lock-fiscal-period.dto';
+import { UnlockFiscalPeriodDto } from './dto/unlock-fiscal-period.dto';
+import { CloseFiscalPeriodDto } from './dto/close-fiscal-period.dto';
+import { ReopenFiscalPeriodDto } from './dto/reopen-fiscal-period.dto';
 import { AccountingPostingService } from './accounting-posting.service';
 
 @Injectable()
@@ -36,7 +40,7 @@ export class AccountingService {
   /**
    * Block direct updates to posted journal entries.
    */
-  async updateJournalEntry() {
+  updateJournalEntry() {
     throw new ConflictException(
       'Journal entries are immutable. Use correction or reversal workflows.',
     );
@@ -45,7 +49,7 @@ export class AccountingService {
   /**
    * Block direct deletions of journal entries.
    */
-  async deleteJournalEntry() {
+  deleteJournalEntry() {
     throw new ConflictException(
       'Journal entries are immutable and cannot be deleted once posted.',
     );
@@ -384,6 +388,7 @@ export class AccountingService {
         reversalDate,
         narration:
           dto.narration ?? `Reversal of journal entry ${original.entryNumber}`,
+        reason: dto.reason,
         lines: original.lines.map((line) => ({
           chartAccountId: line.chartAccountId,
           side: reverseJournalSide(line.side),
@@ -644,10 +649,9 @@ export class AccountingService {
     });
   }
 
-  async updateFiscalPeriodStatus(
+  async lockFiscalPeriod(
     id: string,
-    status: AccountingPeriodStatus,
-    dto: AccountingActionDto,
+    dto: LockFiscalPeriodDto,
     actor: AuthContext,
   ) {
     const period = await this.prisma.fiscalPeriod.findFirst({
@@ -655,43 +659,186 @@ export class AccountingService {
     });
 
     if (!period) {
-      throw new NotFoundException('Fiscal period not found in this tenant');
+      throw new NotFoundException('Fiscal period not found');
     }
 
-    if (status === AccountingPeriodStatus.OPEN && !dto.reason) {
+    if (period.status === AccountingPeriodStatus.CLOSED) {
+      throw new ConflictException('Cannot lock a closed fiscal period');
+    }
+
+    const updated = await this.prisma.fiscalPeriod.update({
+      where: { id: period.id },
+      data: {
+        status: AccountingPeriodStatus.LOCKED,
+        lockedAt: new Date(),
+        lockedById: actor.userId,
+        lockReason: dto.reason,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'lock',
+      resource: 'fiscal_period',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      before: { status: period.status },
+      after: { status: updated.status, reason: dto.reason },
+    });
+
+    return updated;
+  }
+
+  async unlockFiscalPeriod(
+    id: string,
+    dto: UnlockFiscalPeriodDto,
+    actor: AuthContext,
+  ) {
+    const period = await this.prisma.fiscalPeriod.findFirst({
+      where: { id, tenantId: actor.tenantId },
+    });
+
+    if (!period) {
+      throw new NotFoundException('Fiscal period not found');
+    }
+
+    if (period.status === AccountingPeriodStatus.CLOSED) {
+      throw new ConflictException('Cannot unlock a closed fiscal period');
+    }
+
+    if (period.status === AccountingPeriodStatus.OPEN) {
+      return period;
+    }
+
+    const updated = await this.prisma.fiscalPeriod.update({
+      where: { id: period.id },
+      data: {
+        status: AccountingPeriodStatus.OPEN,
+        unlockedAt: new Date(),
+        unlockedById: actor.userId,
+        unlockReason: dto.reason,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'unlock',
+      resource: 'fiscal_period',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      before: { status: period.status },
+      after: { status: updated.status, reason: dto.reason },
+    });
+
+    return updated;
+  }
+
+  async closeFiscalPeriod(
+    id: string,
+    dto: CloseFiscalPeriodDto,
+    actor: AuthContext,
+  ) {
+    const period = await this.prisma.fiscalPeriod.findFirst({
+      where: { id, tenantId: actor.tenantId },
+    });
+
+    if (!period) {
+      throw new NotFoundException('Fiscal period not found');
+    }
+
+    if (period.status === AccountingPeriodStatus.CLOSED) {
+      throw new ConflictException('Fiscal period is already closed');
+    }
+
+    if (period.status === AccountingPeriodStatus.OPEN) {
       throw new ConflictException(
-        'Reason is mandatory for reopening a fiscal period',
+        'Fiscal period must be LOCKED before closing.',
+      );
+    }
+
+    // Optional: check if previous period is closed
+    const previousPeriod = await this.prisma.fiscalPeriod.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        fiscalYearId: period.fiscalYearId,
+        periodNumber: period.periodNumber - 1,
+      },
+    });
+
+    if (
+      previousPeriod &&
+      previousPeriod.status !== AccountingPeriodStatus.CLOSED
+    ) {
+      throw new ConflictException(
+        `Previous fiscal period "${previousPeriod.label}" must be closed first.`,
       );
     }
 
     const updated = await this.prisma.fiscalPeriod.update({
       where: { id: period.id },
       data: {
-        status,
-        lockedAt:
-          status === AccountingPeriodStatus.LOCKED
-            ? new Date()
-            : period.lockedAt,
-        closedAt: status === AccountingPeriodStatus.CLOSED ? new Date() : null,
+        status: AccountingPeriodStatus.CLOSED,
+        closedAt: new Date(),
+        closedById: actor.userId,
+        closeReason: dto.reason,
       },
     });
 
     await this.auditService.record({
-      action:
-        status === AccountingPeriodStatus.OPEN
-          ? 'reopen'
-          : status.toLowerCase(),
+      action: 'close',
       resource: 'fiscal_period',
       tenantId: actor.tenantId,
       userId: actor.userId,
       resourceId: updated.id,
       before: { status: period.status },
-      after: { status: updated.status, reason: dto.reason ?? null },
+      after: { status: updated.status, reason: dto.reason },
     });
 
     return updated;
   }
 
+  async reopenFiscalPeriod(
+    id: string,
+    dto: ReopenFiscalPeriodDto,
+    actor: AuthContext,
+  ) {
+    const period = await this.prisma.fiscalPeriod.findFirst({
+      where: { id, tenantId: actor.tenantId },
+      include: { fiscalYear: true },
+    });
+
+    if (!period) {
+      throw new NotFoundException('Fiscal period not found');
+    }
+
+    if (period.fiscalYear.status === 'CLOSED') {
+      throw new ConflictException(
+        'Cannot reopen a fiscal period in a closed fiscal year. Reopen the fiscal year first.',
+      );
+    }
+
+    const updated = await this.prisma.fiscalPeriod.update({
+      where: { id: period.id },
+      data: {
+        status: AccountingPeriodStatus.OPEN,
+        reopenedAt: new Date(),
+        reopenedById: actor.userId,
+        reopenReason: dto.reason,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'reopen',
+      resource: 'fiscal_period',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      before: { status: period.status },
+      after: { status: updated.status, reason: dto.reason },
+    });
+
+    return updated;
+  }
   async correctJournalEntry(
     id: string,
     dto: ReverseJournalEntryDto,
@@ -724,6 +871,7 @@ export class AccountingService {
         originalEntryId: id,
         correctionDate,
         narration: dto.narration ?? `Correction of ${original.entryNumber}`,
+        reason: dto.reason,
         lines: original.lines.map((l) => ({
           chartAccountId: l.chartAccountId,
           debit: l.debit ?? (l.side === JournalLineSide.DEBIT ? l.amount : 0),

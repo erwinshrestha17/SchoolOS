@@ -1809,6 +1809,9 @@ model JournalEntry {
   createdById    String?
   postedAt       DateTime           @default(now())
   reversedById   String?
+  reversedAt     DateTime?
+  reversalReason String?
+  correctionReason String?
   createdAt      DateTime           @default(now())
 
   tenant       Tenant         @relation(fields: [tenantId], references: [id])
@@ -1824,7 +1827,9 @@ model JournalEntry {
   @@unique([tenantId, fiscalYearId, entryNumber])
   @@unique([tenantId, sourceModule, sourceType, sourceId, postingType])
   @@index([tenantId, status, entryDate])
+  @@index([tenantId, status, postedAt])
   @@index([tenantId, reversalOfId])
+  @@index([tenantId, fiscalYearId, fiscalPeriodId, postedAt])
   @@index([tenantId, fiscalYearId])
   @@index([tenantId, fiscalPeriodId])
 }
@@ -1857,6 +1862,12 @@ model FiscalYear {
   startDate DateTime
   endDate   DateTime
   status    FiscalYearStatus @default(OPEN)
+  closedAt  DateTime?
+  closedById String?
+  closeReason String?
+  reopenedAt DateTime?
+  reopenedById String?
+  reopenReason String?
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
@@ -1881,7 +1892,17 @@ model FiscalPeriod {
   endDate      DateTime
   status       AccountingPeriodStatus @default(OPEN)
   lockedAt     DateTime?
+  lockedById   String?
+  lockReason   String?
+  unlockedAt   DateTime?
+  unlockedById String?
+  unlockReason String?
   closedAt     DateTime?
+  closedById   String?
+  closeReason  String?
+  reopenedAt   DateTime?
+  reopenedById String?
+  reopenReason String?
   createdAt    DateTime               @default(now())
   updatedAt    DateTime               @updatedAt
 
@@ -1893,6 +1914,8 @@ model FiscalPeriod {
   @@unique([tenantId, fiscalYearId, label])
   @@index([tenantId, startDate, endDate])
   @@index([tenantId, status])
+  @@index([tenantId, fiscalYearId, status])
+  @@index([tenantId, status, startDate, endDate])
 }
 
 model Notice {

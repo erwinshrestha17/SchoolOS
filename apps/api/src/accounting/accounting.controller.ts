@@ -26,6 +26,10 @@ import { CreateManualJournalDto } from './dto/create-manual-journal.dto';
 import { ReconciliationQueryDto } from './dto/reconciliation-query.dto';
 import { ReportsQueryDto } from './dto/reports-query.dto';
 import { ReverseJournalEntryDto } from './dto/reverse-journal-entry.dto';
+import { LockFiscalPeriodDto } from './dto/lock-fiscal-period.dto';
+import { UnlockFiscalPeriodDto } from './dto/unlock-fiscal-period.dto';
+import { CloseFiscalPeriodDto } from './dto/close-fiscal-period.dto';
+import { ReopenFiscalPeriodDto } from './dto/reopen-fiscal-period.dto';
 
 @Controller('accounting')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -136,45 +140,40 @@ export class AccountingController {
   @Permissions('accounting:fiscal:manage')
   lockFiscalPeriod(
     @Param('id') id: string,
-    @Body() dto: AccountingActionDto,
+    @Body() dto: LockFiscalPeriodDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.accountingService.updateFiscalPeriodStatus(
-      id,
-      AccountingPeriodStatus.LOCKED,
-      dto,
-      auth,
-    );
+    return this.accountingService.lockFiscalPeriod(id, dto, auth);
+  }
+
+  @Post('fiscal-periods/:id/unlock')
+  @Permissions('accounting:fiscal:manage')
+  unlockFiscalPeriod(
+    @Param('id') id: string,
+    @Body() dto: UnlockFiscalPeriodDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.unlockFiscalPeriod(id, dto, auth);
   }
 
   @Post('fiscal-periods/:id/close')
   @Permissions('accounting:fiscal:manage')
   closeFiscalPeriod(
     @Param('id') id: string,
-    @Body() dto: AccountingActionDto,
+    @Body() dto: CloseFiscalPeriodDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.accountingService.updateFiscalPeriodStatus(
-      id,
-      AccountingPeriodStatus.CLOSED,
-      dto,
-      auth,
-    );
+    return this.accountingService.closeFiscalPeriod(id, dto, auth);
   }
 
   @Post('fiscal-periods/:id/reopen')
-  @Permissions('accounting:fiscal:manage')
+  @Permissions('accounting:fiscal:reopen')
   reopenFiscalPeriod(
     @Param('id') id: string,
-    @Body() dto: AccountingActionDto,
+    @Body() dto: ReopenFiscalPeriodDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.accountingService.updateFiscalPeriodStatus(
-      id,
-      AccountingPeriodStatus.OPEN,
-      dto,
-      auth,
-    );
+    return this.accountingService.reopenFiscalPeriod(id, dto, auth);
   }
 
   @Get('reports')

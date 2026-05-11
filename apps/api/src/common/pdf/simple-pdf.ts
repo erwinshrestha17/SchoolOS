@@ -307,7 +307,13 @@ export function buildIdCardPdf(input: {
     '0.8 w',
     `${left} ${bottom} ${width} ${height} re S`,
     `${left + 8} ${bottom + 8} ${width - 16} ${height - 16} re S`,
-    text(fitText(input.schoolName, 29), left + 14, bottom + height - 28, 11, 'F2'),
+    text(
+      fitText(input.schoolName, 29),
+      left + 14,
+      bottom + height - 28,
+      11,
+      'F2',
+    ),
     text('STUDENT ID CARD', left + 50, bottom + height - 48, 10, 'F2'),
     `${left + 20} ${bottom + 176} 88 96 re S`,
     text('PHOTO', left + 48, bottom + 220, 9, 'F1'),
@@ -328,10 +334,22 @@ export function buildIdCardPdf(input: {
       : '',
     `${left + 14} ${bottom + 76} m ${left + width - 14} ${bottom + 76} l S`,
     sectionLabel('Emergency Contact', left + 20, bottom + 60),
-    text(fitText(input.guardianName ?? 'N/A', 22), left + 20, bottom + 45, 8, 'F1'),
+    text(
+      fitText(input.guardianName ?? 'N/A', 22),
+      left + 20,
+      bottom + 45,
+      8,
+      'F1',
+    ),
     text(input.guardianPhone ?? 'N/A', left + 122, bottom + 45, 8, 'F1'),
     input.academicYear
-      ? text(`Valid for: ${input.academicYear}`, left + 20, bottom + 26, 7, 'F1')
+      ? text(
+          `Valid for: ${input.academicYear}`,
+          left + 20,
+          bottom + 26,
+          7,
+          'F1',
+        )
       : '',
   ];
 
@@ -370,7 +388,9 @@ export function buildReportCardPdf(input: {
     ...pageFrame(
       'PROGRESS REPORT',
       input.schoolName,
-      input.panNumber ? `PAN: ${input.panNumber}` : `${input.examName} - ${input.academicYear}`,
+      input.panNumber
+        ? `PAN: ${input.panNumber}`
+        : `${input.examName} - ${input.academicYear}`,
     ),
     infoBox(48, 626, 492, 58),
     sectionLabel('Student', 60, 666),
@@ -392,7 +412,9 @@ export function buildReportCardPdf(input: {
     contentParts.push(
       text(subject.name, 60, y, 9, 'F1'),
       text(
-        subject.theory ? `${subject.theory.obtained}/${subject.theory.max}` : '—',
+        subject.theory
+          ? `${subject.theory.obtained}/${subject.theory.max}`
+          : '—',
         204,
         y,
         9,
@@ -454,7 +476,9 @@ export function buildRosterPdf(input: {
     ...pageFrame(
       'CLASS ROSTER',
       input.schoolName,
-      input.academicYear ? `Academic Year: ${input.academicYear}` : 'Student directory export',
+      input.academicYear
+        ? `Academic Year: ${input.academicYear}`
+        : 'Student directory export',
     ),
     text(
       `${input.className}${input.sectionName ? ' - ' + input.sectionName : ''}`,
@@ -476,7 +500,9 @@ export function buildRosterPdf(input: {
   for (const row of input.rows.slice(0, 34)) {
     let x = 60;
     for (const header of input.headers) {
-      contentParts.push(text(fitText(String(row[header] ?? ''), 18), x, y, 8, 'F1'));
+      contentParts.push(
+        text(fitText(String(row[header] ?? ''), 18), x, y, 8, 'F1'),
+      );
       x += colWidth;
     }
     y -= 16;
@@ -566,7 +592,9 @@ function pill(x: number, y: number, width: number, height: number) {
 }
 
 function stamp(value: string, x: number, y: number) {
-  return [`${x} ${y} 82 22 re S`, text(value, x + 16, y + 7, 9, 'F2')].join('\n');
+  return [`${x} ${y} 82 22 re S`, text(value, x + 16, y + 7, 9, 'F2')].join(
+    '\n',
+  );
 }
 
 function sectionLabel(value: string, x: number, y: number) {

@@ -125,6 +125,7 @@ describe('Accounting M9 Hardening (E2E)', () => {
         {
           reversalDate: new Date().toISOString(),
           narration: 'Correcting wrong amount',
+          reason: 'Typo in original amount',
         },
         actor,
       );
@@ -167,7 +168,7 @@ describe('Accounting M9 Hardening (E2E)', () => {
           },
           actor,
         ),
-      ).rejects.toThrow(/at least two lines/i);
+      ).rejects.toThrow('Journal entry must have at least two valid lines.');
 
       // Manual Journal - Imbalanced
       await expect(
@@ -226,7 +227,7 @@ describe('Accounting M9 Hardening (E2E)', () => {
           },
           actor,
         ),
-      ).rejects.toThrow(/non-zero/i);
+      ).rejects.toThrow(/must have either a debit or a credit amount/i);
     });
   });
 

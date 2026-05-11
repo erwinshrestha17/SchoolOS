@@ -106,7 +106,7 @@ describe('AccountingPostingService payroll posting', () => {
     expect(client.chartAccount.upsert).toHaveBeenCalledTimes(6);
   });
 
-  it('blocks duplicate payroll journal posting for the same source document', async () => {
+  it('returns existing payroll journal for duplicate source document posting', async () => {
     const client = createPostingClient({
       existingJournal: { entryNumber: 'JE-2026-00005' },
     });
@@ -116,21 +116,21 @@ describe('AccountingPostingService payroll posting', () => {
       auditService as never,
     );
 
-    await expect(
-      service.postPayrollAccrual(
-        {
-          tenantId: 'tenant-1',
-          payrollRunId: 'run-1',
-          periodMonth: 5,
-          periodYear: 2026,
-          grossAmount: new Prisma.Decimal(75000),
-          deductionAmount: new Prisma.Decimal(1750),
-          netAmount: new Prisma.Decimal(73250),
-        },
-        { tenantId: 'tenant-1', userId: 'user-1' } as never,
-        client as never,
-      ),
-    ).rejects.toBeInstanceOf(ConflictException);
+    const result = await service.postPayrollAccrual(
+      {
+        tenantId: 'tenant-1',
+        payrollRunId: 'run-1',
+        periodMonth: 5,
+        periodYear: 2026,
+        grossAmount: new Prisma.Decimal(75000),
+        deductionAmount: new Prisma.Decimal(1750),
+        netAmount: new Prisma.Decimal(73250),
+      },
+      { tenantId: 'tenant-1', userId: 'user-1' } as never,
+      client as never,
+    );
+
+    expect(result.entryNumber).toBe('JE-2026-00005');
   });
 
   it('blocks payroll posting into a closed accounting period', async () => {

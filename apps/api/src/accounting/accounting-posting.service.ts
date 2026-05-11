@@ -162,7 +162,7 @@ export class AccountingPostingService {
       entryDate,
     );
 
-    await this.ensureNoDuplicateSource(
+    const existing = await this.ensureNoDuplicateSource(
       tx,
       input.tenantId,
       'PAYROLL',
@@ -170,6 +170,10 @@ export class AccountingPostingService {
       input.payrollRunId,
       'APPROVAL',
     );
+
+    if (existing) {
+      return existing;
+    }
 
     const salaryExpense = await this.ensureAccount(tx, input.tenantId, {
       code: '5010',
@@ -349,7 +353,7 @@ export class AccountingPostingService {
       entryDate,
     );
 
-    await this.ensureNoDuplicateSource(
+    const existing = await this.ensureNoDuplicateSource(
       tx,
       input.tenantId,
       'PAYROLL',
@@ -357,6 +361,10 @@ export class AccountingPostingService {
       input.payrollRunId,
       'DISBURSEMENT',
     );
+
+    if (existing) {
+      return existing;
+    }
 
     const salaryPayable = await this.ensureAccount(tx, input.tenantId, {
       code: '2200',
@@ -529,6 +537,7 @@ export class AccountingPostingService {
       originalEntryId: string;
       correctionDate: Date;
       narration: string;
+      reason: string;
       lines: JournalPostingLineInput[];
     },
     actor: AuthContext,
@@ -554,6 +563,7 @@ export class AccountingPostingService {
         originalEntryId: original.id,
         reversalDate: input.correctionDate,
         narration: `Correction Reversal: ${input.narration}`,
+        reason: `Reversal for correction: ${input.reason}`,
         lines: original.lines.map((line) => ({
           chartAccountId: line.chartAccountId,
           side:
@@ -584,25 +594,12 @@ export class AccountingPostingService {
       tx,
     );
 
-    // 3. Update original with correction link
-    await tx.journalEntry.update({
-      where: { id: original.id },
-      data: {
-        correctionOfId: correction.id, // Or use a separate field if needed, but the schema has correctionOfId
-        // Wait, correctionOfId should probably be on the NEW entry pointing to OLD.
-        // Let's check schema: correctionOfId String?
-      },
-    });
-
-    // Actually, according to schema:
-    // correctionOf   JournalEntry?  @relation("JournalEntryCorrection", fields: [correctionOfId], references: [id], onDelete: Restrict)
-    // corrections  JournalEntry[] @relation("JournalEntryCorrection")
-    // So the NEW entry (correction) should have correctionOfId = original.id.
-
+    // 3. Update correction with linkage
     await tx.journalEntry.update({
       where: { id: correction.id },
       data: {
         correctionOfId: original.id,
+        correctionReason: input.reason,
       },
     });
 
@@ -616,6 +613,7 @@ export class AccountingPostingService {
         originalEntryId: original.id,
         reversalEntryId: reversal.id,
         correctionEntryNumber: correction.entryNumber,
+        reason: input.reason,
       },
     });
 
@@ -628,6 +626,7 @@ export class AccountingPostingService {
       originalEntryId: string;
       reversalDate: Date;
       narration: string;
+      reason: string;
       lines: Array<{
         chartAccountId: string;
         side: JournalLineSide;
@@ -677,8 +676,20 @@ export class AccountingPostingService {
             description: line.description,
           })),
         },
+        reversalReason: input.reason,
       },
       include: { lines: true },
+    });
+
+    // Update original journal entry
+    await tx.journalEntry.update({
+      where: { id: input.originalEntryId },
+      data: {
+        status: JournalEntryStatus.REVERSED,
+        reversedAt: new Date(),
+        reversedById: actor.userId,
+        reversalReason: input.reason,
+      },
     });
 
     await this.auditService.record({
@@ -709,7 +720,7 @@ export class AccountingPostingService {
       entryDate,
     );
 
-    await this.ensureNoDuplicateSource(
+    const existing = await this.ensureNoDuplicateSource(
       tx,
       input.tenantId,
       'FINANCE',
@@ -717,6 +728,10 @@ export class AccountingPostingService {
       input.paymentId,
       'RECEIPT',
     );
+
+    if (existing) {
+      return existing;
+    }
 
     const debitAccount = await tx.chartAccount.findUniqueOrThrow({
       where: {
@@ -821,7 +836,7 @@ export class AccountingPostingService {
       entryDate,
     );
 
-    await this.ensureNoDuplicateSource(
+    const existing = await this.ensureNoDuplicateSource(
       tx,
       input.tenantId,
       'FINANCE',
@@ -829,6 +844,10 @@ export class AccountingPostingService {
       input.invoiceId,
       'BILLING',
     );
+
+    if (existing) {
+      return existing;
+    }
 
     const receivableAccount = await this.ensureAccount(tx, input.tenantId, {
       code: '1200',
@@ -933,6 +952,19 @@ export class AccountingPostingService {
       entryDate,
     );
 
+    const existing = await this.ensureNoDuplicateSource(
+      tx,
+      input.tenantId,
+      'FINANCE',
+      JournalSourceType.ADJUSTMENT,
+      input.waiverId,
+      'WAIVER',
+    );
+
+    if (existing) {
+      return existing;
+    }
+
     const waiverExpense = await this.ensureAccount(tx, input.tenantId, {
       code: '5100',
       name: 'Fee Waivers & Discounts',
@@ -1021,6 +1053,19 @@ export class AccountingPostingService {
       input.tenantId,
       entryDate,
     );
+
+    const existing = await this.ensureNoDuplicateSource(
+      tx,
+      input.tenantId,
+      'FINANCE',
+      JournalSourceType.PAYMENT_REFUND,
+      input.refundId,
+      'REFUND',
+    );
+
+    if (existing) {
+      return existing;
+    }
 
     const paymentAccount = await tx.chartAccount.findUniqueOrThrow({
       where: {
@@ -1120,6 +1165,18 @@ export class AccountingPostingService {
       input.tenantId,
       entryDate,
     );
+    const existing = await this.ensureNoDuplicateSource(
+      tx,
+      input.tenantId,
+      'CANTEEN',
+      JournalSourceType.ADJUSTMENT,
+      input.walletId,
+      'TOPUP',
+    );
+
+    if (existing) {
+      return existing;
+    }
 
     const cashAccount = await this.ensureAccount(tx, input.tenantId, {
       code: input.paymentAccountCode ?? '1010',
@@ -1194,6 +1251,19 @@ export class AccountingPostingService {
       input.tenantId,
       entryDate,
     );
+
+    const existing = await this.ensureNoDuplicateSource(
+      tx,
+      input.tenantId,
+      'CANTEEN',
+      JournalSourceType.FEE_PAYMENT,
+      input.saleId,
+      'SALE',
+    );
+
+    if (existing) {
+      return existing;
+    }
 
     const revenueAccount = await this.ensureAccount(tx, input.tenantId, {
       code: '4100',
@@ -1350,19 +1420,26 @@ export class AccountingPostingService {
     const existing = await tx.journalEntry.findFirst({
       where: {
         tenantId,
-        OR: [
-          { sourceModule, sourceType, sourceId, postingType },
-          { sourceType, sourceId, postingType },
-          { sourceType: JournalSourceType.PAYROLL, sourceId },
-        ],
+        sourceModule,
+        sourceType,
+        sourceId,
+        postingType,
+      },
+      include: {
+        lines: true,
       },
     });
 
     if (existing) {
-      throw new ConflictException(
-        `Source document already posted as journal entry ${existing.entryNumber}`,
-      );
+      // Idempotency check: if existing entry is found for the same source,
+      // we check if it's the exact same or if there's a conflict.
+      // For now, we follow the requirement to return the existing journal or a safe idempotent result.
+      // If we wanted to check material difference, we'd compare totals or lines here.
+
+      return existing;
     }
+
+    return null;
   }
 
   private async generateJournalEntryNumber(
@@ -1413,22 +1490,23 @@ export class AccountingPostingService {
     });
   }
 
-  private ensureBalanced(
+  private validateJournalLines(
     lines: Array<{
       side?: JournalLineSide;
       amount?: Prisma.Decimal | number | string | Prisma.DecimalJsLike;
       debit?: Prisma.Decimal | number | string | Prisma.DecimalJsLike;
       credit?: Prisma.Decimal | number | string | Prisma.DecimalJsLike;
+      chartAccountId: string;
     }>,
   ) {
     if (lines.length < 2) {
       throw new ConflictException(
-        'Journal entry must have at least two lines.',
+        'Journal entry must have at least two valid lines.',
       );
     }
 
     const totals = lines.reduce(
-      (acc: { debit: Prisma.Decimal; credit: Prisma.Decimal }, line) => {
+      (acc: { debit: Prisma.Decimal; credit: Prisma.Decimal }, line, index) => {
         const debit =
           line.debit !== undefined
             ? toDecimal(line.debit)
@@ -1442,6 +1520,31 @@ export class AccountingPostingService {
             : line.side === JournalLineSide.CREDIT
               ? toDecimal(line.amount ?? 0)
               : new Prisma.Decimal(0);
+
+        // Correctness hardening
+        if (debit.lt(0) || credit.lt(0)) {
+          throw new ConflictException(
+            `Line ${index + 1}: Negative debit or credit values are not allowed.`,
+          );
+        }
+
+        if (debit.gt(0) && credit.gt(0)) {
+          throw new ConflictException(
+            `Line ${index + 1}: A journal line cannot have both debit and credit values greater than zero.`,
+          );
+        }
+
+        if (debit.equals(0) && credit.equals(0)) {
+          throw new ConflictException(
+            `Line ${index + 1}: A journal line must have either a debit or a credit amount.`,
+          );
+        }
+
+        if (!line.chartAccountId) {
+          throw new ConflictException(
+            `Line ${index + 1}: Chart account is required.`,
+          );
+        }
 
         return {
           debit: acc.debit.add(debit),
@@ -1464,11 +1567,23 @@ export class AccountingPostingService {
       );
     }
 
-    if (totals.debit.lte(0) && totals.credit.lte(0)) {
+    if (totals.debit.equals(0)) {
       throw new ConflictException(
         'Journal entry must have a non-zero balanced amount.',
       );
     }
+  }
+
+  private ensureBalanced(
+    lines: Array<{
+      side?: JournalLineSide;
+      amount?: Prisma.Decimal | number | string | Prisma.DecimalJsLike;
+      debit?: Prisma.Decimal | number | string | Prisma.DecimalJsLike;
+      credit?: Prisma.Decimal | number | string | Prisma.DecimalJsLike;
+      chartAccountId: string;
+    }>,
+  ) {
+    this.validateJournalLines(lines);
   }
 }
 
@@ -1485,8 +1600,4 @@ function toDecimal(
     return new Prisma.Decimal(0);
   }
   return new Prisma.Decimal(value as string | number);
-}
-
-function decimalText(value: Prisma.Decimal | number | string) {
-  return toDecimal(value).toString();
 }

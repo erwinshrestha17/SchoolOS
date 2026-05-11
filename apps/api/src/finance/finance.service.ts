@@ -2873,6 +2873,7 @@ export class FinanceService {
           originalEntryId: sourceJournal.id,
           reversalDate: new Date(),
           narration: `Voiding Payment ${payment.receipt?.receiptNumber ?? payment.id}: ${dto.reason}`,
+          reason: dto.reason,
           lines: sourceJournal.lines.map((line) => ({
             chartAccountId: line.chartAccountId,
             side:

@@ -276,14 +276,14 @@ describe('Accounting Module Hardening (E2E)', () => {
   });
 
   describe('Immutability', () => {
-    it('should not allow direct update of a journal entry', async () => {
-      await expect(accountingService.updateJournalEntry()).rejects.toThrow(
+    it('should not allow direct update of a journal entry', () => {
+      expect(() => accountingService.updateJournalEntry()).toThrow(
         'Journal entries are immutable. Use correction or reversal workflows.',
       );
     });
 
-    it('should not allow direct deletion of a journal entry', async () => {
-      await expect(accountingService.deleteJournalEntry()).rejects.toThrow(
+    it('should not allow direct deletion of a journal entry', () => {
+      expect(() => accountingService.deleteJournalEntry()).toThrow(
         'Journal entries are immutable and cannot be deleted once posted.',
       );
     });
@@ -297,7 +297,11 @@ describe('Accounting Module Hardening (E2E)', () => {
       });
 
       await expect(
-        accountingService.reverseJournalEntry('je-1', {}, actorA),
+        accountingService.reverseJournalEntry(
+          'je-1',
+          { reason: 'Test duplicate' },
+          actorA,
+        ),
       ).rejects.toThrow('Journal entry is already reversed');
     });
 
@@ -310,7 +314,11 @@ describe('Accounting Module Hardening (E2E)', () => {
       });
 
       await expect(
-        accountingService.reverseJournalEntry('je-1', {}, actorA),
+        accountingService.reverseJournalEntry(
+          'je-1',
+          { reason: 'Test closed period' },
+          actorA,
+        ),
       ).rejects.toThrow(/belongs to a closed fiscal period/);
     });
   });
