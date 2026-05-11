@@ -19,7 +19,6 @@ export class MarksService {
   ) {}
 
   async bulkUpsert(dto: BulkUpsertMarksDto, actor: AuthContext) {
-    // 1. Verify examTerm
     const examTerm = await this.prisma.examTerm.findFirst({
       where: { id: dto.examTermId, tenantId: actor.tenantId },
     });
@@ -27,7 +26,6 @@ export class MarksService {
       throw new NotFoundException('Exam term not found');
     }
 
-    // 2. Verify assessment component & associations
     const component = await this.prisma.assessmentComponent.findFirst({
       where: {
         id: dto.assessmentComponentId,
@@ -51,7 +49,6 @@ export class MarksService {
       throw new ConflictException('Subject does not belong to the given class');
     }
 
-    // 3. Verify section if provided
     if (dto.sectionId) {
       const section = await this.prisma.section.findFirst({
         where: {
@@ -65,13 +62,11 @@ export class MarksService {
       }
     }
 
-    // 4. Duplicate entries check
     const studentIds = dto.entries.map((e) => e.studentId);
     if (new Set(studentIds).size !== studentIds.length) {
       throw new ConflictException('Duplicate student entries in request');
     }
 
-    // 5. Verify all students belong to the class/section
     const students = await this.prisma.student.findMany({
       where: {
         id: { in: studentIds },
@@ -86,7 +81,6 @@ export class MarksService {
       );
     }
 
-    // 6. Validate each entry
     const maxMarks = Number(component.maxMarks);
     for (const entry of dto.entries) {
       if (entry.isAbsent && entry.isWithheld) {
@@ -107,7 +101,6 @@ export class MarksService {
       }
     }
 
-    // 7. Verify existing locks
     const existingMarks = await this.prisma.markEntry.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -120,10 +113,9 @@ export class MarksService {
       throw new ConflictException('Cannot update locked mark entries');
     }
 
-    // 8. Transactional Upsert
     const results = await this.prisma.$transaction(
       dto.entries.map((entry) => {
-        let status = MarkEntryStatus.SUBMITTED;
+        let status: MarkEntryStatus = MarkEntryStatus.SUBMITTED;
         if (entry.isAbsent) status = MarkEntryStatus.ABSENT;
         else if (entry.isWithheld) status = MarkEntryStatus.WITHHELD;
 
@@ -328,7 +320,7 @@ export class MarksService {
       throw new ConflictException('Entry cannot be both absent and withheld');
     }
 
-    let status = existingMark.status;
+    let status: MarkEntryStatus = existingMark.status;
     let val = Number(existingMark.marksObtained);
 
     const isAbsent = dto.isAbsent ?? status === MarkEntryStatus.ABSENT;
