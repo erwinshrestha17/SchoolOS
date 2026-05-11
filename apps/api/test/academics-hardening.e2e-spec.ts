@@ -3,9 +3,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthMethod, MarkEntryStatus } from '@prisma/client';
 import { GradeCalculatorService } from '../src/academics/grade-calculator.service';
 import { MarksService } from '../src/academics/marks.service';
-import { PrismaService } from '../src/prisma/prisma.service';
 import { AuditService } from '../src/audit/audit.service';
 import { AuthContext } from '../src/auth/auth.types';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { createPrismaMock, PrismaMock } from './test-helpers';
 
 describe('Academics Hardening (Service Layer)', () => {
@@ -16,7 +16,7 @@ describe('Academics Hardening (Service Layer)', () => {
     userId: 'user-1',
     tenantId: 'tenant-a',
     tenantSlug: 'tenant-a',
-    email: 'teacher@example.com',
+    email: 'teacher@school.test',
     authMethod: AuthMethod.PASSWORD,
     roles: ['teacher'],
     permissions: ['academics:enter_marks'],
@@ -54,20 +54,26 @@ describe('Academics Hardening (Service Layer)', () => {
       examTermId: 'term-1',
       subjectId: 'sub-1',
       maxMarks: 100,
-      subject: { id: 'sub-1', classId: 'class-1', class: { id: 'class-1' } },
+      subject: {
+        id: 'sub-1',
+        classId: 'class-1',
+        class: { id: 'class-1' },
+      },
     });
     p.student.findMany.mockResolvedValue([
       { id: 'student-1', tenantId: 'tenant-a', classId: 'class-1' },
     ]);
     p.markEntry.findMany.mockResolvedValue([]);
     p.markEntry.upsert.mockResolvedValue({ id: 'mark-1' });
-    p.$transaction.mockImplementation((queries: unknown[]) => Promise.all(queries));
+    p.$transaction.mockImplementation((queries: unknown[]) =>
+      Promise.all(queries),
+    );
 
     return p;
   }
 
   describe('marks entry hardening', () => {
-    it('should reject marks for students outside the class or tenant scope', async () => {
+    it('rejects marks for students beyond the selected scope', async () => {
       const p = mockValidScope();
       p.student.findMany.mockResolvedValue([]);
 
@@ -85,7 +91,7 @@ describe('Academics Hardening (Service Layer)', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should reject marks exceeding component maxMarks', async () => {
+    it('rejects marks exceeding component maxMarks', async () => {
       mockValidScope();
 
       await expect(
@@ -102,7 +108,7 @@ describe('Academics Hardening (Service Layer)', () => {
       ).rejects.toThrow(ConflictException);
     });
 
-    it('should reject negative marks', async () => {
+    it('rejects negative marks', async () => {
       mockValidScope();
 
       await expect(
@@ -119,7 +125,7 @@ describe('Academics Hardening (Service Layer)', () => {
       ).rejects.toThrow(ConflictException);
     });
 
-    it('should handle ABSENT status by forcing marks to 0', async () => {
+    it('handles ABSENT status by storing zero marks', async () => {
       const p = mockValidScope();
 
       await marksService.bulkUpsert(
@@ -143,7 +149,7 @@ describe('Academics Hardening (Service Layer)', () => {
       );
     });
 
-    it('should prevent editing locked marks', async () => {
+    it('prevents editing locked marks', async () => {
       const p = mockValidScope();
       p.markEntry.findMany.mockResolvedValue([{ id: 'mark-1', isLocked: true }]);
 
@@ -163,7 +169,7 @@ describe('Academics Hardening (Service Layer)', () => {
   });
 
   describe('GradeCalculator hardening', () => {
-    it('should calculate NG grade if a student is ABSENT in a required component', () => {
+    it('calculates NG grade for absent required component', () => {
       const gradeCalculator = new GradeCalculatorService();
 
       const result = gradeCalculator.calculateWeightedSubjectGrade({
