@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import {
   AudienceType,
   ConsentType,
@@ -147,7 +143,8 @@ export class ResultPublishingService {
           : null,
         blockedReasons,
         notificationEligibility:
-          card.student.lifecycleStatus === 'ACTIVE' && blockedReasons.length === 0,
+          card.student.lifecycleStatus === 'ACTIVE' &&
+          blockedReasons.length === 0,
       });
     }
 
