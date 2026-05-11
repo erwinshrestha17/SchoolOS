@@ -72,6 +72,29 @@ export class ReportCardsService {
       throw new NotFoundException('Student not found in this tenant');
     }
 
+    if (!examTerm.isLocked) {
+      throw new ConflictException(
+        'Report card generation requires locked marks for this exam term',
+      );
+    }
+
+    const existingReportCard = await this.prisma.reportCard.findUnique({
+      where: {
+        tenantId_academicYearId_examTermId_studentId: {
+          tenantId: actor.tenantId,
+          academicYearId: dto.academicYearId,
+          examTermId: dto.examTermId,
+          studentId: dto.studentId,
+        },
+      },
+    });
+
+    if (existingReportCard?.status === GradeLockStatus.LOCKED) {
+      throw new ConflictException(
+        'Locked report cards cannot be regenerated without a correction workflow',
+      );
+    }
+
     const settings = await this.prisma.tenantSetting.findFirst({
       where: { tenantId: actor.tenantId, key: 'block_report_card_on_dues' },
     });
@@ -117,9 +140,35 @@ export class ReportCardsService {
       );
     }
 
+    const unlockedMarks = marks.filter((mark) => !mark.isLocked);
+    if (unlockedMarks.length > 0) {
+      throw new ConflictException(
+        'Report card generation requires all available marks to be locked',
+      );
+    }
+
     const subjectGrades = this.calculateSubjectGrades(components, marks);
     const overall = this.gradeCalculator.calculateOverallGpa(subjectGrades);
+
+    if (overall.resultStatus === 'INCOMPLETE') {
+      throw new ConflictException(
+        'Cannot generate report card while required marks are incomplete',
+      );
+    }
+
+    if (overall.resultStatus === 'WITHHELD') {
+      throw new ConflictException(
+        'Cannot generate report card while any result is withheld',
+      );
+    }
+
     const status = dto.lock ? GradeLockStatus.LOCKED : GradeLockStatus.DRAFT;
+    const lockedAt = status === GradeLockStatus.LOCKED ? new Date() : null;
+    const remarks = this.buildRemarks(
+      dto.remarks,
+      subjectGrades,
+      overall.resultStatus,
+    );
 
     const reportCard = await this.prisma.reportCard.upsert({
       where: {
@@ -137,34 +186,26 @@ export class ReportCardsService {
         studentId: dto.studentId,
         classId: student.classId,
         sectionId: student.sectionId ?? null,
-        totalMarks: new Prisma.Decimal(overall.percentage),
-        maxMarks: new Prisma.Decimal(100),
+        totalMarks: new Prisma.Decimal(overall.totalObtained),
+        maxMarks: new Prisma.Decimal(overall.totalFullMarks),
         percentage: new Prisma.Decimal(overall.percentage),
         grade: overall.grade,
         gpa: new Prisma.Decimal(overall.gpa),
-        remarks: this.buildRemarks(
-          dto.remarks,
-          subjectGrades,
-          overall.resultStatus,
-        ),
+        remarks,
         status,
-        lockedAt: status === GradeLockStatus.LOCKED ? new Date() : null,
+        lockedAt,
       },
       update: {
         classId: student.classId,
         sectionId: student.sectionId ?? null,
-        totalMarks: new Prisma.Decimal(overall.percentage),
-        maxMarks: new Prisma.Decimal(100),
+        totalMarks: new Prisma.Decimal(overall.totalObtained),
+        maxMarks: new Prisma.Decimal(overall.totalFullMarks),
         percentage: new Prisma.Decimal(overall.percentage),
         grade: overall.grade,
         gpa: new Prisma.Decimal(overall.gpa),
-        remarks: this.buildRemarks(
-          dto.remarks,
-          subjectGrades,
-          overall.resultStatus,
-        ),
+        remarks,
         status,
-        lockedAt: status === GradeLockStatus.LOCKED ? new Date() : null,
+        lockedAt,
       },
       include: {
         academicYear: true,
@@ -176,7 +217,7 @@ export class ReportCardsService {
     });
 
     await this.auditService.record({
-      action: 'generate',
+      action: 'ACADEMICS_REPORT_CARD_GENERATED',
       resource: 'report_card',
       tenantId: actor.tenantId,
       userId: actor.userId,
@@ -185,6 +226,8 @@ export class ReportCardsService {
         academicYearId: dto.academicYearId,
         examTermId: dto.examTermId,
         studentId: dto.studentId,
+        totalObtained: overall.totalObtained,
+        totalFullMarks: overall.totalFullMarks,
         percentage: overall.percentage,
         grade: overall.grade,
         gpa: overall.gpa,
@@ -209,6 +252,10 @@ export class ReportCardsService {
     dto: BatchGenerateReportCardsDto,
     actor: AuthContext,
   ) {
+    if (new Set(dto.studentIds).size !== dto.studentIds.length) {
+      throw new ConflictException('Duplicate student IDs are not allowed');
+    }
+
     const reports: GeneratedReportCard[] = [];
 
     for (const studentId of dto.studentIds) {
@@ -255,7 +302,9 @@ export class ReportCardsService {
 
             return {
               componentId: component.id,
+              componentName: component.name,
               subjectId,
+              type: component.type,
               maxMarks: Number(component.maxMarks),
               marksObtained: mark ? Number(mark.marksObtained) : null,
               status: mark?.status,
@@ -272,6 +321,8 @@ export class ReportCardsService {
 
         return this.gradeCalculator.calculateWeightedSubjectGrade({
           subjectId,
+          subjectName: subjectComponents[0]?.subject.name,
+          subjectCode: subjectComponents[0]?.subject.code,
           components: componentInputs,
         });
       },
