@@ -1,6 +1,6 @@
 # SchoolOS Master Project Memory
 
-**Status:** Phase 2D M9 Accounting Production Candidate Complete + Phase 2/3 foundations in progress  
+**Status:** Phase 2A M4 Academics backend complete + Phase 2D M9 Accounting Production Candidate Complete + Phase 2/3 foundations in progress  
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard
 
@@ -26,17 +26,19 @@ Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation Depth: Completed
+Phase 2A M4 Academics backend: Completed / Contract-Protected
 Phase 2D M9 Accounting: Production Candidate Complete
-Current stage: Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
+Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
 ```
 
-SchoolOS is ready for controlled Phase 1 pilot preparation, and the repo now contains real Phase 2 backend/web foundations plus Phase 3 operations admin foundations. M9 Accounting has moved from hardening priority to production-candidate complete after full verification passed.
+SchoolOS is ready for controlled Phase 1 pilot preparation, and the repo now contains real Phase 2 backend/web foundations plus Phase 3 operations admin foundations. M4 Academics Phase 2A backend is complete and contract-protected. M9 Accounting has moved from hardening priority to production-candidate complete after full verification passed.
 
 Recommended near-term direction:
 
 ```text
 Run pilot hardening while deepening one existing vertical at a time.
-Next priority: stabilize and browser-test the completed Accounting UI, then continue focused hardening for Academics, Homework/Timetable, HR/Payroll, Library, Transport, and Canteen.
+Next priority: build the Phase 2A Academics frontend/admin UI against the completed backend APIs, then add browser smoke/Playwright contracts for the full Phase 2A workflow.
+After Phase 2A UI, stabilize and browser-test the completed Accounting UI, then continue focused hardening for Homework/Timetable, HR/Payroll, Library, Transport, and Canteen.
 Keep parent/mobile portal, driver app, live map/WebSocket, full canteen inventory/vendor workflows, and AI/ML implementation deferred.
 ```
 
@@ -126,7 +128,7 @@ Purpose:
 | M1 | Admissions & Student Profiles | Phase 1A/1B |
 | M2 | Smart Attendance | Phase 1A/1B |
 | M3 | Fees & Receipts | Phase 1A/1B |
-| M4 | Exams, CAS & Report Cards | Phase 2 foundation implemented |
+| M4 | Exams, CAS & Report Cards | Phase 2A backend complete / contract-protected; admin UI next |
 | M5 | Activity Feed & Milestones | Phase 1A/1B |
 | M6 | Homework & Timetable | Phase 2 foundation implemented |
 | M7 | HR & Payroll | Phase 2 foundation implemented |
@@ -158,16 +160,74 @@ Includes:
 
 ### Phase 2 — Academic, HR, Timetable, and Accounting Expansion
 
-Status: Foundations implemented; M9 Accounting is production-candidate complete.
+Status: Phase 2A backend is complete and contract-protected; M9 Accounting is production-candidate complete; other Phase 2 foundations are implemented and need vertical hardening.
 
 Sub-phases:
 
-- 2A Academics, Exams, CAS, and Report Cards — foundation implemented.
+- 2A Academics, Exams, CAS, and Report Cards — **backend complete / contract-protected**.
 - 2B Homework and Timetable — foundation implemented.
 - 2C HR and Payroll — foundation implemented.
 - 2D Full M9 Accounting and Finance — **Production Candidate Complete**.
 - 2E Parent Communication Expansion — foundation implemented / further hardening later.
 - 2F Student Identity QR Foundation — foundation documented / staged for vertical reuse.
+
+#### Phase 2A — M4 Academics Backend Completion
+
+Completed backend sequence:
+
+```text
+Step 1 — Exam Terms + Assessment Components foundation
+Step 2 — Subject Marks Entry
+Step 3 — CAS Records
+Step 4 — Nepal Grading/GPA Result Preview
+Step 5 — Marks Lock/Unlock Workflow Hardening
+Step 6 — Report Card Generation Backend Hardening
+Step 7 — Promotion Readiness Backend Hardening
+Step 8 — Result Publishing + Parent Notification Backend Hardening
+Step 9 — Backend Final Hardening + Phase 2A Flow Contract
+```
+
+Completed backend scope:
+
+```text
+- Tenant-scoped exam term and assessment component APIs.
+- Transactional marks bulk upsert with max-mark, absent, withheld, and lock validation.
+- CAS create/list/update/delete and bulk upsert.
+- Server-side Nepal grading/GPA result preview for student/class results.
+- Marks lock request/review/unlock workflow with audit logs.
+- Report card generation requiring locked marks and rejecting incomplete/withheld outcomes.
+- Promotion readiness based on generated/locked report cards instead of raw marks.
+- Result publishing, unpublishing, and parent notification hardening.
+- Consent-aware result notification through CommunicationsService.
+- Phase 2A flow contract test covering the full backend chain.
+```
+
+Latest verified Phase 2A backend results:
+
+```text
+pnpm --filter @schoolos/api test src/academics/phase2a-flow.contract.spec.ts
+  PASS: 1 suite / 9 tests
+
+pnpm --filter @schoolos/api test src/integrity/production-contracts.spec.ts
+  PASS: 1 suite / 11 tests
+
+pnpm typecheck
+  PASS: API + web
+
+pnpm test
+  PASS: API 76 suites / 494 tests
+  PASS: Web 71 tests
+```
+
+Next Phase 2A work:
+
+```text
+- Phase 2A frontend/admin UI wired to real APIs.
+- Browser smoke/Playwright contracts for the full Phase 2A workflow.
+- Report card PDF visual polish.
+- Future locked report-card correction/regeneration workflow.
+- Deeper academic reports and exports.
+```
 
 ### Phase 3 — Extended School Operations
 
@@ -347,11 +407,12 @@ Remaining M9 future enhancements:
 
 ## 9. Current Repo Analysis Summary
 
-Repo status after M9 completion:
+Repo status after Phase 2A backend completion and M9 completion:
 
 ```text
 Full SchoolOS vision: around 70-80% implemented
 Phase 1 pilot product: around 90-95% implemented
+Phase 2A M4 Academics backend: complete / contract-protected
 M9 Accounting: production-candidate complete
 ```
 
@@ -361,6 +422,7 @@ Readiness:
 Demo-ready: Yes
 Internal QA-ready: Yes
 Controlled pilot-ready: Yes, after staging checks
+M4 Academics backend-ready: Yes
 M9 Accounting production-candidate: Yes
 Multi-school production-ready: Not yet
 Full SchoolOS product complete: No
@@ -377,7 +439,7 @@ Module estimates:
 | M3 Fees & Receipts | 85-90% |
 | M5 Activity Feed | 75-85% |
 | M10 Notices & Communication | 85-90% |
-| M4 Academics | 70-80% |
+| M4 Academics | 80-90% |
 | M6 Homework & Timetable | 60-70% |
 | M7 HR & Payroll | 65-75% |
 | M9 Accounting | 95-100% |
@@ -388,7 +450,8 @@ Module estimates:
 
 Biggest risks:
 
-- Existing Phase 2/3 breadth without enough depth outside M9.
+- Phase 2A backend is complete but still needs admin UI wiring and browser smoke tests.
+- Existing Phase 2/3 breadth without enough depth outside M4 and M9.
 - Pilot operations exposing real-world data-entry, fee, attendance, guardian-contact, PDF, and slow-network issues.
 - Parent/mobile portal, driver app, live map/WebSocket, full canteen inventory/vendor workflows, and AI/ML implementation remain intentionally unbuilt.
 - Tiered pricing and entitlements must be enforced backend-side before broad paid rollout; sidebar hiding alone is not security.
@@ -425,7 +488,24 @@ pnpm build
 pnpm verify:production
 ```
 
-Latest verified results included API unit tests, web tests, API E2E, API build, web build, and Playwright browser smoke. Authenticated Playwright accounting workflow tests should be added once seeded credentials are available.
+Phase 2A backend completion verification passed with:
+
+```text
+pnpm --filter @schoolos/api test src/academics/phase2a-flow.contract.spec.ts
+  PASS: 1 suite / 9 tests
+
+pnpm --filter @schoolos/api test src/integrity/production-contracts.spec.ts
+  PASS: 1 suite / 11 tests
+
+pnpm typecheck
+  PASS: API + web
+
+pnpm test
+  PASS: API 76 suites / 494 tests
+  PASS: Web 71 tests
+```
+
+Latest verified results included API unit tests, web tests, API E2E, API build, web build, and Playwright browser smoke. Authenticated Playwright accounting workflow tests should be added once seeded credentials are available. Phase 2A browser smoke tests should be added after the frontend/admin UI is wired.
 
 Documentation-only roadmap changes do not require runtime verification, but should still be reviewed for consistency.
 
