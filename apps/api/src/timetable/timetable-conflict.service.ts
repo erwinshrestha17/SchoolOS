@@ -126,6 +126,16 @@ export class TimetableConflictService {
       throw new Error('PrismaService is required for database-backed validation');
     }
 
+    const candidateScopes = [
+      candidate.versionId ? { versionId: candidate.versionId } : null,
+      { staffId: candidate.staffId },
+      candidate.roomId ? { roomId: candidate.roomId } : null,
+      {
+        classId: candidate.classId,
+        sectionId: candidate.sectionId ?? null,
+      },
+    ].filter(Boolean) as Record<string, unknown>[];
+
     const [existingSlots, teacherAvailability, teacherWorkloadLimit] =
       await Promise.all([
         this.prisma.timetableSlot.findMany({
@@ -134,15 +144,7 @@ export class TimetableConflictService {
             academicYearId: candidate.academicYearId,
             dayOfWeek: candidate.dayOfWeek,
             id: { not: candidate.id },
-            OR: [
-              { versionId: candidate.versionId ?? undefined },
-              { staffId: candidate.staffId },
-              candidate.roomId ? { roomId: candidate.roomId } : {},
-              {
-                classId: candidate.classId,
-                sectionId: candidate.sectionId ?? null,
-              },
-            ],
+            OR: candidateScopes,
           },
           select: {
             id: true,
