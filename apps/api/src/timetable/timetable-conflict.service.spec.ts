@@ -220,4 +220,51 @@ describe('TimetableConflictService', () => {
     expect(result.valid).toBe(true);
     expect(result.errors).toHaveLength(0);
   });
+
+  describe('validateVersionSlots', () => {
+    it('aggregates conflicts for all slots in a version', () => {
+      const slots = [
+        { ...baseSlot, id: 'slot-1', startsAt: '09:00', endsAt: '10:00' },
+        { ...baseSlot, id: 'slot-2', startsAt: '09:30', endsAt: '10:30' }, // Overlap with slot-1
+      ];
+
+      const result = service.validateVersionSlots(slots);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: 'TEACHER_DOUBLE_BOOKED',
+            severity: 'BLOCKING',
+          }),
+        ]),
+      );
+    });
+
+    it('validates subject weekly requirements once per subject scope', () => {
+      const slots = [
+        { ...baseSlot, id: 'slot-1' },
+        { ...baseSlot, id: 'slot-2', startsAt: '10:00', endsAt: '11:00' },
+      ];
+      const requirements = [
+        {
+          subjectId: 'subject-math',
+          classId: 'class-1',
+          sectionId: 'section-a',
+          requiredPeriodsPerWeek: 3,
+        },
+      ];
+
+      const result = service.validateVersionSlots(slots, requirements);
+
+      expect(result.valid).toBe(true);
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0]).toEqual(
+        expect.objectContaining({
+          type: 'SUBJECT_REQUIREMENT_MISSING',
+          message: expect.stringContaining('(2/3)'),
+        }),
+      );
+    });
+  });
 });

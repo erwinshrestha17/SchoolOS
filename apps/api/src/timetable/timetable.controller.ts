@@ -16,20 +16,22 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { CreateTimetableSlotDto } from './dto/create-timetable-slot.dto';
 import {
-  AssignSubstitutionDto,
-  CreateRoomDto,
-  CreateSubstitutionDto,
-  CreateTimetablePeriodDto,
-  CreateTimetableVersionDto,
   CreateVersionSlotDto,
+  ListSubjectWeeklyRequirementQueryDto,
+  ListTeacherAvailabilityQueryDto,
+  ListTeacherWorkloadQueryDto,
   SubstitutionQueryDto,
   TeacherAvailabilityDto,
   TimetableVersionQueryDto,
   UpdateRoomDto,
+  UpdateSubjectWeeklyRequirementDto,
   UpdateSubstitutionDto,
+  UpdateTeacherAvailabilityDto,
   UpdateTimetablePeriodDto,
   UpdateVersionSlotDto,
+  UpsertTeacherWorkloadLimitDto,
   WorkloadQueryDto,
+  CreateSubjectWeeklyRequirementDto,
 } from './dto/timetable-setup.dto';
 import { TimetableService } from './timetable.service';
 
@@ -254,13 +256,36 @@ export class TimetableController {
     return this.timetableService.deleteSlot(id, auth);
   }
 
-  @Get('teachers/:teacherId/availability')
+  @Get('teacher-availability')
   @Permissions('timetable:read')
   listTeacherAvailability(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: ListTeacherAvailabilityQueryDto,
+  ) {
+    return this.timetableService.listTeacherAvailability(auth, query);
+  }
+
+  @Get('teachers/:teacherId/availability')
+  @Permissions('timetable:read')
+  getTeacherAvailability(
     @Param('teacherId') teacherId: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.timetableService.listTeacherAvailability(teacherId, auth);
+    return this.timetableService.getTeacherAvailability(teacherId, auth);
+  }
+
+  @Post('teacher-availability/:teacherId')
+  @Permissions('timetable:manage')
+  createTeacherAvailability(
+    @Param('teacherId') teacherId: string,
+    @Body() dto: TeacherAvailabilityDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.createTeacherAvailability(
+      teacherId,
+      dto,
+      auth,
+    );
   }
 
   @Post('teachers/:teacherId/availability')
@@ -277,23 +302,126 @@ export class TimetableController {
     );
   }
 
-  @Patch('availability/:id')
+  @Patch('teacher-availability/:id')
   @Permissions('timetable:manage')
   updateTeacherAvailability(
     @Param('id') id: string,
-    @Body() dto: TeacherAvailabilityDto,
+    @Body() dto: UpdateTeacherAvailabilityDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.timetableService.updateTeacherAvailability(id, dto, auth);
   }
 
-  @Delete('availability/:id')
+  @Patch('availability/:id')
+  @Permissions('timetable:manage')
+  updateTeacherAvailabilityLegacy(
+    @Param('id') id: string,
+    @Body() dto: UpdateTeacherAvailabilityDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.updateTeacherAvailability(id, dto, auth);
+  }
+
+  @Delete('teacher-availability/:id')
   @Permissions('timetable:manage')
   deleteTeacherAvailability(
     @Param('id') id: string,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.timetableService.deleteTeacherAvailability(id, auth);
+  }
+
+  @Delete('availability/:id')
+  @Permissions('timetable:manage')
+  deleteTeacherAvailabilityLegacy(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.deleteTeacherAvailability(id, auth);
+  }
+
+  @Get('workload-rules')
+  @Permissions('timetable:read')
+  listTeacherWorkloadRules(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: ListTeacherWorkloadQueryDto,
+  ) {
+    return this.timetableService.listTeacherWorkloadRules(auth, query);
+  }
+
+  @Get('workload-rules/:teacherId')
+  @Permissions('timetable:read')
+  getTeacherWorkloadRule(
+    @Param('teacherId') teacherId: string,
+    @Query('academicYearId') academicYearId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.getTeacherWorkloadRule(
+      teacherId,
+      auth,
+      academicYearId,
+    );
+  }
+
+  @Post('workload-rules/:teacherId')
+  @Permissions('timetable:manage')
+  upsertTeacherWorkloadRule(
+    @Param('teacherId') teacherId: string,
+    @Body() dto: UpsertTeacherWorkloadLimitDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.upsertTeacherWorkloadRule(
+      teacherId,
+      dto,
+      auth,
+    );
+  }
+
+  @Patch('workload-rules/:id')
+  @Permissions('timetable:manage')
+  updateTeacherWorkloadRule(
+    @Param('id') id: string,
+    @Body() dto: UpsertTeacherWorkloadLimitDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.updateTeacherWorkloadRule(id, dto, auth);
+  }
+
+  @Get('subject-weekly-requirements')
+  @Permissions('timetable:read')
+  listSubjectWeeklyRequirements(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: ListSubjectWeeklyRequirementQueryDto,
+  ) {
+    return this.timetableService.listSubjectWeeklyRequirements(auth, query);
+  }
+
+  @Post('subject-weekly-requirements')
+  @Permissions('timetable:manage')
+  createSubjectWeeklyRequirement(
+    @Body() dto: CreateSubjectWeeklyRequirementDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.createSubjectWeeklyRequirement(dto, auth);
+  }
+
+  @Patch('subject-weekly-requirements/:id')
+  @Permissions('timetable:manage')
+  updateSubjectWeeklyRequirement(
+    @Param('id') id: string,
+    @Body() dto: UpdateSubjectWeeklyRequirementDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.updateSubjectWeeklyRequirement(id, dto, auth);
+  }
+
+  @Delete('subject-weekly-requirements/:id')
+  @Permissions('timetable:manage')
+  deleteSubjectWeeklyRequirement(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.deleteSubjectWeeklyRequirement(id, auth);
   }
 
   @Get('teachers/:teacherId/workload')

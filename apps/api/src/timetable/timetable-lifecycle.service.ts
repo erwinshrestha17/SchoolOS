@@ -100,6 +100,41 @@ export class TimetableLifecycleService {
       };
     }
 
+    const staffIds = Array.from(new Set(version.slots.map((s) => s.staffId)));
+    const subjectIds = Array.from(new Set(version.slots.map((s) => s.subjectId)));
+
+    const [availability, workloadLimits, requirements] = await Promise.all([
+      this.prisma.teacherAvailability.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: { in: staffIds },
+          OR: [
+            { academicYearId: version.academicYearId },
+            { academicYearId: null },
+          ],
+        },
+      }),
+      this.prisma.teacherWorkloadLimit.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: { in: staffIds },
+          OR: [
+            { academicYearId: version.academicYearId },
+            { academicYearId: null },
+          ],
+        },
+      }),
+      this.prisma.subjectWeeklyRequirement.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          academicYearId: version.academicYearId,
+          classId: version.classId ?? undefined,
+          sectionId: version.sectionId ?? undefined,
+          subjectId: { in: subjectIds },
+        },
+      }),
+    ]);
+
     return this.conflictService.validateVersionSlots(
       version.slots.map((slot) => ({
         id: slot.id,
@@ -115,6 +150,9 @@ export class TimetableLifecycleService {
         startsAt: slot.startsAt,
         endsAt: slot.endsAt,
       })),
+      requirements,
+      workloadLimits,
+      availability,
     );
   }
 

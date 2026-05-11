@@ -230,7 +230,7 @@ export class UpdateVersionSlotDto {
   endsAt?: string;
 }
 
-export class TeacherAvailabilityDto {
+export class CreateTeacherAvailabilityDto {
   @IsOptional()
   @IsString()
   academicYearId?: string;
@@ -254,7 +254,38 @@ export class TeacherAvailabilityDto {
   @IsString()
   @MaxLength(300)
   note?: string;
+}
 
+export class UpdateTeacherAvailabilityDto {
+  @IsOptional()
+  @IsString()
+  academicYearId?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(7)
+  dayOfWeek?: number;
+
+  @IsOptional()
+  @IsString()
+  startsAt?: string;
+
+  @IsOptional()
+  @IsString()
+  endsAt?: string;
+
+  @IsOptional()
+  @IsEnum(TeacherAvailabilityType)
+  type?: TeacherAvailabilityType;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  note?: string;
+}
+
+export class TeacherAvailabilityDto extends CreateTeacherAvailabilityDto {
   @IsOptional()
   @IsInt()
   @Min(0)
@@ -265,6 +296,39 @@ export class TeacherAvailabilityDto {
   @Min(0)
   maxPeriodsPerWeek?: number;
 }
+
+export class ListTeacherAvailabilityQueryDto extends PaginatedQueryDto {
+  @IsOptional()
+  @IsString()
+  staffId?: string;
+
+  @IsOptional()
+  @IsString()
+  academicYearId?: string;
+}
+
+export class UpsertTeacherWorkloadLimitDto {
+  @IsOptional()
+  @IsString()
+  academicYearId?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxPeriodsPerDay?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxPeriodsPerWeek?: number;
+}
+
+export class ListTeacherWorkloadQueryDto extends PaginatedQueryDto {
+  @IsOptional()
+  @IsString()
+  academicYearId?: string;
+}
+
 
 export class WorkloadQueryDto {
   @IsOptional()
@@ -331,4 +395,48 @@ export class UpdateSubstitutionDto {
 export class AssignSubstitutionDto {
   @IsString()
   substituteTeacherId!: string;
+}
+
+export class CreateSubjectWeeklyRequirementDto {
+  @IsString()
+  academicYearId!: string;
+
+  @IsString()
+  classId!: string;
+
+  @IsOptional()
+  @IsString()
+  sectionId?: string;
+
+  @IsString()
+  subjectId!: string;
+
+  @IsInt()
+  @Min(1)
+  requiredPeriodsPerWeek!: number;
+}
+
+export class UpdateSubjectWeeklyRequirementDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  requiredPeriodsPerWeek?: number;
+}
+
+export class ListSubjectWeeklyRequirementQueryDto extends PaginatedQueryDto {
+  @IsOptional()
+  @IsString()
+  academicYearId?: string;
+
+  @IsOptional()
+  @IsString()
+  classId?: string;
+
+  @IsOptional()
+  @IsString()
+  sectionId?: string;
+
+  @IsOptional()
+  @IsString()
+  subjectId?: string;
 }

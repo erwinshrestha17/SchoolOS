@@ -136,73 +136,93 @@ export class TimetableConflictService {
       },
     ].filter(Boolean) as Record<string, unknown>[];
 
-    const [existingSlots, teacherAvailability, teacherWorkloadLimit] =
-      await Promise.all([
-        this.prisma.timetableSlot.findMany({
-          where: {
-            tenantId,
-            academicYearId: candidate.academicYearId,
-            dayOfWeek: candidate.dayOfWeek,
-            id: { not: candidate.id },
-            OR: candidateScopes,
-          },
-          select: {
-            id: true,
-            tenantId: true,
-            academicYearId: true,
-            versionId: true,
-            classId: true,
-            sectionId: true,
-            subjectId: true,
-            staffId: true,
-            roomId: true,
-            dayOfWeek: true,
-            startsAt: true,
-            endsAt: true,
-          },
-        }),
-        this.prisma.teacherAvailability.findMany({
-          where: {
-            tenantId,
-            staffId: candidate.staffId,
-            dayOfWeek: candidate.dayOfWeek,
-            OR: [
-              { academicYearId: candidate.academicYearId },
-              { academicYearId: null },
-            ],
-          },
-          select: {
-            id: true,
-            staffId: true,
-            academicYearId: true,
-            dayOfWeek: true,
-            startsAt: true,
-            endsAt: true,
-            type: true,
-          },
-        }),
-        this.prisma.teacherWorkloadLimit.findFirst({
-          where: {
-            tenantId,
-            staffId: candidate.staffId,
-            OR: [
-              { academicYearId: candidate.academicYearId },
-              { academicYearId: null },
-            ],
-          },
-          select: {
-            staffId: true,
-            maxPeriodsPerDay: true,
-            maxPeriodsPerWeek: true,
-          },
-        }),
-      ]);
+    const [
+      existingSlots,
+      teacherAvailability,
+      teacherWorkloadLimit,
+      subjectWeeklyRequirement,
+    ] = await Promise.all([
+      this.prisma.timetableSlot.findMany({
+        where: {
+          tenantId,
+          academicYearId: candidate.academicYearId,
+          dayOfWeek: candidate.dayOfWeek,
+          id: { not: candidate.id },
+          OR: candidateScopes,
+        },
+        select: {
+          id: true,
+          tenantId: true,
+          academicYearId: true,
+          versionId: true,
+          classId: true,
+          sectionId: true,
+          subjectId: true,
+          staffId: true,
+          roomId: true,
+          dayOfWeek: true,
+          startsAt: true,
+          endsAt: true,
+        },
+      }),
+      this.prisma.teacherAvailability.findMany({
+        where: {
+          tenantId,
+          staffId: candidate.staffId,
+          dayOfWeek: candidate.dayOfWeek,
+          OR: [
+            { academicYearId: candidate.academicYearId },
+            { academicYearId: null },
+          ],
+        },
+        select: {
+          id: true,
+          staffId: true,
+          academicYearId: true,
+          dayOfWeek: true,
+          startsAt: true,
+          endsAt: true,
+          type: true,
+        },
+      }),
+      this.prisma.teacherWorkloadLimit.findFirst({
+        where: {
+          tenantId,
+          staffId: candidate.staffId,
+          OR: [
+            { academicYearId: candidate.academicYearId },
+            { academicYearId: null },
+          ],
+        },
+        select: {
+          staffId: true,
+          maxPeriodsPerDay: true,
+          maxPeriodsPerWeek: true,
+        },
+      }),
+      this.prisma.subjectWeeklyRequirement.findFirst({
+        where: {
+          tenantId,
+          academicYearId: candidate.academicYearId,
+          classId: candidate.classId,
+          sectionId: candidate.sectionId ?? null,
+          subjectId: candidate.subjectId,
+        },
+        select: {
+          subjectId: true,
+          classId: true,
+          sectionId: true,
+          requiredPeriodsPerWeek: true,
+        },
+      }),
+    ]);
 
     return this.validateCandidate({
       candidate,
       existingSlots,
       teacherAvailability,
       teacherWorkloadLimit,
+      subjectWeeklyRequirement,
     });
   }
 
@@ -212,8 +232,11 @@ export class TimetableConflictService {
     workloadLimits: TeacherWorkloadLimitInput[] = [],
     availability: AvailabilityInput[] = [],
   ): TimetableConflictValidationResult {
-    const issues = slots.flatMap((slot) =>
-      this.validateCandidate({
+    const issues: TimetableConflictIssue[] = [];
+
+    // 1. Validate each slot for individual conflicts (teacher/room double booking, availability, workload)
+    for (const slot of slots) {
+      const result = this.validateCandidate({
         candidate: slot,
         existingSlots: slots.filter((existing) => existing.id !== slot.id),
         teacherAvailability: availability.filter(
@@ -221,23 +244,42 @@ export class TimetableConflictService {
         ),
         teacherWorkloadLimit:
           workloadLimits.find((item) => item.staffId === slot.staffId) ?? null,
-        subjectWeeklyRequirement:
-          requirements.find(
-            (item) =>
-              item.subjectId === slot.subjectId &&
-              item.classId === slot.classId &&
-              normalizeNullable(item.sectionId) === normalizeNullable(slot.sectionId),
-          ) ?? null,
-      }),
-    );
+        // We handle requirements separately to avoid duplicates
+        subjectWeeklyRequirement: null,
+      });
+      issues.push(...result.errors, ...result.warnings);
+    }
 
-    const errors = issues.flatMap((result) => result.errors);
-    const warnings = issues.flatMap((result) => result.warnings);
+    // 2. Validate subject weekly requirements once per subject scope
+    for (const req of requirements) {
+      const matchingSlots = slots.filter(
+        (slot) =>
+          slot.subjectId === req.subjectId &&
+          slot.classId === req.classId &&
+          normalizeNullable(slot.sectionId) === normalizeNullable(req.sectionId),
+      );
+      const actual = matchingSlots.length;
+      if (actual < req.requiredPeriodsPerWeek) {
+        issues.push({
+          type: 'SUBJECT_REQUIREMENT_MISSING',
+          severity: 'WARNING',
+          message: `Subject weekly requirement not met (${actual}/${req.requiredPeriodsPerWeek}).`,
+          affectedPeriodIds: matchingSlots.map((slot) => slot.id),
+          classId: req.classId,
+          sectionId: req.sectionId ?? null,
+          subjectId: req.subjectId,
+        });
+      }
+    }
+
+    const deduped = dedupeIssues(issues);
+    const errors = deduped.filter((issue) => issue.severity === 'BLOCKING');
+    const warnings = deduped.filter((issue) => issue.severity === 'WARNING');
 
     return {
       valid: errors.length === 0,
-      errors: dedupeIssues(errors),
-      warnings: dedupeIssues(warnings),
+      errors,
+      warnings,
     };
   }
 

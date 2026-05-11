@@ -12,5 +12,6 @@ import { HrAttendanceController } from './hr-attendance.controller';
   imports: [AuthModule, AuditModule, CommunicationsModule, SettingsModule],
   controllers: [AttendanceController, HrAttendanceController],
   providers: [AttendanceService, AttendanceCron],
+  exports: [AttendanceService],
 })
 export class AttendanceModule {}

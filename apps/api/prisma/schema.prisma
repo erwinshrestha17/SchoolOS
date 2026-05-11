@@ -691,6 +691,7 @@ model Tenant {
   teacherAvailabilities         TeacherAvailability[]
   teacherWorkloadLimits         TeacherWorkloadLimit[]
   timetableSubstitutions        TimetableSubstitution[]
+  subjectWeeklyRequirements     SubjectWeeklyRequirement[]
   homeworkAssignments           HomeworkAssignment[]
   homeworkSubmissions           HomeworkSubmission[]
   homeworkAttachments           HomeworkAttachment[]
@@ -2839,6 +2840,7 @@ model TeacherAvailability {
 
   @@index([tenantId, staffId, dayOfWeek])
   @@index([tenantId, academicYearId, staffId])
+  @@index([tenantId, staffId, academicYearId, dayOfWeek, startsAt, endsAt])
 }
 
 model TeacherWorkloadLimit {
@@ -2856,6 +2858,28 @@ model TeacherWorkloadLimit {
 
   @@unique([tenantId, academicYearId, staffId])
   @@index([tenantId, staffId])
+}
+
+model SubjectWeeklyRequirement {
+  id                     String   @id @default(uuid())
+  tenantId               String
+  academicYearId         String
+  classId                String
+  sectionId              String?
+  subjectId              String
+  requiredPeriodsPerWeek Int
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, academicYearId, classId, sectionId, subjectId])
+  @@index([tenantId, academicYearId, classId, sectionId])
+  @@index([tenantId, subjectId])
 }
 
 model TimetableSubstitution {
