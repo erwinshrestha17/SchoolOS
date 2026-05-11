@@ -3,13 +3,14 @@
 import { PageHeader } from '../../../components/ui/page-header';
 import { TimetableWorkspace } from '../../../components/timetable/timetable-workspace';
 
-export default function TimetablePage() {
+export default function HomeworkPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Timetable"
-        description="Plan class schedules, teacher availability, conflicts, and substitutions."
+        title="Homework"
+        description="Create assignments, track submissions, and review student work."
       />
+
       <TimetableWorkspace />
     </div>
   );

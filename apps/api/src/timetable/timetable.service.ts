@@ -115,6 +115,7 @@ export class TimetableService {
         { sortOrder: 'asc' },
         { startsAt: 'asc' },
       ],
+      take: 100,
     });
   }
 
@@ -171,6 +172,7 @@ export class TimetableService {
     return this.prisma.room.findMany({
       where: { tenantId: actor.tenantId },
       orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
+      take: 100,
     });
   }
 
@@ -210,6 +212,9 @@ export class TimetableService {
   }
 
   async listVersions(actor: AuthContext, query: TimetableVersionQueryDto) {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 50, 100);
+
     return this.prisma.timetableVersion.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -227,7 +232,8 @@ export class TimetableService {
         slots: { include: timetableSlotInclude() },
       },
       orderBy: [{ effectiveFrom: 'desc' }, { createdAt: 'desc' }],
-      take: 100,
+      skip: (page - 1) * limit,
+      take: limit,
     });
   }
 
@@ -538,6 +544,7 @@ export class TimetableService {
       this.prisma.teacherAvailability.findMany({
         where: { tenantId: actor.tenantId, staffId: teacherId },
         orderBy: [{ dayOfWeek: 'asc' }, { startsAt: 'asc' }],
+        take: 100,
       }),
       this.prisma.teacherWorkloadLimit.findFirst({
         where: { tenantId: actor.tenantId, staffId: teacherId },
@@ -630,6 +637,7 @@ export class TimetableService {
         homeworkAssignments: true,
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+      take: 200, // Teacher workload can be larger but should be bounded
     });
     return staff.map((member) => {
       const teachingMinutes = member.timetableSlots.reduce(
@@ -698,7 +706,10 @@ export class TimetableService {
   }
 
   async listSubstitutions(actor: AuthContext, query: SubstitutionQueryDto) {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 50, 100);
     const date = query.date ? parseDate(query.date, 'date') : null;
+
     return this.prisma.timetableSubstitution.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -723,7 +734,8 @@ export class TimetableService {
       },
       include: substitutionInclude(),
       orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-      take: 100,
+      skip: (page - 1) * limit,
+      take: limit,
     });
   }
 

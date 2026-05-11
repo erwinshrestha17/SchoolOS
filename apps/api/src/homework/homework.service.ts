@@ -54,7 +54,7 @@ export class HomeworkService {
 
   async listAssignments(actor: AuthContext, query: HomeworkQueryDto) {
     const page = query.page ?? 1;
-    const limit = query.limit ?? 50;
+    const limit = Math.min(query.limit ?? 50, 100);
     const studentId = await this.resolveVisibleStudentId(
       actor,
       query.studentId,
@@ -970,7 +970,7 @@ export class HomeworkService {
     return (
       actor.roles.includes('subject_teacher') &&
       !actor.roles.some((role) =>
-        ['super_admin', 'admin', 'principal'].includes(role),
+        ['platform_super_admin', 'admin', 'principal'].includes(role),
       )
     );
   }

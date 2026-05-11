@@ -16,6 +16,21 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
+export class PaginatedQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
+}
+
 export class CreateTimetablePeriodDto {
   @IsString()
   academicYearId!: string;
@@ -107,7 +122,7 @@ export class UpdateRoomDto {
   isActive?: boolean;
 }
 
-export class TimetableVersionQueryDto {
+export class TimetableVersionQueryDto extends PaginatedQueryDto {
   @IsOptional()
   @IsString()
   academicYearId?: string;
@@ -261,7 +276,7 @@ export class WorkloadQueryDto {
   versionId?: string;
 }
 
-export class SubstitutionQueryDto {
+export class SubstitutionQueryDto extends PaginatedQueryDto {
   @IsOptional()
   @IsISO8601()
   date?: string;
@@ -316,19 +331,4 @@ export class UpdateSubstitutionDto {
 export class AssignSubstitutionDto {
   @IsString()
   substituteTeacherId!: string;
-}
-
-export class PaginatedQueryDto {
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit?: number;
 }
