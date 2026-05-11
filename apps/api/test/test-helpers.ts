@@ -292,18 +292,22 @@ export function createPrismaMock() {
 
   ensureTenantDefaults('tenant-default');
 
-  const prisma = {
+  const prisma: any = {
     __state: state,
     $connect: jest.fn(() => Promise.resolve()),
     $disconnect: jest.fn(() => Promise.resolve()),
     onModuleInit: jest.fn(() => Promise.resolve()),
     onModuleDestroy: jest.fn(() => Promise.resolve()),
-    $transaction: jest.fn(async (arg: any) => {
-      if (typeof arg === 'function') {
-        return arg(prisma);
-      }
-      return Promise.all(arg);
-    }),
+  };
+
+  prisma.$transaction = jest.fn((arg: any) => {
+    if (typeof arg === 'function') {
+      return arg(prisma);
+    }
+    return Promise.all(arg);
+  });
+
+  Object.assign(prisma, {
     tenant: {
       findUnique: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
@@ -1797,12 +1801,102 @@ export function createPrismaMock() {
       findMany: jest.fn(() => Promise.resolve([])),
     },
     homeworkAssignment: {
-      findFirst: jest.fn((q: PrismaQuery) => Promise.resolve(null)),
-      findMany: jest.fn(() => Promise.resolve([])),
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.homeworkAssignments.find(
+            (item) =>
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
+              (!q.where?.id || item.id === q.where.id),
+          ),
+        ),
+      ),
+      findUnique: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.homeworkAssignments.find(
+            (item) =>
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
+              (!q.where?.id || item.id === q.where.id),
+          ),
+        ),
+      ),
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.homeworkAssignments.filter(
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ),
+        ),
+      ),
+      create: jest.fn((q: PrismaQuery) => {
+        const item = { id: nextId('hw'), ...q.data, createdAt: new Date() };
+        state.homeworkAssignments.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
+      }),
+      update: jest.fn((q: PrismaQuery) => {
+        const item = state.homeworkAssignments.find((i) => i.id === q.where?.id);
+        if (item) Object.assign(item, q.data);
+        return Promise.resolve(item);
+      }),
+      count: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.homeworkAssignments.filter(
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ).length,
+        ),
+      ),
     },
     homeworkSubmission: {
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.homeworkSubmissions.find(
+            (item) =>
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
+              (!q.where?.id || item.id === q.where.id),
+          ),
+        ),
+      ),
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.homeworkSubmissions.filter(
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ),
+        ),
+      ),
+      create: jest.fn((q: PrismaQuery) => {
+        const item = { id: nextId('sub'), ...q.data, createdAt: new Date() };
+        state.homeworkSubmissions.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
+      }),
+      update: jest.fn((q: PrismaQuery) => {
+        const item = state.homeworkSubmissions.find((i) => i.id === q.where?.id);
+        if (item) Object.assign(item, q.data);
+        return Promise.resolve(item);
+      }),
+      upsert: jest.fn((q: PrismaQuery) => {
+        const item = state.homeworkSubmissions.find(
+          (i) => i.id === q.where?.id,
+        );
+        if (item) {
+          Object.assign(item, q.update ?? {});
+          return Promise.resolve(item);
+        }
+        const newItem = { id: nextId('sub'), ...q.create, createdAt: new Date() };
+        state.homeworkSubmissions.push(newItem as Record<string, unknown>);
+        return Promise.resolve(newItem);
+      }),
+      count: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.homeworkSubmissions.filter(
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ).length,
+        ),
+      ),
+    },
+    homeworkReminderBatch: {
       findFirst: jest.fn((q: PrismaQuery) => Promise.resolve(null)),
       findMany: jest.fn(() => Promise.resolve([])),
+      create: jest.fn((q: any) => Promise.resolve(q.data || {})),
+      update: jest.fn((q: any) => Promise.resolve(q.data || {})),
+      upsert: jest.fn((q: any) => Promise.resolve(q.create || {})),
     },
     teacherAvailability: {
       findMany: jest.fn(() => Promise.resolve([])),
@@ -1813,7 +1907,7 @@ export function createPrismaMock() {
     subjectTeacherAssignment: {
       findFirst: jest.fn(() => Promise.resolve(null)),
     },
-  };
+  });
 
   prisma.generatedStudentDocument = {
     findFirst: jest.fn((q: PrismaQuery) => Promise.resolve(null)),

@@ -24,8 +24,9 @@ function createController() {
     cancelHomework: jest.fn(),
     assignHomework: jest.fn(),
     closeHomework: jest.fn(),
-    previewReminders: jest.fn(),
-    sendReminders: jest.fn(),
+    sendHomeworkReminder: jest.fn(),
+    listHomeworkReminderBatches: jest.fn(),
+    retryHomeworkReminderBatch: jest.fn(),
     createSubmission: jest.fn(),
     updateSubmission: jest.fn(),
     updateSubmissionStatus: jest.fn(),
@@ -94,24 +95,26 @@ describe('HomeworkController M6 contracts', () => {
     );
   });
 
-  it('delegates reminder preview/send through service boundary', () => {
+  it('delegates reminder send/list through service boundary', () => {
     const { controller, homeworkService } = createController();
-    homeworkService.previewReminders.mockReturnValue({ targetCount: 2 });
-    homeworkService.sendReminders.mockReturnValue({ delivery: { count: 2 } });
+    const reminderDto = { reminderType: 'HOMEWORK_DUE_SOON' } as any;
+    homeworkService.sendHomeworkReminder.mockReturnValue({ id: 'batch-1' });
+    homeworkService.listHomeworkReminderBatches.mockReturnValue([{ id: 'batch-1' }]);
 
-    expect(controller.previewReminders('homework-1', actor)).toEqual({
-      targetCount: 2,
+    expect(controller.sendReminder('homework-1', reminderDto, actor)).toEqual({
+      id: 'batch-1',
     });
-    expect(controller.sendReminders('homework-1', actor)).toEqual({
-      delivery: { count: 2 },
-    });
-    expect(homeworkService.previewReminders).toHaveBeenCalledWith(
+    expect(controller.listAssignmentReminders('homework-1', {} as any, actor)).toEqual([{
+      id: 'batch-1',
+    }]);
+    expect(homeworkService.sendHomeworkReminder).toHaveBeenCalledWith(
       'homework-1',
+      reminderDto,
       actor,
     );
-    expect(homeworkService.sendReminders).toHaveBeenCalledWith(
-      'homework-1',
+    expect(homeworkService.listHomeworkReminderBatches).toHaveBeenCalledWith(
       actor,
+      expect.objectContaining({ homeworkId: 'homework-1' }),
     );
   });
 

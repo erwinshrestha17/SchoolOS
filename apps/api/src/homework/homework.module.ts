@@ -7,10 +7,27 @@ import { HomeworkAttachmentAccessService } from './homework-attachment-access.se
 import { HomeworkController } from './homework.controller';
 import { HomeworkService } from './homework.service';
 
+import { BullModule } from '@nestjs/bullmq';
+import { HomeworkProcessor } from './homework.processor';
+import { HomeworkCron } from './homework.cron';
+
 @Module({
-  imports: [AuthModule, CommunicationsModule, AuditModule, FileRegistryModule],
+  imports: [
+    AuthModule,
+    CommunicationsModule,
+    AuditModule,
+    FileRegistryModule,
+    BullModule.registerQueue({
+      name: 'homework',
+    }),
+  ],
   controllers: [HomeworkController],
-  providers: [HomeworkService, HomeworkAttachmentAccessService],
+  providers: [
+    HomeworkService,
+    HomeworkAttachmentAccessService,
+    HomeworkProcessor,
+    HomeworkCron,
+  ],
   exports: [HomeworkService, HomeworkAttachmentAccessService],
 })
 export class HomeworkModule {}

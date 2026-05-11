@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CommunicationsService } from '../communications/communications.service';
 import { AuthContext } from '../auth/auth.types';
+import { getQueueToken } from '@nestjs/bullmq';
 
 describe('Homework Workflow', () => {
   let service: HomeworkService;
@@ -48,16 +49,16 @@ describe('Homework Workflow', () => {
       homeworkAssignment: {
         findFirst: jest.fn(),
         findUnique: jest.fn(),
-        create: jest.fn(),
-        update: jest.fn(),
+        create: jest.fn().mockImplementation((q) => Promise.resolve({ id: 'hw-1', ...q.data })),
+        update: jest.fn().mockImplementation((q) => Promise.resolve({ id: 'hw-1', ...q.data })),
         delete: jest.fn(),
         findMany: jest.fn(),
       },
       homeworkSubmission: {
         findFirst: jest.fn(),
-        create: jest.fn(),
-        update: jest.fn(),
-        upsert: jest.fn(),
+        create: jest.fn().mockImplementation((q) => Promise.resolve({ id: 'sub-1', ...q.data })),
+        update: jest.fn().mockImplementation((q) => Promise.resolve({ id: 'sub-1', ...q.data })),
+        upsert: jest.fn().mockImplementation((q) => Promise.resolve({ id: 'sub-1', ...q.create })),
         createMany: jest.fn(),
         findMany: jest.fn(),
       },
@@ -69,13 +70,20 @@ describe('Homework Workflow', () => {
         findMany: jest.fn(),
         updateMany: jest.fn(),
       },
-      academicYear: { findFirst: jest.fn() },
-      class: { findFirst: jest.fn() },
+      academicYear: { findFirst: jest.fn().mockResolvedValue({ id: 'year-1' }) },
+      class: { findFirst: jest.fn().mockResolvedValue({ id: 'class-1' }) },
       section: { findFirst: jest.fn() },
-      subject: { findFirst: jest.fn() },
-      staff: { findFirst: jest.fn() },
+      subject: { findFirst: jest.fn().mockResolvedValue({ id: 'sub-1' }) },
+      staff: { findFirst: jest.fn().mockResolvedValue({ id: 'staff-1' }) },
       student: { findFirst: jest.fn(), findMany: jest.fn() },
-      subjectTeacherAssignment: { findFirst: jest.fn() },
+      subjectTeacherAssignment: { findFirst: jest.fn().mockResolvedValue({ id: 'assign-1' }) },
+      homeworkReminderBatch: {
+        findFirst: jest.fn(),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        upsert: jest.fn().mockImplementation((q) => Promise.resolve({ id: 'batch-1', ...q.create })),
+      },
       $transaction: jest.fn((cb) => cb(prisma)),
     };
 
@@ -86,7 +94,11 @@ describe('Homework Workflow', () => {
         { provide: AuditService, useValue: { record: jest.fn() } },
         {
           provide: CommunicationsService,
-          useValue: { recordDeliveryRecords: jest.fn() },
+          useValue: { recordDeliveryRecords: jest.fn().mockResolvedValue({ sentCount: 1 }) },
+        },
+        {
+          provide: getQueueToken('homework'),
+          useValue: { add: jest.fn() },
         },
       ],
     }).compile();
@@ -177,7 +189,7 @@ describe('Homework Workflow', () => {
       prisma.homeworkAssignment.findFirst.mockResolvedValue(pastAssignment);
       prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
       prisma.homeworkSubmission.upsert.mockResolvedValue({ id: 'sub-1', status: HomeworkSubmissionStatus.LATE });
-      prisma.homeworkSubmission.findFirst.mockResolvedValue({ id: 'sub-1', status: HomeworkSubmissionStatus.LATE });
+      prisma.homeworkSubmission.findFirst.mockResolvedValueOnce(null).mockResolvedValue({ id: 'sub-1', status: HomeworkSubmissionStatus.LATE });
 
       const result = await service.createSubmission('hw-1', {
         studentId: 'student-1',

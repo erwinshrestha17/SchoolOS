@@ -2920,11 +2920,20 @@ model HomeworkReminderBatch {
   dueSoonCount  Int      @default(0)
   overdueCount  Int      @default(0)
   createdAt     DateTime @default(now())
+  reminderType  String   @default("HOMEWORK_DUE_SOON")
+  status        String   @default("COMPLETED")
+  idempotencyKey String?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  failedReason  String?
 
   tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   homework HomeworkAssignment @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, homeworkId, createdAt])
+  @@index([tenantId, reminderType, createdAt])
+  @@index([tenantId, status, createdAt])
+  @@unique([tenantId, idempotencyKey])
 }
 
 model HomeworkAssignment {

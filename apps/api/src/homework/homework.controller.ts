@@ -27,6 +27,10 @@ import {
   UpdateHomeworkSubmissionDto,
   UpdateHomeworkSubmissionStatusDto,
 } from './dto/submission.dto';
+import {
+  HomeworkReminderQueryDto,
+  SendHomeworkReminderDto,
+} from './dto/reminder.dto';
 import { UpdateHomeworkDto } from './dto/update-homework.dto';
 import { HomeworkAttachmentAccessService } from './homework-attachment-access.service';
 import { HomeworkService } from './homework.service';
@@ -98,6 +102,47 @@ export class HomeworkController {
   @Permissions('homework:delete')
   archiveAssignment(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.homeworkService.cancelHomework(id, auth);
+  }
+
+  @Post('assignments/:id/reminders')
+  @Permissions('homework:update')
+  sendReminder(
+    @Param('id') id: string,
+    @Body() dto: SendHomeworkReminderDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.homeworkService.sendHomeworkReminder(id, dto, auth);
+  }
+
+  @Get('assignments/:id/reminders')
+  @Permissions('homework:read')
+  listAssignmentReminders(
+    @Param('id') id: string,
+    @Query() query: HomeworkReminderQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.homeworkService.listHomeworkReminderBatches(auth, {
+      ...query,
+      homeworkId: id,
+    });
+  }
+
+  @Get('reminder-batches')
+  @Permissions('homework:read')
+  listReminderBatches(
+    @Query() query: HomeworkReminderQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.homeworkService.listHomeworkReminderBatches(auth, query);
+  }
+
+  @Post('reminder-batches/:id/retry')
+  @Permissions('homework:update')
+  retryReminderBatch(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.homeworkService.retryHomeworkReminderBatch(id, auth);
   }
 
   @Get('assignments/:id/submissions')

@@ -11,6 +11,7 @@ import { AuditService } from '../audit/audit.service';
 import { CommunicationsService } from '../communications/communications.service';
 import { AuthContext } from '../auth/auth.types';
 import { createPrismaMock, PrismaMock } from '../../test/test-helpers';
+import { getQueueToken } from '@nestjs/bullmq';
 
 describe('Homework Hardening', () => {
   let homeworkService: HomeworkService;
@@ -28,6 +29,11 @@ describe('Homework Hardening', () => {
 
   beforeEach(async () => {
     prisma = createPrismaMock();
+    prisma.__state.staff.push({
+      id: 'staff-1',
+      tenantId: 'tenant-a',
+      userId: 'user-1',
+    });
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         HomeworkService,
@@ -35,7 +41,11 @@ describe('Homework Hardening', () => {
         { provide: AuditService, useValue: { record: jest.fn() } },
         {
           provide: CommunicationsService,
-          useValue: { recordDeliveryRecords: jest.fn() },
+          useValue: { recordDeliveryRecords: jest.fn().mockResolvedValue({ sentCount: 1 }) },
+        },
+        {
+          provide: getQueueToken('homework'),
+          useValue: { add: jest.fn() },
         },
       ],
     }).compile();
