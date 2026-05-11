@@ -13,6 +13,7 @@ Related focused plans:
 ```text
 docs/project/SCHOOLOS_STUDENT_IDENTITY_QR_PLAN.md
 docs/project/SCHOOLOS_M11_INTELLIGENCE_ROADMAP.md
+docs/project/SCHOOLOS_M9_ACCOUNTING_COMPLETION.md
 ```
 
 Keep this file only as a compatibility pointer for older prompts that still reference `SCHOOLOS_PHASE_STRUCTURE.md`.
@@ -25,7 +26,8 @@ Keep this file only as a compatibility pointer for older prompts that still refe
 Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
-Current stage: Phase 2 implemented foundations + Phase 3 operations admin foundations
+Phase 2D M9 Accounting: Production Candidate Complete
+Current stage: Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
 ```
 
 ---
@@ -35,7 +37,7 @@ Current stage: Phase 2 implemented foundations + Phase 3 operations admin founda
 | Phase | Name | Goal | Status |
 |---|---|---|---|
 | Phase 1 | Pilot-Ready Core School System | Make the system usable for real live-school daily operations and polish it for pilot use. | Completed |
-| Phase 2 | Academic, HR, Timetable, and Accounting Expansion | Add academic depth, timetable/homework, HR/payroll, full M9 accounting, controlled parent communication expansion, and cross-module hardening such as QR-based Student Identity. | Foundation implemented; hardening in progress |
+| Phase 2 | Academic, HR, Timetable, and Accounting Expansion | Add academic depth, timetable/homework, HR/payroll, full M9 accounting, controlled parent communication expansion, and cross-module hardening such as QR-based Student Identity. | Foundations implemented; M9 Accounting production-candidate complete |
 | Phase 3 | Extended School Operations | Add library, transport, canteen, and parent/mobile expansion using shared foundations such as Student QR Identity. | Admin foundations implemented for Library/Transport/Canteen; parent/mobile later |
 | Phase 4 | AI, Analytics, Scale, and Enterprise SaaS | Add M11 School Intelligence & Analytics, AI/ML features, analytics platform, scale optimizations, and enterprise SaaS controls. | Roadmap documented; implementation later |
 
@@ -43,12 +45,62 @@ Current stage: Phase 2 implemented foundations + Phase 3 operations admin founda
 
 ## Phase 2 Sub-Phases
 
-- 2A Academics, Exams, CAS, and Report Cards.
-- 2B Homework and Timetable.
-- 2C HR and Payroll.
-- 2D Full M9 Accounting and Finance.
-- 2E Parent Communication Expansion.
-- 2F Student Identity QR Foundation.
+- 2A Academics, Exams, CAS, and Report Cards — foundation implemented.
+- 2B Homework and Timetable — foundation implemented.
+- 2C HR and Payroll — foundation implemented.
+- 2D Full M9 Accounting and Finance — **Production Candidate Complete**.
+- 2E Parent Communication Expansion — foundation implemented / further hardening later.
+- 2F Student Identity QR Foundation — foundation documented / staged for vertical reuse.
+
+### Phase 2D — Full M9 Accounting and Finance
+
+Status: **Production Candidate Complete**.
+
+Completed scope:
+
+```text
+- Ledger correctness and double-entry enforcement.
+- Decimal-safe ledger posting.
+- Immutable posted journals.
+- Source-based idempotent posting.
+- Database-level idempotency constraints.
+- Reversal and correction workflows.
+- Fiscal period lifecycle: OPEN, LOCKED, CLOSED.
+- Fiscal year close/reopen workflow.
+- Opening balance workflow.
+- Expense/payment/receipt/contra voucher workflows.
+- Trial Balance, General Ledger, Cash Book, Income Statement, Balance Sheet.
+- VAT/TDS/PF summaries.
+- CSV report exports.
+- Explicit report account mappings.
+- Bank reconciliation.
+- Frontend Accounting workspace.
+- Granular RBAC permissions, audit coverage, and tenant isolation.
+```
+
+Verification passed:
+
+```text
+pnpm db:generate
+pnpm db:validate
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:e2e
+pnpm build
+pnpm verify:production
+```
+
+Remaining future enhancements:
+
+```text
+- PDF accounting exports.
+- Saved report snapshots and File Registry integration.
+- Advanced bank auto-match rules.
+- Accounting audit log viewer UI.
+- Seeded Playwright accounting workflow tests.
+- Production seed review for default Chart of Accounts and report mappings.
+```
 
 ### Phase 2F — Student Identity QR Foundation
 
@@ -74,7 +126,7 @@ Recommended next work:
 
 ```text
 Harden one existing vertical at a time.
-Priority: M9 accounting correctness, production verification, reports/exports, tenant isolation, contract-test alignment, and Student QR Identity foundation before deeper Library/Canteen workflows.
+Priority: seeded Accounting browser workflow tests, production seed review for default COA/report mappings, and continued module hardening for Academics, Homework/Timetable, HR/Payroll, Library, Transport, and Canteen.
 ```
 
 ---
