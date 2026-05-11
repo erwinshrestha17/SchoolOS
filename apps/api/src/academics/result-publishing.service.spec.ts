@@ -188,7 +188,10 @@ describe('ResultPublishingService', () => {
 
   it('requires unpublish reason', async () => {
     await expect(
-      service.unpublishResults({ reportCardIds: ['rc-1'], reason: '   ' }, actor),
+      service.unpublishResults(
+        { reportCardIds: ['rc-1'], reason: '   ' },
+        actor,
+      ),
     ).rejects.toThrow(ConflictException);
   });
 
