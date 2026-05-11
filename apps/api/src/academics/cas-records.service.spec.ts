@@ -1,9 +1,9 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { CasRecordsService } from './cas-records.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { AuditService } from '../audit/audit.service';
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
+import { PrismaService } from '../prisma/prisma.service';
+import { CasRecordsService } from './cas-records.service';
 
 describe('CasRecordsService', () => {
   let service: CasRecordsService;
@@ -61,22 +61,31 @@ describe('CasRecordsService', () => {
     const validDto = {
       academicYearId: 'year-1',
       classId: 'class-1',
+      subjectId: 'subject-1',
       studentId: 'student-1',
       category: 'Participation',
       score: 4,
       maxScore: 5,
+      observedOn: '2026-05-11',
     };
 
-    it('rejects if score exceeds maxScore', async () => {
+    function mockValidScope() {
       (prisma.academicYear.findFirst as jest.Mock).mockResolvedValue({
         id: 'year-1',
       });
       (prisma.class.findFirst as jest.Mock).mockResolvedValue({
         id: 'class-1',
       });
+      (prisma.subject.findFirst as jest.Mock).mockResolvedValue({
+        id: 'subject-1',
+      });
       (prisma.student.findFirst as jest.Mock).mockResolvedValue({
         id: 'student-1',
       });
+    }
+
+    it('rejects if score exceeds maxScore', async () => {
+      mockValidScope();
 
       await expect(
         service.create({ ...validDto, score: 10, maxScore: 5 }, mockActor),
@@ -84,15 +93,7 @@ describe('CasRecordsService', () => {
     });
 
     it('rejects if score is negative', async () => {
-      (prisma.academicYear.findFirst as jest.Mock).mockResolvedValue({
-        id: 'year-1',
-      });
-      (prisma.class.findFirst as jest.Mock).mockResolvedValue({
-        id: 'class-1',
-      });
-      (prisma.student.findFirst as jest.Mock).mockResolvedValue({
-        id: 'student-1',
-      });
+      mockValidScope();
 
       await expect(
         service.create({ ...validDto, score: -1 }, mockActor),
@@ -105,6 +106,9 @@ describe('CasRecordsService', () => {
       });
       (prisma.class.findFirst as jest.Mock).mockResolvedValue({
         id: 'class-1',
+      });
+      (prisma.subject.findFirst as jest.Mock).mockResolvedValue({
+        id: 'subject-1',
       });
       (prisma.student.findFirst as jest.Mock).mockResolvedValue(null);
 
