@@ -5,8 +5,11 @@ import { TimetableService } from './timetable.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CommunicationsService } from '../communications/communications.service';
+import { AttendanceService } from '../attendance/attendance.service';
 import { AuthContext } from '../auth/auth.types';
 import { createPrismaMock, PrismaMock } from '../../test/test-helpers';
+import { TimetableConflictService } from './timetable-conflict.service';
+import { TimetableLifecycleService } from './timetable-lifecycle.service';
 
 describe('Timetable Hardening', () => {
   let timetableService: TimetableService;
@@ -24,6 +27,12 @@ describe('Timetable Hardening', () => {
 
   beforeEach(async () => {
     prisma = createPrismaMock();
+    const conflictService = new TimetableConflictService(prisma as never);
+    const lifecycleService = new TimetableLifecycleService(
+      prisma as never,
+      conflictService,
+    );
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TimetableService,
@@ -33,6 +42,9 @@ describe('Timetable Hardening', () => {
           provide: CommunicationsService,
           useValue: { recordDeliveryRecords: jest.fn() },
         },
+        { provide: TimetableConflictService, useValue: conflictService },
+        { provide: TimetableLifecycleService, useValue: lifecycleService },
+        { provide: AttendanceService, useValue: {} },
       ],
     }).compile();
 
