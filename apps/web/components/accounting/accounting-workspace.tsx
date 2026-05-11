@@ -12,6 +12,8 @@ import { StatCard } from '../ui/stat-card';
 import { Badge } from '../ui/badge';
 import { cn } from '../../lib/utils';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
+import { AuditInfo } from '../ui/audit-info';
+import { PageState } from '../ui/page-state';
 import { ReportFilters } from './report-filters';
 import { ReportTable } from './report-table';
 import { FiscalPeriodActions } from './fiscal-period-actions';
@@ -85,8 +87,25 @@ export function AccountingWorkspace() {
   };
 
   const renderReportContent = () => {
-    if (reportQuery.isLoading) return <div className="py-20 text-center text-slate-400">Loading report data...</div>;
-    if (reportQuery.isError) return <div className="py-20 text-center text-rose-500">Failed to load report.</div>;
+    if (reportQuery.isLoading) {
+      return (
+        <PageState
+          tone="loading"
+          title="Loading report data"
+          description="SchoolOS is fetching backend-generated ledger data for this report."
+        />
+      );
+    }
+
+    if (reportQuery.isError) {
+      return (
+        <PageState
+          tone="danger"
+          title="Failed to load report"
+          description={reportQuery.error?.message ?? 'The accounting report could not be loaded from the backend ledger.'}
+        />
+      );
+    }
 
     const data = reportQuery.data;
 
@@ -278,33 +297,38 @@ export function AccountingWorkspace() {
                   title="Financial Reports" 
                   description="Access all standard accounting reports and tax summaries."
                 >
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {[
-                      { id: 'trial-balance', label: 'Trial Balance', desc: 'Summary of all ledger balances.', icon: BarChart3, color: 'bg-primary-500' },
-                      { id: 'income-statement', label: 'Income Statement', desc: 'Profit and loss for the period.', icon: FileText, color: 'bg-emerald-500' },
-                      { id: 'balance-sheet', label: 'Balance Sheet', desc: 'Financial position of the school.', icon: PieChart, color: 'bg-secondary-500' },
-                      { id: 'general-ledger', label: 'General Ledger', desc: 'Detailed transaction history.', icon: History, color: 'bg-amber-500' },
-                      { id: 'cash-book', label: 'Cash Book', desc: 'Real-time cash and bank flow.', icon: Wallet, color: 'bg-cyan-500' },
-                      { id: 'tax-summary', label: 'VAT/TDS/PF Summary', desc: 'Tax and statutory deductions.', icon: Calculator, color: 'bg-rose-500' },
-                    ].map((report) => (
-                      <button
-                        key={report.id}
-                        onClick={() => {
-                          setActiveReport(report.id as ReportType);
-                          setActiveTab('reports');
-                        }}
-                        className="group flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 text-left transition hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5"
-                      >
-                        <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white shadow-lg transition group-hover:scale-110", report.color)}>
-                          <report.icon size={22} />
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-bold text-slate-900">{report.label}</p>
-                          <p className="text-xs text-slate-500">{report.desc}</p>
-                        </div>
-                        <ArrowRight size={18} className="text-slate-300 transition group-hover:translate-x-1 group-hover:text-emerald-500" />
-                      </button>
-                    ))}
+                  <div className="space-y-4">
+                    <AuditInfo>
+                      Accounting reports are generated from the backend ledger. Posted journals are immutable; use reversal or correction workflows instead of editing posted entries.
+                    </AuditInfo>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {[
+                        { id: 'trial-balance', label: 'Trial Balance', desc: 'Summary of all ledger balances.', icon: BarChart3, color: 'bg-primary-500' },
+                        { id: 'income-statement', label: 'Income Statement', desc: 'Profit and loss for the period.', icon: FileText, color: 'bg-emerald-500' },
+                        { id: 'balance-sheet', label: 'Balance Sheet', desc: 'Financial position of the school.', icon: PieChart, color: 'bg-secondary-500' },
+                        { id: 'general-ledger', label: 'General Ledger', desc: 'Detailed transaction history.', icon: History, color: 'bg-amber-500' },
+                        { id: 'cash-book', label: 'Cash Book', desc: 'Real-time cash and bank flow.', icon: Wallet, color: 'bg-cyan-500' },
+                        { id: 'tax-summary', label: 'VAT/TDS/PF Summary', desc: 'Tax and statutory deductions.', icon: Calculator, color: 'bg-rose-500' },
+                      ].map((report) => (
+                        <button
+                          key={report.id}
+                          onClick={() => {
+                            setActiveReport(report.id as ReportType);
+                            setActiveTab('reports');
+                          }}
+                          className="group flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 text-left transition hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5"
+                        >
+                          <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white shadow-lg transition group-hover:scale-110", report.color)}>
+                            <report.icon size={22} />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-bold text-slate-900">{report.label}</p>
+                            <p className="text-xs text-slate-500">{report.desc}</p>
+                          </div>
+                          <ArrowRight size={18} className="text-slate-300 transition group-hover:translate-x-1 group-hover:text-emerald-500" />
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </SectionCard>
 
@@ -317,18 +341,32 @@ export function AccountingWorkspace() {
                     </button>
                   }
                 >
-                  <ReportTable
-                    headers={['Date', 'Number', 'Narration', 'Amount']}
-                    rows={(journalsQuery.data ?? []).slice(0, 5).map((entry) => ({
-                      id: entry.id,
-                      cells: [
-                        { value: entry.entryDate, type: 'date' },
-                        { value: entry.entryNumber, bold: true },
-                        { value: entry.narration },
-                        { value: entry.totalDebit ?? entry.totalCredit ?? 0, type: 'currency' }
-                      ],
-                    }))}
-                  />
+                  {journalsQuery.isLoading ? (
+                    <PageState
+                      tone="loading"
+                      title="Loading journal entries"
+                      description="Fetching recent ledger postings from the backend."
+                    />
+                  ) : journalsQuery.isError ? (
+                    <PageState
+                      tone="danger"
+                      title="Unable to load journal entries"
+                      description={journalsQuery.error?.message ?? 'Recent ledger postings could not be loaded.'}
+                    />
+                  ) : (
+                    <ReportTable
+                      headers={['Date', 'Number', 'Narration', 'Amount']}
+                      rows={(journalsQuery.data ?? []).slice(0, 5).map((entry) => ({
+                        id: entry.id,
+                        cells: [
+                          { value: entry.entryDate, type: 'date' },
+                          { value: entry.entryNumber, bold: true },
+                          { value: entry.narration },
+                          { value: entry.totalDebit ?? entry.totalCredit ?? 0, type: 'currency' }
+                        ],
+                      }))}
+                    />
+                  )}
                 </SectionCard>
               </div>
 
@@ -423,6 +461,9 @@ export function AccountingWorkspace() {
 
         <TabsContent value="reports" className="mt-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="space-y-4">
+            <AuditInfo>
+              These reports are generated from backend ledger records. Frontend filters only request data; accounting totals are not calculated in the browser.
+            </AuditInfo>
             <SectionCard>
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex flex-wrap gap-2">
@@ -478,9 +519,17 @@ export function AccountingWorkspace() {
             description="Complete list of all financial postings in chronological order."
           >
             {journalsQuery.isLoading ? (
-              <div className="py-20 text-center text-slate-400">Loading journal entries...</div>
+              <PageState
+                tone="loading"
+                title="Loading journal entries"
+                description="Fetching posted and draft journal records from the backend."
+              />
             ) : journalsQuery.isError ? (
-              <div className="py-20 text-center text-rose-500">Failed to load journal entries.</div>
+              <PageState
+                tone="danger"
+                title="Failed to load journal entries"
+                description={journalsQuery.error?.message ?? 'Journal entries could not be loaded.'}
+              />
             ) : (
               <ReportTable
                 headers={['Date', 'Number', 'Narration', 'Type', 'Amount']}
