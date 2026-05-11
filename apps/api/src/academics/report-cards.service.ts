@@ -304,8 +304,6 @@ export class ReportCardsService {
               componentId: component.id,
               componentName: component.name,
               subjectId,
-              subjectName: component.subject.name,
-              subjectCode: component.subject.code,
               type: component.type,
               maxMarks: Number(component.maxMarks),
               marksObtained: mark ? Number(mark.marksObtained) : null,
