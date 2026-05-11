@@ -355,18 +355,17 @@ describe('AcademicsController M4 contracts', () => {
         actor,
       ),
     ).toEqual({ promoted: 1 });
-    expect(promotionReadinessService.listPromotionReadiness).toHaveBeenCalledWith(
-      actor,
-      {
-        academicYearId: 'year-1',
-        examTermId: 'term-1',
-        classId: 'class-1',
-        sectionId: 'section-1',
-        status: 'READY',
-        page: undefined,
-        limit: undefined,
-      },
-    );
+    expect(
+      promotionReadinessService.listPromotionReadiness,
+    ).toHaveBeenCalledWith(actor, {
+      academicYearId: 'year-1',
+      examTermId: 'term-1',
+      classId: 'class-1',
+      sectionId: 'section-1',
+      status: 'READY',
+      page: undefined,
+      limit: undefined,
+    });
   });
 
   it('delegates results preview to ResultsService', async () => {
