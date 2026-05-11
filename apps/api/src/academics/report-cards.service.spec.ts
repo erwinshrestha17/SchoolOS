@@ -1,6 +1,10 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { GradeLockStatus, MarkEntryStatus, Prisma } from '@prisma/client';
+import {
+  GradeLockStatus,
+  MarkEntryStatus,
+  Prisma,
+} from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { FinanceService } from '../finance/finance.service';
@@ -223,9 +227,15 @@ describe('ReportCardsService', () => {
     expect(prisma.reportCard.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         create: expect.objectContaining({
-          totalMarks: expect.objectContaining({ toString: expect.any(Function) }),
-          maxMarks: expect.objectContaining({ toString: expect.any(Function) }),
-          percentage: expect.objectContaining({ toString: expect.any(Function) }),
+          totalMarks: expect.objectContaining({
+            toString: expect.any(Function),
+          }),
+          maxMarks: expect.objectContaining({
+            toString: expect.any(Function),
+          }),
+          percentage: expect.objectContaining({
+            toString: expect.any(Function),
+          }),
           status: GradeLockStatus.LOCKED,
           lockedAt: expect.any(Date),
         }),
