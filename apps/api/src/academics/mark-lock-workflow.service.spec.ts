@@ -146,7 +146,9 @@ describe('MarkLockWorkflowService', () => {
     prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
     prisma.section.findFirst.mockResolvedValue({ id: 'section-1' });
     prisma.subject.findFirst.mockResolvedValue({ id: 'subject-1' });
-    prisma.assessmentComponent.findFirst.mockResolvedValue({ id: 'component-1' });
+    prisma.assessmentComponent.findFirst.mockResolvedValue({
+      id: 'component-1',
+    });
     prisma.markLockRequest.findFirst.mockResolvedValue(null);
     prisma.markLockRequest.create.mockResolvedValue({
       id: 'lock-1',
@@ -218,7 +220,11 @@ describe('MarkLockWorkflowService', () => {
     prisma.examTerm.update.mockResolvedValue({ id: 'term-1', isLocked: true });
     prisma.markEntry.updateMany.mockResolvedValue({ count: 10 });
 
-    const result = await service.review('lock-1', { status: 'APPROVED' }, actor);
+    const result = await service.review(
+      'lock-1',
+      { status: 'APPROVED' },
+      actor,
+    );
 
     expect(result.status).toBe('APPROVED');
     expect(prisma.examTerm.update).toHaveBeenCalledWith({

@@ -46,7 +46,9 @@ export class MarkLockWorkflowService {
       tenantId: actor.tenantId,
       ...(filters.examTermId ? { examTermId: filters.examTermId } : {}),
       ...(filters.status ? { status: filters.status } : {}),
-      ...(filters.requestedById ? { requestedById: filters.requestedById } : {}),
+      ...(filters.requestedById
+        ? { requestedById: filters.requestedById }
+        : {}),
     };
 
     const [items, total] = await Promise.all([
