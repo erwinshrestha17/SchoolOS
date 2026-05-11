@@ -1,18 +1,22 @@
-import { Injectable } from '@nestjs/common';
 import {
-  GradeLockStatus,
-  NotificationChannel,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
   AudienceType,
   ConsentType,
+  GradeLockStatus,
+  NotificationChannel,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { FinanceService } from '../finance/finance.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotifyResultsDto } from './dto/notify-results.dto';
 import { PublishResultsDto } from './dto/publish-results.dto';
 import { UnpublishResultsDto } from './dto/unpublish-results.dto';
-import { NotifyResultsDto } from './dto/notify-results.dto';
 
 export interface PublishingReadinessRow {
   reportCardId: string;
@@ -38,6 +42,18 @@ export interface PublishingReadinessRow {
   notificationEligibility: boolean;
 }
 
+type PublishingFailure = { id: string; reason: string };
+
+type PublishingFilters = {
+  academicYearId?: string;
+  examTermId?: string;
+  classId?: string;
+  sectionId?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+};
+
 @Injectable()
 export class ResultPublishingService {
   constructor(
@@ -49,14 +65,12 @@ export class ResultPublishingService {
 
   async listPublishingReadiness(
     actor: AuthContext,
-    filters: {
-      academicYearId?: string;
-      examTermId?: string;
-      classId?: string;
-      sectionId?: string;
-      status?: string;
-    },
+    filters: PublishingFilters,
   ): Promise<PublishingReadinessRow[]> {
+    const page = Math.max(1, Number(filters.page ?? 1));
+    const limit = Math.min(100, Math.max(1, Number(filters.limit ?? 50)));
+    const skip = (page - 1) * limit;
+
     const reportCards = await this.prisma.reportCard.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -81,8 +95,11 @@ export class ResultPublishingService {
         { student: { firstNameEn: 'asc' } },
         { student: { lastNameEn: 'asc' } },
       ],
+      skip,
+      take: limit,
     });
 
+    const blockOnDues = await this.shouldBlockPublishingOnDues(actor);
     const results: PublishingReadinessRow[] = [];
 
     for (const card of reportCards) {
@@ -94,11 +111,7 @@ export class ResultPublishingService {
         );
       }
 
-      const publishingBlockSetting = await this.prisma.tenantSetting.findFirst({
-        where: { tenantId: actor.tenantId, key: 'block_publishing_on_dues' },
-      });
-
-      if (publishingBlockSetting?.value === 'true') {
+      if (blockOnDues) {
         const ledger = await this.financeService.getStudentFeeLedger(
           card.studentId,
           actor,
@@ -133,7 +146,8 @@ export class ResultPublishingService {
           ? `${card.publishedBy.email ?? card.publishedBy.phone}`
           : null,
         blockedReasons,
-        notificationEligibility: card.student.lifecycleStatus === 'ACTIVE',
+        notificationEligibility:
+          card.student.lifecycleStatus === 'ACTIVE' && blockedReasons.length === 0,
       });
     }
 
@@ -141,26 +155,42 @@ export class ResultPublishingService {
   }
 
   async publishResults(dto: PublishResultsDto, actor: AuthContext) {
-    const reportCardIds = dto.reportCardIds || [];
+    const explicitIds = this.normalizeUniqueIds(dto.reportCardIds);
+
+    if (explicitIds.length === 0 && !dto.academicYearId && !dto.examTermId) {
+      throw new ConflictException(
+        'Provide reportCardIds or an academicYearId/examTermId publishing scope',
+      );
+    }
 
     const cards = await this.prisma.reportCard.findMany({
       where: {
-        id: { in: reportCardIds },
         tenantId: actor.tenantId,
+        ...(explicitIds.length > 0 ? { id: { in: explicitIds } } : {}),
+        ...(explicitIds.length === 0 && dto.academicYearId
+          ? { academicYearId: dto.academicYearId }
+          : {}),
+        ...(explicitIds.length === 0 && dto.examTermId
+          ? { examTermId: dto.examTermId }
+          : {}),
+        ...(explicitIds.length === 0 && dto.classId
+          ? { classId: dto.classId }
+          : {}),
+        ...(explicitIds.length === 0 && dto.sectionId
+          ? { sectionId: dto.sectionId }
+          : {}),
       },
     });
 
     const results = {
       published: 0,
       skipped: 0,
-      failed: [] as Array<{ id: string; reason: string }>,
+      failed: [] as PublishingFailure[],
       rows: [] as Array<{ id: string }>,
     };
 
-    const publishingBlockSetting = await this.prisma.tenantSetting.findFirst({
-      where: { tenantId: actor.tenantId, key: 'block_publishing_on_dues' },
-    });
-    const blockOnDues = publishingBlockSetting?.value === 'true';
+    this.addMissingIdFailures(explicitIds, cards, results.failed);
+    const blockOnDues = await this.shouldBlockPublishingOnDues(actor);
 
     for (const card of cards) {
       if (blockOnDues) {
@@ -206,13 +236,15 @@ export class ResultPublishingService {
     }
 
     await this.auditService.record({
-      action: 'publish',
+      action: 'ACADEMICS_RESULTS_PUBLISHED',
       resource: 'report_card_results',
       tenantId: actor.tenantId,
       userId: actor.userId,
       after: {
         count: results.published,
-        reportCardIds: results.rows.map((r) => r.id),
+        skipped: results.skipped,
+        failed: results.failed,
+        reportCardIds: results.rows.map((row) => row.id),
       },
     });
 
@@ -220,9 +252,16 @@ export class ResultPublishingService {
   }
 
   async unpublishResults(dto: UnpublishResultsDto, actor: AuthContext) {
+    const reportCardIds = this.normalizeUniqueIds(dto.reportCardIds);
+    const reason = dto.reason.trim();
+
+    if (!reason) {
+      throw new ConflictException('Unpublish reason is required');
+    }
+
     const cards = await this.prisma.reportCard.findMany({
       where: {
-        id: { in: dto.reportCardIds },
+        id: { in: reportCardIds },
         tenantId: actor.tenantId,
       },
     });
@@ -230,8 +269,10 @@ export class ResultPublishingService {
     const results = {
       unpublished: 0,
       skipped: 0,
-      failed: [] as Array<{ id: string; reason: string }>,
+      failed: [] as PublishingFailure[],
     };
+
+    this.addMissingIdFailures(reportCardIds, cards, results.failed);
 
     for (const card of cards) {
       if (card.publishStatus !== 'PUBLISHED') {
@@ -251,14 +292,16 @@ export class ResultPublishingService {
     }
 
     await this.auditService.record({
-      action: 'unpublish',
+      action: 'ACADEMICS_RESULTS_UNPUBLISHED',
       resource: 'report_card_results',
       tenantId: actor.tenantId,
       userId: actor.userId,
       after: {
         count: results.unpublished,
-        reportCardIds: dto.reportCardIds,
-        reason: dto.reason,
+        skipped: results.skipped,
+        failed: results.failed,
+        reportCardIds,
+        reason,
       },
     });
 
@@ -266,11 +309,11 @@ export class ResultPublishingService {
   }
 
   async notifyResults(dto: NotifyResultsDto, actor: AuthContext) {
+    const reportCardIds = this.normalizeUniqueIds(dto.reportCardIds);
     const cards = await this.prisma.reportCard.findMany({
       where: {
-        id: { in: dto.reportCardIds },
+        id: { in: reportCardIds },
         tenantId: actor.tenantId,
-        publishStatus: 'PUBLISHED',
       },
       include: {
         student: true,
@@ -282,10 +325,30 @@ export class ResultPublishingService {
     const results = {
       notified: 0,
       skipped: 0,
+      failed: [] as PublishingFailure[],
     };
 
+    this.addMissingIdFailures(reportCardIds, cards, results.failed);
+
     for (const card of cards) {
-      // Use existing notification infrastructure
+      if (card.publishStatus !== 'PUBLISHED') {
+        results.skipped++;
+        results.failed.push({
+          id: card.id,
+          reason: 'Report card is not published',
+        });
+        continue;
+      }
+
+      if (card.student.lifecycleStatus !== 'ACTIVE') {
+        results.skipped++;
+        results.failed.push({
+          id: card.id,
+          reason: 'Student is not active',
+        });
+        continue;
+      }
+
       const schoolName = card.tenant.name;
       const termName = card.examTerm.name;
 
@@ -293,7 +356,7 @@ export class ResultPublishingService {
         actor,
         sourceType: 'report_card_published',
         sourceId: card.id,
-        audienceType: AudienceType.ALL, // Will resolve to student/guardian
+        audienceType: AudienceType.ALL,
         studentIds: [card.studentId],
         title: 'Result Published',
         body: `[${schoolName}]: Result for ${termName} has been published. Please contact school administration for details.`,
@@ -305,16 +368,51 @@ export class ResultPublishingService {
     }
 
     await this.auditService.record({
-      action: 'notify',
+      action: 'ACADEMICS_RESULTS_NOTIFIED',
       resource: 'report_card_results',
       tenantId: actor.tenantId,
       userId: actor.userId,
       after: {
         count: results.notified,
-        reportCardIds: cards.map((c) => c.id),
+        skipped: results.skipped,
+        failed: results.failed,
+        reportCardIds: cards.map((card) => card.id),
       },
     });
 
     return results;
+  }
+
+  private normalizeUniqueIds(ids: string[] | undefined) {
+    const normalized = (ids ?? []).map((id) => id.trim()).filter(Boolean);
+    const unique = new Set(normalized);
+
+    if (unique.size !== normalized.length) {
+      throw new ConflictException('Duplicate reportCardIds are not allowed');
+    }
+
+    return normalized;
+  }
+
+  private addMissingIdFailures(
+    requestedIds: string[],
+    cards: Array<{ id: string }>,
+    failures: PublishingFailure[],
+  ) {
+    const found = new Set(cards.map((card) => card.id));
+
+    for (const id of requestedIds) {
+      if (!found.has(id)) {
+        failures.push({ id, reason: 'Report card not found in this tenant' });
+      }
+    }
+  }
+
+  private async shouldBlockPublishingOnDues(actor: AuthContext) {
+    const setting = await this.prisma.tenantSetting.findFirst({
+      where: { tenantId: actor.tenantId, key: 'block_publishing_on_dues' },
+    });
+
+    return setting?.value === 'true';
   }
 }
