@@ -38,11 +38,9 @@ const studentSections = [
 type AdminSection = (typeof adminSections)[number];
 type StudentSection = (typeof studentSections)[number];
 type Section = AdminSection | StudentSection;
-export type HomeworkWorkspaceMode = 'list' | 'create' | 'review';
 
 type TimetableWorkspaceProps = {
   initialSection?: Section;
-  homeworkMode?: HomeworkWorkspaceMode;
 };
 
 const sectionMeta: Record<Section, { title: string; description: string; icon: any }> = {
@@ -73,10 +71,7 @@ const sectionMeta: Record<Section, { title: string; description: string; icon: a
   },
 };
 
-export function TimetableWorkspace({
-  initialSection,
-  homeworkMode = 'list',
-}: TimetableWorkspaceProps = {}) {
+export function TimetableWorkspace({ initialSection }: TimetableWorkspaceProps = {}) {
   const { session } = useSession();
   const isStudent = session?.user.roles.includes('student');
   const sections = isStudent ? studentSections : adminSections;
@@ -194,7 +189,6 @@ export function TimetableWorkspace({
             staff={staffQuery.data ?? []}
             classId={classId}
             setClassId={setClassId}
-            mode={homeworkMode}
           />
         </TabsContent>
 
