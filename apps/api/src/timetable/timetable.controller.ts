@@ -16,6 +16,12 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { CreateTimetableSlotDto } from './dto/create-timetable-slot.dto';
 import {
+  AssignSubstitutionDto,
+  CreateRoomDto,
+  CreateSubjectWeeklyRequirementDto,
+  CreateSubstitutionDto,
+  CreateTimetablePeriodDto,
+  CreateTimetableVersionDto,
   CreateVersionSlotDto,
   ListSubjectWeeklyRequirementQueryDto,
   ListTeacherAvailabilityQueryDto,
@@ -31,7 +37,6 @@ import {
   UpdateVersionSlotDto,
   UpsertTeacherWorkloadLimitDto,
   WorkloadQueryDto,
-  CreateSubjectWeeklyRequirementDto,
 } from './dto/timetable-setup.dto';
 import { TimetableService } from './timetable.service';
 

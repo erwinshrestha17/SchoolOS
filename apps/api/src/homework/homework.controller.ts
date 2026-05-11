@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { HomeworkQueryDto } from './dto/homework-query.dto';
+import { HomeworkSubmissionQueryDto } from './dto/homework-submission-query.dto';
 import {
   LegacyReviewHomeworkSubmissionDto,
   LegacySubmitHomeworkDto,
@@ -149,9 +150,10 @@ export class HomeworkController {
   @Permissions('homework:read')
   listAssignmentSubmissions(
     @Param('id') id: string,
+    @Query() query: HomeworkSubmissionQueryDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.homeworkService.listSubmissions(auth, id);
+    return this.homeworkService.listSubmissions(auth, id, query);
   }
 
   @Post('assignments/:id/submissions')
@@ -196,8 +198,12 @@ export class HomeworkController {
 
   @Get('submissions')
   @Permissions('homework:read')
-  listLegacySubmissions(@CurrentAuth() auth: AuthContext) {
-    return this.homeworkService.listSubmissions(auth);
+  listLegacySubmissions(
+    @CurrentAuth() auth: AuthContext,
+    @Query('assignmentId') assignmentId: string | undefined,
+    @Query() query: HomeworkSubmissionQueryDto,
+  ) {
+    return this.homeworkService.listSubmissions(auth, assignmentId, query);
   }
 
   @Post('submissions')
@@ -307,8 +313,12 @@ export class HomeworkController {
 
   @Get(':id/submissions')
   @Permissions('homework:read')
-  listSubmissions(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
-    return this.homeworkService.listSubmissions(auth, id);
+  listSubmissions(
+    @Param('id') id: string,
+    @Query() query: HomeworkSubmissionQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.homeworkService.listSubmissions(auth, id, query);
   }
 
   @Post(':id/submissions')

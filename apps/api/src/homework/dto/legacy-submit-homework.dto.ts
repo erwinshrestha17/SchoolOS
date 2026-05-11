@@ -27,5 +27,11 @@ export class LegacyReviewHomeworkSubmissionDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(3000)
   feedback?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3000)
+  teacherRemarks?: string;
 }
