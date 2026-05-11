@@ -52,7 +52,7 @@ export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
           <input
             type="date"
             onChange={(e) => onFilterChange({ startDate: e.target.value })}
-            className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-semibold text-slate-600 outline-none transition-all focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"
+            className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-semibold text-slate-600 outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
           />
         </div>
         <span className="text-slate-400">to</span>
@@ -61,7 +61,7 @@ export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
           <input
             type="date"
             onChange={(e) => onFilterChange({ endDate: e.target.value })}
-            className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-semibold text-slate-600 outline-none transition-all focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10"
+            className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-semibold text-slate-600 outline-none transition-all focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
           />
         </div>
       </div>
