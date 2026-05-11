@@ -32,7 +32,7 @@ export interface PromotionReadinessRow {
   outstandingBalance: number;
 }
 
-type PromotionFilters = {
+interface PromotionFilters {
   academicYearId: string;
   examTermId?: string;
   classId?: string;
@@ -40,9 +40,9 @@ type PromotionFilters = {
   status?: string;
   page?: number;
   limit?: number;
-};
+}
 
-type StudentWithScope = {
+interface StudentWithScope {
   id: string;
   firstNameEn: string;
   lastNameEn: string;
@@ -52,9 +52,9 @@ type StudentWithScope = {
   lifecycleStatus?: string | null;
   class?: { id: string; name: string } | null;
   sectionRef?: { id: string; name: string } | null;
-};
+}
 
-type ReportCardLike = {
+interface ReportCardLike {
   id: string;
   studentId: string;
   status: GradeLockStatus | string;
@@ -62,7 +62,7 @@ type ReportCardLike = {
   grade: string;
   gpa: Prisma.Decimal | number;
   remarks?: string | null;
-};
+}
 
 @Injectable()
 export class PromotionReadinessService {

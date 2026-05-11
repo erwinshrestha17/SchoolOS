@@ -61,7 +61,7 @@ export class JwtAuthGuard implements CanActivate {
       },
     });
 
-    if (!user || user.status !== 'ACTIVE' || !user.tenant.isActive) {
+    if (user?.status !== 'ACTIVE' || !user.tenant.isActive) {
       throw new UnauthorizedException('User or tenant is inactive');
     }
 

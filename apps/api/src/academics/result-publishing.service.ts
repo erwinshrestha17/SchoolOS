@@ -38,9 +38,12 @@ export interface PublishingReadinessRow {
   notificationEligibility: boolean;
 }
 
-type PublishingFailure = { id: string; reason: string };
+interface PublishingFailure {
+  id: string;
+  reason: string;
+}
 
-type PublishingFilters = {
+interface PublishingFilters {
   academicYearId?: string;
   examTermId?: string;
   classId?: string;
@@ -48,7 +51,7 @@ type PublishingFilters = {
   status?: string;
   page?: number;
   limit?: number;
-};
+}
 
 @Injectable()
 export class ResultPublishingService {

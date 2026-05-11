@@ -199,7 +199,7 @@ export class ResultsService {
 
       const casInputs = casRecords.map((r) => ({
         subjectId: r.subjectId,
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+
         subjectName: r.subject?.name ?? 'General',
         category: r.category,
         score: Number(r.score),

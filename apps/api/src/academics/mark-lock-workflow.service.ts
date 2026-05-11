@@ -18,13 +18,13 @@ interface MarkLockFilters {
   limit?: number;
 }
 
-type LockScope = {
+interface LockScope {
   examTermId: string;
   classId?: string;
   sectionId?: string;
   subjectId?: string;
   assessmentComponentId?: string;
-};
+}
 
 @Injectable()
 export class MarkLockWorkflowService {

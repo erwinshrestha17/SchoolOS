@@ -1375,7 +1375,7 @@ export class AccountingService {
         entryDate,
         narration: dto.narration ?? `Opening balance for ${fiscalYear.name}`,
         sourceModule: 'ACCOUNTING',
-        sourceType: 'OPENING_BALANCE' as JournalSourceType,
+        sourceType: 'OPENING_BALANCE',
         sourceId: dto.fiscalYearId,
         lines: dto.lines.map((line) => ({
           chartAccountId: line.chartAccountId,
@@ -1407,7 +1407,7 @@ export class AccountingService {
     const entry = await this.prisma.journalEntry.findFirst({
       where: {
         tenantId: actor.tenantId,
-        sourceType: 'OPENING_BALANCE' as JournalSourceType,
+        sourceType: 'OPENING_BALANCE',
         sourceId: fiscalYearId,
       },
       include: { lines: { include: { chartAccount: true } } },
@@ -1576,8 +1576,7 @@ export class AccountingService {
         where: {
           tenantId: actor.tenantId,
           // RETAINED_EARNINGS added to schema; after prisma generate this cast becomes redundant
-          mappingType:
-            'RETAINED_EARNINGS' as unknown as AccountingReportMappingType,
+          mappingType: 'RETAINED_EARNINGS',
         },
       });
 
@@ -1612,12 +1611,8 @@ export class AccountingService {
       );
       if (!lineData) continue;
 
-      const debit = new Prisma.Decimal(
-        (lineData._sum.debit ?? 0) as string | number,
-      );
-      const credit = new Prisma.Decimal(
-        (lineData._sum.credit ?? 0) as string | number,
-      );
+      const debit = new Prisma.Decimal(lineData._sum.debit ?? 0);
+      const credit = new Prisma.Decimal(lineData._sum.credit ?? 0);
       const net = debit.minus(credit);
 
       if (net.isZero()) continue;
@@ -1677,7 +1672,7 @@ export class AccountingService {
         entryDate: fiscalYear.endDate,
         narration: `Closing entries for fiscal year ${fiscalYear.name}`,
         sourceModule: 'ACCOUNTING',
-        sourceType: 'CLOSING_ENTRY' as JournalSourceType,
+        sourceType: 'CLOSING_ENTRY',
         sourceId: fiscalYearId,
         postingType: 'FISCAL_YEAR_CLOSE',
         lines: closingLines,
@@ -1768,7 +1763,7 @@ export class AccountingService {
    */
   private get bankStatements(): Record<string, (...args: unknown[]) => any> {
     const p = this.prisma as unknown as Record<string, unknown>;
-    return p['bankStatement'] as Record<string, (...args: unknown[]) => any>;
+    return p.bankStatement as Record<string, (...args: unknown[]) => any>;
   }
 
   async importBankStatement(

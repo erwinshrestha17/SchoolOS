@@ -136,7 +136,7 @@ export class TimetableConflictService {
         classId: candidate.classId,
         sectionId: candidate.sectionId ?? null,
       },
-    ].filter(Boolean) as Record<string, unknown>[];
+    ].filter(Boolean) as Array<Record<string, unknown>>;
 
     const [
       existingSlots,
