@@ -7,9 +7,21 @@ import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { HomeworkQueryDto } from './dto/homework-query.dto';
 import { HomeworkSubmissionQueryDto } from './dto/homework-submission-query.dto';
-import { LegacyReviewHomeworkSubmissionDto, LegacySubmitHomeworkDto } from './dto/legacy-submit-homework.dto';
-import { HomeworkReminderQueryDto, SendHomeworkReminderDto } from './dto/reminder.dto';
-import { CreateHomeworkSubmissionDto, RequestCorrectionDto, ReviewHomeworkSubmissionDto, UpdateHomeworkSubmissionDto, UpdateHomeworkSubmissionStatusDto } from './dto/submission.dto';
+import {
+  LegacyReviewHomeworkSubmissionDto,
+  LegacySubmitHomeworkDto,
+} from './dto/legacy-submit-homework.dto';
+import {
+  CreateHomeworkSubmissionDto,
+  RequestCorrectionDto,
+  ReviewHomeworkSubmissionDto,
+  UpdateHomeworkSubmissionDto,
+  UpdateHomeworkSubmissionStatusDto,
+} from './dto/submission.dto';
+import {
+  HomeworkReminderQueryDto,
+  SendHomeworkReminderDto,
+} from './dto/reminder.dto';
 import { UpdateHomeworkDto } from './dto/update-homework.dto';
 import { HomeworkAttachmentAccessService } from './homework-attachment-access.service';
 import { HomeworkService } from './homework.service';
@@ -96,7 +108,11 @@ export class HomeworkController {
 
   @Get('assignments/:id/submissions')
   @Permissions('homework:read')
-  listAssignmentSubmissions(@Param('id') id: string, @Query() query: HomeworkSubmissionQueryDto, @CurrentAuth() auth: AuthContext) {
+  listAssignmentSubmissions(
+    @Param('id') id: string,
+    @Query() query: HomeworkSubmissionQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.homeworkService.listSubmissions(auth, id, query);
   }
 
@@ -108,8 +124,12 @@ export class HomeworkController {
 
   @Get('submissions')
   @Permissions('homework:read')
-  listLegacySubmissions(@Query() query: HomeworkSubmissionQueryDto, @CurrentAuth() auth: AuthContext) {
-    return this.homeworkService.listSubmissions(auth, undefined, query);
+  listLegacySubmissions(
+    @CurrentAuth() auth: AuthContext,
+    @Query('assignmentId') assignmentId: string | undefined,
+    @Query() query: HomeworkSubmissionQueryDto,
+  ) {
+    return this.homeworkService.listSubmissions(auth, assignmentId, query);
   }
 
   @Post('submissions')
@@ -192,7 +212,11 @@ export class HomeworkController {
 
   @Get(':id/submissions')
   @Permissions('homework:read')
-  listSubmissions(@Param('id') id: string, @Query() query: HomeworkSubmissionQueryDto, @CurrentAuth() auth: AuthContext) {
+  listSubmissions(
+    @Param('id') id: string,
+    @Query() query: HomeworkSubmissionQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
     return this.homeworkService.listSubmissions(auth, id, query);
   }
 
