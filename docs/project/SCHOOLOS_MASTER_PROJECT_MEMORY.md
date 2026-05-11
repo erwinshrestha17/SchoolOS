@@ -1,6 +1,6 @@
 # SchoolOS Master Project Memory
 
-**Status:** Phase 2 implemented foundations + Phase 3 operations admin foundations  
+**Status:** Phase 2D M9 Accounting Production Candidate Complete + Phase 2/3 foundations in progress  
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard
 
@@ -14,6 +14,7 @@ docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md
 docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md
 docs/project/SCHOOLOS_M11_INTELLIGENCE_ROADMAP.md
 docs/project/SCHOOLOS_PRICING_TIERS_AND_ENTITLEMENTS_PLAN.md
+docs/project/SCHOOLOS_M9_ACCOUNTING_COMPLETION.md
 ```
 
 ---
@@ -25,18 +26,18 @@ Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation Depth: Completed
-M9 Accounting Ledger Hardening: Completed
-Current stage: Phase 2 implemented foundations + Phase 3 operations admin foundations
+Phase 2D M9 Accounting: Production Candidate Complete
+Current stage: Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
 ```
 
-SchoolOS is ready for controlled Phase 1 pilot preparation, and the repo now contains real Phase 2 backend/web foundations plus Phase 3 operations admin foundations. The next work should harden existing modules rather than opening broad new fronts.
+SchoolOS is ready for controlled Phase 1 pilot preparation, and the repo now contains real Phase 2 backend/web foundations plus Phase 3 operations admin foundations. M9 Accounting has moved from hardening priority to production-candidate complete after full verification passed.
 
 Recommended near-term direction:
 
 ```text
 Run pilot hardening while deepening one existing vertical at a time.
-Highest priority: M9 accounting correctness, tenant isolation, reports/exports, and production verification.
-Keep parent/mobile portal, driver app, live map/WebSocket, full inventory/vendor workflows, and AI/ML implementation deferred.
+Next priority: stabilize and browser-test the completed Accounting UI, then continue focused hardening for Academics, Homework/Timetable, HR/Payroll, Library, Transport, and Canteen.
+Keep parent/mobile portal, driver app, live map/WebSocket, full canteen inventory/vendor workflows, and AI/ML implementation deferred.
 ```
 
 Do not expand Phase 2/3 modules broadly at once. Existing Phase 3 admin modules may be polished and hardened, but parent/mobile and driver-facing experiences remain separate future scope.
@@ -132,7 +133,7 @@ Purpose:
 | M8A | Library Management | Phase 3 admin foundation implemented |
 | M8B | Transport Management | Phase 3 admin foundation implemented |
 | M8C | Canteen Management | Phase 3 admin foundation implemented |
-| M9 | Accounting & Finance | Phase 2 foundation implemented; hardening priority |
+| M9 | Accounting & Finance | Phase 2D Production Candidate Complete |
 | M10 | Notices & Communication | Phase 1A/1B + parent-teacher chat foundation |
 | M11 | School Intelligence & Analytics | Phase 4 roadmap documented; implementation deferred |
 
@@ -157,16 +158,16 @@ Includes:
 
 ### Phase 2 — Academic, HR, Timetable, and Accounting Expansion
 
-Status: Implemented foundation; production hardening in progress.
+Status: Foundations implemented; M9 Accounting is production-candidate complete.
 
 Sub-phases:
 
-- 2A Academics, Exams, CAS, and Report Cards.
-- 2B Homework and Timetable.
-- 2C HR and Payroll.
-- 2D Full M9 Accounting and Finance.
-- 2E Parent Communication Expansion.
-- 2F Student Identity QR Foundation.
+- 2A Academics, Exams, CAS, and Report Cards — foundation implemented.
+- 2B Homework and Timetable — foundation implemented.
+- 2C HR and Payroll — foundation implemented.
+- 2D Full M9 Accounting and Finance — **Production Candidate Complete**.
+- 2E Parent Communication Expansion — foundation implemented / further hardening later.
+- 2F Student Identity QR Foundation — foundation documented / staged for vertical reuse.
 
 ### Phase 3 — Extended School Operations
 
@@ -187,36 +188,7 @@ Phase 4 is owned primarily by **M11 School Intelligence & Analytics**. The detai
 docs/project/SCHOOLOS_M11_INTELLIGENCE_ROADMAP.md
 ```
 
-Phase 4 must start with intelligence foundations, not model-first AI. Required sequence:
-
-```text
-4A School Intelligence Foundation
-4B Rule-Based Operational Intelligence
-4C Student Risk and Academic Quality Intelligence
-4D AI Teacher Assistant and Natural Language Interface
-4E Offline-First and Network Intelligence
-4F Scale Optimization and Enterprise SaaS
-```
-
-M11 planned capabilities:
-
-```text
-- Structured SchoolEvent capture across M1-M10.
-- Feature snapshots for students, guardians, teachers, classrooms, and schools.
-- Explainable RiskScoreSnapshot and InsightAction workflows.
-- Teacher Workload Balance Monitor.
-- Substitute Teacher Intelligence.
-- Guardian Communication Health Score.
-- Academic Year Momentum Tracker.
-- Classroom-Level Heat Events.
-- Sibling Academic Correlation Report.
-- Predictive Dropout Engine, rule-based first and ML later.
-- Exam Paper Difficulty Calibration.
-- AI Teaching Assistant for teachers with human review.
-- Natural Language School Management Interface in English using approved query templates.
-- Offline-first AI inference contract for future on-device workflows.
-- Aggregate-only opt-in School Health Network Intelligence.
-```
+Phase 4 must start with intelligence foundations, not model-first AI.
 
 M11 safety rules:
 
@@ -250,28 +222,11 @@ Priority order:
 10. Webhook System.
 11. SaaS Subscription and Billing.
 
-Detailed pricing and entitlement plan:
-
-```text
-docs/project/SCHOOLOS_PRICING_TIERS_AND_ENTITLEMENTS_PLAN.md
-```
-
 Important distinction:
 
 ```text
 SchoolOS Finance/M3/M9 = school collects money from students/parents.
 SaaS Billing = SchoolOS company charges schools for using SchoolOS.
-```
-
-Pricing/entitlement golden rule:
-
-```text
-Plan controls what the school bought.
-Feature entitlement controls what the tenant can access.
-RBAC controls what the user can do.
-Usage limits control how much they can use.
-Frontend uses entitlements only for display.
-Backend enforces entitlements for security.
 ```
 
 ---
@@ -331,11 +286,40 @@ Move slow/retryable work to BullMQ workers:
 
 ---
 
-## 8. M9 Accounting Rules
+## 8. M9 Accounting Rules and Completion Status
 
-Full M9 belongs to Phase 2. Finance ledger foundation may continue before full M9 is complete.
+Full M9 belongs to Phase 2D and is now **Production Candidate Complete**.
 
-Non-negotiable rules:
+Completed M9 scope:
+
+```text
+- Ledger correctness and double-entry enforcement.
+- Decimal-safe money handling with PostgreSQL numeric / Prisma Decimal.
+- Immutable posted journals.
+- Source-based idempotent posting.
+- Database-level idempotency constraints.
+- Reversal and correction workflows.
+- Fiscal period lifecycle: OPEN, LOCKED, CLOSED.
+- Fiscal year close/reopen workflow.
+- Opening balance workflow.
+- Voucher workflows for expense/payment/receipt/contra use cases.
+- Trial Balance backend.
+- General Ledger backend.
+- Cash Book backend.
+- Income Statement backend.
+- Balance Sheet backend.
+- VAT/TDS/PF summaries.
+- CSV report exports.
+- Explicit report account mappings.
+- Bank reconciliation.
+- Frontend Accounting workspace.
+- Granular RBAC permissions.
+- Audit coverage for critical accounting actions.
+- Tenant-scoped accounting queries.
+- AccountingPostingService ledger boundary.
+```
+
+Non-negotiable rules remain:
 
 1. Immutable ledger: never edit confirmed journal entries.
 2. Use reversal/correction/adjustment entries.
@@ -346,17 +330,29 @@ Non-negotiable rules:
 7. Use PostgreSQL numeric/Prisma Decimal; never floating point.
 8. Journal/voucher/receipt numbers are unique per tenant/fiscal year.
 9. Reports come from backend ledger data.
-10. Audit posting, approval, reversal, closing, reopening, and exports.
+10. Audit posting, approval, reversal, closing, reopening, bank reconciliation, and exports.
+
+Remaining M9 future enhancements:
+
+```text
+- PDF accounting exports.
+- Saved report snapshots / File Registry integration for generated reports.
+- Advanced bank auto-match rules.
+- Accounting audit log viewer UI.
+- Seeded Playwright accounting workflow tests.
+- Production seed review for default Chart of Accounts and report mappings.
+```
 
 ---
 
 ## 9. Current Repo Analysis Summary
 
-Repo inspection on May 6, 2026 indicates:
+Repo status after M9 completion:
 
 ```text
-Full SchoolOS vision: around 60-70% implemented
+Full SchoolOS vision: around 70-80% implemented
 Phase 1 pilot product: around 90-95% implemented
+M9 Accounting: production-candidate complete
 ```
 
 Readiness:
@@ -365,6 +361,7 @@ Readiness:
 Demo-ready: Yes
 Internal QA-ready: Yes
 Controlled pilot-ready: Yes, after staging checks
+M9 Accounting production-candidate: Yes
 Multi-school production-ready: Not yet
 Full SchoolOS product complete: No
 ```
@@ -391,9 +388,8 @@ Module estimates:
 
 Biggest risks:
 
-- Existing Phase 2/3 breadth without enough depth.
-- Accounting complexity and ledger immutability.
-- Pilot operations exposing real-world data-entry, fee, attendance, guardian-contact, PDF, slow-network, and contract-test drift issues.
+- Existing Phase 2/3 breadth without enough depth outside M9.
+- Pilot operations exposing real-world data-entry, fee, attendance, guardian-contact, PDF, and slow-network issues.
 - Parent/mobile portal, driver app, live map/WebSocket, full canteen inventory/vendor workflows, and AI/ML implementation remain intentionally unbuilt.
 - Tiered pricing and entitlements must be enforced backend-side before broad paid rollout; sidebar hiding alone is not security.
 
@@ -415,6 +411,21 @@ pnpm build
 pnpm verify:production
 pnpm smoke:phase1
 ```
+
+M9 completion verification passed with:
+
+```text
+pnpm db:generate
+pnpm db:validate
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:e2e
+pnpm build
+pnpm verify:production
+```
+
+Latest verified results included API unit tests, web tests, API E2E, API build, web build, and Playwright browser smoke. Authenticated Playwright accounting workflow tests should be added once seeded credentials are available.
 
 Documentation-only roadmap changes do not require runtime verification, but should still be reviewed for consistency.
 
