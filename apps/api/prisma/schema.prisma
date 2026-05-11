@@ -118,6 +118,17 @@ enum ChartAccountType {
   EXPENSE
 }
 
+enum AccountingReportMappingType {
+  CASH
+  BANK
+  VAT_OUTPUT
+  VAT_INPUT
+  TDS_PAYABLE
+  PF_EMPLOYEE_PAYABLE
+  PF_EMPLOYER_PAYABLE
+  PF_PAYABLE
+}
+
 enum JournalEntryStatus {
   DRAFT
   SUBMITTED
@@ -723,6 +734,7 @@ model Tenant {
   studentIdentities             StudentIdentity[]
   studentDocumentHistory        StudentDocumentHistory[]
   attendanceCorrectionRequests   AttendanceCorrectionRequest[]
+  accountingReportMappings      AccountingReportAccountMapping[]
 }
 
 model User {
@@ -776,6 +788,8 @@ model User {
 
   requestedAttendanceCorrections AttendanceCorrectionRequest[] @relation("RequestedAttendanceCorrections")
   reviewedAttendanceCorrections  AttendanceCorrectionRequest[] @relation("ReviewedAttendanceCorrections")
+  createdAccountMappings         AccountingReportAccountMapping[] @relation("CreatedAccountMappings")
+  updatedAccountMappings         AccountingReportAccountMapping[] @relation("UpdatedAccountMappings")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
@@ -1791,6 +1805,7 @@ model ChartAccount {
   parent       ChartAccount?  @relation("ChartAccountTree", fields: [parentId], references: [id])
   children     ChartAccount[] @relation("ChartAccountTree")
   journalLines JournalLine[]
+  accountingReportMappings AccountingReportAccountMapping[]
 
   @@unique([tenantId, code])
   @@index([tenantId, fiscalYearId])
@@ -3849,4 +3864,24 @@ model CanteenSpendingControl {
 
   @@unique([tenantId, studentId])
   @@index([tenantId, studentId])
+}
+
+model AccountingReportAccountMapping {
+  id          String                      @id @default(uuid())
+  tenantId    String
+  mappingType AccountingReportMappingType
+  accountId   String
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+  createdById String?
+  updatedById String?
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  account     ChartAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdBy   User?        @relation("CreatedAccountMappings", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy   User?        @relation("UpdatedAccountMappings", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, mappingType, accountId])
+  @@index([tenantId, mappingType])
+  @@index([tenantId, accountId])
 }

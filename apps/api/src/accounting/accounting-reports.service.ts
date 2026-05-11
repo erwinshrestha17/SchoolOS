@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { TrialBalanceQueryDto } from './dto/trial-balance-query.dto';
 import { GeneralLedgerQueryDto } from './dto/general-ledger-query.dto';
 import {
@@ -7,12 +8,27 @@ import {
   TrialBalanceRow,
   GeneralLedgerResponse,
   GeneralLedgerRow,
+  CashBookResponse,
+  CashBookRow,
+  IncomeStatementResponse,
+  IncomeStatementAccount,
+  BalanceSheetResponse,
+  BalanceSheetAccount,
+  TaxSummaryResponse,
 } from './types/accounting-reports.types';
-import { ChartAccountType, JournalLineSide, Prisma } from '@prisma/client';
+import { CashBookQueryDto } from './dto/cash-book-query.dto';
+import { IncomeStatementQueryDto } from './dto/income-statement-query.dto';
+import { BalanceSheetQueryDto } from './dto/balance-sheet-query.dto';
+import { TaxSummaryQueryDto, TaxSummaryType } from './dto/tax-summary-query.dto';
+import { UpdateAccountingReportMappingsDto } from './dto/report-account-mapping.dto';
+import { ChartAccountType, JournalLineSide, Prisma, AccountingReportMappingType } from '@prisma/client';
 
 @Injectable()
 export class AccountingReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   async getTrialBalance(
     tenantId: string,
@@ -409,6 +425,746 @@ export class AccountingReportsService {
         total: totalLines,
         totalPages,
       },
+      generatedAt: new Date(),
+    };
+  }
+
+  async getReportMappings(tenantId: string) {
+    return this.prisma.accountingReportAccountMapping.findMany({
+      where: { tenantId },
+      include: {
+        account: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            type: true,
+          },
+        },
+      },
+    });
+  }
+
+  async updateReportMappings(
+    tenantId: string,
+    userId: string,
+    dto: UpdateAccountingReportMappingsDto,
+  ) {
+    const accountIds = dto.mappings.map((m) => m.accountId);
+
+    if (accountIds.length > 0) {
+      const accounts = await this.prisma.chartAccount.findMany({
+        where: { tenantId, id: { in: accountIds } },
+      });
+
+      if (accounts.length !== new Set(accountIds).size) {
+        throw new BadRequestException('One or more accounts do not exist or belong to another tenant');
+      }
+    }
+
+    const existingMappings = await this.prisma.accountingReportAccountMapping.findMany({
+      where: { tenantId },
+    });
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.accountingReportAccountMapping.deleteMany({
+        where: { tenantId },
+      });
+
+      if (dto.mappings.length > 0) {
+        await tx.accountingReportAccountMapping.createMany({
+          data: dto.mappings.map((m) => ({
+            tenantId,
+            mappingType: m.mappingType,
+            accountId: m.accountId,
+            createdById: userId,
+            updatedById: userId,
+          })),
+        });
+      }
+
+      return true;
+    });
+
+    if (this.auditService) {
+      await this.auditService.log({
+        tenantId,
+        userId,
+        action: 'UPDATE_REPORT_MAPPINGS',
+        resource: 'ACCOUNTING_REPORT_MAPPING',
+        metadata: {
+          previous: existingMappings.map((m) => ({ mappingType: m.mappingType, accountId: m.accountId })),
+          new: dto.mappings,
+        },
+      });
+    }
+
+    return { success: true, count: dto.mappings.length };
+  }
+
+  async getCashBook(
+    tenantId: string,
+    query: CashBookQueryDto,
+  ): Promise<CashBookResponse> {
+    const {
+      fiscalYearId,
+      fiscalPeriodId,
+      fromDate,
+      toDate,
+      accountId,
+      accountCode,
+      page = 1,
+      limit = 50,
+    } = query;
+
+    const fiscalYear = await this.prisma.fiscalYear.findUnique({
+      where: { id: fiscalYearId, tenantId },
+    });
+    if (!fiscalYear) throw new NotFoundException('Fiscal year not found');
+
+    if (fiscalPeriodId) {
+      const fiscalPeriod = await this.prisma.fiscalPeriod.findUnique({
+        where: { id: fiscalPeriodId, tenantId, fiscalYearId },
+      });
+      if (!fiscalPeriod) {
+        throw new BadRequestException('Invalid fiscal period for this year');
+      }
+    }
+
+    if (fromDate && toDate && new Date(fromDate) > new Date(toDate)) {
+      throw new BadRequestException('fromDate cannot be after toDate');
+    }
+
+    const cashBankMappings = await this.prisma.accountingReportAccountMapping.findMany({
+      where: {
+        tenantId,
+        mappingType: { in: ['CASH', 'BANK'] },
+      },
+      include: { account: true },
+    });
+
+    let targetAccounts: any[] = [];
+    let setupWarnings: string[] = [];
+
+    if (accountId || accountCode) {
+      const account = await this.prisma.chartAccount.findFirst({
+        where: {
+          tenantId,
+          ...(accountId ? { id: accountId } : {}),
+          ...(accountCode ? { code: accountCode } : {}),
+        },
+      });
+
+      if (!account) throw new NotFoundException('Account not found');
+
+      const isMapped = cashBankMappings.some((m) => m.accountId === account.id);
+      if (!isMapped) {
+        throw new BadRequestException('Account is not explicitly mapped as CASH or BANK in report settings.');
+      }
+      targetAccounts = [account];
+    } else {
+      if (cashBankMappings.length === 0) {
+        setupWarnings.push('No cash or bank accounts are mapped. Configure Accounting report account mappings.');
+      } else {
+        targetAccounts = cashBankMappings.map((m) => m.account);
+      }
+    }
+
+    if (targetAccounts.length === 0) {
+      return {
+        fiscalYearId,
+        fiscalPeriodId,
+        fromDate,
+        toDate,
+        openingBalance: new Prisma.Decimal(0),
+        openingBalanceSide: JournalLineSide.DEBIT,
+        totalReceipts: new Prisma.Decimal(0),
+        totalPayments: new Prisma.Decimal(0),
+        closingBalance: new Prisma.Decimal(0),
+        closingBalanceSide: JournalLineSide.DEBIT,
+        rows: [],
+        pagination: { page, limit, total: 0, totalPages: 0 },
+        generatedAt: new Date(),
+        setupWarnings,
+      } as any;
+    }
+
+    const targetAccountIds = targetAccounts.map((a) => a.id);
+
+    const journalWhere: Prisma.JournalEntryWhereInput = {
+      tenantId,
+      status: 'POSTED',
+      fiscalYearId,
+    };
+    if (fiscalPeriodId) journalWhere.fiscalPeriodId = fiscalPeriodId;
+    if (fromDate || toDate) {
+      journalWhere.entryDate = {};
+      if (fromDate) journalWhere.entryDate.gte = new Date(fromDate);
+      if (toDate) journalWhere.entryDate.lte = new Date(toDate);
+    }
+
+    let openingBalance = new Prisma.Decimal(0);
+
+    if (fromDate) {
+      const priorLinesGrouped = await this.prisma.journalLine.groupBy({
+        by: ['chartAccountId'],
+        _sum: { debit: true, credit: true },
+        where: {
+          tenantId,
+          chartAccountId: { in: targetAccountIds },
+          journalEntry: {
+            tenantId,
+            status: 'POSTED',
+            fiscalYearId,
+            entryDate: { lt: new Date(fromDate) },
+          },
+        },
+      });
+
+      for (const group of priorLinesGrouped) {
+        const pDebit = group._sum.debit || new Prisma.Decimal(0);
+        const pCredit = group._sum.credit || new Prisma.Decimal(0);
+        openingBalance = openingBalance.plus(pDebit.minus(pCredit));
+      }
+    }
+
+    let openingBalanceSide = JournalLineSide.DEBIT;
+    let absoluteOpeningBalance = openingBalance;
+    if (openingBalance.lt(0)) {
+      absoluteOpeningBalance = openingBalance.abs();
+      openingBalanceSide = JournalLineSide.CREDIT;
+    }
+
+    const lineWhere: Prisma.JournalLineWhereInput = {
+      tenantId,
+      chartAccountId: { in: targetAccountIds },
+      journalEntry: journalWhere,
+    };
+
+    const totalLines = await this.prisma.journalLine.count({
+      where: lineWhere,
+    });
+    const totalPages = Math.ceil(totalLines / limit);
+    const skip = (page - 1) * limit;
+
+    const lines = await this.prisma.journalLine.findMany({
+      where: lineWhere,
+      include: { journalEntry: true },
+      orderBy: [
+        { journalEntry: { entryDate: 'asc' } },
+        { journalEntry: { entryNumber: 'asc' } },
+      ],
+      skip,
+      take: limit,
+    });
+
+    let runningSignedBalance = openingBalance;
+    const rows: CashBookRow[] = [];
+    let totalReceipts = new Prisma.Decimal(0);
+    let totalPayments = new Prisma.Decimal(0);
+
+    for (const line of lines) {
+      runningSignedBalance = runningSignedBalance.plus(line.debit).minus(line.credit);
+
+      totalReceipts = totalReceipts.plus(line.debit);
+      totalPayments = totalPayments.plus(line.credit);
+
+      let lineRunBalance = runningSignedBalance;
+      let lineRunSide = JournalLineSide.DEBIT;
+
+      if (runningSignedBalance.lt(0)) {
+        lineRunBalance = runningSignedBalance.abs();
+        lineRunSide = JournalLineSide.CREDIT;
+      }
+
+      const rowAccount = targetAccounts.find((a) => a.id === line.chartAccountId)!;
+
+      rows.push({
+        journalEntryId: line.journalEntryId,
+        journalLineId: line.id,
+        entryDate: line.journalEntry.entryDate,
+        postedAt: line.journalEntry.postedAt,
+        entryNumber: line.journalEntry.entryNumber,
+        accountId: rowAccount.id,
+        accountCode: rowAccount.code,
+        accountName: rowAccount.name,
+        narration: line.description || line.journalEntry.narration,
+        sourceModule: line.journalEntry.sourceModule,
+        sourceType: line.journalEntry.sourceType,
+        sourceId: line.journalEntry.sourceId,
+        receiptAmount: line.debit,
+        paymentAmount: line.credit,
+        runningBalance: lineRunBalance,
+        runningBalanceSide: lineRunSide,
+        postedById: line.journalEntry.postedById,
+      });
+    }
+
+    let closingBalance = absoluteOpeningBalance;
+    let closingBalanceSide = openingBalanceSide;
+
+    if (rows.length > 0) {
+      closingBalance = rows[rows.length - 1].runningBalance;
+      closingBalanceSide = rows[rows.length - 1].runningBalanceSide;
+    }
+
+    return {
+      fiscalYearId,
+      fiscalPeriodId,
+      fromDate,
+      toDate,
+      account: targetAccounts.length === 1 ? {
+        id: targetAccounts[0].id,
+        code: targetAccounts[0].code,
+        name: targetAccounts[0].name,
+      } : undefined,
+      openingBalance: absoluteOpeningBalance,
+      openingBalanceSide,
+      totalReceipts,
+      totalPayments,
+      closingBalance,
+      closingBalanceSide,
+      rows,
+      pagination: {
+        page,
+        limit,
+        total: totalLines,
+        totalPages,
+      },
+      generatedAt: new Date(),
+      setupWarnings,
+    };
+  }
+
+  async getIncomeStatement(
+    tenantId: string,
+    query: IncomeStatementQueryDto,
+  ): Promise<IncomeStatementResponse> {
+    const { fiscalYearId, fiscalPeriodId, fromDate, toDate, includeZeroBalances } = query;
+
+    const fiscalYear = await this.prisma.fiscalYear.findUnique({
+      where: { id: fiscalYearId, tenantId },
+    });
+    if (!fiscalYear) throw new NotFoundException('Fiscal year not found');
+
+    if (fiscalPeriodId) {
+      const fiscalPeriod = await this.prisma.fiscalPeriod.findUnique({
+        where: { id: fiscalPeriodId, tenantId, fiscalYearId },
+      });
+      if (!fiscalPeriod) {
+        throw new BadRequestException('Invalid fiscal period for this year');
+      }
+    }
+
+    const journalWhere: Prisma.JournalEntryWhereInput = {
+      tenantId,
+      status: 'POSTED',
+      fiscalYearId,
+    };
+
+    if (fiscalPeriodId) journalWhere.fiscalPeriodId = fiscalPeriodId;
+    if (fromDate || toDate) {
+      journalWhere.entryDate = {};
+      if (fromDate) journalWhere.entryDate.gte = new Date(fromDate);
+      if (toDate) journalWhere.entryDate.lte = new Date(toDate);
+    }
+
+    const linesGrouped = await this.prisma.journalLine.groupBy({
+      by: ['chartAccountId'],
+      _sum: {
+        debit: true,
+        credit: true,
+      },
+      where: {
+        tenantId,
+        journalEntry: journalWhere,
+      },
+    });
+
+    const accounts = await this.prisma.chartAccount.findMany({
+      where: {
+        tenantId,
+        type: { in: [ChartAccountType.REVENUE, ChartAccountType.EXPENSE] },
+      },
+      orderBy: { code: 'asc' },
+    });
+
+    const incomeAccounts: IncomeStatementAccount[] = [];
+    const expenseAccounts: IncomeStatementAccount[] = [];
+    let totalIncome = new Prisma.Decimal(0);
+    let totalExpense = new Prisma.Decimal(0);
+
+    for (const account of accounts) {
+      const lineData = linesGrouped.find((l) => l.chartAccountId === account.id);
+      const debit = lineData?._sum.debit || new Prisma.Decimal(0);
+      const credit = lineData?._sum.credit || new Prisma.Decimal(0);
+
+      if (!includeZeroBalances && debit.isZero() && credit.isZero()) continue;
+
+      if (account.type === ChartAccountType.REVENUE) {
+        const netIncome = credit.minus(debit);
+        if (!includeZeroBalances && netIncome.isZero()) continue;
+        incomeAccounts.push({
+          accountId: account.id,
+          accountCode: account.code,
+          accountName: account.name,
+          amount: netIncome,
+        });
+        totalIncome = totalIncome.plus(netIncome);
+      } else if (account.type === ChartAccountType.EXPENSE) {
+        const netExpense = debit.minus(credit);
+        if (!includeZeroBalances && netExpense.isZero()) continue;
+        expenseAccounts.push({
+          accountId: account.id,
+          accountCode: account.code,
+          accountName: account.name,
+          amount: netExpense,
+        });
+        totalExpense = totalExpense.plus(netExpense);
+      }
+    }
+
+    const netSurplusOrDeficit = totalIncome.minus(totalExpense);
+    let resultType: 'SURPLUS' | 'DEFICIT' | 'BREAK_EVEN' = 'BREAK_EVEN';
+
+    if (netSurplusOrDeficit.gt(0)) {
+      resultType = 'SURPLUS';
+    } else if (netSurplusOrDeficit.lt(0)) {
+      resultType = 'DEFICIT';
+    }
+
+    return {
+      fiscalYearId,
+      fiscalPeriodId,
+      fromDate,
+      toDate,
+      sections: [
+        {
+          section: 'INCOME',
+          total: totalIncome,
+          accounts: incomeAccounts,
+        },
+        {
+          section: 'EXPENSE',
+          total: totalExpense,
+          accounts: expenseAccounts,
+        },
+      ],
+      totalIncome,
+      totalExpense,
+      netSurplusOrDeficit: netSurplusOrDeficit.abs(),
+      resultType,
+      generatedAt: new Date(),
+    };
+  }
+
+  async getBalanceSheet(
+    tenantId: string,
+    query: BalanceSheetQueryDto,
+  ): Promise<BalanceSheetResponse> {
+    const { fiscalYearId, fiscalPeriodId, asOfDate, includeZeroBalances } = query;
+
+    const fiscalYear = await this.prisma.fiscalYear.findUnique({
+      where: { id: fiscalYearId, tenantId },
+    });
+    if (!fiscalYear) throw new NotFoundException('Fiscal year not found');
+
+    const journalWhere: Prisma.JournalEntryWhereInput = {
+      tenantId,
+      status: 'POSTED',
+      fiscalYearId,
+    };
+    if (fiscalPeriodId) journalWhere.fiscalPeriodId = fiscalPeriodId;
+    if (asOfDate) {
+      journalWhere.entryDate = { lte: new Date(asOfDate) };
+    }
+
+    const linesGrouped = await this.prisma.journalLine.groupBy({
+      by: ['chartAccountId'],
+      _sum: {
+        debit: true,
+        credit: true,
+      },
+      where: {
+        tenantId,
+        journalEntry: journalWhere,
+      },
+    });
+
+    const accounts = await this.prisma.chartAccount.findMany({
+      where: { tenantId },
+      orderBy: { code: 'asc' },
+    });
+
+    const assetAccounts: BalanceSheetAccount[] = [];
+    const liabilityAccounts: BalanceSheetAccount[] = [];
+    const equityAccounts: BalanceSheetAccount[] = [];
+
+    let totalAssets = new Prisma.Decimal(0);
+    let totalLiabilities = new Prisma.Decimal(0);
+    let totalEquity = new Prisma.Decimal(0);
+
+    let currentYearIncome = new Prisma.Decimal(0);
+    let currentYearExpense = new Prisma.Decimal(0);
+
+    for (const account of accounts) {
+      const lineData = linesGrouped.find((l) => l.chartAccountId === account.id);
+      const debit = lineData?._sum.debit || new Prisma.Decimal(0);
+      const credit = lineData?._sum.credit || new Prisma.Decimal(0);
+
+      if (account.type === ChartAccountType.REVENUE) {
+        currentYearIncome = currentYearIncome.plus(credit.minus(debit));
+        continue;
+      } else if (account.type === ChartAccountType.EXPENSE) {
+        currentYearExpense = currentYearExpense.plus(debit.minus(credit));
+        continue;
+      }
+
+      if (!includeZeroBalances && debit.isZero() && credit.isZero()) continue;
+
+      if (account.type === ChartAccountType.ASSET) {
+        const netAsset = debit.minus(credit);
+        if (!includeZeroBalances && netAsset.isZero()) continue;
+        assetAccounts.push({
+          accountId: account.id,
+          accountCode: account.code,
+          accountName: account.name,
+          amount: netAsset,
+        });
+        totalAssets = totalAssets.plus(netAsset);
+      } else if (account.type === ChartAccountType.LIABILITY) {
+        const netLiability = credit.minus(debit);
+        if (!includeZeroBalances && netLiability.isZero()) continue;
+        liabilityAccounts.push({
+          accountId: account.id,
+          accountCode: account.code,
+          accountName: account.name,
+          amount: netLiability,
+        });
+        totalLiabilities = totalLiabilities.plus(netLiability);
+      } else if (account.type === ChartAccountType.EQUITY) {
+        const netEquity = credit.minus(debit);
+        if (!includeZeroBalances && netEquity.isZero()) continue;
+        equityAccounts.push({
+          accountId: account.id,
+          accountCode: account.code,
+          accountName: account.name,
+          amount: netEquity,
+        });
+        totalEquity = totalEquity.plus(netEquity);
+      }
+    }
+
+    const currentYearResult = currentYearIncome.minus(currentYearExpense);
+    if (currentYearResult.abs().gt(0)) {
+      equityAccounts.push({
+        accountCode: 'CURRENT_YEAR_RESULT',
+        accountName: 'Current Year Surplus / Deficit',
+        amount: currentYearResult,
+      });
+      totalEquity = totalEquity.plus(currentYearResult);
+    }
+
+    const totalLiabilitiesAndEquity = totalLiabilities.plus(totalEquity);
+    const imbalanceAmount = totalAssets.minus(totalLiabilitiesAndEquity).abs();
+    const isBalanced = imbalanceAmount.isZero();
+
+    return {
+      fiscalYearId,
+      asOfDate: asOfDate ? new Date(asOfDate) : fiscalYear.endDate,
+      sections: [
+        { section: 'ASSETS', total: totalAssets, accounts: assetAccounts },
+        { section: 'LIABILITIES', total: totalLiabilities, accounts: liabilityAccounts },
+        { section: 'EQUITY', total: totalEquity, accounts: equityAccounts },
+      ],
+      totalAssets,
+      totalLiabilities,
+      totalEquity,
+      totalLiabilitiesAndEquity,
+      isBalanced,
+      imbalanceAmount,
+      generatedAt: new Date(),
+    };
+  }
+
+  async getTaxSummary(
+    tenantId: string,
+    query: TaxSummaryQueryDto,
+  ): Promise<TaxSummaryResponse> {
+    const {
+      fiscalYearId,
+      fiscalPeriodId,
+      fromDate,
+      toDate,
+      summaryType = TaxSummaryType.ALL,
+    } = query;
+
+    const fiscalYear = await this.prisma.fiscalYear.findUnique({
+      where: { id: fiscalYearId, tenantId },
+    });
+    if (!fiscalYear) throw new NotFoundException('Fiscal year not found');
+
+    const journalWhere: Prisma.JournalEntryWhereInput = {
+      tenantId,
+      status: 'POSTED',
+      fiscalYearId,
+    };
+    if (fiscalPeriodId) journalWhere.fiscalPeriodId = fiscalPeriodId;
+    if (fromDate || toDate) {
+      journalWhere.entryDate = {};
+      if (fromDate) journalWhere.entryDate.gte = new Date(fromDate);
+      if (toDate) journalWhere.entryDate.lte = new Date(toDate);
+    }
+
+    const linesGrouped = await this.prisma.journalLine.groupBy({
+      by: ['chartAccountId'],
+      _sum: { debit: true, credit: true },
+      where: { tenantId, journalEntry: journalWhere },
+    });
+
+    const accounts = await this.prisma.chartAccount.findMany({
+      where: { tenantId },
+    });
+
+    const mappings = await this.prisma.accountingReportAccountMapping.findMany({
+      where: { tenantId },
+    });
+
+    const getAccountsByMapping = (types: string[]) => {
+      const mappedIds = mappings.filter((m) => types.includes(m.mappingType)).map((m) => m.accountId);
+      return accounts.filter((a) => mappedIds.includes(a.id));
+    };
+
+    const vatPayableAccounts = getAccountsByMapping(['VAT_OUTPUT']);
+    const vatInputAccounts = getAccountsByMapping(['VAT_INPUT']);
+    const tdsPayableAccounts = getAccountsByMapping(['TDS_PAYABLE']);
+    const pfEmployeeAccounts = getAccountsByMapping(['PF_EMPLOYEE_PAYABLE']);
+    const pfEmployerAccounts = getAccountsByMapping(['PF_EMPLOYER_PAYABLE']);
+    const pfPayableAccounts = getAccountsByMapping(['PF_PAYABLE']);
+
+    const setupWarnings: string[] = [];
+
+    const getNetCredit = (accs: any[]) => {
+      let total = new Prisma.Decimal(0);
+      for (const a of accs) {
+        const line = linesGrouped.find((l) => l.chartAccountId === a.id);
+        if (line) {
+          total = total.plus(line._sum.credit || 0).minus(line._sum.debit || 0);
+        }
+      }
+      return total;
+    };
+
+    const getNetDebit = (accs: any[]) => {
+      let total = new Prisma.Decimal(0);
+      for (const a of accs) {
+        const line = linesGrouped.find((l) => l.chartAccountId === a.id);
+        if (line) {
+          total = total.plus(line._sum.debit || 0).minus(line._sum.credit || 0);
+        }
+      }
+      return total;
+    };
+
+    let vatOutput = new Prisma.Decimal(0);
+    let vatInput = new Prisma.Decimal(0);
+    let vatNet = new Prisma.Decimal(0);
+    let vatStatus: 'PAYABLE' | 'RECEIVABLE' | 'ZERO' = 'ZERO';
+
+    if (summaryType === TaxSummaryType.ALL || summaryType === TaxSummaryType.VAT) {
+      if (vatPayableAccounts.length === 0)
+        setupWarnings.push('VAT_OUTPUT account mapping is missing');
+      if (vatInputAccounts.length === 0)
+        setupWarnings.push('VAT_INPUT account mapping is missing');
+
+      vatOutput = getNetCredit(vatPayableAccounts);
+      vatInput = getNetDebit(vatInputAccounts);
+      vatNet = vatOutput.minus(vatInput);
+      if (vatNet.gt(0)) vatStatus = 'PAYABLE';
+      else if (vatNet.lt(0)) vatStatus = 'RECEIVABLE';
+    }
+
+    let tdsDeducted = new Prisma.Decimal(0);
+    let tdsPaid = new Prisma.Decimal(0);
+    if (summaryType === TaxSummaryType.ALL || summaryType === TaxSummaryType.TDS) {
+      if (tdsPayableAccounts.length === 0)
+        setupWarnings.push('TDS_PAYABLE account mapping is missing');
+      
+      let tdsCredits = new Prisma.Decimal(0);
+      let tdsDebits = new Prisma.Decimal(0);
+      for (const a of tdsPayableAccounts) {
+        const line = linesGrouped.find((l) => l.chartAccountId === a.id);
+        if (line) {
+          tdsCredits = tdsCredits.plus(line._sum.credit || 0);
+          tdsDebits = tdsDebits.plus(line._sum.debit || 0);
+        }
+      }
+      tdsDeducted = tdsCredits;
+      tdsPaid = tdsDebits;
+    }
+
+    let pfEmp = new Prisma.Decimal(0);
+    let pfEmpr = new Prisma.Decimal(0);
+    let pfPaid = new Prisma.Decimal(0);
+    let netPfPayable = new Prisma.Decimal(0);
+    if (summaryType === TaxSummaryType.ALL || summaryType === TaxSummaryType.PF) {
+      if (pfPayableAccounts.length === 0)
+        setupWarnings.push('PF_PAYABLE account mapping is missing');
+      
+      let pfCredits = new Prisma.Decimal(0);
+      let pfDebits = new Prisma.Decimal(0);
+      for (const a of pfPayableAccounts) {
+        const line = linesGrouped.find((l) => l.chartAccountId === a.id);
+        if (line) {
+          pfCredits = pfCredits.plus(line._sum.credit || 0);
+          pfDebits = pfDebits.plus(line._sum.debit || 0);
+        }
+      }
+      
+      pfPaid = pfDebits;
+      netPfPayable = pfCredits.minus(pfDebits);
+      
+      pfEmp = pfCredits.dividedBy(2);
+      pfEmpr = pfCredits.dividedBy(2);
+      if (pfEmployeeAccounts.length > 0) pfEmp = getNetCredit(pfEmployeeAccounts);
+      if (pfEmployerAccounts.length > 0) pfEmpr = getNetCredit(pfEmployerAccounts);
+    }
+
+    return {
+      fiscalYearId,
+      fiscalPeriodId,
+      fromDate,
+      toDate,
+      ...(summaryType === TaxSummaryType.ALL || summaryType === TaxSummaryType.VAT
+        ? {
+            vat: {
+              outputVat: vatOutput,
+              inputVat: vatInput,
+              netVat: vatNet.abs(),
+              status: vatStatus,
+            },
+          }
+        : {}),
+      ...(summaryType === TaxSummaryType.ALL || summaryType === TaxSummaryType.TDS
+        ? {
+            tds: {
+              deductedPayable: tdsDeducted,
+              paid: tdsPaid,
+              netPayable: tdsDeducted.minus(tdsPaid),
+            },
+          }
+        : {}),
+      ...(summaryType === TaxSummaryType.ALL || summaryType === TaxSummaryType.PF
+        ? {
+            pf: {
+              employeeContribution: pfEmp,
+              employerContribution: pfEmpr,
+              paid: pfPaid,
+              netPayable: netPfPayable,
+            },
+          }
+        : {}),
+      setupWarnings,
       generatedAt: new Date(),
     };
   }
