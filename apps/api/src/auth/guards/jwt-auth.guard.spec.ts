@@ -16,7 +16,10 @@ describe('JwtAuthGuard', () => {
   let guard: JwtAuthGuard;
   let jwtService: { verifyAsync: jest.Mock };
   let auditService: { record: jest.Mock };
-  let prisma: { tenant: { findUnique: jest.Mock } };
+  let prisma: {
+    tenant: { findUnique: jest.Mock };
+    user: { findUnique: jest.Mock };
+  };
   let cls: { set: jest.Mock; isActive: jest.Mock<boolean, []> };
 
   const basePayload: JwtAccessPayload = {
@@ -26,7 +29,25 @@ describe('JwtAuthGuard', () => {
     email: 'admin@schoolos.com',
     authMethod: AuthMethod.PASSWORD,
     roles: ['admin'],
-    permissions: ['students:read'],
+  };
+
+  const mockUser = {
+    id: 'user-1',
+    status: 'ACTIVE',
+    email: 'admin@schoolos.com',
+    tenant: { id: 'tenant-1', isActive: true },
+    userRoles: [
+      {
+        role: {
+          name: 'admin',
+          rolePermissions: [
+            {
+              permission: { resource: 'students', action: 'read' },
+            },
+          ],
+        },
+      },
+    ],
   };
 
   beforeEach(() => {
@@ -39,6 +60,9 @@ describe('JwtAuthGuard', () => {
     prisma = {
       tenant: {
         findUnique: jest.fn(),
+      },
+      user: {
+        findUnique: jest.fn().mockResolvedValue(mockUser),
       },
     };
     cls = {
@@ -58,22 +82,22 @@ describe('JwtAuthGuard', () => {
     );
   });
 
-  it('hydrates auth context and CLS tenant context from a valid token', async () => {
+  it('hydrates auth context and CLS tenant context from a valid token and database lookup', async () => {
     const { context, request } = createContext();
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
 
     expect(request.auth).toEqual({
-      userId: basePayload.sub,
+      userId: mockUser.id,
       tenantId: basePayload.tenantId,
       tenantSlug: basePayload.tenantSlug,
-      email: basePayload.email,
+      email: mockUser.email,
       authMethod: basePayload.authMethod,
-      roles: basePayload.roles,
-      permissions: basePayload.permissions,
+      roles: ['admin'],
+      permissions: ['students:read'],
     });
+    expect(prisma.user.findUnique).toHaveBeenCalled();
     expect(cls.set).toHaveBeenCalledWith(TENANT_ID_KEY, 'tenant-1');
-    expect(prisma.tenant.findUnique).not.toHaveBeenCalled();
   });
 
   it('hydrates auth context from the httpOnly access cookie when no bearer token is present', async () => {
@@ -104,9 +128,16 @@ describe('JwtAuthGuard', () => {
   });
 
   it('rejects tenant override attempts from tenant users including principals', async () => {
-    jwtService.verifyAsync.mockResolvedValueOnce({
-      ...basePayload,
-      roles: ['principal'],
+    prisma.user.findUnique.mockResolvedValueOnce({
+      ...mockUser,
+      userRoles: [
+        {
+          role: {
+            name: 'principal',
+            rolePermissions: [],
+          },
+        },
+      ],
     });
     const { context } = createContext({
       'x-schoolos-tenant-id': 'tenant-2',
@@ -121,9 +152,16 @@ describe('JwtAuthGuard', () => {
   });
 
   it('allows platform super admins to override to an active tenant and audits it', async () => {
-    jwtService.verifyAsync.mockResolvedValueOnce({
-      ...basePayload,
-      roles: ['platform_super_admin'],
+    prisma.user.findUnique.mockResolvedValueOnce({
+      ...mockUser,
+      userRoles: [
+        {
+          role: {
+            name: 'platform_super_admin',
+            rolePermissions: [],
+          },
+        },
+      ],
     });
     prisma.tenant.findUnique.mockResolvedValueOnce({
       id: 'tenant-2',

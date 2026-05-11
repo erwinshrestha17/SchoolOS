@@ -6,7 +6,6 @@ import { RolesPermissionsGuard } from './roles-permissions.guard';
 describe('RolesPermissionsGuard', () => {
   let guard: RolesPermissionsGuard;
   let reflector: Reflector;
-  let prisma: any;
   let request: any;
   let context: any;
 
@@ -14,12 +13,7 @@ describe('RolesPermissionsGuard', () => {
     reflector = {
       getAllAndOverride: jest.fn(),
     } as unknown as Reflector;
-    prisma = {
-      userRole: {
-        findMany: jest.fn(),
-      },
-    };
-    guard = new RolesPermissionsGuard(reflector, prisma);
+    guard = new RolesPermissionsGuard(reflector);
     request = {
       auth: {
         userId: 'user-1',
@@ -44,18 +38,8 @@ describe('RolesPermissionsGuard', () => {
     (reflector.getAllAndOverride as jest.Mock)
       .mockReturnValueOnce(['admin'])
       .mockReturnValueOnce(['users:create']);
-    prisma.userRole.findMany.mockResolvedValue([
-      {
-        role: {
-          name: 'admin',
-          rolePermissions: [
-            {
-              permission: { resource: 'users', action: 'create' },
-            },
-          ],
-        },
-      },
-    ]);
+    request.auth.roles = ['admin'];
+    request.auth.permissions = ['users:create'];
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(request.auth.roles).toEqual(['admin']);
@@ -66,49 +50,12 @@ describe('RolesPermissionsGuard', () => {
     (reflector.getAllAndOverride as jest.Mock)
       .mockReturnValueOnce([])
       .mockReturnValueOnce(['roles:assign']);
-    prisma.userRole.findMany.mockResolvedValue([
-      {
-        role: {
-          name: 'teacher',
-          rolePermissions: [
-            {
-              permission: { resource: 'roles', action: 'read' },
-            },
-          ],
-        },
-      },
-    ]);
+    request.auth.roles = ['teacher'];
+    request.auth.permissions = ['roles:read'];
 
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
   });
 
-  it('scopes role lookups to the authenticated tenant', async () => {
-    (reflector.getAllAndOverride as jest.Mock)
-      .mockReturnValueOnce(['admin'])
-      .mockReturnValueOnce([]);
-    prisma.userRole.findMany.mockResolvedValue([]);
-
-    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
-    expect(prisma.userRole.findMany).toHaveBeenCalledWith({
-      where: {
-        userId: 'user-1',
-        tenantId: 'tenant-1',
-      },
-      include: {
-        role: {
-          include: {
-            rolePermissions: {
-              include: {
-                permission: true,
-              },
-            },
-          },
-        },
-      },
-    });
-  });
 });

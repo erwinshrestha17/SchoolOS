@@ -877,7 +877,6 @@ export class AuthService {
       email: authContext.email,
       authMethod: authContext.authMethod,
       roles: authContext.roles,
-      permissions: authContext.permissions,
     };
 
     const accessToken = await this.jwtService.signAsync(payload, {

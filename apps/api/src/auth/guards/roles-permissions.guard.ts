@@ -6,7 +6,6 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { PrismaService } from '../../prisma/prisma.service';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { AuthenticatedRequest } from '../auth-request.interface';
@@ -87,10 +86,7 @@ function hasRequiredPermission(
 
 @Injectable()
 export class RolesPermissionsGuard implements CanActivate {
-  constructor(
-    private readonly reflector: Reflector,
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly reflector: Reflector) {}
 
   async canActivate(context: ExecutionContext) {
     const requiredRoles =
@@ -120,44 +116,13 @@ export class RolesPermissionsGuard implements CanActivate {
       return true;
     }
 
-    const memberships = await this.prisma.userRole.findMany({
-      where: {
-        userId: auth.userId,
-        tenantId: auth.tenantId,
-      },
-      include: {
-        role: {
-          include: {
-            rolePermissions: {
-              include: {
-                permission: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    const roleNames = memberships.map((membership) => membership.role.name);
-    const permissionKeys = memberships.flatMap((membership) =>
-      membership.role.rolePermissions.map(
-        ({ permission }) => `${permission.resource}:${permission.action}`,
-      ),
-    );
-
-    request.auth = {
-      ...auth,
-      roles: Array.from(new Set(roleNames)),
-      permissions: Array.from(new Set(permissionKeys)),
-    };
-
     const hasRole =
       requiredRoles.length === 0 ||
-      requiredRoles.some((role) => request.auth?.roles.includes(role));
+      requiredRoles.some((role) => auth.roles.includes(role));
     const hasPermission =
       requiredPermissions.length === 0 ||
       requiredPermissions.every((permission) =>
-        hasRequiredPermission(request.auth?.permissions, permission),
+        hasRequiredPermission(auth.permissions, permission),
       );
 
     if (!hasRole || !hasPermission) {

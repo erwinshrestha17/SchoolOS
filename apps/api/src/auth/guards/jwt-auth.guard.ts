@@ -38,10 +38,45 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid access token');
     }
 
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: {
+        tenant: true,
+        userRoles: {
+          where: {
+            tenantId: payload.tenantId, // Use the user's home tenant for role lookup
+          },
+          include: {
+            role: {
+              include: {
+                rolePermissions: {
+                  include: {
+                    permission: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user || user.status !== 'ACTIVE' || !user.tenant.isActive) {
+      throw new UnauthorizedException('User or tenant is inactive');
+    }
+
+    const permissionKeys = user.userRoles.flatMap((ur) =>
+      ur.role.rolePermissions.map(
+        ({ permission }) => `${permission.resource}:${permission.action}`,
+      ),
+    );
+
+    const roles = user.userRoles.map((ur) => ur.role.name);
+
     const overrideTenantId = resolveHeader(
       request.headers['x-schoolos-tenant-id'],
     );
-    const canOverrideTenant = payload.roles.includes('platform_super_admin');
+    const canOverrideTenant = roles.includes('platform_super_admin');
 
     if (overrideTenantId && !canOverrideTenant) {
       throw new ForbiddenException(
@@ -54,13 +89,13 @@ export class JwtAuthGuard implements CanActivate {
       : payload.tenantId;
 
     request.auth = {
-      userId: payload.sub,
+      userId: user.id,
       tenantId: effectiveTenantId,
       tenantSlug: payload.tenantSlug,
-      email: payload.email,
+      email: user.email,
       authMethod: payload.authMethod,
-      roles: payload.roles,
-      permissions: payload.permissions,
+      roles: Array.from(new Set(roles)),
+      permissions: Array.from(new Set(permissionKeys)),
     };
     const hasActiveCls =
       typeof this.cls.isActive === 'function' ? this.cls.isActive() : true;
