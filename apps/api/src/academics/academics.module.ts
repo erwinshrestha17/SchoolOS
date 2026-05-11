@@ -12,6 +12,7 @@ import { CasRecordsService } from './cas-records.service';
 import { GradeCalculatorService } from './grade-calculator.service';
 import { MarkLockWorkflowService } from './mark-lock-workflow.service';
 import { MarksService } from './marks.service';
+import { PromotionReadinessService } from './promotion-readiness.service';
 import { ReportCardPdfService } from './report-card-pdf.service';
 import { ReportCardsService } from './report-cards.service';
 import { ResultPublishingService } from './result-publishing.service';
@@ -42,6 +43,7 @@ import {
     GradeCalculatorService,
     MarkLockWorkflowService,
     MarksService,
+    PromotionReadinessService,
     ReportCardPdfService,
     ReportCardsService,
     ResultPublishingService,
@@ -55,6 +57,7 @@ import {
     GradeCalculatorService,
     MarkLockWorkflowService,
     MarksService,
+    PromotionReadinessService,
     ReportCardPdfService,
     ReportCardsService,
     ResultPublishingService,
