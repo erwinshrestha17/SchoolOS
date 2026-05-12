@@ -291,7 +291,7 @@ export default function AttendanceRegisterPage() {
                  <Users size={32} />
                </div>
                <p className="text-sm font-bold text-slate-900 tracking-tight">No Students Found</p>
-               <p className="text-xs text-slate-500 mt-1 max-w-[240px]">We couldn't find any students for the selected class and month. Please check your filters.</p>
+               <p className="text-xs text-slate-500 mt-1 max-w-[240px]">We couldn&apos;t find any students for the selected class and month. Please check your filters.</p>
             </div>
           )}
         </div>

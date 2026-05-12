@@ -142,7 +142,7 @@ export function StudentDirectory({
         const secondRoll = second.rollNumber ?? secondAdmission?.rollNumber ?? 99999;
         return firstRoll - secondRoll || getStudentName(first, firstAdmission).localeCompare(getStudentName(second, secondAdmission));
       });
-  }, [admissionBySystemId, deferredSearch, selectedAcademicYear, classId, classes, selectedSection, students]);
+  }, [admissionBySystemId, deferredSearch, selectedAcademicYear, classId, classes, selectedSection, students, status]);
 
   if (isLoading) return <LoadingState label="Loading student directory..." />;
 

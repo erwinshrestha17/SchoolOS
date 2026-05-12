@@ -23,6 +23,11 @@ import { PageHeader } from '../ui/page-header';
 import { StatCard } from '../ui/stat-card';
 import { StatusBadge, type StatusTone } from '../ui/status-badge';
 import { cn } from '../../lib/utils';
+const addDays = (date: Date, days: number) => {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+};
 
 type TransportTab =
   | 'overview'

@@ -217,6 +217,7 @@ export type TransportVehiclePayload = {
   capacity: number;
   fitnessCertificateExp?: string;
   documentExpiry?: string;
+  status?: string;
 };
 
 export type TransportDriverAssignmentPayload = {

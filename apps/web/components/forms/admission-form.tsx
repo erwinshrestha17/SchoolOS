@@ -434,7 +434,7 @@ export function AdmissionForm() {
                     <div className="mt-8 flex items-center gap-3 rounded-2xl bg-white/5 p-4 border border-white/10">
                        <ShieldCheck className="text-primary-400" size={20} />
                        <p className="text-[0.65rem] text-slate-400 leading-relaxed">
-                         By clicking "Complete Enrollment", a student record will be created and a ledger will be initialized.
+                         By clicking &quot;Complete Enrollment&quot;, a student record will be created and a ledger will be initialized.
                        </p>
                     </div>
                   </div>

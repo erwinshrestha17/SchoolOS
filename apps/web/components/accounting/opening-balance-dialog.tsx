@@ -181,7 +181,7 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
             {Math.abs(diff) < 0.001 && (
               <div className="flex items-center gap-2 mt-2 text-[10px] text-amber-600 font-bold uppercase tracking-tight bg-amber-50 p-2 rounded-lg border border-amber-100">
                 <AlertCircle size={14} />
-                Opening balances are audited. Ensure all figures match the school's closing statement.
+                Opening balances are audited. Ensure all figures match the school&apos;s closing statement.
               </div>
             )}
           </div>

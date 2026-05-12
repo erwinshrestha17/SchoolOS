@@ -60,7 +60,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
   });
 
   const batchMut = useMutation({
-    mutationFn: (payload: any) => api.submitBatchMarks(payload),
+    mutationFn: (payload: any) => api.batchEnterMarks(payload),
     onSuccess: (data) => {
       setSaveSuccess(data.saved);
       void queryClient.invalidateQueries({ queryKey: ['marks', filters] });

@@ -196,7 +196,7 @@ export default function PlatformSchoolDetail() {
                 <div>
                   <dt className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Operator Notes</dt>
                   <dd className="text-xs text-slate-500 leading-relaxed italic">
-                    "Pilot school for Phase 2A. Special focus on large-scale fee collection."
+                    &quot;Pilot school for Phase 2A. Special focus on large-scale fee collection.&quot;
                   </dd>
                 </div>
               </dl>

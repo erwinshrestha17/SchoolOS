@@ -104,6 +104,12 @@ export type StudentProfile = {
   emergencyPhone?: string | null;
   doctorName?: string | null;
   doctorPhone?: string | null;
+  lifecycleStatus?: string;
+  photoUrl?: string;
+  activeIdentity?: {
+    id: string;
+    status: string;
+  } | null;
 };
 
 export type StudentProfileEnrollment = {
@@ -128,6 +134,7 @@ export type StudentProfileInvoiceLine = {
   unitAmount: number;
   vatAmount: number;
   totalAmount: number;
+  lineItems?: any[];
 };
 
 export type StudentProfileInvoice = {
@@ -488,6 +495,18 @@ export type CashierClosePreview = {
   refundCount: number;
   firstReceiptNumber: string | null;
   lastReceiptNumber: string | null;
+  totalCollected?: number;
+  transactionCount?: number;
+  byMethod?: Array<{
+    method: string;
+    count: number;
+    amount: number;
+  }>;
+  byUser?: Array<{
+    userId: string;
+    userName: string;
+    amount: number;
+  }>;
 };
 
 export type CashierCloseSummary = {
@@ -1012,6 +1031,7 @@ export type AttendanceRoster = {
     conflictStatus: string;
   } | null;
   students: AttendanceRosterStudent[];
+  status?: string;
 };
 
 export type AttendanceAnalytics = {

@@ -242,7 +242,7 @@ export function AccountingDashboardView() {
                       <p className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">Current Period</p>
                     </div>
                   </div>
-                  <Badge variant={activePeriod?.status === 'OPEN' ? 'success' : activePeriod?.status === 'LOCKED' ? 'warning' : 'danger'}>
+                  <Badge variant={activePeriod?.status === 'OPEN' ? 'success' : activePeriod?.status === 'LOCKED' ? 'warning' : 'destructive'}>
                     {activePeriod?.status ?? 'CLOSED'}
                   </Badge>
                 </div>

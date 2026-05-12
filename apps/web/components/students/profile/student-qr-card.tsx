@@ -92,6 +92,7 @@ export function StudentQrCard({ studentId, studentSystemId, initialStatus }: Stu
         {rawToken && (
           <div className="rounded-[2rem] border-2 border-primary-100 bg-primary-50/30 p-6 text-center animate-in zoom-in-95 duration-300">
             <div className="mx-auto mb-4 flex h-48 w-48 items-center justify-center rounded-3xl bg-white p-4 shadow-xl ring-8 ring-primary-50">
+              {/* eslint-disable-next-line @next/next/no-img-element -- Data URL generated for QR code does not benefit from next/image optimization */}
               <img 
                 src={api.getStudentQrImageUrl(studentId, rawToken)} 
                 alt="Student QR Code"

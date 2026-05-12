@@ -107,7 +107,7 @@ export function AttendanceForm() {
   });
 
   const availableSections = (sectionsQuery.data ?? []).filter((s) => !classId || (s.classId ?? s.class?.id) === classId);
-  const roster = rosterQuery.data?.students ?? [];
+  const roster = useMemo(() => rosterQuery.data?.students ?? [], [rosterQuery.data?.students]);
   const futureDateBlocked = isFutureDate(attendanceDate);
 
   const totals = useMemo(() => {
@@ -256,28 +256,43 @@ export function AttendanceForm() {
           />
         ) : (
           <div className="space-y-6">
-            <p className="text-sm text-slate-500 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-3">
-              <Info size={16} className="text-slate-400" />
-              Everyone is present by default. Mark exceptions only for absent, late, sick leave, excused leave, or unexcused leave.
-            </p>
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              Everyone is present by default. Mark exceptions only when a student is absent,
+              late, sick leave, excused leave, or unexcused leave.
+            </div>
+
             <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-            {roster.map((student) => (
-              <AttendanceRosterItem
-                key={student.id}
-                student={student}
-                status={exceptions[student.id] ?? 'PRESENT'}
-                remark={remarks[student.id]}
-                onStatusChange={(status) => {
-                  setExceptions(prev => {
-                    const next = { ...prev };
-                    if (status === 'PRESENT') delete next[student.id];
-                    else next[student.id] = status;
-                    return next;
-                  });
-                }}
-                onRemarkChange={(remark) => setRemarks(prev => ({ ...prev, [student.id]: remark }))}
-              />
-            ))}
+              {roster.map((student) => (
+                <AttendanceRosterItem
+                  key={student.id}
+                  student={student}
+                  status={exceptions[student.id] ?? 'PRESENT'}
+                  remark={remarks[student.id] ?? ''}
+                  onStatusChange={(status) => {
+                    setExceptions((current) => {
+                      const next = { ...current };
+                      if (status === 'PRESENT') {
+                        delete next[student.id];
+                      } else {
+                        next[student.id] = status;
+                      }
+                      return next;
+                    });
+                  }}
+                  onRemarkChange={(remark) => {
+                    setRemarks((current) => ({
+                      ...current,
+                      [student.id]: remark,
+                    }));
+                  }}
+                />
+              ))}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              <strong>Offline sync:</strong> Sync offline draft changes and review conflicts
+              before final submission.
+            </div>
           </div>
         )}
       </SectionCard>

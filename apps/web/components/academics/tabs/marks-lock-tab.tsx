@@ -304,7 +304,7 @@ export function MarksLockTab({ exams }: Props) {
                               <MessageSquare size={12} />
                            </div>
                            <div>
-                              <p className="text-xs font-medium text-slate-600 leading-relaxed italic">"{request.reason}"</p>
+                              <p className="text-xs font-medium text-slate-600 leading-relaxed italic">&quot;{request.reason}&quot;</p>
                               <div className="flex items-center gap-4 mt-2">
                                  <div className="flex items-center gap-1.5">
                                     <User size={10} className="text-slate-300" />
@@ -350,7 +350,7 @@ export function MarksLockTab({ exams }: Props) {
                      {(request.reviewNote || request.reviewedAt) && (
                         <div className="w-full lg:w-[240px] p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100">
                            <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-2">Review Feedback</p>
-                           {request.reviewNote && <p className="text-[10px] font-medium text-slate-600 italic">"{request.reviewNote}"</p>}
+                           {request.reviewNote && <p className="text-[10px] font-medium text-slate-600 italic">&quot;{request.reviewNote}&quot;</p>}
                            <div className="mt-2 flex flex-col gap-1">
                               <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">By {actorLabel(request.reviewedBy)}</span>
                               <span className="text-[8px] font-bold text-slate-300 uppercase tracking-widest">{formatDate(request.reviewedAt)}</span>
