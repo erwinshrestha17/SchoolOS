@@ -4,7 +4,7 @@
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard
 
-This is the consolidated source of truth for SchoolOS. It merges the long-term project roadmap, main phase structure, platform core memory, scalability roadmap, current repo analysis summary, M9 Accounting completion note, M11 Intelligence roadmap, and pricing/entitlements plan.
+This is the consolidated source of truth for SchoolOS. It merges the long-term project roadmap, main phase structure, platform/settings memory, scalability roadmap, current repo analysis summary, Student Identity QR plan, M9 Accounting completion note, M11 Intelligence roadmap, and pricing/entitlements plan.
 
 Focused companion docs:
 
@@ -14,10 +14,10 @@ ARCHITECTURE.md
 DEVELOPMENT_RULES.md
 docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
 docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md
-docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md
+docs/project/SCHOOLOS_PLATFORM_AND_SETTINGS.md
 ```
 
-Do not recreate separate M9, M11, or pricing roadmap files unless the project grows enough to justify splitting them again.
+Do not recreate separate phase structure, scalability, student QR, M9, M11, pricing, platform-core, or settings-boundary docs unless the project grows enough to justify splitting them again.
 
 ---
 
@@ -153,7 +153,7 @@ Status: **Partially complete**.
 2C HR and Payroll — foundation implemented; deeper lifecycle/accounting tests needed
 2D M9 Accounting and Finance — production-candidate complete
 2E Parent Communication Expansion — foundation implemented / further hardening later
-2F Student Identity QR Foundation — documented / staged for vertical reuse
+2F Student Identity QR Foundation — approved cross-module foundation; implement before deeper Library/Canteen/Transport QR usage
 ```
 
 ### Phase 3 — Extended School Operations
@@ -218,7 +218,149 @@ Next Phase 2A work:
 
 ---
 
-## 7. M9 Accounting Completion and Rules
+## 7. Student Identity QR Foundation
+
+Status: **Approved cross-module foundation. Implementation should happen before deeper Phase 3 QR-dependent workflows.**
+
+Student QR identity belongs to **M1 Admissions & Student Profiles**, not Library-only, Canteen-only, or Transport-only.
+
+Approved direction:
+
+```text
+Implement now / near-term:
+- Immutable Student ID code generated during registration/admission.
+- Revocable QR credential per student.
+- QR code on student ID cards.
+- Authenticated QR scan/resolve API.
+- Purpose-based QR scan responses.
+- Reuse QR identity in Library, Canteen, optional Transport, and parent/mobile views.
+
+Do not implement now:
+- Fingerprint registration.
+- Face scan registration.
+- Biometric attendance.
+- Biometric canteen access.
+- Biometric library access.
+- Storage or processing of biometric templates.
+```
+
+Ownership:
+
+```text
+M1 Student Identity Foundation owns:
+- Immutable student code.
+- Student QR credential lifecycle.
+- QR generation/rotation/revocation.
+- QR scan/resolve security boundary.
+- QR block on student ID card.
+
+M8A Library consumes it.
+M8C Canteen consumes it.
+M8B Transport may consume it where useful.
+M10 Notifications reacts to wallet, overdue, boarding/drop, and parent-visible events.
+M3/M9 handle money/accounting impact for wallet, fines, and corrections.
+```
+
+Required foundation scope:
+
+```text
+1. Confirm immutable Student ID code is generated during registration/admission.
+2. Add StudentQrCredential model.
+3. Generate QR credential for each admitted/active student.
+4. Add QR image generation endpoint for ID cards and student profile.
+5. Add QR to student ID card PDF.
+6. Add QR rotate/revoke actions for lost or damaged cards.
+7. Add authenticated QR scan/resolve API.
+8. Add purpose-based scan responses: LIBRARY, CANTEEN, TRANSPORT, ATTENDANCE, GENERAL_STUDENT_LOOKUP.
+9. Add audit logs for generate, rotate, revoke, resolve, and scan actions.
+10. Add permission and tenant-isolation tests.
+```
+
+Security rules:
+
+```text
+- QR must not contain student name, guardian phone, address, health data, wallet balance, or other PII.
+- QR should contain only a random secure token or URL containing a token.
+- Store only token hash in the database.
+- QR scan must require authentication.
+- QR scan must be tenant-scoped by tenantId.
+- QR scan response must be purpose-specific and role-limited.
+- Parents can only resolve their own child.
+- Teachers can only resolve assigned students unless permission allows more.
+- Canteen staff can only see canteen-safe data.
+- Librarians can only see library-safe data.
+- Transport drivers can only see assigned-route students.
+- Admin/principal access remains tenant-scoped and audited.
+- QR credentials must be revocable and rotatable.
+```
+
+Suggested model:
+
+```prisma
+model StudentQrCredential {
+  id            String          @id @default(cuid())
+  tenantId      String
+  studentId     String
+  tokenHash     String
+  status        StudentQrStatus @default(ACTIVE)
+  createdAt     DateTime        @default(now())
+  rotatedAt     DateTime?
+  revokedAt     DateTime?
+  lastScannedAt DateTime?
+
+  student       Student         @relation(fields: [studentId], references: [id])
+
+  @@unique([tenantId, studentId])
+  @@unique([tokenHash])
+  @@index([tenantId, studentId])
+  @@index([tenantId, status])
+}
+
+enum StudentQrStatus {
+  ACTIVE
+  REVOKED
+}
+```
+
+Suggested APIs:
+
+```text
+POST /api/v1/students/:studentId/qr
+POST /api/v1/students/:studentId/qr/rotate
+POST /api/v1/students/:studentId/qr/revoke
+GET  /api/v1/students/:studentId/qr-image
+POST /api/v1/students/qr/resolve
+```
+
+Implementation order:
+
+```text
+1. Add StudentQrCredential model and indexes.
+2. Generate QR credential during student registration/admission or first ID-card generation.
+3. Add QR image generation service.
+4. Add QR to student ID card PDF.
+5. Add QR management actions in student detail page.
+6. Add scan/resolve API with purpose-based response.
+7. Add scan audit logs.
+8. Add Library QR borrower lookup.
+9. Add Canteen wallet ledger.
+10. Add Canteen QR purchase flow.
+11. Add Parent wallet and purchase history.
+12. Add parent spending controls and notifications.
+```
+
+Canteen wallet rule:
+
+```text
+Use immutable wallet movements. Do not silently edit balances.
+Confirmed financial events must later post through M9 Accounting boundaries.
+```
+
+Biometrics are explicitly out of scope until QR identity is stable, parent trust is established, legal/privacy rules are reviewed, and the product has strong consent, retention, encryption, audit, and deletion workflows.
+
+---
+
+## 8. M9 Accounting Completion and Rules
 
 M9 Accounting is **Production Candidate Complete**.
 
@@ -280,7 +422,7 @@ Remaining M9 future enhancements:
 
 ---
 
-## 8. M11 School Intelligence & Analytics Roadmap
+## 9. M11 School Intelligence & Analytics Roadmap
 
 Status: **Roadmap only. No implementation yet.**
 
@@ -338,35 +480,9 @@ Phase 4 implementation order:
 4F — Scale Optimization and Enterprise SaaS
 ```
 
-Priority feature order:
-
-```text
-1. Teacher Workload Balance Monitor
-2. Substitute Teacher Intelligence
-3. Guardian Communication Health Score
-4. Academic Year Momentum Tracker
-5. Exam Paper Difficulty Calibration
-6. Classroom-Level Heat Events
-7. Sibling Academic Correlation Report
-8. Predictive Dropout Engine v1, rule-based first
-9. AI Teaching Assistant with human review
-10. Natural Language School Management Interface using approved query templates
-11. Teacher Performance Intelligence, late and sensitive
-12. Curriculum Gap Detection, later
-13. Offline-first AI inference, later
-14. School Health Network Intelligence, enterprise/network later
-```
-
-Natural language query safety rule:
-
-```text
-Do not let an LLM generate raw SQL directly against production DB.
-Use intent parser -> approved query template -> tenant/permission filter injection -> backend service query -> audited result.
-```
-
 ---
 
-## 9. Pricing Tiers and Entitlements Plan
+## 10. Pricing Tiers and Entitlements Plan
 
 Status: **Roadmap only. No implementation yet.**
 
@@ -374,12 +490,6 @@ Positioning:
 
 ```text
 Nepal-ready School Operating System for modern schools.
-```
-
-Core message:
-
-```text
-Admissions, attendance, fees, exams, payroll, transport, canteen, communication, accounting, and future AI insights — all in one secure school platform.
 ```
 
 Recommended commercial packaging:
@@ -391,38 +501,7 @@ Tier 3: SchoolOS Intelligence
 Optional add-ons: Transport GPS, Canteen, Library, SMS bundle, AI credits, Branded Parent App, Advanced Accounting, Custom Reports
 ```
 
-Tier guide:
-
-```text
-SchoolOS Core:
-- M1 Admissions & Student Profiles
-- M2 Smart Attendance
-- M3 Fees & Receipts
-- M5 Activity Feed basic
-- M10 Notices basic
-- School Settings basic
-- Basic reports/PDFs
-
-SchoolOS Professional:
-- Everything in Core
-- M4 Exams, CAS & Report Cards
-- M6 Homework & Timetable
-- M7 HR & Payroll
-- M9 Accounting basic/professional
-- M10 Parent-Class Teacher Chat
-- Advanced reports, exports, role management, audit logs
-
-SchoolOS Intelligence:
-- Everything in Core + Professional
-- M8A Library
-- M8B Transport
-- M8C Canteen
-- M11 School Intelligence & Analytics
-- AI Teacher Assistant
-- Advanced dashboards and analytics
-```
-
-Important technical rule:
+Technical golden rule:
 
 ```text
 Plan controls what the school bought.
@@ -433,52 +512,7 @@ Frontend uses entitlements only for display.
 Backend enforces entitlements for security.
 ```
 
-Correct access decision:
-
-```text
-Tenant plan allows feature
-+ tenant subscription is active
-+ tenant feature override does not disable it
-+ user role has permission
-+ usage limit is not exceeded
-= access allowed
-```
-
-Use feature keys, not hardcoded plan names:
-
-```text
-module.students
-module.attendance
-module.fees
-module.exams
-module.homework
-module.timetable
-module.hr
-module.payroll
-module.accounting
-module.library
-module.transport
-module.canteen
-module.intelligence
-feature.receipt_pdf
-feature.report_card_pdf
-feature.parent_teacher_chat
-feature.transport_live_tracking
-feature.ai_teacher_assistant
-feature.ai_dropout_prediction
-feature.ai_natural_language_query
-```
-
-Future entitlement implementation phases:
-
-```text
-E1 — Entitlement Foundation: Plan, PlanFeature, TenantSubscription, TenantFeatureOverride, UsageLimit, UsageCounter, EntitlementService
-E2 — Platform Plan Management
-E3 — Backend guards: @RequireFeature, @RequireUsage, EntitlementGuard, UsageLimitGuard
-E4 — Sidebar and route gating
-E5 — Usage metering
-E6 — SaaS billing and subscription
-```
+Do not hardcode plan names into feature access logic. Use feature keys.
 
 Critical boundary:
 
@@ -488,15 +522,9 @@ M3/M9 school finance = schools collect money from parents/students.
 Do not mix these accounting domains.
 ```
 
-Recommended early go-to-market:
-
-```text
-Annual package + setup/training fee
-```
-
 ---
 
-## 10. Scalability Rules
+## 11. Scalability Rules
 
 Every new feature must answer:
 
@@ -523,23 +551,9 @@ Implementation order:
 Feature -> tenant isolation -> indexes -> pagination -> queue slow work -> audit sensitive actions -> tests -> verification
 ```
 
-Move slow/retryable work to BullMQ workers:
-
-```text
-Notifications
-Report/PDF generation
-Batch billing
-Defaulter reminders
-Payroll posting/payslips
-Media compression
-Large CSV/PDF exports
-Future transport ETA jobs
-Future M11 intelligence snapshot generation, risk scoring, insight generation, AI inference logging, and network aggregate jobs
-```
-
 ---
 
-## 11. Current Repo Analysis Summary
+## 12. Current Repo Analysis Summary
 
 ```text
 Full SchoolOS vision: around 70-80% implemented
@@ -581,7 +595,7 @@ Biggest risks:
 
 ---
 
-## 12. Verification Commands
+## 13. Verification Commands
 
 Run relevant checks after meaningful changes:
 
@@ -598,41 +612,11 @@ pnpm verify:production
 pnpm smoke:phase1
 ```
 
-M9 completion verification passed with:
-
-```text
-pnpm db:generate
-pnpm db:validate
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm test:e2e
-pnpm build
-pnpm verify:production
-```
-
-Phase 2A backend completion verification passed with:
-
-```text
-pnpm --filter @schoolos/api test src/academics/phase2a-flow.contract.spec.ts
-  PASS: 1 suite / 9 tests
-
-pnpm --filter @schoolos/api test src/integrity/production-contracts.spec.ts
-  PASS: 1 suite / 11 tests
-
-pnpm typecheck
-  PASS: API + web
-
-pnpm test
-  PASS: API 76 suites / 494 tests
-  PASS: Web 71 tests
-```
-
 After recent verification follow-ups, rerun the full gate locally before treating the repo as green.
 
 ---
 
-## 13. Future Codex Prompt Format
+## 14. Future Codex Prompt Format
 
 ```text
 Read these first:
@@ -642,7 +626,7 @@ Read these first:
 - docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
 - docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
 - docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md when planning implementation order
-- docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md when touching platform/settings boundaries
+- docs/project/SCHOOLOS_PLATFORM_AND_SETTINGS.md when touching platform/settings boundaries
 
 Task:
 [exact feature/change]
