@@ -6,6 +6,12 @@ This file is the short operating rulebook for coding tasks. Full context lives i
 docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
 ```
 
+Also read the current audit before major backend/module work:
+
+```text
+docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
+```
+
 ---
 
 ## Current Stage
@@ -14,22 +20,47 @@ docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
 Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
-Current stage: Phase 2 implemented foundations + Phase 3 operations admin foundations
+M0 Platform Core Foundation Depth: Completed
+Phase 2A M4 Academics backend: Completed / Contract-Protected
+Phase 2D M9 Accounting: Production Candidate Complete
+Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
 ```
 
-Phase 2 is underway in the repo, and Phase 3 operations admin foundations now exist. Work must focus on hardening, correctness, scale, permissions, tests, and UX polish for the existing modules rather than broad new product expansion.
+The repo is broad and advanced. Work must focus on stabilization, correctness, scale, permissions, tests, and UX/API polish for existing modules rather than broad new product expansion.
 
 Preferred next work:
 
 ```text
-Harden one existing vertical at a time.
-Priority areas: M9 Accounting correctness, production verification, reports/exports, tenant isolation, and Phase 2/3 admin UX completeness.
+Repo Verification & Stabilization Sprint
+→ full verification gate
+→ Homework/Timetable schema/service/test alignment
+→ Phase 2A Academics admin UI against completed backend APIs
+→ authenticated Playwright browser smoke tests
+→ controlled pilot staging readiness
+```
+
+Hardening priorities after stabilization:
+
+```text
+1. Phase 2A Academics frontend/admin UI and browser workflow contracts.
+2. M6 Homework/Timetable service/schema/test depth.
+3. M7 HR/Payroll deeper lifecycle/accounting tests.
+4. M8A Library reports/fines/service tests.
+5. M8B Transport parent/driver/live tracking boundaries later.
+6. M8C Canteen inventory/vendor/accounting later.
+7. M10 parent-teacher chat service tests and provider callback depth.
 ```
 
 Explicitly deferred unless requested:
 
 ```text
-Parent/mobile portal, driver app, live transport map/WebSocket UI, full canteen inventory/vendor workflows, AI/ML.
+Angular migration
+Parent/mobile portal
+Driver app
+Live transport map/WebSocket UI
+Full canteen inventory/vendor workflows
+AI/ML implementation
+Microservices
 ```
 
 ---
@@ -43,7 +74,9 @@ Parent/mobile portal, driver app, live transport map/WebSocket UI, full canteen 
 - Treat existing Phase 3 Library/Transport/Canteen admin workspaces as foundations to polish and harden, not as permission to build parent/mobile or driver experiences.
 - Do not start AI/ML features until reliable production data exists.
 - Use `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md` as the long-term source of truth.
-- Keep legacy roadmap files as pointers/summaries only unless explicitly asked to expand them again.
+- Use `docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md` for current repo risk/completion estimates.
+- Keep legacy roadmap files as pointers/summaries unless explicitly asked to expand them.
+- After recent verification follow-ups, treat Homework/Timetable compile/schema/test stability as a high-priority gate before new module expansion.
 
 ---
 
@@ -73,6 +106,8 @@ Parent/mobile portal, driver app, live transport map/WebSocket UI, full canteen 
 - List endpoints for growing data must use pagination and filtering.
 - Add/review indexes for high-volume tenant-scoped query patterns.
 - Move slow/retryable/provider/report/PDF jobs to BullMQ where appropriate.
+- Do not bypass service boundaries by writing another module's internal tables directly.
+- Do not bypass `AccountingPostingService` for ledger writes.
 
 ---
 
@@ -90,6 +125,7 @@ Parent/mobile portal, driver app, live transport map/WebSocket UI, full canteen 
   - `/platform/*` for SchoolOS operators.
   - `/dashboard/settings/*` for school/tenant settings.
   - `/dashboard/*` for school operations.
+- Phase 2A Academics admin UI must use the completed backend APIs and should be covered by browser smoke tests.
 
 ---
 
@@ -99,7 +135,7 @@ Parent/mobile portal, driver app, live transport map/WebSocket UI, full canteen 
 - Parent/student views must only expose own child/self data.
 - Teacher views must only expose assigned data unless role permissions allow more.
 - Sensitive data and files must use private access patterns.
-- Use signed URLs for private files/media.
+- Use signed URLs or protected API URLs for private files/media.
 - Avoid permanent public URLs for student media and documents.
 - Platform users must not enter tenant data silently; support override requires an explicit reason and audit log.
 - UI visibility is not security; backend guards and tenant filters enforce access.
@@ -113,9 +149,10 @@ Parent/mobile portal, driver app, live transport map/WebSocket UI, full canteen 
 - Confirmed financial records should not be silently edited.
 - Use reversal/correction workflows for payment mistakes.
 - Receipt, invoice, journal, and voucher numbers must be tenant/fiscal-year safe.
-- Full M9 Accounting is Phase 2, but finance ledger foundations may continue.
+- M9 Accounting is production-candidate complete but remains inside the modular monolith.
 - Other modules must not directly write ledger rows; use `AccountingPostingService` or a clear accounting boundary.
 - Reports must come from backend ledger/report services, not frontend calculations.
+- Audit posting, approval, reversal, closing, reopening, bank reconciliation, and exports.
 
 ---
 
@@ -124,7 +161,7 @@ Parent/mobile portal, driver app, live transport map/WebSocket UI, full canteen 
 Before implementing a feature, answer:
 
 ```text
-1. Which module owns this feature: M0 or M1-M10?
+1. Which module owns this feature: M0 or M1-M11?
 2. Which backend folder/API namespace/frontend route owns it?
 3. Which tenant owns this data?
 4. Which role/permission can access it?
@@ -136,6 +173,8 @@ Before implementing a feature, answer:
 10. Does it require audit logging?
 11. Does it affect accounting/ledger?
 12. What tests prove tenant isolation and permissions?
+13. If pricing/tiered access is involved, which feature key, entitlement, and usage limit controls access?
+14. If intelligence/AI is involved, is the output explainable and human-reviewed?
 ```
 
 Feature is not production-ready until these are answered.
@@ -158,6 +197,8 @@ pnpm build
 pnpm verify:production
 pnpm smoke:phase1
 ```
+
+For the immediate stabilization sprint, run the full gate before marking the repo healthy.
 
 ---
 
