@@ -3,6 +3,20 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../../../lib/api';
+import { 
+  Calendar, 
+  Layers, 
+  Plus, 
+  Trash2, 
+  CalendarCheck, 
+  Trophy, 
+  Info,
+  CheckCircle2,
+  AlertCircle,
+  Clock
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { SectionCard } from '@/components/ui/section-card';
 
 type Props = {
   academicYears: any[];
@@ -21,93 +35,263 @@ export function ExamTermsTab({ academicYears, subjects, exams }: Props) {
     void queryClient.invalidateQueries({ queryKey: ['exam-terms'] });
   };
 
-  const examMut = useMutation({ mutationFn: api.createExamTerm, onSuccess: invalidate });
-  const compMut = useMutation({ mutationFn: api.createAssessmentComponent, onSuccess: invalidate });
+  const examMut = useMutation({ 
+    mutationFn: api.createExamTerm, 
+    onSuccess: () => {
+      invalidate();
+      setExam({ academicYearId: '', name: '', startsOn: today, endsOn: today, weightPercent: 100 });
+    } 
+  });
+  
+  const compMut = useMutation({ 
+    mutationFn: api.createAssessmentComponent, 
+    onSuccess: () => {
+      invalidate();
+      setComp({ examTermId: '', subjectId: '', name: 'Theory', type: 'TERMINAL', maxMarks: 100, weightPercent: 100, passMarks: 35 });
+    } 
+  });
+
   const currentYear = academicYears.find((y: any) => y.isCurrent) ?? academicYears[0];
 
   return (
-    <div className="grid gap-6 xl:grid-cols-2">
-      {/* Create Exam Term */}
-      <section className="rounded-[28px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-        <div className="mb-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-amber-600">Setup</p>
-          <h2 className="mt-1 text-lg font-bold text-gray-950">Create Exam Term</h2>
-        </div>
-        <div className="grid gap-3">
-          <select value={exam.academicYearId || currentYear?.id || ''} onChange={(e) => setExam((c) => ({ ...c, academicYearId: e.target.value }))}>
-            <option value="">Academic year</option>
-            {academicYears.map((y: any) => <option key={y.id} value={y.id}>{y.name}</option>)}
-          </select>
-          <input value={exam.name} onChange={(e) => setExam((c) => ({ ...c, name: e.target.value }))} placeholder="e.g. First Terminal, Mid-Term" />
-          <div className="grid gap-3 md:grid-cols-3">
-            <input type="date" value={exam.startsOn} onChange={(e) => setExam((c) => ({ ...c, startsOn: e.target.value }))} />
-            <input type="date" value={exam.endsOn} onChange={(e) => setExam((c) => ({ ...c, endsOn: e.target.value }))} />
-            <input type="number" value={exam.weightPercent} onChange={(e) => setExam((c) => ({ ...c, weightPercent: Number(e.target.value) }))} placeholder="Weight %" />
+    <div className="space-y-12">
+      <div className="grid gap-8 lg:grid-cols-2">
+        {/* Create Exam Term */}
+        <div className="group relative rounded-[2.5rem] border border-slate-200 bg-white p-8 transition-all hover:shadow-xl hover:shadow-slate-200/50">
+          <div className="mb-8">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 mb-4 transition-transform group-hover:rotate-12">
+              <Calendar size={24} />
+            </div>
+            <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 italic">Create Exam Term</h2>
+            <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-widest">Setup terminal boundaries</p>
           </div>
-          <button type="button" className="rounded-2xl bg-indigo-950 px-5 py-3 font-semibold text-white transition hover:bg-indigo-900 disabled:opacity-50" disabled={!exam.name || examMut.isPending} onClick={() => examMut.mutate({ ...exam, academicYearId: exam.academicYearId || currentYear?.id, startsOn: new Date(exam.startsOn).toISOString(), endsOn: new Date(exam.endsOn).toISOString() })}>
-            {examMut.isPending ? 'Creating…' : 'Create Exam Term'}
-          </button>
-          {examMut.isError && <p className="text-sm text-red-600">{examMut.error.message}</p>}
-        </div>
-      </section>
 
-      {/* Add Assessment Component */}
-      <section className="rounded-[28px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-        <div className="mb-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-violet-600">Component</p>
-          <h2 className="mt-1 text-lg font-bold text-gray-950">Add Assessment Component</h2>
-        </div>
-        <div className="grid gap-3">
-          <div className="grid gap-3 md:grid-cols-2">
-            <select value={comp.examTermId} onChange={(e) => setComp((c) => ({ ...c, examTermId: e.target.value }))}>
-              <option value="">Exam term</option>
-              {exams.map((e: any) => <option key={e.id} value={e.id}>{e.name}{e.isLocked ? ' 🔒' : ''}</option>)}
-            </select>
-            <select value={comp.subjectId} onChange={(e) => setComp((c) => ({ ...c, subjectId: e.target.value }))}>
-              <option value="">Subject</option>
-              {subjects.map((s: any) => <option key={s.id} value={s.id}>{s.code} — {s.name}</option>)}
-            </select>
+          <div className="grid gap-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Academic Year</label>
+              <select 
+                value={exam.academicYearId || currentYear?.id || ''} 
+                onChange={(e) => setExam((c) => ({ ...c, academicYearId: e.target.value }))}
+                className="premium-input bg-slate-50 border-slate-100"
+              >
+                <option value="">Select year</option>
+                {academicYears.map((y: any) => <option key={y.id} value={y.id}>{y.name}</option>)}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Exam Title</label>
+              <input 
+                value={exam.name} 
+                onChange={(e) => setExam((c) => ({ ...c, name: e.target.value }))} 
+                placeholder="e.g. First Terminal, Mid-Term" 
+                className="premium-input bg-slate-50 border-slate-100"
+              />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Starts On</label>
+                <input 
+                  type="date" 
+                  value={exam.startsOn} 
+                  onChange={(e) => setExam((c) => ({ ...c, startsOn: e.target.value }))} 
+                  className="premium-input bg-slate-50 border-slate-100"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Ends On</label>
+                <input 
+                  type="date" 
+                  value={exam.endsOn} 
+                  onChange={(e) => setExam((c) => ({ ...c, endsOn: e.target.value }))} 
+                  className="premium-input bg-slate-50 border-slate-100"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Weight %</label>
+                <input 
+                  type="number" 
+                  value={exam.weightPercent} 
+                  onChange={(e) => setExam((c) => ({ ...c, weightPercent: Number(e.target.value) }))} 
+                  placeholder="100" 
+                  className="premium-input bg-slate-50 border-slate-100 font-black tracking-tighter"
+                />
+              </div>
+            </div>
+
+            <button 
+              type="button" 
+              className="mt-4 flex items-center justify-center gap-3 rounded-[1.5rem] bg-slate-900 px-5 py-4 font-black uppercase tracking-widest text-white transition hover:bg-slate-800 disabled:opacity-50 shadow-xl shadow-slate-900/10 active:scale-95" 
+              disabled={!exam.name || examMut.isPending} 
+              onClick={() => examMut.mutate({ ...exam, academicYearId: exam.academicYearId || currentYear?.id, startsOn: new Date(exam.startsOn).toISOString(), endsOn: new Date(exam.endsOn).toISOString() })}
+            >
+              {examMut.isPending ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
+              Initialize Exam Term
+            </button>
+            {examMut.isError && <p className="text-xs font-bold text-red-600 mt-2 flex items-center gap-1"><AlertCircle size={12} /> {examMut.error.message}</p>}
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <input value={comp.name} onChange={(e) => setComp((c) => ({ ...c, name: e.target.value }))} placeholder="Component name" />
-            <input type="number" value={comp.maxMarks} onChange={(e) => setComp((c) => ({ ...c, maxMarks: Number(e.target.value) }))} placeholder="Max marks" />
-            <input type="number" value={comp.passMarks} onChange={(e) => setComp((c) => ({ ...c, passMarks: Number(e.target.value) }))} placeholder="Pass marks" />
-          </div>
-          <button type="button" className="rounded-2xl bg-violet-700 px-5 py-3 font-semibold text-white transition hover:bg-violet-600 disabled:opacity-50" disabled={!comp.examTermId || !comp.subjectId || !comp.name || compMut.isPending} onClick={() => compMut.mutate(comp)}>
-            {compMut.isPending ? 'Adding…' : 'Add Component'}
-          </button>
-          {compMut.isError && <p className="text-sm text-red-600">{compMut.error.message}</p>}
         </div>
-      </section>
+
+        {/* Add Assessment Component */}
+        <div className="group relative rounded-[2.5rem] border border-slate-200 bg-white p-8 transition-all hover:shadow-xl hover:shadow-slate-200/50">
+          <div className="mb-8">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 mb-4 transition-transform group-hover:rotate-12">
+              <Layers size={24} />
+            </div>
+            <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 italic">Add Component</h2>
+            <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-widest">Define evaluation metrics</p>
+          </div>
+
+          <div className="grid gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Exam Term</label>
+                <select 
+                  value={comp.examTermId} 
+                  onChange={(e) => setComp((c) => ({ ...c, examTermId: e.target.value }))}
+                  className="premium-input bg-slate-50 border-slate-100"
+                >
+                  <option value="">Select term</option>
+                  {exams.map((e: any) => <option key={e.id} value={e.id}>{e.name}{e.isLocked ? ' 🔒' : ''}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Subject</label>
+                <select 
+                  value={comp.subjectId} 
+                  onChange={(e) => setComp((c) => ({ ...c, subjectId: e.target.value }))}
+                  className="premium-input bg-slate-50 border-slate-100"
+                >
+                  <option value="">Select subject</option>
+                  {subjects.map((s: any) => <option key={s.id} value={s.id}>{s.code} — {s.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Component Label</label>
+              <input 
+                value={comp.name} 
+                onChange={(e) => setComp((c) => ({ ...c, name: e.target.value }))} 
+                placeholder="e.g. Theory, Practical, Viva" 
+                className="premium-input bg-slate-50 border-slate-100"
+              />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Max Marks</label>
+                <input 
+                  type="number" 
+                  value={comp.maxMarks} 
+                  onChange={(e) => setComp((c) => ({ ...c, maxMarks: Number(e.target.value) }))} 
+                  placeholder="100" 
+                  className="premium-input bg-slate-50 border-slate-100 font-black tracking-tighter"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Pass Marks</label>
+                <input 
+                  type="number" 
+                  value={comp.passMarks} 
+                  onChange={(e) => setComp((c) => ({ ...c, passMarks: Number(e.target.value) }))} 
+                  placeholder="35" 
+                  className="premium-input bg-slate-50 border-slate-100 font-black tracking-tighter"
+                />
+              </div>
+            </div>
+
+            <button 
+              type="button" 
+              className="mt-4 flex items-center justify-center gap-3 rounded-[1.5rem] bg-violet-700 px-5 py-4 font-black uppercase tracking-widest text-white transition hover:bg-violet-600 disabled:opacity-50 shadow-xl shadow-violet-700/10 active:scale-95" 
+              disabled={!comp.examTermId || !comp.subjectId || !comp.name || compMut.isPending} 
+              onClick={() => compMut.mutate(comp)}
+            >
+              {compMut.isPending ? <Loader2 className="animate-spin" size={20} /> : <Layers size={20} />}
+              Add Assessment Map
+            </button>
+            {compMut.isError && <p className="text-xs font-bold text-red-600 mt-2 flex items-center gap-1"><AlertCircle size={12} /> {compMut.error.message}</p>}
+          </div>
+        </div>
+      </div>
 
       {/* Exam Terms list */}
-      <section className="rounded-[28px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm xl:col-span-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4">Existing Exam Terms</p>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <section>
+        <div className="flex items-center gap-4 mb-8">
+           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+              <CalendarCheck size={20} />
+           </div>
+           <div>
+              <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic">Operational Registry</h3>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Existing Exam Definitions</p>
+           </div>
+           <div className="h-px flex-1 bg-slate-100" />
+        </div>
+
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {exams.length === 0 ? (
-            <p className="text-sm text-gray-400 col-span-full">No exam terms created yet.</p>
+            <div className="col-span-full py-20 border-2 border-dashed border-slate-100 rounded-[3rem] flex flex-col items-center justify-center text-slate-400">
+               <Info className="h-12 w-12 mb-4 opacity-10" />
+               <p className="text-xs font-black uppercase tracking-widest">No Exam Terms Found</p>
+               <p className="mt-2 text-[10px] font-bold">Initialize your first exam term above to begin.</p>
+            </div>
           ) : exams.map((e: any) => (
-            <div key={e.id} className="rounded-2xl border border-[var(--line)] bg-white p-4 transition hover:shadow-md">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-semibold text-gray-950">{e.name}</p>
-                  <p className="mt-1 text-sm text-gray-500">{e.academicYear?.name ?? 'Year'}</p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {new Date(e.startsOn).toLocaleDateString()} — {new Date(e.endsOn).toLocaleDateString()}
-                  </p>
+            <div key={e.id} className="group relative rounded-[2.5rem] border border-slate-200 bg-white p-8 transition-all hover:scale-[1.02] hover:shadow-2xl hover:shadow-slate-200">
+              <div className="flex items-start justify-between mb-6">
+                <div className="space-y-1">
+                  <h4 className="text-xl font-black uppercase tracking-tight text-slate-900 italic leading-none">{e.name}</h4>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{e.academicYear?.name ?? 'Year'}</p>
                 </div>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${e.isLocked ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                <div className={cn(
+                  "h-8 px-3 rounded-full flex items-center justify-center text-[8px] font-black uppercase tracking-widest border",
+                  e.isLocked ? "bg-red-50 text-red-600 border-red-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"
+                )}>
                   {e.isLocked ? 'Locked' : 'Open'}
-                </span>
+                </div>
               </div>
-              {(e.components?.length ?? 0) > 0 && (
-                <div className="mt-3 space-y-1">
-                  {e.components.map((c: any) => (
-                    <div key={c.id} className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-1.5 text-xs">
-                      <span className="font-medium text-gray-700">{c.subject?.code ?? 'Subject'} · {c.name}</span>
-                      <span className="text-gray-500">{Number(c.maxMarks)} marks</span>
-                    </div>
-                  ))}
+
+              <div className="flex items-center gap-2 mb-6">
+                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    <Clock size={12} />
+                    {new Date(e.startsOn).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                 </div>
+                 <div className="h-px w-3 bg-slate-200" />
+                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    {new Date(e.endsOn).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                 </div>
+                 <div className="ml-auto text-sm font-black text-indigo-600 tracking-tighter">
+                   {e.weightPercent}%
+                 </div>
+              </div>
+
+              {(e.components?.length ?? 0) > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-300 ml-1">Assessment Components</p>
+                  <div className="grid gap-2">
+                    {e.components.map((c: any) => (
+                      <div key={c.id} className="group/item flex items-center justify-between rounded-2xl bg-slate-50/50 border border-transparent p-4 transition-all hover:bg-white hover:border-slate-100 hover:shadow-sm">
+                        <div className="flex items-center gap-3">
+                           <div className="h-8 w-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 group-hover/item:text-violet-500 transition-colors">
+                              <Trophy size={14} />
+                           </div>
+                           <div className="flex flex-col">
+                              <span className="text-[10px] font-black text-slate-900 uppercase tracking-tight">{c.subject?.name ?? 'Subject'}</span>
+                              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{c.name}</span>
+                           </div>
+                        </div>
+                        <div className="text-right">
+                           <span className="text-xs font-black text-slate-700 tracking-tighter">{Number(c.maxMarks)}</span>
+                           <span className="text-[8px] font-black text-slate-300 uppercase block">Max</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="py-6 rounded-2xl bg-slate-50/50 border border-dashed border-slate-100 flex flex-col items-center justify-center text-slate-300">
+                   <Plus size={20} className="mb-2 opacity-20" />
+                   <p className="text-[8px] font-black uppercase tracking-[0.2em]">Map Components</p>
                 </div>
               )}
             </div>
@@ -115,5 +299,23 @@ export function ExamTermsTab({ academicYears, subjects, exams }: Props) {
         </div>
       </section>
     </div>
+  );
+}
+
+function Loader2({ size, className }: { size?: number, className?: string }) {
+  return (
+    <svg 
+      className={cn("animate-spin", className)} 
+      width={size} 
+      height={size} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="3" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
   );
 }

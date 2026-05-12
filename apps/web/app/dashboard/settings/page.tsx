@@ -19,7 +19,13 @@ import {
   Shield,
   Database,
   ExternalLink,
-  Loader2
+  Database,
+  ExternalLink,
+  Loader2,
+  FileText,
+  Upload,
+  Download,
+  ShieldCheck
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
@@ -224,7 +230,8 @@ export default function TenantSettingsPage() {
           <TabsTrigger value="accounting" className="gap-2"><Calculator size={16} /> Accounting</TabsTrigger>
           <TabsTrigger value="communication" className="gap-2"><MessageSquare size={16} /> Comms</TabsTrigger>
           <TabsTrigger value="security" className="gap-2"><Shield size={16} /> Security</TabsTrigger>
-          <TabsTrigger value="data" className="gap-2"><Database size={16} /> Data</TabsTrigger>
+          <TabsTrigger value="data" className="gap-2"><Download size={16} /> Import/Export</TabsTrigger>
+          <TabsTrigger value="audit" className="gap-2"><FileText size={16} /> Audit Logs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile">
@@ -256,6 +263,9 @@ export default function TenantSettingsPage() {
         </TabsContent>
         <TabsContent value="data">
           <SectionData initialValues={settings} />
+        </TabsContent>
+        <TabsContent value="audit">
+          <SectionAudit initialValues={settings} />
         </TabsContent>
       </Tabs>
     </div>
@@ -701,67 +711,88 @@ function SectionCommunication({ initialValues, onUpdate }: { initialValues: Tena
       isSaving={isSaving}
       alert={alert}
     >
-      <FormField label="Default Notice Channel"><Select value={form.default_notice_channel || 'EMAIL'} onChange={e => setFieldValue('default_notice_channel', e.target.value)}>
-        <option value="EMAIL">Email</option>
-        <option value="SMS">SMS</option>
-        <option value="APP">Mobile App Push</option>
-      </Select></FormField>
+      <FormField label="Default Notice Channel" description="Primary delivery method.">
+        <Select value={form.default_notice_channel || 'EMAIL'} onChange={e => setFieldValue('default_notice_channel', e.target.value)}>
+          <option value="EMAIL">Email</option>
+          <option value="SMS">SMS</option>
+          <option value="APP">Mobile App Push</option>
+        </Select>
+      </FormField>
       
-      <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+      <FormField label="Timezone" description="School operational timezone.">
+        <Select value={form.timezone || 'Asia/Kathmandu'} onChange={e => setFieldValue('timezone', e.target.value)}>
+          <option value="Asia/Kathmandu">Nepal (UTC+5:45)</option>
+          <option value="UTC">UTC</option>
+        </Select>
+      </FormField>
+
+      <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-slate-100 mt-2">
         <div className="space-y-4">
-          <label className="text-sm font-bold text-slate-700">Sunday–Thursday Chat Hours</label>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-bold text-slate-700">Sunday–Thursday Hours</label>
+            <Badge variant="neutral" className="text-[10px] font-bold">DEFAULT: 16:00–19:00</Badge>
+          </div>
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="Sun–Thu Start">
+            <FormField label="Start">
               <Input type="time" value={sunThuStart} onChange={e => handleTimeChange('chat_sunday_to_thursday_hours', e.target.value, sunThuEnd)} />
             </FormField>
-            <FormField label="Sun–Thu End">
+            <FormField label="End">
               <Input type="time" value={sunThuEnd} onChange={e => handleTimeChange('chat_sunday_to_thursday_hours', sunThuStart, e.target.value)} />
             </FormField>
           </div>
         </div>
 
         <div className="space-y-4">
-          <label className="text-sm font-bold text-slate-700">Friday Chat Hours</label>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-bold text-slate-700">Friday Hours</label>
+            <Badge variant="neutral" className="text-[10px] font-bold">DEFAULT: 14:00–17:00</Badge>
+          </div>
           <div className="grid grid-cols-2 gap-4">
-            <FormField label="Friday Start">
+            <FormField label="Start">
               <Input type="time" value={friStart} onChange={e => handleTimeChange('chat_friday_hours', e.target.value, friEnd)} />
             </FormField>
-            <FormField label="Friday End">
+            <FormField label="End">
               <Input type="time" value={friEnd} onChange={e => handleTimeChange('chat_friday_hours', friStart, e.target.value)} />
             </FormField>
           </div>
         </div>
 
-        <p className="col-span-full text-xs text-slate-500">
-          Messages outside these hours are queued unless marked as emergency by an admin.
-        </p>
+        <div className="col-span-full rounded-2xl border border-primary-100 bg-primary-50/30 p-4">
+          <div className="flex gap-3">
+            <AlertCircle className="text-primary-600 shrink-0" size={18} />
+            <p className="text-sm text-primary-700 leading-relaxed">
+              <strong>Chat Expectations:</strong> Messages received outside these configured hours will be automatically <strong>queued</strong>. Teachers will see them once their next shift starts. Saturday is <strong>closed</strong> by default.
+            </p>
+          </div>
+        </div>
 
-        <div className="col-span-full mt-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-sm font-semibold text-slate-900">
-            Current availability
-          </p>
+        <div className="col-span-full rounded-2xl border border-slate-200 bg-slate-50 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm font-bold text-slate-900">Live Preview (Parent View)</p>
+            <Badge variant={form.chat_availability_enabled ? 'success' : 'neutral'}>
+              {form.chat_availability_enabled ? 'ONLINE' : 'OFFLINE'}
+            </Badge>
+          </div>
 
-          <dl className="mt-3 grid gap-4 text-sm text-slate-600 sm:grid-cols-3">
-            <div>
-              <dt className="font-medium text-slate-700">Sunday–Thursday</dt>
-              <dd className="mt-1">
+          <dl className="grid gap-6 text-sm text-slate-600 sm:grid-cols-3">
+            <div className="p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
+              <dt className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Sun–Thu</dt>
+              <dd className="font-semibold text-slate-700">
                 {formatTimeRangeForPreview(sunThuStart, sunThuEnd)}
               </dd>
             </div>
 
-            <div>
-              <dt className="font-medium text-slate-700">Friday</dt>
-              <dd className="mt-1">
+            <div className="p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
+              <dt className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Friday</dt>
+              <dd className="font-semibold text-slate-700">
                 {formatTimeRangeForPreview(friStart, friEnd)}
               </dd>
             </div>
 
-            <div>
-              <dt className="font-medium text-slate-700">Saturday</dt>
-              <dd className="mt-1">
-                {form.chat_saturday_enabled
-                  ? 'Enabled by school policy'
-                  : 'Closed'}
+            <div className="p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
+              <dt className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Saturday</dt>
+              <dd className={cn("font-semibold", form.chat_saturday_enabled ? "text-emerald-600" : "text-rose-500")}>
+                {form.chat_saturday_enabled ? 'Open (Special Policy)' : 'Closed'}
               </dd>
             </div>
           </dl>
@@ -807,26 +838,76 @@ function SectionData({ initialValues }: { initialValues: TenantSettingSummary[] 
   return (
     <SectionWrapper 
       title="Data Import / Export" 
-      description="Bulk data operations and integrations."
+      description="Bulk data operations and system integrations."
     >
-      <DataActionCard title="Student Import" description="Import students from CSV/iEMIS." href="/dashboard/admissions/bulk-import" />
-      <DataActionCard title="iEMIS Export" description="Generate government-ready iEMIS files." href="/dashboard/students" />
-      <DataActionCard title="Fee Ledger Export" description="Bulk export student fee histories." href="/dashboard/fees" />
-      <DataActionCard title="Accounting Audit" description="Download full journal audit trail." href="/dashboard/accounting" />
-      <DataActionCard title="Payroll Export" description="Export approved payroll runs." href="/dashboard/hr/payroll" />
-      <DataActionCard title="Class Roster" description="Download student list by class." href="/dashboard/students" />
+      <div className="col-span-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="space-y-4">
+          <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+            <Upload size={14} /> Imports
+          </h4>
+          <div className="grid gap-3">
+            <DataActionCard title="Student Import" description="Import students from CSV/iEMIS." href="/dashboard/admissions/bulk-import" />
+            <DataActionCard title="Staff Import" description="Bulk upload staff records." href="/dashboard/staff" />
+            <DataActionCard title="Fee Ledger Import" description="Import historic fee data." href="/dashboard/fees" />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+            <Download size={14} /> Exports
+          </h4>
+          <div className="grid gap-3">
+            <DataActionCard title="iEMIS Export" description="Government-ready Excel files." href="/dashboard/students" />
+            <DataActionCard title="Accounting Audit" description="Download full journal trail." href="/dashboard/accounting" />
+            <DataActionCard title="Class Roster" description="Student list by class." href="/dashboard/students" />
+            <DataActionCard title="Payroll Register" description="Export approved payroll runs." href="/dashboard/hr/payroll" />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+            <ExternalLink size={14} /> Integrations
+          </h4>
+          <div className="grid gap-3">
+            <DataActionCard title="API Access" description="Generate keys for integration." href="/dashboard/settings/security" />
+            <DataActionCard title="Webhooks" description="Configure real-time events." href="/dashboard/settings/security" />
+          </div>
+        </div>
+      </div>
+    </SectionWrapper>
+  );
+}
+
+function SectionAudit({ initialValues }: { initialValues: TenantSettingSummary[] }) {
+  return (
+    <SectionWrapper 
+      title="Audit Logs" 
+      description="Track every administrative action within your school."
+    >
+      <div className="col-span-full flex flex-col items-center justify-center py-12 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+        <div className="h-16 w-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-400 mb-4 border border-slate-100">
+          <ShieldCheck size={32} />
+        </div>
+        <h4 className="text-lg font-bold text-slate-900">Audit Trail Ready</h4>
+        <p className="text-sm text-slate-500 max-w-sm mt-2">
+          Your school activity is being recorded. Detailed log viewing and filtering will be available in the next release.
+        </p>
+        <Button variant="outline" className="mt-6 gap-2">
+          <Download size={16} /> Request Archive
+        </Button>
+      </div>
     </SectionWrapper>
   );
 }
 
 function DataActionCard({ title, description, href }: { title: string, description: string, href: string }) {
   return (
-    <Link href={href} className="group rounded-xl border border-slate-200 p-4 transition-all hover:border-primary-500 hover:shadow-md bg-white">
+    <Link href={href} className="group rounded-xl border border-slate-200 p-4 transition-all hover:border-primary-500 hover:shadow-md bg-white block">
       <div className="flex items-center justify-between mb-2">
-        <h4 className="font-bold text-slate-800">{title}</h4>
-        <ExternalLink size={16} className="text-slate-300 group-hover:text-primary-500" />
+        <h4 className="font-bold text-slate-800 text-sm">{title}</h4>
+        <ExternalLink size={14} className="text-slate-300 group-hover:text-primary-500" />
       </div>
-      <p className="text-xs text-slate-500 leading-relaxed">{description}</p>
+      <p className="text-[11px] text-slate-500 leading-relaxed">{description}</p>
     </Link>
   );
 }

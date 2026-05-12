@@ -34,6 +34,10 @@ import { EmptyState } from '../ui/empty-state';
 import { LoadingState } from '../ui/loading-state';
 import { StatusBadge, type StatusTone } from '../ui/status-badge';
 import { cn } from '../../lib/utils';
+import { StudentSelector } from '../students/student-selector';
+import { BookSelector } from './book-selector';
+import { QRResolver } from '../ui/qr-resolver';
+import { ConfirmDialog } from '../ui/confirm-dialog';
 
 const tabs = [
   { key: 'overview', label: 'Overview', href: '/dashboard/library' },
@@ -98,6 +102,7 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
   const [issueForm, setIssueForm] = useState<LibraryIssuePayload>(emptyIssueForm);
   const [returnDrafts, setReturnDrafts] = useState<Record<string, ReturnLibraryIssuePayload>>({});
   const [notice, setNotice] = useState<string | null>(null);
+  const [isConfirmingReturn, setIsConfirmingReturn] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -542,7 +547,7 @@ function BooksPanel(props: {
           description="Search books by title, author, ISBN, or category."
         />
         <div className="mt-5 grid gap-3 md:grid-cols-3">
-          <SearchBox value={props.search} onChange={props.setSearch} placeholder="Search book catalogue" />
+          <SearchBox value={props.search} onChange={props.setSearch} placeholder="Search catalogue (Title, ISBN, Author)" />
           <select value={author} onChange={(e) => setAuthor(e.target.value)} className="input-control">
             <option value="">All authors</option>
             {authors.map((item) => <option key={item} value={item}>{item}</option>)}
@@ -711,7 +716,7 @@ function CopiesPanel(props: {
 function IssuesPanel(props: {
   copies: LibraryCopy[];
   issues: LibraryIssue[];
-  students: Array<{ id: string; firstNameEn?: string; lastNameEn?: string; studentSystemId?: string }>;
+  students: StudentProfile[];
   staff: Array<{ id: string; firstName?: string; lastName?: string; employeeId?: string }>;
   status: string;
   setStatus: (value: string) => void;
@@ -725,15 +730,15 @@ function IssuesPanel(props: {
   isSaving: boolean;
   error: Error | null;
 }) {
-  const availableCopies = props.copies.filter((copy) => copy.status === 'AVAILABLE');
-
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
       <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
         <PanelHeader title="Issue / Return" description="Issue available copies and close active borrower records." />
         <div className="mt-5 max-w-xs">
           <select value={props.status} onChange={(e) => props.setStatus(e.target.value)} className="input-control">
-            <option value="">All issue statuses</option>
+            <option value="">All active & historical records</option>
             {['ISSUED', 'RETURNED', 'OVERDUE', 'LOST'].map((status) => <option key={status} value={status}>{formatStatus(status)}</option>)}
           </select>
         </div>
@@ -742,60 +747,106 @@ function IssuesPanel(props: {
           {!props.isLoading && props.issues.length === 0 && <EmptyState title="No issue records" description="Issue an available copy to start circulation history." />}
           {props.issues.map((issue) => {
             const draft = props.returnDrafts[issue.id] ?? {};
-            const active = issue.status === 'ISSUED';
+            const active = ['ISSUED', 'OVERDUE'].includes(issue.status);
             return (
-              <div key={issue.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <div key={issue.id} className={cn("rounded-2xl border p-4 transition", active ? "border-slate-200 bg-white shadow-sm" : "border-slate-100 bg-slate-50 opacity-80")}>
                 <IssueRow issue={issue} />
                 {active && (
-                  <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 md:grid-cols-4">
-                    <TextInput label="Condition" value={draft.returnCondition ?? ''} onChange={(returnCondition) => props.setReturnDrafts({ ...props.returnDrafts, [issue.id]: { ...draft, returnCondition } })} />
-                    <TextInput label="Fine amount" type="number" value={draft.fineAmount?.toString() ?? ''} onChange={(value) => props.setReturnDrafts({ ...props.returnDrafts, [issue.id]: { ...draft, fineAmount: value ? Number(value) : undefined } })} />
-                    <label className="flex items-center gap-2 pt-7 text-sm font-semibold text-slate-700">
-                      <input type="checkbox" checked={Boolean(draft.markLost)} onChange={(e) => props.setReturnDrafts({ ...props.returnDrafts, [issue.id]: { ...draft, markLost: e.target.checked } })} />
-                      Mark lost
+                  <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4 md:grid-cols-4 lg:items-end">
+                    <TextInput label="Condition" placeholder="e.g. Good" value={draft.returnCondition ?? ''} onChange={(returnCondition) => props.setReturnDrafts({ ...props.returnDrafts, [issue.id]: { ...draft, returnCondition } })} />
+                    <TextInput label="Fine (NPR)" type="number" value={draft.fineAmount?.toString() ?? ''} onChange={(value) => props.setReturnDrafts({ ...props.returnDrafts, [issue.id]: { ...draft, fineAmount: value ? Number(value) : undefined } })} />
+                    <label className="flex items-center gap-2 pb-3 text-sm font-bold text-slate-700">
+                      <input type="checkbox" className="rounded-lg border-slate-300 text-primary-600 focus:ring-primary-100" checked={Boolean(draft.markLost)} onChange={(e) => props.setReturnDrafts({ ...props.returnDrafts, [issue.id]: { ...draft, markLost: e.target.checked } })} />
+                      Mark lost/damaged
                     </label>
-                    <button type="button" className="btn-primary mt-6" disabled={props.isSaving} onClick={() => props.onReturn(issue, draft)}>
-                      <RotateCcw size={16} /> Return
+                    <button type="button" className="btn-primary h-11" disabled={props.isSaving} onClick={() => setConfirmId(issue.id)}>
+                      <RotateCcw size={16} /> Return Copy
                     </button>
                   </div>
                 )}
+                <ConfirmDialog
+                  isOpen={confirmId === issue.id}
+                  onClose={() => setConfirmId(null)}
+                  onConfirm={() => {
+                    props.onReturn(issue, draft);
+                    setConfirmId(null);
+                  }}
+                  title="Confirm Return"
+                  description={`Are you sure you want to mark "${issue.copy?.book?.title}" as returned? ${draft.markLost ? 'This copy will be marked as lost.' : ''}`}
+                  confirmLabel="Return now"
+                  variant={draft.markLost ? 'destructive' : 'default'}
+                />
               </div>
             );
           })}
         </div>
       </section>
 
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
-        <PanelHeader title="Issue copy" description="Select either a student or staff borrower, not both." />
-        {props.error && <ErrorNotice message={props.error.message} />}
-        <form onSubmit={props.onIssueSubmit} className="mt-5 space-y-4">
-          <label className="block text-sm font-semibold text-slate-700">
-            Available copy
-            <select required value={props.form.copyId} onChange={(e) => props.setForm({ ...props.form, copyId: e.target.value })} className="input-control mt-1">
-              <option value="">Select copy</option>
-              {availableCopies.map((copy) => <option key={copy.id} value={copy.id}>{copy.book?.title ?? 'Book'} • {copy.barcode}</option>)}
-            </select>
-          </label>
-          <label className="block text-sm font-semibold text-slate-700">
-            Student borrower
-            <select value={props.form.borrowerStudentId ?? ''} onChange={(e) => props.setForm({ ...props.form, borrowerStudentId: e.target.value, borrowerStaffId: e.target.value ? '' : props.form.borrowerStaffId })} className="input-control mt-1">
-              <option value="">No student borrower</option>
-              {props.students.map((student) => <option key={student.id} value={student.id}>{studentName(student)}</option>)}
-            </select>
-          </label>
-          <label className="block text-sm font-semibold text-slate-700">
-            Staff borrower
-            <select value={props.form.borrowerStaffId ?? ''} onChange={(e) => props.setForm({ ...props.form, borrowerStaffId: e.target.value, borrowerStudentId: e.target.value ? '' : props.form.borrowerStudentId })} className="input-control mt-1">
-              <option value="">No staff borrower</option>
-              {props.staff.map((staff) => <option key={staff.id} value={staff.id}>{staffName(staff)}</option>)}
-            </select>
-          </label>
-          <TextInput label="Due date" type="date" value={props.form.dueAt} required onChange={(dueAt) => props.setForm({ ...props.form, dueAt })} />
-          <TextInput label="Notes" value={props.form.notes ?? ''} onChange={(notes) => props.setForm({ ...props.form, notes })} />
-          <button type="submit" className="btn-primary w-full" disabled={props.isSaving || (!props.form.borrowerStudentId && !props.form.borrowerStaffId)}>
-            {props.isSaving ? 'Issuing...' : 'Issue copy'}
-          </button>
-        </form>
+      <section className="space-y-6">
+        <section className="rounded-[2rem] border border-primary-100 bg-primary-50/20 p-5 shadow-sm">
+          <PanelHeader title="Quick QR Lookup" description="Scan student QR to instantly select borrower." />
+          <QRResolver
+            purpose="LIBRARY"
+            onResolved={(data) => {
+              if (data.id) {
+                props.setForm({ ...props.form, borrowerStudentId: data.id, borrowerStaffId: '' });
+              }
+            }}
+            className="mt-4"
+          />
+        </section>
+
+        <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+          <PanelHeader title="Issue copy" description="Select a physical copy and a borrower." />
+          {props.error && <ErrorNotice message={props.error.message} />}
+          <div className="mt-5 space-y-4">
+            <BookSelector
+              mode="copy"
+              copies={props.copies}
+              selectedId={props.form.copyId}
+              onSelect={(copyId) => props.setForm({ ...props.form, copyId })}
+              label="Physical Copy"
+              placeholder="Search barcode or book title..."
+            />
+            
+            <StudentSelector
+              students={props.students}
+              selectedId={props.form.borrowerStudentId ?? ''}
+              onSelect={(studentId) => props.setForm({ ...props.form, borrowerStudentId: studentId, borrowerStaffId: studentId ? '' : props.form.borrowerStaffId })}
+              label="Student Borrower"
+              optional
+            />
+
+            <div className="relative py-2">
+              <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                <div className="w-full border-t border-slate-100"></div>
+              </div>
+              <div className="relative flex justify-center text-xs font-bold uppercase tracking-wider">
+                <span className="bg-white px-2 text-slate-400 italic">or</span>
+              </div>
+            </div>
+
+            <label className="block text-sm font-semibold text-slate-700">
+              Staff Borrower
+              <select value={props.form.borrowerStaffId ?? ''} onChange={(e) => props.setForm({ ...props.form, borrowerStaffId: e.target.value, borrowerStudentId: e.target.value ? '' : props.form.borrowerStudentId })} className="input-control mt-1">
+                <option value="">No staff borrower</option>
+                {props.staff.map((staff) => <option key={staff.id} value={staff.id}>{staffName(staff)}</option>)}
+              </select>
+            </label>
+            
+            <TextInput label="Due date" type="date" value={props.form.dueAt} required onChange={(dueAt) => props.setForm({ ...props.form, dueAt })} />
+            <TextInput label="Internal Notes" value={props.form.notes ?? ''} onChange={(notes) => props.setForm({ ...props.form, notes })} />
+            
+            <button 
+              type="button" 
+              className="btn-primary w-full h-12 text-base shadow-lg shadow-primary-100" 
+              disabled={props.isSaving || !props.form.copyId || (!props.form.borrowerStudentId && !props.form.borrowerStaffId)}
+              onClick={() => props.onIssueSubmit({ preventDefault: () => {} } as any)}
+            >
+              {props.isSaving ? 'Issuing...' : 'Issue book now'}
+            </button>
+          </div>
+        </section>
       </section>
     </div>
   );
@@ -927,18 +978,20 @@ function TextInput({
   value,
   onChange,
   type = 'text',
+  placeholder,
   required = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
+  placeholder?: string;
   required?: boolean;
 }) {
   return (
     <label className="block text-sm font-semibold text-slate-700">
       {label}
-      <input type={type} required={required} value={value} onChange={(event) => onChange(event.target.value)} className="input-control mt-1" />
+      <input type={type} placeholder={placeholder} required={required} value={value} onChange={(event) => onChange(event.target.value)} className="input-control mt-1" />
     </label>
   );
 }

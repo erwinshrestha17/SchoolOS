@@ -189,8 +189,8 @@ export type TransportReports = {
   activeAssignments: number;
   activeTrips: number;
   logsToday: number;
-  vehicleFitnessAlerts: number;
-  driverLicenseAlerts: number;
+  vehicleFitnessAlerts: any[];
+  driverLicenseAlerts: any[];
 };
 
 export type TransportRoutePayload = {
@@ -439,4 +439,31 @@ export const transportApi = {
   listLogs: (params?: { routeId?: string | null }) =>
     request<TransportLog[]>(withQuery('/transport/logs', params ?? {})),
   getReports: () => request<TransportReports>('/transport/reports'),
+  cancelTrip: (tripId: string, body?: { reason?: string }) =>
+    request<TransportTrip>(`/transport/trips/${encodeURIComponent(tripId)}/cancel`, {
+      method: 'PATCH',
+      json: body ?? {},
+    }),
+  pauseStudentAssignment: (assignmentId: string) =>
+    request<any>(
+      `/transport/assignments/students/${encodeURIComponent(assignmentId)}/pause`,
+      { method: 'PATCH' },
+    ),
+  endStudentAssignment: (assignmentId: string) =>
+    request<any>(
+      `/transport/assignments/students/${encodeURIComponent(assignmentId)}/end`,
+      { method: 'PATCH' },
+    ),
+  getTripHistoryReport: (params?: {
+    routeId?: string;
+    vehicleId?: string;
+    driverAssignmentId?: string;
+  }) =>
+    request<{ items: any[]; meta: { total: number } }>(
+      withQuery('/transport/reports/trips', params ?? {}),
+    ),
+  getBoardingReport: (params?: { tripId?: string; studentId?: string }) =>
+    request<{ items: any[]; meta: { total: number } }>(
+      withQuery('/transport/reports/boarding', params ?? {}),
+    ),
 };

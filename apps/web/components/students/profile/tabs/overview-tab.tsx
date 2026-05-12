@@ -3,7 +3,8 @@
 import { StudentProfileDetail } from '@schoolos/core';
 import { SectionCard } from '@/components/ui/section-card';
 import { StatCard } from '@/components/ui/stat-card';
-import { Users, Wallet, CalendarCheck, TrendingUp, User, MapPin, Hash, Phone } from 'lucide-react';
+import { Users, Wallet, CalendarCheck, TrendingUp, User, MapPin, Hash, Phone, ShieldCheck } from 'lucide-react';
+import { StudentQrCard } from '../student-qr-card';
 
 const formatMoney = (amount: number) => {
   return new Intl.NumberFormat('en-NP', {
@@ -45,33 +46,41 @@ export function OverviewTab({ profile }: { profile: StudentProfileDetail }) {
           </div>
         </SectionCard>
 
-        <SectionCard title="Primary Guardian">
-           {primaryGuardian ? (
-             <div className="space-y-6">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 font-bold">
-                    {primaryGuardian.fullName[0]}
+        <div className="space-y-6">
+          <StudentQrCard 
+            studentId={profile.student.id} 
+            studentSystemId={profile.student.studentSystemId}
+            initialStatus={profile.student.activeIdentity ? 'ACTIVE' : 'NOT_GENERATED'}
+          />
+
+          <SectionCard title="Primary Guardian">
+             {primaryGuardian ? (
+               <div className="space-y-6">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 font-bold text-lg">
+                      {primaryGuardian.fullName[0]}
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 leading-tight">{primaryGuardian.fullName}</p>
+                      <p className="text-[0.65rem] text-slate-500 uppercase font-bold tracking-wider mt-1">{primaryGuardian.relation}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-bold text-slate-900">{primaryGuardian.fullName}</p>
-                    <p className="text-xs text-slate-500 uppercase font-bold tracking-wider">{primaryGuardian.relation}</p>
+                  <div className="space-y-3 pt-4 border-t border-slate-100">
+                    <div className="flex items-center gap-3 text-sm text-slate-600">
+                      <Phone size={16} className="text-slate-400" />
+                      <span className="font-medium">{primaryGuardian.primaryPhone || 'No phone'}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm text-slate-600">
+                      <User size={16} className="text-slate-400" />
+                      <span className="font-medium">{primaryGuardian.email || 'No email'}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-3 pt-4 border-t border-slate-100">
-                  <div className="flex items-center gap-3 text-sm text-slate-600">
-                    <Phone size={16} className="text-slate-400" />
-                    <span>{primaryGuardian.primaryPhone || 'No phone'}</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-sm text-slate-600">
-                    <User size={16} className="text-slate-400" />
-                    <span>{primaryGuardian.email || 'No email'}</span>
-                  </div>
-                </div>
-             </div>
-           ) : (
-             <p className="text-sm text-slate-400">No guardian information recorded.</p>
-           )}
-        </SectionCard>
+               </div>
+             ) : (
+               <p className="text-sm text-slate-400">No guardian information recorded.</p>
+             )}
+          </SectionCard>
+        </div>
       </div>
     </div>
   );

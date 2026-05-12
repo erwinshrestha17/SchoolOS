@@ -91,12 +91,12 @@ export default function PlatformSchools() {
     <div className="space-y-8 p-8 max-w-7xl mx-auto">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Schools</h1>
-          <p className="text-slate-500 mt-1">Global tenant directory and platform controls.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Global Tenants</h1>
+          <p className="text-slate-500 mt-1">Manage and monitor school instances across the platform.</p>
         </div>
-        <Button className="rounded-xl shadow-sm gap-2">
-          <Plus size={18} />
-          Register New School
+        <Button className="rounded-xl shadow-lg shadow-primary-500/20 gap-2 px-6 py-6 font-bold bg-primary-600 hover:bg-primary-700 transition-all">
+          <Plus size={20} />
+          Onboard New School
         </Button>
       </div>
 
@@ -141,13 +141,12 @@ export default function PlatformSchools() {
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
         <Table>
           <TableHeader className="bg-slate-50/50">
-            <TableRow>
-              <TableHead className="w-[300px]">School Identity</TableHead>
-              <TableHead>Slug</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Plan</TableHead>
-              <TableHead>Users</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+            <TableRow className="hover:bg-transparent border-b border-slate-100">
+              <TableHead className="w-[350px] font-bold text-slate-500 text-[10px] uppercase tracking-wider">Identity & Location</TableHead>
+              <TableHead className="font-bold text-slate-500 text-[10px] uppercase tracking-wider">Access Status</TableHead>
+              <TableHead className="font-bold text-slate-500 text-[10px] uppercase tracking-wider">Service Tier</TableHead>
+              <TableHead className="font-bold text-slate-500 text-[10px] uppercase tracking-wider">User Base</TableHead>
+              <TableHead className="text-right font-bold text-slate-500 text-[10px] uppercase tracking-wider">Operations</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -172,41 +171,49 @@ export default function PlatformSchools() {
               data.items.map((tenant) => (
                 <TableRow key={tenant.id} className="group hover:bg-slate-50/50 transition-colors">
                   <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-bold text-slate-900 group-hover:text-primary-600 transition-colors">
+                    <div className="flex flex-col gap-1">
+                      <span className="font-extrabold text-slate-900 group-hover:text-primary-600 transition-colors">
                         {tenant.name}
                       </span>
-                      <span className="text-[10px] font-mono text-slate-400 uppercase tracking-tighter">
-                        {tenant.id}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 uppercase tracking-tighter">
+                          {tenant.slug}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-300">
+                          {tenant.id}
+                        </span>
+                      </div>
                     </div>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-slate-500">
-                    {tenant.slug}
                   </TableCell>
                   <TableCell>
                     {tenant.isActive ? (
-                      <Badge variant="success" className="gap-1 px-2">
-                        <Shield size={10} />
+                      <Badge variant="success" className="gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border-emerald-100 font-bold text-[10px]">
+                        <Shield size={12} fill="currentColor" className="opacity-20" />
                         ACTIVE
                       </Badge>
                     ) : (
-                      <Badge variant="destructive" className="gap-1 px-2">
-                        <ShieldOff size={10} />
+                      <Badge variant="destructive" className="gap-1.5 px-3 py-1 bg-rose-50 text-rose-700 border-rose-100 font-bold text-[10px]">
+                        <ShieldOff size={12} fill="currentColor" className="opacity-20" />
                         SUSPENDED
                       </Badge>
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="neutral" className="uppercase font-bold text-[10px]">
+                    <Badge variant="neutral" className="uppercase font-extrabold text-[10px] tracking-widest bg-slate-100 text-slate-600 border-slate-200">
                       {tenant.plan}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1.5 text-slate-600 font-medium">
-                      <span>{tenant.studentCount}</span>
-                      <span className="text-slate-300">/</span>
-                      <span className="text-xs text-slate-400">Students</span>
+                    <div className="flex items-center gap-3">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-slate-700">{tenant.studentCount.toLocaleString()}</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Students</span>
+                      </div>
+                      <div className="h-8 w-px bg-slate-100" />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-slate-700">Healthy</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Health</span>
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell className="text-right">

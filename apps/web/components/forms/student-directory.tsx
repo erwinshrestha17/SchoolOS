@@ -16,7 +16,8 @@ import { Avatar } from '../ui/avatar';
 import { LoadingState } from '../ui/loading-state';
 import { EmptyState } from '../ui/empty-state';
 import { cn } from '../../lib/utils';
-import { Search, Filter, Download, UserPlus, Wallet, FileText, ChevronRight } from 'lucide-react';
+import { Search, Filter, Download, UserPlus, Wallet, FileText, ChevronRight, MoreHorizontal, UserCheck, UserX, GraduationCap, ArrowRightLeft, XCircle, RotateCcw } from 'lucide-react';
+import { StatusBadge } from '../ui/status-badge';
 
 type StudentDirectoryProps = {
   academicYears: AcademicYearSummary[];
@@ -53,6 +54,7 @@ export function StudentDirectory({
   const [academicYearId, setAcademicYearId] = useState('');
   const [classId, setClassId] = useState('');
   const [sectionId, setSectionId] = useState('');
+  const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   const deferredSearch = useDeferredValue(search);
 
@@ -123,10 +125,13 @@ export function StudentDirectory({
           .join(' ')
           .toLowerCase();
 
+        const statusMatches = !status || student.lifecycleStatus === status;
+
         return (
           academicYearMatches &&
           classMatches &&
           sectionMatches &&
+          statusMatches &&
           (!normalizedSearch || searchable.includes(normalizedSearch))
         );
       })
@@ -166,10 +171,10 @@ export function StudentDirectory({
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Directory Total" value={students.length} icon={<Users size={20} />} />
-        <StatCard title="Filtered Total" value={filteredStudents.length} icon={<Filter size={20} />} />
-        <StatCard title="Active Classes" value={classes.length} icon={<School size={20} />} />
-        <div className="flex items-center justify-end px-2">
+        <StatCard title="Total Records" value={students.length} icon={<Users size={20} />} />
+        <StatCard title="Active Enrollment" value={students.filter(s => s.lifecycleStatus === 'ACTIVE').length} icon={<UserCheck size={20} />} className="border-success-100 bg-success-50/20" />
+        <StatCard title="Filtered Results" value={filteredStudents.length} icon={<Filter size={20} />} className="border-primary-100 bg-primary-50/20" />
+        <div className="flex items-center justify-end px-2 gap-2">
            <button
             type="button"
             className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
@@ -178,15 +183,41 @@ export function StudentDirectory({
             <Download size={18} />
             Export CSV
           </button>
+           <Link
+            href="/dashboard/admissions"
+            className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-slate-800"
+          >
+            <UserPlus size={18} />
+            Enroll Student
+          </Link>
         </div>
       </div>
 
-      <SectionCard title="Directory Filters">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <SectionCard 
+        title="Directory Filters"
+        headerAction={
+          (academicYearId || classId || sectionId || status || search) && (
+            <button 
+              onClick={() => {
+                setAcademicYearId(currentAcademicYear?.id ?? '');
+                setClassId('');
+                setSectionId('');
+                setStatus('');
+                setSearch('');
+              }}
+              className="flex items-center gap-1.5 text-xs font-bold text-primary-600 transition hover:text-primary-700"
+            >
+              <RotateCcw size={12} />
+              Reset All
+            </button>
+          )
+        }
+      >
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-1.5">
             <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Academic Year</label>
             <select
-              className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:ring-primary-500"
+              className="premium-input text-sm"
               value={academicYearId}
               onChange={(e) => setAcademicYearId(e.target.value)}
             >
@@ -199,7 +230,7 @@ export function StudentDirectory({
           <div className="space-y-1.5">
             <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Class</label>
             <select
-              className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:ring-primary-500"
+              className="premium-input text-sm"
               value={classId}
               onChange={(e) => {
                 setClassId(e.target.value);
@@ -215,7 +246,7 @@ export function StudentDirectory({
           <div className="space-y-1.5">
             <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Section</label>
             <select
-              className="w-full rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:ring-primary-500"
+              className="premium-input text-sm"
               value={sectionId}
               onChange={(e) => setSectionId(e.target.value)}
               disabled={!classId}
@@ -227,14 +258,29 @@ export function StudentDirectory({
             </select>
           </div>
           <div className="space-y-1.5">
+            <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Status</label>
+            <select
+              className="premium-input text-sm"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <option value="">All Statuses</option>
+              <option value="ACTIVE">Active</option>
+              <option value="TRANSFERRED">Transferred</option>
+              <option value="ALUMNI">Alumni</option>
+              <option value="WITHDRAWN">Withdrawn</option>
+              <option value="DEACTIVATED">Deactivated</option>
+            </select>
+          </div>
+          <div className="space-y-1.5">
             <label className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-500 ml-1">Quick Search</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
-                className="w-full pl-9 rounded-xl border-slate-200 bg-slate-50/50 text-sm focus:ring-primary-500"
+                className="premium-input pl-9 text-sm"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Name or SCH-ID..."
+                placeholder="Name, Code, or Phone..."
               />
             </div>
           </div>
@@ -259,16 +305,26 @@ export function StudentDirectory({
               return (
                 <div key={student.id} className="group flex flex-col gap-4 p-5 transition hover:bg-slate-50/50 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex items-center gap-4 min-w-0">
-                    <Avatar initials={initials(studentName)} size="lg" className="ring-2 ring-white shadow-sm" />
+                    <Avatar 
+                      src={student.photoUrl ?? undefined} 
+                      initials={initials(studentName)} 
+                      size="lg" 
+                      className="ring-2 ring-white shadow-sm transition group-hover:ring-primary-100" 
+                    />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="font-bold text-slate-900 truncate">{studentName}</p>
-                        <Badge variant="success">Active</Badge>
+                        <Link 
+                          href={`/dashboard/students/${encodeURIComponent(student.id)}`}
+                          className="font-bold text-slate-900 truncate hover:text-primary-600 transition"
+                        >
+                          {studentName}
+                        </Link>
+                        <StatusBadge status={student.lifecycleStatus || 'ACTIVE'} />
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-slate-500">
-                        <span className="text-primary-600 font-bold">{student.studentSystemId}</span>
+                        <span className="text-primary-600 font-bold tracking-tight">{student.studentSystemId}</span>
                         <span className="h-1 w-1 rounded-full bg-slate-300" />
-                        <span>{className} • {sectionName}</span>
+                        <span className="text-slate-700">{className} {sectionName !== 'No section' ? `• ${sectionName}` : ''}</span>
                         {rollNumber && (
                           <>
                             <span className="h-1 w-1 rounded-full bg-slate-300" />
@@ -277,7 +333,7 @@ export function StudentDirectory({
                         )}
                       </div>
                       <p className="mt-1 text-[0.7rem] text-slate-400">
-                         Guardian: {primaryGuardian?.fullName || 'N/A'} • {primaryGuardian?.primaryPhone || 'N/A'}
+                         Guardian: <span className="text-slate-600 font-bold">{primaryGuardian?.fullName || 'N/A'}</span> • {primaryGuardian?.primaryPhone || 'N/A'}
                       </p>
                     </div>
                   </div>
@@ -285,26 +341,40 @@ export function StudentDirectory({
                   <div className="flex flex-wrap items-center gap-2">
                     <Link
                       href={`/dashboard/students/${encodeURIComponent(student.id)}`}
-                      className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-900 px-4 text-xs font-bold text-white transition hover:bg-slate-800"
+                      className="inline-flex h-9 items-center gap-2 rounded-xl bg-slate-900 px-4 text-[0.7rem] font-bold text-white transition hover:bg-slate-800"
                     >
-                      Profile
+                      View Profile
                       <ChevronRight size={14} />
                     </Link>
                     <Link
                       href={`/dashboard/finance?studentId=${encodeURIComponent(student.id)}`}
-                      className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                      className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[0.7rem] font-bold text-slate-700 transition hover:bg-slate-50"
                     >
                       <Wallet size={14} />
-                      Fees
+                      Ledger
                     </Link>
-                    <button
-                      type="button"
-                      className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
-                      onClick={() => onOpenPdf(student.id, 'id-card')}
-                    >
-                      <FileText size={14} />
-                      ID Card
-                    </button>
+                    <div className="relative group/actions">
+                      <button className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-900">
+                        <MoreHorizontal size={16} />
+                      </button>
+                      <div className="absolute right-0 top-full z-10 mt-2 hidden w-48 origin-top-right rounded-2xl border border-slate-200 bg-white p-2 shadow-xl group-hover/actions:block animate-in fade-in zoom-in-95">
+                         <button
+                          type="button"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50"
+                          onClick={() => onOpenPdf(student.id, 'id-card')}
+                        >
+                          <FileText size={14} className="text-slate-400" />
+                          Generate ID Card
+                        </button>
+                        <Link
+                          href={`/dashboard/students/${encodeURIComponent(student.id)}?edit=true`}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50"
+                        >
+                          <UserPlus size={14} className="text-slate-400" />
+                          Edit Student
+                        </Link>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
@@ -312,8 +382,17 @@ export function StudentDirectory({
           </div>
         ) : (
           <EmptyState
-            title="No students found"
-            description="No student records match your current filters or search query."
+            title={search || status || classId ? "No students match your filters" : "No students in directory"}
+            description={search || status || classId ? "Try adjusting your filters or search query to find the student record." : "Enroll your first student to get started with the SchoolOS directory."}
+            action={!(search || status || classId) && (
+               <Link
+                href="/dashboard/admissions"
+                className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-slate-800"
+              >
+                <UserPlus size={18} />
+                Enroll First Student
+              </Link>
+            )}
           />
         )}
       </SectionCard>

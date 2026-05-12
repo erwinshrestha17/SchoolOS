@@ -30,7 +30,8 @@ type TransportTab =
   | 'vehicles'
   | 'assignments'
   | 'trips'
-  | 'location';
+  | 'location'
+  | 'reports';
 
 type TransportWorkspaceProps = {
   initialTab?: TransportTab;
@@ -43,6 +44,7 @@ const tabs: Array<{ key: TransportTab; label: string; href: string }> = [
   { key: 'assignments', label: 'Assignments', href: '/dashboard/transport/assignments' },
   { key: 'trips', label: 'Trips', href: '/dashboard/transport/trips' },
   { key: 'location', label: 'Location', href: '/dashboard/transport/location' },
+  { key: 'reports', label: 'Reports', href: '/dashboard/transport/reports' },
 ];
 
 const today = new Date().toISOString().slice(0, 10);
@@ -114,6 +116,16 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
   const activeTripsQuery = useQuery({ queryKey: ['transport-active-trips'], queryFn: () => transportApi.listActiveTrips() });
   const tripsQuery = useQuery({ queryKey: ['transport-trips'], queryFn: () => transportApi.listTrips() });
   const reportsQuery = useQuery({ queryKey: ['transport-reports'], queryFn: () => transportApi.getReports() });
+  const tripHistoryReportQuery = useQuery({ 
+    queryKey: ['transport-report-trips'], 
+    queryFn: () => transportApi.getTripHistoryReport(),
+    enabled: activeTab === 'reports'
+  });
+  const boardingReportQuery = useQuery({ 
+    queryKey: ['transport-report-boarding'], 
+    queryFn: () => transportApi.getBoardingReport(),
+    enabled: activeTab === 'reports'
+  });
   const schoolStudentsQuery = useQuery<StudentProfile[], Error>({ 
     queryKey: ['students-for-transport'], 
     queryFn: () => api.listStudents() 
@@ -217,6 +229,44 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
       invalidateTransport();
     },
   });
+  const cancelTripMutation = useMutation({
+    mutationFn: ({ tripId, reason }: { tripId: string; reason?: string }) =>
+      transportApi.cancelTrip(tripId, { reason }),
+    onSuccess: () => {
+      setNotice('Trip cancelled.');
+      invalidateTransport();
+    },
+  });
+  const pauseStudentMutation = useMutation({
+    mutationFn: transportApi.pauseStudentAssignment,
+    onSuccess: () => {
+      setNotice('Student assignment paused.');
+      invalidateTransport();
+    },
+  });
+  const endStudentMutation = useMutation({
+    mutationFn: transportApi.endStudentAssignment,
+    onSuccess: () => {
+      setNotice('Student assignment ended.');
+      invalidateTransport();
+    },
+  });
+  const updateRouteMutation = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Partial<TransportRoutePayload> }) =>
+      transportApi.updateRoute(id, body),
+    onSuccess: () => {
+      setNotice('Route updated.');
+      invalidateTransport();
+    },
+  });
+  const updateVehicleMutation = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Partial<TransportVehiclePayload> }) =>
+      transportApi.updateVehicle(id, body),
+    onSuccess: () => {
+      setNotice('Vehicle updated.');
+      invalidateTransport();
+    },
+  });
 
   const routes = routesQuery.data ?? [];
   const stops = stopsQuery.data ?? [];
@@ -241,11 +291,15 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
 
   const stats = {
     activeTrips: reportsQuery.data?.activeTrips ?? activeTrips.length,
+    activeAssignments: reportsQuery.data?.activeAssignments ?? 0,
+    logsToday: reportsQuery.data?.logsToday ?? 0,
     delayedRoutes: 0,
     studentsOnboard,
     studentsNotBoarded,
     vehiclesActive: vehicles.filter((vehicle) => vehicle.status === 'ACTIVE').length,
     driversOnline,
+    vehicleAlerts: (reportsQuery.data?.vehicleFitnessAlerts as any[])?.length ?? 0,
+    driverAlerts: (reportsQuery.data?.driverLicenseAlerts as any[])?.length ?? 0,
   };
 
   const firstError =
@@ -291,17 +345,59 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
 
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard title="Active Trips" value={stats.activeTrips} icon={<Navigation size={18} />} loading={activeTripsQuery.isLoading || reportsQuery.isLoading} />
-            <StatCard title="Delayed Routes" value={stats.delayedRoutes} icon={<AlertTriangle size={18} />} loading={reportsQuery.isLoading} />
-            <StatCard title="Students Onboard" value={stats.studentsOnboard} icon={<Users size={18} />} loading={activeTripsQuery.isLoading} />
-            <StatCard title="Students Not Boarded" value={stats.studentsNotBoarded} icon={<Users size={18} />} loading={activeTripsQuery.isLoading} />
+            <StatCard title="Active Enrollments" value={stats.activeAssignments} icon={<Users size={18} />} loading={reportsQuery.isLoading} />
+            <StatCard title="Logs Today" value={stats.logsToday} icon={<Bus size={18} />} loading={reportsQuery.isLoading} />
             <StatCard title="Vehicles Active" value={stats.vehiclesActive} icon={<Bus size={18} />} loading={vehiclesQuery.isLoading} />
-            <StatCard title="Drivers Online" value={stats.driversOnline} icon={<ShieldCheck size={18} />} loading={activeTripsQuery.isLoading} />
           </div>
-          <InfoCard title="Overview data notes" lines={['Delayed route status is not exposed by the current API yet, so the dashboard shows 0 until a backend delay signal exists.', 'Students onboard and not boarded are derived from active trip student status records when the trip payload includes them.', 'Drivers online is derived from drivers attached to active trips; driver app presence is a later backend feature.']} />
-          <InfoCard title="Privacy and safety rules" lines={['Parents will only see their own child’s assigned vehicle/trip in the future parent view.', 'Driver app will only expose trips assigned to that driver later.', 'Never expose a full bus passenger list to parents.', 'Live map/WebSocket tracking is intentionally deferred; this admin slice shows latest coordinates only.']} />
-          <TripList trips={activeTrips} emptyTitle="No active trips" />
+
+          <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
+            <div className="space-y-6">
+              {(stats.vehicleAlerts > 0 || stats.driverAlerts > 0) && (
+                <section className="rounded-[2rem] border border-red-200 bg-red-50 p-5">
+                  <h3 className="flex items-center gap-2 font-bold text-red-900">
+                    <AlertTriangle size={18} />
+                    Operational Alerts
+                  </h3>
+                  <ul className="mt-3 space-y-2 text-sm text-red-800">
+                    {stats.vehicleAlerts > 0 && (
+                      <li>• {stats.vehicleAlerts} vehicles have documents expiring within 30 days.</li>
+                    )}
+                    {stats.driverAlerts > 0 && (
+                      <li>• {stats.driverAlerts} drivers have licenses expiring within 30 days.</li>
+                    )}
+                  </ul>
+                </section>
+              )}
+
+              <TripList trips={activeTrips} emptyTitle="No active trips" onSelect={(id) => { setSelectedTripId(id); setActiveTab('trips'); }} />
+              
+              <InfoCard title="Privacy and safety rules" lines={['Parents will only see their own child’s assigned vehicle/trip in the future parent view.', 'Driver app will only expose trips assigned to that driver later.', 'Never expose a full bus passenger list to parents.', 'Live map/WebSocket tracking is intentionally deferred; this admin slice shows latest coordinates only.']} />
+            </div>
+
+            <section className="space-y-4 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="font-bold text-slate-900">Quick Actions</h3>
+              <div className="grid gap-2">
+                <button type="button" onClick={() => setActiveTab('routes')} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:bg-slate-100">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600"><MapPin size={20} /></div>
+                  <div><p className="text-sm font-bold text-slate-900">Add Route</p><p className="text-xs text-slate-500">Create new bus path</p></div>
+                </button>
+                <button type="button" onClick={() => setActiveTab('vehicles')} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:bg-slate-100">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600"><Bus size={20} /></div>
+                  <div><p className="text-sm font-bold text-slate-900">Add Vehicle</p><p className="text-xs text-slate-500">Register new bus</p></div>
+                </button>
+                <button type="button" onClick={() => setActiveTab('assignments')} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:bg-slate-100">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100 text-purple-600"><Users size={20} /></div>
+                  <div><p className="text-sm font-bold text-slate-900">Assign Student</p><p className="text-xs text-slate-500">Enrol student to route</p></div>
+                </button>
+                <button type="button" onClick={() => setActiveTab('trips')} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:bg-slate-100">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-600"><Navigation size={20} /></div>
+                  <div><p className="text-sm font-bold text-slate-900">Monitor Trip</p><p className="text-xs text-slate-500">Start or track trip</p></div>
+                </button>
+              </div>
+            </section>
+          </div>
         </div>
       )}
 
@@ -321,8 +417,25 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
                         <TransportStatusBadge status={route.isActive ? 'ACTIVE' : 'INACTIVE'} />
                       </div>
                     </div>
-                    <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">{route.stops?.length ?? stops.filter((stop) => stop.routeId === route.id).length} stops</span>
+                    <div className="flex items-center gap-3">
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">{route.stops?.length ?? stops.filter((stop) => stop.routeId === route.id).length} stops</span>
+                      <button type="button" onClick={() => updateRouteMutation.mutate({ id: route.id, body: { isActive: !route.isActive } })} className="text-xs font-bold text-blue-600 hover:underline">{route.isActive ? 'Deactivate' : 'Activate'}</button>
+                    </div>
                   </div>
+                  {route.stops && route.stops.length > 0 && (
+                    <div className="mt-4 space-y-1">
+                      {route.stops.slice(0, 3).map((stop) => (
+                        <div key={stop.id} className="flex items-center gap-2 text-xs text-slate-500">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 font-bold">{stop.sequence}</span>
+                          <span>{stop.name}</span>
+                          {(stop.estimatedPickup || stop.estimatedDrop) && (
+                            <span className="text-slate-400">({stop.estimatedPickup ?? '--'} / {stop.estimatedDrop ?? '--'})</span>
+                          )}
+                        </div>
+                      ))}
+                      {route.stops.length > 3 && <p className="pl-7 text-[10px] text-slate-400">...and {route.stops.length - 3} more stops</p>}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -352,10 +465,24 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
             <div className="space-y-3">
               {vehicles.map((vehicle) => (
                 <div key={vehicle.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                  <h3 className="font-bold text-slate-900">{vehicle.registrationNumber}</h3>
-                  <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <p className="text-sm text-slate-500">{vehicle.model || 'Model not set'} • {vehicle.capacity} seats</p>
-                    <TransportStatusBadge status={vehicle.status} />
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="font-bold text-slate-900">{vehicle.registrationNumber}</h3>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <p className="text-sm text-slate-500">{vehicle.model || 'Model not set'} • {vehicle.capacity} seats</p>
+                        <TransportStatusBadge status={vehicle.status} />
+                      </div>
+                      {vehicle.documentExpiry && (
+                        <p className={cn("mt-2 text-xs", new Date(vehicle.documentExpiry) < addDays(new Date(), 30) ? "font-bold text-red-600" : "text-slate-400")}>
+                          Docs expire: {new Date(vehicle.documentExpiry).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => updateVehicleMutation.mutate({ id: vehicle.id, body: { status: vehicle.status === 'ACTIVE' ? 'MAINTENANCE' : 'ACTIVE' } })} className="text-xs font-bold text-blue-600 hover:underline">
+                        {vehicle.status === 'ACTIVE' ? 'Maintenance' : 'Set Active'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -386,7 +513,23 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
             <h3 className="mt-6 text-sm font-bold text-slate-700">Student assignments</h3>
             <div className="mt-3 space-y-3">
               {studentAssignments.map((assignment) => (
-                <RecordCard key={assignment.id} title={studentLabel(assignment.student) || assignment.studentId} subtitle={`${assignment.route?.name ?? assignment.routeId} • ${assignment.stop?.name ?? assignment.stopId}`} badge={<TransportStatusBadge status={assignment.status} />} />
+                <div key={assignment.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-bold text-slate-900">{studentLabel(assignment.student) || assignment.studentId}</h3>
+                      <p className="text-sm text-slate-500">{assignment.route?.name ?? assignment.routeId} • {assignment.stop?.name ?? assignment.stopId}</p>
+                      <div className="mt-2">
+                        <TransportStatusBadge status={assignment.status} />
+                      </div>
+                    </div>
+                    {assignment.status === 'ACTIVE' && (
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => pauseStudentMutation.mutate(assignment.id)} className="text-xs font-bold text-slate-500 hover:text-slate-900">Pause</button>
+                        <button type="button" onClick={() => endStudentMutation.mutate(assignment.id)} className="text-xs font-bold text-red-500 hover:text-red-700">End</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           </Panel>
@@ -413,23 +556,16 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
         <TwoColumn>
           <div className="space-y-6">
           <Panel title="Trip Monitor" description="Active trips, student boarding state, and safe completion controls for admin operations.">
-            <TripList trips={activeTrips} emptyTitle="No active trips" onComplete={(tripId) => completeTripMutation.mutate(tripId)} onSelect={setSelectedTripId} />
+            <TripList trips={activeTrips} emptyTitle="No active trips" onComplete={(tripId) => completeTripMutation.mutate(tripId)} onCancel={(tripId) => { if (confirm('Cancel this trip?')) cancelTripMutation.mutate({ tripId }); }} onSelect={setSelectedTripId} showLocationWarning />
           </Panel>
           <Panel title="Trip History" description="Current trip history returned by the backend; live route replay can come later.">
             <TripList trips={trips.slice(0, 8)} emptyTitle="No trip history" compact />
           </Panel>
-          <Panel title="Parent Tracking Controls" description="Foundation placeholder for future school-level visibility controls.">
-            <p className="text-sm leading-6 text-slate-600">
-              Parent tracking controls will allow schools to decide when parents can view bus status. Parents will only see their own child’s assigned vehicle/trip.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <TransportStatusBadge status="READY" />
-              <TransportStatusBadge status="BUS_ARRIVING" />
-              <TransportStatusBadge status="DELAYED" />
+          <Panel title="Safety boundary" description="Foundation placeholder for future school-level visibility controls.">
+            <div className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">
+              <p className="font-bold">Live Tracking Boundary</p>
+              <p className="mt-1">Live map/WebSocket UI and driver app controls are deferred. This admin slice shows latest coordinates only to ensure privacy and system stability.</p>
             </div>
-            <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Live map/WebSocket UI and driver app controls are marked for a later sprint.
-            </p>
           </Panel>
           </div>
           <Panel title="Start trip / mark student" description="Boarding and drop actions use real backend status endpoints.">
@@ -470,32 +606,85 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
         </TwoColumn>
       )}
 
+      {activeTab === 'reports' && (
+        <div className="space-y-6">
+          <TwoColumn>
+            <Panel title="Trip History Report" description="Comprehensive history of all transport trips.">
+               {tripHistoryReportQuery.isLoading ? <LoadingState label="Loading report..." /> : null}
+               <div className="space-y-3">
+                  {((tripHistoryReportQuery.data as any)?.items ?? []).map((item: any) => (
+                    <div key={item.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm">
+                       <div className="flex justify-between font-bold text-slate-900">
+                          <span>{item.route?.name}</span>
+                          <TransportStatusBadge status={item.status} />
+                       </div>
+                       <p className="mt-1 text-slate-500">{item.vehicle?.registrationNumber} • {item.direction} • {new Date(item.startedAt).toLocaleDateString()}</p>
+                       <p className="mt-2 text-xs font-semibold text-slate-400">Driver: {item.driverAssignment?.staff?.firstName} {item.driverAssignment?.staff?.lastName}</p>
+                    </div>
+                  ))}
+                  {((tripHistoryReportQuery.data as any)?.items ?? []).length === 0 && !tripHistoryReportQuery.isLoading && (
+                    <EmptyState title="No history" description="No trip records found for the selected period." />
+                  )}
+               </div>
+            </Panel>
+            <Panel title="Boarding Summary" description="Student-level boarding and drop history.">
+               {boardingReportQuery.isLoading ? <LoadingState label="Loading report..." /> : null}
+               <div className="space-y-3">
+                  {((boardingReportQuery.data as any)?.items ?? []).map((item: any) => (
+                    <div key={item.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm">
+                       <div className="flex justify-between font-bold text-slate-900">
+                          <span>{studentLabel(item.student)}</span>
+                          <TransportStatusBadge status={item.status} />
+                       </div>
+                       <p className="mt-1 text-slate-500">{item.trip?.route?.name} • {item.stop?.name}</p>
+                       <p className="mt-2 text-xs text-slate-400">{formatDateTime(item.createdAt)}</p>
+                    </div>
+                  ))}
+               </div>
+            </Panel>
+          </TwoColumn>
+          <InfoCard title="Export Controls" lines={['PDF and CSV exports use server-side generation to ensure data integrity.', 'Reporting data is restricted to authorized transport administrators only.']} />
+        </div>
+      )}
+
       {activeTab === 'location' && (
         <TwoColumn>
           <Panel title="Latest location" description="Map and WebSocket live tracking will be added later; this reads the latest backend location.">
-            <SelectInput label="Trip" value={selectedTripId} onChange={setSelectedTripId} options={[...activeTrips, ...trips].map((trip) => ({ label: `${trip.route?.name ?? trip.routeId} • ${trip.status}`, value: trip.id }))} />
+            <SelectInput label="Trip" value={selectedTripId} onChange={setSelectedTripId} options={[...activeTrips, ...trips].map((trip) => ({ label: `${trip.route?.name ?? trip.routeId} • ${trip.status} (${trip.direction})`, value: trip.id }))} />
             {locationQuery.isFetching ? <LoadingState label="Loading latest location..." /> : null}
             {locationQuery.data ? (
-              <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm text-slate-700">
-                <p><strong>Latitude:</strong> {locationQuery.data.latitude}</p>
-                <p><strong>Longitude:</strong> {locationQuery.data.longitude}</p>
-                <p><strong>Speed:</strong> {locationQuery.data.speedKph ?? 'Not set'} km/h</p>
-                <p><strong>Heading:</strong> {locationQuery.data.heading ?? 'Not set'}</p>
-                <p><strong>Recorded:</strong> {formatDateTime(locationQuery.data.recordedAt)}</p>
+              <div className="mt-4 space-y-4">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                   <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div><p className="text-slate-500">Latitude</p><p className="font-bold">{locationQuery.data.latitude}</p></div>
+                      <div><p className="text-slate-500">Longitude</p><p className="font-bold">{locationQuery.data.longitude}</p></div>
+                      <div><p className="text-slate-500">Speed</p><p className="font-bold">{locationQuery.data.speedKph ?? '0'} km/h</p></div>
+                      <div><p className="text-slate-500">Recorded</p><p className="font-bold">{formatDateTime(locationQuery.data.recordedAt)}</p></div>
+                   </div>
+                   {new Date().getTime() - new Date(locationQuery.data.recordedAt).getTime() > 120000 && (
+                     <div className="mt-3 flex items-center gap-2 rounded-xl bg-red-100 px-3 py-2 text-xs font-bold text-red-700">
+                        <AlertTriangle size={14} />
+                        Stale Data: Last update was over 2 minutes ago.
+                     </div>
+                   )}
+                </div>
+                <div className="flex h-48 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                  <MapPin size={32} />
+                  <span className="ml-2 font-semibold">Map Preview Deferred</span>
+                </div>
               </div>
             ) : <EmptyState title="No location selected" description="Select an active or recent trip to read its latest location." />}
           </Panel>
-          <Panel title="Manual location ping" description="Useful for API smoke testing until the driver app sends GPS automatically.">
-            <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); if (selectedTripId) pingMutation.mutate({ tripId: selectedTripId, body: pingForm }); }}>
-              <TextInput label="Latitude" type="number" value={String(pingForm.latitude)} onChange={(value) => setPingForm({ ...pingForm, latitude: Number(value) })} />
-              <TextInput label="Longitude" type="number" value={String(pingForm.longitude)} onChange={(value) => setPingForm({ ...pingForm, longitude: Number(value) })} />
-              <TextInput label="Speed KPH" type="number" value={pingForm.speedKph?.toString() ?? ''} onChange={(value) => setPingForm({ ...pingForm, speedKph: value ? Number(value) : undefined })} />
-              <button type="submit" className="btn-primary" disabled={!selectedTripId || pingMutation.isPending}>{pingMutation.isPending ? 'Recording...' : 'Record ping'}</button>
-            </form>
-          </Panel>
-          <Panel title="Live map later" description="Realtime map, ETA, geofence, and WebSocket/SSE updates remain out of this admin polish sprint.">
-            <InfoCard title="Safety boundary" lines={['Admin location tools use existing backend location APIs only.', 'Parent-facing map access must stay child-scoped when it is built.', 'Driver app GPS automation will come later.']} />
-          </Panel>
+          <div className="space-y-6">
+            <Panel title="Manual location ping" description="Useful for API smoke testing until the driver app sends GPS automatically.">
+              <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); if (selectedTripId) pingMutation.mutate({ tripId: selectedTripId, body: pingForm }); }}>
+                <TextInput label="Latitude" type="number" value={String(pingForm.latitude)} onChange={(value) => setPingForm({ ...pingForm, latitude: Number(value) })} />
+                <TextInput label="Longitude" type="number" value={String(pingForm.longitude)} onChange={(value) => setPingForm({ ...pingForm, longitude: Number(value) })} />
+                <button type="submit" className="btn-primary w-full" disabled={!selectedTripId || pingMutation.isPending}>{pingMutation.isPending ? 'Recording...' : 'Record ping'}</button>
+              </form>
+            </Panel>
+            <InfoCard title="Safety warning" lines={['Location data is read-only for admins.', 'Manual pings are for testing purposes only.', 'Real-time GPS flow requires the driver mobile application.']} />
+          </div>
         </TwoColumn>
       )}
     </div>
@@ -536,7 +725,7 @@ function InfoCard({ title, lines }: { title: string; lines: string[] }) {
   );
 }
 
-function TripList({ trips, emptyTitle, onComplete, onSelect, compact }: { trips: TransportTrip[]; emptyTitle: string; onComplete?: (tripId: string) => void; onSelect?: (tripId: string) => void; compact?: boolean }) {
+function TripList({ trips, emptyTitle, onComplete, onCancel, onSelect, compact, showLocationWarning }: { trips: TransportTrip[]; emptyTitle: string; onComplete?: (tripId: string) => void; onCancel?: (tripId: string) => void; onSelect?: (tripId: string) => void; compact?: boolean; showLocationWarning?: boolean }) {
   if (trips.length === 0) return <EmptyState title={emptyTitle} description="Trip records will appear here." />;
 
   return (
@@ -549,13 +738,20 @@ function TripList({ trips, emptyTitle, onComplete, onSelect, compact }: { trips:
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <p className="text-sm text-slate-500">{trip.vehicle?.registrationNumber ?? trip.vehicleId} • {trip.direction}</p>
                 <TransportStatusBadge status={trip.status} />
-                {trip.status === 'COMPLETED' ? <TransportStatusBadge status="ROUTE_COMPLETED" /> : null}
               </div>
-              {!compact ? <p className="mt-1 text-xs text-slate-400">Students: {trip.studentStatuses?.length ?? 0}</p> : null}
+              {!compact && (
+                <div className="mt-2 flex items-center gap-4">
+                  <p className="text-xs text-slate-400 font-semibold">Students: {trip.studentStatuses?.length ?? 0}</p>
+                  {trip.driverAssignment?.staff && (
+                    <p className="text-xs text-slate-400 font-semibold">Driver: {trip.driverAssignment.staff.firstName} {trip.driverAssignment.staff.lastName}</p>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex gap-2">
-              {onSelect ? <button type="button" className="btn-secondary" onClick={() => onSelect(trip.id)}>Select</button> : null}
+              {onSelect ? <button type="button" className="btn-secondary" onClick={() => onSelect(trip.id)}>Details</button> : null}
               {onComplete && trip.status === 'ACTIVE' ? <button type="button" className="btn-primary" onClick={() => onComplete(trip.id)}>Complete</button> : null}
+              {onCancel && trip.status === 'ACTIVE' ? <button type="button" className="text-xs font-bold text-red-500 hover:text-red-700 ml-2" onClick={() => onCancel(trip.id)}>Cancel</button> : null}
             </div>
           </div>
         </div>

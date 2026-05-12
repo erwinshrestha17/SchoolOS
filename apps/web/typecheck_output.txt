@@ -1,0 +1,50 @@
+components/academics/tabs/marks-entry-tab.tsx(62,39): error TS2339: Property 'submitBatchMarks' does not exist on type '{ login: (body: JsonBody) => Promise<AuthSession | AuthChallengeResponse>; refreshSession: () => Promise<AuthSession>; ... 295 more ...; openApprovedSalarySlipPdf: (runId: string, lineId: string) => Promise<...>; }'.
+components/academics/tabs/marks-entry-tab.tsx(64,22): error TS18046: 'data' is of type 'unknown'.
+components/academics/tabs/marks-entry-tab.tsx(243,25): error TS2552: Cannot find name 'Users'. Did you mean 'User'?
+components/accounting/accounting-dashboard-view.tsx(245,26): error TS2322: Type '"success" | "warning" | "danger"' is not assignable to type '"default" | "info" | "success" | "warning" | "secondary" | "outline" | "destructive" | "neutral" | "phase2" | "later" | undefined'.
+  Type '"danger"' is not assignable to type '"default" | "info" | "success" | "warning" | "secondary" | "outline" | "destructive" | "neutral" | "phase2" | "later" | undefined'.
+components/accounting/report-table.tsx(86,15): error TS2304: Cannot find name 'Calculator'.
+components/canteen/menu-item-selector.tsx(59,78): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(value: number | bigint | StringNumericLiteral): string', gave the following error.
+    Argument of type 'string | number' is not assignable to parameter of type 'number | bigint | StringNumericLiteral'.
+      Type 'string' is not assignable to type 'number | bigint | StringNumericLiteral'.
+  Overload 2 of 3, '(value: number | bigint): string', gave the following error.
+    Argument of type 'string | number' is not assignable to parameter of type 'number | bigint'.
+      Type 'string' is not assignable to type 'number | bigint'.
+  Overload 3 of 3, '(value: number): string', gave the following error.
+    Argument of type 'string | number' is not assignable to parameter of type 'number'.
+      Type 'string' is not assignable to type 'number'.
+components/canteen/menu-item-selector.tsx(117,66): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(value: number | bigint | StringNumericLiteral): string', gave the following error.
+    Argument of type 'string | number' is not assignable to parameter of type 'number | bigint | StringNumericLiteral'.
+      Type 'string' is not assignable to type 'number | bigint | StringNumericLiteral'.
+  Overload 2 of 3, '(value: number | bigint): string', gave the following error.
+    Argument of type 'string | number' is not assignable to parameter of type 'number | bigint'.
+      Type 'string' is not assignable to type 'number | bigint'.
+  Overload 3 of 3, '(value: number): string', gave the following error.
+    Argument of type 'string | number' is not assignable to parameter of type 'number'.
+      Type 'string' is not assignable to type 'number'.
+components/finance/cashier-close-section.tsx(60,42): error TS2339: Property 'totalCollected' does not exist on type 'CashierClosePreview'.
+components/finance/cashier-close-section.tsx(61,28): error TS2339: Property 'transactionCount' does not exist on type 'CashierClosePreview'.
+components/finance/cashier-close-section.tsx(67,42): error TS2339: Property 'byMethod' does not exist on type 'CashierClosePreview'.
+components/finance/cashier-close-section.tsx(74,43): error TS2339: Property 'totalCollected' does not exist on type 'CashierClosePreview'.
+components/finance/cashier-close-section.tsx(74,76): error TS2339: Property 'byMethod' does not exist on type 'CashierClosePreview'.
+components/finance/cashier-close-section.tsx(88,25): error TS2339: Property 'byMethod' does not exist on type 'CashierClosePreview'.
+components/finance/cashier-close-section.tsx(110,29): error TS2339: Property 'byUser' does not exist on type 'CashierClosePreview'.
+components/finance/cashier-close-section.tsx(156,62): error TS2339: Property 'totalCollected' does not exist on type 'CashierClosePreview'.
+components/finance/collection-counter.tsx(116,18): error TS2304: Cannot find name 'Loader2'.
+components/finance/collection-counter.tsx(180,48): error TS2339: Property 'lineItems' does not exist on type 'InvoiceDetail'.
+components/forms/admission-form.tsx(478,24): error TS2552: Cannot find name 'Download'. Did you mean 'onload'?
+components/forms/attendance-form.tsx(119,46): error TS2339: Property 'status' does not exist on type 'AttendanceRoster'.
+components/forms/student-directory.tsx(128,50): error TS2339: Property 'lifecycleStatus' does not exist on type 'StudentProfile'.
+components/forms/student-directory.tsx(175,75): error TS2339: Property 'lifecycleStatus' does not exist on type 'StudentProfile'.
+components/forms/student-directory.tsx(309,36): error TS2339: Property 'photoUrl' does not exist on type 'StudentProfile'.
+components/forms/student-directory.tsx(322,54): error TS2339: Property 'lifecycleStatus' does not exist on type 'StudentProfile'.
+components/library/library-workspace.tsx(756,50): error TS2322: Type '{ label: string; placeholder: string; value: string; onChange: (returnCondition: string) => void; }' is not assignable to type 'IntrinsicAttributes & { label: string; value: string; onChange: (value: string) => void; type?: string | undefined; required?: boolean | undefined; }'.
+  Property 'placeholder' does not exist on type 'IntrinsicAttributes & { label: string; value: string; onChange: (value: string) => void; type?: string | undefined; required?: boolean | undefined; }'.
+components/library/library-workspace.tsx(776,19): error TS2322: Type '{ isOpen: boolean; onClose: () => void; onConfirm: () => void; title: string; description: string; confirmText: string; tone: string; }' is not assignable to type 'IntrinsicAttributes & ConfirmDialogProps'.
+  Property 'confirmText' does not exist on type 'IntrinsicAttributes & ConfirmDialogProps'.
+components/students/profile/tabs/overview-tab.tsx(53,44): error TS2339: Property 'activeIdentity' does not exist on type 'StudentProfile & { lifecycleStatus?: string | undefined; }'.
+components/students/student-selector.tsx(144,36): error TS2339: Property 'photoUrl' does not exist on type 'StudentProfile'.
+components/transport/transport-workspace.tsx(476,93): error TS2304: Cannot find name 'addDays'.
+components/transport/transport-workspace.tsx(482,115): error TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'Partial<TransportVehiclePayload>'.

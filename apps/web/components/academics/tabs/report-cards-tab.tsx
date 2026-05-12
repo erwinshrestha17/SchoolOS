@@ -1,8 +1,23 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { api } from '../../../lib/api';
+import { 
+  FileText, 
+  Printer, 
+  Plus, 
+  AlertCircle, 
+  CheckCircle2, 
+  Loader2, 
+  Layers, 
+  Search, 
+  Download,
+  Eye,
+  Settings,
+  Info
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type Props = {
   academicYears: any[];
@@ -27,22 +42,34 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
     lock: true,
   });
 
-  const sectionsForClass = allSections.filter((s: any) => s.classId === report.classId);
-  const studentsForClass = students.filter(
+  const sectionsForClass = useMemo(() => allSections.filter((s: any) => s.classId === report.classId), [allSections, report.classId]);
+  const studentsForClass = useMemo(() => students.filter(
     (s: any) => s.class?.id === report.classId && (!report.sectionId || s.section?.id === report.sectionId),
-  );
+  ), [students, report.classId, report.sectionId]);
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['report-cards'] });
     void queryClient.invalidateQueries({ queryKey: ['promotion-readiness'] });
   };
 
-  const batchGenerateMut = useMutation({ mutationFn: api.batchGenerateReportCards, onSuccess: invalidate });
-  const generateMut = useMutation({ mutationFn: api.generateReportCard, onSuccess: invalidate });
+  const batchGenerateMut = useMutation({ 
+    mutationFn: api.batchGenerateReportCards, 
+    onSuccess: (data) => {
+      invalidate();
+      alert(`Successfully queued ${data.length} report cards for generation.`);
+    } 
+  });
+  
+  const generateMut = useMutation({ 
+    mutationFn: api.generateReportCard, 
+    onSuccess: () => {
+      invalidate();
+    } 
+  });
 
   const handleBatchGenerate = () => {
     if (!report.academicYearId || !report.examTermId || studentsForClass.length === 0) return;
-    if (!confirm(`Are you sure you want to generate report cards for all ${studentsForClass.length} students?`)) return;
+    if (!confirm(`Confirm batch generation for all ${studentsForClass.length} students in the selected roster? This will overwrite existing drafts.`)) return;
 
     batchGenerateMut.mutate({
       academicYearId: report.academicYearId,
@@ -62,7 +89,7 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
 
       if (!response.ok) {
         const text = await response.text();
-        throw new Error(text || 'Failed to load PDF');
+        throw new Error(text || 'Failed to generate PDF. Marks may be incomplete.');
       }
 
       const blob = await response.blob();
@@ -74,176 +101,209 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
   };
 
   return (
-    <div className="space-y-6">
-      {/* Generate report card */}
-      <section className="rounded-[28px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-        <div className="mb-5 flex items-start justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Generate</p>
-            <h2 className="mt-1 text-lg font-bold text-gray-950">Generate Report Card</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Report cards are generated from marks and CAS records using Nepal MoEST grading.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="rounded-2xl border border-[var(--line)] bg-white px-6 py-3 font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
-              disabled={!report.academicYearId || !report.examTermId || studentsForClass.length === 0 || batchGenerateMut.isPending}
-              onClick={handleBatchGenerate}
-            >
-              {batchGenerateMut.isPending ? 'Generating Batch…' : `Batch Generate (${studentsForClass.length})`}
-            </button>
-            <button
-              type="button"
-              className="rounded-2xl bg-indigo-950 px-6 py-3 font-semibold text-white transition hover:bg-indigo-900 disabled:opacity-50"
-              disabled={!report.academicYearId || !report.examTermId || !report.studentId || generateMut.isPending}
-              onClick={() => generateMut.mutate(report)}
-            >
-              {generateMut.isPending ? 'Generating…' : 'Generate Single'}
-            </button>
-          </div>
+    <div className="space-y-10 animate-fade-in">
+      {/* Configuration & Generation */}
+      <section className="rounded-[2.5rem] border border-slate-200 bg-white/50 p-8 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between mb-8">
+           <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 italic">Document Generation</h2>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Official Report Card Processing (MoEST Standards)</p>
+           </div>
+           <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                className="h-12 px-6 rounded-2xl border border-slate-200 bg-white flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px] text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-30"
+                disabled={!report.academicYearId || !report.examTermId || studentsForClass.length === 0 || batchGenerateMut.isPending}
+                onClick={handleBatchGenerate}
+              >
+                {batchGenerateMut.isPending ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
+                Batch Generate ({studentsForClass.length})
+              </button>
+              <button
+                type="button"
+                className="h-12 px-6 rounded-2xl bg-slate-900 text-white flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px] shadow-xl shadow-slate-900/10 hover:bg-slate-800 transition-all disabled:opacity-30"
+                disabled={!report.academicYearId || !report.examTermId || !report.studentId || generateMut.isPending}
+                onClick={() => generateMut.mutate(report)}
+              >
+                {generateMut.isPending ? <Loader2 size={16} className="animate-spin" /> : <Layers size={16} />}
+                Process Single
+              </button>
+           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <select
-            value={report.academicYearId}
-            onChange={(e) => setReport((c) => ({ ...c, academicYearId: e.target.value }))}
-          >
-            <option value="">Academic year</option>
-            {academicYears.map((y: any) => (
-              <option key={y.id} value={y.id}>
-                {y.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={report.examTermId}
-            onChange={(e) => setReport((c) => ({ ...c, examTermId: e.target.value }))}
-          >
-            <option value="">Exam term</option>
-            {exams.map((e: any) => (
-              <option key={e.id} value={e.id}>
-                {e.name}
-              </option>
-            ))}
-          </select>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+           <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Academic Year</label>
+              <select value={report.academicYearId} onChange={(e) => setReport(c => ({ ...c, academicYearId: e.target.value }))} className="premium-input bg-white">
+                {academicYears.map((y: any) => <option key={y.id} value={y.id}>{y.name}</option>)}
+              </select>
+           </div>
+           <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Exam Term</label>
+              <select value={report.examTermId} onChange={(e) => setReport(c => ({ ...c, examTermId: e.target.value }))} className="premium-input bg-white">
+                <option value="">Select Term</option>
+                {exams.map((e: any) => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+           </div>
+           <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Class</label>
+              <select value={report.classId} onChange={(e) => setReport(c => ({ ...c, classId: e.target.value, sectionId: '', studentId: '' }))} className="premium-input bg-white">
+                <option value="">Select Class</option>
+                {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+           </div>
+           <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Student (Single)</label>
+              <select value={report.studentId} onChange={(e) => setReport(c => ({ ...c, studentId: e.target.value }))} className="premium-input bg-white">
+                <option value="">Full Roster (Batch)</option>
+                {studentsForClass.map((s: any) => <option key={s.id} value={s.id}>{s.studentSystemId} — {s.firstNameEn} {s.lastNameEn}</option>)}
+              </select>
+           </div>
         </div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <select
-            value={report.classId}
-            onChange={(e) => setReport((c) => ({ ...c, classId: e.target.value, sectionId: '', studentId: '' }))}
-          >
-            <option value="">Class</option>
-            {classes.map((c: any) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={report.sectionId}
-            onChange={(e) => setReport((c) => ({ ...c, sectionId: e.target.value, studentId: '' }))}
-          >
-            <option value="">All sections</option>
-            {sectionsForClass.map((s: any) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={report.studentId}
-            onChange={(e) => setReport((c) => ({ ...c, studentId: e.target.value }))}
-          >
-            <option value="">Student (Optional for batch)</option>
-            {studentsForClass.map((s: any) => (
-              <option key={s.id} value={s.id}>
-                {s.studentSystemId} — {s.firstNameEn} {s.lastNameEn}
-              </option>
-            ))}
-          </select>
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={report.lock}
-                onChange={(e) => setReport((c) => ({ ...c, lock: e.target.checked }))}
-                className="rounded"
+
+        <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-end">
+           <div className="flex-1 space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Internal Remarks</label>
+              <textarea 
+                rows={1}
+                value={report.remarks} 
+                onChange={(e) => setReport(c => ({ ...c, remarks: e.target.value }))} 
+                placeholder="Optional remarks for the report card..."
+                className="premium-input bg-white py-4 text-xs font-medium min-h-[56px]"
               />
-              Lock marks
-            </label>
-          </div>
+           </div>
+           <div className="flex h-14 items-center gap-4 px-6 rounded-2xl bg-slate-900/5 border border-slate-100">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={report.lock} 
+                  onChange={(e) => setReport(c => ({ ...c, lock: e.target.checked }))} 
+                  className="h-5 w-5 rounded-lg border-slate-200 text-primary-600 focus:ring-primary-500 transition-all"
+                />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-hover:text-slate-900 transition-colors">Lock marks after generation</span>
+              </label>
+           </div>
         </div>
-        <textarea
-          rows={2}
-          className="mt-3 w-full rounded-2xl border border-[var(--line)] px-4 py-3 text-sm focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
-          value={report.remarks}
-          onChange={(e) => setReport((c) => ({ ...c, remarks: e.target.value }))}
-          placeholder="Remarks (optional)"
-        />
 
         {(generateMut.isError || batchGenerateMut.isError) && (
-          <p className="mt-2 text-sm text-red-600">
-            {generateMut.error?.message || batchGenerateMut.error?.message}
-          </p>
-        )}
-        {(generateMut.isSuccess || batchGenerateMut.isSuccess) && (
-          <p className="mt-2 text-sm text-emerald-600">Report card(s) generated successfully.</p>
+          <div className="mt-6 p-4 rounded-2xl bg-rose-50 border border-rose-100 flex items-center gap-3 text-rose-600 animate-in slide-in-from-top-2">
+             <AlertCircle size={18} />
+             <p className="text-xs font-bold">{generateMut.error?.message || batchGenerateMut.error?.message}</p>
+          </div>
         )}
       </section>
 
-      {/* Report cards list */}
-      <section className="rounded-[28px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4">Generated Report Cards</p>
-        {reports.length === 0 ? (
-          <p className="text-sm text-gray-400">No report cards generated yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+      {/* Generated List */}
+      <section className="rounded-[2.5rem] border border-slate-200 bg-white overflow-hidden shadow-2xl shadow-slate-200/20">
+         <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div>
+               <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic text-[18px]">Operational History</h3>
+               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Recently generated documents</p>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-400">
+               <FileText size={14} />
+               {reports.length} Total Cards
+            </div>
+         </div>
+
+         <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[var(--line)]">
-                  <th className="py-3 text-left font-semibold text-gray-500">Student</th>
-                  <th className="py-3 text-left font-semibold text-gray-500">Exam</th>
-                  <th className="py-3 text-left font-semibold text-gray-500">Class</th>
-                  <th className="py-3 text-left font-semibold text-gray-500">Percentage</th>
-                  <th className="py-3 text-left font-semibold text-gray-500">Grade</th>
-                  <th className="py-3 text-left font-semibold text-gray-500">GPA</th>
-                  <th className="py-3 text-left font-semibold text-gray-500">Status</th>
-                  <th className="py-3 text-left font-semibold text-gray-500">PDF</th>
+                <tr className="bg-slate-50/50 border-b border-slate-100">
+                  <th className="py-4 px-8 font-black uppercase tracking-widest text-[10px] text-slate-400">Student Identity</th>
+                  <th className="py-4 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400">Term / Class</th>
+                  <th className="py-4 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400 text-center">Performance</th>
+                  <th className="py-4 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400 text-center">Outcome</th>
+                  <th className="py-4 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400 text-center">Lifecycle</th>
+                  <th className="py-4 px-8 font-black uppercase tracking-widest text-[10px] text-slate-400 text-right">Preview</th>
                 </tr>
               </thead>
-              <tbody>
-                {reports.slice(0, 50).map((r: any) => (
-                  <tr key={r.id} className="border-b border-[var(--line)] hover:bg-indigo-50/30 transition">
-                    <td className="py-2 font-medium text-gray-950">
-                      {r.student?.firstNameEn ?? ''} {r.student?.lastNameEn ?? ''}
-                    </td>
-                    <td className="py-2 text-gray-600">{r.examTerm?.name ?? '—'}</td>
-                    <td className="py-2 text-gray-600">{r.class?.name ?? '—'} {r.section?.name ? `/ ${r.section.name}` : ''}</td>
-                    <td className="py-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${Number(r.percentage) >= 35 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                        {Number(r.percentage).toFixed(1)}%
-                      </span>
-                    </td>
-                    <td className="py-2 font-semibold text-gray-950">{r.grade}</td>
-                    <td className="py-2 text-gray-600">{Number(r.gpa).toFixed(2)}</td>
-                    <td className="py-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${r.status === 'LOCKED' ? 'bg-indigo-50 text-indigo-700' : 'bg-amber-50 text-amber-700'}`}>
-                        {r.status}
-                      </span>
-                    </td>
-                    <td className="py-2">
-                      <button type="button" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition" onClick={() => openPdf(r.id)}>
-                        View PDF
-                      </button>
+              <tbody className="divide-y divide-slate-50">
+                {reports.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-20 text-center text-slate-300">
+                       <FileText className="h-12 w-12 mx-auto mb-4 opacity-10" />
+                       <p className="text-[10px] font-black uppercase tracking-widest">No report cards generated yet</p>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  reports.slice(0, 50).map((r: any) => {
+                    const isPass = Number(r.percentage) >= 35;
+                    return (
+                      <tr key={r.id} className="group hover:bg-slate-50/50 transition-all">
+                        <td className="py-4 px-8">
+                           <div className="flex flex-col">
+                              <span className="text-sm font-black text-slate-900 uppercase tracking-tight italic">{r.student?.firstNameEn} {r.student?.lastNameEn}</span>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{r.student?.studentSystemId}</span>
+                           </div>
+                        </td>
+                        <td className="py-4 px-6">
+                           <div className="flex flex-col">
+                              <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{r.examTerm?.name}</span>
+                              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{r.class?.name} {r.section?.name ? `/ ${r.section.name}` : ''}</span>
+                           </div>
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                           <div className="inline-flex flex-col items-center">
+                              <span className={cn(
+                                "text-sm font-black tracking-tighter",
+                                isPass ? "text-emerald-600" : "text-rose-600"
+                              )}>
+                                 {Number(r.percentage).toFixed(1)}%
+                              </span>
+                              <div className="w-12 h-1 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                                 <div className={cn("h-full", isPass ? "bg-emerald-500" : "bg-rose-500")} style={{ width: `${Number(r.percentage)}%` }} />
+                              </div>
+                           </div>
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                           <div className="inline-flex flex-col items-center gap-1">
+                              <span className="text-sm font-black text-slate-900 italic tracking-tight">{r.grade}</span>
+                              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">GPA {Number(r.gpa).toFixed(2)}</span>
+                           </div>
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                           <div className={cn(
+                             "inline-flex px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border",
+                             r.status === 'LOCKED' ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-amber-50 text-amber-600 border-amber-100"
+                           )}>
+                              {r.status}
+                           </div>
+                        </td>
+                        <td className="py-4 px-8 text-right">
+                           <button 
+                            onClick={() => openPdf(r.id)}
+                            className="h-10 px-4 rounded-xl bg-slate-900 text-white flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px] shadow-lg shadow-slate-900/10 hover:bg-slate-800 transition-all active:scale-95"
+                           >
+                              <Eye size={14} />
+                              Open
+                           </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
-          </div>
-        )}
+         </div>
+         
+         {reports.length > 0 && (
+           <div className="bg-slate-900 p-6 flex items-center justify-between text-white">
+              <div className="flex items-center gap-6">
+                 <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-primary-500" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">MoEST Compliance: Active</span>
+                 </div>
+                 <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Digital Signatures: Enabled</span>
+                 </div>
+              </div>
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                 System Generated Documents
+              </div>
+           </div>
+         )}
       </section>
     </div>
   );

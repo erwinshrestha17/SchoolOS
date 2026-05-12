@@ -4,6 +4,25 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useMemo } from 'react';
 import { api } from '../../../lib/api';
 import type { ResultPublishingReadiness } from '@schoolos/core';
+import { 
+  Megaphone, 
+  Search, 
+  Zap, 
+  CheckCircle2, 
+  AlertCircle, 
+  XCircle, 
+  Loader2, 
+  Eye, 
+  EyeOff,
+  Bell,
+  Clock,
+  Info,
+  ShieldCheck,
+  Send,
+  Lock,
+  ChevronRight
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type Props = {
   academicYears: any[];
@@ -19,8 +38,7 @@ export function ResultPublishingTab({
   exams,
 }: Props) {
   const queryClient = useQueryClient();
-  const currentYear =
-    academicYears.find((y: any) => y.isCurrent) ?? academicYears[0];
+  const currentYear = academicYears.find((y: any) => y.isCurrent) ?? academicYears[0];
 
   const [selection, setSelection] = useState({
     academicYearId: currentYear?.id ?? '',
@@ -34,22 +52,14 @@ export function ResultPublishingTab({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const publishingQuery = useQuery({
-    queryKey: [
-      'result-publishing-readiness',
-      selection.academicYearId,
-      selection.examTermId,
-      selection.classId,
-      selection.sectionId,
-      selection.status,
-    ],
-    queryFn: () =>
-      api.listResultPublishingReadiness({
-        academicYearId: selection.academicYearId,
-        examTermId: selection.examTermId,
-        classId: selection.classId || undefined,
-        sectionId: selection.sectionId || undefined,
-        status: selection.status || undefined,
-      }),
+    queryKey: ['result-publishing-readiness', selection.academicYearId, selection.examTermId, selection.classId, selection.sectionId, selection.status],
+    queryFn: () => api.listResultPublishingReadiness({
+      academicYearId: selection.academicYearId,
+      examTermId: selection.examTermId,
+      classId: selection.classId || undefined,
+      sectionId: selection.sectionId || undefined,
+      status: selection.status || undefined,
+    }),
     enabled: Boolean(selection.academicYearId && selection.examTermId),
   });
 
@@ -57,21 +67,13 @@ export function ResultPublishingTab({
     const data = publishingQuery.data ?? [];
     if (!selection.search) return data;
     const s = selection.search.toLowerCase();
-    return data.filter(
-      (r) =>
-        r.studentName.toLowerCase().includes(s) ||
-        r.studentSystemId.toLowerCase().includes(s),
-    );
+    return data.filter(r => r.studentName.toLowerCase().includes(s) || r.studentSystemId.toLowerCase().includes(s));
   }, [publishingQuery.data, selection.search]);
 
-  const sectionsForClass = allSections.filter(
-    (s: any) => s.classId === selection.classId,
-  );
+  const sectionsForClass = useMemo(() => allSections.filter((s: any) => s.classId === selection.classId), [allSections, selection.classId]);
 
   const invalidate = () => {
-    void queryClient.invalidateQueries({
-      queryKey: ['result-publishing-readiness'],
-    });
+    void queryClient.invalidateQueries({ queryKey: ['result-publishing-readiness'] });
     void queryClient.invalidateQueries({ queryKey: ['report-cards'] });
   };
 
@@ -79,7 +81,7 @@ export function ResultPublishingTab({
     mutationFn: api.publishResults,
     onSuccess: (data) => {
       invalidate();
-      alert(`Successfully published ${data.published} results.`);
+      alert(`Successfully published ${data.published} results to student/parent dashboards.`);
       setSelectedIds(new Set());
     },
   });
@@ -88,7 +90,7 @@ export function ResultPublishingTab({
     mutationFn: api.unpublishResults,
     onSuccess: () => {
       invalidate();
-      alert('Results unpublished successfully.');
+      alert('Results removed from dashboards.');
       setSelectedIds(new Set());
     },
   });
@@ -96,100 +98,41 @@ export function ResultPublishingTab({
   const notifyMut = useMutation({
     mutationFn: api.notifyResults,
     onSuccess: () => {
-      alert('Notifications queued successfully.');
+      alert('Push notifications and emails queued.');
     },
   });
 
   const handleBatchPublish = () => {
     if (selectedIds.size === 0) return;
-    const selectedRecords = records.filter((r) =>
-      selectedIds.has(r.reportCardId),
-    );
-    const publishable = selectedRecords.filter(
-      (r) => r.reportStatus === 'LOCKED' && r.publishStatus !== 'PUBLISHED',
-    );
-
+    const publishable = records.filter(r => selectedIds.has(r.reportCardId) && r.reportStatus === 'LOCKED' && r.publishStatus !== 'PUBLISHED');
+    
     if (publishable.length === 0) {
-      alert('No publishable report cards selected (must be LOCKED and not already PUBLISHED).');
+      alert('No publishable report cards selected. Must be LOCKED first.');
       return;
     }
 
-    if (
-      !confirm(
-        `Are you sure you want to publish ${publishable.length} report cards? This will make them visible to guardians and students.`,
-      )
-    )
-      return;
+    if (!confirm(`CONFIRM PUBLISH: This will make results for ${publishable.length} students visible on the Parent/Student App. Proceed?`)) return;
 
-    publishMut.mutate({
-      reportCardIds: publishable.map((r) => r.reportCardId),
-    });
-  };
-
-  const handleBatchUnpublish = () => {
-    if (selectedIds.size === 0) return;
-    const selectedRecords = records.filter((r) =>
-      selectedIds.has(r.reportCardId),
-    );
-    const publishable = selectedRecords.filter(
-      (r) => r.publishStatus === 'PUBLISHED',
-    );
-
-    if (publishable.length === 0) {
-      alert('No published report cards selected.');
-      return;
-    }
-
-    const reason = prompt(
-      'Please enter the reason for unpublishing (mandatory):',
-    );
-    if (!reason) return;
-
-    if (
-      !confirm(
-        `Are you sure you want to unpublish ${publishable.length} report cards?`,
-      )
-    )
-      return;
-
-    unpublishMut.mutate({
-      reportCardIds: publishable.map((r) => r.reportCardId),
-      reason,
-    });
+    publishMut.mutate({ reportCardIds: publishable.map(r => r.reportCardId) });
   };
 
   const handleBatchNotify = () => {
     if (selectedIds.size === 0) return;
-    const selectedRecords = records.filter((r) =>
-      selectedIds.has(r.reportCardId),
-    );
-    const notified = selectedRecords.filter(
-      (r) => r.publishStatus === 'PUBLISHED' && r.notificationEligibility,
-    );
-
+    const notified = records.filter(r => selectedIds.has(r.reportCardId) && r.publishStatus === 'PUBLISHED');
+    
     if (notified.length === 0) {
-      alert('Only PUBLISHED results for ACTIVE students can be notified.');
+      alert('Only PUBLISHED results can be notified.');
       return;
     }
 
-    if (
-      !confirm(
-        `Send publishing notifications for ${notified.length} students?`,
-      )
-    )
-      return;
+    if (!confirm(`Send automated alerts to ${notified.length} guardians?`)) return;
 
-    notifyMut.mutate({
-      reportCardIds: notified.map((r) => r.reportCardId),
-    });
+    notifyMut.mutate({ reportCardIds: notified.map(r => r.reportCardId) });
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === records.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(records.map((r) => r.reportCardId)));
-    }
+    if (selectedIds.size === records.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(records.map(r => r.reportCardId)));
   };
 
   const toggleSelect = (id: string) => {
@@ -200,276 +143,230 @@ export function ResultPublishingTab({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Filters & Actions */}
-      <section className="rounded-[28px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-        <div className="mb-5 flex items-start justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">
-              Publishing
-            </p>
-            <h2 className="mt-1 text-lg font-bold text-gray-950">
-              Result Publishing Dashboard
-            </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Control the release of report cards to guardians and students.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              onClick={invalidate}
-            >
-              Refresh
-            </button>
-          </div>
+    <div className="space-y-10 animate-fade-in">
+      {/* Configuration & High-Level Actions */}
+      <section className="rounded-[2.5rem] border border-slate-200 bg-white/50 p-8 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between mb-8">
+           <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 italic">Results Delivery</h2>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Dashboard Visibility & Notifications</p>
+           </div>
+           <div className="flex flex-wrap gap-3">
+              <button 
+                onClick={handleBatchNotify}
+                disabled={selectedIds.size === 0 || notifyMut.isPending}
+                className="h-12 px-6 rounded-2xl bg-white border border-slate-200 flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px] text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-30"
+              >
+                {notifyMut.isPending ? <Loader2 className="animate-spin" size={16} /> : <Bell size={16} />}
+                Notify Guardians
+              </button>
+              <button 
+                onClick={handleBatchPublish}
+                disabled={selectedIds.size === 0 || publishMut.isPending}
+                className="h-12 px-8 rounded-2xl bg-slate-900 text-white flex items-center justify-center gap-3 font-black uppercase tracking-widest text-[10px] shadow-xl shadow-slate-900/10 hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-30"
+              >
+                {publishMut.isPending ? <Loader2 className="animate-spin" size={16} /> : <Zap size={16} />}
+                Publish Visibility ({selectedIds.size})
+              </button>
+           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <select
-            value={selection.academicYearId}
-            onChange={(e) =>
-              setSelection((c) => ({ ...c, academicYearId: e.target.value }))
-            }
-          >
-            {academicYears.map((y: any) => (
-              <option key={y.id} value={y.id}>
-                {y.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={selection.examTermId}
-            onChange={(e) =>
-              setSelection((c) => ({ ...c, examTermId: e.target.value }))
-            }
-          >
-            <option value="">Exam term</option>
-            {exams.map((e: any) => (
-              <option key={e.id} value={e.id}>
-                {e.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={selection.classId}
-            onChange={(e) =>
-              setSelection((c) => ({ ...c, classId: e.target.value, sectionId: '' }))
-            }
-          >
-            <option value="">All Classes</option>
-            {classes.map((c: any) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={selection.sectionId}
-            onChange={(e) =>
-              setSelection((c) => ({ ...c, sectionId: e.target.value }))
-            }
-          >
-            <option value="">All Sections</option>
-            {sectionsForClass.map((s: any) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={selection.status}
-            onChange={(e) =>
-              setSelection((c) => ({ ...c, status: e.target.value }))
-            }
-          >
-            <option value="">All Publish Status</option>
-            <option value="UNPUBLISHED">Unpublished</option>
-            <option value="PUBLISHED">Published</option>
-          </select>
-        </div>
-
-        <div className="mt-6 flex items-center justify-between border-t border-gray-100 pt-4">
-          <div className="text-sm text-gray-500">
-            {selectedIds.size > 0 ? (
-              <span className="font-medium text-emerald-600">
-                {selectedIds.size} records selected
-              </span>
-            ) : (
-              'Select records to take action'
-            )}
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-30"
-              disabled={selectedIds.size === 0 || unpublishMut.isPending}
-              onClick={handleBatchUnpublish}
-            >
-              Unpublish
-            </button>
-            <button
-              type="button"
-              className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:opacity-30"
-              disabled={selectedIds.size === 0 || notifyMut.isPending}
-              onClick={handleBatchNotify}
-            >
-              Notify Guardians
-            </button>
-            <button
-              type="button"
-              className="rounded-xl bg-emerald-600 px-6 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-30"
-              disabled={selectedIds.size === 0 || publishMut.isPending}
-              onClick={handleBatchPublish}
-            >
-              {publishMut.isPending ? 'Publishing…' : 'Publish Selected'}
-            </button>
-          </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+           <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Academic Year</label>
+              <select value={selection.academicYearId} onChange={(e) => setSelection(c => ({ ...c, academicYearId: e.target.value }))} className="premium-input bg-white">
+                {academicYears.map((y: any) => <option key={y.id} value={y.id}>{y.name}</option>)}
+              </select>
+           </div>
+           <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Exam Term</label>
+              <select value={selection.examTermId} onChange={(e) => setSelection(c => ({ ...c, examTermId: e.target.value }))} className="premium-input bg-white">
+                <option value="">Select Term</option>
+                {exams.map((e: any) => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+           </div>
+           <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Class</label>
+              <select value={selection.classId} onChange={(e) => setSelection(c => ({ ...c, classId: e.target.value, sectionId: '' }))} className="premium-input bg-white">
+                <option value="">All Classes</option>
+                {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+           </div>
+           <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Section</label>
+              <select value={selection.sectionId} onChange={(e) => setSelection(c => ({ ...c, sectionId: e.target.value }))} className="premium-input bg-white">
+                <option value="">All Sections</option>
+                {sectionsForClass.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+           </div>
+           <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Status</label>
+              <select value={selection.status} onChange={(e) => setSelection(c => ({ ...c, status: e.target.value }))} className="premium-input bg-white">
+                <option value="">All Publish Status</option>
+                <option value="PUBLISHED">Published</option>
+                <option value="UNPUBLISHED">Unpublished</option>
+              </select>
+           </div>
         </div>
       </section>
 
-      {/* List */}
-      <section className="rounded-[28px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500">
-            Report Cards · {records.length} results
-          </h3>
-          <div className="w-64">
-            <input
-              type="text"
-              placeholder="Search student..."
-              className="w-full text-xs"
-              value={selection.search}
-              onChange={(e) =>
-                setSelection((c) => ({ ...c, search: e.target.value }))
-              }
-            />
+      {/* Roster & Visibility Control */}
+      {selection.examTermId ? (
+        <section className="rounded-[2.5rem] border border-slate-200 bg-white overflow-hidden shadow-2xl shadow-slate-200/20">
+          <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+             <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                   <ShieldCheck size={20} />
+                </div>
+                <div>
+                   <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic text-[18px]">Delivery Hub</h3>
+                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Control visibility to {records.length} students</p>
+                </div>
+             </div>
+             <div className="flex items-center gap-3">
+                <div className="relative w-64">
+                   <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                   <input 
+                    type="text" 
+                    placeholder="Search roster..." 
+                    value={selection.search} 
+                    onChange={(e) => setSelection(f => ({ ...f, search: e.target.value }))}
+                    className="premium-input pl-10 h-10 text-[10px]"
+                   />
+                </div>
+             </div>
           </div>
-        </div>
 
-        {publishingQuery.isLoading ? (
-          <div className="py-12 text-center">
-            <div className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-emerald-200 border-t-emerald-600" />
-          </div>
-        ) : records.length === 0 ? (
-          <div className="py-12 text-center border-2 border-dashed border-gray-100 rounded-3xl">
-            <p className="text-sm text-gray-400">
-              No results found for current filters.
-            </p>
-          </div>
-        ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--line)]">
-                  <th className="py-3 pr-4 text-left">
-                    <input
-                      type="checkbox"
-                      className="rounded"
-                      checked={
-                        selectedIds.size === records.length &&
-                        records.length > 0
-                      }
-                      onChange={toggleSelectAll}
-                    />
-                  </th>
-                  <th className="py-3 text-left font-semibold text-gray-500">
-                    Student
-                  </th>
-                  <th className="py-3 text-left font-semibold text-gray-500">
-                    Academic
-                  </th>
-                  <th className="py-3 text-left font-semibold text-gray-500">
-                    Result
-                  </th>
-                  <th className="py-3 text-left font-semibold text-gray-500">
-                    Report Status
-                  </th>
-                  <th className="py-3 text-left font-semibold text-gray-500">
-                    Publish Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {records.map((r) => (
-                  <tr
-                    key={r.reportCardId}
-                    className={`border-b border-[var(--line)] transition hover:bg-emerald-50/10 ${
-                      selectedIds.has(r.reportCardId) ? 'bg-emerald-50/20' : ''
-                    }`}
-                  >
-                    <td className="py-3 pr-4">
-                      <input
-                        type="checkbox"
-                        className="rounded"
-                        checked={selectedIds.has(r.reportCardId)}
-                        onChange={() => toggleSelect(r.reportCardId)}
+             <table className="w-full text-left border-collapse">
+               <thead>
+                 <tr className="bg-slate-50/50 border-b border-slate-100">
+                   <th className="py-4 px-8 w-12">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedIds.size === records.length && records.length > 0} 
+                        onChange={toggleSelectAll}
+                        className="h-5 w-5 rounded-lg border-slate-200 text-primary-600 focus:ring-primary-500"
                       />
-                    </td>
-                    <td className="py-3">
-                      <div className="font-bold text-gray-950">
-                        {r.studentName}
-                      </div>
-                      <div className="text-[10px] font-mono text-gray-400">
-                        {r.studentSystemId}
-                      </div>
-                    </td>
-                    <td className="py-3">
-                      <div className="text-xs font-medium text-gray-700">
-                        {r.className} {r.sectionName ? `/ ${r.sectionName}` : ''}
-                      </div>
-                      <div className="text-[10px] text-gray-400">
-                        {r.examTermName}
-                      </div>
-                    </td>
-                    <td className="py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-gray-900">
-                          {r.grade}
-                        </span>
-                        <span className="text-[10px] text-gray-500">
-                          ({r.percentage.toFixed(1)}%)
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                          r.reportStatus === 'LOCKED'
-                            ? 'bg-indigo-50 text-indigo-700'
-                            : 'bg-amber-50 text-amber-700'
-                        }`}
-                      >
-                        {r.reportStatus}
-                      </span>
-                    </td>
-                    <td className="py-3">
-                      <div className="flex flex-col gap-1">
-                        <span
-                          className={`inline-flex w-fit rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                            r.publishStatus === 'PUBLISHED'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-gray-100 text-gray-600'
-                          }`}
-                        >
-                          {r.publishStatus}
-                        </span>
-                        {r.publishedAt && (
-                          <div className="text-[10px] text-gray-400">
-                            {new Date(r.publishedAt).toLocaleDateString()} by{' '}
-                            {r.publishedBy}
+                   </th>
+                   <th className="py-4 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400">Student Identity</th>
+                   <th className="py-4 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400">Academic Context</th>
+                   <th className="py-4 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400 text-center">Score Summary</th>
+                   <th className="py-4 px-6 font-black uppercase tracking-widest text-[10px] text-slate-400 text-center">Report Card Status</th>
+                   <th className="py-4 px-8 font-black uppercase tracking-widest text-[10px] text-slate-400 text-right">Publishing</th>
+                 </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-50">
+                 {publishingQuery.isLoading ? (
+                   <tr>
+                      <td colSpan={6} className="py-20 text-center">
+                         <Loader2 className="h-10 w-10 animate-spin text-primary-500 mx-auto opacity-20" />
+                         <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Analyzing Delivery Readiness</p>
+                      </td>
+                   </tr>
+                 ) : records.length === 0 ? (
+                   <tr>
+                      <td colSpan={6} className="py-20 text-center text-slate-300">
+                         <Info className="h-12 w-12 mx-auto mb-4 opacity-10" />
+                         <p className="text-[10px] font-black uppercase tracking-widest">No results found for current filters</p>
+                      </td>
+                   </tr>
+                 ) : records.map((r) => {
+                   const isPublished = r.publishStatus === 'PUBLISHED';
+                   const isLocked = r.reportStatus === 'LOCKED';
+                   return (
+                     <tr key={r.reportCardId} className={cn(
+                       "group transition-all hover:bg-slate-50/50",
+                       selectedIds.has(r.reportCardId) && "bg-emerald-50/30"
+                     )}>
+                       <td className="py-4 px-8">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedIds.has(r.reportCardId)} 
+                            onChange={() => toggleSelect(r.reportCardId)}
+                            className="h-5 w-5 rounded-lg border-slate-200 text-primary-600 focus:ring-primary-500"
+                          />
+                       </td>
+                       <td className="py-4 px-6">
+                          <div className="flex flex-col">
+                             <span className="text-sm font-black text-slate-900 uppercase tracking-tight italic">{r.studentName}</span>
+                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{r.studentSystemId}</span>
                           </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                       </td>
+                       <td className="py-4 px-6">
+                          <div className="flex flex-col">
+                             <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{r.className} {r.sectionName ? `/ ${r.sectionName}` : ''}</span>
+                             <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{r.examTermName}</span>
+                          </div>
+                       </td>
+                       <td className="py-4 px-6 text-center">
+                          <div className="inline-flex flex-col items-center">
+                             <span className="text-sm font-black text-slate-900 tracking-tighter italic">{r.grade}</span>
+                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{r.percentage.toFixed(1)}%</span>
+                          </div>
+                       </td>
+                       <td className="py-4 px-6 text-center">
+                          <div className={cn(
+                             "inline-flex px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border",
+                             isLocked ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-amber-50 text-amber-600 border-amber-100"
+                          )}>
+                             {isLocked ? <ShieldCheck size={10} className="mr-1" /> : <Clock size={10} className="mr-1" />}
+                             {r.reportStatus}
+                          </div>
+                       </td>
+                       <td className="py-4 px-8 text-right">
+                          <div className="flex flex-col items-end gap-1">
+                             <div className={cn(
+                               "inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest",
+                               isPublished ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" : "bg-slate-100 text-slate-400"
+                             )}>
+                                {isPublished ? <Eye size={10} /> : <EyeOff size={10} />}
+                                {r.publishStatus}
+                             </div>
+                             {r.publishedAt && (
+                               <span className="text-[7px] font-bold text-slate-300 uppercase tracking-widest">Released {new Date(r.publishedAt).toLocaleDateString()}</span>
+                             )}
+                          </div>
+                       </td>
+                     </tr>
+                   );
+                 })}
+               </tbody>
+             </table>
           </div>
-        )}
-      </section>
+          
+          <div className="bg-slate-900 p-6 flex items-center justify-between text-white">
+             <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                   <div className="h-2 w-2 rounded-full bg-primary-500" />
+                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Published: {records.filter(r => r.publishStatus === 'PUBLISHED').length}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                   <div className="h-2 w-2 rounded-full bg-amber-500" />
+                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Awaiting Lock: {records.filter(r => r.reportStatus !== 'LOCKED').length}</span>
+                </div>
+             </div>
+             <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 italic">
+                Finalized Results are visible to Parents
+             </div>
+          </div>
+        </section>
+      ) : (
+        <section className="rounded-[3rem] border-2 border-dashed border-slate-200 bg-white/50 p-20 text-center">
+          <div className="h-20 w-20 rounded-[2.5rem] bg-white shadow-xl flex items-center justify-center text-slate-300 mx-auto mb-8 border border-slate-50">
+             <Megaphone size={40} />
+          </div>
+          <h3 className="text-2xl font-black text-slate-900 italic uppercase tracking-tight">Delivery Hub</h3>
+          <p className="mt-2 text-sm font-bold text-slate-400 max-w-sm mx-auto leading-relaxed">
+            Select an exam term to control result visibility and notify guardians of student performance.
+          </p>
+          <div className="mt-8 flex items-center justify-center gap-3">
+             <div className="px-4 py-2 rounded-2xl bg-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-500">Live Dashboard</div>
+             <div className="px-4 py-2 rounded-2xl bg-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-500">Push Notifications</div>
+             <div className="px-4 py-2 rounded-2xl bg-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-500">Audit Logs</div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

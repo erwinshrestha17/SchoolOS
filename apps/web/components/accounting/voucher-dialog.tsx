@@ -269,6 +269,18 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
             </div>
           </div>
 
+          <div className="mt-4 rounded-2xl bg-amber-50 border border-amber-100 p-4">
+             <div className="flex gap-3">
+               <AlertCircle size={18} className="text-amber-600 shrink-0" />
+               <div>
+                 <p className="text-xs font-bold text-amber-900">Immutable Ledger Warning</p>
+                 <p className="text-[10px] mt-0.5 text-amber-700 font-medium leading-relaxed">
+                   Posted journals cannot be edited. If you make a mistake, you must use a reversal or correction workflow to maintain the audit trail.
+                 </p>
+               </div>
+             </div>
+          </div>
+
           <DialogFooter className="pt-4">
             <button
               type="button"
@@ -283,7 +295,7 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
               className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-2 text-sm font-semibold text-white shadow-lg transition-all hover:bg-slate-800 disabled:opacity-50"
             >
               {loading && <Loader2 size={16} className="animate-spin" />}
-              Create Voucher
+              Post Transaction
             </button>
           </DialogFooter>
         </form>

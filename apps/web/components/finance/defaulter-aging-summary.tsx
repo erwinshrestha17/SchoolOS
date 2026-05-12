@@ -3,7 +3,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { SectionCard } from '@/components/ui/section-card';
-import { BarChart3, Clock, AlertTriangle } from 'lucide-react';
+import { Clock, AlertTriangle, ChevronRight, TrendingUp } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { LoadingState } from '@/components/ui/loading-state';
 
 export function DefaulterAgingSummary() {
   const defaultersQuery = useQuery({
@@ -11,48 +13,85 @@ export function DefaulterAgingSummary() {
     queryFn: () => api.listDefaulters(),
   });
 
+  if (defaultersQuery.isLoading) return <LoadingState variant="page" label="Analyzing aging buckets..." />;
+
   const defaulters = defaultersQuery.data || [];
   
   const buckets = {
-    '1-30': 0,
-    '31-60': 0,
-    '61-90': 0,
-    '90+': 0,
+    '1-30': { count: 0, amount: 0 },
+    '31-60': { count: 0, amount: 0 },
+    '61-90': { count: 0, amount: 0 },
+    '90+': { count: 0, amount: 0 },
   };
-
-  let totalOutstanding = 0;
 
   defaulters.forEach((d: any) => {
     const bucket = d.agingBucket as keyof typeof buckets;
     if (buckets[bucket] !== undefined) {
-      buckets[bucket]++;
+      buckets[bucket].count++;
+      buckets[bucket].amount += d.outstanding;
     } else {
-      buckets['90+']++;
+      buckets['90+'].count++;
+      buckets['90+'].amount += d.outstanding;
     }
-    totalOutstanding += d.outstanding;
   });
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-NP', {
+      style: 'currency',
+      currency: 'NPR',
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
   const bucketData = [
-    { label: '1-30 Days', count: buckets['1-30'], color: 'bg-emerald-500' },
-    { label: '31-60 Days', count: buckets['31-60'], color: 'bg-amber-500' },
-    { label: '61-90 Days', count: buckets['61-90'], color: 'bg-orange-500' },
-    { label: '90+ Days', count: buckets['90+'], color: 'bg-rose-500' },
-  ];
+    { label: '1-30 Days', key: '1-30', color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+    { label: '31-60 Days', key: '31-60', color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-100' },
+    { label: '61-90 Days', key: '61-90', color: 'text-orange-500', bg: 'bg-orange-50', border: 'border-orange-100' },
+    { label: '90+ Days', key: '90+', color: 'text-rose-500', bg: 'bg-rose-50', border: 'border-rose-100' },
+  ] as const;
 
   return (
-    <div className="grid gap-6 md:grid-cols-4 mb-6">
-      {bucketData.map((b) => (
-        <div key={b.label} className="p-5 bg-white rounded-[2rem] border border-slate-100 shadow-sm transition-all hover:shadow-md">
-          <div className="flex items-center justify-between mb-3">
-            <div className={`h-8 w-8 rounded-xl ${b.color} bg-opacity-10 flex items-center justify-center`}>
-              <Clock size={16} className={b.color.replace('bg-', 'text-')} />
+    <div className="space-y-6">
+      <div className="grid gap-6 md:grid-cols-4">
+        {bucketData.map((b) => (
+          <div 
+            key={b.label} 
+            className={cn(
+              "group relative p-6 bg-white rounded-[2.5rem] border transition-all duration-500 hover:shadow-2xl hover:shadow-slate-200/50 hover:-translate-y-1",
+              b.border
+            )}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 duration-500", b.bg, b.color)}>
+                <Clock size={20} />
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest">{b.label}</span>
+                <div className="flex items-center gap-1 mt-1">
+                   <TrendingUp size={10} className={b.color} />
+                   <span className={cn("text-[0.65rem] font-bold", b.color)}>Critical</span>
+                </div>
+              </div>
             </div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{b.label}</span>
+            
+            <p className="text-3xl font-black text-slate-900 tracking-tighter">
+              {buckets[b.key].count}
+            </p>
+            <div className="flex items-center justify-between mt-1">
+               <p className="text-[0.65rem] font-bold text-slate-500 uppercase tracking-tight">Defaulters</p>
+               <p className="text-xs font-black text-slate-700">{formatCurrency(buckets[b.key].amount)}</p>
+            </div>
+            
+            <div className="mt-6 flex items-center justify-between pt-4 border-t border-slate-50">
+               <button className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors flex items-center gap-1">
+                 View List
+                 <ChevronRight size={12} />
+               </button>
+               <div className={cn("h-1.5 w-1.5 rounded-full animate-pulse", b.color.replace('text', 'bg'))} />
+            </div>
           </div>
-          <p className="text-2xl font-black text-slate-900">{b.count}</p>
-          <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-tight">Defaulters</p>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

@@ -3,6 +3,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { api } from '../../../../lib/api';
+import { PageHeader } from '@/components/ui/page-header';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Download, Calendar, Filter, Users, FileText, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { LoadingState } from '@/components/ui/loading-state';
 
 const today = new Date();
 
@@ -103,13 +108,6 @@ export default function AttendanceRegisterPage() {
     { value: 12, label: 'December' },
   ];
 
-  const getStatusColor = (status: string | null) => {
-    if (!status) return 'text-gray-300';
-    if (status === 'PRESENT' || status === 'LATE') return 'text-emerald-600 font-bold';
-    if (status === 'ABSENT' || status === 'UNEXCUSED_LEAVE') return 'text-danger-600 font-bold';
-    return 'text-amber-600 font-bold';
-  };
-
   const getStatusLabel = (status: string | null) => {
     if (!status) return '-';
     if (status === 'PRESENT') return 'P';
@@ -120,70 +118,78 @@ export default function AttendanceRegisterPage() {
     return '-';
   };
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
-          Monthly Attendance Register
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          View and export the daily attendance matrix for a selected class and month.
-        </p>
-      </div>
+  const getStatusColorClass = (status: string | null) => {
+    if (!status) return 'text-slate-200';
+    if (status === 'PRESENT') return 'text-emerald-600 bg-emerald-50';
+    if (status === 'LATE') return 'text-warning-600 bg-warning-50';
+    if (status === 'ABSENT') return 'text-danger-600 bg-danger-50';
+    return 'text-info-600 bg-info-50';
+  };
 
-      <section className="rounded-[30px] border border-[var(--line)] bg-white/90 p-5 shadow-sm backdrop-blur-sm">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5 items-end">
-          <label className="grid gap-2">
-            <span className="label">Academic year</span>
+  return (
+    <div className="space-y-8 animate-fade-in">
+      <PageHeader 
+        title="Attendance Register" 
+        description="Comprehensive monthly attendance matrix for classroom management."
+      />
+
+      <section className="rounded-[3rem] border border-slate-100 bg-white/50 p-6 backdrop-blur-xl shadow-xl shadow-slate-200/50">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5 items-end">
+          <div className="space-y-2">
+            <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">Academic Year</label>
             <select
               value={academicYearId}
-              onChange={(event) => setAcademicYearId(event.target.value)}
+              onChange={(e) => setAcademicYearId(e.target.value)}
+              className="premium-input bg-white"
             >
-              <option value="">Select year</option>
+              <option value="">Select Year</option>
               {(academicYearsQuery.data ?? []).map((year) => (
                 <option key={year.id} value={year.id}>
                   {year.name}
-                  {year.isCurrent ? ' (current)' : ''}
+                  {year.isCurrent ? ' (Current)' : ''}
                 </option>
               ))}
             </select>
-          </label>
-          <label className="grid gap-2">
-            <span className="label">Class</span>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">Class</label>
             <select
               value={classId}
-              onChange={(event) => {
-                setClassId(event.target.value);
+              onChange={(e) => {
+                setClassId(e.target.value);
                 setSectionId('');
               }}
+              className="premium-input bg-white"
             >
-              <option value="">Select class</option>
+              <option value="">Select Class</option>
               {(classesQuery.data ?? []).map((classroom) => (
                 <option key={classroom.id} value={classroom.id}>
                   {classroom.name}
                 </option>
               ))}
             </select>
-          </label>
-          <label className="grid gap-2">
-            <span className="label">Section</span>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">Section</label>
             <select
               value={sectionId}
-              onChange={(event) => setSectionId(event.target.value)}
+              onChange={(e) => setSectionId(e.target.value)}
+              className="premium-input bg-white"
             >
-              <option value="">All sections</option>
+              <option value="">All Sections</option>
               {availableSections.map((section) => (
                 <option key={section.id} value={section.id}>
                   {section.name}
                 </option>
               ))}
             </select>
-          </label>
-          <label className="grid gap-2">
-            <span className="label">Month</span>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">Month</label>
             <select
               value={month}
-              onChange={(event) => setMonth(Number(event.target.value))}
+              onChange={(e) => setMonth(Number(e.target.value))}
+              className="premium-input bg-white"
             >
               {months.map((m) => (
                 <option key={m.value} value={m.value}>
@@ -191,60 +197,65 @@ export default function AttendanceRegisterPage() {
                 </option>
               ))}
             </select>
-          </label>
-          <div className="flex gap-2 h-10">
+          </div>
+          <div className="flex gap-2">
             <button
               type="button"
-              className="inline-flex flex-1 items-center justify-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:translate-y-0 disabled:opacity-50"
+              className="flex-1 h-12 flex items-center justify-center gap-2 rounded-2xl bg-slate-900 text-sm font-bold text-white shadow-lg transition hover:bg-slate-800 disabled:opacity-50"
               disabled={!academicYearId || !classId || registerQuery.isFetching}
               onClick={() => registerQuery.refetch()}
             >
-              {registerQuery.isFetching ? 'Loading...' : 'Load'}
+              {registerQuery.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Filter size={16} />}
+              Apply
             </button>
             <button
               type="button"
-              className="inline-flex flex-1 items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-gray-50 disabled:translate-y-0 disabled:opacity-50"
+              className="flex-1 h-12 flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
               disabled={!academicYearId || !classId || !registerQuery.data?.students?.length}
               onClick={handleExportCsv}
             >
-              Export CSV
+              <Download size={16} />
+              CSV
             </button>
           </div>
         </div>
       </section>
 
-      {registerQuery.data ? (
-        <section className="rounded-[30px] border border-[var(--line)] bg-white p-5 shadow-sm overflow-x-auto">
+      {registerQuery.isFetching ? (
+        <LoadingState label="Preparing attendance matrix..." />
+      ) : registerQuery.data ? (
+        <div className="rounded-[2.5rem] border border-slate-100 bg-white p-6 shadow-xl overflow-x-auto relative">
           {registerQuery.data.students.length > 0 ? (
-            <table className="min-w-full border-collapse text-sm text-left">
+            <table className="min-w-full border-separate border-spacing-0 text-left">
               <thead>
                 <tr>
-                  <th className="border-b border-gray-200 py-3 px-2 font-semibold text-gray-900 sticky left-0 bg-white shadow-[1px_0_0_0_#e5e7eb] z-10">
-                    Student
+                  <th className="sticky left-0 bg-white z-20 border-b-2 border-slate-100 py-4 px-4 font-black text-slate-900 text-[0.65rem] uppercase tracking-widest shadow-[4px_0_10px_-5px_rgba(0,0,0,0.05)]">
+                    Student Information
                   </th>
                   {registerQuery.data.days.map((day: AttendanceRegisterDay) => (
                     <th
                       key={day.date}
-                      className={`border-b border-gray-200 py-3 px-2 text-center text-xs font-semibold ${
-                        !day.isWorkingDay ? 'bg-gray-50 text-gray-400' : 'text-gray-900'
-                      }`}
+                      className={cn(
+                        "border-b-2 border-slate-100 py-4 px-2 text-center text-[0.65rem] font-black uppercase tracking-tighter min-w-[36px]",
+                        !day.isWorkingDay ? 'bg-slate-50 text-slate-400' : 'text-slate-600'
+                      )}
                       title={day.label || ''}
                     >
                       {day.date}
                     </th>
                   ))}
-                  <th className="border-b border-gray-200 py-3 px-2 text-center text-xs font-semibold text-emerald-700">P</th>
-                  <th className="border-b border-gray-200 py-3 px-2 text-center text-xs font-semibold text-danger-700">A</th>
-                  <th className="border-b border-gray-200 py-3 px-2 text-center text-xs font-semibold text-amber-700">L</th>
+                  <th className="border-b-2 border-slate-100 py-4 px-3 text-center text-[0.65rem] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50/50">P</th>
+                  <th className="border-b-2 border-slate-100 py-4 px-3 text-center text-[0.65rem] font-black uppercase tracking-widest text-danger-600 bg-danger-50/50">A</th>
+                  <th className="border-b-2 border-slate-100 py-4 px-3 text-center text-[0.65rem] font-black uppercase tracking-widest text-warning-600 bg-warning-50/50">L</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-50">
                 {registerQuery.data.students.map((student: AttendanceRegisterStudent) => (
-                  <tr key={student.studentId} className="hover:bg-gray-50">
-                    <td className="py-2 px-2 sticky left-0 bg-inherit shadow-[1px_0_0_0_#e5e7eb] whitespace-nowrap">
+                  <tr key={student.studentId} className="group hover:bg-slate-50/50 transition-colors">
+                    <td className="sticky left-0 bg-inherit z-10 py-3 px-4 shadow-[4px_0_10px_-5px_rgba(0,0,0,0.05)]">
                       <div className="flex flex-col">
-                        <span className="font-medium text-gray-900">{student.fullName}</span>
-                        <span className="text-xs text-gray-500">Roll: {student.rollNumber || '-'}</span>
+                        <span className="text-sm font-bold text-slate-900 leading-tight">{student.fullName}</span>
+                        <span className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-widest mt-0.5">ID: {student.studentId.slice(0, 8)} • Roll: {student.rollNumber || '-'}</span>
                       </div>
                     </td>
                     {student.statuses.map((status: string | null, index: number) => {
@@ -252,21 +263,22 @@ export default function AttendanceRegisterPage() {
                       return (
                         <td
                           key={index}
-                          className={`py-2 px-1 text-center text-xs ${
-                            !day.isWorkingDay ? 'bg-gray-50 text-gray-300' : getStatusColor(status)
-                          }`}
+                          className={cn(
+                            "py-3 px-1 text-center text-[0.65rem] font-black transition-all",
+                            !day.isWorkingDay ? 'bg-slate-50/50 text-slate-200' : getStatusColorClass(status)
+                          )}
                         >
-                          {!day.isWorkingDay ? 'H' : getStatusLabel(status)}
+                          {!day.isWorkingDay ? '•' : getStatusLabel(status)}
                         </td>
                       );
                     })}
-                    <td className="py-2 px-2 text-center font-semibold text-emerald-700 bg-emerald-50/50">
+                    <td className="py-3 px-3 text-center font-black text-emerald-700 bg-emerald-50/30">
                       {student.totalPresent}
                     </td>
-                    <td className="py-2 px-2 text-center font-semibold text-danger-700 bg-danger-50/50">
+                    <td className="py-3 px-3 text-center font-black text-danger-700 bg-danger-50/30">
                       {student.totalAbsent}
                     </td>
-                    <td className="py-2 px-2 text-center font-semibold text-amber-700 bg-amber-50/50">
+                    <td className="py-3 px-3 text-center font-black text-warning-700 bg-warning-50/30">
                       {student.totalLeave}
                     </td>
                   </tr>
@@ -274,12 +286,34 @@ export default function AttendanceRegisterPage() {
               </tbody>
             </table>
           ) : (
-            <div className="py-12 text-center">
-              <p className="text-gray-500">No student records found for the selected criteria.</p>
+            <div className="py-20 flex flex-col items-center text-center">
+               <div className="h-16 w-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 mb-4">
+                 <Users size={32} />
+               </div>
+               <p className="text-sm font-bold text-slate-900 tracking-tight">No Students Found</p>
+               <p className="text-xs text-slate-500 mt-1 max-w-[240px]">We couldn't find any students for the selected class and month. Please check your filters.</p>
             </div>
           )}
-        </section>
-      ) : null}
+        </div>
+      ) : (
+        <div className="rounded-[3rem] border-2 border-dashed border-slate-100 p-20 flex flex-col items-center text-center">
+           <div className="h-20 w-20 rounded-[2rem] bg-slate-50 flex items-center justify-center text-slate-400 mb-6">
+             <Calendar size={40} />
+           </div>
+           <h3 className="text-xl font-bold text-slate-900 tracking-tight">Generate Monthly Register</h3>
+           <p className="text-sm text-slate-500 mt-2 max-w-md">Select an academic year and class from the filters above to load the attendance matrix.</p>
+           <div className="mt-8 flex gap-3">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 text-[0.65rem] font-bold text-slate-500 uppercase tracking-widest">
+                <Users size={14} />
+                Student Roster
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 text-[0.65rem] font-bold text-slate-500 uppercase tracking-widest">
+                <FileText size={14} />
+                PDF Export
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }

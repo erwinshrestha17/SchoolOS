@@ -23,6 +23,10 @@ import { PageHeader } from '../ui/page-header';
 import { StatCard } from '../ui/stat-card';
 import { StatusBadge, type StatusTone } from '../ui/status-badge';
 import { cn } from '../../lib/utils';
+import { StudentSelector } from '../students/student-selector';
+import { MenuItemSelector } from './menu-item-selector';
+import { QRResolver } from '../ui/qr-resolver';
+import { ConfirmDialog } from '../ui/confirm-dialog';
 
 type CanteenTab = 'overview' | 'menu' | 'plans' | 'enrollments' | 'serving' | 'wallets' | 'pos' | 'controls' | 'reports';
 
@@ -64,6 +68,9 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
   const [controlForm, setControlForm] = useState<CanteenSpendingControlPayload>(emptyControlForm);
   const [reportDate, setReportDate] = useState(today);
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirmingSaleId, setConfirmingSaleId] = useState<string | null>(null);
+  const [confirmingEnrollmentId, setConfirmingEnrollmentId] = useState<string | null>(null);
+  const [isTopUpOpen, setIsTopUpOpen] = useState(false);
 
   const queryClient = useQueryClient();
   const menuQuery = useQuery({ queryKey: ['canteen-menu'], queryFn: () => canteenApi.listMenuItems({ status: '' }) });
@@ -132,6 +139,19 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
     blockedByLimit: 0,
     allergyWarnings: allergyWarnings.length,
   };
+
+  const selectedPosStudent = posForm.studentId;
+  const posStudentWalletQuery = useQuery({
+    queryKey: ['canteen-wallet-preview', selectedPosStudent],
+    queryFn: () => canteenApi.getWalletBalance(selectedPosStudent!),
+    enabled: Boolean(selectedPosStudent && posForm.paymentMethod === 'WALLET'),
+  });
+
+  const posStudentControlQuery = useQuery({
+    queryKey: ['canteen-control-preview', selectedPosStudent],
+    queryFn: () => canteenApi.getSpendingControl(selectedPosStudent!),
+    enabled: Boolean(selectedPosStudent),
+  });
 
   const firstError = menuQuery.error || plansQuery.error || enrollmentsQuery.error || servingsQuery.error || salesQuery.error || lowBalanceQuery.error;
 
@@ -230,7 +250,7 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
           </Panel>
           <Panel title="Enroll student" description="Meal enrollment is tenant-scoped and uses real student records.">
             <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); enrollmentMutation.mutate(cleanEnrollment(enrollmentForm)); }}>
-              <StudentSelect value={enrollmentForm.studentId} onChange={(studentId) => setEnrollmentForm({ ...enrollmentForm, studentId })} students={studentsQuery.data ?? []} />
+              <StudentSelector students={studentsQuery.data ?? []} selectedId={enrollmentForm.studentId} onSelect={(studentId) => setEnrollmentForm({ ...enrollmentForm, studentId })} label="Student" />
               <SelectInput label="Meal plan" value={enrollmentForm.mealPlanId} onChange={(mealPlanId) => setEnrollmentForm({ ...enrollmentForm, mealPlanId })} required options={plans.map((plan) => ({ label: plan.name, value: plan.id }))} />
               <TextInput label="Starts on" type="date" value={enrollmentForm.startsOn} onChange={(startsOn) => setEnrollmentForm({ ...enrollmentForm, startsOn })} required />
               <button type="submit" className="btn-primary" disabled={enrollmentMutation.isPending}>{enrollmentMutation.isPending ? 'Enrolling...' : 'Enroll student'}</button>
@@ -245,23 +265,29 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
             <div className="space-y-3">{servings.map((serving) => <RecordCard key={serving.id} title={studentLabel(serving.student) || serving.studentId} subtitle={`${serving.mealType} • ${serving.mealDate?.slice(0, 10)}${serving.dietaryWarning ? ` • ${serving.dietaryWarning}` : ''}`} badge={<div className="flex flex-wrap gap-2"><CanteenStatusBadge status={serving.status} />{serving.dietaryWarning ? <CanteenStatusBadge status="ALLERGY_WARNING" /> : null}</div>} />)}</div>
             {servings.length === 0 && !servingsQuery.isLoading ? <EmptyState title="No servings" description="Served meals will appear here." /> : null}
           </Panel>
-          <Panel title="Student ID / QR-style serving" description="Scan-style foundation using the existing serve meal API and normal student selector.">
-            <div className="mb-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-              <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-700 shadow-sm">
-                  <QrCode size={20} />
-                </span>
-                <div>
-                  <h3 className="font-bold text-slate-900">Student ID / QR-style serving</h3>
-                  <p className="text-sm text-slate-500">Use the student selector now; scanner hardware can fill this same workflow later.</p>
-                </div>
-              </div>
-            </div>
-            <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); servingMutation.mutate(cleanServing(servingForm)); }}>
-              <StudentSelect value={servingForm.studentId} onChange={(studentId) => setServingForm({ ...servingForm, studentId })} students={studentsQuery.data ?? []} />
+          <Panel title="Student ID / QR Serving" description="Scan student QR to instantly serve enrolled meals.">
+            <QRResolver
+              purpose="CANTEEN_SERVE"
+              onResolved={(data) => {
+                if (data.id) {
+                  setServingForm({ ...servingForm, studentId: data.id });
+                  // Optionally auto-submit if enrollment is found
+                }
+              }}
+              className="mb-6"
+            />
+            <form className="space-y-4 border-t border-slate-100 pt-6" onSubmit={(event) => { event.preventDefault(); servingMutation.mutate(cleanServing(servingForm)); }}>
+              <StudentSelector students={studentsQuery.data ?? []} selectedId={servingForm.studentId} onSelect={(studentId) => setServingForm({ ...servingForm, studentId })} label="Or Select Student Manually" />
               <SelectInput label="Meal type" value={servingForm.mealType ?? 'LUNCH'} onChange={(mealType) => setServingForm({ ...servingForm, mealType })} options={mealTypeOptions()} />
               <TextInput label="Meal date" type="date" value={servingForm.mealDate ?? today} onChange={(mealDate) => setServingForm({ ...servingForm, mealDate })} />
-              <button type="submit" className="btn-primary" disabled={servingMutation.isPending}>{servingMutation.isPending ? 'Serving...' : 'Serve meal'}</button>
+              
+              {posStudentControlQuery.data?.blockedCategories?.length ? (
+                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-800">
+                    Warning: Parent has blocked items: {posStudentControlQuery.data.blockedCategories.join(', ')}
+                 </div>
+              ) : null}
+
+              <button type="submit" className="btn-primary w-full h-12" disabled={servingMutation.isPending || !servingForm.studentId}>{servingMutation.isPending ? 'Serving...' : 'Serve meal now'}</button>
             </form>
           </Panel>
         </TwoColumn>
@@ -270,17 +296,17 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
       {activeTab === 'wallets' && (
         <TwoColumn>
           <Panel title="Wallet balance" description="Create wallet, view balance, and review transaction history.">
-            <StudentSelect value={walletStudentId} onChange={setWalletStudentId} students={studentsQuery.data ?? []} />
+            <StudentSelector students={studentsQuery.data ?? []} selectedId={walletStudentId} onSelect={setWalletStudentId} label="Student" />
             <div className="mt-3 flex gap-2"><button className="btn-secondary" disabled={!walletStudentId || createWalletMutation.isPending} onClick={() => createWalletMutation.mutate(walletStudentId)}>Create / load wallet</button></div>
             {walletQuery.data ? <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm text-slate-500">Balance</p><p className="text-2xl font-black text-slate-900">{money(walletQuery.data.balance)}</p><p className="text-xs text-slate-400">Low balance threshold: {money(walletQuery.data.lowBalanceThreshold)}</p></div>{isWalletLow(walletQuery.data.balance, walletQuery.data.lowBalanceThreshold) ? <CanteenStatusBadge status="WALLET_LOW" /> : null}</div></div> : <EmptyState title="No wallet selected" description="Select a student to view or create a wallet." />}
             <div className="mt-4 space-y-3">{(transactionsQuery.data ?? []).slice(0, 6).map((tx) => <RecordCard key={tx.id} title={`${tx.type} • ${money(tx.amount)}`} subtitle={`Balance after: ${money(tx.balanceAfter)} • ${tx.note ?? 'No note'}`} />)}</div>
           </Panel>
           <Panel title="Manual top-up" description="Top-up writes are backend-controlled and audited.">
             <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); if (walletStudentId) topUpMutation.mutate({ studentId: walletStudentId, body: cleanTopUp(topUpForm) }); }}>
-              <TextInput label="Amount" type="number" value={String(topUpForm.amount)} onChange={(value) => setTopUpForm({ ...topUpForm, amount: Number(value) || 0 })} required />
+              <TextInput label="Amount (NPR)" type="number" value={String(topUpForm.amount)} onChange={(value) => setTopUpForm({ ...topUpForm, amount: Number(value) || 0 })} required />
               <TextInput label="Low balance threshold" type="number" value={topUpForm.lowBalanceThreshold?.toString() ?? ''} onChange={(value) => setTopUpForm({ ...topUpForm, lowBalanceThreshold: value ? Number(value) : undefined })} />
-              <TextInput label="Note" value={topUpForm.note ?? ''} onChange={(note) => setTopUpForm({ ...topUpForm, note })} />
-              <button type="submit" className="btn-primary" disabled={!walletStudentId || topUpMutation.isPending}>{topUpMutation.isPending ? 'Topping up...' : 'Top up wallet'}</button>
+              <TextInput label="Internal Note" value={topUpForm.note ?? ''} onChange={(note) => setTopUpForm({ ...topUpForm, note })} />
+              <button type="submit" className="btn-primary w-full" disabled={!walletStudentId || topUpMutation.isPending}>{topUpMutation.isPending ? 'Topping up...' : 'Top up wallet'}</button>
             </form>
           </Panel>
         </TwoColumn>
@@ -292,12 +318,34 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
             <SaleList sales={sales} emptyTitle="No POS sales" onComplete={(saleId) => completeSaleMutation.mutate(saleId)} onCancel={(saleId) => cancelSaleMutation.mutate(saleId)} />
           </Panel>
           <Panel title="Create POS sale" description="Wallet spending limits and balance checks are enforced by backend.">
-            <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); posMutation.mutate(cleanPos(posForm)); }}>
-              <StudentSelect value={posForm.studentId ?? ''} onChange={(studentId) => setPosForm({ ...posForm, studentId })} students={studentsQuery.data ?? []} optional />
+            <QRResolver
+              purpose="CANTEEN_POS"
+              onResolved={(data) => {
+                if (data.id) {
+                  setPosForm({ ...posForm, studentId: data.id, paymentMethod: 'WALLET' });
+                }
+              }}
+              className="mb-6"
+            />
+            <form className="space-y-4 border-t border-slate-100 pt-6" onSubmit={(event) => { event.preventDefault(); posMutation.mutate(cleanPos(posForm)); }}>
+              <StudentSelector students={studentsQuery.data ?? []} selectedId={posForm.studentId ?? ''} onSelect={(studentId) => setPosForm({ ...posForm, studentId })} label="Or Select Student" optional />
               <SelectInput label="Payment method" value={posForm.paymentMethod} onChange={(paymentMethod) => setPosForm({ ...posForm, paymentMethod: paymentMethod as CanteenPaymentMethod })} options={[{ label: 'Cash', value: 'CASH' }, { label: 'Wallet', value: 'WALLET' }, { label: 'Staff credit', value: 'STAFF_CREDIT' }]} />
-              <SelectInput label="Menu item" value={posForm.items[0]?.menuItemId ?? ''} onChange={(menuItemId) => setPosForm({ ...posForm, items: [{ ...(posForm.items[0] ?? { quantity: 1 }), menuItemId }] })} required options={menuItems.map((item) => ({ label: `${item.name} • ${money(item.unitPrice)}`, value: item.id }))} />
+              <MenuItemSelector items={menuItems} selectedId={posForm.items[0]?.menuItemId ?? ''} onSelect={(menuItemId) => setPosForm({ ...posForm, items: [{ ...(posForm.items[0] ?? { quantity: 1 }), menuItemId }] })} label="Menu Item" />
               <TextInput label="Quantity" type="number" value={String(posForm.items[0]?.quantity ?? 1)} onChange={(value) => setPosForm({ ...posForm, items: [{ ...(posForm.items[0] ?? { menuItemId: '' }), quantity: Number(value) || 1 }] })} />
-              <button type="submit" className="btn-primary" disabled={posMutation.isPending}>{posMutation.isPending ? 'Creating...' : 'Create sale'}</button>
+              
+              {posStudentWalletQuery.data ? (
+                <div className={cn("rounded-xl border p-3 text-sm font-bold", isWalletLow(posStudentWalletQuery.data.balance, posStudentWalletQuery.data.lowBalanceThreshold) ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-100 bg-emerald-50 text-emerald-800")}>
+                  Wallet Balance: {money(posStudentWalletQuery.data.balance)}
+                </div>
+              ) : null}
+
+              {posStudentControlQuery.data?.blockedCategories?.length ? (
+                 <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-800">
+                    Warning: Parent blocked categories: {posStudentControlQuery.data.blockedCategories.join(', ')}
+                 </div>
+              ) : null}
+
+              <button type="submit" className="btn-primary w-full h-12 text-base" disabled={posMutation.isPending}>{posMutation.isPending ? 'Creating Sale...' : 'Create POS sale'}</button>
             </form>
           </Panel>
         </TwoColumn>
@@ -322,11 +370,11 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
           </Panel>
           <Panel title="Save control" description="Server-side controls protect canteen spending rules.">
             <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); controlMutation.mutate(cleanControl(controlForm)); }}>
-              <StudentSelect value={controlForm.studentId} onChange={(studentId) => setControlForm({ ...controlForm, studentId })} students={studentsQuery.data ?? []} />
-              <TextInput label="Daily spending limit" type="number" value={controlForm.dailySpendingLimit?.toString() ?? ''} onChange={(value) => setControlForm({ ...controlForm, dailySpendingLimit: value ? Number(value) : undefined })} />
+              <StudentSelector students={studentsQuery.data ?? []} selectedId={controlForm.studentId} onSelect={(studentId) => setControlForm({ ...controlForm, studentId })} label="Student" />
+              <TextInput label="Daily spending limit (NPR)" type="number" value={controlForm.dailySpendingLimit?.toString() ?? ''} onChange={(value) => setControlForm({ ...controlForm, dailySpendingLimit: value ? Number(value) : undefined })} />
               <TextInput label="Blocked categories" value={controlForm.blockedCategories?.join(', ') ?? ''} onChange={(value) => setControlForm({ ...controlForm, blockedCategories: splitCsv(value) })} />
               <TextInput label="Low balance threshold" type="number" value={controlForm.lowBalanceThreshold?.toString() ?? ''} onChange={(value) => setControlForm({ ...controlForm, lowBalanceThreshold: value ? Number(value) : undefined })} />
-              <button type="submit" className="btn-primary" disabled={controlMutation.isPending}>{controlMutation.isPending ? 'Saving...' : 'Save control'}</button>
+              <button type="submit" className="btn-primary w-full" disabled={controlMutation.isPending}>{controlMutation.isPending ? 'Saving...' : 'Save control'}</button>
             </form>
           </Panel>
         </TwoColumn>

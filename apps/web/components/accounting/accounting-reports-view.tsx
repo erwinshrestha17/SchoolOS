@@ -1,13 +1,16 @@
+'use client';
+
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { 
   BarChart3, FileText, PieChart, History, 
-  Wallet, Calculator, Download, AlertCircle, FileSpreadsheet
+  Wallet, Calculator, AlertCircle, FileSpreadsheet, ArrowRight
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { SectionCard } from '../ui/section-card';
 import { PageState } from '../ui/page-state';
 import { cn } from '../../lib/utils';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { AuditInfo } from '../ui/audit-info';
 import { ReportFilters } from './report-filters';
 import { ReportTable } from './report-table';
@@ -15,13 +18,30 @@ import { ReportTable } from './report-table';
 type ReportType = 'trial-balance' | 'income-statement' | 'balance-sheet' | 'general-ledger' | 'cash-book' | 'tax-summary';
 
 export function AccountingReportsView({ initialReport = 'trial-balance' }: { initialReport?: ReportType }) {
-  const [activeReport, setActiveReport] = useState<ReportType>(initialReport);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const reportParam = searchParams.get('report') as ReportType;
+  
+  const [activeReport, setActiveReport] = useState<ReportType>(reportParam || initialReport);
   const [filters, setFilters] = useState<{
     startDate?: string;
     endDate?: string;
     fiscalYearId?: string;
     fiscalPeriodId?: string;
   }>({});
+
+  useEffect(() => {
+    if (reportParam && reportParam !== activeReport) {
+      setActiveReport(reportParam);
+    }
+  }, [reportParam, activeReport]);
+
+  const handleReportChange = (report: ReportType) => {
+    setActiveReport(report);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('report', report);
+    router.push(`?${params.toString()}`);
+  };
 
   const reportQuery = useQuery({ 
     queryKey: ['accounting-report', activeReport, filters], 
@@ -72,6 +92,16 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
 
     const data = reportQuery.data;
 
+    if (!data || (Array.isArray(data) && data.length === 0)) {
+      return (
+        <PageState
+          tone="info"
+          title="No Transactions Found"
+          description="There are no ledger entries for the selected report and period."
+        />
+      );
+    }
+
     if (activeReport === 'trial-balance') {
       return (
         <ReportTable
@@ -82,9 +112,9 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
               { value: row.code, bold: true },
               { value: row.name },
               { value: row.type },
-              { value: row.debit, type: 'currency' },
-              { value: row.credit, type: 'currency' },
-              { value: row.balance, type: 'currency', bold: true },
+              { value: row.debit, type: 'currency', align: 'right' },
+              { value: row.credit, type: 'currency', align: 'right' },
+              { value: row.balance, type: 'currency', bold: true, align: 'right' },
             ],
           }))}
         />
@@ -99,17 +129,17 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
       
       rows.push({ id: 'rev-header', isHeader: true, cells: [{ value: 'REVENUE', bold: true }] });
       (groups.revenue ?? []).forEach((r: any) => {
-        rows.push({ id: r.accountId, cells: [{ value: r.name, indent: 1 }, { value: '' }, { value: '' }, { value: r.balance * -1, type: 'currency' }] });
+        rows.push({ id: r.accountId, cells: [{ value: r.name, indent: 1 }, { value: '' }, { value: '' }, { value: r.balance * -1, type: 'currency', align: 'right' }] });
       });
-      rows.push({ id: 'rev-total', isFooter: true, cells: [{ value: 'Total Revenue' }, { value: '' }, { value: '' }, { value: pnl?.income ?? 0, type: 'currency' }] });
+      rows.push({ id: 'rev-total', isFooter: true, cells: [{ value: 'Total Revenue' }, { value: '' }, { value: '' }, { value: pnl?.income ?? 0, type: 'currency', align: 'right' }] });
 
       rows.push({ id: 'exp-header', isHeader: true, className: 'mt-4', cells: [{ value: 'EXPENSES', bold: true }] });
       (groups.expenses ?? []).forEach((e: any) => {
-        rows.push({ id: e.accountId, cells: [{ value: e.name, indent: 1 }, { value: '' }, { value: '' }, { value: e.balance, type: 'currency' }] });
+        rows.push({ id: e.accountId, cells: [{ value: e.name, indent: 1 }, { value: '' }, { value: '' }, { value: e.balance, type: 'currency', align: 'right' }] });
       });
-      rows.push({ id: 'exp-total', isFooter: true, cells: [{ value: 'Total Expenses' }, { value: '' }, { value: '' }, { value: pnl?.expenses ?? 0, type: 'currency' }] });
+      rows.push({ id: 'exp-total', isFooter: true, cells: [{ value: 'Total Expenses' }, { value: '' }, { value: '' }, { value: pnl?.expenses ?? 0, type: 'currency', align: 'right' }] });
 
-      rows.push({ id: 'net-total', isFooter: true, className: 'bg-slate-900 text-white hover:bg-slate-900', cells: [{ value: 'NET INCOME', bold: true }, { value: '' }, { value: '' }, { value: pnl?.netIncome ?? 0, type: 'currency' }] });
+      rows.push({ id: 'net-total', isFooter: true, className: 'bg-slate-900 text-white hover:bg-slate-900', cells: [{ value: 'NET INCOME', bold: true }, { value: '' }, { value: '' }, { value: pnl?.netIncome ?? 0, type: 'currency', align: 'right' }] });
 
       return <ReportTable headers={['Classification', '', '', 'Amount']} rows={rows} />;
     }
@@ -120,21 +150,21 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
 
       rows.push({ id: 'ast-header', isHeader: true, cells: [{ value: 'ASSETS', bold: true }] });
       (bs.assets ?? []).forEach((a: any) => {
-        rows.push({ id: a.accountId, cells: [{ value: a.name, indent: 1 }, { value: a.balance, type: 'currency' }] });
+        rows.push({ id: a.accountId, cells: [{ value: a.name, indent: 1 }, { value: a.balance, type: 'currency', align: 'right' }] });
       });
-      rows.push({ id: 'ast-total', isFooter: true, cells: [{ value: 'Total Assets' }, { value: bs.totals?.assets ?? 0, type: 'currency' }] });
+      rows.push({ id: 'ast-total', isFooter: true, cells: [{ value: 'Total Assets' }, { value: bs.totals?.assets ?? 0, type: 'currency', align: 'right' }] });
 
       rows.push({ id: 'liab-header', isHeader: true, cells: [{ value: 'LIABILITIES', bold: true }] });
       (bs.liabilities ?? []).forEach((l: any) => {
-        rows.push({ id: l.accountId, cells: [{ value: l.name, indent: 1 }, { value: l.balance * -1, type: 'currency' }] });
+        rows.push({ id: l.accountId, cells: [{ value: l.name, indent: 1 }, { value: l.balance * -1, type: 'currency', align: 'right' }] });
       });
-      rows.push({ id: 'liab-total', isFooter: true, cells: [{ value: 'Total Liabilities' }, { value: bs.totals?.liabilities ?? 0, type: 'currency' }] });
+      rows.push({ id: 'liab-total', isFooter: true, cells: [{ value: 'Total Liabilities' }, { value: bs.totals?.liabilities ?? 0, type: 'currency', align: 'right' }] });
 
       rows.push({ id: 'eq-header', isHeader: true, cells: [{ value: 'EQUITY', bold: true }] });
       (bs.equity ?? []).forEach((e: any) => {
-        rows.push({ id: e.accountId, cells: [{ value: e.name, indent: 1 }, { value: e.balance * -1, type: 'currency' }] });
+        rows.push({ id: e.accountId, cells: [{ value: e.name, indent: 1 }, { value: e.balance * -1, type: 'currency', align: 'right' }] });
       });
-      rows.push({ id: 'eq-total', isFooter: true, cells: [{ value: 'Total Equity' }, { value: bs.totals?.equity ?? 0, type: 'currency' }] });
+      rows.push({ id: 'eq-total', isFooter: true, cells: [{ value: 'Total Equity' }, { value: bs.totals?.equity ?? 0, type: 'currency', align: 'right' }] });
 
       return <ReportTable headers={['Account', 'Balance']} rows={rows} />;
     }
@@ -149,9 +179,9 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
               { value: row.date, type: 'date' },
               { value: row.journalNumber, bold: true },
               { value: row.accountName },
-              { value: row.debit, type: 'currency' },
-              { value: row.credit, type: 'currency' },
-              { value: row.runningBalance, type: 'currency', bold: true },
+              { value: row.debit, type: 'currency', align: 'right' },
+              { value: row.credit, type: 'currency', align: 'right' },
+              { value: row.runningBalance, type: 'currency', bold: true, align: 'right' },
             ],
           }))}
         />
@@ -169,9 +199,9 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
               { value: row.date, type: 'date' },
               { value: row.journalNumber },
               { value: row.narration },
-              { value: row.debit, type: 'currency' },
-              { value: row.credit, type: 'currency' },
-              { value: row.runningBalance, type: 'currency', bold: true },
+              { value: row.debit, type: 'currency', align: 'right' },
+              { value: row.credit, type: 'currency', align: 'right' },
+              { value: row.runningBalance, type: 'currency', bold: true, align: 'right' },
             ],
           }))}
         />
@@ -187,9 +217,9 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
             cells: [
               { value: row.type, bold: true },
               { value: row.reference },
-              { value: row.baseAmount, type: 'currency' },
+              { value: row.baseAmount, type: 'currency', align: 'right' },
               { value: `${row.taxRate}%` },
-              { value: row.taxAmount, type: 'currency', bold: true },
+              { value: row.taxAmount, type: 'currency', bold: true, align: 'right' },
             ],
           }))}
         />
@@ -218,7 +248,7 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
             ].map((report) => (
               <button
                 key={report.id}
-                onClick={() => setActiveReport(report.id as ReportType)}
+                onClick={() => handleReportChange(report.id as ReportType)}
                 className={cn(
                   "inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all",
                   activeReport === report.id

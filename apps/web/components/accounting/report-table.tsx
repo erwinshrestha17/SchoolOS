@@ -21,6 +21,13 @@ interface ReportTableProps {
 }
 
 export function ReportTable({ headers, rows }: ReportTableProps) {
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-NP', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm border-separate border-spacing-0">
@@ -30,7 +37,7 @@ export function ReportTable({ headers, rows }: ReportTableProps) {
               <th
                 key={header}
                 className={cn(
-                  "border-b border-slate-200 px-4 py-3 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400 first:pl-6 last:pr-6",
+                  "border-b border-slate-200 px-4 py-3 text-[0.65rem] font-black uppercase tracking-widest text-slate-400 first:pl-6 last:pr-6",
                   index > 2 ? "text-right" : "text-left"
                 )}
               >
@@ -54,16 +61,16 @@ export function ReportTable({ headers, rows }: ReportTableProps) {
                 <td
                   key={index}
                   className={cn(
-                    "px-4 py-4 text-slate-600 first:pl-6 last:pr-6",
+                    "px-4 py-4 text-slate-600 first:pl-6 last:pr-6 whitespace-nowrap",
                     cell.bold && "font-bold text-slate-900",
-                    cell.align === 'right' || (index > 2 && !cell.align) ? "text-right" : "text-left",
+                    cell.align === 'right' || (index > 2 && !cell.align) ? "text-right tabular-nums" : "text-left",
                   )}
                   style={{ paddingLeft: cell.indent ? `${cell.indent * 1.5 + 1.5}rem` : undefined }}
                 >
                   {cell.type === 'currency' ? (
-                    <MoneyDisplay amount={cell.value} />
+                    <span className="font-mono">{formatCurrency(cell.value)}</span>
                   ) : cell.type === 'date' ? (
-                    new Date(cell.value).toLocaleDateString()
+                    <span className="font-medium text-slate-500">{new Date(cell.value).toLocaleDateString()}</span>
                   ) : (
                     String(cell.value ?? '')
                   )}
@@ -74,8 +81,12 @@ export function ReportTable({ headers, rows }: ReportTableProps) {
         </tbody>
       </table>
       {rows.length === 0 && (
-        <div className="py-12 text-center text-sm text-slate-400 font-medium">
-          No data available for the selected filters.
+        <div className="py-20 text-center">
+          <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50 text-slate-300 mb-4">
+             <Calculator size={32} />
+          </div>
+          <p className="text-sm text-slate-500 font-bold">No financial records found</p>
+          <p className="text-xs text-slate-400 mt-1">Try adjusting your filters or selected period.</p>
         </div>
       )}
     </div>

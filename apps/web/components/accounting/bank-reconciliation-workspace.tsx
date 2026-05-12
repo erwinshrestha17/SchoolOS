@@ -9,12 +9,14 @@ import { Loader2, Upload, CheckCircle2, AlertTriangle, ArrowRightLeft, Search, L
 import { cn } from '../../lib/utils';
 import { ReportTable } from './report-table';
 import { Input } from '../ui/input';
+import { ConfirmDialog } from '../ui/confirm-dialog';
 
 export function BankReconciliationWorkspace() {
   const queryClient = useQueryClient();
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [importing, setImporting] = useState(false);
   const [matching, setMatching] = useState<string | null>(null); // statementId being matched
+  const [isConfirmingRecon, setIsConfirmingRecon] = useState<{ statementId: string; journalLineId: string } | null>(null);
   const [journalFilter, setJournalFilter] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,11 +72,13 @@ export function BankReconciliationWorkspace() {
       queryClient.invalidateQueries({ queryKey: ['bank-recon-summary', selectedAccountId] });
       queryClient.invalidateQueries({ queryKey: ['unreconciled-statements', selectedAccountId] });
       setMatching(null);
+      setIsConfirmingRecon(null);
       setTimeout(() => setMessage(null), 3000);
     },
     onError: (err: any) => {
       setError(err.message || 'Reconciliation failed');
       setMessage(null);
+      setIsConfirmingRecon(null);
     }
   });
 
@@ -193,17 +197,17 @@ export function BankReconciliationWorkspace() {
                     },
                     { 
                       value: (
-                        <button
-                          onClick={() => setMatching(matching === stmt.id ? null : stmt.id)}
-                          className={cn(
-                            "rounded-lg px-3 py-1 text-xs font-bold transition-all",
-                            matching === stmt.id 
-                              ? "bg-primary-600 text-white shadow-md shadow-primary-600/20" 
-                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                          )}
-                        >
-                          {matching === stmt.id ? 'Cancel' : 'Match'}
-                        </button>
+                      <button
+                        onClick={() => setMatching(matching === stmt.id ? null : stmt.id)}
+                        className={cn(
+                          "rounded-lg px-3 py-1 text-xs font-bold transition-all",
+                          matching === stmt.id 
+                            ? "bg-primary-600 text-white shadow-md shadow-primary-600/20" 
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        )}
+                      >
+                        {matching === stmt.id ? 'Cancel' : 'Match'}
+                      </button>
                       )
                     }
                   ]
@@ -249,7 +253,7 @@ export function BankReconciliationWorkspace() {
                           value: (
                             <button
                               disabled={!matching}
-                              onClick={() => matching && reconcileMutation.mutate({ statementId: matching, journalLineId: row.journalLineId })}
+                              onClick={() => matching && setIsConfirmingRecon({ statementId: matching, journalLineId: row.journalLineId })}
                               className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all disabled:opacity-30"
                             >
                               <ArrowRightLeft size={16} />
@@ -277,6 +281,15 @@ export function BankReconciliationWorkspace() {
           </p>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={!!isConfirmingRecon}
+        onClose={() => setIsConfirmingRecon(null)}
+        onConfirm={() => isConfirmingRecon && reconcileMutation.mutate(isConfirmingRecon)}
+        title="Confirm Reconciliation"
+        description="Are you sure you want to reconcile this statement line with the selected ledger entry? This action cannot be easily undone."
+        confirmLabel={reconcileMutation.isPending ? 'Reconciling...' : 'Confirm'}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
   TrendingUp, Calculator, Wallet, Landmark, 
@@ -15,6 +16,7 @@ import { cn } from '../../lib/utils';
 import { PageState } from '../ui/page-state';
 import { AuditInfo } from '../ui/audit-info';
 import { ReportTable } from './report-table';
+import { VoucherDialog } from './voucher-dialog';
 
 export function AccountingDashboardView() {
   const summaryQuery = useQuery({
@@ -32,6 +34,13 @@ export function AccountingDashboardView() {
     queryFn: () => api.listFiscalYears(),
   });
 
+  const accountsQuery = useQuery({
+    queryKey: ['chart-accounts'],
+    queryFn: () => api.listChartAccounts(),
+  });
+
+  const [isVoucherDialogOpen, setIsVoucherDialogOpen] = useState(false);
+
   const activeFiscalYear = (fiscalYearsQuery.data ?? []).find(y => y.status === 'OPEN') ?? fiscalYearsQuery.data?.[0];
   const activePeriod = activeFiscalYear?.periods?.find((p: any) => p.status === 'OPEN');
 
@@ -39,7 +48,7 @@ export function AccountingDashboardView() {
     return new Intl.NumberFormat('en-NP', {
       style: 'currency',
       currency: 'NPR',
-      maximumFractionDigits: 0,
+      maximumFractionDigits: 2,
     }).format(amount);
   };
 
@@ -105,8 +114,36 @@ export function AccountingDashboardView() {
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-8">
           <SectionCard 
-            title="Financial Command Center" 
-            description="Quick access to production-grade accounting reports."
+            title="Operational Quick Actions" 
+            description="Execute standard financial transactions and vouchers."
+          >
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+              {[
+                { label: 'Journal Voucher', desc: 'Manual ledger posting', icon: FileText, color: 'bg-slate-900', action: () => setIsVoucherDialogOpen(true) },
+                { label: 'Expense Voucher', desc: 'Direct school expenses', icon: Calculator, color: 'bg-rose-600', action: () => setIsVoucherDialogOpen(true) },
+                { label: 'Payment Voucher', desc: 'Vendor/Staff payments', icon: Wallet, color: 'bg-primary-600', action: () => setIsVoucherDialogOpen(true) },
+                { label: 'Receipt Voucher', desc: 'Inward cash/bank receipts', icon: CheckCircle2, color: 'bg-emerald-600', action: () => setIsVoucherDialogOpen(true) },
+              ].map((action, idx) => (
+                <button
+                  key={idx}
+                  onClick={action.action}
+                  className="group flex flex-col items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 text-center transition hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5"
+                >
+                  <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-lg transition group-hover:scale-110", action.color)}>
+                    <action.icon size={22} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-slate-900 uppercase tracking-tight">{action.label}</p>
+                    <p className="mt-1 text-[10px] font-bold text-slate-400">{action.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </SectionCard>
+
+          <SectionCard 
+            title="Financial Reporting Hub" 
+            description="Access real-time verified accounting reports."
           >
             <div className="space-y-4">
               <AuditInfo>
@@ -114,12 +151,12 @@ export function AccountingDashboardView() {
               </AuditInfo>
               <div className="grid gap-4 sm:grid-cols-2">
                 {[
-                  { href: '/dashboard/accounting/reports/trial-balance', label: 'Trial Balance', desc: 'Summary of all ledger balances.', icon: BarChart3, color: 'bg-primary-500' },
-                  { href: '/dashboard/accounting/reports/pnl', label: 'Income Statement', desc: 'Profit and loss for the period.', icon: FileText, color: 'bg-emerald-500' },
-                  { href: '/dashboard/accounting/reports/balance-sheet', label: 'Balance Sheet', desc: 'Financial position of the school.', icon: PieChart, color: 'bg-secondary-500' },
-                  { href: '/dashboard/accounting/reports/general-ledger', label: 'General Ledger', desc: 'Detailed transaction history.', icon: History, color: 'bg-amber-500' },
-                  { href: '/dashboard/accounting/reports/cash-book', label: 'Cash Book', desc: 'Real-time cash and bank flow.', icon: Wallet, color: 'bg-cyan-500' },
-                  { href: '/dashboard/accounting/reports/tax-summary', label: 'VAT/TDS/PF Summary', desc: 'Tax and statutory deductions.', icon: Calculator, color: 'bg-rose-500' },
+                  { href: '/dashboard/accounting/reports?report=trial-balance', label: 'Trial Balance', desc: 'Summary of all ledger balances.', icon: BarChart3, color: 'bg-primary-500' },
+                  { href: '/dashboard/accounting/reports?report=income-statement', label: 'Income Statement', desc: 'Profit and loss for the period.', icon: FileText, color: 'bg-emerald-500' },
+                  { href: '/dashboard/accounting/reports?report=balance-sheet', label: 'Balance Sheet', desc: 'Financial position of the school.', icon: PieChart, color: 'bg-secondary-500' },
+                  { href: '/dashboard/accounting/reports?report=general-ledger', label: 'General Ledger', desc: 'Detailed transaction history.', icon: History, color: 'bg-amber-500' },
+                  { href: '/dashboard/accounting/reports?report=cash-book', label: 'Cash Book', desc: 'Real-time cash and bank flow.', icon: Wallet, color: 'bg-cyan-500' },
+                  { href: '/dashboard/accounting/reconciliation', label: 'Bank Reconciliation', desc: 'Verify bank statements.', icon: Landmark, color: 'bg-indigo-500' },
                 ].map((report) => (
                   <Link
                     key={report.href}
@@ -205,7 +242,7 @@ export function AccountingDashboardView() {
                       <p className="text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">Current Period</p>
                     </div>
                   </div>
-                  <Badge variant={activePeriod?.status === 'OPEN' ? 'success' : 'warning'}>
+                  <Badge variant={activePeriod?.status === 'OPEN' ? 'success' : activePeriod?.status === 'LOCKED' ? 'warning' : 'danger'}>
                     {activePeriod?.status ?? 'CLOSED'}
                   </Badge>
                 </div>
@@ -264,6 +301,12 @@ export function AccountingDashboardView() {
           </SectionCard>
         </div>
       </div>
+
+      <VoucherDialog 
+        isOpen={isVoucherDialogOpen} 
+        onClose={() => setIsVoucherDialogOpen(false)} 
+        accounts={accountsQuery.data ?? []} 
+      />
     </div>
   );
 }

@@ -1,18 +1,20 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { SectionCard } from '@/components/ui/section-card';
-import { Badge } from '@/components/ui/badge';
-import { Wallet, Search, CreditCard, Banknote, History, ChevronRight } from 'lucide-react';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Wallet, Search, CreditCard, Banknote, History, ChevronRight, User, GraduationCap, MapPin, Phone, Receipt, Printer, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '../ui/input';
 import { LoadingState } from '../ui/loading-state';
 import { EmptyState } from '../ui/empty-state';
+import { api } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
 
 interface CollectionCounterProps {
   onSearch: (query: string) => void;
   invoices: any[];
-  onCollect: (invoiceId: string, amount: number, method: string) => void;
+  onCollect: (invoiceId: string, amount: number, method: string, reference?: string, remarks?: string) => void;
   isLoading?: boolean;
 }
 
@@ -33,16 +35,35 @@ const formatDate = (value: string) =>
 
 export function CollectionCounter({ onSearch, invoices, onCollect, isLoading }: CollectionCounterProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [amount, setAmount] = useState<number>(0);
   const [method, setMethod] = useState('CASH');
+  const [reference, setReference] = useState('');
+  const [remarks, setRemarks] = useState('');
+
+  const selectedInvoice = useMemo(() => 
+    invoices.find(inv => inv.id === selectedInvoiceId) || null,
+  [invoices, selectedInvoiceId]);
+
+  const invoiceDetailQuery = useQuery({
+    queryKey: ['invoice-detail', selectedInvoiceId],
+    queryFn: () => api.getInvoiceDetail(selectedInvoiceId!),
+    enabled: !!selectedInvoiceId,
+  });
+
+  const handleSelectInvoice = (inv: any) => {
+    setSelectedInvoiceId(inv.id);
+    setAmount(inv.outstandingAmount);
+    setReference('');
+    setRemarks('');
+  };
 
   return (
     <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
-      <SectionCard title="Search & Select" description="Find student or invoice">
-        <div className="space-y-4">
+      <SectionCard title="Student Discovery" description="Search by name, ID or invoice number">
+        <div className="space-y-6">
           <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <Input
               type="text"
               value={searchQuery}
@@ -50,149 +71,284 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading }: 
                 setSearchQuery(e.target.value);
                 onSearch(e.target.value);
               }}
-              placeholder="Student name, ID, or Invoice #"
-              className="pl-11"
+              placeholder="Find student or invoice..."
+              className="pl-12 h-14 rounded-2xl border-slate-100 bg-slate-50/50 focus:bg-white transition-all shadow-sm"
             />
           </div>
 
-          <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
+          <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
             {invoices.map((inv) => (
               <button
                 key={inv.id}
-                onClick={() => {
-                  setSelectedInvoice(inv);
-                  setAmount(inv.outstandingAmount);
-                }}
+                onClick={() => handleSelectInvoice(inv)}
                 className={cn(
-                  "w-full flex items-start justify-between p-4 rounded-2xl border text-left transition-all group",
-                  selectedInvoice?.id === inv.id
-                    ? "bg-slate-900 border-slate-900 text-white shadow-xl shadow-slate-900/10 scale-[1.02] z-10"
+                  "w-full flex items-start justify-between p-5 rounded-[2rem] border transition-all duration-300 group",
+                  selectedInvoiceId === inv.id
+                    ? "bg-slate-900 border-slate-900 text-white shadow-2xl shadow-slate-900/20 translate-x-1"
                     : "bg-white border-slate-100 hover:border-slate-200 text-slate-900 hover:bg-slate-50/50"
                 )}
               >
-                <div>
-                  <p className="text-sm font-black truncate max-w-[200px]">{inv.student?.name || 'Unknown'}</p>
-                  <p className={cn(
-                    "text-[0.65rem] font-black uppercase tracking-widest mt-1",
-                    selectedInvoice?.id === inv.id ? "text-slate-400" : "text-slate-500"
+                <div className="flex gap-4">
+                  <div className={cn(
+                    "h-12 w-12 rounded-2xl flex items-center justify-center transition-colors",
+                    selectedInvoiceId === inv.id ? "bg-white/10 text-white" : "bg-slate-50 text-slate-400 group-hover:bg-white"
                   )}>
-                    {inv.invoiceNumber} • {inv.student?.studentSystemId}
-                  </p>
+                    <User size={20} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-black truncate max-w-[160px] tracking-tight">{inv.student?.name || 'Unknown Student'}</p>
+                    <p className={cn(
+                      "text-[0.65rem] font-bold uppercase tracking-widest mt-1",
+                      selectedInvoiceId === inv.id ? "text-slate-400" : "text-slate-500"
+                    )}>
+                      {inv.invoiceNumber}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-black tabular-nums">{formatCurrency(inv.outstandingAmount)}</p>
-                  <Badge variant={inv.status === 'PARTIAL' ? 'warning' : 'destructive'} className="mt-1.5 h-5 text-[0.6rem] font-black uppercase tracking-widest">
-                    {inv.status}
-                  </Badge>
+                <div className="text-right flex flex-col items-end">
+                  <p className="text-sm font-black tabular-nums tracking-tighter">{formatCurrency(inv.outstandingAmount)}</p>
+                  <StatusBadge status={inv.status} className="mt-2 h-5" />
                 </div>
               </button>
             ))}
             {isLoading && (
-              <LoadingState variant="spinner" label="Finding invoices..." />
+              <div className="py-12 flex justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+              </div>
             )}
             {invoices.length === 0 && !isLoading && (
               <EmptyState 
-                title="No invoices" 
-                description="No outstanding records match."
+                title="No Records Found" 
+                description="Try searching with a different student ID or name."
+                className="py-12"
               />
             )}
           </div>
         </div>
       </SectionCard>
 
-      <SectionCard 
-        title="Payment Collection" 
-        description={selectedInvoice ? `Collecting for ${selectedInvoice.student?.name}` : 'Select an invoice to proceed'}
-      >
+      <div className="space-y-6">
         {selectedInvoice ? (
-          <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <p className="text-[0.6rem] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Due</p>
-                <p className="text-xl font-black text-slate-900">{formatCurrency(selectedInvoice.totalAmount)}</p>
-              </div>
-              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
-                <p className="text-[0.6rem] font-bold text-emerald-600 uppercase tracking-widest mb-1">Balance</p>
-                <p className="text-xl font-black text-emerald-700">{formatCurrency(selectedInvoice.outstandingAmount)}</p>
-              </div>
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <p className="text-[0.6rem] font-bold text-slate-400 uppercase tracking-widest mb-1">Due Date</p>
-                <p className="text-sm font-bold text-slate-900 mt-1">{formatDate(selectedInvoice.dueDate)}</p>
-              </div>
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <p className="text-[0.6rem] font-bold text-slate-400 uppercase tracking-widest mb-1">Invoice #</p>
-                <p className="text-sm font-bold text-slate-900 mt-1">{selectedInvoice.invoiceNumber}</p>
-              </div>
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-700">
+            {/* Student Quick Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+               <SummaryCard 
+                icon={<GraduationCap size={18} />} 
+                label="Student Detail" 
+                value={selectedInvoice.student?.name} 
+                sub={selectedInvoice.student?.studentSystemId} 
+               />
+               <SummaryCard 
+                icon={<MapPin size={18} />} 
+                label="Class / Section" 
+                value={`${selectedInvoice.student?.class?.name || 'N/A'}`} 
+                sub={selectedInvoice.student?.section?.name || 'General'} 
+               />
+               <SummaryCard 
+                icon={<Phone size={18} />} 
+                label="Primary Guardian" 
+                value={selectedInvoice.student?.primaryGuardianName || 'N/A'} 
+                sub={selectedInvoice.student?.primaryGuardianPhone || 'No contact'} 
+               />
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="space-y-3">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Payment Amount</label>
-                <div className="relative group">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400 uppercase tracking-widest pointer-events-none group-focus-within:text-primary-600 transition-colors">NPR</span>
-                  <Input
-                    type="number"
-                    value={amount}
-                    onChange={(e) => setAmount(Number(e.target.value))}
-                    className="pl-16 text-2xl font-black h-16 rounded-2xl"
-                  />
+            <SectionCard 
+              title="Collection Detail" 
+              description="Review breakdown and finalize payment collection."
+              headerAction={
+                <div className="flex items-center gap-2">
+                   <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 border border-slate-100 text-[0.65rem] font-black text-slate-500 uppercase tracking-widest hover:bg-slate-100 transition-colors">
+                     <Receipt size={14} />
+                     View Full Invoice
+                   </button>
                 </div>
-              </div>
+              }
+            >
+              <div className="space-y-8">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-slate-50 rounded-[2.5rem] border border-slate-100">
+                  <StatItem label="Total Billed" value={formatCurrency(selectedInvoice.totalAmount)} />
+                  <StatItem label="Paid Amount" value={formatCurrency(selectedInvoice.totalAmount - selectedInvoice.outstandingAmount)} color="text-emerald-600" />
+                  <StatItem label="Current Balance" value={formatCurrency(selectedInvoice.outstandingAmount)} color="text-danger-600 font-black" />
+                  <StatItem label="Due Date" value={formatDate(selectedInvoice.dueDate)} />
+                </div>
 
-              <div className="space-y-3">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Payment Method</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { id: 'CASH', icon: <Banknote size={16} />, label: 'Cash' },
-                    { id: 'BANK', icon: <CreditCard size={16} />, label: 'Bank' },
-                    { id: 'TRANSFER', icon: <History size={16} />, label: 'Transfer' },
-                    { id: 'MOBILE', icon: <CreditCard size={16} />, label: 'Mobile' },
-                  ].map((m) => (
-                    <button
-                      key={m.id}
-                      onClick={() => setMethod(m.id)}
-                      className={cn(
-                        "flex items-center gap-3 p-3 rounded-xl border-2 font-bold text-sm transition-all",
-                        method === m.id
-                          ? "bg-slate-900 border-slate-900 text-white"
-                          : "bg-white border-slate-50 text-slate-600 hover:border-slate-200"
-                      )}
+                {/* Dues Breakdown (if available) */}
+                {invoiceDetailQuery.data && (
+                  <div className="space-y-3">
+                    <h5 className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-1">Fee Breakdown</h5>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {invoiceDetailQuery.data.lineItems?.map((item: any) => (
+                        <div key={item.id} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl">
+                          <span className="text-xs font-bold text-slate-700">{item.feeHead?.name || 'General Fee'}</span>
+                          <span className="text-xs font-black text-slate-900">{formatCurrency(item.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid gap-8 md:grid-cols-2">
+                  <div className="space-y-6">
+                    <div className="space-y-3">
+                      <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">Collection Amount</label>
+                      <div className="relative group">
+                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400 pointer-events-none transition-colors group-focus-within:text-emerald-600">NPR</span>
+                        <Input
+                          type="number"
+                          value={amount}
+                          onChange={(e) => setAmount(Number(e.target.value))}
+                          className="pl-20 text-3xl font-black h-20 rounded-[1.5rem] border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-2">
+                         <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">Reference #</label>
+                         <Input 
+                          placeholder="e.g. Check/Bank Ref" 
+                          value={reference}
+                          onChange={(e) => setReference(e.target.value)}
+                          className="h-12 rounded-xl border-slate-100 bg-slate-50/50"
+                         />
+                       </div>
+                       <div className="space-y-2">
+                         <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">Remarks</label>
+                         <Input 
+                          placeholder="Note for ledger..." 
+                          value={remarks}
+                          onChange={(e) => setRemarks(e.target.value)}
+                          className="h-12 rounded-xl border-slate-100 bg-slate-50/50"
+                         />
+                       </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">Payment Method</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { id: 'CASH', icon: <Banknote size={18} />, label: 'Cash Payment' },
+                        { id: 'BANK', icon: <CreditCard size={18} />, label: 'Bank Deposit' },
+                        { id: 'TRANSFER', icon: <History size={18} />, label: 'Online Transfer' },
+                        { id: 'MOBILE', icon: <CreditCard size={18} />, label: 'Mobile Wallet' },
+                      ].map((m) => (
+                        <button
+                          key={m.id}
+                          onClick={() => setMethod(m.id)}
+                          className={cn(
+                            "flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-300",
+                            method === m.id
+                              ? "bg-slate-900 border-slate-900 text-white shadow-xl shadow-slate-900/20"
+                              : "bg-white border-slate-100 text-slate-600 hover:border-slate-200"
+                          )}
+                        >
+                          <div className={cn(
+                            "h-8 w-8 rounded-lg flex items-center justify-center",
+                            method === m.id ? "bg-white/10" : "bg-slate-50"
+                          )}>
+                            {m.icon}
+                          </div>
+                          <span className="text-[0.7rem] font-black uppercase tracking-wider">{m.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-8 border-t border-slate-100">
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <AlertCircle size={16} />
+                    <span className="text-[0.65rem] font-bold">Collect exactly NPR {amount.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button 
+                      onClick={() => setSelectedInvoiceId(null)}
+                      className="px-8 py-3 text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors"
                     >
-                      {m.icon}
-                      {m.label}
+                      Reset selection
                     </button>
-                  ))}
+                    <button
+                      onClick={() => onCollect(selectedInvoice.id, amount, method, reference, remarks)}
+                      disabled={amount <= 0 || amount > selectedInvoice.outstandingAmount}
+                      className="flex items-center gap-3 px-12 py-4 bg-emerald-600 text-white rounded-[2rem] font-black text-sm shadow-2xl shadow-emerald-600/30 transition-all hover:bg-emerald-700 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                    >
+                      <CheckSquare size={20} />
+                      Finalize & Print Receipt
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-4 pt-6 border-t border-slate-100">
-              <button 
-                onClick={() => setSelectedInvoice(null)}
-                className="px-6 py-3 text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => onCollect(selectedInvoice.id, amount, method)}
-                disabled={amount <= 0 || amount > selectedInvoice.outstandingAmount}
-                className="flex items-center gap-2 px-10 py-3 bg-emerald-600 text-white rounded-xl font-bold transition-all hover:bg-emerald-700 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-lg shadow-emerald-600/20"
-              >
-                Collect Payment
-                <ChevronRight size={18} />
-              </button>
-            </div>
+            </SectionCard>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
-            <div className="h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-slate-400 mb-4 flex">
-              <Wallet size={32} />
+          <div className="h-[700px] rounded-[3rem] border-2 border-dashed border-slate-100 flex flex-col items-center justify-center text-center p-12 bg-slate-50/20">
+            <div className="h-24 w-24 rounded-[2.5rem] bg-white shadow-xl flex items-center justify-center text-slate-300 mb-8 border border-slate-50">
+              <Wallet size={48} />
             </div>
-            <p className="text-sm font-bold text-slate-900">No Invoice Selected</p>
-            <p className="text-xs text-slate-500 mt-1 max-w-[200px]">Select an outstanding invoice from the left panel to begin collection.</p>
+            <h4 className="text-2xl font-black text-slate-900 tracking-tight">Fee Collection Counter</h4>
+            <p className="text-sm text-slate-500 mt-3 max-w-[320px] leading-relaxed">Select an outstanding invoice from the search results to load student details and process payment.</p>
+            
+            <div className="mt-12 grid grid-cols-3 gap-6 opacity-30 grayscale">
+               <div className="flex flex-col items-center gap-2">
+                 <div className="h-12 w-12 rounded-2xl bg-white flex items-center justify-center"><User size={24} /></div>
+                 <span className="text-[0.6rem] font-black uppercase tracking-widest">Select</span>
+               </div>
+               <div className="flex flex-col items-center gap-2">
+                 <div className="h-12 w-12 rounded-2xl bg-white flex items-center justify-center"><Banknote size={24} /></div>
+                 <span className="text-[0.6rem] font-black uppercase tracking-widest">Process</span>
+               </div>
+               <div className="flex flex-col items-center gap-2">
+                 <div className="h-12 w-12 rounded-2xl bg-white flex items-center justify-center"><Printer size={24} /></div>
+                 <span className="text-[0.6rem] font-black uppercase tracking-widest">Receipt</span>
+               </div>
+            </div>
           </div>
         )}
-      </SectionCard>
+      </div>
     </div>
+  );
+}
+
+function SummaryCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
+  return (
+    <div className="p-5 bg-white border border-slate-100 rounded-[2rem] shadow-sm flex items-center gap-4">
+      <div className="h-12 w-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center">
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-[0.6rem] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+        <p className="text-sm font-black text-slate-900 truncate mt-0.5">{value}</p>
+        {sub && <p className="text-[0.65rem] font-bold text-slate-500 truncate">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+function StatItem({ label, value, color = "text-slate-900" }: { label: string; value: string; color?: string }) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-[0.6rem] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{label}</span>
+      <span className={cn("text-lg font-black tracking-tight", color)}>{value}</span>
+    </div>
+  );
+}
+
+function CheckSquare({ size, className }: { size?: number, className?: string }) {
+  return (
+    <svg 
+      width={size} 
+      height={size} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="3" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      className={className}
+    >
+      <polyline points="9 11 12 14 22 4"></polyline>
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+    </svg>
   );
 }

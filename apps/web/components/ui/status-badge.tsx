@@ -52,6 +52,17 @@ const statusToneMap: Record<string, StatusTone> = {
   REFUNDED: 'refunded',
   CONFLICT: 'conflict',
   ESCALATED: 'conflict',
+  TRANSFERRED: 'pending',
+  ALUMNI: 'published',
+  GRADUATED: 'published',
+  DEACTIVATED: 'inactive',
+  WITHDRAWN: 'inactive',
+  PRESENT: 'approved',
+  ABSENT: 'rejected',
+  LATE: 'partial',
+  SICK_LEAVE: 'info',
+  EXCUSED_LEAVE: 'info',
+  UNEXCUSED_LEAVE: 'partial',
 };
 
 const toneClasses: Record<StatusTone, string> = {

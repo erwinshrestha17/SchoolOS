@@ -5,10 +5,11 @@ import { CollectionSection } from '@/components/finance/collection-section';
 import { LedgerSection } from '@/components/finance/ledger-section';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Wallet, Receipt, Settings, BarChart3, Calculator, History } from 'lucide-react';
+import { Wallet, Receipt, Settings, BarChart3, Calculator, History, FileText } from 'lucide-react';
 import { StatCard } from '@/components/ui/stat-card';
 import { DuesAnalysisSection } from '@/components/finance/dues-analysis-section';
 import { DefaulterAgingSummary } from '@/components/finance/defaulter-aging-summary';
+import { CashierCloseSection } from '@/components/finance/cashier-close-section';
 import { Badge } from '@/components/ui/badge';
 import { useSession } from '@/components/session-provider';
 import type { InvoiceSummary } from '@schoolos/core';
@@ -46,7 +47,7 @@ export default function FinancePage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <header className="relative overflow-hidden rounded-[2rem] bg-slate-900 px-6 py-10 text-white shadow-2xl lg:px-12">
+      <header className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 px-6 py-10 text-white shadow-2xl lg:px-12">
         <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-primary-500/10 blur-3xl" />
         <div className="absolute bottom-0 left-1/4 h-48 w-48 rounded-full bg-emerald-500/10 blur-3xl" />
         
@@ -62,7 +63,7 @@ export default function FinancePage() {
               </span>
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight sm:text-5xl">
-              Fee <span className="text-primary-400">Management</span>
+              Financial <span className="text-primary-400">Terminal</span>
             </h1>
             <p className="mt-4 text-lg text-slate-300 leading-relaxed">
               Track student fee collections, manage billing runs, and analyze outstanding dues for <span className="font-bold text-white">{session?.tenant.name}</span>.
@@ -100,46 +101,55 @@ export default function FinancePage() {
         />
       </div>
 
-      <Tabs defaultValue="collection" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[640px] rounded-2xl bg-slate-100 p-1">
-          <TabsTrigger value="collection" className="flex items-center gap-2 rounded-xl py-2 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <Calculator size={14} />
-            Counter
-          </TabsTrigger>
-          <TabsTrigger value="ledger" className="flex items-center gap-2 rounded-xl py-2 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <History size={14} />
-            Ledger
-          </TabsTrigger>
-          <TabsTrigger value="reports" className="flex items-center gap-2 rounded-xl py-2 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <BarChart3 size={14} />
-            Dues Analysis
-          </TabsTrigger>
-          <TabsTrigger value="setup" className="flex items-center gap-2 rounded-xl py-2 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            <Settings size={14} />
-            Fee Setup
-          </TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="collection" className="space-y-8">
+        <div className="flex items-center justify-between">
+          <TabsList className="h-auto gap-2 rounded-[2rem] border border-slate-100 bg-white/50 p-2 backdrop-blur-sm">
+            {[
+              { value: 'collection', label: 'Counter', icon: <Calculator size={14} /> },
+              { value: 'close', label: 'Day End', icon: <History size={14} /> },
+              { value: 'ledger', label: 'Ledger', icon: <FileText size={14} /> },
+              { value: 'reports', label: 'Analysis', icon: <BarChart3 size={14} /> },
+              { value: 'setup', label: 'Setup', icon: <Settings size={14} /> },
+            ].map((tab) => (
+              <TabsTrigger
+                key={tab.value}
+                value={tab.value}
+                className="flex items-center gap-2 rounded-[1.5rem] px-6 py-2.5 font-bold transition-all data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 bg-transparent shadow-none"
+              >
+                {tab.icon}
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
 
-        <TabsContent value="collection" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <TabsContent value="collection" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <CollectionSection invoices={invoices} isLoading={invoicesQuery.isLoading} />
         </TabsContent>
 
-        <TabsContent value="ledger" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <TabsContent value="close" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <CashierCloseSection />
+        </TabsContent>
+
+        <TabsContent value="ledger" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <LedgerSection />
         </TabsContent>
 
-        <TabsContent value="reports" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <TabsContent value="reports" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <DefaulterAgingSummary />
           <DuesAnalysisSection />
         </TabsContent>
 
-        <TabsContent value="setup" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[3rem] border border-dashed border-slate-200">
-             <div className="h-16 w-16 rounded-3xl bg-slate-50 flex items-center justify-center text-slate-400 mb-4">
-               <Settings size={32} />
+        <TabsContent value="setup" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="flex flex-col items-center justify-center py-24 bg-white rounded-[3rem] border-2 border-dashed border-slate-100">
+             <div className="h-20 w-20 rounded-[2rem] bg-slate-50 flex items-center justify-center text-slate-300 mb-6">
+               <Settings size={40} />
              </div>
-             <p className="text-sm font-bold text-slate-900">Fee Configuration</p>
-             <p className="text-xs text-slate-500 mt-1 max-w-xs text-center">Configure fee heads, billing plans, and discount rules in this section.</p>
+             <h4 className="text-xl font-bold text-slate-900">Fee Configuration</h4>
+             <p className="text-sm text-slate-500 mt-2 max-w-xs text-center">Configure fee heads, billing plans, and discount rules in this high-level settings panel.</p>
+             <button className="mt-8 px-8 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors">
+                Initialize Setup
+             </button>
           </div>
         </TabsContent>
       </Tabs>

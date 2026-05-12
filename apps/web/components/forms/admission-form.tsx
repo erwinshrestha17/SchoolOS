@@ -23,7 +23,8 @@ import {
   AlertTriangle, 
   Upload,
   FileText,
-  Calendar
+  Calendar,
+  ShieldCheck
 } from 'lucide-react';
 
 const today = new Date().toISOString().slice(0, 10);
@@ -226,21 +227,29 @@ export function AdmissionForm() {
           )}
            <div className="flex items-center justify-between px-4">
             {enrollmentSteps.map((step, idx) => (
-              <div key={step} className="flex items-center gap-3">
+              <div key={step} className="flex items-center gap-2 group cursor-default">
                 <div className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-all",
-                  activeStep === idx ? "bg-primary-500 text-white shadow-lg shadow-primary-500/30 scale-110" : 
-                  activeStep > idx || latestAdmission ? "bg-success-500 text-white" : "bg-slate-100 text-slate-400"
+                  "flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold transition-all duration-500",
+                  activeStep === idx ? "bg-primary-500 text-white shadow-xl shadow-primary-500/40 scale-110 ring-4 ring-primary-50" : 
+                  activeStep > idx || latestAdmission ? "bg-success-500 text-white shadow-lg shadow-success-500/20" : "bg-slate-100 text-slate-400"
                 )}>
-                  {activeStep > idx || (idx === 4 && latestAdmission) ? <CheckCircle2 size={16} /> : idx + 1}
+                  {activeStep > idx || (idx === 4 && latestAdmission) ? <CheckCircle2 size={18} /> : idx + 1}
                 </div>
-                <span className={cn(
-                  "hidden text-xs font-bold uppercase tracking-wider lg:block",
-                  activeStep === idx ? "text-slate-900" : "text-slate-400"
-                )}>
-                  {step}
-                </span>
-                {idx < enrollmentSteps.length - 1 && <div className="h-px w-8 bg-slate-200" />}
+                <div className="hidden lg:flex flex-col">
+                   <span className={cn(
+                    "text-[0.6rem] font-bold uppercase tracking-tighter",
+                    activeStep === idx ? "text-primary-600" : "text-slate-400"
+                  )}>
+                    Step {idx + 1}
+                  </span>
+                  <span className={cn(
+                    "text-[0.7rem] font-bold whitespace-nowrap",
+                    activeStep === idx ? "text-slate-900" : "text-slate-400"
+                  )}>
+                    {step}
+                  </span>
+                </div>
+                {idx < enrollmentSteps.length - 1 && <div className={cn("h-px w-6 ml-2 transition-colors duration-500", activeStep > idx ? "bg-success-300" : "bg-slate-200")} />}
               </div>
             ))}
           </div>
@@ -404,14 +413,28 @@ export function AdmissionForm() {
                      )}
                   </div>
 
-                  <div className="rounded-2xl bg-slate-900 p-6 text-white">
-                    <h4 className="text-sm font-bold uppercase tracking-wider text-slate-400">Enrollment Summary</h4>
-                    <div className="mt-6 space-y-4">
-                       <SummaryItem label="Student" value={`${watchedFirstNameEn} ${watchedLastNameEn}`} />
+                  <div className="rounded-[2.5rem] bg-slate-900 p-8 text-white shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary-500/10 rounded-full blur-3xl -mr-16 -mt-16" />
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-primary-400 mb-8">Enrollment Summary</h4>
+                    <div className="space-y-5">
+                       <SummaryItem label="Full Name" value={`${watchedFirstNameEn} ${watchedLastNameEn}`} />
+                       <SummaryItem label="Gender" value={form.getValues('gender')} />
+                       <SummaryItem label="Date of Birth" value={watchedDateOfBirth ? new Date(watchedDateOfBirth).toLocaleDateString() : 'N/A'} />
+                       <div className="h-px bg-white/10 my-2" />
                        <SummaryItem label="Class" value={classesQuery.data?.find(c => c.id === selectedClassId)?.name ?? 'N/A'} />
-                       <SummaryItem label="Section" value={availableSections.find(s => s.id === selectedSectionId)?.name ?? 'N/A'} />
-                       <SummaryItem label="Primary Guardian" value={watchedGuardians.find(g => g.isPrimary)?.fullName ?? 'N/A'} />
-                       <SummaryItem label="Documents" value={documentFile ? '1 Attached' : 'None'} />
+                       <SummaryItem label="Section" value={availableSections.find(s => s.id === selectedSectionId)?.name ?? 'None'} />
+                       <SummaryItem label="Admission Date" value={new Date(form.getValues('admissionDate')).toLocaleDateString()} />
+                       <div className="h-px bg-white/10 my-2" />
+                       <SummaryItem label="Primary Guardian" value={watchedGuardians.find(g => g.isPrimary)?.fullName ?? 'Not set'} />
+                       <SummaryItem label="Contact" value={watchedGuardians.find(g => g.isPrimary)?.primaryPhone ?? 'N/A'} />
+                       <div className="h-px bg-white/10 my-2" />
+                       <SummaryItem label="Documents" value={documentFile ? `1 File (${documentKind.replace('_', ' ')})` : 'None attached'} />
+                    </div>
+                    <div className="mt-8 flex items-center gap-3 rounded-2xl bg-white/5 p-4 border border-white/10">
+                       <ShieldCheck className="text-primary-400" size={20} />
+                       <p className="text-[0.65rem] text-slate-400 leading-relaxed">
+                         By clicking "Complete Enrollment", a student record will be created and a ledger will be initialized.
+                       </p>
                     </div>
                   </div>
                 </div>
@@ -419,27 +442,45 @@ export function AdmissionForm() {
             )}
 
             {activeStep === 4 && (
-              <EmptyState 
-                title="Enrollment Successful!" 
-                description={`Student ${watchedFirstNameEn} ${watchedLastNameEn} has been successfully added to the system.`}
-                icon={<CheckCircle2 className="text-success-500" size={48} />}
-                action={
-                  <div className="flex flex-wrap justify-center gap-3">
-                    <button type="button" className="rounded-xl bg-slate-900 px-6 py-3 text-sm font-bold text-white shadow-lg" onClick={() => window.location.reload()}>
-                      Add Another Student
-                    </button>
-                    <Link href="/dashboard/students" className="rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 shadow-sm">
-                      Go to Directory
-                    </Link>
-                    <Link href="/dashboard/finance" className="rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 shadow-sm">
-                      Collect First Fee
-                    </Link>
-                    <button type="button" className="rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 shadow-sm">
-                      Download ID Card
-                    </button>
-                  </div>
-                }
-              />
+              <div className="rounded-[3rem] border border-slate-100 bg-white p-12 text-center shadow-xl animate-in zoom-in-95 duration-500">
+                <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-[2.5rem] bg-success-50 text-success-500 shadow-inner">
+                  <CheckCircle2 size={48} />
+                </div>
+                <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Enrollment Successful!</h2>
+                <p className="mx-auto mt-4 max-w-md text-slate-500 font-medium">
+                  Student <span className="font-bold text-slate-900">{watchedFirstNameEn} {watchedLastNameEn}</span> has been admitted to {classesQuery.data?.find(c => c.id === selectedClassId)?.name}.
+                </p>
+                
+                <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <button type="button" className="flex flex-col items-center gap-3 rounded-3xl border border-slate-100 bg-slate-50/50 p-6 transition hover:bg-primary-50 hover:border-primary-100 group" onClick={() => window.location.reload()}>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-primary-500 group-hover:text-white transition-colors">
+                      <UserPlus size={20} />
+                    </div>
+                    <span className="text-xs font-bold text-slate-600 group-hover:text-primary-700">Add Another</span>
+                  </button>
+                  
+                  <Link href={`/dashboard/students/${latestAdmission?.student.id}`} className="flex flex-col items-center gap-3 rounded-3xl border border-slate-100 bg-slate-50/50 p-6 transition hover:bg-primary-50 hover:border-primary-100 group">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-primary-500 group-hover:text-white transition-colors">
+                      <FileText size={20} />
+                    </div>
+                    <span className="text-xs font-bold text-slate-600 group-hover:text-primary-700">View Profile</span>
+                  </Link>
+
+                  <Link href={`/dashboard/finance?studentId=${latestAdmission?.student.id}`} className="flex flex-col items-center gap-3 rounded-3xl border border-slate-100 bg-slate-50/50 p-6 transition hover:bg-primary-50 hover:border-primary-100 group">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-primary-500 group-hover:text-white transition-colors">
+                      <Wallet size={20} />
+                    </div>
+                    <span className="text-xs font-bold text-slate-600 group-hover:text-primary-700">Collect Fee</span>
+                  </Link>
+
+                  <button type="button" className="flex flex-col items-center gap-3 rounded-3xl border border-slate-100 bg-slate-50/50 p-6 transition hover:bg-primary-50 hover:border-primary-100 group">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-primary-500 group-hover:text-white transition-colors">
+                      <Download size={20} />
+                    </div>
+                    <span className="text-xs font-bold text-slate-600 group-hover:text-primary-700">Print ID Card</span>
+                  </button>
+                </div>
+              </div>
             )}
           </div>
 

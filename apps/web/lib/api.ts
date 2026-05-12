@@ -425,6 +425,31 @@ export const api = {
         json: body as JsonBody,
       },
     ),
+  generateStudentQr: (studentId: string) =>
+    request<{ credential: any; rawToken: string }>(
+      `/students/${encodeURIComponent(studentId)}/qr`,
+      { method: 'POST' },
+    ),
+  rotateStudentQr: (studentId: string, body: { reason: string }) =>
+    request<{ credential: any; rawToken: string }>(
+      `/students/${encodeURIComponent(studentId)}/qr/rotate`,
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
+  revokeStudentQr: (studentId: string, body: { reason: string }) =>
+    request<any>(`/students/${encodeURIComponent(studentId)}/qr/revoke`, {
+      method: 'POST',
+      json: body,
+    }),
+  resolveStudentQr: (body: { token: string; purpose: string }) =>
+    request<any>('/students/qr/resolve', {
+      method: 'POST',
+      json: body,
+    }),
+  getStudentQrImageUrl: (studentId: string, token: string) =>
+    `${API_BASE_URL}/students/${encodeURIComponent(studentId)}/qr-image?token=${encodeURIComponent(token)}`,
   listStaff: () => request<StaffSummary[]>('/staff'),
   getStaffDetail: (staffId: string) =>
     request<StaffDetail>(`/hr/staff/${encodeURIComponent(staffId)}`),
@@ -762,6 +787,11 @@ export const api = {
     notes?: string | null;
   }) =>
     request<CashierCloseSummary>('/payments/cashier-close', {
+      method: 'POST',
+      json: body as JsonBody,
+    }),
+  reversePayment: (paymentId: string, body: { reason: string }) =>
+    request<{ success: true }>(`/payments/${encodeURIComponent(paymentId)}/reverse`, {
       method: 'POST',
       json: body as JsonBody,
     }),

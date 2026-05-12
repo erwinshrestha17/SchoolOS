@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { LoadingState } from '@/components/ui/loading-state';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -47,6 +48,13 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const [lifecycleMessage, setLifecycleMessage] = useState('');
 
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('edit') === 'true') {
+      setIsEditingStudent(true);
+    }
+  }, [searchParams]);
 
   const profileQuery = useQuery({
     queryKey: ['student-profile', studentId],

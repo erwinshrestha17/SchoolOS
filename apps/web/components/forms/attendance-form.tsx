@@ -1,16 +1,15 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/api';
 import { SectionCard } from '@/components/ui/section-card';
-import { FilterBar } from '@/components/ui/filter-bar';
 import { AttendanceHeader } from '@/components/attendance/attendance-header';
 import { AttendanceRosterItem } from '@/components/attendance/attendance-roster-item';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LoadingState } from '@/components/ui/loading-state';
-import { CheckCircle2, AlertCircle, Save, Download } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Save, Download, Eraser, CheckSquare, Loader2, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const today = new Date().toISOString().slice(0, 10);
@@ -48,6 +47,7 @@ export function AttendanceForm() {
     queryKey: ['sections'],
     queryFn: api.listSections,
   });
+  
   const rosterQuery = useQuery({
     queryKey: ['attendance-roster', academicYearId, classId, sectionId, attendanceDate],
     queryFn: () =>
@@ -84,6 +84,7 @@ export function AttendanceForm() {
     });
     setExceptions(nextExceptions);
     setRemarks(nextRemarks);
+    setSubmitMessage('');
   }, [rosterQuery.data]);
 
   const mutation = useMutation({
@@ -91,14 +92,7 @@ export function AttendanceForm() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['attendance-roster'] });
       setSubmitMessage(`Attendance submitted successfully at ${new Date().toLocaleTimeString()}.`);
-    },
-  });
-
-  const syncMutation = useMutation({
-    mutationFn: api.syncAttendance,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['attendance-roster'] });
-      setSubmitMessage(`Offline sync envelope accepted at ${new Date().toLocaleTimeString()}.`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     },
   });
 
@@ -106,93 +100,135 @@ export function AttendanceForm() {
   const roster = rosterQuery.data?.students ?? [];
   const futureDateBlocked = isFutureDate(attendanceDate);
 
-  const totals = roster.reduce(
-    (acc, s) => {
-      const status = exceptions[s.id] ?? 'PRESENT';
-      acc.total++;
-      if (status === 'PRESENT') acc.present++;
-      else acc.exceptions++;
-      return acc;
-    },
-    { total: 0, present: 0, exceptions: 0 }
-  );
+  const totals = useMemo(() => {
+    return roster.reduce(
+      (acc, s) => {
+        const status = exceptions[s.id] ?? 'PRESENT';
+        acc.total++;
+        if (status === 'PRESENT') acc.present++;
+        else if (status === 'ABSENT') acc.absent++;
+        else if (status === 'LATE') acc.late++;
+        else acc.leave++;
+        return acc;
+      },
+      { total: 0, present: 0, absent: 0, late: 0, leave: 0 }
+    );
+  }, [roster, exceptions]);
 
   const presentPercent = totals.total > 0 ? Math.round((totals.present / totals.total) * 100) : 0;
+  const submissionStatus = rosterQuery.data?.status || 'NOT_STARTED';
+
+  const markAllPresent = () => {
+    setExceptions({});
+  };
+
+  const clearAll = () => {
+    const allAbsent: Record<string, AttendanceStatus> = {};
+    roster.forEach(s => { allAbsent[s.id] = 'ABSENT'; });
+    setExceptions(allAbsent);
+  };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-8 animate-fade-in pb-24">
+      {submitMessage && (
+        <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-[2rem] flex items-center gap-4 text-emerald-800 text-sm font-bold animate-in slide-in-from-top-4 duration-500">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
+            <CheckCircle2 size={20} />
+          </div>
+          {submitMessage}
+        </div>
+      )}
+
       <AttendanceHeader 
         total={totals.total} 
         presentPercent={presentPercent} 
-        exceptions={totals.exceptions} 
+        exceptions={totals.absent + totals.late + totals.leave} 
       />
 
-      <FilterBar label="Roster Filters">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
-          <label className="space-y-1.5">
-            <span className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-wider ml-1">Academic Year</span>
+      <section className="rounded-[3rem] border border-slate-100 bg-white/50 p-6 backdrop-blur-xl shadow-xl shadow-slate-200/50">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="space-y-2">
+            <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Academic Year</label>
             <select
               value={academicYearId}
               onChange={(e) => setAcademicYearId(e.target.value)}
-              className="w-full text-sm font-medium bg-white border-slate-200 rounded-xl"
+              className="premium-input bg-white"
             >
               <option value="">Select Year</option>
               {academicYearsQuery.data?.map((y) => (
                 <option key={y.id} value={y.id}>{y.name}{y.isCurrent ? ' (Current)' : ''}</option>
               ))}
             </select>
-          </label>
+          </div>
 
-          <label className="space-y-1.5">
-            <span className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-wider ml-1">Class</span>
+          <div className="space-y-2">
+            <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Class</label>
             <select
               value={classId}
               onChange={(e) => { setClassId(e.target.value); setSectionId(''); }}
-              className="w-full text-sm font-medium bg-white border-slate-200 rounded-xl"
+              className="premium-input bg-white"
             >
               <option value="">Select Class</option>
               {classesQuery.data?.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-          </label>
+          </div>
 
-          <label className="space-y-1.5">
-            <span className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-wider ml-1">Section</span>
+          <div className="space-y-2">
+            <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Section</label>
             <select
               value={sectionId}
               onChange={(e) => setSectionId(e.target.value)}
-              className="w-full text-sm font-medium bg-white border-slate-200 rounded-xl"
+              className="premium-input bg-white"
             >
               <option value="">All Sections</option>
               {availableSections.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-          </label>
+          </div>
 
-          <label className="space-y-1.5">
-            <span className="text-[0.65rem] font-bold text-slate-400 uppercase tracking-wider ml-1">Date</span>
+          <div className="space-y-2">
+            <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Date</label>
             <input
               type="date"
               value={attendanceDate}
               max={today}
               onChange={(e) => setAttendanceDate(e.target.value)}
-              className="w-full text-sm font-medium bg-white border-slate-200 rounded-xl"
+              className="premium-input bg-white"
             />
-          </label>
+          </div>
         </div>
-      </FilterBar>
+      </section>
 
       <SectionCard 
-        title="Student Roster" 
-        description="Mark attendance by student. Everyone is present by default."
+        title="Attendance Roster" 
+        description="Mark student attendance status. Multi-tap for quick changes."
         headerAction={
-          <div className="flex items-center gap-2">
-            <button className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-              <Download size={14} />
-              Export Register
-            </button>
+          <div className="flex items-center gap-3">
+             <div className="flex items-center gap-2 mr-4 px-4 py-2 rounded-2xl bg-slate-100 border border-slate-200">
+               <span className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest">Status:</span>
+               <StatusBadge status={submissionStatus} className="h-6" />
+             </div>
+             {roster.length > 0 && (
+               <>
+                <button 
+                  onClick={markAllPresent}
+                  className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-xl hover:bg-emerald-100 transition-colors"
+                >
+                  <CheckSquare size={14} />
+                  Mark All Present
+                </button>
+                <button 
+                  onClick={clearAll}
+                  className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors"
+                >
+                  <Eraser size={14} />
+                  Clear All
+                </button>
+               </>
+             )}
           </div>
         }
       >
@@ -201,9 +237,15 @@ export function AttendanceForm() {
         ) : futureDateBlocked ? (
           <EmptyState title="Date Not Allowed" description="Please select a date that is not in the future." icon={<AlertCircle size={32} />} />
         ) : roster.length === 0 ? (
-          <EmptyState title="No Students" description="No students found for the selected filters." />
+          <EmptyState 
+            title="No Students Found" 
+            description={classId ? "The selected class/section appears to be empty." : "Please select a class to view the roster."} 
+            action={!classId ? undefined : (
+              <button className="text-primary-600 font-bold text-sm hover:underline">Setup Class Roster</button>
+            )}
+          />
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
             {roster.map((student) => (
               <AttendanceRosterItem
                 key={student.id}
@@ -225,88 +267,77 @@ export function AttendanceForm() {
         )}
       </SectionCard>
 
-      <div className="sticky bottom-6 flex items-center justify-between p-4 bg-slate-900 text-white rounded-2xl shadow-2xl animate-slide-up border border-slate-800">
-        <div className="flex items-center gap-6 px-4">
-          <div className="flex flex-col">
-            <span className="text-[0.6rem] font-bold text-slate-400 uppercase tracking-widest">Present</span>
-            <span className="text-lg font-black text-emerald-400">{totals.present}</span>
+      {/* Summary Floating Bar */}
+      {roster.length > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-8 p-6 bg-slate-900/95 backdrop-blur-xl text-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] animate-in slide-in-from-bottom-8 duration-700 border border-white/10 z-50">
+          <div className="flex items-center gap-8 px-4">
+            <SummaryStat label="Present" value={totals.present} color="text-emerald-400" />
+            <SummaryStat label="Absent" value={totals.absent} color="text-danger-400" />
+            <SummaryStat label="Late" value={totals.late} color="text-warning-400" />
+            <div className="h-10 w-px bg-white/10 mx-2" />
+            <div className="flex flex-col">
+              <span className="text-[0.6rem] font-bold text-slate-500 uppercase tracking-[0.2em]">Completion</span>
+              <span className="text-xl font-black">{presentPercent}%</span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="text-[0.6rem] font-bold text-slate-400 uppercase tracking-widest">Exceptions</span>
-            <span className="text-lg font-black text-amber-400">{totals.exceptions}</span>
-          </div>
-          <div className="h-8 w-px bg-slate-800" />
-          <div className="flex flex-col">
-            <span className="text-[0.6rem] font-bold text-slate-400 uppercase tracking-widest">Rate</span>
-            <span className="text-lg font-black">{presentPercent}%</span>
-          </div>
-        </div>
 
-        <button
-          onClick={() => mutation.mutate({
-            academicYearId,
-            classId,
-            sectionId: sectionId || null,
-            attendanceDate: new Date(attendanceDate).toISOString(),
-            exceptions: Object.entries(exceptions).map(([studentId, status]) => ({
-              studentId,
-              status,
-              remark: remarks[studentId]?.trim() || null,
-            }))
-          })}
-          disabled={mutation.isPending || roster.length === 0 || futureDateBlocked}
-          className="flex items-center gap-2 px-8 py-3 bg-white text-slate-950 rounded-xl font-bold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-        >
-          {mutation.isPending ? (
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-900 border-t-transparent" />
-          ) : <Save size={18} />}
-          Submit Attendance
-        </button>
-      </div>
-
-      {submitMessage && (
-        <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 text-emerald-800 text-sm font-bold animate-fade-in">
-          <CheckCircle2 size={18} />
-          {submitMessage}
-        </div>
-      )}
-      <details className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <summary className="cursor-pointer text-sm font-bold text-slate-700">
-          Offline sync
-        </summary>
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-slate-500">
-            Use this only for a saved draft captured during a connection problem. Normal attendance should use Submit Attendance.
-          </p>
           <button
-            type="button"
-            disabled={syncMutation.isPending || roster.length === 0 || futureDateBlocked}
-            onClick={() => syncMutation.mutate({
+            onClick={() => mutation.mutate({
               academicYearId,
               classId,
               sectionId: sectionId || null,
               attendanceDate: new Date(attendanceDate).toISOString(),
-              clientSubmissionId: `${classId}-${sectionId || 'all'}-${attendanceDate}`,
-              deviceTimestamp: new Date().toISOString(),
-              deviceLabel: 'SchoolOS web attendance',
               exceptions: Object.entries(exceptions).map(([studentId, status]) => ({
                 studentId,
                 status,
                 remark: remarks[studentId]?.trim() || null,
-              })),
+              }))
             })}
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 disabled:opacity-50"
+            disabled={mutation.isPending || roster.length === 0 || futureDateBlocked}
+            className="flex items-center gap-3 px-10 py-4 bg-primary-500 text-white rounded-[2rem] font-black text-sm transition-all hover:scale-105 hover:bg-primary-600 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-xl shadow-primary-500/30"
           >
-            {syncMutation.isPending ? 'Syncing...' : 'Sync offline draft'}
+            {mutation.isPending ? (
+              <Loader2 size={20} className="animate-spin" />
+            ) : <Save size={20} />}
+            Submit Attendance
           </button>
         </div>
-      </details>
+      )}
+
       {mutation.isError && (
-        <div className="p-4 bg-destructive/5 border border-destructive/10 rounded-2xl flex items-center gap-3 text-destructive text-sm font-bold animate-fade-in">
-          <AlertCircle size={18} />
-          {mutation.error.message}
+        <div className="p-6 bg-danger-50 border border-danger-100 rounded-[2rem] flex items-center gap-4 text-danger-800 text-sm font-bold animate-fade-in shadow-lg">
+          <AlertCircle size={24} className="text-danger-500" />
+          <div className="flex flex-col">
+             <span className="text-[0.65rem] uppercase tracking-widest text-danger-600 mb-1">Submission Error</span>
+             {mutation.error.message}
+          </div>
         </div>
       )}
+      
+      <div className="rounded-[2.5rem] border border-slate-200 bg-white p-6 shadow-sm flex items-center justify-between">
+         <div className="flex items-center gap-4 text-slate-500">
+           <div className="h-10 w-10 rounded-2xl bg-slate-50 flex items-center justify-center">
+             <Info size={20} />
+           </div>
+           <div>
+             <p className="text-xs font-bold text-slate-900">Attendance Policy</p>
+             <p className="text-[0.65rem] mt-0.5">Final submission locks records for the day. Corrections require administrative approval.</p>
+           </div>
+         </div>
+         <button className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+            <Download size={14} />
+            Download Sheet
+          </button>
+      </div>
+    </div>
+  );
+}
+
+function SummaryStat({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-[0.6rem] font-bold text-slate-500 uppercase tracking-[0.2em]">{label}</span>
+      <span className={cn("text-xl font-black", color)}>{value}</span>
     </div>
   );
 }

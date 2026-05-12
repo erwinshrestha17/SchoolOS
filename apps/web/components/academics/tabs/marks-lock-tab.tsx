@@ -5,6 +5,23 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { api, type MarkLockRequestSummary } from '../../../lib/api';
 import { useSession } from '../../session-provider';
+import { 
+  Lock, 
+  Unlock, 
+  ShieldCheck, 
+  ShieldAlert, 
+  Clock, 
+  CheckCircle2, 
+  XCircle, 
+  Loader2, 
+  MessageSquare,
+  History,
+  AlertCircle,
+  Zap,
+  User,
+  Shield
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type Props = {
   exams: ExamTermSummary[];
@@ -16,25 +33,12 @@ type ReviewAction = {
 };
 
 function actorLabel(actor?: MarkLockRequestSummary['requestedBy']) {
-  return actor?.email || actor?.phone || actor?.id || 'Unknown user';
+  return actor?.email || actor?.phone || actor?.id || 'System';
 }
 
 function formatDate(value?: string | null) {
   if (!value) return '—';
   return new Date(value).toLocaleString();
-}
-
-function statusClass(status: string) {
-  switch (status) {
-    case 'APPROVED':
-      return 'bg-emerald-50 text-emerald-700 border-emerald-100';
-    case 'REJECTED':
-      return 'bg-red-50 text-red-700 border-red-100';
-    case 'UNLOCKED':
-      return 'bg-indigo-50 text-indigo-700 border-indigo-100';
-    default:
-      return 'bg-amber-50 text-amber-700 border-amber-100';
-  }
 }
 
 export function MarksLockTab({ exams }: Props) {
@@ -48,11 +52,10 @@ export function MarksLockTab({ exams }: Props) {
 
   const requestsQuery = useQuery({
     queryKey: ['mark-lock-requests', filters],
-    queryFn: () =>
-      api.listMarkLockRequests({
-        examTermId: filters.examTermId || null,
-        status: filters.status || null,
-      }),
+    queryFn: () => api.listMarkLockRequests({
+      examTermId: filters.examTermId || null,
+      status: filters.status || null,
+    }),
     enabled: status === 'authenticated',
   });
 
@@ -68,13 +71,11 @@ export function MarksLockTab({ exams }: Props) {
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['mark-lock-requests'] });
     void queryClient.invalidateQueries({ queryKey: ['exam-terms'] });
-    void queryClient.invalidateQueries({ queryKey: ['marks-grid'] });
-    void queryClient.invalidateQueries({ queryKey: ['marks'] });
   };
 
   const showSuccess = (message: string) => {
     setSuccessMessage(message);
-    window.setTimeout(() => setSuccessMessage(''), 3000);
+    window.setTimeout(() => setSuccessMessage(''), 5000);
   };
 
   const createMutation = useMutation({
@@ -82,7 +83,7 @@ export function MarksLockTab({ exams }: Props) {
     onSuccess: () => {
       invalidate();
       setRequestForm((current) => ({ ...current, reason: '' }));
-      showSuccess('Mark lock review request submitted.');
+      showSuccess('Operational lock request submitted for review.');
     },
   });
 
@@ -94,7 +95,7 @@ export function MarksLockTab({ exams }: Props) {
       }),
     onSuccess: () => {
       invalidate();
-      showSuccess('Mark lock request reviewed.');
+      showSuccess('Security review completed.');
     },
   });
 
@@ -104,7 +105,7 @@ export function MarksLockTab({ exams }: Props) {
     onSuccess: () => {
       invalidate();
       setUnlockForm((current) => ({ ...current, reason: '' }));
-      showSuccess('Exam term unlocked successfully.');
+      showSuccess('Security lock bypassed successfully.');
     },
   });
 
@@ -113,236 +114,253 @@ export function MarksLockTab({ exams }: Props) {
   );
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-[28px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-        <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">Marks lock</p>
-            <h2 className="mt-1 text-lg font-bold text-gray-950">Lock / Unlock Workflow</h2>
-            <p className="mt-1 max-w-2xl text-sm text-gray-500">
-              Manage mark correction requests, approve final locks, and unlock exam terms with an audit trail.
-            </p>
-          </div>
-          {successMessage && (
-            <p className="rounded-2xl bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
-              {successMessage}
-            </p>
-          )}
+    <div className="space-y-10 animate-fade-in">
+      {/* Security Overview */}
+      <section className="rounded-[2.5rem] border border-slate-200 bg-white/50 p-8 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between mb-8">
+           <div>
+              <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900 italic">Security & Locks</h2>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Operational Data Integrity Control</p>
+           </div>
+           {successMessage && (
+             <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-lg shadow-emerald-500/5">
+                <CheckCircle2 size={18} />
+                <span className="text-xs font-black uppercase tracking-widest">{successMessage}</span>
+             </div>
+           )}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <select
-            value={filters.examTermId}
-            onChange={(event) => setFilters((current) => ({ ...current, examTermId: event.target.value }))}
-          >
-            <option value="">All exam terms</option>
-            {exams.map((exam) => (
-              <option key={exam.id} value={exam.id}>
-                {exam.name}{exam.isLocked ? ' · Locked' : ' · Open'}
-              </option>
-            ))}
-          </select>
-          <select
-            value={filters.status}
-            onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
-          >
-            <option value="">All statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="APPROVED">Approved</option>
-            <option value="REJECTED">Rejected</option>
-            <option value="UNLOCKED">Unlocked</option>
-          </select>
-          <div className="rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-500">
-            Pending: <span className="font-semibold text-gray-950">{pendingRequests.length}</span>
-          </div>
-          <div className="rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-500">
-            Locked terms:{' '}
-            <span className="font-semibold text-gray-950">
-              {exams.filter((exam) => exam.isLocked).length}
-            </span>
-          </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+           <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Exam Context</label>
+              <select value={filters.examTermId} onChange={(e) => setFilters(c => ({ ...c, examTermId: e.target.value }))} className="premium-input bg-white">
+                <option value="">All Exams</option>
+                {exams.map((exam) => <option key={exam.id} value={exam.id}>{exam.name} {exam.isLocked ? '🔒' : '🔓'}</option>)}
+              </select>
+           </div>
+           <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Request Status</label>
+              <select value={filters.status} onChange={(e) => setFilters(c => ({ ...c, status: e.target.value }))} className="premium-input bg-white">
+                <option value="">All Statuses</option>
+                <option value="PENDING">Pending</option>
+                <option value="APPROVED">Approved</option>
+                <option value="REJECTED">Rejected</option>
+                <option value="UNLOCKED">Unlocked</option>
+              </select>
+           </div>
+           <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100 flex items-center gap-4">
+              <div className="h-10 w-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/20">
+                 <ShieldAlert size={20} />
+              </div>
+              <div>
+                 <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Pending Reviews</p>
+                 <p className="text-xl font-black text-amber-900 tracking-tighter italic">{pendingRequests.length}</p>
+              </div>
+           </div>
+           <div className="p-4 rounded-2xl bg-slate-900 text-white flex items-center gap-4 shadow-xl shadow-slate-900/10">
+              <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center">
+                 <Lock size={20} />
+              </div>
+              <div>
+                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Locked Terms</p>
+                 <p className="text-xl font-black text-white tracking-tighter italic">{exams.filter(e => e.isLocked).length}</p>
+              </div>
+           </div>
         </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <section className="rounded-[28px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">Request</p>
-          <h3 className="mt-1 text-lg font-bold text-gray-950">Request mark review / lock</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Submit a reason for admin review before marks are locked or corrected.
-          </p>
-          <div className="mt-4 grid gap-3">
-            <select
-              value={requestForm.examTermId}
-              onChange={(event) => setRequestForm((current) => ({ ...current, examTermId: event.target.value }))}
-            >
-              <option value="">Exam term</option>
-              {exams.map((exam) => (
-                <option key={exam.id} value={exam.id}>
-                  {exam.name}{exam.isLocked ? ' · Locked' : ' · Open'}
-                </option>
-              ))}
-            </select>
-            {selectedRequestExam && (
-              <p className="text-sm text-gray-500">
-                Current state:{' '}
-                <span className="font-semibold text-gray-950">
-                  {selectedRequestExam.isLocked ? 'LOCKED' : 'OPEN'}
-                </span>
-              </p>
-            )}
-            <textarea
-              rows={3}
-              value={requestForm.reason}
-              onChange={(event) => setRequestForm((current) => ({ ...current, reason: event.target.value }))}
-              placeholder="Reason for lock/review request"
-            />
-            <button
-              type="button"
-              className="rounded-2xl bg-indigo-950 px-6 py-3 font-semibold text-white transition hover:bg-indigo-900 disabled:opacity-50"
-              disabled={!requestForm.examTermId || !requestForm.reason.trim() || createMutation.isPending}
-              onClick={() => createMutation.mutate(requestForm)}
-            >
-              {createMutation.isPending ? 'Submitting…' : 'Submit request'}
-            </button>
-            {createMutation.isError && (
-              <p className="text-sm text-red-600">{createMutation.error.message}</p>
-            )}
-          </div>
-        </section>
+      <div className="grid gap-10 lg:grid-cols-2">
+         {/* Request Review */}
+         <section className="group relative rounded-[2.5rem] border border-slate-200 bg-white p-8 transition-all hover:shadow-xl hover:shadow-slate-200/50 overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 opacity-5">
+               <ShieldCheck size={120} />
+            </div>
+            <div className="mb-8">
+               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 mb-4 transition-transform group-hover:rotate-12">
+                  <ShieldCheck size={24} />
+               </div>
+               <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic">Request Integrity Check</h3>
+               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Submit for administrative review</p>
+            </div>
 
-        <section className="rounded-[28px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-amber-600">Unlock</p>
-          <h3 className="mt-1 text-lg font-bold text-gray-950">Unlock exam term</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Authorized users can reopen locked marks with a reason. This creates an audit record.
-          </p>
-          <div className="mt-4 grid gap-3">
-            <select
-              value={unlockForm.examTermId}
-              onChange={(event) => setUnlockForm((current) => ({ ...current, examTermId: event.target.value }))}
-            >
-              <option value="">Locked exam term</option>
-              {exams
-                .filter((exam) => exam.isLocked)
-                .map((exam) => (
-                  <option key={exam.id} value={exam.id}>
-                    {exam.name}
-                  </option>
-                ))}
-            </select>
-            {selectedUnlockExam && (
-              <p className="text-sm text-gray-500">
-                This will reopen marks for{' '}
-                <span className="font-semibold text-gray-950">{selectedUnlockExam.name}</span>.
-              </p>
-            )}
-            <textarea
-              rows={3}
-              value={unlockForm.reason}
-              onChange={(event) => setUnlockForm((current) => ({ ...current, reason: event.target.value }))}
-              placeholder="Unlock reason"
-            />
-            <button
-              type="button"
-              className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-3 font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
-              disabled={!unlockForm.examTermId || unlockMutation.isPending}
-              onClick={() =>
-                unlockMutation.mutate({
-                  id: unlockForm.examTermId,
-                  reason: unlockForm.reason || undefined,
-                })
-              }
-            >
-              {unlockMutation.isPending ? 'Unlocking…' : 'Unlock exam term'}
-            </button>
-            {unlockMutation.isError && (
-              <p className="text-sm text-red-600">{unlockMutation.error.message}</p>
-            )}
-          </div>
-        </section>
+            <div className="space-y-4">
+               <select value={requestForm.examTermId} onChange={(e) => setRequestForm(c => ({ ...c, examTermId: e.target.value }))} className="premium-input bg-slate-50">
+                 <option value="">Select Exam</option>
+                 {exams.map((exam) => <option key={exam.id} value={exam.id}>{exam.name} {exam.isLocked ? '🔒' : '🔓'}</option>)}
+               </select>
+
+               {selectedRequestExam && (
+                 <div className={cn(
+                   "p-3 rounded-xl border flex items-center gap-3 transition-colors",
+                   selectedRequestExam.isLocked ? "bg-amber-50 border-amber-100 text-amber-700" : "bg-emerald-50 border-emerald-100 text-emerald-700"
+                 )}>
+                    {selectedRequestExam.isLocked ? <Lock size={14} /> : <Unlock size={14} />}
+                    <span className="text-[10px] font-black uppercase tracking-widest">Currently {selectedRequestExam.isLocked ? 'Locked' : 'Open'}</span>
+                 </div>
+               )}
+
+               <textarea 
+                rows={3} 
+                value={requestForm.reason} 
+                onChange={(e) => setRequestForm(c => ({ ...c, reason: e.target.value }))} 
+                placeholder="Reason for lock or correction request..."
+                className="premium-input bg-slate-50 py-4 text-xs font-medium min-h-[100px]"
+               />
+
+               <button 
+                onClick={() => createMutation.mutate(requestForm)}
+                disabled={!requestForm.examTermId || !requestForm.reason.trim() || createMutation.isPending}
+                className="w-full h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs shadow-xl shadow-slate-900/10 active:scale-95 transition-all disabled:opacity-30"
+               >
+                 {createMutation.isPending ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
+                 Submit for Audit
+               </button>
+            </div>
+         </section>
+
+         {/* Unlock Bypass */}
+         <section className="group relative rounded-[2.5rem] border border-slate-200 bg-white p-8 transition-all hover:shadow-xl hover:shadow-slate-200/50 overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 opacity-5">
+               <Unlock size={120} className="text-amber-500" />
+            </div>
+            <div className="mb-8">
+               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 mb-4 transition-transform group-hover:-rotate-12">
+                  <Unlock size={24} />
+               </div>
+               <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic">Security Bypass</h3>
+               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Unlock exam terms (Authorized Only)</p>
+            </div>
+
+            <div className="space-y-4">
+               <select value={unlockForm.examTermId} onChange={(e) => setUnlockForm(c => ({ ...c, examTermId: e.target.value }))} className="premium-input bg-slate-50">
+                 <option value="">Locked Exam Term</option>
+                 {exams.filter(e => e.isLocked).map((exam) => <option key={exam.id} value={exam.id}>{exam.name}</option>)}
+               </select>
+
+               <textarea 
+                rows={3} 
+                value={unlockForm.reason} 
+                onChange={(e) => setUnlockForm(c => ({ ...c, reason: e.target.value }))} 
+                placeholder="Reason for unlocking (Mandatory)..."
+                className="premium-input bg-slate-50 py-4 text-xs font-medium min-h-[100px]"
+               />
+
+               <button 
+                onClick={() => unlockMutation.mutate({ id: unlockForm.examTermId, reason: unlockForm.reason || undefined })}
+                disabled={!unlockForm.examTermId || !unlockForm.reason.trim() || unlockMutation.isPending}
+                className="w-full h-14 rounded-2xl border border-amber-200 bg-amber-50 text-amber-700 flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs shadow-xl shadow-amber-500/5 active:scale-95 transition-all disabled:opacity-30"
+               >
+                 {unlockMutation.isPending ? <Loader2 className="animate-spin" size={18} /> : <Shield size={18} />}
+                 Bypass Security Lock
+               </button>
+            </div>
+         </section>
       </div>
 
-      <section className="rounded-[28px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-        <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
-          Requests · {requestsQuery.data?.length ?? 0} shown
-        </p>
-        {requestsQuery.isLoading ? (
-          <div className="py-8 text-center text-sm text-gray-400">Loading lock requests…</div>
-        ) : requestsQuery.isError ? (
-          <p className="py-8 text-center text-sm text-red-600">{requestsQuery.error.message}</p>
-        ) : (requestsQuery.data ?? []).length === 0 ? (
-          <p className="py-8 text-center text-sm text-gray-400">No mark lock requests found.</p>
-        ) : (
-          <div className="grid gap-3">
-            {(requestsQuery.data ?? []).map((request) => (
-              <article key={request.id} className="rounded-2xl border border-[var(--line)] bg-white p-4">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="font-semibold text-gray-950">
-                        {request.examTerm?.name ?? 'Exam term'}
-                      </h4>
-                      <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${statusClass(request.status)}`}>
-                        {request.status}
-                      </span>
-                      {request.examTerm?.isLocked && (
-                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
-                          Locked
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-2 text-sm text-gray-600">{request.reason}</p>
-                    <p className="mt-2 text-xs text-gray-400">
-                      Requested by {actorLabel(request.requestedBy)} · {formatDate(request.createdAt)}
-                    </p>
-                    {request.reviewNote && (
-                      <p className="mt-2 text-sm text-gray-500">Review note: {request.reviewNote}</p>
-                    )}
-                    {request.reviewedAt && (
-                      <p className="mt-1 text-xs text-gray-400">
-                        Reviewed by {actorLabel(request.reviewedBy)} · {formatDate(request.reviewedAt)}
-                      </p>
-                    )}
+      {/* Audit History */}
+      <section className="rounded-[2.5rem] border border-slate-200 bg-white overflow-hidden shadow-2xl shadow-slate-200/20">
+         <div className="p-8 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50">
+            <div className="h-10 w-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-lg shadow-slate-900/10">
+               <History size={20} />
+            </div>
+            <div>
+               <h3 className="text-xl font-black uppercase tracking-tight text-slate-900 italic text-[18px]">Security Log History</h3>
+               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Audit trail of all lock operations</p>
+            </div>
+         </div>
+
+         <div className="p-8 grid gap-6">
+            {requestsQuery.isLoading ? (
+               <div className="py-20 text-center">
+                  <Loader2 className="h-10 w-10 animate-spin text-primary-500 mx-auto opacity-20" />
+                  <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Loading Audit Trail</p>
+               </div>
+            ) : (requestsQuery.data ?? []).length === 0 ? (
+               <div className="py-20 text-center border-2 border-dashed border-slate-100 rounded-3xl">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No security events recorded</p>
+               </div>
+            ) : (requestsQuery.data ?? []).map((request) => (
+               <article key={request.id} className="group relative rounded-[2rem] border border-slate-100 bg-white p-6 transition-all hover:border-primary-200 hover:shadow-xl hover:shadow-primary-500/5">
+                  <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                     <div className="flex-1 space-y-4">
+                        <div className="flex items-center gap-3">
+                           <div className={cn(
+                             "px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border flex items-center gap-1.5",
+                             request.status === 'APPROVED' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                             request.status === 'REJECTED' ? "bg-rose-50 text-rose-600 border-rose-100" :
+                             request.status === 'UNLOCKED' ? "bg-indigo-50 text-indigo-600 border-indigo-100" :
+                             "bg-amber-50 text-amber-600 border-amber-100"
+                           )}>
+                              {request.status === 'APPROVED' ? <CheckCircle2 size={10} /> : 
+                               request.status === 'REJECTED' ? <XCircle size={10} /> : 
+                               request.status === 'UNLOCKED' ? <Unlock size={10} /> : <Clock size={10} />}
+                              {request.status}
+                           </div>
+                           <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight italic">{request.examTerm?.name}</h4>
+                        </div>
+                        
+                        <div className="flex items-start gap-3">
+                           <div className="mt-1 h-6 w-6 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
+                              <MessageSquare size={12} />
+                           </div>
+                           <div>
+                              <p className="text-xs font-medium text-slate-600 leading-relaxed italic">"{request.reason}"</p>
+                              <div className="flex items-center gap-4 mt-2">
+                                 <div className="flex items-center gap-1.5">
+                                    <User size={10} className="text-slate-300" />
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{actorLabel(request.requestedBy)}</span>
+                                 </div>
+                                 <div className="flex items-center gap-1.5">
+                                    <Clock size={10} className="text-slate-300" />
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{formatDate(request.createdAt)}</span>
+                                 </div>
+                              </div>
+                           </div>
+                        </div>
+                     </div>
+
+                     {request.status === 'PENDING' && (
+                        <div className="w-full lg:w-[320px] p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
+                           <textarea 
+                            rows={2}
+                            value={reviewNote[request.id] ?? ''} 
+                            onChange={(e) => setReviewNote(c => ({ ...c, [request.id]: e.target.value }))} 
+                            placeholder="Add review note..."
+                            className="w-full bg-white rounded-xl border border-slate-100 p-3 text-[10px] font-medium focus:ring-4 focus:ring-primary-100 transition-all"
+                           />
+                           <div className="flex gap-2">
+                              <button 
+                                onClick={() => reviewMutation.mutate({ id: request.id, status: 'APPROVED' })}
+                                disabled={reviewMutation.isPending}
+                                className="flex-1 h-10 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/10 hover:bg-emerald-700 transition-all active:scale-95"
+                              >
+                                Approve
+                              </button>
+                              <button 
+                                onClick={() => reviewMutation.mutate({ id: request.id, status: 'REJECTED' })}
+                                disabled={reviewMutation.isPending}
+                                className="flex-1 h-10 rounded-xl border border-rose-100 bg-rose-50 text-rose-600 text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all active:scale-95"
+                              >
+                                Reject
+                              </button>
+                           </div>
+                        </div>
+                     )}
+
+                     {(request.reviewNote || request.reviewedAt) && (
+                        <div className="w-full lg:w-[240px] p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100">
+                           <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-2">Review Feedback</p>
+                           {request.reviewNote && <p className="text-[10px] font-medium text-slate-600 italic">"{request.reviewNote}"</p>}
+                           <div className="mt-2 flex flex-col gap-1">
+                              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">By {actorLabel(request.reviewedBy)}</span>
+                              <span className="text-[8px] font-bold text-slate-300 uppercase tracking-widest">{formatDate(request.reviewedAt)}</span>
+                           </div>
+                        </div>
+                     )}
                   </div>
-                  {request.status === 'PENDING' && (
-                    <div className="grid min-w-[280px] gap-2">
-                      <textarea
-                        rows={2}
-                        value={reviewNote[request.id] ?? ''}
-                        onChange={(event) =>
-                          setReviewNote((current) => ({ ...current, [request.id]: event.target.value }))
-                        }
-                        placeholder="Review note"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          className="flex-1 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                          disabled={reviewMutation.isPending}
-                          onClick={() => reviewMutation.mutate({ id: request.id, status: 'APPROVED' })}
-                        >
-                          Approve & lock
-                        </button>
-                        <button
-                          type="button"
-                          className="flex-1 rounded-xl border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-50"
-                          disabled={reviewMutation.isPending}
-                          onClick={() => reviewMutation.mutate({ id: request.id, status: 'REJECTED' })}
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </article>
+               </article>
             ))}
-          </div>
-        )}
-        {reviewMutation.isError && (
-          <p className="mt-3 text-sm text-red-600">{reviewMutation.error.message}</p>
-        )}
+         </div>
       </section>
     </div>
   );

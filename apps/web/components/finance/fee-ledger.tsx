@@ -1,12 +1,15 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
-import { Download, Receipt, Printer } from 'lucide-react';
+import { Download, Receipt, Printer, Undo2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ReprintDialog } from './reprint-dialog';
-import { useState } from 'react';
+import { ReversalDialog } from './reversal-dialog';
+import { api } from '@/lib/api';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { StatusBadge } from '@/components/ui/status-badge';
 
 interface Invoice {
   id: string;
@@ -18,6 +21,10 @@ interface Invoice {
   status: string;
   receiptId?: string | null;
   receiptNumber?: string | null;
+  student?: {
+    name: string;
+    studentSystemId: string;
+  };
 }
 
 interface FeeLedgerProps {
@@ -41,7 +48,17 @@ const formatDate = (value: string) =>
   }).format(new Date(value));
 
 export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
+  const queryClient = useQueryClient();
   const [selectedReceipt, setSelectedReceipt] = useState<{ id: string; number: string } | null>(null);
+  const [reversalTarget, setReversalTarget] = useState<Invoice | null>(null);
+
+  const reverseMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => api.reversePayment(id, { reason }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      void queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
+    },
+  });
 
   const columns = [
     {
@@ -49,9 +66,18 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
       cell: (inv: Invoice) => (
         <div className="flex flex-col">
           <span className="font-bold text-slate-900">{inv.invoiceNumber}</span>
-          <span className="text-[0.65rem] text-slate-400 font-bold uppercase tracking-wider">
+          <span className="text-[0.65rem] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
             Issued {formatDate(inv.issuedAt)}
           </span>
+        </div>
+      )
+    },
+    {
+      header: 'Student',
+      cell: (inv: Invoice) => (
+        <div className="flex flex-col">
+          <span className="text-sm font-bold text-slate-900">{inv.student?.name || 'N/A'}</span>
+          <span className="text-[0.6rem] text-slate-400 uppercase tracking-widest">{inv.student?.studentSystemId}</span>
         </div>
       )
     },
@@ -59,8 +85,8 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
       header: 'Due Date',
       cell: (inv: Invoice) => (
         <span className={cn(
-          "font-medium",
-          new Date(inv.dueDate) < new Date() && inv.outstandingAmount > 0 ? "text-destructive" : "text-slate-600"
+          "text-xs font-bold",
+          new Date(inv.dueDate) < new Date() && inv.outstandingAmount > 0 ? "text-danger-600" : "text-slate-500"
         )}>
           {formatDate(inv.dueDate)}
         </span>
@@ -68,14 +94,14 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
     },
     {
       header: 'Total',
-      cell: (inv: Invoice) => <span className="font-black text-slate-900">{formatCurrency(inv.totalAmount)}</span>
+      cell: (inv: Invoice) => <span className="font-black text-slate-900 text-sm">{formatCurrency(inv.totalAmount)}</span>
     },
     {
       header: 'Outstanding',
       cell: (inv: Invoice) => (
         <span className={cn(
-          "font-black",
-          inv.outstandingAmount > 0 ? "text-destructive" : "text-emerald-600"
+          "font-black text-sm",
+          inv.outstandingAmount > 0 ? "text-danger-600" : "text-emerald-600"
         )}>
           {formatCurrency(inv.outstandingAmount)}
         </span>
@@ -83,28 +109,36 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
     },
     {
       header: 'Status',
-      cell: (inv: Invoice) => (
-        <Badge variant={inv.status === 'PAID' ? 'success' : inv.status === 'PARTIAL' ? 'warning' : 'destructive'}>
-          {inv.status}
-        </Badge>
-      )
+      cell: (inv: Invoice) => <StatusBadge status={inv.status} className="h-6" />
     },
     {
       header: 'Actions',
       cell: (inv: Invoice) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {inv.receiptNumber && (
             <button 
-              className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-colors" 
+              className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-900 transition-all active:scale-90" 
               title="Print Receipt"
               onClick={() => setSelectedReceipt({ id: inv.receiptId!, number: inv.receiptNumber! })}
             >
               <Printer size={16} />
             </button>
           )}
-          <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-colors" title="Download PDF">
+          <button 
+            className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-900 transition-all active:scale-90" 
+            title="Download Invoice"
+          >
             <Download size={16} />
           </button>
+          {inv.status !== 'UNPAID' && (
+            <button 
+              className="p-2 hover:bg-danger-50 rounded-xl text-slate-300 hover:text-danger-600 transition-all active:scale-90" 
+              title="Reverse Payment"
+              onClick={() => setReversalTarget(inv)}
+            >
+              <Undo2 size={16} />
+            </button>
+          )}
         </div>
       )
     }
@@ -112,12 +146,14 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
 
   return (
     <div className="space-y-4">
-      <DataTable
-        columns={columns}
-        data={invoices}
-        isLoading={isLoading}
-        emptyMessage="No financial records found."
-      />
+      <div className="rounded-[2.5rem] border border-slate-100 overflow-hidden bg-white shadow-sm">
+        <DataTable
+          columns={columns}
+          data={invoices}
+          isLoading={isLoading}
+          emptyMessage="No financial records found."
+        />
+      </div>
 
       {selectedReceipt && (
         <ReprintDialog
@@ -125,6 +161,18 @@ export function FeeLedger({ invoices, isLoading }: FeeLedgerProps) {
           receiptNumber={selectedReceipt.number}
           isOpen={!!selectedReceipt}
           onClose={() => setSelectedReceipt(null)}
+        />
+      )}
+
+      {reversalTarget && (
+        <ReversalDialog
+          invoiceId={reversalTarget.id}
+          invoiceNumber={reversalTarget.invoiceNumber}
+          isOpen={!!reversalTarget}
+          onClose={() => setReversalTarget(null)}
+          onConfirm={async (reason) => {
+            await reverseMutation.mutateAsync({ id: reversalTarget.id, reason });
+          }}
         />
       )}
     </div>

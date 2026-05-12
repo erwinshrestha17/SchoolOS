@@ -195,14 +195,29 @@ export default function DashboardPage() {
     attendanceQuery.isLoading || 
     receiptsQuery.isLoading;
 
+  const onboardingSteps = [
+    { id: 'profile', label: 'School Profile', isComplete: !!session?.tenant.name, href: '/dashboard/settings' },
+    { id: 'academic', label: 'Academic Year', isComplete: !!currentAcademicYear, href: '/dashboard/settings' },
+    { id: 'classes', label: 'Classes & Sections', isComplete: classCount > 0, href: '/dashboard/settings' },
+    { id: 'fees', label: 'Fee Setup', isComplete: activeFeePlanCount > 0, href: '/dashboard/settings' },
+    { id: 'staff', label: 'Staff Directory', isComplete: (academicYearsQuery.data?.length ?? 0) > 0 && true, href: '/dashboard/staff' }, // Placeholder logic for staff
+    { id: 'students', label: 'Student Import', isComplete: totalStudents > 0, href: '/dashboard/admissions' },
+    { id: 'attendance', label: 'Attendance Ready', isComplete: attendancePercent > 0, href: '/dashboard/attendance' },
+    { id: 'receipts', label: 'Receipt Config', isComplete: (receiptsQuery.data?.length ?? 0) > 0, href: '/dashboard/settings' },
+  ];
+
+  const completedSteps = onboardingSteps.filter(s => s.isComplete).length;
+  const onboardingProgress = Math.round((completedSteps / onboardingSteps.length) * 100);
+  const showOnboarding = onboardingProgress < 100;
+
   if (isInitialLoading) {
     return <LoadingState variant="page" label="Gathering school insights..." />;
   }
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <header className="relative overflow-hidden rounded-2xl bg-slate-950 px-6 py-9 text-white shadow-xl lg:px-10">
-        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+      <header className="relative overflow-hidden rounded-3xl bg-slate-950 px-6 py-9 text-white shadow-xl lg:px-10">
+        <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-2xl">
             <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
               School Dashboard
@@ -241,28 +256,50 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {setupWarnings.length > 0 && (
-          <div className="relative mt-8 flex flex-col gap-4 rounded-2xl border border-warning-500/30 bg-warning-500/10 p-5 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning-500 text-white">
-                <AlertTriangle size={20} />
-              </div>
-              <div>
-                <p className="font-bold text-warning-400">Setup needs attention</p>
-                <p className="mt-0.5 text-sm text-slate-300">
-                  {setupWarnings.join(' · ')}
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/dashboard/settings"
-              className="inline-flex items-center gap-2 rounded-xl bg-warning-500 px-4 py-2 text-xs font-bold text-slate-900 transition hover:bg-warning-400"
-            >
-              Open Settings
-              <ArrowRight size={14} />
-            </Link>
+        {showOnboarding && (
+          <div className="relative z-10 mt-10 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl shadow-2xl">
+             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge variant="neutral" className="bg-amber-500/20 text-amber-400 border-amber-500/30 font-bold text-[10px]">PILOT ONBOARDING</Badge>
+                    <span className="text-xs font-bold text-white">{onboardingProgress}% Complete</span>
+                  </div>
+                  <h2 className="text-xl font-bold text-white">Setup Checklist</h2>
+                  <p className="text-sm text-slate-400 mt-1">Complete these steps to ensure your school is production-ready.</p>
+                </div>
+                <div className="h-2 w-full max-w-xs bg-white/10 rounded-full overflow-hidden">
+                  <div className="h-full bg-amber-500 transition-all duration-1000" style={{ width: `${onboardingProgress}%` }} />
+                </div>
+             </div>
+
+             <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {onboardingSteps.map((step) => (
+                  <Link 
+                    key={step.id}
+                    href={step.href}
+                    className={cn(
+                      "flex items-center gap-3 rounded-2xl border p-3 transition-all",
+                      step.isComplete 
+                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" 
+                        : "border-white/5 bg-white/5 text-slate-400 hover:bg-white/10 hover:border-white/20"
+                    )}
+                  >
+                    <div className={cn(
+                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2",
+                      step.isComplete ? "border-emerald-400 bg-emerald-400 text-slate-900" : "border-slate-600"
+                    )}>
+                      {step.isComplete && <CheckCircle2 size={12} strokeWidth={3} />}
+                    </div>
+                    <span className="text-xs font-bold truncate">{step.label}</span>
+                  </Link>
+                ))}
+             </div>
           </div>
         )}
+
+        {/* Decorative elements */}
+        <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-primary-600/20 blur-3xl" />
+        <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-indigo-600/20 blur-3xl" />
       </header>
 
       <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
