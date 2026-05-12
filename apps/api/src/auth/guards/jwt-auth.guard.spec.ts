@@ -169,6 +169,7 @@ describe('JwtAuthGuard', () => {
     });
     const { context, request } = createContext({
       'x-schoolos-tenant-id': 'tenant-2',
+      'x-schoolos-tenant-override-reason': 'Support investigation',
     });
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
@@ -187,6 +188,7 @@ describe('JwtAuthGuard', () => {
       after: {
         originalTenantId: 'tenant-1',
         effectiveTenantId: 'tenant-2',
+        reason: 'Support investigation',
       },
     });
   });
@@ -197,7 +199,10 @@ describe('JwtAuthGuard', () => {
       roles: ['platform_super_admin'],
     });
     prisma.tenant.findUnique.mockResolvedValueOnce(null);
-    const missingTenant = createContext({ 'x-schoolos-tenant-id': 'missing' });
+    const missingTenant = createContext({
+      'x-schoolos-tenant-id': 'missing',
+      'x-schoolos-tenant-override-reason': 'Support investigation',
+    });
 
     await expect(
       guard.canActivate(missingTenant.context),
@@ -209,6 +214,7 @@ describe('JwtAuthGuard', () => {
     });
     const inactiveTenant = createContext({
       'x-schoolos-tenant-id': 'tenant-2',
+      'x-schoolos-tenant-override-reason': 'Support investigation',
     });
 
     await expect(

@@ -621,6 +621,77 @@ enum FileStatus {
   DELETED
 }
 
+enum PlatformPlanStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum TenantSubscriptionStatus {
+  TRIAL
+  ACTIVE
+  GRACE
+  SUSPENDED
+  EXPIRED
+  CANCELLED
+}
+
+enum UsagePeriod {
+  DAILY
+  MONTHLY
+  ANNUAL
+  LIFETIME
+}
+
+enum SaaSInvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  PARTIAL
+  OVERDUE
+  CANCELLED
+}
+
+enum SaaSInvoiceLineType {
+  SUBSCRIPTION
+  SETUP_FEE
+  TRAINING_FEE
+  SMS_BUNDLE
+  STORAGE_ADDON
+  CUSTOM_SUPPORT
+  OTHER
+}
+
+enum SaaSPaymentMethod {
+  CASH
+  BANK_TRANSFER
+  ESEWA
+  KHALTI
+  CHEQUE
+  OTHER
+}
+
+enum ProviderType {
+  SMS
+  EMAIL
+  FCM
+  OBJECT_STORAGE
+  PAYMENT_GATEWAY
+  AI_PROVIDER
+}
+
+enum ProviderEnvironment {
+  TEST
+  PRODUCTION
+}
+
+enum ReportExportStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
 enum StudentQrStatus {
   ACTIVE
   REVOKED
@@ -751,6 +822,14 @@ model Tenant {
   syllabusTopics                SyllabusTopic[]
   settings                      TenantSetting[]
   fileAssets                    FileAsset[]
+  subscriptions                 TenantSubscription[]
+  featureOverrides              TenantFeatureOverride[]
+  usageCounters                 UsageCounter[]
+  billingProfile                TenantBillingProfile?
+  saasInvoices                  SaaSInvoice[]
+  saasPayments                  SaaSPayment[]
+  reportExports                 ReportExport[]
+  onboardingOverrides           TenantOnboardingChecklistOverride[]
   studentMergeHistory           StudentMergeHistory[]
   studentIdentities             StudentIdentity[]
   studentDocumentHistory        StudentDocumentHistory[]
@@ -947,6 +1026,232 @@ model FileAsset {
   studentDocuments    StudentDocument[]    @relation("DocumentFile")
 
   @@index([tenantId, module, entityId])
+}
+
+model PlatformPlan {
+  id          String             @id @default(uuid())
+  key         String             @unique
+  name        String
+  description String?
+  status      PlatformPlanStatus @default(ACTIVE)
+  priceNpr    Decimal            @default(0) @db.Decimal(12, 2)
+  billingCycle String            @default("ANNUAL")
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  features      PlatformPlanFeature[]
+  usageLimits   UsageLimit[]
+  subscriptions TenantSubscription[]
+  saasInvoices  SaaSInvoice[]
+}
+
+model PlatformPlanFeature {
+  id        String   @id @default(uuid())
+  planId    String
+  featureKey String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  plan PlatformPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, featureKey])
+  @@index([featureKey])
+}
+
+model TenantSubscription {
+  id          String                   @id @default(uuid())
+  tenantId    String
+  planId      String
+  status      TenantSubscriptionStatus @default(TRIAL)
+  startsAt    DateTime                 @default(now())
+  endsAt      DateTime?
+  renewsAt    DateTime?
+  trialEndsAt DateTime?
+  notes       String?
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  plan         PlatformPlan  @relation(fields: [planId], references: [id], onDelete: Restrict)
+  saasInvoices SaaSInvoice[]
+
+  @@index([tenantId, status])
+  @@index([planId])
+}
+
+model TenantFeatureOverride {
+  id         String   @id @default(uuid())
+  tenantId   String
+  featureKey String
+  enabled    Boolean
+  reason     String
+  createdBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, featureKey])
+  @@index([featureKey])
+}
+
+model UsageLimit {
+  id        String      @id @default(uuid())
+  planId    String
+  usageKey  String
+  limit     Int
+  period    UsagePeriod @default(MONTHLY)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  plan PlatformPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, usageKey, period])
+}
+
+model UsageCounter {
+  id          String      @id @default(uuid())
+  tenantId    String
+  usageKey    String
+  period      UsagePeriod @default(MONTHLY)
+  periodStart DateTime
+  value       Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, usageKey, period, periodStart])
+  @@index([tenantId, usageKey])
+}
+
+model TenantBillingProfile {
+  id                    String   @id @default(uuid())
+  tenantId              String   @unique
+  billingContactName    String?
+  billingEmail          String?
+  billingPhone          String?
+  billingAddress        String?
+  panVatNumber          String?
+  preferredBillingCycle String   @default("ANNUAL")
+  notes                 String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model SaaSInvoice {
+  id             String            @id @default(uuid())
+  tenantId       String
+  invoiceNumber  String            @unique
+  planId         String?
+  subscriptionId String?
+  amount         Decimal           @db.Decimal(12, 2)
+  currency       String            @default("NPR")
+  issueDate      DateTime
+  dueDate        DateTime
+  status         SaaSInvoiceStatus @default(DRAFT)
+  notes          String?
+  cancelledAt    DateTime?
+  cancelledBy    String?
+  cancellationReason String?
+  createdBy      String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  plan         PlatformPlan?        @relation(fields: [planId], references: [id], onDelete: SetNull)
+  subscription TenantSubscription?  @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  lines        SaaSInvoiceLine[]
+  payments     SaaSPayment[]
+
+  @@index([tenantId, status])
+  @@index([dueDate])
+}
+
+model SaaSInvoiceLine {
+  id          String              @id @default(uuid())
+  invoiceId   String
+  lineType    SaaSInvoiceLineType
+  description String
+  quantity    Int                 @default(1)
+  unitAmount  Decimal             @db.Decimal(12, 2)
+  totalAmount Decimal             @db.Decimal(12, 2)
+
+  invoice SaaSInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model SaaSPayment {
+  id          String            @id @default(uuid())
+  tenantId    String
+  invoiceId   String
+  amount      Decimal           @db.Decimal(12, 2)
+  paymentDate DateTime
+  method      SaaSPaymentMethod
+  reference   String?
+  notes       String?
+  createdBy   String?
+  createdAt   DateTime          @default(now())
+
+  tenant  Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  invoice SaaSInvoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, paymentDate])
+  @@index([invoiceId])
+}
+
+model ProviderConfig {
+  id             String              @id @default(uuid())
+  type           ProviderType
+  name           String
+  enabled        Boolean             @default(false)
+  environment    ProviderEnvironment @default(TEST)
+  configEncrypted Json
+  secretKeys      String[]            @default([])
+  lastValidatedAt DateTime?
+  validationStatus String?
+  updatedBy       String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([type, name, environment])
+  @@index([type, enabled])
+}
+
+model ReportExport {
+  id          String             @id @default(uuid())
+  tenantId    String?
+  scope       String             @default("tenant")
+  reportKey   String
+  format      String
+  filters     Json
+  status      ReportExportStatus @default(COMPLETED)
+  fileAssetId String?
+  requestedBy String?
+  errorSummary String?
+  createdAt   DateTime           @default(now())
+  completedAt DateTime?
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([scope, reportKey])
+}
+
+model TenantOnboardingChecklistOverride {
+  id         String   @id @default(uuid())
+  tenantId   String
+  itemKey    String
+  completed  Boolean
+  reason     String
+  updatedBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, itemKey])
 }
 
 model AcademicYear {

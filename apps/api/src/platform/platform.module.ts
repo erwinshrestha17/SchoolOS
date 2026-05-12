@@ -5,9 +5,18 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { UsageModule } from '../usage/usage.module';
+import { ConfigModule } from '../config/config.module';
+import { RedisModule } from '../redis/redis.module';
 
 @Module({
-  imports: [PrismaModule, AuditModule, AuthModule, UsageModule],
+  imports: [
+    PrismaModule,
+    AuditModule,
+    AuthModule,
+    UsageModule,
+    ConfigModule,
+    RedisModule,
+  ],
   controllers: [PlatformController],
   providers: [PlatformService],
   exports: [PlatformService],

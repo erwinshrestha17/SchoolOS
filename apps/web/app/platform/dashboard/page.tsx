@@ -1,179 +1,99 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '../../../lib/api';
-import { PlatformTenantSummary } from '@schoolos/core';
-import { 
-  ShieldCheck, 
-  School, 
-  Users, 
-  Activity,
-  AlertCircle,
-  TrendingUp,
-  Server,
-  Zap,
-  Globe,
-  ArrowRight
-} from 'lucide-react';
-import { StatCard } from '@/components/ui/stat-card';
-import { SectionCard } from '@/components/ui/section-card';
-import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { Activity, ArrowRight, Database, School, ShieldCheck, Users } from 'lucide-react';
+import { api } from '../../../lib/api';
+import type { PlatformDashboardSummary } from '@schoolos/core';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 export default function PlatformDashboard() {
-  const [tenants, setTenants] = useState<PlatformTenantSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [summary, setSummary] = useState<PlatformDashboardSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.listPlatformTenants()
-      .then(setTenants)
-      .finally(() => setLoading(false));
+    api
+      .getPlatformDashboard()
+      .then(setSummary)
+      .catch((err) => setError(err.message ?? 'Failed to load platform dashboard'));
   }, []);
 
-  const stats = [
-    {
-      label: 'Active Schools',
-      value: tenants.filter(t => t.isActive).length,
-      icon: School,
-      color: 'text-indigo-600',
-      bg: 'bg-indigo-50',
-    },
-    {
-      label: 'Global Students',
-      value: tenants.reduce((acc, t) => acc + t.studentCount, 0).toLocaleString(),
-      icon: Users,
-      color: 'text-emerald-600',
-      bg: 'bg-emerald-50',
-    },
-    {
-      label: 'API Requests (24h)',
-      value: '1.2M',
-      icon: Zap,
-      color: 'text-amber-600',
-      bg: 'bg-amber-50',
-    },
-    {
-      label: 'Infrastructure Status',
-      value: 'Operational',
-      icon: ShieldCheck,
-      color: 'text-sky-600',
-      bg: 'bg-sky-50',
-    },
-  ];
-
-  if (loading) {
-    return (
-      <div className="p-8 space-y-8 animate-pulse">
-        <div className="h-20 bg-slate-100 rounded-2xl w-1/3" />
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
-          {[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-slate-100 rounded-2xl" />)}
-        </div>
-      </div>
-    );
+  if (error) {
+    return <div className="rounded-lg border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">{error}</div>;
   }
 
-  return (
-    <div className="space-y-8 p-8 max-w-7xl mx-auto">
-      <header className="relative overflow-hidden rounded-3xl bg-slate-950 px-8 py-10 text-white shadow-2xl">
-        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Badge variant="neutral" className="bg-primary-500/20 text-primary-400 border-primary-500/30 font-bold tracking-widest text-[10px]">
-                CONTROL PLANE
-              </Badge>
-              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">System Healthy</span>
-            </div>
-            <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Platform Intelligence</h1>
-            <p className="mt-2 text-slate-400 max-w-xl">
-              Centralized command for SchoolOS multi-tenant infrastructure. Monitor health, manage schools, and oversee global operations.
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-4">
-             <div className="rounded-2xl bg-white/5 border border-white/10 p-4 backdrop-blur-md">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Global Load</p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold">14%</span>
-                  <TrendingUp size={14} className="text-emerald-500" />
-                </div>
-             </div>
-             <Link href="/platform/schools" className="flex items-center gap-2 rounded-2xl bg-white px-6 py-3 text-sm font-bold text-slate-900 transition hover:bg-slate-100 shadow-xl">
-                Manage Schools
-                <ArrowRight size={18} />
-             </Link>
-          </div>
-        </div>
+  if (!summary) {
+    return <div className="h-48 animate-pulse rounded-lg bg-slate-100" />;
+  }
 
-        {/* Decorative elements */}
-        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary-500/10 blur-3xl" />
-        <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
+  const stats = [
+    { label: 'Total Schools', value: summary.totalTenants, icon: School },
+    { label: 'Active Schools', value: summary.activeTenants, icon: ShieldCheck },
+    { label: 'Suspended Schools', value: summary.suspendedTenants, icon: Activity },
+    { label: 'Pending Onboarding', value: summary.pendingOnboarding, icon: Database },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <header className="flex flex-col gap-4 border-b border-slate-200 pb-6 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <Badge variant="neutral" className="mb-3">Control Plane</Badge>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-950">Platform Dashboard</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+            Tenant management, usage, onboarding, billing, provider safety, queues, and production health for SchoolOS operators.
+          </p>
+        </div>
+        <Link href="/platform/schools">
+          <Button className="gap-2">
+            Manage Schools
+            <ArrowRight size={16} />
+          </Button>
+        </Link>
       </header>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-4">
         {stats.map((stat) => (
-          <div key={stat.label} className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all hover:border-primary-200 hover:shadow-md">
-            <div className="flex items-center gap-4">
-              <div className={`rounded-xl ${stat.bg} ${stat.color} p-3 transition-transform group-hover:scale-110`}>
-                <stat.icon size={24} />
-              </div>
-              <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p>
-                <p className="text-2xl font-bold text-slate-900 tracking-tight">{stat.value}</p>
-              </div>
+          <div key={stat.label} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+              <stat.icon size={20} />
             </div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{stat.label}</p>
+            <p className="mt-1 text-2xl font-bold text-slate-950">{stat.value.toLocaleString()}</p>
           </div>
         ))}
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-3">
-        <SectionCard 
-          title="Security Events" 
-          description="Recent platform-level security audits"
-          className="lg:col-span-2"
-        >
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="h-16 w-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300 mb-4">
-              <Activity size={32} />
-            </div>
-            <h3 className="text-lg font-bold text-slate-900">No Security Alerts</h3>
-            <p className="text-sm text-slate-500 max-w-sm mt-1">
-              Your platform infrastructure is secure. No unauthorized access attempts or suspicious activities detected in the last 24 hours.
-            </p>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Students</p>
+          <div className="mt-3 flex items-center gap-3">
+            <Users className="text-slate-400" size={22} />
+            <p className="text-xl font-bold text-slate-950">{summary.usage.totalActiveStudents.toLocaleString()}</p>
           </div>
-        </SectionCard>
-
-        <SectionCard title="Infrastructure Nodes">
-          <div className="space-y-4">
-            <NodeStatus label="API Cluster (np-central-1)" status="Healthy" load={12} />
-            <NodeStatus label="Database (Primary)" status="Healthy" load={45} />
-            <NodeStatus label="Redis Cache" status="Healthy" load={8} />
-            <NodeStatus label="Asset Storage (S3)" status="Healthy" load={2} />
-            <NodeStatus label="Worker Queue" status="Healthy" load={18} />
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Staff</p>
+          <div className="mt-3 flex items-center gap-3">
+            <Users className="text-slate-400" size={22} />
+            <p className="text-xl font-bold text-slate-950">{summary.usage.totalActiveStaff.toLocaleString()}</p>
           </div>
-        </SectionCard>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Private Storage</p>
+          <div className="mt-3 flex items-center gap-3">
+            <Database className="text-slate-400" size={22} />
+            <p className="text-xl font-bold text-slate-950">{formatBytes(summary.usage.totalStorageBytes)}</p>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function NodeStatus({ label, status, load }: { label: string, status: string, load: number }) {
-  return (
-    <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/50">
-      <div className="flex items-center gap-3">
-        <Server size={16} className="text-slate-400" />
-        <div>
-          <p className="text-xs font-bold text-slate-800">{label}</p>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            <span className="text-[10px] font-medium text-slate-500 uppercase">{status}</span>
-          </div>
-        </div>
-      </div>
-      <div className="text-right">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Load</p>
-        <p className="text-xs font-bold text-slate-900">{load}%</p>
-      </div>
-    </div>
-  );
+function formatBytes(value: number) {
+  if (!value) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const index = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
+  return `${(value / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 }

@@ -57,6 +57,13 @@ import type {
   PlatformTenantSummary,
   PlatformTenantDetail,
   PlatformAuditLog,
+  PlatformDashboardSummary,
+  PlatformPlanSummary,
+  PlatformProviderConfigSummary,
+  PlatformQueueSummary,
+  PlatformHealthSummary,
+  PlatformOnboardingChecklist,
+  PlatformSaaSInvoiceSummary,
   TenantSettingSummary,
   PayslipSummary,
   PromotionReadiness,
@@ -1558,8 +1565,76 @@ export const api = {
         limit: params?.limit?.toString(),
       }),
     ),
+  getPlatformDashboard: () =>
+    request<PlatformDashboardSummary>('/platform/dashboard'),
+  listPlatformPlans: () => request<PlatformPlanSummary[]>('/platform/plans'),
+  createPlatformPlan: (body: JsonBody) =>
+    request<PlatformPlanSummary>('/platform/plans', { method: 'POST', json: body }),
+  updatePlatformPlan: (planId: string, body: JsonBody) =>
+    request<PlatformPlanSummary>(`/platform/plans/${encodeURIComponent(planId)}`, {
+      method: 'PATCH',
+      json: body,
+    }),
+  assignPlatformSubscription: (tenantId: string, body: JsonBody) =>
+    request(
+      `/platform/tenants/${encodeURIComponent(tenantId)}/subscriptions`,
+      { method: 'POST', json: body },
+    ),
+  setPlatformFeatureOverride: (tenantId: string, body: JsonBody) =>
+    request(
+      `/platform/tenants/${encodeURIComponent(tenantId)}/feature-overrides`,
+      { method: 'POST', json: body },
+    ),
+  listPlatformUsageCounters: (tenantId: string) =>
+    request(`/platform/tenants/${encodeURIComponent(tenantId)}/usage-counters`),
+  getPlatformBillingProfile: (tenantId: string) =>
+    request(`/platform/tenants/${encodeURIComponent(tenantId)}/billing-profile`),
+  updatePlatformBillingProfile: (tenantId: string, body: JsonBody) =>
+    request(`/platform/tenants/${encodeURIComponent(tenantId)}/billing-profile`, {
+      method: 'PATCH',
+      json: body,
+    }),
+  listPlatformSaaSInvoices: (tenantId: string) =>
+    request<PlatformSaaSInvoiceSummary[]>(
+      `/platform/tenants/${encodeURIComponent(tenantId)}/saas-invoices`,
+    ),
+  createPlatformSaaSInvoice: (tenantId: string, body: JsonBody) =>
+    request<PlatformSaaSInvoiceSummary>(
+      `/platform/tenants/${encodeURIComponent(tenantId)}/saas-invoices`,
+      { method: 'POST', json: body },
+    ),
+  recordPlatformSaaSPayment: (tenantId: string, invoiceId: string, body: JsonBody) =>
+    request<PlatformSaaSInvoiceSummary>(
+      `/platform/tenants/${encodeURIComponent(tenantId)}/saas-invoices/${encodeURIComponent(invoiceId)}/payments`,
+      { method: 'POST', json: body },
+    ),
+  listPlatformProviders: () =>
+    request<PlatformProviderConfigSummary[]>('/platform/providers'),
+  upsertPlatformProvider: (body: JsonBody) =>
+    request<PlatformProviderConfigSummary>('/platform/providers', {
+      method: 'POST',
+      json: body,
+    }),
+  getPlatformQueueHealth: () =>
+    request<PlatformQueueSummary[]>('/platform/queues'),
+  retryPlatformFailedJob: (body: JsonBody) =>
+    request('/platform/queues/retry', { method: 'POST', json: body }),
+  getPlatformHealth: () => request<PlatformHealthSummary>('/platform/health'),
+  listPlatformReportExports: (params?: { tenantId?: string }) =>
+    request(withQuery('/platform/report-exports', params ?? {})),
+  getTenantOnboardingChecklist: (tenantId: string) =>
+    request<PlatformOnboardingChecklist>(
+      `/platform/tenants/${encodeURIComponent(tenantId)}/onboarding`,
+    ),
+  setTenantOnboardingOverride: (tenantId: string, body: JsonBody) =>
+    request<PlatformOnboardingChecklist>(
+      `/platform/tenants/${encodeURIComponent(tenantId)}/onboarding/override`,
+      { method: 'POST', json: body },
+    ),
   getTenantSettings: () => request<TenantSettingSummary[]>('/settings'),
   getPublicTenantSettings: () => request<TenantSettingSummary[]>('/settings/public'),
+  getSchoolOnboardingChecklist: () =>
+    request<PlatformOnboardingChecklist>('/settings/onboarding'),
   updateTenantSetting: (key: string, value: any) =>
     request<{ success: true }>(`/settings/${encodeURIComponent(key)}`, {
       method: 'PATCH',

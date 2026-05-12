@@ -76,11 +76,19 @@ export class JwtAuthGuard implements CanActivate {
     const overrideTenantId = resolveHeader(
       request.headers['x-schoolos-tenant-id'],
     );
+    const overrideReason = resolveHeader(
+      request.headers['x-schoolos-tenant-override-reason'],
+    );
     const canOverrideTenant = roles.includes('platform_super_admin');
 
     if (overrideTenantId && !canOverrideTenant) {
       throw new ForbiddenException(
         'Tenant override requires platform super admin',
+      );
+    }
+    if (overrideTenantId && (!overrideReason || overrideReason.length < 5)) {
+      throw new ForbiddenException(
+        'Tenant override requires an explicit reason',
       );
     }
 
@@ -113,6 +121,7 @@ export class JwtAuthGuard implements CanActivate {
         after: {
           originalTenantId: payload.tenantId,
           effectiveTenantId,
+          reason: overrideReason,
         },
       });
     }

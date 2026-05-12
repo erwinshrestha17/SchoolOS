@@ -46,6 +46,7 @@ async function bootstrap() {
       'X-Requested-With',
       'X-Request-Id',
       'X-SchoolOS-Tenant-Id',
+      'X-SchoolOS-Tenant-Override-Reason',
     ],
   });
 

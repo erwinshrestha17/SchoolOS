@@ -16,7 +16,8 @@ import {
   ExternalLink,
   History,
   CreditCard,
-  CheckCircle2
+  CheckCircle2,
+  ClipboardCheck
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,9 +40,13 @@ export default function PlatformSchoolDetail() {
 
   const toggleStatus = async () => {
     if (!tenant) return;
+    const reason = window.prompt(
+      tenant.isActive ? 'Reason for suspending this school:' : 'Reason for restoring this school:',
+    );
+    if (!reason || reason.trim().length < 5) return;
     setUpdating(true);
     try {
-      await api.updatePlatformTenantStatus(tenant.id, !tenant.isActive, 'Operator override');
+      await api.updatePlatformTenantStatus(tenant.id, !tenant.isActive, reason);
       const updated = await api.getPlatformTenantDetail(tenant.id);
       setTenant(updated);
     } catch (error) {
@@ -132,21 +137,54 @@ export default function PlatformSchoolDetail() {
                   </div>
                   <div>
                     <p className="text-xl font-extrabold text-slate-900 uppercase tracking-tight">{tenant.plan} Tier</p>
-                    <p className="text-sm text-slate-500 mt-1">Multi-campus support · Full Academics · Priority Support</p>
+                    <p className="text-sm text-slate-500 mt-1">
+                      {tenant.subscription
+                        ? `${tenant.subscription.planName} · ${tenant.subscription.status}`
+                        : 'No SaaS subscription assigned yet'}
+                    </p>
                     <div className="flex items-center gap-4 mt-3">
                        <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-600">
-                         <CheckCircle2 size={14} /> Paid monthly
+                         <CheckCircle2 size={14} /> SaaS billing only
                        </span>
-                       <span className="text-xs text-slate-400 font-medium">Next renewal: Jun 1, 2026</span>
+                       <span className="text-xs text-slate-400 font-medium">
+                         Next renewal: {tenant.subscription?.renewsAt ? new Date(tenant.subscription.renewsAt).toLocaleDateString() : 'Not set'}
+                       </span>
                     </div>
                   </div>
                 </div>
                 <div className="text-right">
-                  <Badge variant="success" className="px-4 py-1.5 font-bold">ACTIVE</Badge>
+                  <Badge variant={tenant.subscription?.status === 'ACTIVE' ? 'success' : 'neutral'} className="px-4 py-1.5 font-bold">
+                    {tenant.subscription?.status ?? 'UNASSIGNED'}
+                  </Badge>
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          {tenant.onboarding && (
+            <Card className="border-slate-200 shadow-sm">
+              <CardHeader className="border-b border-slate-50">
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <ClipboardCheck size={20} className="text-slate-400" />
+                  Pilot Onboarding
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <p className="text-sm font-bold text-slate-900">{tenant.onboarding.completed} of {tenant.onboarding.total} complete</p>
+                  <Badge variant={tenant.onboarding.progressPercent === 100 ? 'success' : 'neutral'}>{tenant.onboarding.progressPercent}%</Badge>
+                </div>
+                <div className="space-y-2">
+                  {tenant.onboarding.items.slice(0, 6).map((item) => (
+                    <div key={item.key} className="flex items-center justify-between rounded-xl border border-slate-100 p-3 text-sm">
+                      <span className="font-medium text-slate-700">{item.label}</span>
+                      <Badge variant={item.completed ? 'success' : 'neutral'}>{item.completed ? 'Done' : 'Missing'}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card className="border-slate-200 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-slate-50 pb-6">
@@ -162,9 +200,19 @@ export default function PlatformSchoolDetail() {
             </CardHeader>
             <CardContent className="p-0">
                <div className="divide-y divide-slate-50">
-                  <AuditRow action="Status Changed" date="Today, 10:42 AM" user="admin@schoolos.com" detail="Suspension lifted" />
-                  <AuditRow action="Plan Updated" date="Yesterday" user="system" detail="Upgraded to Premium" />
-                  <AuditRow action="New Admission" date="May 10, 2026" user="school_admin" detail="Bulk import (142 students)" />
+                  {(tenant.recentAudit ?? []).length === 0 ? (
+                    <div className="p-5 text-sm text-slate-500">No platform audit events yet.</div>
+                  ) : (
+                    (tenant.recentAudit ?? []).map((log) => (
+                      <AuditRow
+                        key={log.id}
+                        action={log.action}
+                        date={new Date(log.createdAt).toLocaleString()}
+                        user={log.user?.email ?? log.userId ?? 'system'}
+                        detail={log.resource}
+                      />
+                    ))
+                  )}
                </div>
             </CardContent>
           </Card>

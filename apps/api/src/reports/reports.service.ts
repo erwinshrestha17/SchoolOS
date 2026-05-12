@@ -807,6 +807,13 @@ export class ReportsService {
         filterCount: Object.keys(request.filters).length,
       },
     });
+    await this.recordExportHistory({
+      tenantId: actor.tenantId,
+      reportKey,
+      format: request.format,
+      filters: request.filters as Prisma.InputJsonValue,
+      requestedBy: actor.userId,
+    });
 
     const fileName = `${reportKey}-${new Date().toISOString().split('T')[0]}`;
 
@@ -857,5 +864,36 @@ export class ReportsService {
     );
 
     return [headers.join(','), ...rows].join('\n');
+  }
+
+  private async recordExportHistory(input: {
+    tenantId: string;
+    reportKey: string;
+    format: string;
+    filters: Prisma.InputJsonValue;
+    requestedBy: string;
+  }) {
+    const delegate = (
+      this.prisma as unknown as {
+        reportExport?: {
+          create(input: unknown): Promise<unknown>;
+        };
+      }
+    ).reportExport;
+    if (!delegate?.create) {
+      return;
+    }
+    await delegate.create({
+      data: {
+        tenantId: input.tenantId,
+        scope: 'tenant',
+        reportKey: input.reportKey,
+        format: input.format,
+        filters: input.filters,
+        requestedBy: input.requestedBy,
+        status: 'COMPLETED',
+        completedAt: new Date(),
+      },
+    });
   }
 }

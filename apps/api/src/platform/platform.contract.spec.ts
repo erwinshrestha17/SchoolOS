@@ -24,8 +24,12 @@ describe('M0 Platform Control Plane contracts', () => {
       expect(controller).toContain(endpoint);
     }
 
-    expect(controller).toContain("@Permissions('platform:read')");
-    expect(controller).toContain("@Permissions('platform:manage')");
+    expect(controller).toContain("@Permissions('platform:tenants:read')");
+    expect(controller).toContain("@Permissions('platform:tenants:status')");
+    expect(controller).toContain("@Permissions('platform:plans:manage')");
+    expect(controller).toContain("@Permissions('platform:billing:manage')");
+    expect(controller).toContain("@Permissions('platform:providers:manage')");
+    expect(controller).toContain("@Permissions('platform:queues:retry')");
     expect(controller).toContain('UpdatePlatformTenantStatusDto');
     expect(controller).toContain('ListPlatformTenantsDto');
   });
@@ -66,7 +70,7 @@ describe('M0 Platform Control Plane contracts', () => {
       'tenant_suspended',
       'tenant_status_noop',
       "tenantId: 'platform'",
-      'reason: reason ?? null',
+      'reason.trim()',
     ]) {
       expect(service).toContain(auditMarker);
     }
@@ -78,5 +82,48 @@ describe('M0 Platform Control Plane contracts', () => {
     expect(service).toContain('getTenantUsage');
     expect(service).toContain('findUnique({');
     expect(service).toContain('Tenant with ID ${tenantId} not found');
+  });
+
+  it('keeps M0 SaaS billing, providers, queues, reports, and onboarding inside platform routes', () => {
+    const controller = read('src/platform/platform.controller.ts');
+    const service = read('src/platform/platform.service.ts');
+    const schema = read('prisma/schema.prisma');
+
+    for (const endpoint of [
+      "@Get('plans')",
+      "@Post('tenants/:tenantId/subscriptions')",
+      "@Post('tenants/:tenantId/feature-overrides')",
+      "@Get('tenants/:tenantId/saas-invoices')",
+      "@Post('providers')",
+      "@Get('queues')",
+      "@Post('queues/retry')",
+      "@Get('health')",
+      "@Get('report-exports')",
+      "@Get('tenants/:tenantId/onboarding')",
+    ]) {
+      expect(controller).toContain(endpoint);
+    }
+
+    for (const model of [
+      'model PlatformPlan',
+      'model TenantSubscription',
+      'model TenantFeatureOverride',
+      'model UsageCounter',
+      'model TenantBillingProfile',
+      'model SaaSInvoice',
+      'model SaaSPayment',
+      'model ProviderConfig',
+      'model ReportExport',
+      'model TenantOnboardingChecklistOverride',
+    ]) {
+      expect(schema).toContain(model);
+    }
+
+    expect(service).toContain('saas_invoice_created');
+    expect(service).toContain('provider_config_updated');
+    expect(service).toContain("'********'");
+    expect(service).toContain('queue_failed_job_retry_requested');
+    expect(service).toContain('onboarding_override_updated');
+    expect(service).not.toContain('AccountingPostingService');
   });
 });

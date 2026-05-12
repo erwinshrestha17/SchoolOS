@@ -9,6 +9,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { SettingsService } from './settings.service';
+import { PlatformService } from '../platform/platform.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
@@ -21,7 +22,10 @@ import type {
 @Controller('settings')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class SettingsController {
-  constructor(private readonly settingsService: SettingsService) {}
+  constructor(
+    private readonly settingsService: SettingsService,
+    private readonly platformService: PlatformService,
+  ) {}
 
   @Get()
   @Permissions('settings:read')
@@ -43,6 +47,15 @@ export class SettingsController {
       throw new UnauthorizedException('Authentication context required');
     }
     return this.settingsService.getPublicSettings(req.auth.tenantId);
+  }
+
+  @Get('onboarding')
+  @Permissions('settings:read')
+  async getOnboarding(@Req() req: AuthenticatedRequest) {
+    if (!req.auth) {
+      throw new UnauthorizedException('Authentication context required');
+    }
+    return this.platformService.getOnboardingChecklist(req.auth.tenantId);
   }
 
   @Patch(':key')
