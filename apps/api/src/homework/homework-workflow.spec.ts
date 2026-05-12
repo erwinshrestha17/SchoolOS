@@ -208,7 +208,7 @@ describe('Homework Workflow', () => {
         ...mockAssignment,
         status: HomeworkAssignmentStatus.ASSIGNED,
       });
-      const comms = service.communicationsService;
+      const comms = (service as any).communicationsService;
 
       await service.assignHomework('hw-1', mockActor);
 
@@ -309,7 +309,7 @@ describe('Homework Workflow', () => {
         ...submission,
         status: HomeworkSubmissionStatus.NEEDS_CORRECTION,
       });
-      const comms = service.communicationsService;
+      const comms = (service as any).communicationsService;
 
       await service.reviewSubmission(
         'sub-1',

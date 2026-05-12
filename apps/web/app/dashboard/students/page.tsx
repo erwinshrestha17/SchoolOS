@@ -26,10 +26,7 @@ export default function StudentsPage() {
     queryKey: ['sections'],
     queryFn: api.listSections,
   });
-  const studentsQuery = useQuery({
-    queryKey: ['students'],
-    queryFn: api.listStudents,
-  });
+  const studentsQuery = useQuery({ queryKey: ['students'], queryFn: () => api.listStudents() });
 
   async function openStudentPdf(studentId: string, kind: string) {
     setPdfError('');

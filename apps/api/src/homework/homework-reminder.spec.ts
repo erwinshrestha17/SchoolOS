@@ -178,7 +178,7 @@ describe('Homework Reminders', () => {
         { studentId: 's1' },
       ]);
 
-      const targets = await service.resolveHomeworkReminderTargets(
+      const targets = await (service as any).resolveHomeworkReminderTargets(
         mockActor,
         mockHomework,
         HomeworkReminderType.HOMEWORK_DUE_SOON,

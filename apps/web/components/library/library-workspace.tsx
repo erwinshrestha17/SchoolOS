@@ -15,6 +15,7 @@ import {
   RotateCcw,
   Search,
 } from 'lucide-react';
+import type { StudentProfile } from '@schoolos/core';
 import {
   libraryApi,
   type LibraryBook,
@@ -125,9 +126,9 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
     queryKey: ['library-overdue'],
     queryFn: libraryApi.listOverdue,
   });
-  const studentsQuery = useQuery({
-    queryKey: ['students-for-library'],
-    queryFn: api.listStudents,
+  const schoolStudentsQuery = useQuery<StudentProfile[], Error>({ 
+    queryKey: ['students-for-library'], 
+    queryFn: () => api.listStudents() 
   });
   const staffQuery = useQuery({
     queryKey: ['staff-for-library'],
@@ -416,7 +417,7 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
         <IssuesPanel
           copies={copies}
           issues={issues}
-          students={studentsQuery.data ?? []}
+          students={schoolStudentsQuery.data ?? []}
           staff={staffQuery.data ?? []}
           status={issueStatus}
           setStatus={setIssueStatus}

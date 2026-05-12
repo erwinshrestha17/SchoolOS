@@ -1,16 +1,16 @@
 'use client';
 
-import { AcademicsWorkspace } from '../../../../components/academics/academics-workspace';
-import { PageHeader } from '../../../../components/ui/page-header';
+import { ReportCardsWorkspace } from '@/components/academics/report-cards/report-cards-workspace';
+import { PageHeader } from '@/components/ui/page-header';
 
 export default function AcademicReportCardsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
         title="Report Cards"
-        description="Generate, review, and manage student report cards from backend academic records."
+        description="Generate, track, and manage student performance reports using backend-calculated data."
       />
-      <AcademicsWorkspace initialSection="Report Cards" />
+      <ReportCardsWorkspace />
     </div>
   );
 }

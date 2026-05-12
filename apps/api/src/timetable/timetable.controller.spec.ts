@@ -198,7 +198,11 @@ describe('TimetableController M6 contracts', () => {
     });
     timetableService.getTeacherWorkload.mockReturnValue({ weeklyPeriods: 20 });
 
-    expect(controller.listTeacherAvailability('teacher-1', actor)).toEqual({
+    expect(
+      controller.listTeacherAvailability(actor, {
+        staffId: 'teacher-1',
+      } as any),
+    ).toEqual({
       availability: [],
     });
     expect(
@@ -212,8 +216,8 @@ describe('TimetableController M6 contracts', () => {
       controller.getTeacherWorkload('teacher-1', workloadQuery as never, actor),
     ).toEqual({ weeklyPeriods: 20 });
     expect(timetableService.listTeacherAvailability).toHaveBeenCalledWith(
-      'teacher-1',
       actor,
+      { staffId: 'teacher-1' },
     );
     expect(timetableService.createTeacherAvailability).toHaveBeenCalledWith(
       'teacher-1',

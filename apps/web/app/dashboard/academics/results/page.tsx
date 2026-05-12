@@ -1,7 +1,7 @@
 'use client';
 
-import { AcademicsWorkspace } from '../../../../components/academics/academics-workspace';
-import { PageHeader } from '../../../../components/ui/page-header';
+import { ResultsPublishingWorkspace } from '@/components/academics/results/results-publishing-workspace';
+import { PageHeader } from '@/components/ui/page-header';
 
 export default function AcademicResultsPage() {
   return (
@@ -10,7 +10,7 @@ export default function AcademicResultsPage() {
         title="Result Publishing"
         description="Review readiness, publish results, unpublish safely, and notify families through approved channels."
       />
-      <AcademicsWorkspace initialSection="Result Publishing" />
+      <ResultsPublishingWorkspace />
     </div>
   );
 }

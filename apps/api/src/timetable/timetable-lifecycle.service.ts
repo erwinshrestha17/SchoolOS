@@ -132,8 +132,8 @@ export class TimetableLifecycleService {
         where: {
           tenantId: actor.tenantId,
           academicYearId: version.academicYearId,
-          classId: version.classId ?? undefined,
-          sectionId: version.sectionId ?? undefined,
+          classId: (version.classId as string) || undefined,
+          sectionId: version.sectionId || undefined,
           subjectId: { in: subjectIds },
         },
       }),

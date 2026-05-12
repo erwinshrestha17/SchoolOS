@@ -17,7 +17,7 @@ interface ReportFiltersProps {
 export function ReportFilters({ onFilterChange }: ReportFiltersProps) {
   const fiscalYearsQuery = useQuery({
     queryKey: ['fiscal-years'],
-    queryFn: api.listFiscalYears,
+    queryFn: () => api.listFiscalYears(),
   });
 
   const handleYearChange = (yearId: string) => {

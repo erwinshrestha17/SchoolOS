@@ -65,7 +65,7 @@ export function AdmissionForm() {
   const academicYearsQuery = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
   const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
-  const studentsQuery = useQuery({ queryKey: ['students'], queryFn: api.listStudents });
+  const studentsQuery = useQuery({ queryKey: ['students'], queryFn: () => api.listStudents() });
 
   const form = useForm<AdmissionFormInput>({
     resolver: zodResolver(admissionFormSchema),

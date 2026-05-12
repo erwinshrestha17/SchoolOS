@@ -1037,10 +1037,12 @@ export class TimetableService {
     // 1. Validation: Slot version status
     if (
       !slot.version ||
-      ![
-        TimetableVersionStatus.PUBLISHED,
-        TimetableVersionStatus.LOCKED,
-      ].includes(slot.version.status)
+      !(
+        [
+          TimetableVersionStatus.PUBLISHED,
+          TimetableVersionStatus.LOCKED,
+        ] as TimetableVersionStatus[]
+      ).includes(slot.version.status)
     ) {
       throw new ConflictException(
         'Substitutions can only be created for PUBLISHED or LOCKED timetable versions',
@@ -1374,7 +1376,6 @@ export class TimetableService {
         dayOfWeek: slot.dayOfWeek,
         startsAt: slot.startsAt,
         endsAt: slot.endsAt,
-        version: null,
       },
       actor,
     );

@@ -5,6 +5,15 @@ import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { HomeworkAssignmentStatus, AuthMethod } from '@prisma/client';
 import { HomeworkReminderType } from './dto/reminder.dto';
+import { AuthContext } from '../auth/auth.types';
+
+export interface HomeworkReminderJobData {
+  tenantId: string;
+  homeworkId: string;
+  reminderType: HomeworkReminderType;
+  actor: AuthContext;
+  force: boolean;
+}
 
 @Injectable()
 export class HomeworkCron {
@@ -60,7 +69,7 @@ export class HomeworkCron {
   }
 
   private async queueReminder(
-    homework: any,
+    homework: { id: string; tenantId: string },
     reminderType: HomeworkReminderType,
   ) {
     const adminUser = await this.prisma.user.findFirst({
@@ -72,7 +81,7 @@ export class HomeworkCron {
 
     if (!adminUser) return;
 
-    const actor = {
+    const actor: AuthContext = {
       userId: adminUser.id,
       tenantId: homework.tenantId,
       tenantSlug: 'system',

@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import type { AssessmentComponentSummary } from '@schoolos/core';
+import type { AssessmentComponentSummary, StudentProfile, ReportCardSummary } from '@schoolos/core';
 import { api } from '../../lib/api';
 import { useSession } from '../session-provider';
 
@@ -107,9 +107,9 @@ export function AcademicsForm() {
     queryFn: api.listSections,
     enabled: status === 'authenticated',
   });
-  const studentsQuery = useQuery({
+  const studentsQuery = useQuery<StudentProfile[], Error>({
     queryKey: ['students'],
-    queryFn: api.listStudents,
+    queryFn: () => api.listStudents(),
     enabled: status === 'authenticated',
   });
   const staffQuery = useQuery({
@@ -150,9 +150,9 @@ export function AcademicsForm() {
     queryFn: () => api.listCasRecords(),
     enabled: status === 'authenticated',
   });
-  const reportsQuery = useQuery({
+  const reportsQuery = useQuery<ReportCardSummary[], Error>({
     queryKey: ['report-cards'],
-    queryFn: api.listReportCards,
+    queryFn: () => api.listReportCards(),
     enabled: status === 'authenticated',
   });
   const promotionsQuery = useQuery({

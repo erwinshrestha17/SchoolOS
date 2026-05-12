@@ -26,6 +26,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { HomeworkQueryDto } from './dto/homework-query.dto';
+import { HomeworkSubmissionQueryDto } from './dto/homework-submission-query.dto';
 import {
   CreateHomeworkSubmissionDto,
   RequestCorrectionDto,
@@ -125,13 +126,20 @@ export class HomeworkService {
     if (!subject) throw new NotFoundException('Subject not found');
 
     // 3. Validate Teacher Assignment
-    if (actor.roles.includes('teacher') && !actor.roles.includes('admin')) {
+    const isTeacher =
+      actor.roles.includes('teacher') ||
+      actor.roles.includes('subject_teacher');
+    const isAdmin =
+      actor.roles.includes('admin') ||
+      actor.roles.includes('platform_super_admin');
+
+    if (isTeacher && !isAdmin) {
       const isAssigned = await this.prisma.subjectTeacherAssignment.findFirst({
         where: {
           tenantId: actor.tenantId,
           academicYearId: dto.academicYearId,
           subjectId: dto.subjectId,
-          teacherId: staffId,
+          staffId: staffId,
         },
       });
       if (!isAssigned) {
@@ -150,7 +158,9 @@ export class HomeworkService {
           assignedByStaffId: staffId,
           title: dto.title,
           description: dto.description,
+          instructions: dto.instructions,
           dueDate: new Date(dto.dueDate),
+          dueAt: dto.dueAt ? new Date(dto.dueAt) : new Date(dto.dueDate),
           maxScore: dto.maxScore,
           submissionRequired: dto.submissionRequired,
           status: HomeworkAssignmentStatus.DRAFT,
@@ -208,7 +218,13 @@ export class HomeworkService {
         data: {
           title: dto.title,
           description: dto.description,
+          instructions: dto.instructions,
           dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+          dueAt: dto.dueAt
+            ? new Date(dto.dueAt)
+            : dto.dueDate
+              ? new Date(dto.dueDate)
+              : undefined,
           maxScore: dto.maxScore,
           submissionRequired: dto.submissionRequired,
         },
@@ -315,6 +331,17 @@ export class HomeworkService {
     );
   }
 
+  async deleteOrCancelHomework(id: string, actor: AuthContext) {
+    const assignment = await this.findAssignmentOrThrow(actor, id);
+    if (assignment.status === HomeworkAssignmentStatus.DRAFT) {
+      await this.prisma.homeworkAssignment.delete({
+        where: { id: assignment.id, tenantId: actor.tenantId },
+      });
+      return { deleted: true, id };
+    }
+    return this.cancelHomework(id, actor);
+  }
+
   private async setAssignmentStatus(
     id: string,
     status: HomeworkAssignmentStatus,
@@ -342,15 +369,15 @@ export class HomeworkService {
 
   async listSubmissions(
     actor: AuthContext,
-    assignmentId: string,
-    query: HomeworkQueryDto,
+    assignmentId: string | undefined,
+    query: HomeworkSubmissionQueryDto,
   ) {
     const skip = ((query.page ?? 1) - 1) * (query.limit ?? 20);
     const take = query.limit ?? 20;
 
     const where: Prisma.HomeworkSubmissionWhereInput = {
       tenantId: actor.tenantId,
-      homeworkId: assignmentId,
+      ...(assignmentId ? { homeworkId: assignmentId } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.studentId ? { studentId: query.studentId } : {}),
     };
@@ -574,7 +601,7 @@ export class HomeworkService {
     if (dto.status === HomeworkSubmissionStatus.NEEDS_CORRECTION) {
       return this.requestCorrection(
         dto.submissionId,
-        { correctionRemarks: dto.teacherRemarks },
+        { correctionRemarks: dto.teacherRemarks ?? 'Needs correction' },
         actor,
       );
     }
@@ -582,9 +609,24 @@ export class HomeworkService {
     return this.reviewSubmission(
       dto.submissionId,
       {
-        status: dto.status as any,
+        status: dto.status,
         score: dto.score,
         teacherRemarks: dto.teacherRemarks,
+      },
+      actor,
+    );
+  }
+
+  async legacySubmit(dto: LegacySubmitHomeworkDto, actor: AuthContext) {
+    const submission = await this.findSubmissionOrThrow(
+      actor,
+      dto.submissionId,
+    );
+    return this.updateSubmission(
+      submission.id,
+      {
+        studentRemarks: dto.content,
+        attachmentFileIds: dto.attachmentIds,
       },
       actor,
     );
@@ -656,7 +698,7 @@ export class HomeworkService {
         tenantId: actor.tenantId,
         classId: assignment.classId,
         ...(assignment.sectionId ? { sectionId: assignment.sectionId } : {}),
-        status: 'ACTIVE',
+        lifecycleStatus: 'ACTIVE',
       },
       select: { id: true },
     });
@@ -675,7 +717,7 @@ export class HomeworkService {
           tenantId: actor.tenantId,
           homeworkId: assignmentId,
           studentId: s.id,
-          status: HomeworkSubmissionStatus.PENDING,
+          status: HomeworkSubmissionStatus.NOT_SUBMITTED,
         })),
       });
     }
@@ -702,7 +744,7 @@ export class HomeworkService {
     action: string,
     submissionId: string,
     actor: AuthContext,
-    payload: any,
+    payload: Record<string, unknown>,
   ) {
     await this.auditService.record({
       action: `${action}_submission`,
@@ -840,6 +882,28 @@ export class HomeworkService {
     return batch;
   }
 
+  async previewReminders(id: string, actor: AuthContext) {
+    const homework = await this.findAssignmentOrThrow(actor, id);
+    const targets = await this.resolveHomeworkReminderTargets(
+      actor,
+      homework,
+      HomeworkReminderType.HOMEWORK_DUE_SOON,
+    );
+    return {
+      homeworkId: id,
+      targetCount: targets.studentIds.length,
+      targets: targets.studentIds,
+    };
+  }
+
+  async sendReminders(id: string, actor: AuthContext) {
+    return this.sendHomeworkReminder(
+      id,
+      { reminderType: HomeworkReminderType.HOMEWORK_DUE_SOON },
+      actor,
+    );
+  }
+
   async listHomeworkReminderBatches(
     actor: AuthContext,
     query: HomeworkReminderQueryDto,
@@ -974,7 +1038,7 @@ export class HomeworkService {
 
   private async resolveHomeworkReminderTargets(
     actor: AuthContext,
-    homework: any,
+    homework: { id: string; classId: string; sectionId: string | null },
     reminderType: HomeworkReminderType,
   ) {
     // Get all students in the class/section
@@ -983,7 +1047,7 @@ export class HomeworkService {
         tenantId: actor.tenantId,
         classId: homework.classId,
         ...(homework.sectionId ? { sectionId: homework.sectionId } : {}),
-        status: 'ACTIVE', // Only active students
+        lifecycleStatus: 'ACTIVE', // Only active students
       },
       select: { id: true },
     });
@@ -1145,7 +1209,7 @@ export class HomeworkService {
   }
 
   private async notifySubmissionStudent(
-    submission: any,
+    submission: { id: string; studentId: string },
     actor: AuthContext,
     sourceType: string,
     title: string,

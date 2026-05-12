@@ -1,12 +1,28 @@
 'use client';
 
 import { ReactNode } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Badge } from '../../../components/ui/badge';
-import { Calculator } from 'lucide-react';
+import { 
+  Calculator, LayoutDashboard, History, 
+  BarChart3, Landmark, Settings, Wallet
+} from 'lucide-react';
 import { useSession } from '../../../components/session-provider';
+import { cn } from '../../../lib/utils';
 
 export default function AccountingLayout({ children }: { children: ReactNode }) {
   const { session } = useSession();
+  const pathname = usePathname();
+
+  const navItems = [
+    { href: '/dashboard/accounting', label: 'Overview', icon: LayoutDashboard },
+    { href: '/dashboard/accounting/journals', label: 'Journals', icon: History },
+    { href: '/dashboard/accounting/accounts', label: 'Chart of Accounts', icon: Landmark },
+    { href: '/dashboard/accounting/reports', label: 'Reports', icon: BarChart3 },
+    { href: '/dashboard/accounting/reconciliation', label: 'Reconciliation', icon: Wallet },
+    { href: '/dashboard/accounting/management', label: 'Fiscal Management', icon: Settings },
+  ];
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -37,9 +53,32 @@ export default function AccountingLayout({ children }: { children: ReactNode }) 
             <Calculator size={40} className="text-emerald-400" />
           </div>
         </div>
+
+        <nav className="relative mt-10 flex flex-wrap gap-2 border-t border-white/10 pt-6">
+          {navItems.map((item) => {
+            const active = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all",
+                  active 
+                    ? "bg-emerald-500 text-slate-900 shadow-lg shadow-emerald-500/20" 
+                    : "text-white/60 hover:bg-white/5 hover:text-white"
+                )}
+              >
+                <item.icon size={16} />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
       </header>
 
-      {children}
+      <main className="pb-12">
+        {children}
+      </main>
     </div>
   );
 }

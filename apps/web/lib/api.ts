@@ -106,6 +106,7 @@ import type {
   WaiverRecord,
   ReportDefinition,
   ReportExportRequest,
+  SubjectWeeklyRequirementSummary,
   ApiResponse,
 } from '@schoolos/core';
 import { clearStoredSession } from './session';
@@ -345,7 +346,8 @@ export const api = {
   listSections: () => request<SectionSummary[]>('/sections'),
   createSection: (body: JsonBody) =>
     request<SectionSummary>('/sections', { method: 'POST', json: body }),
-  listStudents: () => request<StudentProfile[]>('/students'),
+  listStudents: (params?: { classId?: string; sectionId?: string; status?: string }) =>
+    request<StudentProfile[]>(withQuery('/students', params ?? {})),
   getStudentProfile: (studentId: string) =>
     request<StudentProfileDetail>(`/students/${encodeURIComponent(studentId)}`),
   updateStudent: (studentId: string, body: UpdateStudentProfilePayload) =>
@@ -453,6 +455,15 @@ export const api = {
   listExamTerms: () => request<ExamTermSummary[]>('/academics/exams'),
   createExamTerm: (body: JsonBody) =>
     request<ExamTermSummary>('/academics/exams', { method: 'POST', json: body }),
+  updateExamTerm: (id: string, body: JsonBody) =>
+    request<ExamTermSummary>(`/academics/exams/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      json: body,
+    }),
+  deleteExamTerm: (id: string) =>
+    request<{ deleted: true; examTermId: string }>(`/academics/exams/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
   createAssessmentComponent: (body: JsonBody) =>
     request<AssessmentComponentSummary>('/academics/exams/components', {
       method: 'POST',
@@ -478,7 +489,12 @@ export const api = {
     ),
   createCasRecord: (body: JsonBody) =>
     request<CasRecordSummary>('/academics/cas', { method: 'POST', json: body }),
-  listReportCards: () => request<ReportCardSummary[]>('/academics/report-cards'),
+  listReportCards: (params?: {
+    academicYearId?: string;
+    examTermId?: string;
+    classId?: string;
+    sectionId?: string;
+  }) => request<ReportCardSummary[]>(withQuery('/academics/report-cards', params ?? {})),
   generateReportCard: (body: JsonBody) =>
     request<ReportCardSummary>('/academics/report-cards', { method: 'POST', json: body }),
   batchGenerateReportCards: (body: JsonBody) =>
@@ -858,6 +874,35 @@ export const api = {
       `/timetable/versions/${encodeURIComponent(versionId)}/reopen-draft`,
       { method: 'PATCH', json: {} },
     ),
+  listSubjectWeeklyRequirements: (params?: {
+    academicYearId?: string;
+    classId?: string;
+    sectionId?: string;
+    subjectId?: string;
+  }) =>
+    request<SubjectWeeklyRequirementSummary[]>(
+      withQuery('/timetable/requirements', params ?? {}),
+    ),
+  createSubjectWeeklyRequirement: (body: JsonBody) =>
+    request<SubjectWeeklyRequirementSummary>('/timetable/requirements', {
+      method: 'POST',
+      json: body,
+    }),
+  updateSubjectWeeklyRequirement: (id: string, body: JsonBody) =>
+    request<SubjectWeeklyRequirementSummary>(
+      `/timetable/requirements/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
+  deleteSubjectWeeklyRequirement: (id: string) =>
+    request<{ deleted: true; id: string }>(
+      `/timetable/requirements/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+      },
+    ),
   listTeacherAvailability: (teacherId: string) =>
     request<TeacherAvailabilitySummary>(
       `/timetable/teachers/${encodeURIComponent(teacherId)}/availability`,
@@ -915,6 +960,8 @@ export const api = {
       method: 'POST',
       json: body,
     }),
+  getHomework: (id: string) =>
+    request<HomeworkAssignmentSummary>(`/homework/${encodeURIComponent(id)}`),
   updateHomework: (id: string, body: JsonBody) =>
     request<HomeworkAssignmentSummary>(`/homework/${encodeURIComponent(id)}`, {
       method: 'PATCH',
@@ -927,6 +974,11 @@ export const api = {
     }),
   closeHomework: (id: string) =>
     request<HomeworkAssignmentSummary>(`/homework/${encodeURIComponent(id)}/close`, {
+      method: 'PATCH',
+      json: {},
+    }),
+  cancelHomework: (id: string) =>
+    request<HomeworkAssignmentSummary>(`/homework/${encodeURIComponent(id)}/cancel`, {
       method: 'PATCH',
       json: {},
     }),
@@ -1056,24 +1108,33 @@ export const api = {
   },
   listStaffAttendanceSummary: (params: { month?: number; year?: number }) =>
     request<StaffAttendanceMonthlySummary>(
-      withQuery('/attendance/staff/summary', {
+      withQuery('/hr/staff-attendance/summary', {
         month: params.month ? String(params.month) : undefined,
         year: params.year ? String(params.year) : undefined,
       }),
     ),
+  listStaffAttendance: (staffId: string) =>
+    request<any[]>(`/hr/staff/${encodeURIComponent(staffId)}/attendance`),
   listLeaveRequests: () =>
-    request<StaffLeaveRequestSummary[]>('/attendance/staff/leave-requests'),
+    request<StaffLeaveRequestSummary[]>('/hr/leave-requests'),
   createLeaveRequest: (body: JsonBody) =>
-    request<StaffLeaveRequestSummary>('/attendance/staff/leave-requests', {
+    request<StaffLeaveRequestSummary>('/hr/leave-requests', {
       method: 'POST',
       json: body,
     }),
-  reviewLeaveRequest: (id: string, body: JsonBody) =>
-    request<StaffLeaveReviewResult>(`/attendance/staff/leave-requests/${id}/review`, {
-      method: 'PATCH',
+  approveLeaveRequest: (id: string, body: JsonBody) =>
+    request<StaffLeaveReviewResult>(`/hr/leaves/${encodeURIComponent(id)}/approve`, {
+      method: 'POST',
       json: body,
     }),
-  listStaffLeaveBalances: () =>
+  rejectLeaveRequest: (id: string, body: JsonBody) =>
+    request<StaffLeaveReviewResult>(`/hr/leaves/${encodeURIComponent(id)}/reject`, {
+      method: 'POST',
+      json: body,
+    }),
+  listStaffLeaveBalances: (staffId: string) =>
+    request<StaffLeaveBalanceSummary[]>(`/hr/staff/${encodeURIComponent(staffId)}/leave-balances`),
+  listAllLeaveBalances: () =>
     request<StaffLeaveBalanceSummary[]>('/hr/leave-balances'),
   getPayrollPreview: (params: {
     year: number;
@@ -1157,6 +1218,9 @@ export const api = {
     ),
   listCashBook: (params?: JsonBody) =>
     request<unknown>(withQuery('/accounting/reports/cash-book', params ?? {})),
+  listVatSummary: () => request<any>('/accounting/reports/vat-summary'),
+  listTdsSummary: () => request<any>('/accounting/reports/tds-summary'),
+  listPfSummary: () => request<any>('/accounting/reports/pf-summary'),
   exportAccountingCsv: async (report: string) => {
     const response = await fetch(
       `${API_BASE_URL}/accounting/exports/${encodeURIComponent(report)}.csv`,
@@ -1216,6 +1280,31 @@ export const api = {
     }),
   getReconciliationSummary: (accountId: string) =>
     request<any>(`/accounting/bank-reconciliation/accounts/${accountId}/summary`),
+  listJournalEntries: () => request<JournalEntryView[]>('/accounting/journals'),
+  createManualJournal: (body: JsonBody) =>
+    request<JournalEntryView>('/accounting/journals', {
+      method: 'POST',
+      json: body,
+    }),
+  submitJournal: (id: string, body: JsonBody) =>
+    request<JournalEntryView>(`/accounting/journals/${encodeURIComponent(id)}/submit`, {
+      method: 'POST',
+      json: body,
+    }),
+  postJournal: (id: string) =>
+    request<JournalEntryView>(`/accounting/journals/${encodeURIComponent(id)}/post`, {
+      method: 'POST',
+    }),
+  reverseJournal: (id: string, body: JsonBody) =>
+    request<JournalEntryView>(`/accounting/journals/${encodeURIComponent(id)}/reverse`, {
+      method: 'POST',
+      json: body,
+    }),
+  correctJournal: (id: string, body: JsonBody) =>
+    request<JournalEntryView>(`/accounting/journals/${encodeURIComponent(id)}/correct`, {
+      method: 'POST',
+      json: body,
+    }),
   listConversations: () =>
     request<ConversationSummary[]>('/messaging/conversations'),
   createConversation: (body: JsonBody) =>

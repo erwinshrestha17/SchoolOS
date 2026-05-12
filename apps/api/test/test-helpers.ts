@@ -1906,14 +1906,26 @@ export function createPrismaMock() {
       update: jest.fn((q: any) => Promise.resolve(q.data || {})),
       upsert: jest.fn((q: any) => Promise.resolve(q.create || {})),
     },
-    teacherAvailability: {
+    subjectWeeklyRequirement: {
+      findFirst: jest.fn(() => Promise.resolve(null)),
       findMany: jest.fn(() => Promise.resolve([])),
+      create: jest.fn((q: any) => Promise.resolve(q.data || {})),
+      update: jest.fn((q: any) => Promise.resolve(q.data || {})),
+    },
+    teacherAvailability: {
+      findFirst: jest.fn(() => Promise.resolve(null)),
+      findMany: jest.fn(() => Promise.resolve([])),
+      create: jest.fn((q: any) => Promise.resolve(q.data || {})),
+      update: jest.fn((q: any) => Promise.resolve(q.data || {})),
     },
     teacherWorkloadLimit: {
       findFirst: jest.fn(() => Promise.resolve(null)),
+      findMany: jest.fn(() => Promise.resolve([])),
+      upsert: jest.fn((q: any) => Promise.resolve(q.create || {})),
     },
     subjectTeacherAssignment: {
       findFirst: jest.fn(() => Promise.resolve(null)),
+      findMany: jest.fn(() => Promise.resolve([])),
     },
   });
 

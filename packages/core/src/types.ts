@@ -757,15 +757,23 @@ export type JournalEntryView = {
   entryNumber: string;
   entryDate: string;
   narration: string;
+  status: string;
   sourceType: string;
   sourceId?: string | null;
-  totalDebit?: number;
-  totalCredit?: number;
-  lines?: Array<{
+  reference?: string | null;
+  totalDebit: number;
+  totalCredit: number;
+  postedBy?: {
+    firstName: string;
+    lastName: string;
+  } | null;
+  lines: Array<{
     id: string;
-    side: string;
+    side: "DEBIT" | "CREDIT";
     amount: number;
     description: string | null;
+    accountName: string;
+    accountCode: string;
     chartAccount: {
       code: string;
       name: string;
@@ -1471,7 +1479,12 @@ export type ExamTermSummary = {
   startsOn: string;
   endsOn: string;
   weightPercent: number;
+  status: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
   isLocked: boolean;
+  academicYear?: {
+    id: string;
+    name: string;
+  };
   components?: AssessmentComponentSummary[];
 };
 
@@ -1518,6 +1531,7 @@ export type MarkEntrySummary = {
   subjectId: string;
   studentId: string;
   marksObtained: number;
+  status: 'PRESENT' | 'ABSENT' | 'EXCUSED' | 'MISSING' | 'WITHHELD' | 'SUBMITTED';
   remarks: string | null;
   isLocked: boolean;
   student?: StudentProfile;
@@ -1730,6 +1744,18 @@ export type TeacherAvailabilitySummary = {
     maxPeriodsPerDay: number | null;
     maxPeriodsPerWeek: number | null;
   } | null;
+};
+
+export type SubjectWeeklyRequirementSummary = {
+  id: string;
+  academicYearId: string;
+  classId: string;
+  sectionId: string | null;
+  subjectId: string;
+  requiredPeriodsPerWeek: number;
+  class?: ClassSummary;
+  section?: SectionSummary | null;
+  subject?: SubjectSummary;
 };
 
 export type TimetableSubstitutionSummary = {

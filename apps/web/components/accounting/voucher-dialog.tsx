@@ -45,7 +45,9 @@ export function VoucherDialog({ isOpen, onClose, accounts }: VoucherDialogProps)
       return api.createContraVoucher(data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounting-report'] });
+      void queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
+      void queryClient.invalidateQueries({ queryKey: ['accounting-summary'] });
+      void queryClient.invalidateQueries({ queryKey: ['accounting-report'] });
       onClose();
     },
     onError: (err: any) => {

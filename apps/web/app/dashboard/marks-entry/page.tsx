@@ -1,7 +1,7 @@
 'use client';
 
-import { AcademicsWorkspace } from '../../../../components/academics/academics-workspace';
-import { PageHeader } from '../../../../components/ui/page-header';
+import { MarksEntryWorkspace } from '@/components/academics/marks-entry/marks-entry-workspace';
+import { PageHeader } from '@/components/ui/page-header';
 
 export default function AcademicMarksPage() {
   return (
@@ -10,7 +10,7 @@ export default function AcademicMarksPage() {
         title="Marks Entry"
         description="Enter, validate, and review subject marks for exams and assessment components."
       />
-      <AcademicsWorkspace initialSection="Marks Entry" />
+      <MarksEntryWorkspace />
     </div>
   );
 }

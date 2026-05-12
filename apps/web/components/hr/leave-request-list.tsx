@@ -19,7 +19,9 @@ export function LeaveRequestList() {
 
   const reviewMutation = useMutation({
     mutationFn: ({ id, status, note }: { id: string, status: 'APPROVED' | 'REJECTED', note?: string }) => 
-      api.reviewLeaveRequest(id, { status, reviewNote: note }),
+      status === 'APPROVED' 
+        ? api.approveLeaveRequest(id, { reviewNote: note })
+        : api.rejectLeaveRequest(id, { reviewNote: note }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['staff-leave-requests'] });
       void queryClient.invalidateQueries({ queryKey: ['staff-attendance-summary'] });

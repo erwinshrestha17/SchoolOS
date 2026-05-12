@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TeacherAvailabilityType } from '@prisma/client';
+import { TeacherAvailabilityType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type TimetableConflictType =
@@ -136,7 +136,7 @@ export class TimetableConflictService {
         classId: candidate.classId,
         sectionId: candidate.sectionId ?? null,
       },
-    ].filter(Boolean) as Array<Record<string, unknown>>;
+    ].filter(Boolean) as Prisma.TimetableSlotWhereInput[];
 
     const [
       existingSlots,

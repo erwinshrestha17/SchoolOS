@@ -6,6 +6,7 @@ import { cn } from '../../lib/utils';
 interface FormFieldProps {
   label: string;
   description?: string;
+  error?: string;
   children: ReactNode;
   className?: string;
 }
@@ -13,6 +14,7 @@ interface FormFieldProps {
 export function FormField({ 
   label, 
   description, 
+  error,
   children,
   className
 }: FormFieldProps) {
@@ -20,7 +22,8 @@ export function FormField({
     <div className={cn("space-y-1.5", className)}>
       <label className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-500 ml-1">{label}</label>
       {children}
-      {description && <p className="text-[10px] font-medium text-slate-400 ml-1">{description}</p>}
+      {error && <p className="text-[10px] font-bold text-red-500 ml-1">{error}</p>}
+      {description && !error && <p className="text-[10px] font-medium text-slate-400 ml-1">{description}</p>}
     </div>
   );
 }

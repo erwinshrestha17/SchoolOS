@@ -36,12 +36,21 @@ export class UpdateHomeworkDto {
   instructions?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  description?: string;
+
+  @IsOptional()
   @IsISO8601()
   assignedDate?: string;
 
   @IsOptional()
   @IsISO8601()
   dueDate?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  dueAt?: string;
 
   @IsOptional()
   @IsEnum(HomeworkAssignmentStatus)

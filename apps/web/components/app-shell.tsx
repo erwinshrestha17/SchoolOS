@@ -53,9 +53,14 @@ const navItems: Array<{
     permission: 'timetable:manage',
   },
   {
+    href: '/dashboard/hr',
+    label: 'HR',
+    permission: 'hr:staff:read',
+  },
+  {
     href: '/dashboard/payroll',
-    label: 'HR & Payroll',
-    permission: 'payroll:manage',
+    label: 'Payroll',
+    permission: 'payroll:run:read',
   },
   {
     href: '/dashboard/accounting',

@@ -57,7 +57,7 @@ export default function DashboardPage() {
   });
   const studentsQuery = useQuery({
     queryKey: ['dashboard-students'],
-    queryFn: api.listStudents,
+    queryFn: () => api.listStudents(),
     enabled: status === 'authenticated',
   });
   const admissionsQuery = useQuery({

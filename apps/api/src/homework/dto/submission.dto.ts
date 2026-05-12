@@ -21,6 +21,11 @@ export class CreateHomeworkSubmissionDto {
   submissionText?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(3000)
+  studentRemarks?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   attachmentFileIds?: string[];
@@ -39,6 +44,11 @@ export class UpdateHomeworkSubmissionDto {
   @IsString()
   @MaxLength(5000)
   submissionText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3000)
+  studentRemarks?: string;
 
   @IsOptional()
   @IsArray()

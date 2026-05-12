@@ -33,7 +33,9 @@ export function OpeningBalanceDialog({ isOpen, onClose, fiscalYear, accounts }: 
   const mutation = useMutation({
     mutationFn: (data: any) => api.createOpeningBalance(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounting-report'] });
+      void queryClient.invalidateQueries({ queryKey: ['chart-accounts'] });
+      void queryClient.invalidateQueries({ queryKey: ['accounting-report'] });
+      void queryClient.invalidateQueries({ queryKey: ['accounting-summary'] });
       onClose();
     },
     onError: (err: any) => {

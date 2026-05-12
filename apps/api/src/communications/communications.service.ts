@@ -655,6 +655,23 @@ export class CommunicationsService {
     }
   }
 
+  private async ensureStudentRefs(actor: AuthContext, studentIds: string[]) {
+    if (studentIds.length === 0) return;
+
+    const count = await this.prisma.student.count({
+      where: {
+        tenantId: actor.tenantId,
+        id: { in: studentIds },
+      },
+    });
+
+    if (count !== studentIds.length) {
+      throw new NotFoundException(
+        'One or more students not found in this tenant',
+      );
+    }
+  }
+
   private async resolveAudienceRecipients(
     input: DeliveryRecordInput,
   ): Promise<DeliveryRecipient[]> {
@@ -694,6 +711,11 @@ export class CommunicationsService {
           ? { sectionId: input.sectionId }
           : {}),
         ...(input.studentIds?.length ? { id: { in: input.studentIds } } : {}),
+        // If audience type is STUDENT but no IDs provided, we return NO ONE (safer)
+        ...(input.audienceType === AudienceType.STUDENT &&
+        !input.studentIds?.length
+          ? { id: 'none' }
+          : {}),
       },
       include: {
         user: true,

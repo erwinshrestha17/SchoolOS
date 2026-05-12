@@ -201,10 +201,7 @@ export function ActivityFeedForm() {
     queryKey: ['sections'],
     queryFn: api.listSections,
   });
-  const studentsQuery = useQuery({
-    queryKey: ['students'],
-    queryFn: api.listStudents,
-  });
+  const studentsQuery = useQuery({ queryKey: ['students'], queryFn: () => api.listStudents() });
   const postsQuery = useQuery({
     queryKey: ['activity-posts'],
     queryFn: api.listActivityPosts,

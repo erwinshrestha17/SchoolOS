@@ -2,7 +2,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { HomeworkService } from './homework.service';
-import { HomeworkReminderType } from './dto/reminder.dto';
+import { HomeworkReminderJobData } from './homework.cron';
 
 @Processor('homework')
 export class HomeworkProcessor extends WorkerHost {
@@ -12,7 +12,7 @@ export class HomeworkProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<any, void>): Promise<void> {
+  async process(job: Job<HomeworkReminderJobData, void>): Promise<void> {
     const { tenantId, homeworkId, reminderType, actor, force } = job.data;
 
     this.logger.log(

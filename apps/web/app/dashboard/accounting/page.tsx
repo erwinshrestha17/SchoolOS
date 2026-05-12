@@ -1,11 +1,7 @@
 'use client';
 
-import { AccountingWorkspace } from '../../../components/accounting/accounting-workspace';
+import { AccountingDashboardView } from '../../../components/accounting/accounting-dashboard-view';
 
 export default function AccountingPage() {
-  return (
-    <div className="space-y-6">
-      <AccountingWorkspace />
-    </div>
-  );
+  return <AccountingDashboardView />;
 }

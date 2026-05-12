@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AlertTriangle, Bus, MapPin, Navigation, ShieldCheck, Users } from 'lucide-react';
+import type { StudentProfile } from '@schoolos/core';
 import { api } from '../../lib/api';
 import {
   transportApi,
@@ -110,11 +111,14 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
   const vehiclesQuery = useQuery({ queryKey: ['transport-vehicles'], queryFn: () => transportApi.listVehicles() });
   const driversQuery = useQuery({ queryKey: ['transport-driver-assignments'], queryFn: () => transportApi.listDriverAssignments() });
   const studentsQuery = useQuery({ queryKey: ['transport-student-assignments'], queryFn: () => transportApi.listStudentAssignments() });
-  const activeTripsQuery = useQuery({ queryKey: ['transport-active-trips'], queryFn: transportApi.listActiveTrips });
+  const activeTripsQuery = useQuery({ queryKey: ['transport-active-trips'], queryFn: () => transportApi.listActiveTrips() });
   const tripsQuery = useQuery({ queryKey: ['transport-trips'], queryFn: () => transportApi.listTrips() });
-  const reportsQuery = useQuery({ queryKey: ['transport-reports'], queryFn: transportApi.getReports });
-  const schoolStudentsQuery = useQuery({ queryKey: ['students-for-transport'], queryFn: api.listStudents });
-  const staffQuery = useQuery({ queryKey: ['staff-for-transport'], queryFn: api.listStaff });
+  const reportsQuery = useQuery({ queryKey: ['transport-reports'], queryFn: () => transportApi.getReports() });
+  const schoolStudentsQuery = useQuery<StudentProfile[], Error>({ 
+    queryKey: ['students-for-transport'], 
+    queryFn: () => api.listStudents() 
+  });
+  const staffQuery = useQuery({ queryKey: ['staff-for-transport'], queryFn: () => api.listStaff() });
   const locationQuery = useQuery({
     queryKey: ['transport-latest-location', selectedTripId],
     queryFn: () => transportApi.getLatestLocation(selectedTripId),

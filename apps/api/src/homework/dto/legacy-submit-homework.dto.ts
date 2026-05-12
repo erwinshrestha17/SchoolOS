@@ -1,4 +1,11 @@
-import { IsArray, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
+import { HomeworkSubmissionStatus } from '@prisma/client';
 
 export class LegacySubmitHomeworkDto {
   @IsString()
@@ -19,8 +26,8 @@ export class LegacyReviewHomeworkSubmissionDto {
   @IsString()
   submissionId!: string;
 
-  @IsString()
-  status!: string;
+  @IsEnum(HomeworkSubmissionStatus)
+  status!: HomeworkSubmissionStatus;
 
   @IsOptional()
   score?: number;

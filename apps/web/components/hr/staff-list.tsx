@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Search, UserPlus } from 'lucide-react';
+import { Search, UserPlus, Mail, Briefcase } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { Input } from '../ui/input';
@@ -39,65 +39,76 @@ export function StaffList() {
         </button>
       </div>
 
-      <div className="shell-card overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+      <div className="bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left">
             <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">Employee</th>
-                <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">ID</th>
-                <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">Roles</th>
-                <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400">Joined</th>
-                <th className="px-6 py-4 text-[0.65rem] font-bold uppercase tracking-wider text-slate-400 text-right">Actions</th>
+              <tr className="bg-slate-50/50 border-b border-slate-200">
+                <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400">Employee</th>
+                <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-slate-400 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-100">
               {staffQuery.isLoading ? (
-                <tr>
-                  <td colSpan={5} className="p-0">
-                    <LoadingState variant="spinner" label="Loading staff directory..." />
-                  </td>
-                </tr>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-2xl bg-slate-100" />
+                        <div className="space-y-2">
+                          <div className="h-4 w-32 bg-slate-100 rounded" />
+                          <div className="h-3 w-24 bg-slate-50 rounded" />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-8 py-6 text-right">
+                      <div className="h-8 w-24 bg-slate-100 rounded-xl ml-auto" />
+                    </td>
+                  </tr>
+                ))
               ) : filteredStaff.length > 0 ? (
                 filteredStaff.map((staff) => (
-                  <tr key={staff.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-black text-sm border-2 border-white shadow-sm">
+                  <tr key={staff.id} className="hover:bg-slate-50/30 transition-all group">
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-5">
+                        <div className="h-14 w-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center font-black text-lg border border-slate-200 shadow-inner group-hover:bg-blue-50 group-hover:text-blue-500 group-hover:border-blue-100 transition-colors">
                           {staff.firstName[0]}{staff.lastName[0]}
                         </div>
-                        <div>
-                          <p className="font-bold text-slate-900 leading-none">{staff.firstName} {staff.lastName}</p>
-                          <p className="text-xs text-slate-500 mt-1">{staff.email}</p>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-black text-slate-900 text-lg">{staff.firstName} {staff.lastName}</p>
+                            <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200">
+                              {staff.employeeId}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 text-xs font-bold text-slate-500">
+                            <span className="flex items-center gap-1.5">
+                              <Mail size={12} className="text-slate-400" />
+                              {staff.email}
+                            </span>
+                            {staff.contractType && (
+                              <span className="flex items-center gap-1.5">
+                                <Briefcase size={12} className="text-slate-400" />
+                                {staff.contractType}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm font-bold text-slate-600">{staff.employeeId}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-1.5">
-                        {staff.roles.map((role) => (
-                          <span key={role} className="px-2.5 py-0.5 rounded-full bg-slate-100 text-[10px] font-black uppercase text-slate-600 tracking-tight border border-slate-200/50">
-                            {role}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm font-medium text-slate-500">
-                      {new Date(staff.joiningDate).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-8 py-6 text-right">
                       <Link
-                        href={`/dashboard/staff/${staff.id}`}
-                        className="inline-flex items-center gap-1.5 text-sm font-bold text-primary-600 hover:text-primary-700 transition-colors"
+                        href={`/dashboard/hr/staff/${staff.id}`}
+                        className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-blue-600 transition-all shadow-lg shadow-slate-900/10 active:scale-95"
                       >
-                        View Profile
+                        Profile
                       </Link>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="p-0">
+                  <td colSpan={2} className="px-8 py-20 text-center">
                     <EmptyState 
                       title="No staff members found" 
                       description={search ? `No results for "${search}"` : "The staff directory is currently empty."}

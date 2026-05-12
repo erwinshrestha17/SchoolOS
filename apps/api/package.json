@@ -108,6 +108,8 @@
     "rootDir": ".",
     "moduleNameMapper": {
       "^@prisma/client$": "<rootDir>/test/mocks/prisma-client.ts",
+      "^bullmq$": "<rootDir>/test/mocks/bullmq.ts",
+      "^ioredis$": "<rootDir>/test/mocks/ioredis.ts",
       "^@schoolos/core$": "<rootDir>/../../packages/core/src/index.ts"
     },
     "testRegex": ".*\\.spec\\.ts$",

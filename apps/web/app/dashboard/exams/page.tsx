@@ -1,7 +1,7 @@
 'use client';
 
-import { AcademicsWorkspace } from '../../../../components/academics/academics-workspace';
-import { PageHeader } from '../../../../components/ui/page-header';
+import { ExamsWorkspace } from '@/components/academics/exams/exams-workspace';
+import { PageHeader } from '@/components/ui/page-header';
 
 export default function AcademicExamsPage() {
   return (
@@ -10,7 +10,7 @@ export default function AcademicExamsPage() {
         title="Exams"
         description="Set up exam terms, assessment components, and academic evaluation rules."
       />
-      <AcademicsWorkspace initialSection="Exam Terms" />
+      <ExamsWorkspace />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AlertTriangle, Ban, Package, QrCode, Soup, Utensils, Wallet } from 'lucide-react';
+import type { StudentProfile } from '@schoolos/core';
 import { api } from '../../lib/api';
 import {
   canteenApi,
@@ -74,7 +75,10 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
   const mealCountQuery = useQuery({ queryKey: ['canteen-meal-count', reportDate], queryFn: () => canteenApi.getDailyMealCountReport({ date: reportDate }) });
   const itemSalesQuery = useQuery({ queryKey: ['canteen-item-sales'], queryFn: () => canteenApi.getItemWiseSalesReport() });
   const spendingSummaryQuery = useQuery({ queryKey: ['canteen-spending-summary'], queryFn: () => canteenApi.getStudentSpendingSummary() });
-  const studentsQuery = useQuery({ queryKey: ['students-for-canteen'], queryFn: api.listStudents });
+  const studentsQuery = useQuery<StudentProfile[], Error>({ 
+    queryKey: ['students'], 
+    queryFn: () => api.listStudents() 
+  });
   const walletQuery = useQuery({
     queryKey: ['canteen-wallet', walletStudentId],
     queryFn: () => canteenApi.getWalletBalance(walletStudentId),

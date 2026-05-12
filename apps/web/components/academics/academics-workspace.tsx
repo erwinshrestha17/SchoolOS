@@ -35,12 +35,12 @@ export function AcademicsWorkspace({ initialSection = 'Subjects' }: AcademicsWor
   const academicYearsQuery = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
   const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
-  const studentsQuery = useQuery({ queryKey: ['students'], queryFn: api.listStudents });
+  const studentsQuery = useQuery({ queryKey: ['students'], queryFn: () => api.listStudents() });
   const staffQuery = useQuery({ queryKey: ['staff'], queryFn: api.listStaff });
   const subjectsQuery = useQuery({ queryKey: ['subjects'], queryFn: () => api.listSubjects() });
   const assignmentsQuery = useQuery({ queryKey: ['teacher-assignments'], queryFn: api.listTeacherAssignments });
   const examsQuery = useQuery({ queryKey: ['exam-terms'], queryFn: api.listExamTerms });
-  const reportsQuery = useQuery({ queryKey: ['report-cards'], queryFn: api.listReportCards });
+  const reportsQuery = useQuery({ queryKey: ['report-cards'], queryFn: () => api.listReportCards() });
 
   const academicYear = academicYearsQuery.data?.find(y => y.isCurrent);
 
