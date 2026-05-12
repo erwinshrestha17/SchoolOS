@@ -18,10 +18,10 @@ Do not treat older Phase 1B / Phase 2-transition notes as current unless they ar
 Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
-M0 Platform Core Foundation Depth: Completed
+M0 Platform Core Foundation: Completed across eight sprints
 Phase 2A M4 Academics backend: Completed / Contract-Protected
 Phase 2D M9 Accounting: Production Candidate Complete
-Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
+Current stage: Phase 2A backend complete + M0 platform foundation complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
 ```
 
 Readiness:
@@ -38,7 +38,9 @@ CTO verdict:
 
 ```text
 SchoolOS is beyond MVP.
-The backend/module surface is broad and architecturally strong, but the next priority is stabilization, verification, browser smoke coverage, and one-vertical-at-a-time hardening.
+The backend/module surface is broad and architecturally strong.
+M0 Platform Core is now implemented as a real platform foundation, not just a roadmap item.
+The next priority is stabilization, Docker-backed smoke verification, browser smoke coverage, M0 regression coverage, and one-vertical-at-a-time hardening.
 Do not expand broad new modules until the full repo verification gate is clean.
 ```
 
@@ -49,7 +51,7 @@ Do not expand broad new modules until the full repo verification gate is clean.
 | Module | Estimated Completion | Current Implementation State |
 |---|---:|---|
 | Auth / RBAC / Tenant Isolation | 90-95% | Cookie-first auth, bearer support, RBAC, tenant context, super-admin override audit. |
-| M0 Platform Core | 65-75% | Platform control plane, tenant settings/file/report/usage foundations; SaaS billing/API keys/webhooks later. |
+| M0 Platform Core | 80-90% | Platform tenant management, entitlements/usage, SaaS billing foundation, providers/queues, file registry, reports/exports, health, onboarding implemented; deeper queue topology, E2E, seed, async reporting hardening remains. |
 | M1 Admissions & Student Profiles | 90-95% | Admission, student profile/detail/edit, guardian edit, lifecycle, documents, photo/document access, roster exports. |
 | M2 Smart Attendance | 85-90% | 3-tap attendance, history, monthly register, exports, correction/sync guardrails. |
 | M3 Fees & Receipts | 85-90% | Invoices, payments, receipts, ledger, cashier close, reports, reversal/correction foundation. |
@@ -66,6 +68,95 @@ Do not expand broad new modules until the full repo verification gate is clean.
 
 ---
 
+## M0 Platform Core Completion Snapshot
+
+M0 Platform Core was completed across eight implementation sprints:
+
+```text
+1. Platform Tenant Management
+2. Entitlements + Usage
+3. SaaS Billing
+4. Providers + Queues
+5. File Registry
+6. Reports / Exports
+7. Observability / Ops
+8. Pilot Onboarding
+```
+
+Implemented M0 capabilities:
+
+```text
+- Tenant list/detail/dashboard/status flows.
+- Reason-required tenant suspend/activate behavior.
+- Audited support override reason.
+- Plan, feature, subscription, override, and usage-counter foundations.
+- Explainable entitlement checks and usage-limit surfaces.
+- Manual tenant billing profile.
+- SaaS invoices, invoice lines, payments, and cancellation rules.
+- Provider config masking and secret-safe response shape.
+- Queue health and audited retry endpoint.
+- Upload validation and dangerous extension blocking.
+- Private/protected file URL response shape.
+- Report export history and audited export persistence where available.
+- Platform health summary for DB, Redis, queues, and object storage readiness.
+- Computed tenant onboarding checklist.
+- School settings onboarding page.
+- Platform tenant onboarding visibility.
+```
+
+Implemented M0 models:
+
+```text
+PlatformPlan
+PlatformPlanFeature
+TenantSubscription
+TenantFeatureOverride
+UsageLimit
+UsageCounter
+TenantBillingProfile
+SaaSInvoice
+SaaSInvoiceLine
+SaaSPayment
+ProviderConfig
+ReportExport
+TenantOnboardingChecklistOverride
+```
+
+Verification snapshot from the M0 completion pass:
+
+```text
+Passed:
+- pnpm db:generate
+- pnpm db:validate
+- pnpm verify:openapi
+- pnpm lint
+- pnpm typecheck
+- pnpm test
+- pnpm test:e2e
+- pnpm build
+- pnpm verify:production
+
+Notes:
+- verify:production passed after rerun with approval because sandbox blocked Playwright local port binding.
+- pnpm smoke:phase1 did not pass because local Postgres, Redis, and API were not running.
+- Focused platform/auth/report/settings tests passed.
+```
+
+Remaining M0 hardening risks:
+
+```text
+- Queue health has the production API/audit surface, but live BullMQ failed-job inspection should be wired deeper per deployed queue topology.
+- Report/export history is standardized, but heavy async generation can be expanded module by module.
+- Provider test connection is intentionally conservative and avoids paid/external calls.
+- Demo Nepal tenant seed was not broadly expanded in the M0 pass.
+- Credentialed web E2E routes were skipped where seeded credentials were unavailable.
+- Platform/school route denial browser tests still need to be added.
+- SaaS billing lifecycle tests still need more depth.
+- Entitlement enforcement tests against real school APIs still need more depth.
+```
+
+---
+
 ## Phase-Wise Status
 
 ### Phase 0 — Foundation
@@ -73,6 +164,14 @@ Do not expand broad new modules until the full repo verification gate is clean.
 Status: **Completed**.
 
 Includes monorepo, NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, auth/RBAC, tenant context, Docker/dev verification, and production verification foundations.
+
+### M0 — Platform Core / SaaS Starter
+
+Status: **Foundation completed across eight sprints; pilot hardening next**.
+
+Implemented enough for platform owner operations, tenant visibility, plan/usage foundations, SaaS billing records, provider/queue readiness, report export history, health summary, and tenant onboarding visibility.
+
+Remaining work is hardening, deeper E2E coverage, queue topology detail, and production seed/staging verification — not broad architectural rewrite.
 
 ### Phase 1A — Core Live-School Workflows
 
@@ -163,7 +262,7 @@ Recent repo history shows these waves:
 2. Architecture/project memory/phase docs.
 3. Phase 2A Academics implementation and hardening.
 4. Phase 3 Library/Transport/Canteen foundations.
-5. M0 Platform Core hardening.
+5. M0 Platform Core implementation and hardening.
 6. Module guardrail and DB-trigger hardening across M1-M10.
 7. M9 Accounting and Payroll/Finance integration coverage.
 8. Verification-fix wave around Homework/Timetable, Academics controller return types, and Timetable tests.
@@ -172,31 +271,36 @@ Recent repo history shows these waves:
 Important latest observation:
 
 ```text
-PR #62 merged a verification follow-up for Timetable test dependency wiring.
-This indicates the next sprint should be repo stabilization and full verification, not broad new feature expansion.
+M0 Platform Core foundation now includes platform tenant management, entitlements, usage, SaaS billing records, provider/queue readiness, file registry hardening, report exports, health, and onboarding surfaces.
+The next sprint should be repo stabilization, smoke verification, and focused vertical hardening — not broad new product expansion.
 ```
 
 ---
 
 ## Current Highest Risks
 
-1. **Homework/Timetable stability** — recent PRs mention schema/service/test drift and Prisma generation concerns.
-2. **Breadth without equal depth** — Phase 2/3 foundations exist, but not all are production-complete.
-3. **Browser workflow coverage** — backend is ahead of authenticated Playwright coverage.
-4. **Staging readiness** — pilot seed data, staging checks, backup/restore rehearsal, and observability still matter.
-5. **Parent/mobile/driver/live tracking** — intentionally deferred and should not be accidentally treated as complete.
+1. **Docker-backed smoke not yet green** — `pnpm smoke:phase1` needs Postgres, Redis, and API running.
+2. **M0 E2E depth** — platform/school route denial, entitlement enforcement, SaaS billing lifecycle, and queue retry browser/API coverage need depth.
+3. **Homework/Timetable stability** — recent PRs mention schema/service/test drift and Prisma generation concerns.
+4. **Breadth without equal depth** — Phase 2/3 foundations exist, but not all are production-complete.
+5. **Browser workflow coverage** — backend is ahead of authenticated Playwright coverage.
+6. **Staging readiness** — pilot seed data, staging checks, backup/restore rehearsal, and observability still matter.
+7. **Parent/mobile/driver/live tracking** — intentionally deferred and should not be accidentally treated as complete.
 
 ---
 
 ## Recommended Next Sprint
 
 ```text
-Repo Verification & Stabilization Sprint
+Repo Verification + M0 Pilot Hardening Sprint
 → run full verification gate
-→ fix Prisma/schema/typecheck/test blockers
-→ stabilize Homework/Timetable
+→ run Docker-backed smoke with Postgres, Redis, and API running
+→ add platform/school route denial browser tests
+→ add SaaS billing lifecycle tests
+→ add entitlement enforcement tests against real school APIs
+→ deepen BullMQ failed-job inspection by deployed queue topology
+→ stabilize Homework/Timetable if verification shows drift
 → wire Phase 2A Academics admin UI to completed APIs
-→ add authenticated Playwright browser smoke
 → prepare controlled pilot staging
 ```
 
