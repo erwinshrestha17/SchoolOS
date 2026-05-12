@@ -80,7 +80,7 @@ export class LibraryService {
           }
         : {}),
       archivedAt: null,
-    } as any;
+    };
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.libraryBook.findMany({
@@ -210,10 +210,10 @@ export class LibraryService {
       await tx.libraryCopy.updateMany({
         where: { bookId: book.id, tenantId: actor.tenantId },
         data: {
-          status: 'ARCHIVED' as any,
+          status: LibraryCopyStatus.ARCHIVED,
           archivedAt: new Date(),
           archiveReason: reason,
-        } as any,
+        },
       });
 
       return tx.libraryBook.update({
@@ -221,7 +221,7 @@ export class LibraryService {
         data: {
           archivedAt: new Date(),
           archiveReason: reason,
-        } as any,
+        },
       });
     });
 
@@ -249,7 +249,7 @@ export class LibraryService {
         ? { barcode: { contains: options.barcode, mode: 'insensitive' } }
         : {}),
       archivedAt: null,
-    } as any;
+    };
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.libraryCopy.findMany({
@@ -387,10 +387,10 @@ export class LibraryService {
     const updated = await this.prisma.libraryCopy.update({
       where: { id: copy.id },
       data: {
-        status: 'ARCHIVED' as any,
+        status: LibraryCopyStatus.ARCHIVED,
         archivedAt: new Date(),
         archiveReason: reason,
-      } as any,
+      },
     });
 
     await this.auditService.record({
@@ -507,7 +507,7 @@ export class LibraryService {
       throw new NotFoundException('Library copy not found in this tenant');
     }
 
-    if ((copy as any).archivedAt) {
+    if (copy.archivedAt) {
       throw new ConflictException('Cannot issue an archived library copy');
     }
 

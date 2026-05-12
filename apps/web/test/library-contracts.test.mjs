@@ -23,13 +23,14 @@ describe('Phase 3B Library frontend contracts', () => {
     }
   });
 
-  it('enables Library in the dashboard sidebar while keeping Transport locked', () => {
+  it('enables Library and implemented operations modules in the dashboard sidebar', () => {
     const sidebar = read('components/layout/sidebar.tsx');
 
     assert.match(sidebar, /label: 'Library'/);
     assert.match(sidebar, /href: '\/dashboard\/library'/);
     assert.doesNotMatch(sidebar, /#library-coming-soon/);
-    assert.match(sidebar, /label: 'Transport'[\s\S]*disabled: true/);
+    assert.match(sidebar, /href: '\/dashboard\/transport'[\s\S]*label: 'Transport'/);
+    assert.match(sidebar, /href: '\/dashboard\/canteen'[\s\S]*label: 'Canteen'/);
   });
 
   it('adds Library API client methods for the Phase 3A backend endpoints', () => {

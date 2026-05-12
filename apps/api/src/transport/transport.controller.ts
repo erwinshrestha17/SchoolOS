@@ -187,7 +187,7 @@ export class TransportController {
   }
 
   @Get('parent/students/:studentId/active-trip')
-  @Permissions('transport:trips:read')
+  @Permissions('transport:tracking:parent')
   getParentStudentActiveTrip(
     @Param('studentId') studentId: string,
     @CurrentAuth() auth: AuthContext,
@@ -245,6 +245,16 @@ export class TransportController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.transportService.markStudentDropped(tripId, dto, auth);
+  }
+
+  @Patch('trips/:id/students/absent')
+  @Permissions('transport:trips:update')
+  markStudentAbsent(
+    @Param('id') tripId: string,
+    @Body() dto: MarkTransportStudentStatusDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportService.markStudentAbsent(tripId, dto, auth);
   }
 
   @Get('trips/active')

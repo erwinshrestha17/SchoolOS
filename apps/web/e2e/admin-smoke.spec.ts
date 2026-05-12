@@ -29,13 +29,13 @@ test.describe.serial('SchoolOS Web Admin Smoke Tests', () => {
 
   test('Dashboard: Navigation and shell integrity', async ({ page }) => {
     await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.getByRole('heading', { name: /Admin Command Center/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /School Dashboard/i })).toBeVisible();
     
     // Verify sidebar navigation to refactored modules
     const navItems = [
       { name: /Students/i, url: /\/students/ },
       { name: /Attendance/i, url: /\/attendance/ },
-      { name: /Fees/i, url: /\/finance/ },
+      { name: /^Fees$/i, url: /\/fees/ },
       { name: /HR/i, url: /\/payroll/ },
       { name: /Notices/i, url: /\/notices/ },
     ];

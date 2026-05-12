@@ -117,6 +117,7 @@ describe('SchoolOS web production contracts', () => {
     const requiredRoutes = [
       'admissions',
       'attendance',
+      'fees',
       'finance',
       'activity',
       'notices',
@@ -317,7 +318,7 @@ describe('SchoolOS web production contracts', () => {
       'Students',
       'Admissions',
       'Attendance',
-      'Fee Collection',
+      'Fees',
       'Activity Feed',
       'Notices',
       'Settings',
@@ -335,18 +336,12 @@ describe('SchoolOS web production contracts', () => {
 
     assert.match(sidebar, /href: '\/dashboard\/activity'/);
     assert.match(sidebar, /href: '\/dashboard\/messages'/);
+    assert.match(sidebar, /href: '\/dashboard\/transport'/);
+    assert.match(sidebar, /href: '\/dashboard\/canteen'/);
     assert.match(sidebar, /label: 'HR \/ Staff'/);
     assert.match(sidebar, /label: 'Payroll'/);
-    assert.doesNotMatch(
-      sidebar,
-      /label: 'Transport'[\s\S]*href: '\/dashboard\/activity'/,
-      'Transport must not point at the Activity Feed route',
-    );
-    assert.doesNotMatch(
-      sidebar,
-      /label: 'Library'[\s\S]*href: '\/dashboard\/timetable'/,
-      'Library must not point at the Timetable route',
-    );
+    assert.match(sidebar, /href: '\/dashboard\/transport'[\s\S]*label: 'Transport'/);
+    assert.match(sidebar, /href: '\/dashboard\/library'[\s\S]*label: 'Library'/);
   });
 
   it('uses authenticated session metadata and real shell APIs in the header', () => {
@@ -393,7 +388,7 @@ describe('SchoolOS web production contracts', () => {
     const requiredRoutes = [
       '/dashboard/admissions',
       '/dashboard/attendance',
-      '/dashboard/finance',
+      '/dashboard/fees',
       '/dashboard/activity',
       '/dashboard/notices',
       '/dashboard/settings',

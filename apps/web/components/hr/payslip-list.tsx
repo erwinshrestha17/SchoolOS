@@ -78,7 +78,7 @@ export function PayslipList() {
               ) : (
                 filteredPayslips?.map((payslip) => (
                   <tr key={payslip.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 font-mono font-bold text-blue-600">
+                    <td className="px-6 py-4 font-bold text-blue-600">
                       {payslip.payslipNumber}
                     </td>
                     <td className="px-6 py-4">

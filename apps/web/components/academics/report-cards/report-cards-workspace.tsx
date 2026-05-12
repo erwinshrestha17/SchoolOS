@@ -92,7 +92,7 @@ export function ReportCardsWorkspace() {
       cell: (row: any) => (
         <div className="flex flex-col">
           <span className="font-bold text-slate-900">{row.student?.firstNameEn} {row.student?.lastNameEn}</span>
-          <span className="text-[10px] font-mono text-slate-400">{row.student?.studentSystemId}</span>
+          <span className="text-[10px] text-slate-400">{row.student?.studentSystemId}</span>
         </div>
       ),
     },

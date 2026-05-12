@@ -1,5 +1,7 @@
 import {
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -495,6 +497,11 @@ export class TransportService {
         'Cannot start trip without assigned driver and vehicle',
       );
     }
+    await this.assertDriverCanOperateAssignment(
+      actor,
+      driverAssignment.id,
+      'start this trip',
+    );
 
     const trip = await this.prisma.$transaction(async (tx) => {
       const created = await tx.transportTrip.create({
@@ -561,6 +568,15 @@ export class TransportService {
     if (trip.status === TransportTripStatus.COMPLETED) {
       throw new ConflictException('Trip is already completed');
     }
+
+    if (trip.status !== TransportTripStatus.ACTIVE) {
+      throw new ConflictException('Only active trips can be completed');
+    }
+    await this.assertDriverCanOperateAssignment(
+      actor,
+      trip.driverAssignmentId,
+      'complete this trip',
+    );
 
     await this.prisma.transportTrip.updateMany({
       where: { tenantId: actor.tenantId, id: trip.id },
@@ -638,6 +654,20 @@ export class TransportService {
     );
   }
 
+  markStudentAbsent(
+    tripId: string,
+    dto: MarkTransportStudentStatusDto,
+    actor: AuthContext,
+  ) {
+    return this.updateTripStudentStatus(
+      tripId,
+      dto.studentId,
+      actor,
+      'ABSENT',
+      dto.notes,
+    );
+  }
+
   listActiveTrips(actor: AuthContext) {
     return this.listTripRows(actor.tenantId, { status: 'ACTIVE' });
   }
@@ -661,6 +691,12 @@ export class TransportService {
         'Location pings are accepted only for active trips',
       );
     }
+    await this.assertDriverCanOperateAssignment(
+      actor,
+      trip.driverAssignmentId,
+      'update this trip location',
+    );
+    this.assertValidLocationPing(dto);
 
     const recordedAt = dto.recordedAt ? new Date(dto.recordedAt) : new Date();
     const payload: LocationPayload = {
@@ -684,19 +720,44 @@ export class TransportService {
         60 * 60 * 6,
       );
 
-    await this.prisma.transportLocationPing.create({
-      data: {
-        tenantId: actor.tenantId,
-        tripId: trip.id,
-        vehicleId: trip.vehicleId,
+    const latestPersisted = await this.prisma.transportLocationPing.findFirst({
+      where: { tenantId: actor.tenantId, tripId: trip.id },
+      orderBy: [{ recordedAt: 'desc' }],
+      select: { recordedAt: true },
+    });
+
+    if (
+      !latestPersisted ||
+      recordedAt.getTime() - latestPersisted.recordedAt.getTime() >= 30_000
+    ) {
+      await this.prisma.transportLocationPing.create({
+        data: {
+          tenantId: actor.tenantId,
+          tripId: trip.id,
+          vehicleId: trip.vehicleId,
+          driverAssignmentId: trip.driverAssignmentId,
+          latitude: new Prisma.Decimal(dto.latitude),
+          longitude: new Prisma.Decimal(dto.longitude),
+          speedKph:
+            dto.speedKph === undefined
+              ? null
+              : new Prisma.Decimal(dto.speedKph),
+          heading:
+            dto.heading === undefined ? null : new Prisma.Decimal(dto.heading),
+          recordedAt,
+        },
+      });
+    }
+
+    await this.auditService.record({
+      action: 'location_update',
+      resource: 'transport_trip',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: trip.id,
+      after: {
         driverAssignmentId: trip.driverAssignmentId,
-        latitude: new Prisma.Decimal(dto.latitude),
-        longitude: new Prisma.Decimal(dto.longitude),
-        speedKph:
-          dto.speedKph === undefined ? null : new Prisma.Decimal(dto.speedKph),
-        heading:
-          dto.heading === undefined ? null : new Prisma.Decimal(dto.heading),
-        recordedAt,
+        recordedAt: payload.recordedAt,
       },
     });
 
@@ -931,6 +992,11 @@ export class TransportService {
         'Student status can be changed only on active trips',
       );
     }
+    await this.assertDriverCanOperateAssignment(
+      actor,
+      trip.driverAssignmentId,
+      'update this trip student status',
+    );
 
     const existing = await this.getTripStudentStatus(
       actor.tenantId,
@@ -1029,6 +1095,57 @@ export class TransportService {
     }
 
     return trip;
+  }
+
+  private async assertDriverCanOperateAssignment(
+    actor: AuthContext,
+    driverAssignmentId: string,
+    action: string,
+  ) {
+    if (canOperateAnyTransportTrip(actor)) {
+      return;
+    }
+
+    const assignment = await this.prisma.transportDriverAssignment.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        id: driverAssignmentId,
+      },
+      include: {
+        staff: {
+          select: { userId: true },
+        },
+      },
+    });
+
+    if (!assignment) {
+      throw new NotFoundException('Driver assignment not found in this tenant');
+    }
+
+    if (assignment.staff.userId !== actor.userId) {
+      throw new ForbiddenException(`Driver is not assigned to ${action}`);
+    }
+  }
+
+  private assertValidLocationPing(dto: TransportLocationPingDto) {
+    if (dto.latitude < -90 || dto.latitude > 90) {
+      throw new BadRequestException('Latitude must be between -90 and 90');
+    }
+
+    if (dto.longitude < -180 || dto.longitude > 180) {
+      throw new BadRequestException('Longitude must be between -180 and 180');
+    }
+
+    const recordedAt = dto.recordedAt ? new Date(dto.recordedAt) : new Date();
+    if (Number.isNaN(recordedAt.getTime())) {
+      throw new BadRequestException('recordedAt must be a valid timestamp');
+    }
+
+    if (recordedAt.getTime() - Date.now() > 5 * 60 * 1000) {
+      throw new BadRequestException(
+        'recordedAt cannot be more than five minutes in the future',
+      );
+    }
   }
 
   private async getDriverAssignment(tenantId: string, assignmentId: string) {
@@ -1141,4 +1258,15 @@ function addDays(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
+}
+
+function canOperateAnyTransportTrip(actor: AuthContext) {
+  return (
+    actor.roles.some((role) =>
+      ['platform_super_admin', 'admin', 'principal'].includes(role),
+    ) ||
+    actor.permissions.includes('transport:manage') ||
+    actor.permissions.includes('transport:trips:update') ||
+    actor.permissions.includes('transport:trips:create')
+  );
 }

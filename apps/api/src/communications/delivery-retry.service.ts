@@ -213,6 +213,8 @@ export class DeliveryRetryService {
 
 function isRetryable(status: NotificationStatus) {
   return (
-    status === NotificationStatus.FAILED || status === NotificationStatus.QUEUED
+    status === NotificationStatus.FAILED ||
+    status === NotificationStatus.QUEUED ||
+    status === NotificationStatus.RETRY_PENDING
   );
 }

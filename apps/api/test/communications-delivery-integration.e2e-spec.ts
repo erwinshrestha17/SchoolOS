@@ -18,6 +18,7 @@ interface CommunicationState {
   notices: Record<string, unknown>[];
   notificationDeliveries: Record<string, unknown>[];
   guardianConsents: Record<string, unknown>[];
+  communicationPreferences: Record<string, unknown>[];
   students: Record<string, unknown>[];
   guardians: Record<string, unknown>[];
   auditLogs: Record<string, unknown>[];
@@ -467,6 +468,7 @@ function buildPrismaMock() {
     notices: [],
     notificationDeliveries: [],
     guardianConsents: [],
+    communicationPreferences: [],
     students: [],
     guardians: [],
     auditLogs: [],
@@ -538,6 +540,19 @@ function buildPrismaMock() {
               guardianIn.includes(consent.guardianId as string)) &&
             (!consentIn ||
               consentIn.includes(consent.consentType as ConsentType)),
+        );
+      }),
+    },
+    communicationPreference: {
+      findMany: jest.fn(async (q: { where?: Record<string, unknown> }) => {
+        const guardianIn = (
+          q.where?.guardianId as { in?: string[] } | undefined
+        )?.in;
+        return state.communicationPreferences.filter(
+          (preference) =>
+            preference.tenantId === q.where?.tenantId &&
+            (!guardianIn ||
+              guardianIn.includes(preference.guardianId as string)),
         );
       }),
     },

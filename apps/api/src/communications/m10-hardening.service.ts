@@ -163,14 +163,14 @@ export class M10HardeningService {
     await this.prisma.$executeRaw(Prisma.sql`
       UPDATE "NotificationDelivery"
       SET
-        "status" = 'RETRYING',
+        "status" = 'RETRY_PENDING',
         "retryCount" = "retryCount" + 1,
         "lastRetryAt" = NOW(),
         "retryReason" = ${dto.reason ?? null},
         "requestedById" = ${actor.userId}
       WHERE "id" = ${deliveryId}
         AND "tenantId" = ${actor.tenantId}
-        AND "status" IN ('FAILED', 'QUEUED')
+        AND "status" IN ('FAILED', 'QUEUED', 'RETRY_PENDING')
     `);
 
     return this.deliveryRetryService.retryDelivery(deliveryId, actor);

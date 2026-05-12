@@ -710,6 +710,11 @@ export const permissionCatalog = [
     description: 'Update transport latest location',
   },
   {
+    resource: 'transport:tracking',
+    action: 'parent',
+    description: 'Read own child active transport trip tracking',
+  },
+  {
     resource: 'transport:reports',
     action: 'read',
     description: 'Read transport reports',
@@ -1025,6 +1030,7 @@ export const systemRolePermissions: Record<string, string[]> = {
     'homework:submit',
     'messaging:create',
     'messaging:read',
+    'transport:tracking:parent',
     'settings:read_public',
   ],
   accountant: [

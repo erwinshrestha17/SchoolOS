@@ -205,10 +205,10 @@ export function JournalDetailDialog({ isOpen, onClose, entry }: JournalDetailDia
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{line.accountCode}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right font-mono font-bold text-emerald-600">
+                      <td className="px-4 py-3 text-right font-bold text-emerald-600">
                         {line.side === 'DEBIT' ? formatCurrency(line.amount) : '-'}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono font-bold text-rose-600">
+                      <td className="px-4 py-3 text-right font-bold text-rose-600">
                         {line.side === 'CREDIT' ? formatCurrency(line.amount) : '-'}
                       </td>
                     </tr>
@@ -217,8 +217,8 @@ export function JournalDetailDialog({ isOpen, onClose, entry }: JournalDetailDia
                 <tfoot>
                   <tr className="bg-slate-900 text-white font-bold">
                     <td className="px-4 py-3">Totals</td>
-                    <td className="px-4 py-3 text-right font-mono">{formatCurrency(entry.totalDebit)}</td>
-                    <td className="px-4 py-3 text-right font-mono">{formatCurrency(entry.totalCredit)}</td>
+                    <td className="px-4 py-3 text-right">{formatCurrency(entry.totalDebit)}</td>
+                    <td className="px-4 py-3 text-right">{formatCurrency(entry.totalCredit)}</td>
                   </tr>
                 </tfoot>
               </table>

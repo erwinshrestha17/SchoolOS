@@ -13,8 +13,14 @@ import {
   Calculator,
   ArrowRight,
   TrendingUp,
-  School,
+  type LucideIcon,
 } from 'lucide-react';
+import type {
+  ActivityPost,
+  AdmissionSummary,
+  NoticeSummary,
+  ReceiptView,
+} from '@schoolos/core';
 import { api } from '../../lib/api';
 import { StatCard } from '../../components/ui/stat-card';
 import { SectionCard } from '../../components/ui/section-card';
@@ -23,11 +29,7 @@ import { LoadingState } from '../../components/ui/loading-state';
 import { Badge } from '../../components/ui/badge';
 import { cn } from '../../lib/utils';
 import { useSession } from '../../components/session-provider';
-import { 
-  formatAdDate, 
-  formatSchoolDate, 
-  normalizeActivityDate 
-} from '../../lib/date-utils';
+import { formatSchoolDate, normalizeActivityDate } from '../../lib/date-utils';
 
 const formatMoney = (amount: number) => {
   return new Intl.NumberFormat('en-NP', {
@@ -141,6 +143,7 @@ export default function DashboardPage() {
     deliveriesQuery.data?.filter(
       (delivery) => delivery.status.toUpperCase() === 'SENT',
     ).length ?? 0;
+  const todayLabel = formatSchoolDate(new Date(), 'BOTH');
 
   const operationalAlerts = [
     ...setupWarnings.map((warning) => ({
@@ -198,27 +201,26 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <header className="relative overflow-hidden rounded-[2rem] bg-slate-900 px-6 py-10 text-white shadow-2xl lg:px-12">
-        <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-primary-500/20 blur-3xl" />
-        <div className="absolute bottom-0 left-1/4 h-48 w-48 rounded-full bg-secondary-500/10 blur-3xl" />
-        
+      <header className="relative overflow-hidden rounded-2xl bg-slate-950 px-6 py-9 text-white shadow-xl lg:px-10">
         <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-2xl">
-            <div className="flex items-center gap-2 mb-4">
-              <Badge variant="phase2" className="bg-white/10 text-white border-white/20">
-                Admin Command Center
-              </Badge>
-              <div className="h-1 w-1 rounded-full bg-white/30" />
-              <span className="text-xs font-bold uppercase tracking-wider text-white/50">
-                {currentAcademicYear?.name ?? 'No Academic Year'}
-              </span>
-            </div>
-            <h1 className="text-3xl font-extrabold tracking-tight sm:text-5xl">
-              Namaste, <span className="text-primary-400">{session?.user.email?.split('@')[0] ?? 'User'}</span>
+            <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+              School Dashboard
             </h1>
-            <p className="mt-4 text-lg text-slate-300 leading-relaxed">
-              Here is what is happening across <span className="font-bold text-white">{session?.tenant.name}</span> today.
+            <p className="mt-3 text-base leading-7 text-slate-300">
+              Namaste, <span className="font-bold text-white">{session?.user.email?.split('@')[0] ?? 'User'}</span>. Here is what needs attention across <span className="font-bold text-white">{session?.tenant.name}</span> today.
             </p>
+            <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+              <Badge variant="neutral" className="border-white/10 bg-white/10 text-white">
+                {currentAcademicYear?.name ?? 'Academic year not set'}
+              </Badge>
+              <Badge variant="neutral" className="border-white/10 bg-white/10 text-white">
+                {todayLabel}
+              </Badge>
+              <Badge variant="neutral" className="border-white/10 bg-white/10 text-white capitalize">
+                {session?.user.roles[0]?.replace(/_/g, ' ') ?? 'User'}
+              </Badge>
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-4">
@@ -271,7 +273,7 @@ export default function DashboardPage() {
           loading={studentsQuery.isLoading}
         />
         <StatCard
-          title="Attendance Today"
+          title="Today's Attendance"
           value={`${attendancePercent}%`}
           icon={<CalendarCheck size={20} />}
           loading={attendanceQuery.isLoading}
@@ -348,7 +350,7 @@ export default function DashboardPage() {
           <div className="grid gap-3">
             {[
               { label: 'New Admission', href: '/dashboard/admissions', icon: UserPlus },
-              { label: 'Collect Fees', href: '/dashboard/finance', icon: Wallet },
+              { label: 'Collect Fee', href: '/dashboard/fees', icon: Wallet },
               { label: 'Mark Attendance', href: '/dashboard/attendance', icon: CalendarCheck },
               { label: 'Post Update', href: '/dashboard/activity', icon: Images },
               { label: 'Send Notice', href: '/dashboard/notices', icon: Megaphone },
@@ -507,41 +509,66 @@ function HealthRow({ label, count, total, color }: { label: string; count: numbe
   );
 }
 
-function RecentActivityList({ admissions, receipts, activityPosts, notices }: any) {
+type RecentActivityListProps = {
+  admissions: AdmissionSummary[];
+  receipts: ReceiptView[];
+  activityPosts: ActivityPost[];
+  notices: NoticeSummary[];
+};
+
+type RecentActivityItem = {
+  title: string;
+  body: string;
+  date: string;
+  icon: LucideIcon;
+  color: string;
+  bg: string;
+};
+
+function RecentActivityList({
+  admissions,
+  receipts,
+  activityPosts,
+  notices,
+}: RecentActivityListProps) {
   const items = [
-    ...(admissions || []).slice(0, 3).map((a: any) => ({
-      title: `New Admission: ${a.student?.firstName} ${a.student?.lastName}`,
-      body: `Class ${a.class?.name}`,
-      date: normalizeActivityDate(a),
+    ...admissions.slice(0, 3).map((admission) => ({
+      title: `New Admission: ${admission.fullNameEn}`,
+      body: admission.sectionName
+        ? `${admission.className} ${admission.sectionName}`
+        : admission.className,
+      date: normalizeActivityDate(admission),
       icon: UserPlus,
       color: 'text-primary-500',
       bg: 'bg-primary-50',
     })),
-    ...(receipts || []).slice(0, 3).map((r: any) => ({
-      title: `Fee Collected: ${formatMoney(r.amount)}`,
-      body: `Receipt #${r.receiptNumber}`,
-      date: normalizeActivityDate(r),
+    ...receipts.slice(0, 3).map((receipt) => ({
+      title: `Fee Collected: ${formatMoney(receipt.amount ?? receipt.payment?.amount ?? 0)}`,
+      body: `Receipt #${receipt.receiptNumber}`,
+      date: normalizeActivityDate(receipt),
       icon: Wallet,
       color: 'text-success-500',
       bg: 'bg-success-50',
     })),
-    ...(activityPosts || []).slice(0, 3).map((p: any) => ({
-      title: `Activity: ${p.title}`,
-      body: p.category,
-      date: normalizeActivityDate(p),
+    ...activityPosts.slice(0, 3).map((post) => ({
+      title: `Activity: ${post.title}`,
+      body: post.category,
+      date: normalizeActivityDate(post),
       icon: Images,
       color: 'text-secondary-500',
       bg: 'bg-secondary-50',
     })),
-    ...(notices || []).slice(0, 3).map((n: any) => ({
-      title: `Notice: ${n.title}`,
-      body: n.priority,
-      date: normalizeActivityDate(n),
+    ...notices.slice(0, 3).map((notice) => ({
+      title: `Notice: ${notice.title}`,
+      body: notice.priority,
+      date: normalizeActivityDate(notice),
       icon: Megaphone,
       color: 'text-warning-500',
       bg: 'bg-warning-50',
     })),
-  ]
+  ] satisfies RecentActivityItem[];
+
+  const sortedItems = items
     .sort((a, b) => {
       const da = new Date(a.date).getTime() || 0;
       const db = new Date(b.date).getTime() || 0;
@@ -549,13 +576,13 @@ function RecentActivityList({ admissions, receipts, activityPosts, notices }: an
     })
     .slice(0, 6);
 
-  if (items.length === 0) {
+  if (sortedItems.length === 0) {
     return <EmptyState title="No recent operations yet" description="Activity from all modules will appear here once you start using the system." />;
   }
 
   return (
     <div className="divide-y divide-slate-50">
-      {items.map((item, idx) => (
+      {sortedItems.map((item, idx) => (
         <div key={idx} className="flex items-center gap-4 py-4 transition first:pt-0 last:pb-0 hover:bg-slate-50/50">
           <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", item.bg, item.color)}>
             <item.icon size={20} />
@@ -575,7 +602,7 @@ function RecentActivityList({ admissions, receipts, activityPosts, notices }: an
   );
 }
 
-function sumReceiptsThisMonth(receipts: any[]) {
+function sumReceiptsThisMonth(receipts: ReceiptView[]) {
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
@@ -588,7 +615,14 @@ function sumReceiptsThisMonth(receipts: any[]) {
   }, 0);
 }
 
-function sumOutstandingFees(defaulters: any[], invoices: any[]) {
+function sumOutstandingFees(
+  defaulters: Array<{ outstanding: number }>,
+  invoices: Array<{
+    status: string;
+    totalAmount: number;
+    paidAmount?: number;
+  }>,
+) {
   if (defaulters?.length > 0) return defaulters.reduce((sum, item) => sum + item.outstanding, 0);
   return (invoices || [])
     .filter((invoice) => !['PAID', 'WAIVED'].includes(invoice.status.toUpperCase()))

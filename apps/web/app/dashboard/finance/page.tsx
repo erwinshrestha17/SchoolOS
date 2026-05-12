@@ -11,6 +11,11 @@ import { DuesAnalysisSection } from '@/components/finance/dues-analysis-section'
 import { DefaulterAgingSummary } from '@/components/finance/defaulter-aging-summary';
 import { Badge } from '@/components/ui/badge';
 import { useSession } from '@/components/session-provider';
+import type { InvoiceSummary } from '@schoolos/core';
+
+type InvoiceWithOutstanding = InvoiceSummary & {
+  outstandingAmount?: number;
+};
 
 export default function FinancePage() {
   const { session } = useSession();
@@ -19,8 +24,14 @@ export default function FinancePage() {
     queryFn: () => api.listInvoices(),
   });
 
-  const invoices = (invoicesQuery.data as any[]) || [];
-  const totalOutstanding = invoices.reduce((sum, inv) => sum + inv.outstandingAmount, 0);
+  const invoices: InvoiceWithOutstanding[] = invoicesQuery.data ?? [];
+  const totalOutstanding = invoices.reduce(
+    (sum, invoice) =>
+      sum +
+      (invoice.outstandingAmount ??
+        Math.max(0, invoice.totalAmount - (invoice.paidAmount ?? 0))),
+    0,
+  );
   const totalInvoices = invoices.length;
   const paidInvoices = invoices.filter(inv => inv.status === 'PAID').length;
   const collectionRate = totalInvoices > 0 ? Math.round((paidInvoices / totalInvoices) * 100) : 0;

@@ -25,7 +25,6 @@ import {
   Utensils,
   ClipboardList,
   FileCheck2,
-  Trophy,
   CalendarDays,
   type LucideIcon,
 } from 'lucide-react';
@@ -63,7 +62,7 @@ export const dashboardNavGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'People',
+    label: 'Students',
     items: [
       {
         href: '/dashboard/students',
@@ -80,7 +79,7 @@ export const dashboardNavGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Academics',
+    label: 'Daily Operations',
     items: [
       {
         href: '/dashboard/attendance',
@@ -100,9 +99,14 @@ export const dashboardNavGroups: NavGroup[] = [
         icon: CalendarDays,
         permissions: timetablePermissions,
       },
+    ],
+  },
+  {
+    label: 'Academics',
+    items: [
       {
         href: '/dashboard/academics',
-        label: 'Academic Hub',
+        label: 'Academics',
         icon: GraduationCap,
         permissions: academicPermissions,
       },
@@ -130,8 +134,8 @@ export const dashboardNavGroups: NavGroup[] = [
     label: 'Finance',
     items: [
       {
-        href: '/dashboard/finance',
-        label: 'Fee Collection',
+        href: '/dashboard/fees',
+        label: 'Fees',
         icon: Wallet,
         permissions: [
           'fees:manage',
@@ -153,7 +157,65 @@ export const dashboardNavGroups: NavGroup[] = [
     ],
   },
   {
+    label: 'Staff',
+    items: [
+      {
+        href: '/dashboard/hr',
+        label: 'HR / Staff',
+        icon: UserCog,
+        permissions: ['hr:read'],
+      },
+      {
+        href: '/dashboard/payroll',
+        label: 'Payroll',
+        icon: UserCog,
+        permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
+      },
+    ],
+  },
+  {
     label: 'Operations',
+    items: [
+      {
+        href: '/dashboard/library',
+        label: 'Library',
+        icon: BookOpen,
+        permissions: ['library:read', 'library:manage'],
+      },
+      {
+        href: '/dashboard/transport',
+        label: 'Transport',
+        icon: Bus,
+        permissions: [
+          'transport:read',
+          'transport:manage',
+          'transport:operate',
+          'transport:routes:read',
+          'transport:vehicles:read',
+          'transport:assignments:read',
+          'transport:trips:read',
+          'transport:location:read',
+          'transport:tracking:read',
+        ],
+      },
+      {
+        href: '/dashboard/canteen',
+        label: 'Canteen',
+        icon: Utensils,
+        permissions: [
+          'canteen:menu:read',
+          'canteen:plans:read',
+          'canteen:enrollments:read',
+          'canteen:serving:read',
+          'canteen:wallets:read',
+          'canteen:pos:read',
+          'canteen:reports:read',
+        ],
+      },
+    ],
+  },
+  {
+    label: 'Communication',
     items: [
       {
         href: '/dashboard/notices',
@@ -178,64 +240,10 @@ export const dashboardNavGroups: NavGroup[] = [
         icon: Images,
         permissions: ['activity_feed:read', 'activity_feed:create'],
       },
-      {
-        href: '/dashboard/library',
-        label: 'Library',
-        icon: BookOpen,
-        permissions: ['library:read', 'library:manage'],
-      },
-      {
-        href: '/dashboard/transport',
-        label: 'Transport',
-        icon: Bus,
-        disabled: true,
-        permissions: [
-          'transport:read',
-          'transport:manage',
-          'transport:operate',
-          'transport:routes:read',
-          'transport:vehicles:read',
-          'transport:assignments:read',
-          'transport:trips:read',
-          'transport:location:read',
-        ],
-      },
-      {
-        href: '/dashboard/canteen',
-        label: 'Canteen',
-        icon: Utensils,
-        disabled: true,
-        permissions: [
-          'canteen:menu:read',
-          'canteen:plans:read',
-          'canteen:enrollments:read',
-          'canteen:serving:read',
-          'canteen:wallets:read',
-          'canteen:pos:read',
-          'canteen:reports:read',
-        ],
-      },
     ],
   },
   {
-    label: 'HR',
-    items: [
-      {
-        href: '/dashboard/hr',
-        label: 'HR / Staff',
-        icon: UserCog,
-        permissions: ['hr:read'],
-      },
-      {
-        href: '/dashboard/payroll',
-        label: 'Payroll',
-        icon: UserCog,
-        permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
-      },
-    ],
-  },
-  {
-    label: 'System',
+    label: 'Settings',
     items: [
       {
         href: '/dashboard/settings',

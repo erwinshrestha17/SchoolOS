@@ -30,6 +30,7 @@ function createController() {
     completeTrip: jest.fn(),
     markStudentBoarded: jest.fn(),
     markStudentDropped: jest.fn(),
+    markStudentAbsent: jest.fn(),
     listActiveTrips: jest.fn(),
     listTripHistory: jest.fn(),
     recordLocationPing: jest.fn(),
@@ -246,6 +247,7 @@ describe('TransportController M8B contracts', () => {
     };
     transportService.markStudentBoarded.mockReturnValue({ status: 'BOARDED' });
     transportService.markStudentDropped.mockReturnValue({ status: 'DROPPED' });
+    transportService.markStudentAbsent.mockReturnValue({ status: 'ABSENT' });
     transportService.recordLog.mockReturnValue({ id: 'log-1' });
     transportService.broadcastDelay.mockReturnValue({ deliveryCount: 1 });
 
@@ -254,6 +256,9 @@ describe('TransportController M8B contracts', () => {
     });
     expect(controller.markStudentDropped('trip-1', markDto, actor)).toEqual({
       status: 'DROPPED',
+    });
+    expect(controller.markStudentAbsent('trip-1', markDto, actor)).toEqual({
+      status: 'ABSENT',
     });
     expect(controller.recordLog(logDto as never, actor)).toEqual({
       id: 'log-1',
@@ -267,6 +272,11 @@ describe('TransportController M8B contracts', () => {
       actor,
     );
     expect(transportService.markStudentDropped).toHaveBeenCalledWith(
+      'trip-1',
+      markDto,
+      actor,
+    );
+    expect(transportService.markStudentAbsent).toHaveBeenCalledWith(
       'trip-1',
       markDto,
       actor,

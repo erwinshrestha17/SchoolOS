@@ -51,7 +51,7 @@ export class TransportHardeningService {
 
     await this.redisService
       .getClient()
-      .del(`transport:latest-location:${actor.tenantId}:${trip.id}`);
+      .del(latestLocationKey(actor.tenantId, trip.id));
 
     await this.auditService.record({
       action: 'cancel',
@@ -122,9 +122,13 @@ export class TransportHardeningService {
     });
 
     if (!status) {
-      throw new NotFoundException(
-        'No active transport trip found for this child',
-      );
+      return {
+        student: {
+          id: guardianLink.student.id,
+          name: `${guardianLink.student.firstNameEn} ${guardianLink.student.lastNameEn}`,
+        },
+        activeTrip: null,
+      };
     }
 
     const latestLocation = await this.transportService
@@ -160,7 +164,6 @@ export class TransportHardeningService {
       driver: {
         id: status.trip.driverAssignment.staff.id,
         name: `${status.trip.driverAssignment.staff.firstName} ${status.trip.driverAssignment.staff.lastName}`,
-        phone: status.trip.driverAssignment.staff.user.phone,
       },
       childStatus: {
         status: status.status,
@@ -307,10 +310,14 @@ export class TransportHardeningService {
 }
 
 function csvEscape(value: unknown) {
-  const text = String((value as any) ?? '');
+  const text = value == null ? '' : String(value);
   if (/[",\n]/.test(text)) {
     return `"${text.replace(/"/g, '""')}"`;
   }
 
   return text;
+}
+
+function latestLocationKey(tenantId: string, tripId: string) {
+  return `transport:${tenantId}:trip:${tripId}:latest-location`;
 }

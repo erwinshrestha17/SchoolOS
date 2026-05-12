@@ -56,6 +56,10 @@ describe('CommunicationsService', () => {
         create: jest.fn(),
         findMany: jest.fn(),
       },
+      communicationPreference: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
     notificationsService = {
       sendPushNotification: jest.fn(),

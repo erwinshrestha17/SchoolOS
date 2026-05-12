@@ -72,6 +72,10 @@ export class CommunicationsService {
             ? [NotificationChannel.PUSH, NotificationChannel.SMS]
             : [NotificationChannel.PUSH],
         requiredConsentTypes: [ConsentType.MESSAGING],
+        communicationCategory:
+          notice.priority === NoticePriority.EMERGENCY
+            ? 'ESSENTIAL'
+            : 'NON_ESSENTIAL',
       });
     }
 
@@ -130,6 +134,7 @@ export class CommunicationsService {
       body: event.description ?? event.title,
       channels: [NotificationChannel.PUSH],
       requiredConsentTypes: [ConsentType.MESSAGING],
+      communicationCategory: 'NON_ESSENTIAL',
     });
 
     await this.auditService.record({
@@ -225,6 +230,10 @@ export class CommunicationsService {
             ? [NotificationChannel.PUSH, NotificationChannel.SMS]
             : [NotificationChannel.PUSH],
         requiredConsentTypes: [ConsentType.MESSAGING],
+        communicationCategory:
+          notice.priority === NoticePriority.EMERGENCY
+            ? 'ESSENTIAL'
+            : 'NON_ESSENTIAL',
       });
 
       results.push({
@@ -362,7 +371,7 @@ export class CommunicationsService {
 
     const recipients = await this.resolveAudienceRecipients(input);
     const { allowedRecipients, skippedRecipients } =
-      await this.partitionRecipientsByConsent(input, recipients);
+      await this.partitionRecipientsByCommunicationPolicy(input, recipients);
 
     if (recipients.length === 0) {
       return { count: 0 };
@@ -767,13 +776,17 @@ export class CommunicationsService {
     return recipients;
   }
 
-  private async partitionRecipientsByConsent(
+  private async partitionRecipientsByCommunicationPolicy(
     input: DeliveryRecordInput,
     recipients: DeliveryRecipient[],
   ) {
     const requiredConsentTypes = input.requiredConsentTypes ?? [];
+    const communicationCategory = input.communicationCategory ?? 'ESSENTIAL';
 
-    if (requiredConsentTypes.length === 0) {
+    if (
+      requiredConsentTypes.length === 0 &&
+      communicationCategory === 'ESSENTIAL'
+    ) {
       return {
         allowedRecipients: recipients,
         skippedRecipients: [],
@@ -806,6 +819,24 @@ export class CommunicationsService {
         latestByGuardianAndType.set(key, consent);
       }
     }
+    const communicationPreferences =
+      guardianIds.length === 0
+        ? []
+        : await this.prisma.communicationPreference.findMany({
+            where: {
+              tenantId: input.actor.tenantId,
+              guardianId: { in: guardianIds },
+            },
+            select: {
+              guardianId: true,
+              marketingOptOutAt: true,
+            },
+          });
+    const optedOutGuardianIds = new Set(
+      communicationPreferences
+        .filter((preference) => preference.marketingOptOutAt)
+        .map((preference) => preference.guardianId),
+    );
 
     const allowedRecipients: DeliveryRecipient[] = [];
     const skippedRecipients: DeliveryRecipient[] = [];
@@ -813,6 +844,14 @@ export class CommunicationsService {
     for (const recipient of recipients) {
       if (!recipient.guardianId) {
         allowedRecipients.push(recipient);
+        continue;
+      }
+
+      if (
+        communicationCategory !== 'ESSENTIAL' &&
+        optedOutGuardianIds.has(recipient.guardianId)
+      ) {
+        skippedRecipients.push(recipient);
         continue;
       }
 
@@ -855,6 +894,7 @@ interface DeliveryRecordInput {
   body: string;
   channels: NotificationChannel[];
   requiredConsentTypes?: ConsentType[];
+  communicationCategory?: 'ESSENTIAL' | 'NON_ESSENTIAL' | 'MARKETING';
 }
 
 interface DeliveryRecipient {

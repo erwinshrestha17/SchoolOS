@@ -198,7 +198,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
             className="group flex items-center gap-3 rounded-xl p-1 pr-2 transition-all hover:bg-slate-50"
             aria-expanded={userMenuOpen}
             aria-haspopup="menu"
-            aria-label="Open user menu"
+            aria-label="User profile menu"
           >
             <Avatar initials={initials} size="sm" className="shadow-sm shadow-primary-600/10 ring-2 ring-white group-hover:ring-primary-100 transition-all" />
             <div className="hidden sm:block text-left min-w-0">
@@ -233,7 +233,7 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                   </div>
                 </div>
                 <div className="mt-2.5 flex items-center gap-2">
-                  <Badge variant="phase2" className="py-0">
+                  <Badge variant="neutral" className="py-0 capitalize">
                     {primaryRole}
                   </Badge>
                   {session?.tenant.name && (
@@ -289,4 +289,3 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
     </header>
   );
 }
-

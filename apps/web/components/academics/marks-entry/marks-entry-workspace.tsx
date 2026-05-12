@@ -130,7 +130,7 @@ export function MarksEntryWorkspace() {
       cell: (student: any) => (
         <div className="flex flex-col">
           <span className="font-bold text-slate-900">{student.firstNameEn} {student.lastNameEn}</span>
-          <span className="text-[10px] font-mono text-slate-400">{student.studentSystemId}</span>
+          <span className="text-[10px] text-slate-400">{student.studentSystemId}</span>
         </div>
       ),
     },

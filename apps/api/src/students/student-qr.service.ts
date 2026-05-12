@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { randomBytes } from 'crypto';
 import { hashToken } from '../auth/auth.utils';
-import { StudentQrStatus, Prisma } from '@prisma/client';
+import { LibraryIssueStatus, StudentQrStatus, Prisma } from '@prisma/client';
 import { StudentQrResolvePurpose } from './dto/student-qr.dto';
 
 @Injectable()
@@ -222,14 +222,14 @@ export class StudentQrService {
             where: {
               tenantId,
               borrowerStudentId: student.id,
-              status: 'ISSUED' as any,
+              status: LibraryIssueStatus.ISSUED,
             },
           }),
           this.prisma.libraryIssue.count({
             where: {
               tenantId,
               borrowerStudentId: student.id,
-              status: 'ISSUED' as any,
+              status: LibraryIssueStatus.ISSUED,
               dueAt: { lt: new Date() },
             },
           }),

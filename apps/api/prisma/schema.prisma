@@ -291,8 +291,11 @@ enum NotificationChannel {
 
 enum NotificationStatus {
   QUEUED
+  RETRY_PENDING
   SENT
+  DELIVERED
   FAILED
+  CANCELLED
   SKIPPED
 }
 
@@ -2471,6 +2474,15 @@ model NotificationDelivery {
   body            String
   errorMessage    String?
   sentAt          DateTime?
+  retryCount      Int                 @default(0)
+  lastRetryAt     DateTime?
+  retryReason     String?
+  requestedById   String?
+  providerMessageId String?
+  failureReason   String?
+  failureCode     String?
+  deliveredAt     DateTime?
+  failedAt        DateTime?
   createdAt       DateTime            @default(now())
 
   tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
@@ -2486,6 +2498,8 @@ model NotificationDelivery {
   @@index([tenantId, recipientUserId])
   @@index([tenantId, status, createdAt])
   @@index([tenantId, status, channel])
+  @@index([tenantId, noticeId, status, createdAt])
+  @@index([tenantId, recipientUserId, status, createdAt])
 }
 
 model NotificationReadReceipt {
@@ -2503,6 +2517,21 @@ model NotificationReadReceipt {
   @@index([tenantId, notificationDeliveryId, userId])
 }
 
+model NoticeReadReceipt {
+  id              String   @id @default(uuid())
+  tenantId        String
+  noticeId        String
+  userId          String
+  recipientUserId String?
+  guardianId      String?
+  studentId       String?
+  readAt          DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  @@unique([tenantId, noticeId, userId])
+  @@index([tenantId, noticeId, readAt])
+}
+
 model GuardianConsent {
   id          String      @id @default(uuid())
   tenantId    String
@@ -2512,12 +2541,50 @@ model GuardianConsent {
   version     String
   capturedAt  DateTime    @default(now())
   revokedAt   DateTime?
+  consentTemplateId String?
+  templateKey String?
+  templateVersion String?
   metadata    Json?
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   guardian Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, guardianId, consentType])
+}
+
+model ConsentTemplate {
+  id            String   @id @default(uuid())
+  tenantId      String
+  key           String
+  consentType   String
+  version       String
+  title         String
+  body          String
+  status        String   @default("DRAFT")
+  effectiveFrom DateTime?
+  publishedAt   DateTime?
+  archivedAt    DateTime?
+  createdById   String
+  updatedById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([tenantId, key, version])
+  @@index([tenantId, consentType, status, effectiveFrom])
+}
+
+model CommunicationPreference {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  guardianId            String
+  marketingOptOutAt     DateTime?
+  marketingOptOutById   String?
+  marketingOptOutReason String?
+  marketingOptOutSource String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([tenantId, guardianId])
 }
 
 model SubjectTeacherAssignment {
