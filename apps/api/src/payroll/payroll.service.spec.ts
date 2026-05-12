@@ -34,15 +34,15 @@ describe('payroll calculations', () => {
   it('keeps payroll totals balanced for ledger posting', () => {
     expect(
       calculatePayrollTotals([
-        { 
-          grossSalary: new Prisma.Decimal(45000), 
-          deductions: new Prisma.Decimal(1450), 
-          netSalary: new Prisma.Decimal(43550) 
+        {
+          grossSalary: new Prisma.Decimal(45000),
+          deductions: new Prisma.Decimal(1450),
+          netSalary: new Prisma.Decimal(43550),
         },
-        { 
-          grossSalary: new Prisma.Decimal(30000), 
-          deductions: new Prisma.Decimal(300), 
-          netSalary: new Prisma.Decimal(29700) 
+        {
+          grossSalary: new Prisma.Decimal(30000),
+          deductions: new Prisma.Decimal(300),
+          netSalary: new Prisma.Decimal(29700),
         },
       ]),
     ).toEqual({

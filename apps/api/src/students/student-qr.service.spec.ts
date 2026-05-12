@@ -57,27 +57,43 @@ describe('StudentQrService', () => {
 
   describe('generateQr', () => {
     it('should generate a new QR if none exists', async () => {
-      mockPrisma.student.findFirst.mockResolvedValue({ id: 's1', tenantId: 't1' });
+      mockPrisma.student.findFirst.mockResolvedValue({
+        id: 's1',
+        tenantId: 't1',
+      });
       mockPrisma.studentQrCredential.findUnique.mockResolvedValue(null);
-      mockPrisma.studentQrCredential.upsert.mockResolvedValue({ id: 'q1', status: StudentQrStatus.ACTIVE });
+      mockPrisma.studentQrCredential.upsert.mockResolvedValue({
+        id: 'q1',
+        status: StudentQrStatus.ACTIVE,
+      });
 
       const result = await service.generateQr('t1', 's1', 'u1');
 
       expect(result.rawToken).toBeDefined();
-      expect(mockPrisma.studentQrCredential.upsert).toHaveBeenCalledWith(expect.objectContaining({
-        where: { tenantId_studentId: { tenantId: 't1', studentId: 's1' } },
-        create: expect.objectContaining({
-          status: StudentQrStatus.ACTIVE,
+      expect(mockPrisma.studentQrCredential.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { tenantId_studentId: { tenantId: 't1', studentId: 's1' } },
+          create: expect.objectContaining({
+            status: StudentQrStatus.ACTIVE,
+          }),
         }),
-      }));
-      expect(mockAudit.record).toHaveBeenCalledWith(expect.objectContaining({
-        action: 'QR_GENERATED',
-      }));
+      );
+      expect(mockAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'QR_GENERATED',
+        }),
+      );
     });
 
     it('should return existing if active', async () => {
-      mockPrisma.student.findFirst.mockResolvedValue({ id: 's1', tenantId: 't1' });
-      mockPrisma.studentQrCredential.findUnique.mockResolvedValue({ id: 'q1', status: StudentQrStatus.ACTIVE });
+      mockPrisma.student.findFirst.mockResolvedValue({
+        id: 's1',
+        tenantId: 't1',
+      });
+      mockPrisma.studentQrCredential.findUnique.mockResolvedValue({
+        id: 'q1',
+        status: StudentQrStatus.ACTIVE,
+      });
 
       const result = await service.generateQr('t1', 's1', 'u1');
 
@@ -104,16 +120,25 @@ describe('StudentQrService', () => {
         },
       };
 
-      mockPrisma.studentQrCredential.findUnique.mockResolvedValue(mockCredential);
+      mockPrisma.studentQrCredential.findUnique.mockResolvedValue(
+        mockCredential,
+      );
       mockPrisma.studentQrCredential.update.mockResolvedValue({});
 
-      const result = await service.resolveQr('t1', token, StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP, 'u1');
+      const result = await service.resolveQr(
+        't1',
+        token,
+        StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP,
+        'u1',
+      );
 
       expect(result.studentId).toBe('s1');
       expect(result.name).toBe('John Doe');
-      expect(mockAudit.record).toHaveBeenCalledWith(expect.objectContaining({
-        action: 'QR_RESOLVED',
-      }));
+      expect(mockAudit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'QR_RESOLVED',
+        }),
+      );
     });
 
     it('should fail for revoked QR', async () => {
@@ -124,8 +149,14 @@ describe('StudentQrService', () => {
         status: StudentQrStatus.REVOKED,
       });
 
-      await expect(service.resolveQr('t1', token, StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP, 'u1'))
-        .rejects.toThrow(ForbiddenException);
+      await expect(
+        service.resolveQr(
+          't1',
+          token,
+          StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP,
+          'u1',
+        ),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should fail for wrong tenant', async () => {
@@ -136,8 +167,14 @@ describe('StudentQrService', () => {
         status: StudentQrStatus.ACTIVE,
       });
 
-      await expect(service.resolveQr('t1', token, StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP, 'u1'))
-        .rejects.toThrow(ForbiddenException);
+      await expect(
+        service.resolveQr(
+          't1',
+          token,
+          StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP,
+          'u1',
+        ),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

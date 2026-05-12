@@ -107,45 +107,46 @@ export class TimetableLifecycleService {
       new Set(version.slots.map((s) => s.subjectId)),
     );
 
-    const [availability, workloadLimits, requirements, allPeriods] = await Promise.all([
-      this.prisma.teacherAvailability.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          staffId: { in: staffIds },
-          OR: [
-            { academicYearId: version.academicYearId },
-            { academicYearId: null },
-          ],
-        },
-      }),
-      this.prisma.teacherWorkloadLimit.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          staffId: { in: staffIds },
-          OR: [
-            { academicYearId: version.academicYearId },
-            { academicYearId: null },
-          ],
-        },
-      }),
-      this.prisma.subjectWeeklyRequirement.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          academicYearId: version.academicYearId,
-          classId: version.classId! ?? undefined,
-          sectionId: version.sectionId ?? undefined,
-          subjectId: { in: subjectIds },
-        },
-      }),
-      this.prisma.timetablePeriod.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          academicYearId: version.academicYearId,
-          isActive: true,
-        },
-        select: { id: true, startsAt: true, endsAt: true, dayOfWeek: true },
-      }),
-    ]);
+    const [availability, workloadLimits, requirements, allPeriods] =
+      await Promise.all([
+        this.prisma.teacherAvailability.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            staffId: { in: staffIds },
+            OR: [
+              { academicYearId: version.academicYearId },
+              { academicYearId: null },
+            ],
+          },
+        }),
+        this.prisma.teacherWorkloadLimit.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            staffId: { in: staffIds },
+            OR: [
+              { academicYearId: version.academicYearId },
+              { academicYearId: null },
+            ],
+          },
+        }),
+        this.prisma.subjectWeeklyRequirement.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            academicYearId: version.academicYearId,
+            classId: version.classId! ?? undefined,
+            sectionId: version.sectionId ?? undefined,
+            subjectId: { in: subjectIds },
+          },
+        }),
+        this.prisma.timetablePeriod.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            academicYearId: version.academicYearId,
+            isActive: true,
+          },
+          select: { id: true, startsAt: true, endsAt: true, dayOfWeek: true },
+        }),
+      ]);
 
     return this.conflictService.validateVersionSlots(
       version.slots.map((slot) => ({

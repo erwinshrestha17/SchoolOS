@@ -1243,7 +1243,7 @@ export function calculatePayrollLine(input: PayrollLineInput) {
   const fullGross = basicSalary.add(allowances);
   const grossSalaryDecimal = moneyDecimal(fullGross.mul(attendanceRatio));
   const fullPeriodLeaveDeduction = fullGross.sub(grossSalaryDecimal);
-  
+
   // These should ideally be configurable, but using 10% and 1% for hardening logic
   const pfEmployee = input.pfEnabled
     ? moneyDecimal(grossSalaryDecimal.mul(new Prisma.Decimal('0.10')))
@@ -1254,12 +1254,12 @@ export function calculatePayrollLine(input: PayrollLineInput) {
   const tds = input.tdsEnabled
     ? moneyDecimal(grossSalaryDecimal.mul(new Prisma.Decimal('0.01')))
     : new Prisma.Decimal(0);
-    
+
   const otherDeductions = new Prisma.Decimal(input.contractDeductions);
   const totalDeductions = moneyDecimal(
     otherDeductions.add(pfEmployee).add(tds),
   );
-  
+
   const calculatedNet = grossSalaryDecimal.sub(totalDeductions);
   const netSalaryDecimal = calculatedNet.lt(0)
     ? new Prisma.Decimal(0)

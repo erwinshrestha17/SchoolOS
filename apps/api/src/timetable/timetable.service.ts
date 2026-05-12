@@ -13,9 +13,7 @@ import {
   TeacherWorkloadLimit,
   Prisma,
 } from '@prisma/client';
-import {
-  ConflictSlotInput,
-} from './timetable-conflict.service';
+import { ConflictSlotInput } from './timetable-conflict.service';
 import { TimetableLifecycleService } from './timetable-lifecycle.service';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';

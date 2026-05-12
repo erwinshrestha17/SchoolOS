@@ -10,9 +10,18 @@ import {
   HttpStatus,
   Res,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { StudentQrService } from './student-qr.service';
-import { ResolveStudentQrDto, RotateStudentQrDto, RevokeStudentQrDto } from './dto/student-qr.dto';
+import {
+  ResolveStudentQrDto,
+  RotateStudentQrDto,
+  RevokeStudentQrDto,
+} from './dto/student-qr.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
@@ -34,7 +43,11 @@ export class StudentQrController {
     @Param('studentId') studentId: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.studentQrService.generateQr(auth.tenantId, studentId, auth.userId);
+    return this.studentQrService.generateQr(
+      auth.tenantId,
+      studentId,
+      auth.userId,
+    );
   }
 
   @Post(':studentId/qr/rotate')
@@ -46,7 +59,12 @@ export class StudentQrController {
     @Body() dto: RotateStudentQrDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.studentQrService.rotateQr(auth.tenantId, studentId, auth.userId, dto.reason);
+    return this.studentQrService.rotateQr(
+      auth.tenantId,
+      studentId,
+      auth.userId,
+      dto.reason,
+    );
   }
 
   @Post(':studentId/qr/revoke')
@@ -58,18 +76,30 @@ export class StudentQrController {
     @Body() dto: RevokeStudentQrDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.studentQrService.revokeQr(auth.tenantId, studentId, auth.userId, dto.reason);
+    return this.studentQrService.revokeQr(
+      auth.tenantId,
+      studentId,
+      auth.userId,
+      dto.reason,
+    );
   }
 
   @Post('qr/resolve')
   @Permissions('students:qr:resolve')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Resolve a scanned QR token for a declared purpose' })
+  @ApiOperation({
+    summary: 'Resolve a scanned QR token for a declared purpose',
+  })
   async resolveQr(
     @Body() dto: ResolveStudentQrDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.studentQrService.resolveQr(auth.tenantId, dto.token, dto.purpose, auth.userId);
+    return this.studentQrService.resolveQr(
+      auth.tenantId,
+      dto.token,
+      dto.purpose,
+      auth.userId,
+    );
   }
 
   @Get(':studentId/qr-image')
@@ -83,7 +113,8 @@ export class StudentQrController {
   ) {
     if (!token) {
       return res.status(HttpStatus.BAD_REQUEST).json({
-        message: 'Raw token is required to generate the QR image as it is not stored server-side.'
+        message:
+          'Raw token is required to generate the QR image as it is not stored server-side.',
       });
     }
 
