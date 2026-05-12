@@ -6,13 +6,23 @@ For full project memory, read:
 
 - `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md`
 - `docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md`
+- `docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`
 - `docs/project/SCHOOLOS_PROJECT_MEMORY.md`
 - `docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md`
 - `docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md`
 - `docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md`
-- `docs/project/SCHOOLOS_PRICING_TIERS_AND_ENTITLEMENTS_PLAN.md`
 - `ARCHITECTURE.md`
 - `DEVELOPMENT_RULES.md`
+
+Merged into master memory:
+
+```text
+M9 Accounting completion details
+M11 Intelligence / AI roadmap
+Pricing tiers and entitlements plan
+```
+
+Do not recreate separate M9, M11, or Pricing/Entitlements docs unless the project becomes large enough to justify splitting them again.
 
 ## Product
 
@@ -261,7 +271,7 @@ M9 Accounting is production-candidate complete, but all rules remain strict:
 
 ## M11 School Intelligence & Analytics Roadmap
 
-M11 is documented as the Phase 4 intelligence and analytics layer. Do not implement M11 product features yet.
+M11 is documented in the master memory as the Phase 4 intelligence and analytics layer. Do not implement M11 product features yet.
 
 Rules:
 
@@ -273,6 +283,23 @@ Rules:
 - Human review is required before AI output becomes official communication or record.
 - Cross-school analytics require anonymization, aggregation, explicit opt-in, and platform audit.
 ```
+
+## Pricing and Entitlement Rules
+
+Pricing tiers and entitlement rules are documented in the master memory.
+
+Golden rule:
+
+```text
+Plan controls what the school bought.
+Feature entitlement controls what the tenant can access.
+RBAC controls what the user can do.
+Usage limits control how much they can use.
+Frontend uses entitlements only for display.
+Backend enforces entitlements for security.
+```
+
+Do not hardcode plan names into feature access logic. Use feature keys.
 
 ## Core Rules
 
@@ -317,11 +344,9 @@ Read these files first:
 - DEVELOPMENT_RULES.md
 - docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
 - docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
-- docs/project/SCHOOLOS_PROJECT_MEMORY.md
-- docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md
-- docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md
-- docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md
-- docs/project/SCHOOLOS_PRICING_TIERS_AND_ENTITLEMENTS_PLAN.md when touching plans, pricing, subscriptions, feature access, or UI gating
+- docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md when planning execution order
+- docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md when touching platform/settings boundaries
+- docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md when touching scale, queues, reports, exports, or tenant-heavy workflows
 
 Task:
 [Exact feature/change]
