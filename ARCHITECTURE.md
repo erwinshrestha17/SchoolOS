@@ -6,7 +6,7 @@ This file is intentionally concise. The full source of truth is:
 docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
 ```
 
-Read this file for stable architecture rules, then use the master memory for module scope, phase structure, platform core, scalability, and current repo status.
+Read this file for stable architecture rules, then use the master memory and current repo analysis for module scope, phase structure, platform core, scalability, and current repo status.
 
 ---
 
@@ -45,6 +45,37 @@ Rules:
 
 ---
 
+## Current Implementation Snapshot
+
+```text
+Phase 0: Completed
+Phase 1A: Completed / Pilot-Ready
+Phase 1B: Completed / Pilot-Ready
+M0 Platform Core Foundation Depth: Completed
+Phase 2A M4 Academics backend: Completed / Contract-Protected
+Phase 2D M9 Accounting: Production Candidate Complete
+Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
+```
+
+Current readiness:
+
+```text
+Demo-ready: Yes
+Internal QA-ready: Yes
+Controlled pilot-ready: Yes, after staging checks
+Multi-school production-ready: Not yet
+Full SchoolOS product complete: No
+```
+
+Important architecture implication:
+
+```text
+The repo is now broad. The next architecture priority is not module expansion.
+The next priority is verification, stabilization, service/schema alignment, tenant isolation tests, authenticated browser smoke tests, and one-vertical-at-a-time hardening.
+```
+
+---
+
 ## Three-Plane SaaS Architecture
 
 SchoolOS has three logical product planes inside the same modular monolith. These are access, routing, and responsibility boundaries, not separate services.
@@ -53,7 +84,7 @@ SchoolOS has three logical product planes inside the same modular monolith. Thes
 |---|---|---|---|
 | Platform Control Plane | SchoolOS company/operator administration | `/platform/*` | `/platform/*` |
 | Tenant Configuration Plane | School-owned settings/configuration | `/dashboard/settings/*` | `/settings/*` or `/tenant-settings/*` |
-| School Operations Plane | Daily school workflows | `/dashboard/*` | Module APIs such as `/students`, `/attendance`, `/finance`, `/notices` |
+| School Operations Plane | Daily school workflows | `/dashboard/*` | Module APIs such as `/students`, `/attendance`, `/finance`, `/notices`, `/academics`, `/homework`, `/timetable`, `/payroll`, `/accounting`, `/library`, `/transport`, `/canteen` |
 
 Plane rules:
 
@@ -85,8 +116,10 @@ docs/
 Current implementation snapshot:
 
 - Phase 1 school operations are pilot-ready in `apps/web` and `apps/api`.
-- Phase 2 foundations now exist for Academics, Homework/Timetable, HR/Payroll, Accounting, and Parent–Class Teacher Chat.
-- Phase 3 admin foundations now exist for Library, Transport, and Canteen.
+- Phase 2A Academics backend is complete and contract-protected.
+- Phase 2D M9 Accounting is production-candidate complete.
+- Phase 2 foundations exist for Homework/Timetable, HR/Payroll, and Parent-Class Teacher Chat.
+- Phase 3 admin foundations exist for Library, Transport, and Canteen.
 - Deferred surfaces remain: parent/mobile portal, driver app, live transport map/WebSocket UI, full canteen inventory/vendor workflows, and AI/ML.
 
 Suggested frontend namespaces inside `apps/web`:
@@ -108,7 +141,8 @@ Suggested frontend namespaces inside `apps/web`:
 - Use Prisma transactions for multi-step business writes.
 - Use module boundaries to prevent unrelated modules from writing each other's internal data directly.
 - Keep platform modules under M0 Platform Core or equivalent platform-oriented modules.
-- Keep tenant/school modules under their domain modules: M1 through M10.
+- Keep tenant/school modules under their domain modules: M1 through M11.
+- Other modules must not directly write accounting ledger rows; they must use `AccountingPostingService` or a clear accounting boundary.
 
 ---
 
@@ -123,6 +157,7 @@ Suggested frontend namespaces inside `apps/web`:
 - Never use JavaScript floating point for money.
 - Add indexes for common tenant-scoped queries.
 - Prefer database constraints where correctness must be guaranteed.
+- Treat recent schema/service drift reports as stabilization blockers before expanding new features.
 
 ---
 
@@ -151,6 +186,8 @@ Use Redis + BullMQ for:
 - Heavy exports or report generation.
 - PDF generation when heavy/batch-oriented.
 - Media processing/compression.
+- Payroll/report-card batch work where needed.
+- Future transport ETA/location fanout jobs.
 
 Provider failures must not crash core business transactions.
 
@@ -160,8 +197,8 @@ Provider failures must not crash core business transactions.
 
 - Use private object storage for documents and media.
 - Store object keys, not permanent public URLs.
-- Serve downloads/previews through signed URLs.
-- Student documents, photos, activity media, and receipts must remain tenant-scoped.
+- Serve downloads/previews through signed URLs or protected API access URLs.
+- Student documents, photos, activity media, homework attachments, receipts, report cards, payslips, and exports must remain tenant-scoped.
 - Activity media should support compression for Nepal low-bandwidth environments.
 - Generic File Registry belongs to M0 Platform Core and should provide reusable file metadata across modules.
 
@@ -169,7 +206,7 @@ Provider failures must not crash core business transactions.
 
 ## M9 Accounting Architecture
 
-Full M9 Accounting belongs to Phase 2, but Phase 1B finance ledger foundations can continue.
+M9 Accounting is production-candidate complete and remains inside the modular monolith.
 
 Strict rules:
 
@@ -182,7 +219,23 @@ Strict rules:
 7. Use Decimal/numeric for all money.
 8. Journal, voucher, and receipt numbers must be unique per tenant and fiscal year.
 9. Reports must come from backend ledger data, not frontend calculations.
-10. Audit posting, approval, reversal, closing, reopening, and exports.
+10. Audit posting, approval, reversal, closing, reopening, bank reconciliation, and exports.
+
+Do not move Accounting into a microservice yet.
+
+---
+
+## M11 Intelligence / AI Architecture
+
+M11 is Phase 4 roadmap-only for now.
+
+Rules:
+
+- Do not implement AI/ML until reliable production data exists.
+- Start with explainable rule-based analytics, not model-first AI.
+- Do not allow AI to automatically punish students, block fees, suspend access, make payroll decisions, or publicly rank teachers.
+- Every sensitive insight must be tenant-scoped, permission-guarded, and audited.
+- Cross-school analytics require anonymization, aggregation, explicit opt-in, and platform audit.
 
 ---
 
@@ -201,4 +254,15 @@ pnpm test:e2e
 pnpm build
 pnpm verify:production
 pnpm smoke:phase1
+```
+
+Current recommended next architecture sprint:
+
+```text
+Repo Verification & Stabilization Sprint
+→ full verification gate
+→ Homework/Timetable schema/service/test alignment
+→ Phase 2A Academics admin UI against real APIs
+→ authenticated Playwright browser smoke
+→ controlled pilot staging readiness
 ```
