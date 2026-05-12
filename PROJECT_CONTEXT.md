@@ -7,22 +7,21 @@ For full project memory, read:
 - `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md`
 - `docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md`
 - `docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`
-- `docs/project/SCHOOLOS_PROJECT_MEMORY.md`
-- `docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md`
-- `docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md`
-- `docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md`
+- `docs/project/SCHOOLOS_PLATFORM_AND_SETTINGS.md`
 - `ARCHITECTURE.md`
 - `DEVELOPMENT_RULES.md`
 
 Merged into master memory:
 
 ```text
+Phase structure
+Scalability roadmap
 M9 Accounting completion details
 M11 Intelligence / AI roadmap
 Pricing tiers and entitlements plan
 ```
 
-Do not recreate separate M9, M11, or Pricing/Entitlements docs unless the project becomes large enough to justify splitting them again.
+Do not recreate separate Phase Structure, Scalability, M9, M11, or Pricing/Entitlements docs unless the project becomes large enough to justify splitting them again.
 
 ## Product
 
@@ -151,57 +150,10 @@ M11 Intelligence/AI: 0% implementation
 
 SchoolOS has three logical planes inside the same modular monolith.
 
-### Layer 1: Platform Control Plane
-
-For the SchoolOS company owner/internal platform team.
-
-Recommended namespace:
-
 ```text
-Frontend: /platform/*
-Backend:  /platform/*
-```
-
-Purpose:
-
-- Manage all schools/tenants.
-- Manage plans, subscriptions, SaaS billing, limits, support access, and platform audit.
-
-Typical roles:
-
-- `PLATFORM_SUPER_ADMIN`
-- `PLATFORM_SUPPORT`
-- `PLATFORM_BILLING_ADMIN`
-
-### Layer 2: Tenant Configuration Plane
-
-For each school principal/admin.
-
-Recommended namespace:
-
-```text
-Frontend: /dashboard/settings/*
-Backend:  /settings/* or /tenant-settings/*
-```
-
-Purpose:
-
-- Manage school logo, branding, settings, academic year, receipt preferences, attendance lock time, fee reminder rules, notification rules, and future chat availability hours.
-
-Typical roles:
-
-- `TENANT_PRINCIPAL`
-- `TENANT_ADMIN`
-
-### Layer 3: School Operations Plane
-
-For school staff and day-to-day operations.
-
-Recommended namespace:
-
-```text
-Frontend: /dashboard/*
-Backend:  module APIs such as /students, /attendance, /finance, /notices, /academics, /homework, /timetable, /payroll, /accounting, /library, /transport, /canteen
+Platform Control Plane: /platform/*
+Tenant Configuration Plane: /dashboard/settings/*
+School Operations Plane: /dashboard/*
 ```
 
 Rules:
@@ -211,7 +163,7 @@ Rules:
 - School Operations Plane is for school workflows.
 - Do not mix SchoolOS SaaS billing with school fee collection.
 - Platform support/tenant override must be explicit and audited.
-- For the full school-settings vs platform-settings boundary, read `docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md`.
+- For the full school-settings vs platform-settings boundary, read `docs/project/SCHOOLOS_PLATFORM_AND_SETTINGS.md`.
 
 ## Tenant Boundary
 
@@ -220,13 +172,7 @@ Do not rename `tenantId` to `schoolId` unless a future migration is explicitly p
 
 ## Scalability Rule
 
-SchoolOS scalability must be implemented as development continues, not postponed to the end.
-
-Before every meaningful feature/module change, read:
-
-```text
-docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md
-```
+SchoolOS scalability is now documented in the master memory and must be applied during development, not postponed to the end.
 
 Every new feature must answer:
 
@@ -345,8 +291,7 @@ Read these files first:
 - docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
 - docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
 - docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md when planning execution order
-- docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md when touching platform/settings boundaries
-- docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md when touching scale, queues, reports, exports, or tenant-heavy workflows
+- docs/project/SCHOOLOS_PLATFORM_AND_SETTINGS.md when touching platform/settings boundaries
 
 Task:
 [Exact feature/change]
