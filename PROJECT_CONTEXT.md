@@ -5,10 +5,10 @@ This file gives Codex and other coding assistants a short, stable context file s
 For full project memory, read:
 
 - `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md`
+- `docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md`
 - `docs/project/SCHOOLOS_PROJECT_MEMORY.md`
 - `docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md`
 - `docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md`
-- `docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md`
 - `docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md`
 - `docs/project/SCHOOLOS_PRICING_TIERS_AND_ENTITLEMENTS_PLAN.md`
 - `ARCHITECTURE.md`
@@ -26,18 +26,25 @@ Current delivery stage:
 Phase 0 completed
 Phase 1A completed / pilot-ready
 Phase 1B completed / pilot-ready
-Current stage: Phase 2 implemented foundations + Phase 3 operations admin foundations
+M0 Platform Core Foundation Depth completed
+Phase 2A M4 Academics backend completed / contract-protected
+Phase 2D M9 Accounting production-candidate complete
+Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
 ```
 
-The repo is ahead of the older Phase 1B/Phase 2-transition notes. Phase 2 foundations now exist for Academics, Homework/Timetable, HR/Payroll, Accounting, and Parent Communication/Messaging. Phase 3 admin foundations now exist for Library, Transport, and Canteen. M0 platform control, tenant settings, file registry, reports, usage, and plan-service foundations also exist.
+The repo is ahead of older Phase 1B/Phase 2-transition notes. Phase 2A Academics backend is complete. M9 Accounting is production-candidate complete. Foundations now exist for Homework/Timetable, HR/Payroll, Parent Communication/Messaging, Library, Transport, and Canteen.
 
-Current work should focus on hardening, correctness, scale, permissions, tests, verification, and admin UX polish for existing modules rather than opening broad new product fronts.
+Current work should focus on stabilization, correctness, scale, permissions, tests, verification, and admin UX polish for existing modules rather than opening broad new product fronts.
 
 Recommended near-term direction:
 
 ```text
-Run controlled pilot hardening while deepening one existing vertical at a time.
-Highest priority: M9 accounting correctness, production verification, tenant isolation, reports/exports, API/UI contract alignment, and Phase 2/3 admin foundation stabilization.
+Repo Verification & Stabilization Sprint
+→ fix any remaining Prisma/schema/typecheck/test blockers
+→ stabilize Homework/Timetable after recent verification follow-ups
+→ wire Phase 2A Academics admin UI to completed APIs
+→ add authenticated Playwright browser smoke tests
+→ prepare controlled pilot staging
 ```
 
 Explicitly deferred unless requested:
@@ -78,17 +85,18 @@ Implemented or registered backend foundations now include:
 - M1 Admissions & Student Profiles
 - M2 Smart Attendance
 - M3 Fees & Receipts
-- M4 Academics, Exams, CAS, Report Cards
+- M4 Academics, Exams, CAS, Report Cards backend completion
 - M5 Activity Feed & Milestones
-- M6 Homework & Timetable
-- M7 Staff/HR and Payroll
+- M6 Homework & Timetable foundation
+- M7 Staff/HR and Payroll foundation
 - M8A Library Management admin foundation
 - M8B Transport Management admin/trip/location foundation
 - M8C Canteen Management admin/wallet/POS foundation
-- M9 Accounting & Finance foundation and hardening work
+- M9 Accounting & Finance production-candidate completion
 - M10 Notices, Notifications, Communications, Messaging / Parent-Class Teacher foundation
+- M11 School Intelligence & Analytics roadmap only
 
-Treat Phase 2 and Phase 3 modules as foundation/admin-ready unless verified locally. Several recent GitHub-connector PRs noted that full local verification was not run in the connector environment, so production readiness still requires local/staging verification.
+Treat Phase 2/3 modules as foundation/admin-ready unless verified locally. Several GitHub-connector PRs noted that full local verification was not run in the connector environment. Production readiness still requires local/staging verification.
 
 ## Readiness
 
@@ -100,6 +108,35 @@ Multi-school production-ready: Not yet
 Full SchoolOS product complete: No
 ```
 
+## Module Completion Estimate
+
+```text
+Full SchoolOS vision: around 70-80% implemented
+Phase 1 pilot product: around 90-95% implemented
+M4 Academics backend: complete / contract-protected
+M9 Accounting: production-candidate complete
+```
+
+Approximate module status:
+
+```text
+Auth/Security/Tenant: 90-95%
+M0 Platform Core: 65-75%
+M1 Students: 90-95%
+M2 Attendance: 85-90%
+M3 Fees: 85-90%
+M4 Academics: 80-90%
+M5 Activity: 75-85%
+M6 Homework/Timetable: 60-70%
+M7 HR/Payroll: 65-75%
+M8A Library: 45-55%
+M8B Transport: 45-55%
+M8C Canteen: 45-55%
+M9 Accounting: 95-100%
+M10 Communications: 85-90%
+M11 Intelligence/AI: 0% implementation
+```
+
 ## Three-Plane SaaS Architecture
 
 SchoolOS has three logical planes inside the same modular monolith.
@@ -108,17 +145,17 @@ SchoolOS has three logical planes inside the same modular monolith.
 
 For the SchoolOS company owner/internal platform team.
 
-Purpose:
-
-- Manage all schools/tenants.
-- Manage plans, subscriptions, SaaS billing, limits, support access, and platform audit.
-
 Recommended namespace:
 
 ```text
 Frontend: /platform/*
 Backend:  /platform/*
 ```
+
+Purpose:
+
+- Manage all schools/tenants.
+- Manage plans, subscriptions, SaaS billing, limits, support access, and platform audit.
 
 Typical roles:
 
@@ -130,16 +167,16 @@ Typical roles:
 
 For each school principal/admin.
 
-Purpose:
-
-- Manage school logo, branding, settings, academic year, receipt preferences, attendance lock time, fee reminder rules, notification rules, and future chat availability hours.
-
 Recommended namespace:
 
 ```text
 Frontend: /dashboard/settings/*
 Backend:  /settings/* or /tenant-settings/*
 ```
+
+Purpose:
+
+- Manage school logo, branding, settings, academic year, receipt preferences, attendance lock time, fee reminder rules, notification rules, and future chat availability hours.
 
 Typical roles:
 
@@ -149,10 +186,6 @@ Typical roles:
 ### Layer 3: School Operations Plane
 
 For school staff and day-to-day operations.
-
-Purpose:
-
-- Manage students, attendance, fees, notices, activity feed, reports, academics, HR/payroll, library, transport, canteen, accounting, and future intelligence dashboards.
 
 Recommended namespace:
 
@@ -210,29 +243,21 @@ Scalability implementation order:
 Feature -> tenant isolation -> indexes -> pagination -> queue slow work -> audit sensitive actions -> tests -> verification.
 ```
 
-## Pricing Tiers and Entitlements Roadmap
+## M9 Accounting Rules
 
-SchoolOS commercial packaging is documented as:
-
-```text
-Tier 1: SchoolOS Core
-Tier 2: SchoolOS Professional
-Tier 3: SchoolOS Intelligence
-Optional add-ons: Transport GPS, Canteen, Library, SMS Pack, AI Credits, Branded Parent App, Advanced Accounting, Custom Reports
-```
-
-Technical rule:
+M9 Accounting is production-candidate complete, but all rules remain strict:
 
 ```text
-Plan controls what the school bought.
-Feature entitlement controls what the tenant can access.
-RBAC controls what the user can do.
-Usage limits control how much they can use.
-Frontend uses entitlements only for display.
-Backend enforces entitlements for security.
+- Immutable posted journals.
+- Reversal/correction instead of silent edits.
+- Double-entry debit = credit enforcement.
+- OPEN/LOCKED/CLOSED fiscal period control.
+- Source document linkage for every journal.
+- AccountingPostingService boundary for other modules.
+- Decimal/numeric money only.
+- Backend ledger reports only.
+- Audit posting, approval, reversal, closing, reopening, reconciliation, and exports.
 ```
-
-Do not hardcode plan names across the app. Use feature keys such as `module.exams`, `module.transport`, `module.intelligence`, `feature.ai_teacher_assistant`, and `feature.parent_teacher_chat`.
 
 ## M11 School Intelligence & Analytics Roadmap
 
@@ -266,6 +291,23 @@ Rules:
 - Do not start broad SaaS billing automation until platform plan/subscription boundaries are approved.
 - Do not copy generic SaaS-template modules blindly; adapt reusable platform pieces into SchoolOS only when they strengthen production readiness.
 
+## Verification Gate
+
+Run relevant checks after meaningful changes:
+
+```bash
+pnpm db:generate
+pnpm db:validate
+pnpm verify:openapi
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:e2e
+pnpm build
+pnpm verify:production
+pnpm smoke:phase1
+```
+
 ## Recommended Codex Prompt Format
 
 ```text
@@ -274,10 +316,10 @@ Read these files first:
 - ARCHITECTURE.md
 - DEVELOPMENT_RULES.md
 - docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
+- docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
 - docs/project/SCHOOLOS_PROJECT_MEMORY.md
 - docs/project/SCHOOLOS_PLATFORM_CORE_MEMORY.md
 - docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md
-- docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
 - docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md
 - docs/project/SCHOOLOS_PRICING_TIERS_AND_ENTITLEMENTS_PLAN.md when touching plans, pricing, subscriptions, feature access, or UI gating
 
