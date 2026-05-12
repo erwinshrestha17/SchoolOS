@@ -506,11 +506,11 @@ export class PayrollService {
         presentDays: line?.presentDays ?? 0,
         approvedPaidLeaveDays: line?.approvedPaidLeaveDays ?? 0,
         unpaidLeaveDays: line?.unpaidLeaveDays ?? 0,
-        baseSalary: line?.baseSalary ?? 0,
-        allowances: line?.allowances ?? 0,
-        grossPay: line?.grossSalary ?? 0,
-        deductions: line?.deductions ?? 0,
-        netPay: line?.netSalary ?? 0,
+        baseSalary: Number(line?.baseSalary ?? 0),
+        allowances: Number(line?.allowances ?? 0),
+        grossPay: Number(line?.grossSalary ?? 0),
+        deductions: Number(line?.deductions ?? 0),
+        netPay: Number(line?.netSalary ?? 0),
         warnings,
       };
     });
@@ -628,9 +628,9 @@ export class PayrollService {
       const totalEffectiveDays = presentDays + approvedPaidLeaveDays;
       const unpaidLeaveDays = Math.max(0, workingDays - totalEffectiveDays);
 
-      const baseSalary = decimalNumber(source.baseSalary);
-      const allowances = decimalNumber(source.allowances);
-      const contractDeductions = decimalNumber(source.contractDeductions);
+      const baseSalary = new Prisma.Decimal(source.baseSalary);
+      const allowances = new Prisma.Decimal(source.allowances);
+      const contractDeductions = new Prisma.Decimal(source.contractDeductions);
 
       const calculated = calculatePayrollLine({
         baseSalary,
@@ -789,6 +789,10 @@ export class PayrollService {
     const actions = getPayrollRunActions(run.status);
 
     if (run.status === PayrollRunStatus.POSTED) {
+      return run;
+    }
+
+    if (run.journalEntryId) {
       return run;
     }
 
@@ -1218,9 +1222,9 @@ export class PayrollService {
 }
 
 interface PayrollLineInput {
-  baseSalary: number;
-  allowances: number;
-  contractDeductions: number;
+  baseSalary: Prisma.Decimal | number;
+  allowances: Prisma.Decimal | number;
+  contractDeductions: Prisma.Decimal | number;
   attendanceDays: number;
   workingDays: number;
   pfEnabled?: boolean;
@@ -1239,68 +1243,68 @@ export function calculatePayrollLine(input: PayrollLineInput) {
   const fullGross = basicSalary.add(allowances);
   const grossSalaryDecimal = moneyDecimal(fullGross.mul(attendanceRatio));
   const fullPeriodLeaveDeduction = fullGross.sub(grossSalaryDecimal);
+  
+  // These should ideally be configurable, but using 10% and 1% for hardening logic
   const pfEmployee = input.pfEnabled
-    ? moneyDecimal(grossSalaryDecimal.mul(0.1))
+    ? moneyDecimal(grossSalaryDecimal.mul(new Prisma.Decimal('0.10')))
     : new Prisma.Decimal(0);
   const pfEmployer = input.pfEnabled
-    ? moneyDecimal(grossSalaryDecimal.mul(0.1))
+    ? moneyDecimal(grossSalaryDecimal.mul(new Prisma.Decimal('0.10')))
     : new Prisma.Decimal(0);
   const tds = input.tdsEnabled
-    ? moneyDecimal(grossSalaryDecimal.mul(0.01))
+    ? moneyDecimal(grossSalaryDecimal.mul(new Prisma.Decimal('0.01')))
     : new Prisma.Decimal(0);
+    
   const otherDeductions = new Prisma.Decimal(input.contractDeductions);
-  const deductionsDecimal = moneyDecimal(
+  const totalDeductions = moneyDecimal(
     otherDeductions.add(pfEmployee).add(tds),
   );
-  const calculatedNet = grossSalaryDecimal.sub(deductionsDecimal);
+  
+  const calculatedNet = grossSalaryDecimal.sub(totalDeductions);
   const netSalaryDecimal = calculatedNet.lt(0)
     ? new Prisma.Decimal(0)
-    : calculatedNet;
+    : moneyDecimal(calculatedNet);
 
   return {
-    earnings: Number(grossSalaryDecimal),
-    grossSalary: Number(grossSalaryDecimal),
-    allowances: input.allowances,
-    leaveDeductions: Number(moneyDecimal(fullPeriodLeaveDeduction)),
-    pfEmployee: Number(pfEmployee),
-    pfEmployer: Number(pfEmployer),
-    tds: Number(tds),
-    otherDeductions: Number(otherDeductions),
-    deductions: Number(deductionsDecimal),
-    netSalary: Number(moneyDecimal(netSalaryDecimal)),
+    earnings: grossSalaryDecimal,
+    grossSalary: grossSalaryDecimal,
+    allowances: allowances,
+    leaveDeductions: moneyDecimal(fullPeriodLeaveDeduction),
+    pfEmployee,
+    pfEmployer,
+    tds,
+    otherDeductions,
+    deductions: totalDeductions,
+    netSalary: netSalaryDecimal,
   };
 }
 
 export function calculatePayrollTotals(
   lines: Array<{
-    grossSalary: number;
-    deductions: number;
-    netSalary: number;
-    pfEmployee?: number;
-    pfEmployer?: number;
-    tds?: number;
+    grossSalary: Prisma.Decimal;
+    deductions: Prisma.Decimal;
+    netSalary: Prisma.Decimal;
+    pfEmployee?: Prisma.Decimal;
+    pfEmployer?: Prisma.Decimal;
+    tds?: Prisma.Decimal;
   }>,
 ) {
   return lines.reduce(
     (totals, line) => ({
-      grossAmount: roundMoney(totals.grossAmount + line.grossSalary),
-      deductionAmount: roundMoney(totals.deductionAmount + line.deductions),
-      netAmount: roundMoney(totals.netAmount + line.netSalary),
-      pfEmployeeAmount: roundMoney(
-        totals.pfEmployeeAmount + (line.pfEmployee ?? 0),
-      ),
-      pfEmployerAmount: roundMoney(
-        totals.pfEmployerAmount + (line.pfEmployer ?? 0),
-      ),
-      tdsAmount: roundMoney(totals.tdsAmount + (line.tds ?? 0)),
+      grossAmount: totals.grossAmount.add(line.grossSalary),
+      deductionAmount: totals.deductionAmount.add(line.deductions),
+      netAmount: totals.netAmount.add(line.netSalary),
+      pfEmployeeAmount: totals.pfEmployeeAmount.add(line.pfEmployee ?? 0),
+      pfEmployerAmount: totals.pfEmployerAmount.add(line.pfEmployer ?? 0),
+      tdsAmount: totals.tdsAmount.add(line.tds ?? 0),
     }),
     {
-      grossAmount: 0,
-      deductionAmount: 0,
-      netAmount: 0,
-      pfEmployeeAmount: 0,
-      pfEmployerAmount: 0,
-      tdsAmount: 0,
+      grossAmount: new Prisma.Decimal(0),
+      deductionAmount: new Prisma.Decimal(0),
+      netAmount: new Prisma.Decimal(0),
+      pfEmployeeAmount: new Prisma.Decimal(0),
+      pfEmployerAmount: new Prisma.Decimal(0),
+      tdsAmount: new Prisma.Decimal(0),
     },
   );
 }

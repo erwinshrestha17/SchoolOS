@@ -4,7 +4,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
-  Prisma,
   TransportEnrollmentStatus,
   TransportTripStatus,
 } from '@prisma/client';
@@ -311,7 +310,7 @@ export class TransportHardeningService {
 }
 
 function csvEscape(value: unknown) {
-  const text = String(value ?? '');
+  const text = String((value as any) ?? '');
   if (/[",\n]/.test(text)) {
     return `"${text.replace(/"/g, '""')}"`;
   }

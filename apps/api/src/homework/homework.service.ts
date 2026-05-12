@@ -4,7 +4,6 @@ import {
   HomeworkAssignmentStatus,
   HomeworkSubmissionStatus,
   NotificationChannel,
-  NotificationStatus,
   Prisma,
 } from '@prisma/client';
 import {
@@ -139,7 +138,7 @@ export class HomeworkService {
           tenantId: actor.tenantId,
           academicYearId: dto.academicYearId,
           subjectId: dto.subjectId,
-          staffId: staffId,
+          staffId,
         },
       });
       if (!isAssigned) {
@@ -248,7 +247,7 @@ export class HomeworkService {
       return result;
     });
 
-    const fullUpdated = await this.findAssignmentOrThrow(actor, updated.id);
+    await this.findAssignmentOrThrow(actor, updated.id);
 
     await this.auditService.record({
       action: 'update',
@@ -546,7 +545,7 @@ export class HomeworkService {
     actor: AuthContext,
   ) {
     const submission = await this.findSubmissionOrThrow(actor, submissionId);
-    await this.ensureSubjectTeacherScope(
+    this.ensureSubjectTeacherScope(
       actor,
       submission.homework.subjectId,
       await this.resolveActorStaffId(actor),
@@ -638,7 +637,7 @@ export class HomeworkService {
     actor: AuthContext,
   ) {
     const submission = await this.findSubmissionOrThrow(actor, submissionId);
-    await this.ensureSubjectTeacherScope(
+    this.ensureSubjectTeacherScope(
       actor,
       submission.homework.subjectId,
       await this.resolveActorStaffId(actor),
@@ -723,7 +722,7 @@ export class HomeworkService {
     }
   }
 
-  private async ensureSubjectTeacherScope(
+  private ensureSubjectTeacherScope(
     actor: AuthContext,
     subjectId: string,
     staffId: string | null,

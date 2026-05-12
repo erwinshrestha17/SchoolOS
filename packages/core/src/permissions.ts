@@ -96,6 +96,31 @@ export const permissionCatalog = [
       'Transfer, exit, archive, and manage student lifecycle transitions',
   },
   {
+    resource: 'students:qr',
+    action: 'generate',
+    description: 'Generate new QR credentials for students',
+  },
+  {
+    resource: 'students:qr',
+    action: 'read',
+    description: 'Read student QR credentials and images',
+  },
+  {
+    resource: 'students:qr',
+    action: 'rotate',
+    description: 'Rotate existing student QR credentials',
+  },
+  {
+    resource: 'students:qr',
+    action: 'revoke',
+    description: 'Revoke student QR credentials',
+  },
+  {
+    resource: 'students:qr',
+    action: 'resolve',
+    description: 'Resolve scanned QR tokens for identity verification',
+  },
+  {
     resource: 'tenants',
     action: 'manage',
     description: 'Deactivate or manage tenants (super_admin only)',

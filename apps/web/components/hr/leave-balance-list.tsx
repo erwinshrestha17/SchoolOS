@@ -17,7 +17,7 @@ export function LeaveBalanceList() {
 
   const balancesQuery = useQuery({
     queryKey: ['staff-leave-balances'],
-    queryFn: api.listStaffLeaveBalances,
+    queryFn: () => api.listAllLeaveBalances(),
   });
 
   const leaveTypes = ['SICK_LEAVE', 'CASUAL_LEAVE', 'EARNED_LEAVE', 'MATERNITY_LEAVE', 'PATERNITY_LEAVE', 'UNPAID_LEAVE'];

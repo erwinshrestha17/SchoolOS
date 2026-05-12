@@ -9,7 +9,9 @@ export type TimetableConflictType =
   | 'TEACHER_UNAVAILABLE'
   | 'WORKLOAD_EXCEEDED'
   | 'SUBJECT_REQUIREMENT_MISSING'
-  | 'SUBJECT_REQUIREMENT_EXCEEDED';
+  | 'SUBJECT_REQUIREMENT_EXCEEDED'
+  | 'PERIOD_MISMATCH'
+  | 'OUTSIDE_SCHEDULE';
 
 export type TimetableConflictSeverity = 'BLOCKING' | 'WARNING';
 
@@ -23,6 +25,7 @@ export interface TimetableConflictIssue {
   classId?: string;
   sectionId?: string | null;
   subjectId?: string;
+  periodId?: string | null;
   dayOfWeek?: number;
   startsAt?: string;
   endsAt?: string;
@@ -37,6 +40,7 @@ export interface ConflictSlotInput {
   sectionId?: string | null;
   subjectId: string;
   staffId: string;
+  periodId?: string | null;
   roomId?: string | null;
   dayOfWeek: number;
   startsAt: string;
@@ -72,6 +76,8 @@ export interface TimetableConflictValidationInput {
   teacherAvailability?: AvailabilityInput[];
   teacherWorkloadLimit?: TeacherWorkloadLimitInput | null;
   subjectWeeklyRequirement?: SubjectWeeklyRequirementInput | null;
+  periodConfig?: { id: string; startsAt: string; endsAt: string; dayOfWeek: number | null } | null;
+  allPeriods?: { id: string; startsAt: string; endsAt: string; dayOfWeek: number | null }[];
 }
 
 export interface TimetableConflictValidationResult {
@@ -105,6 +111,8 @@ export class TimetableConflictService {
         input.existingSlots,
         input.subjectWeeklyRequirement ?? null,
       ),
+      ...this.detectPeriodMismatch(input.candidate, input.periodConfig ?? null),
+      ...this.detectOutsideSchedule(input.candidate, input.allPeriods ?? []),
     ];
 
     const deduped = dedupeIssues(issues);
@@ -143,6 +151,8 @@ export class TimetableConflictService {
       teacherAvailability,
       teacherWorkloadLimit,
       subjectWeeklyRequirement,
+      periodConfig,
+      allPeriods,
     ] = await Promise.all([
       this.prisma.timetableSlot.findMany({
         where: {
@@ -165,6 +175,7 @@ export class TimetableConflictService {
           dayOfWeek: true,
           startsAt: true,
           endsAt: true,
+          periodId: true,
         },
       }),
       this.prisma.teacherAvailability.findMany({
@@ -217,7 +228,25 @@ export class TimetableConflictService {
           requiredPeriodsPerWeek: true,
         },
       }),
+      candidate.periodId
+        ? this.prisma.timetablePeriod.findUnique({
+            where: { id: candidate.periodId },
+            select: { id: true, startsAt: true, endsAt: true, dayOfWeek: true, tenantId: true },
+          })
+        : null,
+      this.prisma.timetablePeriod.findMany({
+        where: {
+          tenantId,
+          academicYearId: candidate.academicYearId,
+          isActive: true,
+        },
+        select: { id: true, startsAt: true, endsAt: true, dayOfWeek: true },
+      }),
     ]);
+
+    if (periodConfig && periodConfig.tenantId !== tenantId) {
+      throw new Error('Period tenant mismatch');
+    }
 
     return this.validateCandidate({
       candidate,
@@ -225,6 +254,8 @@ export class TimetableConflictService {
       teacherAvailability,
       teacherWorkloadLimit,
       subjectWeeklyRequirement,
+      periodConfig,
+      allPeriods,
     });
   }
 
@@ -233,6 +264,7 @@ export class TimetableConflictService {
     requirements: SubjectWeeklyRequirementInput[] = [],
     workloadLimits: TeacherWorkloadLimitInput[] = [],
     availability: AvailabilityInput[] = [],
+    allPeriods: { id: string; startsAt: string; endsAt: string; dayOfWeek: number | null }[] = [],
   ): TimetableConflictValidationResult {
     const issues: TimetableConflictIssue[] = [];
 
@@ -246,6 +278,11 @@ export class TimetableConflictService {
         ),
         teacherWorkloadLimit:
           workloadLimits.find((item) => item.staffId === slot.staffId) ?? null,
+        periodConfig:
+          slot.periodId
+            ? allPeriods.find((p) => p.id === slot.periodId) ?? null
+            : null,
+        allPeriods,
         // We handle requirements separately to avoid duplicates
         subjectWeeklyRequirement: null,
       });
@@ -486,6 +523,59 @@ export class TimetableConflictService {
           classId: requirement.classId,
           sectionId: requirement.sectionId ?? null,
           subjectId: requirement.subjectId,
+        },
+      ];
+    }
+
+    return [];
+  }
+
+  private detectPeriodMismatch(
+    candidate: ConflictSlotInput,
+    period: { startsAt: string; endsAt: string; dayOfWeek: number | null } | null,
+  ): TimetableConflictIssue[] {
+    if (!candidate.periodId || !period) return [];
+
+    if (
+      candidate.startsAt !== period.startsAt ||
+      candidate.endsAt !== period.endsAt ||
+      (period.dayOfWeek !== null && candidate.dayOfWeek !== period.dayOfWeek)
+    ) {
+      return [
+        {
+          type: 'PERIOD_MISMATCH',
+          severity: 'BLOCKING',
+          message: `Slot times (${candidate.startsAt}-${candidate.endsAt}) do not match the selected period times (${period.startsAt}-${period.endsAt}).`,
+          affectedPeriodIds: [candidate.id],
+          periodId: candidate.periodId,
+        },
+      ];
+    }
+
+    return [];
+  }
+
+  private detectOutsideSchedule(
+    candidate: ConflictSlotInput,
+    allPeriods: { id: string; startsAt: string; endsAt: string; dayOfWeek: number | null }[],
+  ): TimetableConflictIssue[] {
+    if (allPeriods.length === 0) return [];
+
+    // If a candidate doesn't match ANY of the defined periods for that day, it's outside schedule
+    const matchesAny = allPeriods.some(
+      (p) =>
+        p.startsAt === candidate.startsAt &&
+        p.endsAt === candidate.endsAt &&
+        (p.dayOfWeek === null || p.dayOfWeek === candidate.dayOfWeek),
+    );
+
+    if (!matchesAny) {
+      return [
+        {
+          type: 'OUTSIDE_SCHEDULE',
+          severity: 'WARNING',
+          message: 'Slot times do not align with any configured timetable periods.',
+          affectedPeriodIds: [candidate.id],
         },
       ];
     }

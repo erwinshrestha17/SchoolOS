@@ -1236,13 +1236,13 @@ export class AccountingPostingService {
     return entry;
   }
 
-  async reverseJournal() {
+  reverseJournal() {
     throw new ConflictException(
       'Use AccountingService.reverseJournalEntry for audited reversals.',
     );
   }
 
-  async postAdjustment() {
+  postAdjustment() {
     throw new ConflictException(
       'Use AccountingService correction/adjustment endpoints for audited adjustments.',
     );

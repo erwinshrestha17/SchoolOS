@@ -121,6 +121,16 @@ export class LibraryController {
     return this.libraryService.markCopyStatus(copyId, dto, auth);
   }
 
+  @Post('copies/:id/archive')
+  @Permissions('library:copies:update')
+  archiveCopy(
+    @Param('id') copyId: string,
+    @Body() dto: ArchiveLibraryBookDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.libraryService.archiveCopy(copyId, dto.reason, auth);
+  }
+
   @Get('issues')
   @Permissions('library:issues:read')
   listIssues(

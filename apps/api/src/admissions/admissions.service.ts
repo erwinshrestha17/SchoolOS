@@ -17,9 +17,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { StudentRecordsService } from '../student-records/student-records.service';
-import { ArchiveStudentDto } from '../students/dto/archive-student.dto';
-import { DeleteStudentDto } from '../students/dto/delete-student.dto';
-import { RequestStudentTransferDto } from '../students/dto/request-student-transfer.dto';
 import { StudentsService } from '../students/students.service';
 import { UsersService } from '../users/users.service';
 import {
@@ -147,8 +144,8 @@ export class AdmissionsService {
 
       const managedUser = await this.usersService.createManagedUser({
         tenantId: actor.tenantId,
-        email: dto.email!,
-        password: dto.password!,
+        email: dto.email as string,
+        password: dto.password as string,
         phone: dto.phone,
         roleIds: [studentRole.id],
         assignedById: actor.userId,

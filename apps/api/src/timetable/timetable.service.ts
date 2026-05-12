@@ -10,11 +10,11 @@ import {
   TeacherAvailabilityType,
   TimetableSubstitutionStatus,
   TimetableVersionStatus,
+  TeacherWorkloadLimit,
   Prisma,
 } from '@prisma/client';
 import {
   ConflictSlotInput,
-  TimetableConflictService,
 } from './timetable-conflict.service';
 import { TimetableLifecycleService } from './timetable-lifecycle.service';
 import { AuditService } from '../audit/audit.service';
@@ -731,7 +731,7 @@ export class TimetableService {
       },
     });
 
-    let rule;
+    let rule: TeacherWorkloadLimit;
     if (existing) {
       rule = await this.prisma.teacherWorkloadLimit.update({
         where: { id: existing.id },
@@ -1415,7 +1415,7 @@ export class TimetableService {
         teacherId,
         date,
       );
-    } catch (error) {
+    } catch (_error) {
       // Fallback if attendance service fails or has issues
       return { isAbsent: false, attendanceStatus: null, leaveType: null };
     }
@@ -1706,11 +1706,11 @@ function parseDate(value: string, fieldName: string) {
   return parsed;
 }
 
-function sectionsConflict(a: string | null, b: string | null) {
+function _sectionsConflict(a: string | null, b: string | null) {
   return a === b || a === null || b === null;
 }
 
-function versionsOverlap(
+function _versionsOverlap(
   a: { effectiveFrom: Date; effectiveTo: Date | null } | null,
   b: { effectiveFrom: Date; effectiveTo: Date | null } | null,
 ) {

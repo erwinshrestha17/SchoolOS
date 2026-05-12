@@ -107,7 +107,7 @@ export class TimetableLifecycleService {
       new Set(version.slots.map((s) => s.subjectId)),
     );
 
-    const [availability, workloadLimits, requirements] = await Promise.all([
+    const [availability, workloadLimits, requirements, allPeriods] = await Promise.all([
       this.prisma.teacherAvailability.findMany({
         where: {
           tenantId: actor.tenantId,
@@ -132,10 +132,18 @@ export class TimetableLifecycleService {
         where: {
           tenantId: actor.tenantId,
           academicYearId: version.academicYearId,
-          classId: (version.classId as string) || undefined,
-          sectionId: version.sectionId || undefined,
+          classId: version.classId! ?? undefined,
+          sectionId: version.sectionId ?? undefined,
           subjectId: { in: subjectIds },
         },
+      }),
+      this.prisma.timetablePeriod.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          academicYearId: version.academicYearId,
+          isActive: true,
+        },
+        select: { id: true, startsAt: true, endsAt: true, dayOfWeek: true },
       }),
     ]);
 
@@ -149,6 +157,7 @@ export class TimetableLifecycleService {
         sectionId: slot.sectionId,
         subjectId: slot.subjectId,
         staffId: slot.staffId,
+        periodId: (slot as any).periodId,
         roomId: slot.roomId,
         dayOfWeek: slot.dayOfWeek,
         startsAt: slot.startsAt,
@@ -157,6 +166,7 @@ export class TimetableLifecycleService {
       requirements,
       workloadLimits,
       availability,
+      allPeriods,
     );
   }
 

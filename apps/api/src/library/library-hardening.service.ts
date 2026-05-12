@@ -19,52 +19,7 @@ export class LibraryHardeningService {
     dto: ArchiveLibraryBookDto,
     actor: AuthContext,
   ) {
-    const book = await this.prisma.libraryBook.findFirst({
-      where: { id: bookId, tenantId: actor.tenantId },
-      include: { copies: true },
-    });
-
-    if (!book) {
-      throw new NotFoundException('Library book not found in this tenant');
-    }
-
-    const activeCopyCount = book.copies.filter(
-      (copy) => copy.status === LibraryCopyStatus.ISSUED,
-    ).length;
-
-    if (activeCopyCount > 0) {
-      throw new NotFoundException(
-        'Book cannot be archived while issued copies exist',
-      );
-    }
-
-    const [updated] = await this.prisma.$queryRaw<
-      Array<{
-        id: string;
-        archivedAt: Date | null;
-        archiveReason: string | null;
-      }>
-    >(
-      Prisma.sql`
-        UPDATE "LibraryBook"
-        SET "archivedAt" = now(), "archiveReason" = ${dto.reason}
-        WHERE "id" = ${book.id}
-          AND "tenantId" = ${actor.tenantId}
-        RETURNING "id", "archivedAt", "archiveReason"
-      `,
-    );
-
-    await this.auditService.record({
-      action: 'archive',
-      resource: 'library_book',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: book.id,
-      before: { title: book.title },
-      after: { archivedAt: updated.archivedAt, reason: dto.reason },
-    });
-
-    return updated;
+    return this.libraryService.archiveBook(bookId, dto.reason, actor);
   }
 
   async getIssuedBooksReport(

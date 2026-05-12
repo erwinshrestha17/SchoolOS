@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import {
   calculatePayrollLine,
   calculatePayrollTotals,
@@ -17,32 +18,40 @@ describe('payroll calculations', () => {
         tdsEnabled: true,
       }),
     ).toEqual({
-      earnings: 22500,
-      grossSalary: 22500,
-      allowances: 5000,
-      leaveDeductions: 22500,
-      pfEmployee: 0,
-      pfEmployer: 0,
-      tds: 225,
-      otherDeductions: 1000,
-      deductions: 1225,
-      netSalary: 21275,
+      earnings: new Prisma.Decimal(22500),
+      grossSalary: new Prisma.Decimal(22500),
+      allowances: new Prisma.Decimal(5000),
+      leaveDeductions: new Prisma.Decimal(22500),
+      pfEmployee: new Prisma.Decimal(0),
+      pfEmployer: new Prisma.Decimal(0),
+      tds: new Prisma.Decimal(225),
+      otherDeductions: new Prisma.Decimal(1000),
+      deductions: new Prisma.Decimal(1225),
+      netSalary: new Prisma.Decimal(21275),
     });
   });
 
   it('keeps payroll totals balanced for ledger posting', () => {
     expect(
       calculatePayrollTotals([
-        { grossSalary: 45000, deductions: 1450, netSalary: 43550 },
-        { grossSalary: 30000, deductions: 300, netSalary: 29700 },
+        { 
+          grossSalary: new Prisma.Decimal(45000), 
+          deductions: new Prisma.Decimal(1450), 
+          netSalary: new Prisma.Decimal(43550) 
+        },
+        { 
+          grossSalary: new Prisma.Decimal(30000), 
+          deductions: new Prisma.Decimal(300), 
+          netSalary: new Prisma.Decimal(29700) 
+        },
       ]),
     ).toEqual({
-      grossAmount: 75000,
-      deductionAmount: 1750,
-      netAmount: 73250,
-      pfEmployeeAmount: 0,
-      pfEmployerAmount: 0,
-      tdsAmount: 0,
+      grossAmount: new Prisma.Decimal(75000),
+      deductionAmount: new Prisma.Decimal(1750),
+      netAmount: new Prisma.Decimal(73250),
+      pfEmployeeAmount: new Prisma.Decimal(0),
+      pfEmployerAmount: new Prisma.Decimal(0),
+      tdsAmount: new Prisma.Decimal(0),
     });
   });
 

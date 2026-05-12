@@ -42,8 +42,8 @@ test.describe.serial('SchoolOS Academic Workflow Smoke Tests', () => {
       'Report Cards',
     ];
 
-    for (const module of academicModules) {
-      await expect(page.getByRole('heading', { name: new RegExp(module, 'i') })).toBeVisible();
+    for (const academicModule of academicModules) {
+      await expect(page.getByRole('heading', { name: new RegExp(academicModule, 'i') })).toBeVisible();
     }
   });
 

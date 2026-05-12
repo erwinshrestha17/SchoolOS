@@ -119,7 +119,8 @@ export class CanteenService {
       ...(options.status
         ? { status: this.parseMenuItemStatus(options.status) }
         : {}),
-    };
+      archivedAt: null,
+    } as any;
     const [items, total] = await this.prisma.$transaction([
       this.prisma.canteenMenuItem.findMany({
         where,
@@ -182,6 +183,23 @@ export class CanteenService {
     await this.audit(actor, 'mark_status', 'canteen_menu_item', id, existing, {
       status,
       reason: dto.reason ?? null,
+    });
+    return updated;
+  }
+
+  async archiveMenuItem(id: string, reason: string, actor: AuthContext) {
+    const existing = await this.requireMenuItem(actor.tenantId, id);
+    const updated = await this.prisma.canteenMenuItem.update({
+      where: { id },
+      data: {
+        status: 'ARCHIVED' as any,
+        archivedAt: new Date(),
+        archiveReason: reason,
+      } as any,
+    });
+    await this.audit(actor, 'archive', 'canteen_menu_item', id, existing, {
+      status: 'ARCHIVED' as any,
+      reason,
     });
     return updated;
   }

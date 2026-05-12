@@ -91,6 +91,16 @@ export class CanteenController {
     return this.canteenService.updateMenuItemStatus(id, dto, auth);
   }
 
+  @Post('menu-items/:id/archive')
+  @Permissions('canteen:menu:update')
+  archiveMenuItem(
+    @Param('id') id: string,
+    @Body() dto: CanteenReasonDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.canteenService.archiveMenuItem(id, dto.reason, auth);
+  }
+
   @Post('meal-plans')
   @Permissions('canteen:plans:create')
   createMealPlan(

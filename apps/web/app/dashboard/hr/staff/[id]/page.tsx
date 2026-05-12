@@ -1,6 +1,6 @@
 'use client';
 
-import { StaffDetailWorkspace } from '../../../../components/hr/staff-detail-workspace';
+import { StaffDetailWorkspace } from '@/components/hr/staff-detail-workspace';
 import { useParams } from 'next/navigation';
 
 export default function StaffDetailPage() {

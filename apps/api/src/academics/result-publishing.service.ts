@@ -66,8 +66,8 @@ export class ResultPublishingService {
     actor: AuthContext,
     filters: PublishingFilters,
   ): Promise<PublishingReadinessRow[]> {
-    const page = Math.max(1, Number(filters.page ?? 1));
-    const limit = Math.min(100, Math.max(1, Number(filters.limit ?? 50)));
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(100, Math.max(1, filters.limit ?? 50));
     const skip = (page - 1) * limit;
 
     const reportCards = await this.prisma.reportCard.findMany({

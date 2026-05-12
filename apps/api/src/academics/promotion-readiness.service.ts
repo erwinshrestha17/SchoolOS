@@ -57,7 +57,7 @@ interface StudentWithScope {
 interface ReportCardLike {
   id: string;
   studentId: string;
-  status: GradeLockStatus | string;
+  status: GradeLockStatus;
   percentage: Prisma.Decimal | number;
   grade: string;
   gpa: Prisma.Decimal | number;
@@ -98,8 +98,8 @@ export class PromotionReadinessService {
       await this.ensureSection(actor, filters.sectionId, filters.classId);
     }
 
-    const page = Math.max(1, Number(filters.page ?? 1));
-    const limit = Math.min(100, Math.max(1, Number(filters.limit ?? 50)));
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(100, Math.max(1, filters.limit ?? 50));
     const skip = (page - 1) * limit;
 
     const prisma = this.prisma as unknown as {

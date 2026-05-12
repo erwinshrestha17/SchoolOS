@@ -104,6 +104,7 @@ export default tseslint.config(
 
         // ── NestJS-specific ───────────────────────────────────────────────────────
         // NestJS DI constructors are intentionally empty — don't require explicit return types
+        '@typescript-eslint/no-extraneous-class':     ['error', { allowWithDecorator: true }],
         '@typescript-eslint/explicit-function-return-type': 'off',
         '@typescript-eslint/explicit-module-boundary-types': 'off',
       },

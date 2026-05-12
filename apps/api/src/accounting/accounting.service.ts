@@ -7,7 +7,6 @@ import { ReportsQueryDto } from './dto/reports-query.dto';
 
 import {
   AccountingPeriodStatus,
-  AccountingReportMappingType,
   ChartAccountType,
   JournalEntryStatus,
   JournalLineSide,
@@ -18,7 +17,6 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAccountingPeriodDto } from './dto/create-accounting-period.dto';
-import { AccountingActionDto } from './dto/accounting-action.dto';
 import { CreateChartAccountDto } from './dto/create-chart-account.dto';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { CreateFiscalYearDto } from './dto/create-fiscal-year.dto';
@@ -310,7 +308,7 @@ export class AccountingService {
       );
     }
 
-    const period = await this.postingService.ensurePostingPeriodIsOpen(
+    await this.postingService.ensurePostingPeriodIsOpen(
       this.prisma,
       actor.tenantId,
       new Date(dto.entryDate),
@@ -1816,7 +1814,7 @@ export class AccountingService {
     return { importBatchId, count: statements.length, statements };
   }
 
-  async getUnreconciledStatements(accountId: string, actor: AuthContext) {
+  getUnreconciledStatements(accountId: string, actor: AuthContext) {
     return this.bankStatements.findMany({
       where: {
         tenantId: actor.tenantId,

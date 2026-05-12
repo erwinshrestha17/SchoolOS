@@ -79,7 +79,8 @@ export class LibraryService {
             ],
           }
         : {}),
-    };
+      archivedAt: null,
+    } as any;
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.libraryBook.findMany({
@@ -187,6 +188,55 @@ export class LibraryService {
     return updated;
   }
 
+  async archiveBook(bookId: string, reason: string, actor: AuthContext) {
+    const book = await this.prisma.libraryBook.findFirst({
+      where: { id: bookId, tenantId: actor.tenantId },
+      include: { copies: true },
+    });
+
+    if (!book) {
+      throw new NotFoundException('Book not found in this tenant');
+    }
+
+    const issuedCopies = book.copies.filter(
+      (c) => c.status === LibraryCopyStatus.ISSUED,
+    );
+    if (issuedCopies.length > 0) {
+      throw new ConflictException('Cannot archive book with issued copies');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Archive all copies too
+      await tx.libraryCopy.updateMany({
+        where: { bookId: book.id, tenantId: actor.tenantId },
+        data: {
+          status: 'ARCHIVED' as any,
+          archivedAt: new Date(),
+          archiveReason: reason,
+        } as any,
+      });
+
+      return tx.libraryBook.update({
+        where: { id: book.id },
+        data: {
+          archivedAt: new Date(),
+          archiveReason: reason,
+        } as any,
+      });
+    });
+
+    await this.auditService.record({
+      action: 'archive',
+      resource: 'library_book',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      after: { title: updated.title, reason },
+    });
+
+    return updated;
+  }
+
   async listCopies(actor: AuthContext, options: ListCopiesQuery = {}) {
     const { skip, take, page } = this.pagination(options);
     const where: Prisma.LibraryCopyWhereInput = {
@@ -198,7 +248,8 @@ export class LibraryService {
       ...(options.barcode
         ? { barcode: { contains: options.barcode, mode: 'insensitive' } }
         : {}),
-    };
+      archivedAt: null,
+    } as any;
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.libraryCopy.findMany({
@@ -320,6 +371,40 @@ export class LibraryService {
     return updated;
   }
 
+  async archiveCopy(copyId: string, reason: string, actor: AuthContext) {
+    const copy = await this.prisma.libraryCopy.findFirst({
+      where: { id: copyId, tenantId: actor.tenantId },
+    });
+
+    if (!copy) {
+      throw new NotFoundException('Library copy not found in this tenant');
+    }
+
+    if (copy.status === LibraryCopyStatus.ISSUED) {
+      throw new ConflictException('Cannot archive an issued copy');
+    }
+
+    const updated = await this.prisma.libraryCopy.update({
+      where: { id: copy.id },
+      data: {
+        status: 'ARCHIVED' as any,
+        archivedAt: new Date(),
+        archiveReason: reason,
+      } as any,
+    });
+
+    await this.auditService.record({
+      action: 'archive',
+      resource: 'library_copy',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      after: { barcode: updated.barcode, reason },
+    });
+
+    return updated;
+  }
+
   async markCopyStatus(
     copyId: string,
     dto: MarkLibraryCopyStatusDto,
@@ -420,6 +505,10 @@ export class LibraryService {
 
     if (!copy) {
       throw new NotFoundException('Library copy not found in this tenant');
+    }
+
+    if ((copy as any).archivedAt) {
+      throw new ConflictException('Cannot issue an archived library copy');
     }
 
     if (copy.status !== LibraryCopyStatus.AVAILABLE) {
@@ -634,6 +723,32 @@ export class LibraryService {
     });
 
     return { overdue: overdue.length, deliveryCount: delivery.count };
+  }
+
+  async getBorrowerInfo(actor: AuthContext, studentId: string) {
+    const [activeIssues, overdueBooks] = await Promise.all([
+      this.prisma.libraryIssue.count({
+        where: {
+          tenantId: actor.tenantId,
+          borrowerStudentId: studentId,
+          status: LibraryIssueStatus.ISSUED,
+        },
+      }),
+      this.prisma.libraryIssue.count({
+        where: {
+          tenantId: actor.tenantId,
+          borrowerStudentId: studentId,
+          status: LibraryIssueStatus.ISSUED,
+          dueAt: { lt: new Date() },
+        },
+      }),
+    ]);
+
+    return {
+      activeIssues,
+      overdueBooks,
+      canBorrow: activeIssues < this.configService.libraryMaxBooksPerStudent,
+    };
   }
 
   private async ensureBorrower(

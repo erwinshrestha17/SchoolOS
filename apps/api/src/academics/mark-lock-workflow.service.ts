@@ -38,8 +38,8 @@ export class MarkLockWorkflowService {
       await this.ensureExamTerm(actor, filters.examTermId);
     }
 
-    const page = Math.max(1, Number(filters.page ?? 1));
-    const limit = Math.min(100, Math.max(1, Number(filters.limit ?? 50)));
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(100, Math.max(1, filters.limit ?? 50));
     const skip = (page - 1) * limit;
 
     const where = {

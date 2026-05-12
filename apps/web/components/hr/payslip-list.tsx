@@ -89,7 +89,7 @@ export function PayslipList() {
                       {payslip.periodMonth}/{payslip.periodYear}
                     </td>
                     <td className="px-6 py-4 text-right font-black text-slate-900">
-                      {moneyFormatter.format(payslip.netAmount)}
+                      {moneyFormatter.format(payslip.netAmount ?? 0)}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button

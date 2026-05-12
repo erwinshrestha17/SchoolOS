@@ -151,6 +151,7 @@ enum StaffStatus {
   ON_LEAVE
   SUSPENDED
   TERMINATED
+  RESIGNED
   INACTIVE
 }
 
@@ -512,6 +513,7 @@ enum LibraryCopyStatus {
   LOST
   DAMAGED
   RESERVED
+  ARCHIVED
 }
 
 enum LibraryIssueStatus {
@@ -560,6 +562,7 @@ enum TransportStudentTripStatus {
 enum CanteenMenuItemStatus {
   ACTIVE
   INACTIVE
+  ARCHIVED
 }
 
 enum CanteenMealPlanStatus {
@@ -613,6 +616,11 @@ enum FileStatus {
   UPLOADED
   FAILED
   DELETED
+}
+
+enum StudentQrStatus {
+  ACTIVE
+  REVOKED
 }
 
 model Tenant {
@@ -746,6 +754,7 @@ model Tenant {
   attendanceCorrectionRequests   AttendanceCorrectionRequest[]
   accountingReportMappings      AccountingReportAccountMapping[]
   bankStatements                BankStatement[]
+  studentQrCredentials          StudentQrCredential[]
 }
 
 model User {
@@ -1166,6 +1175,7 @@ model Student {
   canteenPosSales           CanteenPosSale[]
   canteenSpendingControls   CanteenSpendingControl[]
   attendanceCorrectionRequests AttendanceCorrectionRequest[]
+  qrCredentials             StudentQrCredential[]
 
   @@unique([tenantId, studentSystemId])
   @@index([tenantId, classId, sectionId])
@@ -2091,6 +2101,26 @@ model StudentIdentity {
 
   @@index([tenantId, studentId])
   @@index([tenantId, identityCode])
+}
+
+model StudentQrCredential {
+  id            String          @id @default(cuid())
+  tenantId      String
+  studentId     String
+  tokenHash     String
+  status        StudentQrStatus @default(ACTIVE)
+  createdAt     DateTime        @default(now())
+  rotatedAt     DateTime?
+  revokedAt     DateTime?
+  lastScannedAt DateTime?
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student       Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, studentId])
+  @@unique([tokenHash])
+  @@index([tenantId, studentId])
+  @@index([tenantId, status])
 }
 
 model StudentDocumentHistory {
@@ -3433,6 +3463,8 @@ model LibraryBook {
   subjectCategory String?
   classLevel      String?
   purchasePrice   Decimal? @db.Decimal(12, 2)
+  archivedAt      DateTime?
+  archiveReason   String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -3455,6 +3487,8 @@ model LibraryCopy {
   shelfLocation   String?
   replacementCost Decimal?          @db.Decimal(12, 2)
   purchasedAt     DateTime?
+  archivedAt      DateTime?
+  archiveReason   String?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -3763,6 +3797,8 @@ model CanteenMenuItem {
   status       CanteenMenuItemStatus @default(ACTIVE)
   isMealItem   Boolean               @default(false)
   allergenTags String[]              @default([])
+  archivedAt   DateTime?
+  archiveReason String?
   createdAt    DateTime              @default(now())
   updatedAt    DateTime              @updatedAt
 

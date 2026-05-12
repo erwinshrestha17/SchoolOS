@@ -14,6 +14,8 @@ import { StudentSearchController } from './student-search.controller';
 import { StudentSearchService } from './student-search.service';
 import { StudentsService } from './students.service';
 import { StudentsController } from './students.controller';
+import { StudentQrService } from './student-qr.service';
+import { StudentQrController } from './student-qr.controller';
 
 @Module({
   imports: [
@@ -30,18 +32,21 @@ import { StudentsController } from './students.controller';
     StudentPhotoService,
     StudentDocumentAccessService,
     StudentDocumentRetentionCron,
+    StudentQrService,
   ],
   controllers: [
     StudentSearchController,
     StudentsController,
     StudentPhotoController,
     StudentDocumentAccessController,
+    StudentQrController,
   ],
   exports: [
     StudentsService,
     StudentSearchService,
     StudentPhotoService,
     StudentDocumentAccessService,
+    StudentQrService,
   ],
 })
 export class StudentsModule {}

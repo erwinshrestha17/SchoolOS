@@ -1931,6 +1931,17 @@ export type PayslipSummary = {
   deductionAmount: number;
   netSalary: number;
   issuedAt: string | null;
+  // Added to align with UI expectations and API responses
+  staff?: StaffSummary & { fullName?: string };
+  payrollRun?: {
+    id: string;
+    periodMonth: number;
+    periodYear: number;
+    status: string;
+  };
+  periodMonth?: number;
+  periodYear?: number;
+  netAmount?: number;
 };
 
 export type AccountingPeriodSummary = {

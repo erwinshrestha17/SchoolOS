@@ -236,6 +236,10 @@ export function createPrismaMock() {
     feeWaivers: [] as Record<string, unknown>[],
     generatedStudentDocuments: [] as Record<string, unknown>[],
     studentLifecycleTransitions: [] as Record<string, unknown>[],
+    timetablePeriods: [] as Record<string, unknown>[],
+    teacherAvailability: [] as Record<string, unknown>[],
+    teacherWorkloadLimits: [] as Record<string, unknown>[],
+    subjectWeeklyRequirements: [] as Record<string, unknown>[],
   };
 
   const nextId = (prefix: string) =>
@@ -1794,7 +1798,31 @@ export function createPrismaMock() {
       findMany: jest.fn(() => Promise.resolve([])),
     },
     timetablePeriod: {
-      findFirst: jest.fn((q: PrismaQuery) => Promise.resolve(null)),
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.timetablePeriods.find(
+            (item) =>
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
+              (!q.where?.id || item.id === q.where.id),
+          ),
+        ),
+      ),
+      findUnique: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.timetablePeriods.find(
+            (item) =>
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
+              (!q.where?.id || item.id === q.where.id),
+          ),
+        ),
+      ),
+      findMany: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.timetablePeriods.filter(
+            (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
+          ),
+        ),
+      ),
     },
     timetableSubstitution: {
       findFirst: jest.fn((q: PrismaQuery) => Promise.resolve(null)),

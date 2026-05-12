@@ -156,6 +156,10 @@ export class ConfigService {
     return Number(process.env.LIBRARY_FINE_PER_DAY ?? 10);
   }
 
+  get libraryMaxBooksPerStudent() {
+    return Number(process.env.LIBRARY_MAX_BOOKS_PER_STUDENT ?? 5);
+  }
+
   get medicalEncryptionKey() {
     if (process.env.MEDICAL_ENCRYPTION_KEY) {
       return process.env.MEDICAL_ENCRYPTION_KEY;
