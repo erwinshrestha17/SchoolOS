@@ -32,30 +32,97 @@ If the setting changes SaaS ownership, billing, infrastructure, provider credent
 ## 2. Current M0 Platform Core Status
 
 ```text
-M0 Platform Core Foundation Depth: Completed
-Current work: stabilize existing platform/domain foundations, then deepen one vertical at a time.
+M0 Platform Core Foundation: Completed across eight sprints
+Current work: M0 pilot hardening, regression coverage, smoke verification, and one-vertical-at-a-time Phase 2 depth.
 ```
 
-Implemented/foundation areas:
+M0 is now implemented as a real platform foundation inside the existing NestJS modular monolith. It is not a separate microservice and should not be split unless future scale, team ownership, deployment isolation, or compliance requirements clearly justify that cost.
+
+Completed sprint areas:
 
 ```text
-Platform Control Plane foundation
-Tenant/settings boundary documentation
-Generic File Registry foundation
-Global API response/reporting direction
-Usage/plan-service foundations
-Platform audit direction
+1. Platform Tenant Management
+2. Entitlements + Usage
+3. SaaS Billing
+4. Providers + Queues
+5. File Registry
+6. Reports / Exports
+7. Observability / Ops
+8. Pilot Onboarding
 ```
 
-Remaining platform work:
+Implemented M0 foundation areas:
 
 ```text
-SaaS subscription and billing automation
-API key management
-Webhook system
-Plan/feature entitlement enforcement depth
-Platform health/queue/audit UI depth
-Support access workflow polish
+Platform tenant list/detail/dashboard/status flows
+Reason-required tenant suspend/activate actions
+Audited support override reason
+Plan, feature, subscription, override, and usage-counter foundations
+Explainable entitlement checks and usage-limit surfaces
+Manual tenant billing profile
+SaaS invoices, line items, and payments
+Provider config masking and secret-safe response shape
+Queue health and audited retry endpoint
+File upload validation and dangerous extension blocking
+Private/protected file URL response shape
+Report export history and audited export persistence
+Platform health summary for DB, Redis, queues, and object storage readiness
+Computed tenant onboarding checklist
+School settings onboarding page
+Platform tenant onboarding visibility
+```
+
+M0 models now documented as implemented:
+
+```text
+PlatformPlan
+PlatformPlanFeature
+TenantSubscription
+TenantFeatureOverride
+UsageLimit
+UsageCounter
+TenantBillingProfile
+SaaSInvoice
+SaaSInvoiceLine
+SaaSPayment
+ProviderConfig
+ReportExport
+TenantOnboardingChecklistOverride
+```
+
+Verification snapshot for the M0 completion pass:
+
+```text
+Passed:
+- pnpm db:generate
+- pnpm db:validate
+- pnpm verify:openapi
+- pnpm lint
+- pnpm typecheck
+- pnpm test
+- pnpm test:e2e
+- pnpm build
+- pnpm verify:production
+
+Notes:
+- verify:production passed after rerun with approval because the sandbox blocked Playwright local port binding.
+- pnpm smoke:phase1 did not pass because local Postgres, Redis, and API were not running.
+- Focused platform/auth/report/settings tests passed.
+```
+
+Remaining M0 hardening work:
+
+```text
+Deeper BullMQ failed-job inspection per deployed queue topology
+Async report/export generation expansion module by module
+Provider test connection limitations remain intentionally conservative/no paid external calls
+Demo Nepal tenant seed expansion
+Credentialed web E2E coverage where seeded credentials are available
+Platform/school route denial browser tests
+SaaS billing lifecycle tests: invoice -> payment -> overdue/cancel/suspend
+Entitlement enforcement tests against real school APIs
+Object storage readiness verification against staging provider
+Docker-backed smoke once Postgres, Redis, and API are running
 ```
 
 ---
@@ -94,6 +161,8 @@ Examples:
 Student receipt, fee invoice, cashier close, school ledger -> M3/M9 school finance.
 School subscription, plan, SMS quota, AI credits, module entitlement -> M0 platform/SaaS billing.
 ```
+
+M0 SaaS billing records must not post directly into school tenant fee ledgers. Any future internal SchoolOS company accounting must be modeled separately from a tenant school's M3/M9 accounting domain.
 
 ---
 
@@ -538,17 +607,19 @@ Recommended platform routes:
 
 ## 8. Platform Core Priority Order
 
-Near-term priority after repo stabilization:
+Near-term priority after the M0 completion pass:
 
 ```text
-1. Platform audit/usage visibility polish.
-2. Plan/feature entitlement enforcement depth.
-3. Tenant settings depth where it unblocks production workflows.
-4. File Registry adoption for generated reports/files.
-5. Usage limits and plan rules.
-6. API Key Management only when integrations require it.
-7. Webhook System only when external integrations require it.
-8. SaaS Subscription and Billing before broad paid rollout.
+1. Run Docker-backed smoke with Postgres, Redis, and API running.
+2. Add platform/school route denial browser tests.
+3. Add SaaS billing lifecycle tests.
+4. Add entitlement enforcement tests against real school APIs.
+5. Deepen BullMQ failed-job inspection for deployed queue topology.
+6. Expand async report/export generation module by module.
+7. Expand demo Nepal pilot tenant seed data.
+8. Polish platform audit/usage visibility.
+9. Add API Key Management only when integrations require it.
+10. Add Webhook System only when external integrations require it.
 ```
 
 Do not let platform work delay the immediate repo stabilization and Phase 2A admin UI/browser smoke work.
@@ -585,10 +656,12 @@ Do not build all settings at once. Add settings only when they unblock productio
 
 - Keep M0 Platform Core inside the NestJS modular monolith.
 - Every school setting must be tenant-scoped by `tenantId`.
-- Every platform action affecting tenants, plans, billing, support access, providers, or limits must be audited.
+- Every platform action affecting tenants, plans, billing, support access, providers, queues, reports, onboarding, or limits must be audited.
 - School users must not access platform settings.
 - Platform users must not enter tenant data silently; support override requires explicit reason and audit.
 - Do not mix school fee collection with SchoolOS SaaS billing.
+- Provider secrets must never be returned raw.
+- Queue retry actions must be permission-guarded and audited.
 - UI visibility is not security; backend guards, entitlements, permissions, and tenant filters enforce access.
 - Frontend gating is display only; backend entitlement and permission checks must enforce access.
 - Keep all settings inside the modular monolith for now.
