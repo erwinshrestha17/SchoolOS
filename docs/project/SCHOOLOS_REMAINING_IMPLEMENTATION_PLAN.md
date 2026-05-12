@@ -1,7 +1,7 @@
 # SchoolOS Remaining Implementation Plan
 
 **Status source:** `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md`  
-**Current stage:** Backend Sprints 1-4 hardening complete + Phase 2A backend complete + Phase 2/3 foundations  
+**Current stage:** Phase 2A backend complete + Phase 2 implemented foundations + Phase 3 operations admin foundations  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard  
 **Last updated:** 2026-05-12
 
@@ -16,7 +16,7 @@ Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation Depth: Completed
 Phase 2A M4 Academics backend: Completed / contract-protected
 M9 Accounting Ledger Hardening: Production Candidate Complete
-Phase 2: Foundations implemented; Backend Sprints 1-4 hardening complete; frontend/admin UI and vertical hardening in progress
+Phase 2: Foundations implemented; frontend/admin UI and vertical hardening in progress
 Phase 3: Operations admin foundations implemented; parent/mobile/driver/live UX deferred
 Phase 4: Not started
 ```
@@ -46,7 +46,7 @@ Near-term rule:
 ```text
 Do not start broad new modules.
 Harden existing Phase 2 and Phase 3 foundations one vertical at a time.
-Highest priority: Docker-backed smoke, seeded authenticated browser smoke tests, Phase 2A admin UI wired to completed backend APIs, then vertical hardening.
+Highest priority: full verification, Phase 2A admin UI wired to completed backend APIs, browser smoke tests, then vertical hardening.
 ```
 
 Explicitly deferred unless requested:
@@ -69,20 +69,20 @@ Biometric workflows
 | Module | Current Status | Estimated Completion |
 |---|---|---:|
 | Auth / Security / Tenant Isolation | Strong foundation | 90–95% |
-| M0 Platform Core | Completed Foundation Depth + backend hardening | 80–90% |
-| M1 Admissions & Student Profiles | Pilot-ready + Student QR credential foundation | 90–95% |
+| M0 Platform Core | Completed Foundation Depth | 65–75% |
+| M1 Admissions & Student Profiles | Pilot-ready | 90–95% |
 | M2 Smart Attendance | Pilot-ready | 85–90% |
 | M3 Fees & Receipts | Pilot-ready | 85–90% |
 | M4 Academics / Exams / CAS / Report Cards | Backend complete / contract-protected; admin UI next | 80–90% |
 | M5 Activity Feed & Milestones | Strong Phase 1 foundation | 75–85% |
-| M6 Homework & Timetable | Phase 2 foundation implemented + backend hardening/tests passing | 70–80% |
+| M6 Homework & Timetable | Phase 2 foundation implemented | 60–70% |
 | M7 HR & Payroll | Phase 2 foundation implemented | 65–75% |
 | M8A Library Management | Phase 3 admin foundation implemented | 45–55% |
 | M8B Transport Management | Phase 3 admin foundation implemented | 45–55% |
 | M8C Canteen Management | Phase 3 admin foundation implemented | 45–55% |
 | M9 Accounting & Finance | Production Candidate Complete | 95–100% |
 | M10 Notices & Communication | Strong Phase 1 + chat foundation | 85–90% |
-| Student Identity QR Foundation | Backend credential/resolve foundation implemented; ID-card PDF integration remains | 65–75% |
+| Student Identity QR Foundation | Approved cross-module foundation; not fully implemented | 20–30% |
 | Parent / Mobile Portal | Mostly deferred | 5–10% |
 | Driver App | Deferred | 0–5% |
 | AI / ML | Not started | 0% |
@@ -94,11 +94,11 @@ Biometric workflows
 Do first:
 
 ```text
-1. Run Docker-backed `pnpm smoke:phase1` with Postgres, Redis, and API running.
-2. Add seeded authenticated Playwright credentials for school and platform route audits.
-3. Build Phase 2A Academics admin UI against completed backend APIs.
-4. Add authenticated Playwright Phase 2A and Accounting workflow smoke tests.
-5. Expand M6/M7/M8 vertical hardening one module at a time.
+1. Run full verification gate.
+2. Fix any Prisma/schema/typecheck/test blockers.
+3. Stabilize Homework/Timetable service/schema/test alignment.
+4. Build Phase 2A Academics admin UI against completed backend APIs.
+5. Add authenticated Playwright Phase 2A and Accounting workflow smoke tests.
 6. Review production migrations and default Chart of Accounts/report mapping seeds.
 7. Harden one existing vertical at a time: HR/Payroll, Library, Transport, Canteen.
 8. Add request/correlation ID logging if not fully wired.
@@ -152,7 +152,7 @@ Remaining:
 - Better student document audit trail polish.
 - More cross-tenant tests.
 - More Playwright coverage for student flows.
-- Student QR ID-card PDF layout integration and module-specific Library/Canteen/Transport consumption.
+- Student QR credential foundation and ID-card QR integration.
 
 ### M2 — Smart Attendance
 
@@ -242,25 +242,22 @@ Remaining:
 
 ### 6.2 Student Identity QR Foundation
 
-Current estimate: 65–75% implemented.
+Current estimate: 20–30% implemented / approved foundation.
 
 Ownership: **M1 Admissions & Student Profiles**.
 
 Purpose: create one secure, reusable student identity foundation before deeper Phase 3 Library/Canteen/Transport QR workflows depend on it.
 
-Completed:
-
-- `StudentQrCredential` model and indexes.
-- Token-hash-only QR storage.
-- Generate, rotate, revoke, authenticated resolve, and QR SVG generation APIs.
-- Purpose-based limited responses for Library, Canteen, Transport, Attendance, and general lookup.
-- Audit logs and tests for tenant, role, rotation/revocation, and limited response behavior.
-
 Remaining:
 
-- Add QR code to student ID card PDF layout.
-- Add student detail QR management UX.
-- Wire Library/Canteen/Transport/Attendance consumers deeper after pilot workflows are validated.
+- Confirm immutable Student ID code generation during registration/admission.
+- Add `StudentQrCredential` model.
+- Add unique/index constraints for `tenantId + studentId`, `tokenHash`, `tenantId + status`.
+- Generate QR credential for admitted/active students.
+- Add QR image generation service.
+- Add QR code to student ID card PDF.
+- Add student detail QR management actions: generate, rotate, revoke.
+- Add authenticated QR scan/resolve API.
 - Add purpose-based scan responses:
   - `LIBRARY`
   - `CANTEEN`

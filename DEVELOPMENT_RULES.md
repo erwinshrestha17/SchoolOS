@@ -23,7 +23,7 @@ Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation Depth: Completed
 Phase 2A M4 Academics backend: Completed / Contract-Protected
 Phase 2D M9 Accounting: Production Candidate Complete
-Current stage: Backend Sprints 1-4 hardening complete on top of Phase 2A backend + M0 platform foundation + M9 production-candidate completion
+Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
 ```
 
 The repo is broad and advanced. Work must focus on stabilization, correctness, scale, permissions, tests, and UX/API polish for existing modules rather than broad new product expansion.
@@ -31,11 +31,11 @@ The repo is broad and advanced. Work must focus on stabilization, correctness, s
 Preferred next work:
 
 ```text
-Docker/staging pilot readiness sprint
-→ run Docker-backed smoke with Postgres, Redis, and API running
-→ add seeded authenticated Playwright credentials
+Repo Verification & Stabilization Sprint
+→ full verification gate
+→ Homework/Timetable schema/service/test alignment
 → Phase 2A Academics admin UI against completed backend APIs
-→ deeper M6/M7/M8 vertical hardening one module at a time
+→ authenticated Playwright browser smoke tests
 → controlled pilot staging readiness
 ```
 
@@ -76,7 +76,7 @@ Microservices
 - Use `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md` as the long-term source of truth.
 - Use `docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md` for current repo risk/completion estimates.
 - Keep legacy roadmap files as pointers/summaries unless explicitly asked to expand them.
-- Homework/Timetable compile/schema/test stability is currently passing; keep it protected while adding depth incrementally.
+- After recent verification follow-ups, treat Homework/Timetable compile/schema/test stability as a high-priority gate before new module expansion.
 
 ---
 

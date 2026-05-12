@@ -3,7 +3,6 @@ import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { CommunicationsModule } from '../communications/communications.module';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
-import { FeatureEntitlementGuard } from '../platform/feature-entitlement.guard';
 import { HomeworkAttachmentAccessService } from './homework-attachment-access.service';
 import { HomeworkController } from './homework.controller';
 import { HomeworkService } from './homework.service';
@@ -28,7 +27,6 @@ import { HomeworkCron } from './homework.cron';
     HomeworkAttachmentAccessService,
     HomeworkProcessor,
     HomeworkCron,
-    FeatureEntitlementGuard,
   ],
   exports: [HomeworkService, HomeworkAttachmentAccessService],
 })

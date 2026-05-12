@@ -46,7 +46,7 @@ Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation Depth: Completed
 Phase 2A M4 Academics backend: Completed / Contract-Protected
 Phase 2D M9 Accounting: Production Candidate Complete
-Current stage: Backend Sprints 1-4 hardening complete on top of Phase 2A backend + M0 platform foundation + M9 production-candidate completion
+Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
 ```
 
 Current product readiness:
@@ -62,11 +62,11 @@ Full SchoolOS product complete: No
 Recommended next direction:
 
 ```text
-Docker/staging pilot readiness sprint
-→ run Docker-backed smoke with Postgres, Redis, and API running
-→ add seeded authenticated browser smoke credentials
+Repo Verification & Stabilization Sprint
+→ fix any remaining Prisma/schema/typecheck/test blockers
+→ stabilize Homework/Timetable after recent verification follow-ups
 → wire Phase 2A Academics admin UI to completed APIs
-→ deepen existing Phase 2/3 verticals one module at a time
+→ add authenticated Playwright browser smoke tests
 → prepare controlled pilot staging
 ```
 
@@ -145,13 +145,13 @@ Rules:
 
 | Module | Name | Status |
 |---|---|---|
-| M0 | Platform Core / SaaS Starter | Foundation depth completed; entitlement hooks/provider/queue/billing hardening added; API keys/webhooks later |
-| M1 | Admissions & Student Profiles | Phase 1A/1B complete / pilot-ready; secure Student QR credential foundation added |
+| M0 | Platform Core / SaaS Starter | Foundation depth completed; billing/API keys/webhooks later |
+| M1 | Admissions & Student Profiles | Phase 1A/1B complete / pilot-ready |
 | M2 | Smart Attendance | Phase 1A/1B complete / pilot-ready |
 | M3 | Fees & Receipts | Phase 1A/1B complete / pilot-ready |
 | M4 | Exams, CAS & Report Cards | Phase 2A backend complete / admin UI next |
 | M5 | Activity Feed & Milestones | Phase 1A/1B complete; media/moderation hardening ongoing |
-| M6 | Homework & Timetable | Phase 2 foundation implemented; conflict/lifecycle/submission tests passing; deeper UX and reminders later |
+| M6 | Homework & Timetable | Phase 2 foundation implemented; stabilization priority |
 | M7 | HR & Payroll | Phase 2 foundation implemented; deeper tests and UI polish needed |
 | M8A | Library Management | Phase 3 admin foundation implemented |
 | M8B | Transport Management | Phase 3 admin/trip/location foundation implemented; live/driver/parent later |
@@ -298,8 +298,6 @@ pnpm --filter @schoolos/api db:seed:platform
 pnpm smoke:phase1
 pnpm verify:production
 ```
-
-`pnpm smoke:phase1` assumes local Postgres, Redis, and the API are already running with required environment variables loaded. Start `docker compose up -d postgres redis` and the API before using it as a readiness check.
 
 Full verification gate after meaningful backend/module changes:
 

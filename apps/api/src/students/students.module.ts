@@ -16,7 +16,6 @@ import { StudentsService } from './students.service';
 import { StudentsController } from './students.controller';
 import { StudentQrService } from './student-qr.service';
 import { StudentQrController } from './student-qr.controller';
-import { FeatureEntitlementGuard } from '../platform/feature-entitlement.guard';
 
 @Module({
   imports: [
@@ -34,7 +33,6 @@ import { FeatureEntitlementGuard } from '../platform/feature-entitlement.guard';
     StudentDocumentAccessService,
     StudentDocumentRetentionCron,
     StudentQrService,
-    FeatureEntitlementGuard,
   ],
   controllers: [
     StudentSearchController,

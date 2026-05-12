@@ -1,6 +1,6 @@
 # SchoolOS Master Project Memory
 
-**Status:** Backend Sprints 1-4 hardening complete + Phase 2A M4 Academics backend complete + Phase 2D M9 Accounting Production Candidate Complete  
+**Status:** M0 Platform Core Foundation Complete + Phase 2A M4 Academics backend complete + Phase 2D M9 Accounting Production Candidate Complete + Phase 2/3 foundations in progress  
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard
 
@@ -30,7 +30,7 @@ Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation: Completed across eight sprints
 Phase 2A M4 Academics backend: Completed / Contract-Protected
 Phase 2D M9 Accounting: Production Candidate Complete
-Current stage: Backend Sprints 1-4 hardening complete on top of Phase 2A backend + M0 platform foundation + M9 production-candidate completion
+Current stage: Phase 2A backend complete + M0 platform foundation complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
 ```
 
 Readiness:
@@ -46,11 +46,16 @@ Full SchoolOS product complete: No
 Recommended near-term direction:
 
 ```text
-Docker/staging pilot readiness sprint
+Repo Verification + M0 Pilot Hardening Sprint
+→ run full verification gate
 → run Docker-backed smoke with Postgres, Redis, and API running
-→ add seeded authenticated browser smoke credentials
+→ add platform/school route denial browser tests
+→ add SaaS billing lifecycle tests
+→ add entitlement enforcement tests against real school APIs
+→ deepen BullMQ failed-job inspection by deployed queue topology
+→ stabilize Homework/Timetable after recent verification follow-ups
 → wire Phase 2A Academics admin UI to completed APIs
-→ deepen M6/M7/M8 verticals one module at a time
+→ add authenticated Playwright browser smoke tests
 → prepare controlled pilot staging
 ```
 
@@ -106,13 +111,13 @@ Rules:
 
 | Module | Name | Current Status |
 |---|---|---|
-| M0 | Platform Core / SaaS Starter | Foundation depth completed; SaaS billing/API keys/webhooks later |
-| M1 | Admissions & Student Profiles | Phase 1A/1B complete / pilot-ready; Student QR credential foundation implemented |
+| M0 | Platform Core / SaaS Starter | Foundation completed across eight sprints; M0 pilot hardening next |
+| M1 | Admissions & Student Profiles | Phase 1A/1B complete / pilot-ready |
 | M2 | Smart Attendance | Phase 1A/1B complete / pilot-ready |
 | M3 | Fees & Receipts | Phase 1A/1B complete / pilot-ready |
 | M4 | Exams, CAS & Report Cards | Phase 2A backend complete / admin UI next |
 | M5 | Activity Feed & Milestones | Phase 1A/1B complete with media/moderation hardening foundations |
-| M6 | Homework & Timetable | Phase 2 foundation implemented; backend hardening/tests passing |
+| M6 | Homework & Timetable | Phase 2 foundation implemented; stabilization priority |
 | M7 | HR & Payroll | Phase 2 foundation implemented; deeper tests and UI polish needed |
 | M8A | Library Management | Phase 3 admin foundation implemented |
 | M8B | Transport Management | Phase 3 admin/trip/location foundation implemented; live/driver/parent later |
@@ -242,11 +247,11 @@ Status: **Partially complete**.
 
 ```text
 2A Academics, Exams, CAS, Report Cards — backend complete / contract-protected
-2B Homework and Timetable — foundation implemented; backend hardening/tests passing
+2B Homework and Timetable — foundation implemented; stabilization priority
 2C HR and Payroll — foundation implemented; deeper lifecycle/accounting tests needed
 2D M9 Accounting and Finance — production-candidate complete
 2E Parent Communication Expansion — foundation implemented / further hardening later
-2F Student Identity QR Foundation — backend credential and resolve foundation implemented; PDF/card integration next
+2F Student Identity QR Foundation — approved cross-module foundation; implement before deeper Library/Canteen/Transport QR usage
 ```
 
 ### Phase 3 — Extended School Operations
@@ -298,136 +303,19 @@ Next Phase 2A work:
 
 ## 8. Student Identity QR Foundation
 
-Status: **Backend foundation implemented; PDF/card UX integration and deeper module consumption remain.**
+Status: **Approved cross-module foundation. Implementation should happen before deeper Phase 3 QR-dependent workflows.**
 
 Student QR identity belongs to M1 Admissions & Student Profiles, not Library-only, Canteen-only, or Transport-only.
 
 Approved near-term direction:
 
 ```text
-Implemented:
 - Immutable Student ID code generated during registration/admission.
 - Revocable QR credential per student.
-- Token-hash-only QR credential storage.
-- Generate, rotate, revoke, resolve, and QR SVG generation APIs under M1 Students.
+- QR code on student ID cards.
 - Authenticated QR scan/resolve API.
 - Purpose-based QR scan responses.
-
-Remaining near-term:
-- QR code on student ID cards / final PDF layout integration.
 - Reuse QR identity in Library, Canteen, optional Transport, and parent/mobile views.
-
-Do not implement now:
-- Fingerprint registration.
-- Face scan registration.
-- Biometric attendance.
-- Biometric canteen access.
-- Biometric library access.
-- Storage or processing of biometric templates.
-```
-
-Ownership:
-
-```text
-M1 Student Identity Foundation owns:
-- Immutable student code.
-- Student QR credential lifecycle.
-- QR generation/rotation/revocation.
-- QR scan/resolve security boundary.
-- QR block on student ID card.
-
-M8A Library consumes it.
-M8C Canteen consumes it.
-M8B Transport may consume it where useful.
-M10 Notifications reacts to wallet, overdue, boarding/drop, and parent-visible events.
-M3/M9 handle money/accounting impact for wallet, fines, and corrections.
-```
-
-Foundation scope status:
-
-```text
-Done: StudentQrCredential model, token hash storage, generate, rotate, revoke, authenticated resolve, purpose-based responses, QR SVG generation, audit logs, tenant/role tests.
-Remaining: final ID-card PDF QR layout integration and deeper module-specific consumption in Library/Canteen/Transport/Attendance.
-```
-
-Security rules:
-
-```text
-- QR must not contain student name, guardian phone, address, health data, wallet balance, or other PII.
-- QR should contain only a random secure token or URL containing a token.
-- Store only token hash in the database.
-- QR scan must require authentication.
-- QR scan must be tenant-scoped by tenantId.
-- QR scan response must be purpose-specific and role-limited.
-- Parents can only resolve their own child.
-- Teachers can only resolve assigned students unless permission allows more.
-- Canteen staff can only see canteen-safe data.
-- Librarians can only see library-safe data.
-- Transport drivers can only see assigned-route students.
-- Admin/principal access remains tenant-scoped and audited.
-- QR credentials must be revocable and rotatable.
-```
-
-Suggested model:
-
-```prisma
-model StudentQrCredential {
-  id            String          @id @default(cuid())
-  tenantId      String
-  studentId     String
-  tokenHash     String
-  status        StudentQrStatus @default(ACTIVE)
-  createdAt     DateTime        @default(now())
-  rotatedAt     DateTime?
-  revokedAt     DateTime?
-  lastScannedAt DateTime?
-
-  student       Student         @relation(fields: [studentId], references: [id])
-
-  @@unique([tenantId, studentId])
-  @@unique([tokenHash])
-  @@index([tenantId, studentId])
-  @@index([tenantId, status])
-}
-
-enum StudentQrStatus {
-  ACTIVE
-  REVOKED
-}
-```
-
-Suggested APIs:
-
-```text
-POST /api/v1/students/:studentId/qr
-POST /api/v1/students/:studentId/qr/rotate
-POST /api/v1/students/:studentId/qr/revoke
-GET  /api/v1/students/:studentId/qr-image
-POST /api/v1/students/qr/resolve
-```
-
-Implementation order:
-
-```text
-1. Add StudentQrCredential model and indexes.
-2. Generate QR credential during student registration/admission or first ID-card generation.
-3. Add QR image generation service.
-4. Add QR to student ID card PDF.
-5. Add QR management actions in student detail page.
-6. Add scan/resolve API with purpose-based response.
-7. Add scan audit logs.
-8. Add Library QR borrower lookup.
-9. Add Canteen wallet ledger.
-10. Add Canteen QR purchase flow.
-11. Add Parent wallet and purchase history.
-12. Add parent spending controls and notifications.
-```
-
-Canteen wallet rule:
-
-```text
-Use immutable wallet movements. Do not silently edit balances.
-Confirmed financial events must later post through M9 Accounting boundaries.
 ```
 
 Biometrics are explicitly out of scope until QR identity is stable, parent trust is established, legal/privacy rules are reviewed, and the product has strong consent, retention, encryption, audit, and deletion workflows.
