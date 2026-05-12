@@ -1,64 +1,141 @@
-# SchoolOS UI/UX Improvement Plan
+# SchoolOS Final UI/UX Direction and Implementation Plan
 
-## Purpose
-
-
-This document is the complete UI/UX direction for SchoolOS across web, platform, developer, parent, teacher, student, and driver experiences. It includes every UI/UX item discussed and finalized so far.
-
-SchoolOS should become a modern, production-ready, Nepal-friendly school management SaaS. It should not feel like a basic CRUD dashboard. It should feel like a trustworthy education operating system that is simple for schools, safe for children, useful for parents, efficient for teachers, and powerful for administrators.
+**Target path:** `SchoolOS/docs/design/SCHOOLOS_FINAL_UI_UX_DIRECTION.md`  
+**Status:** Final design direction for the SchoolOS web admin, mobile/PWA, and future platform experiences  
+**Current product stage:** Phase 1B Completion Sprint  
+**Frontend reality:** `apps/web` is the current Next.js dashboard. Do not migrate to Angular yet.
 
 ---
 
-# 1. Global UI/UX Direction for Web and App
+## 1. Purpose
 
-## 1.1 Product Experience Principles
+This document replaces scattered or older UI/UX design notes with one single source of truth for the SchoolOS product interface.
 
-SchoolOS must be:
+SchoolOS must feel like a modern, trustworthy, Nepal-ready school operating system. It should not feel like a complicated ERP or generic CRUD dashboard. The product must be easy enough for non-technical school staff to use daily, while still supporting serious operations such as fee collection, attendance, admissions, reports, payroll, accounting, transport, library, canteen, and parent communication.
+
+The key design principle is:
+
+> **One screen = one main job.**
+
+Every screen must answer:
+
+> **What is the user trying to finish here?**
+
+Anything that does not support that job should be moved to a secondary tab, details page, report page, or action menu.
+
+---
+
+## 2. Product Experience Goals
+
+SchoolOS UI/UX must be:
 
 - **Simple:** common tasks should be reachable in 1-3 clicks/taps.
-- **Role-aware:** admins, teachers, parents, students, drivers, accountants, and platform operators should only see what they need.
-- **Trustworthy:** finance, attendance, student records, medical data, and communication must feel secure and auditable.
-- **School-friendly:** language, layout, icons, and flows should match real school operations.
-- **Mobile-first for parents/students:** parents and students should not see dense tables.
-- **Desktop-first for operations:** admins/accountants need tables, filters, exports, reports, and approval flows.
-- **Nepal-ready:** use NPR, Nepali phone patterns, guardian structures, class/section conventions, printable receipts, and future Nepali date/Bikram Sambat support.
-- **Safe for children:** student access must be age-aware, parent-controlled, and school-policy controlled.
+- **Role-aware:** admins, teachers, accountants, admission staff, principals, parents, students, drivers, and platform operators should only see what they need.
+- **Trustworthy:** finance, attendance, student records, medical data, documents, communication, and accounting actions must feel secure and auditable.
+- **School-friendly:** labels, navigation, icons, and workflows must match real school operations.
+- **Desktop-first for school operations:** admin, finance, attendance, reports, HR, and accounting workflows need tables, filters, exports, and approval flows.
+- **Mobile-first for parents, teachers, students, and drivers:** mobile screens should be card-based, quick-action focused, and not table-heavy.
+- **Nepal-ready:** support NPR, class/section conventions, guardian structures, Nepali phone patterns, receipt printing, local payment labels, and future Bikram Sambat support.
+- **Safe for children:** student and parent experiences must be scoped, controlled, age-aware, and privacy-preserving.
 
-## 1.2 Product Experience Split
+---
 
-SchoolOS needs separate UI experiences:
+## 3. Product Experience Split
 
-1. **Public/Landing Experience**
-   - For school owners, principals, and decision-makers.
-   - Explains the product, modules, trust, and demo/onboarding paths.
+SchoolOS has four UI experience families.
 
-2. **School Web Dashboard**
-   - For admins, principals, accountants, admission staff, teachers, HR, and operations users.
-   - Desktop-first, table/report/filter-friendly.
+### 3.1 Public Website Experience
 
-3. **Platform Control Plane / Developer Experience**
-   - For SchoolOS operators, support, billing, platform admins, and future API users.
-   - Must stay visually and functionally separate from tenant-scoped school operations.
+**Route target:** future `apps/web` public pages  
+**Users:** school owners, principals, decision-makers, school admins evaluating the product
 
-4. **Mobile Portal / App Experience**
-   - For parents, teachers, students, and drivers.
-   - Mobile-first, card-based, timeline-based, and role-specific.
+Purpose:
 
-## 1.3 Global Visual Language
+- Explain SchoolOS modules.
+- Show trust, security, and Nepal readiness.
+- Support demo requests and onboarding inquiries.
+- Provide SEO-friendly public pages.
 
-Use a clean SaaS design system:
+Rules:
 
-- Primary color: deep blue/indigo.
-- Secondary accents: soft purple, amber, green, cyan.
-- Background: soft blue-grey or light slate.
+- Keep marketing/public UI separate from internal dashboard UI.
+- Do not expose tenant operations here.
+- Use product storytelling, screenshots, school outcomes, and simple CTAs.
+
+### 3.2 School Web Dashboard
+
+**Current app:** `apps/web` Next.js dashboard  
+**Users:** admins, principals, teachers, accountants, admission staff, HR, librarians, transport staff, canteen staff
+
+Purpose:
+
+- Run daily school operations.
+- Manage students, attendance, fees, communication, academics, HR, accounting, library, transport, and canteen.
+- Support reports, exports, approvals, and audit-friendly operations.
+
+Rules:
+
+- Consume real APIs.
+- Do not use fake production data.
+- Preserve cookie-first auth behavior.
+- Keep every tenant-owned workflow tenant-scoped by backend APIs.
+- Keep school operations under `/dashboard/*`.
+
+### 3.3 Platform Control Plane
+
+**Route target:** `/platform/*`  
+**Users:** SchoolOS company owner, support users, platform admins, billing operators
+
+Purpose:
+
+- Manage schools/tenants.
+- Manage plans, limits, SaaS billing, support access, health, failed jobs, and platform audit logs.
+
+Rules:
+
+- Must be visually and functionally separate from tenant school operations.
+- Platform users are not school staff.
+- Platform access must be explicit, permission-guarded, and audited.
+- Do not show platform pages inside the normal school operations sidebar unless the user is explicitly in a platform route/context.
+
+### 3.4 Mobile/PWA Portal Experience
+
+**Future target:** parent/teacher/student/driver mobile portal or app  
+**Users:** parents, teachers, students, drivers
+
+Purpose:
+
+- Provide quick answers and quick actions.
+- Avoid dense dashboards and complex tables.
+- Give role-specific flows.
+
+Rules:
+
+- Mobile should not be a mini web-admin dashboard.
+- Use cards, timelines, bottom navigation, simple lists, and action buttons.
+- Parents see only their own child/children.
+- Drivers see only assigned transport data.
+- Students get age-appropriate access only.
+
+---
+
+## 4. Global Visual Language
+
+Use the uploaded modern SchoolOS screen concepts as the visual direction, but reduce density where needed.
+
+### 4.1 Style Direction
+
+- Primary color: deep blue / indigo.
+- Secondary accents: purple, amber, green, cyan.
+- Background: soft blue-grey / light slate.
 - Cards: white, rounded, lightly bordered.
-- Radius: 16px to 24px for cards; 10px to 14px for controls.
-- Shadows: soft, minimal, not heavy.
-- Icons: rounded education-style icons.
+- Radius: 16px-24px for cards; 10px-14px for controls.
+- Shadows: soft and minimal.
+- Icons: rounded education-style line icons.
 - Spacing: generous, especially on dashboards and mobile.
-- Typography: clear and high contrast.
+- Typography: clear, high contrast, and readable.
 
-Recommended theme direction:
+### 4.2 Recommended Design Tokens
 
 ```ts
 primary: '#155EEF'
@@ -82,9 +159,7 @@ textSecondary: '#475569'
 textMuted: '#94A3B8'
 ```
 
-## 1.4 Typography
-
-Recommended hierarchy:
+### 4.3 Typography
 
 - Page title: 28px-32px / bold.
 - Section title: 18px-22px / semibold.
@@ -97,1113 +172,913 @@ Rules:
 
 - Use strong contrast.
 - Avoid very light grey text for important information.
-- Use short labels for mobile.
-- Use descriptive headings for web admin screens.
-
-## 1.5 Shared Components
-
-Shared components:
-
-- `PageHeader`
-- `SectionCard`
-- `StatCard`
-- `StatusBadge`
-- `SearchInput`
-- `FilterBar`
-- `EmptyState`
-- `LoadingState`
-- `ActionMenu`
-- `ConfirmDialog`
-- `Toast`
-- `Avatar`
-- `NotificationBadge`
-- `Tabs`
-- `PermissionState`
-- `AuditInfo`
-
-Web-specific components:
-
-- `DashboardShell`
-- `SidebarGroup`
-- `Topbar`
-- `DataTable`
-- `TablePagination`
-- `ReportToolbar`
-- `ExportButton`
-- `ChartCard`
-- `ApprovalPanel`
-
-App/mobile-specific components:
-
-- `MobileShell`
-- `MobileHeader`
-- `MobileBottomNav`
-- `MobileModuleGrid`
-- `MobileStatCard`
-- `MobileSectionCard`
-- `MobileTimelineItem`
-- `MobileCalendarCard`
-- `MobileHomeworkCard`
-- `MobileFeeMonthCard`
-- `MobileBusStatusCard`
-- `MobileProfileSummary`
-- `MobileNoticeCard`
-
-## 1.6 Status and Badge Standards
-
-Use consistent statuses across modules:
-
-| Status | Color | Usage |
-|---|---|---|
-| Active | Green | Student/staff/tenant active |
-| Inactive | Grey | Temporarily disabled records |
-| Pending | Amber | Waiting for action |
-| Approved | Green | Approved workflows |
-| Rejected | Red | Rejected workflows |
-| Draft | Slate | Unpublished records |
-| Published | Blue | Visible to users |
-| Locked | Grey | Final/closed records |
-| Paid | Green | Paid fees/invoices |
-| Partial | Amber | Partially paid fees |
-| Unpaid | Red | Unpaid fees |
-| Overdue | Red | Past due payments/tasks |
-| Waived | Blue | Waived fee/payment item |
-| Refunded | Slate | Refunded payment |
-| Onboard | Blue | Student is on bus |
-| Dropped | Green | Student dropped safely |
-| Delayed | Amber | Bus or workflow delay |
-| Conflict | Red | Timetable/assignment conflict |
-| Substitution Required | Amber | Absent teacher replacement needed |
-
-## 1.7 Accessibility and Safety Rules
-
-- Minimum mobile touch target: 44px.
-- Do not rely only on color; include text labels/icons.
-- Use readable text contrast.
-- Show loading, empty, error, and permission-denied states.
-- Confirm destructive actions.
-- Mask sensitive student, medical, guardian, and financial data based on role.
-- Keep child data access strictly guardian/student-scoped.
-- Keep audit visibility for finance, accounting, student lifecycle, communication, and sensitive edits.
-- Use keyboard-navigable web UI.
-- Show validation errors close to the field.
-- Save progress for long forms.
+- Use short labels on mobile.
+- Use descriptive headings on web admin screens.
 
 ---
 
-# 2. Web-Focused UI/UX
+## 5. Global Layout System
 
-The web experience is for school operations and platform/developer administration. It should prioritize productivity, reports, tables, filtering, approvals, exports, and role-based control.
+Every web admin page should follow this structure:
+
+```text
+Topbar
+Left Sidebar
+Page Header
+Summary Cards
+Main Work Area
+Optional Right Insight Panel
+Bottom or Sticky Action Bar only when needed
+```
+
+### 5.1 Topbar
+
+The topbar should include:
+
+- School selector.
+- Global search.
+- Notification bell.
+- User profile menu.
+- Academic year/date context where relevant.
+
+Global search should support:
+
+- Student name.
+- Admission number.
+- Guardian phone.
+- Invoice number.
+- Receipt number.
+- Staff name.
+- Book title/ISBN/barcode.
+- Vehicle number.
+- Notice title.
+
+Topbar rules:
+
+- Keep it clean.
+- Do not overload it with module-specific actions.
+- The search bar should give suggestions grouped by type.
+- Notification bell should show actionable items, not just generic alerts.
+
+### 5.2 Sidebar
+
+Do not show technical phase labels like Phase 1, Phase 2, or Phase 3 in user-facing navigation.
+
+Recommended sidebar:
+
+```text
+Dashboard
+Students
+Admissions
+Attendance
+Fees
+Communications
+Activity Feed
+Exams, CAS & Reports
+Homework & Timetable
+HR & Payroll
+Accounting
+Library
+Transport
+Canteen
+Reports
+Settings
+```
+
+Sidebar behavior:
+
+- Active route highlighting.
+- Collapsible/toggleable sidebar.
+- Clear icons.
+- No phase labels.
+- Disabled/locked module states only when needed.
+- Permission-hidden items should not appear for users without access.
+- Platform pages must remain outside normal school operations navigation.
+
+### 5.3 Page Header
+
+Every module page should start with:
+
+```text
+Title
+Short description
+Primary action
+Optional secondary action menu
+```
+
+Example:
+
+```text
+Fees & Receipts
+Collect payments, print receipts, and manage student dues.
+[New Collection] [More Actions]
+```
+
+Rules:
+
+- One main title.
+- One short description.
+- One primary action.
+- Secondary actions go inside `More Actions`.
+- Avoid placing 4-6 equal-weight buttons in the header.
+
+### 5.4 Page Type Rules
+
+```text
+Dashboard = summary only
+Module page = daily work
+Detail page = full record
+Report page = filters + exports
+Settings page = configuration
+Mobile page = quick answer/action
+```
 
 ---
 
-## 2.1 Landing Page UX
+## 6. UX Rules for Non-Technical Users
 
-### Audience
+### 6.1 Use School Language
 
-- School owners
-- Principals
-- Administrators
-- Accountants
-- Decision-makers
-- Potential SaaS customers
+Avoid technical wording.
 
-### Landing Page Goals
+Bad:
 
-- Explain what SchoolOS does in less than 10 seconds.
-- Build trust with schools in Nepal.
-- Show core modules clearly.
-- Convert visitors to demo/request/onboarding.
+```text
+Entity
+Mutation failed
+Workflow state
+403 Forbidden
+Posting exception
+```
 
-### Recommended Sections
+Good:
 
-1. **Hero Section**
-   - Headline: `Run your entire school from one modern platform.`
-   - Subheadline: `Admissions, attendance, fees, exams, notices, transport, payroll, and accounting for Nepal-based schools.`
-   - CTA buttons: `Request Demo`, `Login`.
-   - Visual: dashboard/mobile mockup.
+```text
+Student
+Save failed
+Waiting for approval
+You do not have permission
+Payment could not be posted
+```
 
-2. **Problem/Solution Section**
-   - Manual fee tracking.
-   - Paper attendance.
-   - Scattered notices.
-   - Weak parent communication.
-   - No real-time transport visibility.
-   - Hard reporting.
+### 6.2 Guide the Next Action
 
-3. **Module Overview**
-   - Admissions.
-   - Student Profiles.
-   - Attendance.
-   - Fees & Receipts.
-   - Exams & Report Cards.
-   - Homework & Timetable.
-   - Notices & Communication.
-   - Transport.
-   - Accounting.
-   - HR/Payroll.
+Use next-step buttons instead of showing too many actions.
 
-4. **Nepal-Friendly Section**
-   - NPR support.
-   - Cash/bank/QR payment workflows.
-   - Receipt printing.
-   - Guardian records.
-   - Local class/section structure.
-   - Future Nepali date support.
+Examples:
 
-5. **Trust and Security Section**
-   - Role-based access.
-   - Audit logs.
-   - Secure student data.
-   - Tenant isolation.
-   - Encrypted sensitive fields.
+```text
+Next: Verify Documents
+Next: Collect Payment
+Next: Submit Attendance
+Next: Approve Payroll
+Next: Publish Notice
+```
 
-6. **CTA Section**
-   - `Start pilot school setup`.
-   - `Book a demo`.
+### 6.3 Use Safe Confirmations
 
-### Landing Page UX Rules
+Important actions must show confirmation dialogs:
 
-- Avoid technical jargon.
-- Use school workflow language.
-- Use screenshots/cards instead of long text.
-- Make CTAs visible at top and bottom.
-- Mobile landing page must load fast and be scroll-friendly.
+- Submit attendance.
+- Collect payment.
+- Reverse payment.
+- Close cashier day.
+- Lock marks.
+- Publish result.
+- Approve payroll.
+- Post journal.
+- Transfer student.
+- Mark student inactive.
+- Delete/soft-delete posts.
+
+Confirmation dialogs must include:
+
+- What will happen.
+- Who/what is affected.
+- Whether it can be changed later.
+- Reason field for destructive/financial/audit-critical actions.
+
+### 6.4 Use Clear Feedback
+
+Success example:
+
+```text
+Attendance submitted successfully.
+38 present, 8 absent, 3 late, 1 leave.
+```
+
+Error example:
+
+```text
+You do not have permission to reverse payments.
+Please contact the school administrator.
+```
+
+Empty state example:
+
+```text
+No fee payments collected today.
+Start your first collection.
+[New Collection]
+```
+
+### 6.5 Never Hide Critical Risk
+
+Always make these visible:
+
+- Cashier close status.
+- Fiscal period status.
+- Unposted journals.
+- Failed notice deliveries.
+- Attendance not submitted.
+- Pending admission documents.
+- Overdue fees.
+- Allergy warnings.
+- Transport delays.
+- Payroll pending approval.
 
 ---
 
-## 2.2 School Dashboard UX
+## 7. Shared Component System
 
-### Audience
+Build and reuse shared components before redesigning screens.
 
-- School admin
-- Principal
-- Accountant
-- Admission staff
-- Class teacher
-- Subject teacher
-- HR staff
+### 7.1 Core Web Components
 
-### Dashboard Goal
+```text
+DashboardShell
+Sidebar
+Topbar
+PageHeader
+SectionCard
+StatCard
+StatusBadge
+DataTable
+FilterBar
+SearchInput
+ActionMenu
+ConfirmDialog
+Toast
+EmptyState
+LoadingState
+ErrorState
+PermissionState
+AuditInfo
+StudentAvatar
+MoneyDisplay
+DateDisplay
+ProgressStepper
+WorkflowTimeline
+NotificationBadge
+Tabs
+```
 
-The school dashboard should act as the daily command center.
+### 7.2 Mobile/PWA Components
 
-### Web Dashboard Layout
+```text
+MobileShell
+MobileHeader
+MobileBottomNav
+MobileStatCard
+MobileActionGrid
+MobileNoticeCard
+MobileHomeworkCard
+MobileFeeCard
+MobileAttendanceCalendar
+MobileTimelineItem
+ChildSwitcher
+TripStatusCard
+```
 
-- Left sidebar with grouped navigation.
-- Topbar with search, academic year, notifications, profile, and school/tenant context.
-- Welcome/school summary section.
-- KPI cards.
-- Operational cards for attendance, fees, notices, and pending actions.
+### 7.3 Component Rules
 
-### Recommended Sidebar Groups
+- Components must be reusable across modules.
+- Avoid one-off styling inside pages.
+- Keep variants explicit: `success`, `warning`, `danger`, `info`, `neutral`.
+- Use semantic states instead of raw colors.
+- All loading, empty, error, and permission-denied states must be reusable.
+
+---
+
+## 8. Module Screen Direction
+
+## 8.1 Dashboard
+
+Main job:
+
+> Help the school admin understand what needs attention today.
+
+Dashboard should answer:
+
+```text
+How many students are active?
+Was attendance marked today?
+How much fee was collected today?
+What needs attention?
+Are there urgent notices/tasks?
+```
+
+Recommended sections:
+
+```text
+Welcome header
+Today KPI cards
+Today tasks
+Attendance snapshot
+Fee collection snapshot
+Recent activity
+Notices
+Quick actions
+```
+
+Behavior:
+
+- Cards should be clickable.
+- Avoid too many charts.
+- Do not make dashboard a full reports page.
+- Use safe empty states where APIs are not ready.
+
+Clickable mapping:
+
+```text
+Total Students -> Student Directory
+Attendance Rate -> Attendance Report
+Fee Collected -> Fee Collection
+Outstanding Dues -> Defaulter Report
+Unread Notices -> Notice Center
+Pending Tasks -> Task/Action list
+```
+
+---
+
+## 8.2 Students and Student Profile
+
+Main job:
+
+> Find a student quickly and manage the full student record safely.
+
+### Student Directory
+
+Must include:
+
+- Search by name, admission number, roll number, guardian phone.
+- Class/section/status filters.
+- Student status badges.
+- Quick actions through action menu.
+- Pagination.
+
+### Student Detail Header
+
+Show:
+
+```text
+Photo
+Name
+Status
+Class / Section
+Admission No.
+Roll No.
+Gender
+DOB / Age
+Blood Group
+Joined Date
+House
+Primary Guardian
+```
+
+Primary actions:
+
+```text
+Edit
+Print ID Card
+More Actions
+```
+
+More Actions:
+
+```text
+Promote
+Transfer
+Mark Inactive
+Upload Document
+Generate Certificate
+View Audit History
+```
+
+### Student Detail Tabs
 
 ```text
 Overview
-- Dashboard
-
-People
-- Students
-- Guardians
-- Teachers
-- Staff
-
+Attendance
+Fees
+Documents
+Activity
 Academics
-- Classes
-- Subjects
-- Attendance
-- Homework
-- Timetable
-- Exams
-- Report Cards
-
-Finance
-- Fees
-- Receipts
-- Accounting
-- Cashier Close
-
-Operations
-- Notices
-- Activity Feed
-- Transport
-- Library
-- Canteen
-
-HR
-- Payroll
-- Leave
-
-System
-- Settings
-- Tenant Setup
-- Audit Logs
+Guardians
+History
 ```
 
-Use module badges:
+Overview should only show the latest summary:
 
-- `Live`
-- `Phase 2`
-- `Later`
-- `Locked`
+- Guardian summary.
+- Attendance trend.
+- Fee due summary.
+- Recent documents.
+- Recent activity.
 
-### Dashboard Cards
-
-- Total Students
-- Total Teachers
-- Total Parents
-- Present Today
-- Absent Today
-- Fees Collected
-- Pending Fees
-- Upcoming Exams
-- Pending Admissions
-- Unread Notices
-- Cashier Close Status
-
-### Dashboard UX Rules
-
-- Do not overload the dashboard.
-- Use summaries, not full tables.
-- Every card should click into a module.
-- Use charts only where they help decisions.
-- Show urgent items clearly.
-- Separate academic, finance, and operational insights.
+Deep data must live inside tabs.
 
 ---
 
-# 3. Dedicated Module UX Sections
+## 8.3 Admissions
 
-## 3.1 Dedicated Admissions UX
+Main job:
 
-### Purpose
+> Move applicants from inquiry to admitted student with clear document and approval steps.
 
-Admissions UX should help schools manage inquiries, applications, document checks, approvals, and final enrollment without losing applicants or duplicating records.
-
-### Main Screens
-
-- Admission dashboard.
-- Inquiry list.
-- Application list.
-- Admission pipeline/kanban.
-- Multi-step enrollment form.
-- Document checklist.
-- Application review.
-- Admission confirmation.
-- Fee setup link.
-
-### Admission Pipeline
-
-Recommended stages:
+Recommended pipeline stages:
 
 ```text
 Inquiry
 Application Started
 Documents Pending
-Review
+Under Review
 Approved
 Admitted
 Rejected
 Withdrawn
 ```
 
-### Admission Form Steps
+Admission layout:
 
 ```text
-Step 1: Student details
-Step 2: Guardian details
-Step 3: Address/contact
-Step 4: Academic details
-Step 5: Health/medical details
-Step 6: Documents
-Step 7: Review and submit
+Admission KPI cards
+Pipeline / stage list
+Selected applicant detail
+Checklist / timeline
 ```
 
-### UX Requirements
+Applicant detail should show:
 
-- Save progress for long admissions.
-- Show validation clearly.
-- Use Nepal-friendly student/guardian fields.
-- Mask sensitive health data.
-- Allow document preview.
-- Warn before creating duplicate students.
-- Show admission decision history.
-- Convert admitted applicant into active student cleanly.
+- Student summary.
+- Guardian information.
+- Academic placement.
+- Document checklist.
+- Notes.
+- Timeline.
+- Next workflow action.
+
+Primary action should change by status:
+
+```text
+Documents Pending -> Request Documents
+Under Review -> Approve / Reject
+Approved -> Enroll Student
+Admitted -> View Student Profile
+```
+
+Do not show approve, enroll, transfer, print ID, and more as equal actions.
 
 ---
 
-## 3.2 Dedicated Attendance UX
+## 8.4 Attendance
 
-### Purpose
+Main job:
 
-Attendance UX should make daily marking fast for teachers and reporting reliable for admins and parents.
+> Mark today’s attendance in under 2 minutes.
 
-### Web Attendance Screens
-
-- Today’s attendance.
-- Class attendance.
-- Student attendance history.
-- Monthly register.
-- Attendance reports.
-- Attendance calendar.
-
-### Teacher Marking Flow
+Recommended flow:
 
 ```text
-Select class
-Select section
-Select date
-Mark all present
-Change exceptions
-Save
-Confirm
+Select Class
+Select Section
+Select Date
+Auto Fill Present
+Mark exceptions
+Save Draft
+Submit Attendance
 ```
 
-### Attendance Statuses
+Attendance layout:
 
 ```text
-Present
-Absent
-Late
-Excused
-Holiday
-Not Marked
+Class/date filters
+Attendance summary cards
+Attendance register
+Right panel: monthly snapshot + correction requests
+Bottom action bar
 ```
 
-### Calendar Colors
+Register columns:
 
 ```text
-Green = Present
-Red = Absent
-Amber = Late
-Blue = Holiday
-Grey = Not marked
+Roll No.
+Student
+Status
+Remarks
 ```
 
-### Mobile Attendance
+Status buttons:
 
-Parent/student mobile should show:
+```text
+P = Present
+A = Absent
+L = Late
+V = Leave
+```
 
-- Child selector.
-- Monthly calendar.
-- Attendance summary.
-- Legend.
-- Absent/late notes if available.
+Behavior:
 
-### UX Requirements
+- Default all students to Present.
+- Teacher changes exceptions only.
+- Future dates blocked unless role/config allows.
+- Submitted attendance requires correction workflow.
+- Use sticky action bar for Save Draft and Submit Attendance.
 
-- Avoid dense tables on mobile.
-- Allow quick exception marking.
-- Show not-marked warning.
-- Export monthly register.
-- Show attendance percentage by student and class.
+Primary action:
+
+```text
+Submit Attendance
+```
+
+Secondary actions:
+
+```text
+Save Draft
+Export CSV
+Print Register
+```
+
+Admin-only actions:
+
+```text
+Bulk Update
+Correction Requests
+Attendance Settings
+```
 
 ---
 
-## 3.3 Dedicated Fees and Receipts UX
+## 8.5 Fees and Receipts
 
-### Purpose
+Main job:
 
-Fees UX should help accountants collect fees, issue receipts, track dues, and close the day safely.
+> Find a student, collect fee, issue receipt, and close day safely.
 
-### Main Screens
-
-- Fee dashboard.
-- Fee collection counter.
-- Student fee ledger.
-- Invoice detail.
-- Receipt print/download.
-- Defaulter aging report.
-- Payment reversal/refund.
-- Cashier close/day-end.
-
-### Fee Dashboard Cards
+Recommended layout:
 
 ```text
-Today’s Collection
-Monthly Collection
-Pending Fees
-Overdue Fees
-Refunds/Reversals
-Cashier Close Status
+KPI cards
+Student dues list
+Selected student ledger
+Collect payment panel
+Receipt / invoice history
+Top defaulters
+Quick actions
 ```
 
-### Student Fee Ledger Columns
+### Cashier View
+
+Simple workflow:
 
 ```text
-Invoice number
-Fee type
-Due date
-Amount
+Search student
+Select due invoice/fee head
+Enter amount
+Choose payment method
+Collect payment
+Print receipt
+```
+
+### Accountant/Admin View
+
+Advanced workflow:
+
+```text
+Ledger
+Reversal
+Cashier close
+Reports
+Defaulter aging
+Fee-head dues
+Receipt history
+```
+
+### Payment Form
+
+Must show:
+
+```text
+Selected student
+Total due
+Selected fee heads
+Amount paid
 Discount
 Fine
-Paid
-Balance
-Status
-Receipt
+Payment method
+Receipt number
+Payment date
+Remarks
+```
+
+Before submit, show confirmation:
+
+```text
+You are collecting NPR 12,450 from Aarav KC.
+Payment method: Cash.
+Receipt will be generated after confirmation.
+```
+
+Dangerous finance actions must require:
+
+- Confirmation dialog.
+- Reason field.
+- Audit log.
+- Permission check.
+- Clear warning.
+
+Dangerous actions include:
+
+```text
+Reverse Payment
+Void Receipt
+Refund
+Change Due
+Close Day
+```
+
+Finance rules:
+
+- Do not calculate financial truth only on the frontend.
+- Use backend totals, ledger APIs, receipt APIs, and reversal/correction workflows.
+- Do not silently edit confirmed financial records.
+
+---
+
+## 8.6 Communications, Notices, and Activity Feed
+
+Main job:
+
+> Communicate with parents/staff and verify delivery/read status.
+
+Split into clear areas:
+
+```text
+Activity Feed
+Notices & Communication
+Delivery Records
+Consent
+```
+
+### Activity Feed
+
+Post card should show:
+
+```text
+Teacher
+Class
+Time
+Text
+Photos
+Reactions/comments count
+Visibility status
+Approval status
+Seen by parents
+```
+
+Actions:
+
+```text
+Create Post
+Edit
+Delete
+View Details
+Moderate
+```
+
+Activity rules:
+
+- Media preview/download must use private file/signed URL patterns.
+- Consent-aware media visibility must be respected.
+- Soft-deleted posts should disappear from normal views.
+- Parent view must be scoped to own child/class visibility.
+
+### Notices
+
+Notice list columns:
+
+```text
+Notice
+Audience
+Published Date
+Read %
+Delivery Status
 Actions
 ```
 
-### Actions
+Status labels:
 
 ```text
-Collect Payment
-Print Receipt
-Download Receipt
-Reverse Payment
-View Ledger
-Export
+Draft
+Scheduled
+Published
+Delivered
+Partial
+Failed
+Retrying
 ```
 
-### Fee Statuses
+Notification center should show:
 
 ```text
-Paid      green
-Partial   amber
-Unpaid    red
-Overdue   red
-Waived    blue
-Refunded  slate
-```
-
-### Mobile Parent Fees
-
-Parent view should show:
-
-- Total fee.
-- Paid amount.
-- Due amount.
-- Monthly fee cards.
-- Receipt download.
-- Payment history.
-- Payment method labels.
-
-Use NPR formatting:
-
-```text
-NPR 25,000
-NPR 2,500 due
+Unread notices
+Failed deliveries
+Pending approvals
+Correction requests
+Fee alerts
+Attendance alerts
 ```
 
 ---
 
-## 3.4 Dedicated Accounting UX
+## 8.7 Exams, CAS, and Report Cards
 
-### Purpose
+Main job:
 
-Accounting UX must feel more professional than normal school modules. It should support safe double-entry workflows, fiscal controls, posting status, and auditability.
+> Set up exams, enter marks, validate, lock, publish, and generate report cards.
 
-### Accounting Dashboard Cards
-
-```text
-Total Revenue
-Total Expense
-Net Balance
-Cash Balance
-Bank Balance
-Pending Postings
-Journal Entries
-Fiscal Period Status
-```
-
-### Accounting Sections
+Recommended tabs:
 
 ```text
-Revenue Information
-Payment History
-Ledger Summary
-Recent Journal Entries
-Trial Balance Preview
-Cashier Close Summary
-Posting Errors
+Exam Setup
+Marks Entry
+CAS Records
+Results
+Report Cards
 ```
 
-### Journal Entry Fields
+Use workflow stepper:
 
 ```text
-Date
-Voucher number
-Reference
-Description
-Ledger account
-Debit
-Credit
-Source module
-Status
-Approval status
+1. Enter Marks
+2. Validate
+3. Lock
+4. Publish
+5. Generate Report Cards
 ```
 
-### Journal Actions
+Marks entry behavior:
+
+- Spreadsheet-style grid.
+- Autosave draft.
+- Highlight missing marks.
+- Highlight invalid marks.
+- Show absent students.
+- Calculate total/percentage/grade using backend rules.
+- Prevent publish until valid.
+
+Primary workflow actions:
 
 ```text
-Create Draft
-Submit
-Approve
-Post
-Reverse
-Export
-Print
+Save Marks
+Validate Marks
+Lock Marks
+Publish Results
+Generate Report Cards
 ```
 
-### Accounting UX Rules
-
-- Show clear posting status.
-- Link source documents.
-- Show debit/credit balance check.
-- Show fiscal period warning.
-- Show locked/closed period warning.
-- Use reversal/correction workflow instead of editing posted entries.
-- Show audit history.
-- Reports must come from backend ledger, not frontend calculations.
+Do not show all actions as equal primary buttons.
 
 ---
 
-## 3.5 Dedicated Exams and Report Cards UX
+## 8.8 Homework and Timetable
 
-### Purpose
+### Homework
 
-Exam UX should help schools set up exams, enter marks, validate missing data, publish results, and generate report cards.
+Main job:
 
-### Main Screens
+> Create homework and review submissions.
 
-```text
-Exam setup
-Subject marks
-Grade rules
-Exam schedule
-Mark entry
-Result publishing
-Report card generation
-```
-
-### Mark Entry Features
+Recommended layout:
 
 ```text
-Class filter
-Subject filter
-Exam filter
-Autosave draft
-Validation
-Bulk upload
-Lock marks
-Publish result
-```
-
-### Report Card Page
-
-Should include:
-
-```text
-Student summary
-Subject marks
-Total
-Percentage/GPA
-Rank/position
-Teacher remarks
-Attendance summary
-PDF download
-Publish status
-```
-
-### Mobile Result View
-
-Should show:
-
-```text
-Subject
-Marks
-Grade
-Total
-Percentage
-Result status
-Download report card
-```
-
-### UX Rules
-
-- Use step-by-step workflows.
-- Prevent publishing incomplete results.
-- Show missing marks clearly.
-- Allow review before final publish.
-- Lock published/approved results.
-
----
-
-## 3.6 Dedicated Homework UX
-
-### Purpose
-
-Homework UX should help teachers create assignments and parents/students track due work easily.
-
-### Teacher Web Screens
-
-```text
+Homework KPI cards
 Homework list
-Create homework
-Class/section assignment
-Attachment upload
-Submission review
-Teacher comments
+Review queue
+Quick actions
 ```
 
-### Create Homework Fields
+Group homework by:
 
 ```text
-Subject
-Class
-Section
-Title
-Description
-Due date
-Attachments
-Submission required yes/no
-Publish/save draft
-```
-
-### Parent/Student Mobile Homework
-
-Use date-grouped homework cards:
-
-```text
-Subject
-Title
-Short description
-Due date
-Attachment count
-Status
-Action button
-```
-
-### Homework Statuses
-
-```text
-Pending
-Submitted
-Late
+Due Today
+Upcoming
+Overdue
 Checked
-Returned
 ```
 
-### UX Rules
-
-- Group by due date or assigned date.
-- Show subject icon/color.
-- Show attachment count.
-- Keep mobile homework card-based.
-- Teachers should see review queue.
-
----
-
-## 3.7 Dedicated Timetable UX
-
-### Purpose
-
-Timetable UX should support daily class visibility for parents/students/teachers and powerful scheduling for admins.
-
-### Web Timetable Admin
-
-For academic staff:
+Teacher actions:
 
 ```text
-Class timetable
-Teacher timetable
-Room timetable
-Conflict detection
-Substitution workflow
-Versioning
-Publish/lock/archive
+Create Homework
+Review Submissions
+Return for Correction
+Mark Checked
 ```
 
-### Timetable Builder
+Parent/student mobile should use homework cards, not dense tables.
 
-Builder should show:
+### Timetable
+
+Main job:
+
+> View schedule, publish timetable, and resolve conflicts.
+
+Timetable grid should show:
 
 ```text
-Weekly grid
-Periods
-Subjects
-Teachers
-Rooms
-Conflict warnings
-Teacher workload indicator
-Publish button
+Period
+Subject
+Teacher
+Room
+Status
 ```
 
-### Conflict Warnings
+Conflict cards should show:
+
+```text
+Problem
+Reason
+Suggested fix
+Resolve button
+```
+
+Conflict types:
 
 ```text
 Teacher already assigned
 Room already booked
 Teacher unavailable
-Subject weekly period requirement incomplete
 Workload exceeded
-Substitution required
-```
-
-### Important Visual States
-
-```text
-Conflict
-Draft
-Published
-Locked
-Archived
-Substitution required
-```
-
-### Mobile Timetable
-
-Student/parent view should show:
-
-```text
-Today timeline
-Week date selector
-Current period indicator
-Teacher name
-Room
-Subject icon
-```
-
-Example:
-
-```text
-08:00 - 08:45
-Maths
-Jenny Wilson
-Room 204
-Now
+Subject period missing
 ```
 
 ---
 
-## 3.8 Dedicated Notices and Communication UX
+## 8.9 HR, Payroll, and Accounting
 
-### Purpose
+The combined overview screen can exist, but deep work should be split into focused pages.
 
-Communication UX should make school-parent communication clear, trackable, safe, and moderated.
-
-### Notice List
-
-Notice list should show:
+Recommended structure:
 
 ```text
-Title
-Audience
-Priority
-Publish date
-Read count
-Delivery status
-Action menu
+Staff & HR
+Payroll
+Accounting
 ```
 
-### Notice Types
+### Combined Overview
 
-```text
-General
-Exam
-Fee
-Emergency
-Holiday
-Event
-Transport
-```
-
-### Priority Levels
-
-```text
-Normal
-Important
-Urgent
-Emergency
-```
-
-### Notice Composer Fields
-
-```text
-Title
-Message
-Audience
-Class/section
-Attachments
-Publish now/schedule
-SMS/push/email options later
-```
-
-### Parent-Class Teacher Chat
-
-Chat should be controlled and auditable.
-
-UX requirements:
-
-```text
-One thread per student per academic year
-Guardian-to-primary-class-teacher conversation
-Teacher availability indicator
-Quiet hours message
-Read receipts
-Attachment controls
-Report/block controls
-Admin moderation
-```
-
-Recommended availability:
-
-```text
-Sunday–Thursday: 4:00 PM – 7:00 PM
-Friday: 2:00 PM – 5:00 PM
-Saturday/Public holidays: Closed
-Emergency: Allowed with warning
-```
-
-Outside-hours message:
-
-```text
-Message queued.
-Teacher will respond during school chat hours.
-Usually replies within 1 school day.
-```
-
----
-
-## 3.9 Dedicated Transport UX
-
-### Purpose
-
-Transport UX can become one of SchoolOS’s most unique features. It should support admin route control, parent child-specific tracking, and driver trip workflows.
-
-### Current Implementation Snapshot
-
-As of May 6, 2026, the web admin dashboard has a Phase 3 operations polish foundation:
-
-- Overview cards for Active Trips, Delayed Routes, Students Onboard, Students Not Boarded, Vehicles Active, and Drivers Online.
-- Admin trip monitor and trip history sections backed by existing Transport APIs.
-- Readable status badges for ready, arriving, onboard, dropped, delayed, completed, active, and cancelled states where current data supports them.
-- Parent tracking controls placeholder with explicit child-scoped privacy copy.
-- Live map/WebSocket UI and driver app remain later scope.
-
-### Admin Transport Dashboard
-
-Cards:
-
-```text
-Active Trips
-Delayed Routes
-Students Onboard
-Students Not Boarded
-Vehicles Active
-Drivers Online
-```
-
-### Admin Screens
-
-```text
-Route setup
-Vehicle setup
-Driver assignment
-Student stop assignment
-Trip monitor
-Trip history
-Parent tracking controls
-```
-
-### Parent Bus Tracking
-
-Mobile screen should show:
-
-```text
-Live map
-Student status
-ETA
-Driver name
-Driver phone
-Vehicle number
-Route timeline
-Last updated time
-Emergency contact
-```
-
-### Transport Statuses
-
-```text
-Ready
-Bus arriving
-Onboard
-Dropped
-Delayed
-Route completed
-```
-
-### Driver App UX
-
-Driver screen should be very simple:
-
-```text
-Start Trip
-View Stops
-Mark Boarded
-Mark Dropped
-Call School
-End Trip
-```
-
-### Safety Rules
-
-- Parent only sees their own child’s bus status.
-- Driver only sees assigned route/student stop list.
-- Admin sees all routes.
-- Never expose full bus passenger list to parents.
-
----
-
-## 3.10 Dedicated Library UX
-
-### Purpose
-
-Library can remain a later/locked module initially, but future UX should support book inventory, issue/return, overdue tracking, and borrowing history.
-
-### Current Implementation Snapshot
-
-As of May 6, 2026, the web admin dashboard has a Library admin foundation:
-
-- Books, copies, issue/return, and overdue views use real Library APIs.
-- Book list rows show title, author, ISBN, category, total copies, available copies, and status/action area.
-- Copy and issue statuses use readable badges, including a clearer overdue badge.
-- Placeholder foundation cards exist for Students with borrowed books, Fine records, and Library reports with “Backend endpoint pending.”
-
-### Main Screens
-
-```text
-Books
-Issue/Return
-Students with borrowed books
-Overdue books
-Fine records
-Library reports
-```
-
-### Book List Columns
-
-```text
-Book title
-Author
-ISBN
-Category
-Copies
-Available
-Status
-Action
-```
-
-### UX Rules
-
-- Quick issue/return.
-- Barcode/QR support later.
-- Overdue badge.
-- Student borrowing history.
-- Fine records if enabled.
-
----
-
-## 3.11 Dedicated Canteen UX
-
-### Purpose
-
-Canteen UX should support meal plans, student meal tracking, canteen wallet, daily meal reports, and parent spending controls.
-
-### Current Implementation Snapshot
-
-As of May 6, 2026, the web admin dashboard has a Canteen admin foundation:
-
-- Overview cards for Active Menu Items, Active Meal Plans, Meals Served Today, Wallet Low, Blocked by Limit, and Allergy Warnings.
-- Student ID / QR-style serving panel uses the existing serve meal API and normal student selector.
-- Allergy warning, wallet low, serving, menu, plan, enrollment, POS, and control badges are visible where backend data supports them.
-- Spending controls and AccountingPostingService/backend-controlled copy are visible.
-- Inventory tracking is explicitly marked later after menu, wallet, POS, and reports stabilize.
-
-### Parent/Student UX
-
-```text
-Meal plan
-Wallet balance
-Daily meals
-Spending limit
-Allergy warning
-Top-up history
-```
-
-### Admin UX
-
-```text
-Menu management
-Meal served tracking
-QR/student ID scan
-Canteen wallet
-Item sales
-Daily meal count
-Low balance alerts
-Inventory later
-```
-
-### Statuses
-
-```text
-Meal Served
-Not Served
-Wallet Low
-Blocked by Parent Limit
-Allergy Warning
-```
-
-### UX Rules
-
-- Show allergy warnings clearly.
-- Respect parent spending controls.
-- Keep serving workflow fast.
-- Integrate finance/accounting posting later through proper service boundary.
-
----
-
-## 3.12 Dedicated HR and Payroll UX
-
-### Purpose
-
-HR and Payroll UX should help schools manage staff records, leave, payroll preview, approval, payslips, and audit history.
-
-### HR Dashboard Cards
+Good for principals/admins:
 
 ```text
 Total Staff
-Present Today
-On Leave
 Payroll Drafts
-Pending Approvals
-Upcoming Contracts
+Pending Journals
+Fiscal Period Status
+Recent Leave Requests
+Payroll Preview
+Accounting Summary
+Recent Journals
 ```
 
-### Staff Profile Tabs
+### Staff Directory
+
+Table columns:
 
 ```text
-Overview
-Attendance
-Leave
-Payroll
-Documents
-Performance
-Activity Log
+Name
+Employee ID
+Department
+Designation
+Status
+Actions
 ```
 
-### Payroll Screens
+### Payroll
+
+Use workflow:
 
 ```text
-Payroll preview
-Draft payroll run
-Approval
-Payslip generation
-Payroll posting
-Payroll history
+1. Prepare Payroll
+2. Preview
+3. Approve
+4. Post to Accounting
+5. Mark Paid
+6. Generate Payslips
 ```
 
-### Payroll Statuses
+Payroll statuses:
 
 ```text
 Draft
@@ -1214,298 +1089,271 @@ Paid
 Cancelled
 ```
 
-### UX Rules
+Payroll rules:
 
-- Preview before posting.
-- Approval required.
-- No silent edits after posting.
-- Audit all payroll actions.
-- Show payroll posting state clearly.
+- Posted payroll must not be silently edited.
+- Corrections should use reversal/correction workflow.
+- Payslip generation should use backend PDF/report APIs.
 
----
+### Accounting
 
-## 3.13 Dedicated Settings UX
+Accounting UI must be stricter than other modules.
 
-### Purpose
+Rules:
 
-Settings UX should help schools complete setup, configure academic structures, control access, and manage operational preferences.
-
-### School Settings Sections
-
-```text
-School profile
-Academic year
-Class/section setup
-Fee setup
-Attendance settings
-Notice settings
-Role permissions
-Branding
-Security
-Integrations
-```
-
-### Setup Progress
-
-Show setup checklist:
-
-```text
-School profile completed
-Academic year configured
-Classes created
-Fee structure added
-Users invited
-Attendance rules configured
-```
-
-Progress card example:
-
-```text
-Setup 70% complete
-Finish setup
-```
-
-### UX Rules
-
-- Use grouped settings sections.
-- Show setup warnings clearly.
-- Do not mix school settings with platform settings.
-- Show permission warnings before changing roles.
-- Use audit logs for sensitive settings changes.
+- Show fiscal period status clearly.
+- Show debit/credit balance check.
+- Show source document links.
+- Never edit posted journals silently.
+- Use reversal/correction flow.
+- Show audit history.
+- Reports must come from backend ledger data.
 
 ---
 
-## 3.14 Dedicated Platform Control Plane UX
+## 8.10 Library
 
-### Purpose
+Main job:
 
-The Platform Control Plane is for SchoolOS owner/operator roles and must remain separate from school admin screens.
+> Manage books, copies, issue/return, overdue books, and fines.
 
-### Platform Dashboard Cards
-
-```text
-Total Schools
-Active Schools
-Suspended Schools
-Monthly Revenue
-Storage Usage
-API Health
-Failed Jobs
-New Tenants
-```
-
-### Platform Screens
+Recommended layout:
 
 ```text
-Tenants/Schools
-Subscriptions
-Usage
-Billing
-Health
-Audit Logs
-Support Access
-Onboarding
+Library KPI cards
+Book catalog
+Selected book details
+Issue / return panel
+Borrower history
+Overdue books
 ```
 
-### Developer Portal UX
+Book and copy concepts must be visually separate.
 
-Future developer-focused area should include:
+Book:
 
 ```text
-API documentation links
-API key management
-Webhook endpoints
-Request logs
-Error logs
-Rate limit visibility
-Integration guides
-Sandbox/test tenant setup
+Title
+Author
+ISBN
+Category
 ```
 
-### Platform UX Rules
+Copy:
 
-- Use operator-console visual style, different from school admin.
-- Show cross-tenant warnings clearly.
-- Never mix tenant-scoped settings with platform settings.
-- Support actions must be audited.
-- Developer keys and secrets must be masked.
-- Platform actions should require platform roles only.
+```text
+Barcode/QR
+Copy number
+Status
+```
+
+Statuses:
+
+```text
+Available
+Issued
+Overdue
+Lost
+Damaged
+Under Repair
+```
+
+Issue flow:
+
+```text
+Scan/Search Student
+Scan/Search Book Copy
+Select Due Date
+Issue Book
+```
 
 ---
 
-# 4. Full Mobile Portal UX
+## 8.11 Transport
 
-The app experience should be mobile-first and role-specific. It can initially be a responsive PWA inside the Next.js app, with native mobile/Expo considered later only if needed.
+Main job:
 
-## 4.1 Mobile Portal Routes
+> Track active routes, manage vehicles, and ensure students are safely onboard/dropped.
 
-Recommended initial PWA-style routes:
+Recommended layout:
 
 ```text
-/mobile
-/mobile/home
-/mobile/attendance
-/mobile/timetable
-/mobile/homework
-/mobile/fees
-/mobile/profile
-/mobile/transport
-/mobile/messages
-/mobile/notices
-/mobile/results
+Transport KPI cards
+Live route map
+Routes & stops
+Vehicle/driver assignments
+Active trip timeline
+Students onboard
+Alerts
+Quick actions
 ```
 
-## 4.2 Parent App UX
+Safety rules:
 
-### Parent Goals
+- Parents must only see their own child.
+- Driver app must only show assigned route/trip.
+- Admins can see full transport data.
+- Every live map should show last updated time.
 
-Parents need quick answers:
-
-- Is my child present today?
-- Is there homework?
-- Is there a fee due?
-- Is the bus safe/on time?
-- Are there new notices?
-- Can I message the class teacher?
-
-### Parent Home Screen
-
-Sections:
+Parent transport mobile should show:
 
 ```text
-Greeting
-Child switcher
-Today summary card
-School update banner
-Quick access grid
-Homework due
-Fee due
+My child
 Bus status
-Latest notices
+ETA
+Route timeline
+Driver name
+Vehicle number
+Emergency contact
+Last updated time
 ```
 
-Quick actions:
+Driver view should be simple:
 
 ```text
-Attendance
-Homework
-Timetable
-Fees
-Report Card
-Transport
-Notices
-Chat Teacher
-Events
+Start Trip
+Next Stop
+Mark Boarded
+Mark Dropped
+Call School
+End Trip
 ```
 
-### Parent Safety Rules
+---
 
-- Parents only see their own linked children.
-- Parents cannot see other students.
-- Parent chat must be moderated and auditable.
-- Fees and medical data require strict role checks.
+## 8.12 Canteen
 
-## 4.3 Teacher App UX
+Main job:
 
-### Teacher Goals
+> Serve meals quickly, manage wallet balance, and prevent allergy/spending issues.
 
-Teachers need fast daily actions:
+Recommended layout:
 
 ```text
-See today’s classes
-Mark attendance
-Assign homework
-Review homework
-Upload marks
-Reply to parent messages
-See substitution duties
+Canteen KPI cards
+Today’s menu
+Meal serving counter
+Student wallet summary
+Allergy warnings
+Recent transactions
+Top selling items
+Quick actions
 ```
 
-### Teacher Home Cards
+Serving workflow:
 
 ```text
-Today’s Classes
-Attendance to Mark
-Homework to Review
-Parent Messages
-Substitution Duty
-Notices
+Scan student ID
+Show student
+Show wallet balance
+Show allergy warning
+Serve Meal
+Confirm
 ```
 
-### Teacher UX Rules
-
-- Minimize typing on mobile.
-- Use quick actions.
-- Do not overload teacher app with admin-only workflows.
-- Respect chat quiet hours.
-
-## 4.4 Student App UX with Age-Aware Control
-
-Student access must be age-aware and parent-controlled.
-
-### Student Goals
+Wallet statuses:
 
 ```text
-See today’s timetable
-Check homework
-View results/report cards
-Read notices
-Access learning resources
-Track attendance if allowed
+Sufficient
+Low Balance
+Zero Balance
+Blocked by Parent Limit
 ```
 
-### Age Verification and Phone Usage Policy
-
-| Age Group | Access Model | Phone Usage UX |
-|---|---|---|
-| Under 10 | Parent-controlled only | No independent student login by default |
-| 10-12 | Limited student view | Parent approval required |
-| 13-15 | Student login allowed with controls | Parent/school controlled features |
-| 16+ | Expanded student portal | Still school-policy controlled |
-
-### Parent-Controlled Student Access
-
-Parents/school should control:
+Allergy warning example:
 
 ```text
-Whether student login is enabled
-Which modules student can access
-Whether chat is available
-Whether result details are visible
-Notification preferences
-Device/session access
+Warning: This student has peanut allergy.
+Serving this item requires admin override.
 ```
 
-### Student Restrictions
+---
 
-- No direct unrestricted teacher chat for younger students.
-- No visibility into other students.
-- No financial payment controls except read-only fee visibility if allowed.
-- Sensitive guardian/medical information should be hidden or minimized.
-- Parent can disable student app access.
+## 8.13 Reports
 
-## 4.5 Driver App UX
+Main job:
 
-Driver UX should be simple, safe, and route-focused.
+> Filter, preview, export, and audit reports safely.
 
-Screens/actions:
+Reports layout:
 
 ```text
-Assigned route
-Start trip
-View stops
-Mark boarded
-Mark dropped
-Emergency call
-End trip
-Trip history
+Report category cards
+Saved/common reports
+Filter panel
+Preview table/chart
+Export actions
+Export history
 ```
 
-Driver should not see unnecessary school, finance, or academic data.
+Rules:
 
-## 4.6 Mobile Navigation
+- Reports must come from backend APIs.
+- Heavy exports should use background jobs where needed.
+- Export actions must be audited for sensitive data.
+- Do not compute financial/accounting truth only in frontend.
 
-Parent/student:
+---
+
+## 8.14 Settings
+
+Main job:
+
+> Configure school behavior safely without confusing daily operators.
+
+Recommended settings groups:
+
+```text
+School Profile & Branding
+Academic Year
+Fiscal Year
+Attendance Rules
+Fee & Receipt Settings
+Communication Settings
+Parent-Teacher Chat Hours
+User & Role Management
+Feature Toggles
+Data & Exports
+```
+
+Rules:
+
+- Settings must be grouped by school operations language.
+- Dangerous settings require confirmation.
+- Changes affecting finance, attendance lock, fiscal year, chat availability, and feature access must be audited.
+
+---
+
+## 9. Mobile/PWA Direction
+
+Mobile must be role-specific and simpler than web.
+
+### 9.1 Parent Mobile
+
+Parent home should answer:
+
+```text
+Is my child present?
+Any fee due?
+Any homework?
+Any notice?
+Where is the bus?
+```
+
+Recommended parent home:
+
+```text
+Child Switcher
+Today Overview
+Quick Actions
+Latest Notice
+Homework Due
+Fee Due
+Bus Status
+Recent Activity
+```
+
+Navigation:
 
 ```text
 Home
@@ -1515,7 +1363,30 @@ Messages
 Profile
 ```
 
-Teacher:
+### 9.2 Teacher Mobile
+
+Teacher home should answer:
+
+```text
+What class do I have now?
+Do I need to mark attendance?
+Any homework to review?
+Any parent messages?
+Any substitution duty?
+```
+
+Recommended teacher home:
+
+```text
+Today’s Classes
+Attendance to Mark
+Homework Review Queue
+Notices
+Parent Messages
+Substitution Duty
+```
+
+Navigation:
 
 ```text
 Home
@@ -1525,352 +1396,454 @@ Messages
 Profile
 ```
 
-Driver:
+### 9.3 Student Mobile
+
+Student app must be age-aware.
+
+Student should see:
 
 ```text
-Trip
-Route
-Messages
-Profile
+Timetable
+Homework
+Results
+Notices
+Attendance summary
 ```
 
----
+Rules:
 
-# 5. Nepal-Friendly UX Requirements
+- No financial controls.
+- No unrestricted chat.
+- Parent/school policy should control student access.
 
-SchoolOS should support Nepal school workflows from the beginning.
+### 9.4 Driver Mobile
 
-## 5.1 Local Requirements
+Driver UX should be route-focused.
+
+Screens/actions:
 
 ```text
-NPR currency
-Nepali phone number format
-Guardian contact structure
-Grade/Class/Section naming
-Cash, bank, QR payment labels
-Receipt printing
-Nepali date / Bikram Sambat later
-SMS/Viber/WhatsApp-ready communication later
-Local exam/report card structure
-Transport stop names
-Local vehicle number formats
+Assigned Route
+Start Trip
+View Stops
+Mark Boarded
+Mark Dropped
+Emergency Call
+End Trip
+Trip History
 ```
 
-## 5.2 Examples
-
-```text
-Class 10 - Section A
-NPR 25,000
-Ba 2 Kha 1234
-Guardian: Father / Mother / Local Guardian
-Usually replies within 1 school day
-```
-
-## 5.3 Nepal-Friendly Finance UX
-
-- Use `NPR` consistently.
-- Support manual cash/bank/QR collection first.
-- Add eSewa/Khalti only after manual reconciliation is stable.
-- Print receipts clearly.
-- Show cashier close/day-end status.
-
-## 5.4 Nepal-Friendly Communication UX
-
-- Parent notifications should support SMS/push later.
-- Chat hours should match Nepal school routines.
-- Default recommended chat hours:
-  - Sunday-Thursday: 4:00 PM-7:00 PM.
-  - Friday: 2:00 PM-5:00 PM.
-  - Saturday/public holidays: closed except emergency.
+Driver should not see finance, academic, or unnecessary student profile data.
 
 ---
 
-# 6. Implementation Plan
-
-## Phase UI-0: UI Audit and Foundation
-
-Goal: understand current UI and prepare the design foundation.
-
-Tasks:
-
-- Audit current `apps/web` routes and components.
-- Identify duplicate UI patterns.
-- Document current dashboard, student, finance, attendance, and settings screens.
-- Finalize design tokens.
-- Finalize navigation groups.
-
-Deliverables:
-
-- UI audit notes.
-- Design token plan.
-- Component inventory.
-
----
-
-## Phase UI-1: Global Design System
-
-Goal: create consistent UI building blocks.
-
-Tasks:
-
-- Add/standardize theme tokens.
-- Build shared components: PageHeader, SectionCard, StatCard, StatusBadge, EmptyState, LoadingState, ActionMenu.
-- Standardize buttons, inputs, filters, cards, badges, and spacing.
-
-Deliverables:
-
-- Shared design components.
-- Consistent visual system.
-
----
-
-## Phase UI-2: Web Shell and Navigation
-
-Goal: improve the main school admin layout.
-
-Tasks:
-
-- Redesign dashboard shell.
-- Add grouped sidebar.
-- Add active route state.
-- Add module badges: Live, Phase 2, Later, Locked.
-- Improve topbar with search, notification, profile, academic year/school context.
-
-Deliverables:
-
-- Improved web admin shell.
-- Cleaner navigation.
-
----
-
-## Phase UI-3: School Dashboard Redesign
-
-Goal: make dashboard a daily command center.
-
-Tasks:
-
-- Add welcome/school summary section.
-- Add KPI cards.
-- Add attendance overview.
-- Add fee collection overview.
-- Add notices/events panel.
-- Add pending actions/recent activity.
-
-Deliverables:
-
-- Modern school dashboard.
-
----
-
-## Phase UI-4: Student and Admissions UX
-
-Goal: make student and admission operations faster and clearer.
-
-Tasks:
-
-- Redesign student list.
-- Add filters and action menu.
-- Improve student profile with cards and tabs.
-- Improve guardian, document, attendance, fee, and activity views.
-- Add admission pipeline and step-based admission form polish.
-
-Deliverables:
-
-- Modern student directory.
-- Improved student profile.
-- Admission workflow UI foundation.
-
----
-
-## Phase UI-5: Core Academic Workflow UX
-
-Goal: improve daily academic workflows.
-
-Tasks:
-
-- Attendance calendar and summary views.
-- Homework cards and review flow.
-- Timetable timeline/grid views.
-- Timetable conflict UI.
-- Exam/result/report card UX polish.
-- Notice center polish.
-
-Deliverables:
-
-- Better academics and communication workflows.
-
----
-
-## Phase UI-6: Finance and Accounting UX
-
-Goal: make finance safe, clear, and professional.
-
-Tasks:
-
-- Improve fee collection screens.
-- Improve student fee ledger.
-- Improve receipt/cashier close UI.
-- Build accounting dashboard polish.
-- Add posting/fiscal-period/reversal warnings.
-
-Deliverables:
-
-- Production-grade finance/accounting UI.
-
----
-
-## Phase UI-7: Operations UX
-
-Goal: improve school operations modules.
-
-Current status:
-
-```text
-Sprint 1 complete for web admin Library, Transport, and Canteen polish.
-Parent/mobile portal, driver app, live map/WebSocket UI, full canteen inventory/vendor workflows, and AI/ML remain out of scope.
-```
-
-Tasks:
-
-- Transport admin route dashboard and parent tracking foundation.
-- Library future UI foundation.
-- Canteen future UI foundation.
-- Activity feed grouping and audit visibility.
-- HR/payroll UX polish.
-
-Deliverables:
-
-- Clear operations module UX.
-- Future-ready Library/Canteen UX foundations.
-
----
-
-## Phase UI-8: Platform and Developer UX
-
-Goal: separate platform/operator/developer experience from school admin.
-
-Tasks:
-
-- Improve platform dashboard.
-- Improve tenant/school management UI.
-- Add health/usage cards.
-- Add developer portal placeholders for API docs, keys, webhooks, logs.
-
-Deliverables:
-
-- Cleaner platform control plane.
-- Developer portal foundation.
-
----
-
-## Phase UI-9: Mobile/PWA Portal Foundation
-
-Goal: create parent/student/teacher mobile experience as PWA-style routes.
-
-Tasks:
-
-- Create `MobileShell`.
-- Add role-based mobile bottom nav.
-- Build parent/student home.
-- Build attendance, timetable, homework, fees, profile screens.
-- Add transport placeholder.
-
-Deliverables:
-
-- Mobile portal foundation.
-
----
-
-## Phase UI-10: Role-Specific App UX
-
-Goal: deepen mobile flows for parents, teachers, students, and drivers.
-
-Tasks:
-
-- Parent child switcher and teacher chat.
-- Teacher class/attendance/homework flow.
-- Student age-aware access controls.
-- Driver trip screen.
-- Transport tracking UI.
-
-Deliverables:
-
-- Role-specific app UX.
-
----
-
-## Phase UI-11: Polish and Production Readiness
-
-Goal: make the UI ready for pilot schools.
-
-Tasks:
-
-- Responsive testing.
-- Accessibility testing.
-- Loading/empty/error states.
+## 10. Accessibility and Responsiveness
+
+Every redesigned screen must support:
+
+- Keyboard focus states.
+- Visible focus rings.
+- Sufficient text contrast.
+- Responsive desktop/tablet layout.
+- Mobile-friendly layouts where applicable.
+- Loading states.
+- Empty states.
+- Error states.
 - Permission-denied states.
-- Audit-sensitive UI review.
-- Performance cleanup.
-- Visual consistency pass.
+- Confirmation dialogs for destructive actions.
+- Clear labels for icons.
 
-Deliverables:
+Minimum viewport checks:
 
-- Production-ready UI/UX baseline.
-
----
-
-# 7. Module-by-Module Priority Matrix
-
-| Module | Web Admin Priority | Mobile Priority | Notes |
-|---|---:|---:|---|
-| Landing Page | High | High | Converts schools to demos/onboarding |
-| Dashboard | High | Medium | First impression of system |
-| Students | High | Medium | Core school record |
-| Admissions | High | Low | Admin-heavy but important for onboarding |
-| Attendance | High | High | Daily workflow |
-| Fees | High | High | Business-critical |
-| Receipts | High | Medium | Trust and audit critical |
-| Accounting | High | Low | Admin/accountant only |
-| Homework | Medium | High | Parent/student important |
-| Timetable | Medium | High | Parent/student/teacher important |
-| Exams | Medium | Medium | Seasonal but high-impact |
-| Report Cards | Medium | High | Parent/student important |
-| Notices | High | High | Communication-critical |
-| Parent-Class Teacher Chat | Medium | High | Phase 2/3 after notification center is stable |
-| Activity Feed | Medium | Low | Admin/staff mostly |
-| Transport | Medium | High | Unique feature and parent trust driver |
-| Library | Low | Low | Later module |
-| Canteen | Low | Medium | Later module, parent wallet controls important |
-| HR/Payroll | Medium | Low | Admin/staff only |
-| Settings | High | Low | Setup-critical |
-| Platform Control | Medium | None | Operator only |
-| Developer Portal | Low | None | Future integrations/API ecosystem |
-| Driver App | Low | High | Needed when transport live tracking matures |
+```text
+Desktop: 1440px
+Laptop: 1280px
+Tablet: 768px
+Mobile/PWA: 390px
+```
 
 ---
 
-# 8. Final Recommended Execution Order
+## 11. Implementation Plan
 
-Do not start with mobile first. The best order is:
+Do not implement all screens at once. Use small, safe UI slices.
 
-1. Global design system.
-2. Web admin shell/navigation.
-3. School dashboard.
-4. Student list/profile.
-5. Admissions workflow polish.
-6. Attendance, timetable, homework.
-7. Exams and report cards.
-8. Fees and receipts.
-9. Accounting dashboard and ledger-safe UI.
-10. Notices and communication.
-11. Settings/setup UX.
-12. HR/payroll UX.
-13. Transport admin foundation.
-14. Library and canteen future UI placeholders.
-15. Platform control plane.
-16. Developer portal foundation.
-17. Mobile parent/student/teacher portal.
-18. Transport live tracking and driver app.
-19. Final polish, accessibility, and production readiness.
+### UI-A — Foundation
 
-This order avoids visual inconsistency and prevents building mobile screens before the core design system is stable.
+Implement first:
+
+```text
+SchoolOS theme tokens
+DashboardShell
+Sidebar
+Topbar
+PageHeader
+SectionCard
+StatCard
+StatusBadge
+SearchInput
+FilterBar
+EmptyState
+LoadingState
+ErrorState
+PermissionState
+ActionMenu
+ConfirmDialog
+Toast
+```
+
+Verification:
+
+```bash
+pnpm --filter web lint
+pnpm --filter web typecheck
+pnpm --filter web build
+```
+
+### UI-B — Shell and Dashboard
+
+Redesign:
+
+```text
+/dashboard shell layout
+Dashboard KPI cards
+Attendance chart card
+Fee collection chart card
+Notices card
+Upcoming tasks card
+Recent activity card
+```
+
+Use real API summaries where available; otherwise show safe empty states.
+
+### UI-C — Students and Admissions
+
+Redesign:
+
+```text
+Student directory
+Student detail route /dashboard/students/[studentId]
+Guardian cards
+Attendance tab/card
+Fee ledger preview
+Document list
+Recent activity
+Admissions pipeline
+Application review panel
+Admission checklist
+```
+
+Must preserve existing backend workflows for:
+
+- Student creation.
+- Guardian linking.
+- Duplicate detection.
+- Document management.
+- Lifecycle.
+- ID card.
+- Certificate actions.
+
+### UI-D — Attendance
+
+Redesign:
+
+```text
+Attendance filters
+Present/Absent/Late/Leave stat cards
+Attendance register
+Monthly snapshot
+Attendance trend
+Correction requests panel
+Export and print actions
+```
+
+Attendance must remain teacher-first and fast:
+
+```text
+Select class
+Mark all present
+Change exceptions
+Submit
+```
+
+### UI-E — Fees and Receipts
+
+Redesign:
+
+```text
+Today collection KPI
+Outstanding dues KPI
+Pending invoices KPI
+Cashier close status KPI
+Student dues list
+Selected student ledger
+Collect payment panel
+Invoice / receipt history
+Top defaulters
+Quick actions
+```
+
+Finance guardrails:
+
+- Backend totals only.
+- Backend ledger APIs only.
+- Confirmation for collection/reversal/close.
+- Never silently edit confirmed records.
+
+### UI-F — Communications and Activity
+
+Redesign:
+
+```text
+Activity feed
+Milestones
+Notices table
+Delivery records
+Consent management
+Delivery retry actions
+Unread/read tracking
+Notification center
+```
+
+Media preview/download must use signed URL patterns where available.
+
+### UI-G — Academics, Homework, Timetable
+
+Implement UI foundation for:
+
+```text
+Exams, CAS & Report Cards
+Mark entry table
+Grading summary
+Report card preview
+Homework assignment list
+Weekly timetable grid
+Conflict warnings
+Submission/review overview
+```
+
+### UI-H — HR, Payroll, Accounting
+
+Implement UI foundation for:
+
+```text
+Staff directory
+Leave & attendance summary
+Payroll preview/run workflow
+Payslip actions
+Accounting summary
+Recent journals
+Trial balance snapshot
+Fiscal period warning
+Reversal/correction actions
+```
+
+Accounting and payroll must follow immutable posting and correction/reversal rules.
+
+### UI-I — Library, Transport, Canteen
+
+Implement UI foundation for:
+
+```text
+Library book catalog
+Issue/return panel
+Overdue list
+Transport route dashboard
+Vehicle/driver assignment
+Trip timeline
+Canteen menu
+Meal serving counter
+Wallet summary
+Allergy warnings
+```
+
+### UI-J — Settings, Reports, Accessibility, Browser QA
+
+Finalize:
+
+```text
+Settings groups
+Report filters/export UI
+Responsive layouts
+Accessibility states
+Playwright browser smoke tests
+PDF/report visual polish
+```
+
+---
+
+## 12. Recommended PR Sequence
+
+Use small pull requests:
+
+```text
+PR 1: Design tokens and shared components
+PR 2: Dashboard shell, sidebar, topbar
+PR 3: Dashboard command center
+PR 4: Students and student detail redesign
+PR 5: Admissions redesign
+PR 6: Attendance redesign
+PR 7: Fees and receipts redesign
+PR 8: Communications and activity redesign
+PR 9: Exams, homework, timetable UI foundation
+PR 10: HR, payroll, accounting UI foundation
+PR 11: Library, transport, canteen UI foundation
+PR 12: Settings, reports, accessibility, and browser smoke tests
+```
+
+---
+
+## 13. Acceptance Criteria
+
+A redesigned screen is accepted only when:
+
+```text
+It uses shared design components instead of one-off styling.
+It consumes real APIs for implemented workflows.
+It has loading, empty, error, and permission-denied states.
+It preserves tenant isolation and cookie-first auth behavior.
+It does not introduce fake production workflows.
+It keeps destructive actions behind confirmation.
+It remains responsive at desktop and tablet widths.
+It uses school-friendly language.
+It keeps the main job of the screen obvious.
+It passes lint, typecheck, and build.
+```
+
+---
+
+## 14. Verification Commands
+
+After every frontend UI PR:
+
+```bash
+pnpm --filter web lint
+pnpm --filter web typecheck
+pnpm --filter web build
+```
+
+After larger cross-module UI work:
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm verify:production
+```
+
+After browser-flow changes:
+
+```bash
+pnpm test:e2e
+```
+
+When Docker/API are running:
+
+```bash
+pnpm smoke:phase1
+```
+
+---
+
+## 15. Cleanup Instruction for Existing Design Docs
+
+This document should become the single design source of truth in `docs/design`.
+
+Recommended cleanup:
+
+```bash
+mkdir -p docs/design
+find docs/design -type f ! -name 'SCHOOLOS_FINAL_UI_UX_DIRECTION.md' -delete
+```
+
+Then place this file at:
+
+```text
+docs/design/SCHOOLOS_FINAL_UI_UX_DIRECTION.md
+```
+
+If older docs still contain useful historical notes, move them to an archive before deleting:
+
+```bash
+mkdir -p docs/archive/design
+find docs/design -type f ! -name 'SCHOOLOS_FINAL_UI_UX_DIRECTION.md' -exec mv {} docs/archive/design/ \;
+```
+
+Use delete only when the team is sure this file fully replaces the older design docs.
+
+---
+
+## 16. First Implementation Prompt
+
+Use this prompt to start implementation safely:
+
+```text
+Read these files first:
+- PROJECT_CONTEXT.md
+- ARCHITECTURE.md
+- DEVELOPMENT_RULES.md
+- docs/design/SCHOOLOS_FINAL_UI_UX_DIRECTION.md
+- docs/project/SCHOOLOS_PROJECT_MEMORY.md
+- docs/project/SCHOOLOS_PHASE_STRUCTURE.md
+- docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md
+
+Task:
+Start the SchoolOS screenshot-based web admin redesign with UI foundation only.
+
+Scope:
+- Work only inside apps/web unless a shared frontend type already belongs in packages/core.
+- Do not rewrite backend.
+- Do not migrate to Angular.
+- Do not rename tenantId.
+- Do not remove existing working module logic.
+- Do not introduce fake production workflows.
+- Do not redesign all pages in one PR.
+
+Required work:
+1. Add or standardize SchoolOS visual tokens using the existing CSS/Tailwind setup.
+2. Create shared components:
+   - PageHeader
+   - SectionCard
+   - StatCard
+   - StatusBadge
+   - EmptyState
+   - LoadingState
+   - ErrorState
+   - PermissionState
+   - ActionMenu
+   - ConfirmDialog
+3. Keep components generic and reusable.
+4. Preserve current auth and API behavior.
+5. Add examples by refactoring only one low-risk dashboard section if needed.
+
+Verification:
+- pnpm --filter web lint
+- pnpm --filter web typecheck
+- pnpm --filter web build
+
+Return:
+- Summary
+- Files changed
+- Components added
+- Tests run
+- Verification results
+- Remaining gaps
+```
+
+---
+
+## 17. Final Design Rule
+
+SchoolOS should look modern and premium, but it should operate like a calm daily school desk.
+
+The UI should make the user feel:
+
+```text
+I know where I am.
+I know what needs attention.
+I know what action to take next.
+I trust the system with school data, money, attendance, and children.
+```
+
+That is the final UI/UX direction.

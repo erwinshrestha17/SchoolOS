@@ -1,4 +1,13 @@
-import { PrismaClient, AuthMethod, UserStatus, Mode } from '@prisma/client';
+import {
+  AssessmentType,
+  AuthMethod,
+  ExamTermStatus,
+  HomeworkAssignmentStatus,
+  Mode,
+  Prisma,
+  PrismaClient,
+  UserStatus,
+} from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
 import 'dotenv/config';
@@ -24,6 +33,12 @@ type SeedUser = {
   roleName: string;
   email: string;
   password: string;
+};
+
+type SeedSubject = {
+  name: string;
+  code: string;
+  type: string;
 };
 
 const seedUsers: SeedUser[] = [
@@ -124,7 +139,6 @@ async function main() {
 async function cleanupLegacyData(tenantId: string) {
   console.log('Cleaning up legacy seed data...');
 
-  // Delete legacy superadmin user
   await prisma.user.deleteMany({
     where: {
       tenantId,
@@ -132,7 +146,6 @@ async function cleanupLegacyData(tenantId: string) {
     },
   });
 
-  // Delete legacy super_admin role if it exists as a tenant role
   await prisma.role.deleteMany({
     where: {
       tenantId,
@@ -144,7 +157,7 @@ async function cleanupLegacyData(tenantId: string) {
 async function seedTenantSettings(tenantId: string) {
   console.log('Seeding default tenant settings...');
 
-  const defaults: Array<{ key: string; value: any }> = [
+  const defaults: Array<{ key: string; value: Prisma.InputJsonValue }> = [
     { key: 'school_name', value: 'Everest Academy Secondary School' },
     { key: 'school_address', value: 'Bakhundole, Lalitpur, Nepal' },
     { key: 'school_phone', value: '+977-1-5555555' },
@@ -520,25 +533,39 @@ async function ensureSeedUserWithRole({
 
 async function seedSubjects(tenantId: string) {
   console.log('Seeding basic subjects...');
-  const subjects = ['Mathematics', 'Science', 'English', 'Social Studies', 'Nepali'];
+
+  const subjects: SeedSubject[] = [
+    { name: 'Mathematics', code: 'MATH', type: 'CORE' },
+    { name: 'Science', code: 'SCI', type: 'CORE' },
+    { name: 'English', code: 'ENG', type: 'CORE' },
+    { name: 'Social Studies', code: 'SOC', type: 'CORE' },
+    { name: 'Nepali', code: 'NEP', type: 'CORE' },
+  ];
+
   const classes = await prisma.class.findMany({ where: { tenantId } });
 
   for (const cls of classes) {
-    for (const subjectName of subjects) {
+    for (const subject of subjects) {
+      const code = `${cls.name.replace(/\s+/g, '')}-${subject.code}`;
+
       await prisma.subject.upsert({
         where: {
-          tenantId_classId_name: {
+          tenantId_classId_code: {
             tenantId,
             classId: cls.id,
-            name: subjectName,
+            code,
           },
         },
-        update: {},
+        update: {
+          name: subject.name,
+          type: subject.type,
+        },
         create: {
           tenantId,
           classId: cls.id,
-          name: subjectName,
-          code: `${cls.name.replace(/\s+/g, '')}-${subjectName.substring(0, 3).toUpperCase()}`,
+          name: subject.name,
+          code,
+          type: subject.type,
         },
       });
     }
@@ -548,68 +575,133 @@ async function seedSubjects(tenantId: string) {
 async function seedAcademicData(tenantId: string, academicYearId: string) {
   console.log('Seeding academic sample data...');
 
-  // 1. Exam Term
-  const examTerm = await prisma.examTerm.upsert({
+  const examTermName = 'First Terminal Exam';
+  const startsOn = new Date();
+  const endsOn = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  const existingExamTerm = await prisma.examTerm.findFirst({
     where: {
-      tenantId_name: {
-        tenantId,
-        name: 'First Terminal Exam',
-      },
-    },
-    update: {},
-    create: {
       tenantId,
       academicYearId,
-      name: 'First Terminal Exam',
-      startsOn: new Date(),
-      endsOn: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      weightPercent: 20,
-      status: 'ACTIVE',
+      name: examTermName,
     },
   });
 
-  // 2. Assessment Components for Math in Class 1
-  const class1 = await prisma.class.findFirst({ where: { tenantId, name: 'Class 1' } });
-  if (class1) {
-    const math = await prisma.subject.findFirst({ where: { tenantId, classId: class1.id, name: 'Mathematics' } });
-    if (math) {
-      await prisma.assessmentComponent.upsert({
-        where: {
-          tenantId_examTermId_subjectId_name: {
-            tenantId,
-            examTermId: examTerm.id,
-            subjectId: math.id,
-            name: 'Theory',
-          },
+  const examTerm = existingExamTerm
+    ? await prisma.examTerm.update({
+        where: { id: existingExamTerm.id },
+        data: {
+          startsOn,
+          endsOn,
+          weightPercent: new Prisma.Decimal(20),
+          status: ExamTermStatus.ACTIVE,
         },
-        update: {},
-        create: {
-          tenantId,
-          examTermId: examTerm.id,
-          subjectId: math.id,
-          name: 'Theory',
-          maxMarks: 100,
-          passMarks: 40,
-          weightPercent: 100,
-        },
-      });
-
-      // 3. Homework
-      await prisma.homework.create({
+      })
+    : await prisma.examTerm.create({
         data: {
           tenantId,
           academicYearId,
-          classId: class1.id,
-          subjectId: math.id,
-          title: 'Algebra Worksheet #1',
-          instructions: 'Complete the exercises on page 42 of the textbook.',
-          dueAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-          status: 'ASSIGNED',
-          maxScore: 10,
+          name: examTermName,
+          startsOn,
+          endsOn,
+          weightPercent: new Prisma.Decimal(20),
+          status: ExamTermStatus.ACTIVE,
         },
       });
-    }
+
+  const class1 = await prisma.class.findFirst({
+    where: { tenantId, name: 'Class 1' },
+  });
+
+  if (!class1) {
+    return;
   }
+
+  const math = await prisma.subject.findFirst({
+    where: {
+      tenantId,
+      classId: class1.id,
+      code: 'Class1-MATH',
+    },
+  });
+
+  if (!math) {
+    return;
+  }
+
+  await prisma.assessmentComponent.upsert({
+    where: {
+      tenantId_examTermId_subjectId_name: {
+        tenantId,
+        examTermId: examTerm.id,
+        subjectId: math.id,
+        name: 'Theory',
+      },
+    },
+    update: {
+      type: AssessmentType.THEORY,
+      maxMarks: new Prisma.Decimal(100),
+      passMarks: new Prisma.Decimal(40),
+      weightPercent: new Prisma.Decimal(100),
+    },
+    create: {
+      tenantId,
+      examTermId: examTerm.id,
+      subjectId: math.id,
+      name: 'Theory',
+      type: AssessmentType.THEORY,
+      maxMarks: new Prisma.Decimal(100),
+      passMarks: new Prisma.Decimal(40),
+      weightPercent: new Prisma.Decimal(100),
+    },
+  });
+
+  const homeworkTitle = 'Algebra Worksheet #1';
+  const homeworkDueDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+
+  const existingHomework = await prisma.homeworkAssignment.findFirst({
+    where: {
+      tenantId,
+      academicYearId,
+      classId: class1.id,
+      subjectId: math.id,
+      title: homeworkTitle,
+    },
+  });
+
+  if (existingHomework) {
+    await prisma.homeworkAssignment.update({
+      where: { id: existingHomework.id },
+      data: {
+        instructions: 'Complete the exercises on page 42 of the textbook.',
+        dueDate: homeworkDueDate,
+        dueAt: homeworkDueDate,
+        assignedDate: new Date(),
+        status: HomeworkAssignmentStatus.ASSIGNED,
+        maxScore: new Prisma.Decimal(10),
+        submissionRequired: true,
+      },
+    });
+
+    return;
+  }
+
+  await prisma.homeworkAssignment.create({
+    data: {
+      tenantId,
+      academicYearId,
+      classId: class1.id,
+      subjectId: math.id,
+      title: homeworkTitle,
+      instructions: 'Complete the exercises on page 42 of the textbook.',
+      dueDate: homeworkDueDate,
+      dueAt: homeworkDueDate,
+      assignedDate: new Date(),
+      status: HomeworkAssignmentStatus.ASSIGNED,
+      maxScore: new Prisma.Decimal(10),
+      submissionRequired: true,
+    },
+  });
 }
 
 main()
