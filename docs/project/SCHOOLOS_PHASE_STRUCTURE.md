@@ -8,6 +8,12 @@ Current source of truth:
 docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
 ```
 
+Current repo audit:
+
+```text
+docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
+```
+
 Related focused plans:
 
 ```text
@@ -16,7 +22,7 @@ docs/project/SCHOOLOS_M11_INTELLIGENCE_ROADMAP.md
 docs/project/SCHOOLOS_M9_ACCOUNTING_COMPLETION.md
 ```
 
-Keep this file only as a compatibility pointer for older prompts that still reference `SCHOOLOS_PHASE_STRUCTURE.md`.
+Keep this file as a phase compatibility pointer for older prompts that still reference `SCHOOLOS_PHASE_STRUCTURE.md`.
 
 ---
 
@@ -26,9 +32,20 @@ Keep this file only as a compatibility pointer for older prompts that still refe
 Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
-Phase 2A M4 Academics backend: Complete / contract-protected
+M0 Platform Core Foundation Depth: Completed
+Phase 2A M4 Academics backend: Complete / Contract-Protected
 Phase 2D M9 Accounting: Production Candidate Complete
 Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
+```
+
+Current readiness:
+
+```text
+Demo-ready: Yes
+Internal QA-ready: Yes
+Controlled pilot-ready: Yes, after staging checks
+Multi-school production-ready: Not yet
+Full SchoolOS product complete: No
 ```
 
 ---
@@ -37,18 +54,84 @@ Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-c
 
 | Phase | Name | Goal | Status |
 |---|---|---|---|
-| Phase 1 | Pilot-Ready Core School System | Make the system usable for real live-school daily operations and polish it for pilot use. | Completed |
-| Phase 2 | Academic, HR, Timetable, and Accounting Expansion | Add academic depth, timetable/homework, HR/payroll, full M9 accounting, controlled parent communication expansion, and cross-module hardening such as QR-based Student Identity. | Phase 2A backend complete; M9 Accounting production-candidate complete; other foundations implemented |
-| Phase 3 | Extended School Operations | Add library, transport, canteen, and parent/mobile expansion using shared foundations such as Student QR Identity. | Admin foundations implemented for Library/Transport/Canteen; parent/mobile later |
+| Phase 0 | Technical/SaaS Foundation | Establish monorepo, auth/RBAC, tenant context, database, queues, and verification foundations. | Completed |
+| Phase 1 | Pilot-Ready Core School System | Make the system usable for real live-school daily operations and polish it for pilot use. | Completed / Pilot-Ready |
+| Phase 2 | Academic, HR, Timetable, Communication, and Accounting Expansion | Add academic depth, timetable/homework, HR/payroll, full M9 accounting, controlled parent communication expansion, and cross-module hardening such as QR-based Student Identity. | Phase 2A backend complete; M9 Accounting production-candidate complete; other foundations implemented |
+| Phase 3 | Extended School Operations | Add library, transport, canteen, and parent/mobile expansion using shared foundations such as Student QR Identity. | Admin foundations implemented for Library/Transport/Canteen; parent/mobile and driver/live tracking later |
 | Phase 4 | AI, Analytics, Scale, and Enterprise SaaS | Add M11 School Intelligence & Analytics, AI/ML features, analytics platform, scale optimizations, and enterprise SaaS controls. | Roadmap documented; implementation later |
 
 ---
 
-## Phase 2 Sub-Phases
+## Current Recommended Order
+
+```text
+1. Repo Verification & Stabilization Sprint.
+2. Fix any remaining Prisma/schema/typecheck/test blockers.
+3. Stabilize Homework/Timetable after recent verification follow-ups.
+4. Wire Phase 2A Academics admin UI to completed backend APIs.
+5. Add authenticated Playwright browser smoke tests.
+6. Prepare controlled pilot staging.
+7. Harden one existing vertical at a time after the repo is green.
+```
+
+Do not begin broad new product fronts until this is clean.
+
+---
+
+## Phase 1 — Pilot-Ready Core School System
+
+Status: **Completed / Pilot-Ready**.
+
+### Phase 1A — Core Live-School Workflows
+
+Completed:
+
+```text
+Auth/RBAC/Tenant Isolation
+M1 Admissions and Student Creation
+M2 Attendance Core Workflow
+M3 Fee Collection and Receipts
+M5 Activity Feed and Milestones Core
+M10 Notices, Consent, and Delivery Records
+Dashboard Shell and Core Frontend Screens
+Production Hardening Foundation
+```
+
+### Phase 1B — Operational Depth and Pilot Polish
+
+Completed / pilot-ready:
+
+```text
+Student detail, edit, guardian edit, lifecycle, transfer, documents, roster exports
+Attendance history, monthly register, correction guardrails, CSV/PDF export foundation
+Invoice detail, student ledger, payment reversal/correction, cashier close, reports
+Notification center, read tracking, delivery retry/resend, notice detail
+Activity media access, lifecycle/moderation foundation
+Global search, academic year context, settings/branding foundation
+Functional student ID/receipt PDFs
+```
+
+Remaining polish:
+
+```text
+Final iEMIS export mapping
+Duplicate merge operational depth
+Logo/photo UX polish
+Final PDF visual polish
+Authenticated Playwright browser smoke coverage
+```
+
+---
+
+## Phase 2 — Academic, HR, Timetable, Communication, and Accounting Expansion
+
+Status: **Partially complete**.
+
+Sub-phases:
 
 - 2A Academics, Exams, CAS, and Report Cards — **backend complete / contract-protected**.
-- 2B Homework and Timetable — foundation implemented.
-- 2C HR and Payroll — foundation implemented.
+- 2B Homework and Timetable — foundation implemented; stabilization priority.
+- 2C HR and Payroll — foundation implemented; deeper lifecycle/accounting tests needed.
 - 2D Full M9 Accounting and Finance — **Production Candidate Complete**.
 - 2E Parent Communication Expansion — foundation implemented / further hardening later.
 - 2F Student Identity QR Foundation — foundation documented / staged for vertical reuse.
@@ -86,23 +169,6 @@ Completed backend scope:
 - Phase 2A flow contract test covering the full backend chain.
 ```
 
-Latest verified results:
-
-```text
-pnpm --filter @schoolos/api test src/academics/phase2a-flow.contract.spec.ts
-  PASS: 1 suite / 9 tests
-
-pnpm --filter @schoolos/api test src/integrity/production-contracts.spec.ts
-  PASS: 1 suite / 11 tests
-
-pnpm typecheck
-  PASS: API + web
-
-pnpm test
-  PASS: API 76 suites / 494 tests
-  PASS: Web 71 tests
-```
-
 Next Phase 2A work:
 
 ```text
@@ -111,6 +177,56 @@ Next Phase 2A work:
 - Report card PDF visual polish.
 - Future locked report-card correction/regeneration workflow.
 - Deeper academic reports and exports.
+```
+
+### Phase 2B — Homework and Timetable
+
+Status: **Foundation implemented; stabilization priority**.
+
+Implemented foundation:
+
+```text
+Homework assignment/submission/review/correction foundation
+Timetable setup/versioning foundation
+Teacher/room/class conflict service foundation
+Timetable lifecycle validation service foundation
+Homework attachment access boundaries
+Database guardrails and indexes
+Controller/contract tests
+```
+
+Current priority:
+
+```text
+Resolve any remaining Prisma/schema/service/test drift.
+Run full local verification.
+Add deeper integration tests for locked timetable edits, teacher/room conflicts, substitute availability, homework late/correction/reminder idempotency.
+```
+
+### Phase 2C — HR and Payroll
+
+Status: **Foundation implemented**.
+
+Implemented foundation:
+
+```text
+Staff profile lifecycle
+Contracts
+Salary structures
+Payroll lifecycle
+Payslip/report aliases
+Payroll-to-accounting integration tests
+Database guardrails and indexes
+```
+
+Remaining:
+
+```text
+Leave/payroll deduction depth
+Payroll void/reversal workflows
+Payslip batch generation/storage
+More service/integration tests
+UI polish
 ```
 
 ### Phase 2D — Full M9 Accounting and Finance
@@ -139,19 +255,6 @@ Completed scope:
 - Granular RBAC permissions, audit coverage, and tenant isolation.
 ```
 
-Verification passed:
-
-```text
-pnpm db:generate
-pnpm db:validate
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm test:e2e
-pnpm build
-pnpm verify:production
-```
-
 Remaining future enhancements:
 
 ```text
@@ -161,6 +264,31 @@ Remaining future enhancements:
 - Accounting audit log viewer UI.
 - Seeded Playwright accounting workflow tests.
 - Production seed review for default Chart of Accounts and report mappings.
+```
+
+### Phase 2E — Parent Communication Expansion
+
+Status: **Foundation implemented / deeper hardening later**.
+
+Implemented foundation:
+
+```text
+Parent-class teacher thread model foundation
+Guardian/class-teacher access direction
+Message/read receipt aliases
+Quiet hours/chat availability direction
+Moderation/escalation aliases
+Consent/versioning/marketing preference foundations
+```
+
+Remaining:
+
+```text
+Guardian cannot message unrelated teacher integration tests
+Teacher cannot view unrelated class thread tests
+Quiet-hours/emergency override tests
+Provider callback handling
+Scheduled outside-hours release worker if required
 ```
 
 ### Phase 2F — Student Identity QR Foundation
@@ -183,37 +311,102 @@ Scope:
 - Biometrics intentionally deferred.
 ```
 
-Recommended next work:
-
-```text
-Harden one existing vertical at a time.
-Priority: Phase 2A frontend/admin UI, seeded Accounting browser workflow tests, production seed review for default COA/report mappings, and continued module hardening for Homework/Timetable, HR/Payroll, Library, Transport, and Canteen.
-```
-
 ---
 
-## Phase 3 Sub-Phases
+## Phase 3 — Extended School Operations
+
+Status: **Admin foundations implemented; production depth incomplete**.
+
+Sub-phases:
 
 - 3A Library Management.
 - 3B Transport Management.
 - 3C Canteen Management.
 - 3D Parent and Mobile Expansion.
 
-### Phase 3A — Library Management QR Reuse
+### Phase 3A — Library Management
 
-Use M1 Student QR Identity to identify student borrowers during issue/return flows. Library owns book/copy barcodes separately; student QR only identifies the borrower.
+Implemented foundation:
 
-### Phase 3C — Canteen QR + Wallet Reuse
+```text
+Book catalog
+Copy/barcode tracking
+Issue/return workflow
+Overdue/report endpoints
+Admin UI foundation
+Permissions/indexes/guardrails
+```
 
-Use M1 Student QR Identity for canteen counter lookup, wallet purchases, meal/snack serving, duplicate serving prevention, allergy/dietary warning checks, and parent-visible purchase history.
+Remaining:
+
+```text
+Deeper reports
+Fine/accounting depth
+Barcode/QR UX
+Service-level integration tests
+Popular-books/borrower-history depth
+```
+
+### Phase 3B — Transport Management
+
+Implemented foundation:
+
+```text
+Route/stop/vehicle/driver setup
+Student assignments
+Trip lifecycle
+Boarding/drop status
+Redis latest-location foundation
+Parent child-specific active-trip endpoint foundation
+Reports/CSV foundation
+```
+
+Deferred / remaining:
+
+```text
+Driver app
+Parent live map
+WebSocket/SSE live tracking UI
+GPS retention/sampling policy
+ETA/geofence/overspeed/route-deviation premium features
+```
+
+### Phase 3C — Canteen Management
+
+Implemented foundation:
+
+```text
+Menu setup
+Meal plans
+Student enrollments
+Meal serving
+Wallets/top-up/transactions
+POS sales
+Spending controls
+Reports/CSV foundation
+```
+
+Deferred / remaining:
+
+```text
+Inventory/vendor/profit-loss
+Canteen accounting posting integration
+Parent wallet UI
+Low-balance notification integration tests
+Allergy warning tests from real student health fields
+```
 
 ### Phase 3D — Parent and Mobile Expansion
 
-Expose canteen wallet balance, top-up history, purchase history, spending controls, low-balance alerts, and later library borrowed/overdue visibility to parents. Parent APIs must remain guardian/child-scoped.
+Status: **Deferred**.
+
+Do not build broad parent/mobile portal until admin foundations, permission boundaries, and browser smoke coverage are stable.
 
 ---
 
 ## Phase 4 — AI, Analytics, Scale, and Enterprise SaaS
+
+Status: **Roadmap documented; implementation deferred**.
 
 Phase 4 is owned primarily by **M11 School Intelligence & Analytics**.
 
@@ -223,59 +416,28 @@ Detailed M11 plan:
 docs/project/SCHOOLOS_M11_INTELLIGENCE_ROADMAP.md
 ```
 
-### Phase 4A — School Intelligence Foundation
+Do not start AI/ML implementation until reliable production data exists and the M11 event/snapshot/risk-score foundation is approved.
 
-- Structured `SchoolEvent` capture roadmap across M1-M10.
-- Feature snapshot roadmap for students, guardians, teachers, classrooms, and schools.
-- Explainable `RiskScoreSnapshot` roadmap.
-- `InsightAction` workflow roadmap.
-- `AiInferenceRequest` contract roadmap for future cloud and on-device AI.
-- Tenant isolation, RBAC, audit, and sensitive-view rules.
+M11 outputs must never automatically punish students, block fees, suspend access, make payroll/staff discipline decisions, or publicly rank teachers.
 
-### Phase 4B — Rule-Based Operational Intelligence
+---
 
-- Teacher Workload Balance Monitor.
-- Substitute Teacher Intelligence.
-- Guardian Communication Health Score.
-- Academic Year Momentum Tracker.
-- Classroom-Level Heat Events.
+## Verification Gate
 
-### Phase 4C — Student Risk and Academic Quality Intelligence
+Run the full gate after major backend/module changes:
 
-- Sibling Academic Correlation Report.
-- Predictive Dropout Engine v1, rule-based first and ML later.
-- Student risk dashboard and intervention checklist.
-- Exam Paper Difficulty Calibration.
-- Tenant-level curriculum gap detection.
-
-### Phase 4D — AI Teacher Assistant and Natural Language Interface
-
-- AI Teaching Assistant for teachers only, with human review.
-- Report card remark drafts.
-- Lesson plan drafts.
-- Homework feedback drafts.
-- Notice/message drafts.
-- English-first Natural Language School Management Interface using approved query templates.
-
-### Phase 4E — Offline-First and Network Intelligence
-
-- Offline-first AI inference contract.
-- Future on-device model support.
-- Aggregate-only opt-in School Health Network Intelligence.
-- Cross-school curriculum benchmarking with anonymization and platform audit.
-
-### Phase 4F — Scale Optimization and Enterprise SaaS
-
-- Analytics read models.
-- Background intelligence jobs.
-- Model/version governance.
-- Platform intelligence dashboards.
-- Enterprise observability.
-- Plan-based AI/analytics limits.
-
-### Phase 4 Safety Rule
-
-Do not start AI/ML implementation until reliable production data exists and the M11 event/snapshot/risk-score foundation is approved. M11 outputs must never automatically punish students, block fees, suspend access, make payroll/staff discipline decisions, or publicly rank teachers.
+```bash
+pnpm db:generate
+pnpm db:validate
+pnpm verify:openapi
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:e2e
+pnpm build
+pnpm verify:production
+pnpm smoke:phase1
+```
 
 ---
 
