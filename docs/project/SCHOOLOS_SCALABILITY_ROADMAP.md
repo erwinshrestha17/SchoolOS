@@ -1,9 +1,9 @@
 # SchoolOS Scalability Roadmap
 
 **Repository:** `erwinshrestha17/SchoolOS`  
-**Stage:** Phase 2D M9 Accounting Production Candidate Complete + Phase 2/3 foundations in progress  
+**Stage:** Phase 2A M4 Academics backend complete + Phase 2D M9 Accounting production-candidate complete + Phase 2/3 foundations in progress  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard  
-**Purpose:** Define how SchoolOS scales phase by phase while development continues across the SaaS starter/platform core and school-domain modules.
+**Purpose:** Define how SchoolOS scales phase by phase while development continues across M0 Platform Core and school-domain modules.
 
 ---
 
@@ -16,7 +16,7 @@ The correct scalability path remains:
 ```text
 1. Keep the modular monolith.
 2. Make module boundaries strict.
-3. Align backend/API/frontend structure with M0 Platform Core + M1-M10 school modules.
+3. Align backend/API/frontend structure with M0 Platform Core + M1-M11 school modules.
 4. Make tenant isolation impossible to bypass.
 5. Make PostgreSQL queries/indexes production-safe.
 6. Move slow work into Redis/BullMQ workers.
@@ -27,7 +27,18 @@ The correct scalability path remains:
 
 Do **not** jump to microservices now. The repo already has a strong foundation: NestJS modules, Prisma, Redis/BullMQ, throttling, CLS tenant context, health/readiness endpoints, production verification scripts, Docker PostgreSQL/Redis, and Phase 1 smoke/preflight work.
 
-M9 Accounting is now production-candidate complete. The main scaling risk has shifted from accounting correctness to broad Phase 2/3 module depth, authenticated browser workflow coverage, seed/migration readiness, queue visibility, file/report handling, parent/mobile boundaries, and operational observability.
+M9 Accounting is now production-candidate complete and Phase 2A Academics backend is complete/contract-protected. The main scaling risk has shifted from accounting correctness alone to broad Phase 2/3 module depth, authenticated browser workflow coverage, seed/migration readiness, queue visibility, file/report handling, parent/mobile boundaries, and operational observability.
+
+Current scaling priority:
+
+```text
+Repo Verification & Stabilization Sprint
+→ full verification gate
+→ Homework/Timetable schema/service/test alignment
+→ Phase 2A Academics admin UI against real APIs
+→ authenticated Playwright browser smoke
+→ controlled pilot staging readiness
+```
 
 ---
 
@@ -51,10 +62,11 @@ Important current findings:
 
 ```text
 - Phase 1A/1B are pilot-ready.
-- Phase 2 foundations exist.
+- M0 Platform Core Foundation Depth is completed.
+- Phase 2A M4 Academics backend is complete and contract-protected.
 - Phase 2D M9 Accounting is production-candidate complete.
+- Phase 2 foundations exist for Homework/Timetable, HR/Payroll, and Parent-Class Teacher Chat.
 - Phase 3 operations admin foundations exist for Library, Transport, and Canteen.
-- M0 Platform Core contains reusable SaaS starter/platform capabilities.
 - Current frontend stays in apps/web Next.js for now.
 - Future apps/admin Angular dashboard is deferred.
 - Microservices are deferred until scale/team/deployment/compliance justify them.
@@ -67,13 +79,13 @@ Important current findings:
 
 | Module | Name | Phase / Status | Scaling Notes |
 |---|---|---|---|
-| M0 | Platform Core / SaaS Starter | Foundation + gradual rollout | Platform-only permissions, audit support actions, plan/entitlement enforcement later. |
+| M0 | Platform Core / SaaS Starter | Foundation depth completed | Platform-only permissions, audit support actions, plan/entitlement enforcement later. |
 | M1 | Admissions & Student Profiles | Phase 1A/1B complete | Keep student directory paginated, storage-backed docs/photos, and lifecycle audit. |
 | M2 | Smart Attendance | Phase 1A/1B complete | Keep attendance queries tenant/date/class indexed and offline sync bounded. |
 | M3 | Fees & Receipts | Phase 1A/1B complete | Keep Decimal money, transactional payments, cashier close, and M9 posting boundaries. |
-| M4 | Exams, CAS & Report Cards | Phase 2 foundation implemented | Need deeper reports/PDF queue hardening and marks lock audit coverage. |
-| M5 | Activity Feed & Milestones | Phase 1A/1B complete | Need object storage/media compression hardening for broader media use. |
-| M6 | Homework & Timetable | Phase 2 foundation implemented | Need timetable conflict/index hardening and attachment storage boundaries. |
+| M4 | Exams, CAS & Report Cards | Phase 2A backend complete | Admin UI/browser coverage next; queue heavy PDF/report work. |
+| M5 | Activity Feed & Milestones | Phase 1A/1B complete with media hardening | Need object storage/media compression hardening for broader media use. |
+| M6 | Homework & Timetable | Phase 2 foundation implemented | Stabilization priority: schema/service drift, conflict tests, attachment boundaries. |
 | M7 | HR & Payroll | Phase 2 foundation implemented | Need payroll run/report hardening and continued accounting boundary tests. |
 | M8A | Library Management | Phase 3 admin foundation implemented | Need issue/return depth, borrower reports, fines, and QR reuse hardening. |
 | M8B | Transport Management | Phase 3 admin foundation implemented | Live GPS/driver/parent tracking deferred; Redis/WebSocket strategy remains future. |
@@ -101,7 +113,7 @@ M9 is now a production-candidate accounting module. Completed scale-relevant saf
 - Bank reconciliation.
 - Frontend Accounting workspace.
 - Granular permissions and audit coverage.
-- Full production verification passing.
+- Production verification history recorded in project memory.
 ```
 
 M9 scaling rules:
@@ -130,7 +142,38 @@ Remaining M9 future scalability enhancements:
 
 ---
 
-## 5. Scalable Repository Structure
+## 5. Phase 2A Academics Scaling Baseline
+
+Phase 2A M4 Academics backend is complete and contract-protected.
+
+Completed scale-relevant safeguards:
+
+```text
+- Tenant-scoped exam term and assessment component APIs.
+- Transactional marks bulk upsert.
+- Max-mark, absent, withheld, and lock validation.
+- CAS create/list/update/delete and bulk upsert.
+- Backend-owned Nepal grading/GPA preview.
+- Marks lock/unlock workflow with audit logs.
+- Report card generation requiring locked marks.
+- Promotion readiness based on generated/locked report cards.
+- Result publishing/unpublishing/parent notification hardening.
+- Consent-aware result notification through CommunicationsService.
+- Backend flow contract test.
+```
+
+Next scaling work:
+
+```text
+- Build Phase 2A admin UI against real backend APIs.
+- Add authenticated Playwright coverage for setup → marks → CAS → lock → report card → publish.
+- Queue report-card PDF batches if large schools create performance pressure.
+- Add report-card PDF snapshot/File Registry pattern if schools need archived generated reports.
+```
+
+---
+
+## 6. Scalable Repository Structure
 
 Current monorepo direction:
 
@@ -176,7 +219,7 @@ TenantId comes from frontend input instead of authenticated context.
 
 ---
 
-## 6. Tenant Isolation and API Scaling Rules
+## 7. Tenant Isolation and API Scaling Rules
 
 Every tenant-owned table must include `tenantId` unless it is explicitly global/platform metadata.
 
@@ -215,7 +258,7 @@ Every new feature must include:
 
 ---
 
-## 7. Runtime Scaling Direction
+## 8. Runtime Scaling Direction
 
 Near-term target:
 
@@ -246,7 +289,7 @@ At first these can run from the same codebase. They should eventually become sep
 
 ---
 
-## 8. Queue and Worker Discipline
+## 9. Queue and Worker Discipline
 
 Move to BullMQ workers where workflows become heavy or retryable:
 
@@ -282,7 +325,7 @@ platform.maintenance
 
 ---
 
-## 9. File Storage and Report Snapshot Scaling
+## 10. File Storage and Report Snapshot Scaling
 
 Use object storage + File Registry for:
 
@@ -304,7 +347,7 @@ Rules:
 
 ```text
 - Store object keys, not permanent public URLs.
-- Generate signed URLs for preview/download.
+- Generate signed URLs or protected API access URLs for preview/download.
 - Add file size/type validation.
 - Add tenantId, module, entityId to file metadata.
 - Audit sensitive downloads/exports.
@@ -313,7 +356,7 @@ Rules:
 
 ---
 
-## 10. Verification Gate
+## 11. Verification Gate
 
 Minimum deployment gate:
 
@@ -330,38 +373,25 @@ pnpm verify:production
 pnpm smoke:phase1
 ```
 
-M9 completion verification passed:
-
-```text
-pnpm db:generate
-pnpm db:validate
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm test:e2e
-pnpm build
-pnpm verify:production
-```
-
-Latest browser smoke status:
-
-```text
-Public Playwright smoke passed. Seeded authenticated accounting workflow tests remain future work once stable credentials/seed data are available.
-```
+After recent verification follow-ups, do not assume the repo is healthy until this gate is rerun locally.
 
 ---
 
-## 11. Immediate Next Implementation Order
+## 12. Immediate Next Implementation Order
 
 Do next:
 
 ```text
-1. Add seeded Playwright Accounting UI workflow tests.
-2. Review production migrations and default Chart of Accounts/report mapping seeds.
-3. Harden one existing vertical at a time: Academics, Homework/Timetable, HR/Payroll, Library, Transport, Canteen.
-4. Add request/correlation ID logging if not fully wired.
-5. Add queue failure visibility for notifications/reports/payroll/PDF work.
-6. Harden File Registry/object storage before uploads expand.
+1. Run the full verification gate.
+2. Fix any Prisma/schema/typecheck/test blockers.
+3. Stabilize Homework/Timetable service/schema/test alignment.
+4. Build Phase 2A Academics admin UI against completed backend APIs.
+5. Add authenticated Playwright Phase 2A and Accounting workflow smoke tests.
+6. Review production migrations and default Chart of Accounts/report mapping seeds.
+7. Harden one existing vertical at a time: HR/Payroll, Library, Transport, Canteen.
+8. Add request/correlation ID logging if not fully wired.
+9. Add queue failure visibility for notifications/reports/payroll/PDF work.
+10. Harden File Registry/object storage before uploads expand.
 ```
 
 Avoid now:
@@ -378,12 +408,12 @@ Avoid now:
 
 ---
 
-## 12. Final Rule
+## 13. Final Rule
 
 SchoolOS becomes scalable by making every development phase production-aware.
 
 ```text
-Build feature -> identify M0/M1-M10 owner -> align backend/API/frontend route -> enforce tenant isolation -> keep module boundary -> index queries -> paginate lists -> queue slow work -> audit sensitive actions -> verify with tests -> only then move to next feature.
+Build feature -> identify M0/M1-M11 owner -> align backend/API/frontend route -> enforce tenant isolation -> keep module boundary -> index queries -> paginate lists -> queue slow work -> audit sensitive actions -> verify with tests -> only then move to next feature.
 ```
 
 Scalability is not a separate final task. It is a rule applied during every module implementation from this point onward.
