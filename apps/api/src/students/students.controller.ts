@@ -13,6 +13,8 @@ import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { RequiresFeature } from '../platform/feature-entitlement.decorator';
+import { FeatureEntitlementGuard } from '../platform/feature-entitlement.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { ArchiveStudentDto } from './dto/archive-student.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
@@ -35,7 +37,9 @@ export class StudentsController {
   constructor(private readonly studentsService: StudentsService) {}
 
   @Get()
+  @UseGuards(FeatureEntitlementGuard)
   @Permissions('students:read')
+  @RequiresFeature('module.students')
   listStudents(@CurrentAuth() auth: AuthContext) {
     return this.studentsService.listStudents(auth);
   }
@@ -54,7 +58,9 @@ export class StudentsController {
   }
 
   @Post()
+  @UseGuards(FeatureEntitlementGuard)
   @Permissions('students:create')
+  @RequiresFeature('module.students')
   createStudent(
     @Body() dto: CreateStudentDto,
     @CurrentAuth() auth: AuthContext,

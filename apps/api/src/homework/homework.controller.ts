@@ -14,6 +14,8 @@ import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { RequiresFeature } from '../platform/feature-entitlement.decorator';
+import { FeatureEntitlementGuard } from '../platform/feature-entitlement.guard';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { HomeworkQueryDto } from './dto/homework-query.dto';
 import { HomeworkSubmissionQueryDto } from './dto/homework-submission-query.dto';
@@ -45,7 +47,9 @@ export class HomeworkController {
   ) {}
 
   @Get()
+  @UseGuards(FeatureEntitlementGuard)
   @Permissions('homework:read')
+  @RequiresFeature('module.homework')
   listHomework(
     @CurrentAuth() auth: AuthContext,
     @Query() query: HomeworkQueryDto,
@@ -63,7 +67,9 @@ export class HomeworkController {
   }
 
   @Post('assignments')
+  @UseGuards(FeatureEntitlementGuard)
   @Permissions('homework:create')
+  @RequiresFeature('module.homework')
   createAssignment(
     @Body() dto: CreateHomeworkDto,
     @CurrentAuth() auth: AuthContext,

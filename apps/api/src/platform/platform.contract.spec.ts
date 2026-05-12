@@ -126,4 +126,19 @@ describe('M0 Platform Control Plane contracts', () => {
     expect(service).toContain('onboarding_override_updated');
     expect(service).not.toContain('AccountingPostingService');
   });
+
+  it('attaches backend entitlement enforcement to representative school-operation routes', () => {
+    const students = read('src/students/students.controller.ts');
+    const attendance = read('src/attendance/attendance.controller.ts');
+    const homework = read('src/homework/homework.controller.ts');
+
+    for (const [source, feature] of [
+      [students, 'module.students'],
+      [attendance, 'module.attendance'],
+      [homework, 'module.homework'],
+    ] as const) {
+      expect(source).toContain('@UseGuards(FeatureEntitlementGuard)');
+      expect(source).toContain(`@RequiresFeature('${feature}')`);
+    }
+  });
 });

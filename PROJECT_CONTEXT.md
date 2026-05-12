@@ -38,7 +38,7 @@ Phase 1B completed / pilot-ready
 M0 Platform Core Foundation Depth completed
 Phase 2A M4 Academics backend completed / contract-protected
 Phase 2D M9 Accounting production-candidate complete
-Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
+Current stage: Backend Sprints 1-4 hardening complete on top of Phase 2A backend + M0 platform foundation + M9 production-candidate completion
 ```
 
 The repo is ahead of older Phase 1B/Phase 2-transition notes. Phase 2A Academics backend is complete. M9 Accounting is production-candidate complete. Foundations now exist for Homework/Timetable, HR/Payroll, Parent Communication/Messaging, Library, Transport, and Canteen.
@@ -48,11 +48,11 @@ Current work should focus on stabilization, correctness, scale, permissions, tes
 Recommended near-term direction:
 
 ```text
-Repo Verification & Stabilization Sprint
-→ fix any remaining Prisma/schema/typecheck/test blockers
-→ stabilize Homework/Timetable after recent verification follow-ups
+Post-hardening pilot readiness sprint
+→ run Docker-backed smoke with Postgres, Redis, and API running
+→ add seeded authenticated browser smoke credentials
 → wire Phase 2A Academics admin UI to completed APIs
-→ add authenticated Playwright browser smoke tests
+→ expand M6/M7/M8 vertical hardening one module at a time
 → prepare controlled pilot staging
 ```
 
@@ -91,12 +91,12 @@ Implemented or registered backend foundations now include:
 
 - Auth/RBAC/Tenant Isolation
 - M0 Platform Core: platform tenant control, tenant settings, file registry, reports, usage service, plan service foundations
-- M1 Admissions & Student Profiles
+- M1 Admissions & Student Profiles, including secure Student QR credential foundation
 - M2 Smart Attendance
 - M3 Fees & Receipts
 - M4 Academics, Exams, CAS, Report Cards backend completion
 - M5 Activity Feed & Milestones
-- M6 Homework & Timetable foundation
+- M6 Homework & Timetable foundation with backend entitlement hooks and conflict/lifecycle test coverage
 - M7 Staff/HR and Payroll foundation
 - M8A Library Management admin foundation
 - M8B Transport Management admin/trip/location foundation
@@ -112,7 +112,7 @@ Treat Phase 2/3 modules as foundation/admin-ready unless verified locally. Sever
 ```text
 Demo-ready: Yes
 Internal QA-ready: Yes
-Controlled pilot-ready: Yes, after staging checks
+Controlled pilot-ready: Yes, after Docker-backed smoke and seeded staging checks
 Multi-school production-ready: Not yet
 Full SchoolOS product complete: No
 ```
@@ -130,13 +130,13 @@ Approximate module status:
 
 ```text
 Auth/Security/Tenant: 90-95%
-M0 Platform Core: 65-75%
+M0 Platform Core: 80-90%
 M1 Students: 90-95%
 M2 Attendance: 85-90%
 M3 Fees: 85-90%
 M4 Academics: 80-90%
 M5 Activity: 75-85%
-M6 Homework/Timetable: 60-70%
+M6 Homework/Timetable: 70-80%
 M7 HR/Payroll: 65-75%
 M8A Library: 45-55%
 M8B Transport: 45-55%

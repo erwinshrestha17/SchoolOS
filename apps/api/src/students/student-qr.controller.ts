@@ -85,7 +85,6 @@ export class StudentQrController {
   }
 
   @Post('qr/resolve')
-  @Permissions('students:qr:resolve')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Resolve a scanned QR token for a declared purpose',
@@ -98,7 +97,7 @@ export class StudentQrController {
       auth.tenantId,
       dto.token,
       dto.purpose,
-      auth.userId,
+      auth,
     );
   }
 
@@ -118,7 +117,12 @@ export class StudentQrController {
       });
     }
 
-    const svg = await this.studentQrService.getQrImage(token);
+    const svg = await this.studentQrService.getQrImage(
+      auth.tenantId,
+      studentId,
+      token,
+      auth.userId,
+    );
     res.setHeader('Content-Type', 'image/svg+xml');
     res.send(svg);
   }

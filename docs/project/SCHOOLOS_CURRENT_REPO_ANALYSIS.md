@@ -21,7 +21,7 @@ Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation: Completed across eight sprints
 Phase 2A M4 Academics backend: Completed / Contract-Protected
 Phase 2D M9 Accounting: Production Candidate Complete
-Current stage: Phase 2A backend complete + M0 platform foundation complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
+Current stage: Backend Sprints 1-4 hardening complete + Phase 2A backend complete + M0 platform foundation complete + M9 production-candidate completion
 ```
 
 Readiness:
@@ -40,7 +40,7 @@ CTO verdict:
 SchoolOS is beyond MVP.
 The backend/module surface is broad and architecturally strong.
 M0 Platform Core is now implemented as a real platform foundation, not just a roadmap item.
-The next priority is stabilization, Docker-backed smoke verification, browser smoke coverage, M0 regression coverage, and one-vertical-at-a-time hardening.
+The next priority is Docker-backed smoke verification, seeded browser smoke coverage, Phase 2A admin UI, and one-vertical-at-a-time hardening.
 Do not expand broad new modules until the full repo verification gate is clean.
 ```
 
@@ -51,13 +51,13 @@ Do not expand broad new modules until the full repo verification gate is clean.
 | Module | Estimated Completion | Current Implementation State |
 |---|---:|---|
 | Auth / RBAC / Tenant Isolation | 90-95% | Cookie-first auth, bearer support, RBAC, tenant context, super-admin override audit. |
-| M0 Platform Core | 80-90% | Platform tenant management, entitlements/usage, SaaS billing foundation, providers/queues, file registry, reports/exports, health, onboarding implemented; deeper queue topology, E2E, seed, async reporting hardening remains. |
-| M1 Admissions & Student Profiles | 90-95% | Admission, student profile/detail/edit, guardian edit, lifecycle, documents, photo/document access, roster exports. |
+| M0 Platform Core | 80-90% | Platform tenant management, entitlements/usage, SaaS billing foundation, providers/queues, file registry, reports/exports, health, onboarding, and representative backend entitlement guards implemented; deeper queue topology, E2E, seed, async reporting hardening remains. |
+| M1 Admissions & Student Profiles | 90-95% | Admission, student profile/detail/edit, guardian edit, lifecycle, documents, photo/document access, roster exports, secure Student QR credential foundation. |
 | M2 Smart Attendance | 85-90% | 3-tap attendance, history, monthly register, exports, correction/sync guardrails. |
 | M3 Fees & Receipts | 85-90% | Invoices, payments, receipts, ledger, cashier close, reports, reversal/correction foundation. |
 | M4 Academics / Exams / CAS / Report Cards | 80-90% | Backend complete and contract-protected; admin frontend/browser tests still needed. |
 | M5 Activity Feed & Milestones | 75-85% | Posts, targeting, media access, moderation/soft-delete, compression queue scaffold, consent direction. |
-| M6 Homework & Timetable | 60-70% | Foundation, conflict/lifecycle services, guardrails; recent schema/service/test drift needs verification. |
+| M6 Homework & Timetable | 70-80% | Foundation, conflict/lifecycle services, guardrails, schema/service/test drift verified clean; deeper production UX/reporting remains. |
 | M7 HR & Payroll | 65-75% | Staff lifecycle, contracts, salary structures, payroll lifecycle, payroll-to-accounting tests. |
 | M8A Library | 45-55% | Admin catalog/copy/issue/return/report foundation; deeper fines/reports/tests later. |
 | M8B Transport | 45-55% | Route/vehicle/driver/student assignment, trips, GPS latest-location cache foundation; driver/live map later. |
@@ -150,9 +150,29 @@ Remaining M0 hardening risks:
 - Provider test connection is intentionally conservative and avoids paid/external calls.
 - Demo Nepal tenant seed was not broadly expanded in the M0 pass.
 - Credentialed web E2E routes were skipped where seeded credentials were unavailable.
-- Platform/school route denial browser tests still need to be added.
-- SaaS billing lifecycle tests still need more depth.
-- Entitlement enforcement tests against real school APIs still need more depth.
+- Platform/school route denial browser tests still need seeded credentials.
+- SaaS billing lifecycle tests cover the foundation contract; overdue/suspend automation remains later.
+- Entitlement enforcement is attached to representative school APIs; broader per-module rollout remains deliberate and incremental.
+```
+
+Backend Sprints 1-4 verification snapshot:
+
+```text
+Passed:
+- pnpm db:generate
+- pnpm db:validate
+- pnpm verify:openapi
+- pnpm lint
+- pnpm typecheck
+- pnpm test
+- pnpm test:e2e
+- pnpm build
+- pnpm verify:production
+
+Notes:
+- verify:production required an approved rerun because the sandbox blocked localhost binding for Playwright.
+- pnpm smoke:phase1 failed because local Postgres, Redis, and API were not running.
+- Focused Student QR, feature entitlement, file registry, platform, homework, and timetable tests passed.
 ```
 
 ---

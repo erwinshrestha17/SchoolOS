@@ -33,7 +33,7 @@ If the setting changes SaaS ownership, billing, infrastructure, provider credent
 
 ```text
 M0 Platform Core Foundation: Completed across eight sprints
-Current work: M0 pilot hardening, regression coverage, smoke verification, and one-vertical-at-a-time Phase 2 depth.
+Current work: M0 pilot hardening completed for representative backend routes; Docker-backed smoke, seeded browser coverage, and one-vertical-at-a-time Phase 2 depth remain next.
 ```
 
 M0 is now implemented as a real platform foundation inside the existing NestJS modular monolith. It is not a separate microservice and should not be split unless future scale, team ownership, deployment isolation, or compliance requirements clearly justify that cost.
@@ -70,6 +70,7 @@ Platform health summary for DB, Redis, queues, and object storage readiness
 Computed tenant onboarding checklist
 School settings onboarding page
 Platform tenant onboarding visibility
+Representative backend entitlement guards on Students, Attendance, and Homework routes
 ```
 
 M0 models now documented as implemented:
@@ -119,8 +120,8 @@ Provider test connection limitations remain intentionally conservative/no paid e
 Demo Nepal tenant seed expansion
 Credentialed web E2E coverage where seeded credentials are available
 Platform/school route denial browser tests
-SaaS billing lifecycle tests: invoice -> payment -> overdue/cancel/suspend
-Entitlement enforcement tests against real school APIs
+SaaS billing lifecycle tests cover manual invoice/payment/cancel foundations; overdue/suspend automation remains later
+Entitlement enforcement is wired to representative school APIs; broader rollout should remain incremental
 Object storage readiness verification against staging provider
 Docker-backed smoke once Postgres, Redis, and API are running
 ```

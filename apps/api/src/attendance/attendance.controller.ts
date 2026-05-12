@@ -13,6 +13,8 @@ import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { RequiresFeature } from '../platform/feature-entitlement.decorator';
+import { FeatureEntitlementGuard } from '../platform/feature-entitlement.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { AttendanceService } from './attendance.service';
 import { CreateStaffLeaveRequestDto } from './dto/create-staff-leave-request.dto';
@@ -36,7 +38,9 @@ export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
   @Get()
+  @UseGuards(FeatureEntitlementGuard)
   @Permissions('attendance:read')
+  @RequiresFeature('module.attendance')
   listAttendance(@CurrentAuth() auth: AuthContext) {
     return this.attendanceService.listAttendance(auth);
   }
@@ -186,7 +190,9 @@ export class AttendanceController {
   }
 
   @Post('sessions')
+  @UseGuards(FeatureEntitlementGuard)
   @Permissions('attendance:mark')
+  @RequiresFeature('module.attendance')
   submitAttendance(
     @Body() dto: SubmitAttendanceDto,
     @CurrentAuth() auth: AuthContext,
