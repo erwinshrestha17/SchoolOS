@@ -19,7 +19,8 @@ import {
   XCircle,
   FileText,
   Lock,
-  Zap
+  Zap,
+  Users
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '../../ui/badge';

@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { Wallet, Search, CreditCard, Banknote, History, ChevronRight, User, GraduationCap, MapPin, Phone, Receipt, Printer, AlertCircle } from 'lucide-react';
+import { Wallet, Search, CreditCard, Banknote, History, ChevronRight, User, GraduationCap, MapPin, Phone, Receipt, Printer, AlertCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '../ui/input';
 import { LoadingState } from '../ui/loading-state';

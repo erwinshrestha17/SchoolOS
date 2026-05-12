@@ -280,7 +280,7 @@ export function StudentDirectory({
                 className="premium-input pl-9 text-sm"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Name, Code, or Phone..."
+                placeholder="Name or SCH-ID"
               />
             </div>
           </div>
@@ -351,7 +351,7 @@ export function StudentDirectory({
                       className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[0.7rem] font-bold text-slate-700 transition hover:bg-slate-50"
                     >
                       <Wallet size={14} />
-                      Ledger
+                      Fees Ledger
                     </Link>
                     <div className="relative group/actions">
                       <button className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-900">

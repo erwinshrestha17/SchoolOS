@@ -67,6 +67,7 @@ describe('Typography Standardization Contract', () => {
       'app/platform/audit/page.tsx',
       'app/platform/schools/page.tsx',
       'app/platform/schools/[tenantId]/page.tsx',
+      'app/platform/settings/page.tsx',
       'app/dashboard/settings/page.tsx',
       'components/hr/contract-list.tsx',
       'components/hr/staff-attendance-summary.tsx',

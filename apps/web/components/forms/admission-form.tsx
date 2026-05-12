@@ -24,7 +24,8 @@ import {
   Upload,
   FileText,
   Calendar,
-  ShieldCheck
+  ShieldCheck,
+  Download
 } from 'lucide-react';
 
 const today = new Date().toISOString().slice(0, 10);
@@ -456,7 +457,7 @@ export function AdmissionForm() {
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-primary-500 group-hover:text-white transition-colors">
                       <UserPlus size={20} />
                     </div>
-                    <span className="text-xs font-bold text-slate-600 group-hover:text-primary-700">Add Another</span>
+                    <span className="text-xs font-bold text-slate-600 group-hover:text-primary-700">Add Another Student</span>
                   </button>
                   
                   <Link href={`/dashboard/students/${latestAdmission?.student.id}`} className="flex flex-col items-center gap-3 rounded-3xl border border-slate-100 bg-slate-50/50 p-6 transition hover:bg-primary-50 hover:border-primary-100 group">
@@ -470,14 +471,14 @@ export function AdmissionForm() {
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-primary-500 group-hover:text-white transition-colors">
                       <Wallet size={20} />
                     </div>
-                    <span className="text-xs font-bold text-slate-600 group-hover:text-primary-700">Collect Fee</span>
+                    <span className="text-xs font-bold text-slate-600 group-hover:text-primary-700">Collect First Fee</span>
                   </Link>
 
                   <button type="button" className="flex flex-col items-center gap-3 rounded-3xl border border-slate-100 bg-slate-50/50 p-6 transition hover:bg-primary-50 hover:border-primary-100 group">
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-sm group-hover:bg-primary-500 group-hover:text-white transition-colors">
                       <Download size={20} />
                     </div>
-                    <span className="text-xs font-bold text-slate-600 group-hover:text-primary-700">Print ID Card</span>
+                    <span className="text-xs font-bold text-slate-600 group-hover:text-primary-700">Download ID Card</span>
                   </button>
                 </div>
               </div>

@@ -2,6 +2,7 @@
 
 import { cn } from '../../lib/utils';
 import { MoneyDisplay } from '../ui/money-display';
+import { Calculator } from 'lucide-react';
 
 interface ReportTableProps {
   headers: string[];
@@ -68,7 +69,7 @@ export function ReportTable({ headers, rows }: ReportTableProps) {
                   style={{ paddingLeft: cell.indent ? `${cell.indent * 1.5 + 1.5}rem` : undefined }}
                 >
                   {cell.type === 'currency' ? (
-                    <span className="font-mono">{formatCurrency(cell.value)}</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(cell.value)}</span>
                   ) : cell.type === 'date' ? (
                     <span className="font-medium text-slate-500">{new Date(cell.value).toLocaleDateString()}</span>
                   ) : (

@@ -19,8 +19,6 @@ import {
   Shield,
   Database,
   ExternalLink,
-  Database,
-  ExternalLink,
   Loader2,
   FileText,
   Upload,
@@ -29,6 +27,7 @@ import {
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { FormField } from '../../../components/ui/form-field';
 import { Input } from '../../../components/ui/input';

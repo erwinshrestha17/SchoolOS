@@ -96,6 +96,16 @@ export function AttendanceForm() {
     },
   });
 
+  const syncMutation = useMutation({
+    mutationFn: api.syncAttendance,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['attendance-analytics'] });
+      void queryClient.invalidateQueries({ queryKey: ['attendance-conflicts'] });
+      setSubmitMessage(`Offline draft synchronized successfully at ${new Date().toLocaleTimeString()}.`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+  });
+
   const availableSections = (sectionsQuery.data ?? []).filter((s) => !classId || (s.classId ?? s.class?.id) === classId);
   const roster = rosterQuery.data?.students ?? [];
   const futureDateBlocked = isFutureDate(attendanceDate);
@@ -245,7 +255,12 @@ export function AttendanceForm() {
             )}
           />
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="space-y-6">
+            <p className="text-sm text-slate-500 mb-6 bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-3">
+              <Info size={16} className="text-slate-400" />
+              Everyone is present by default. Mark exceptions only for absent, late, sick leave, excused leave, or unexcused leave.
+            </p>
+            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
             {roster.map((student) => (
               <AttendanceRosterItem
                 key={student.id}
@@ -313,6 +328,35 @@ export function AttendanceForm() {
           </div>
         </div>
       )}
+
+      <div className="rounded-[2.5rem] border border-slate-200 bg-slate-50 p-6 shadow-sm flex items-center justify-between mb-4">
+         <div className="flex items-center gap-4 text-slate-600">
+           <div className="h-10 w-10 rounded-2xl bg-white border border-slate-200 flex items-center justify-center">
+             <Download size={20} className="text-slate-400" />
+           </div>
+           <div>
+             <p className="text-xs font-bold text-slate-900">Offline sync</p>
+             <p className="text-[0.65rem] mt-0.5">Sync offline draft and review conflicts before final submission.</p>
+           </div>
+         </div>
+         <button 
+           onClick={() => syncMutation.mutate({
+             academicYearId,
+             classId,
+             sectionId: sectionId || null,
+             attendanceDate: new Date(attendanceDate).toISOString(),
+             exceptions: Object.entries(exceptions).map(([studentId, status]) => ({
+               studentId,
+               status,
+               remark: remarks[studentId]?.trim() || null,
+             }))
+           })}
+           className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-primary-600 bg-white border border-primary-200 rounded-xl hover:bg-primary-50 transition-colors"
+         >
+            <Save size={14} />
+            Sync Attendance
+          </button>
+      </div>
       
       <div className="rounded-[2.5rem] border border-slate-200 bg-white p-6 shadow-sm flex items-center justify-between">
          <div className="flex items-center gap-4 text-slate-500">

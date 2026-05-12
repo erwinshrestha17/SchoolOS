@@ -13,6 +13,7 @@ import {
   Calculator,
   ArrowRight,
   TrendingUp,
+  CheckCircle2,
   type LucideIcon,
 } from 'lucide-react';
 import type {
@@ -336,7 +337,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-8 lg:grid-cols-3">
         <SectionCard
-          title="Operational Alerts"
+          title="Setup needs attention"
           description="Issues requiring immediate attention"
           className="lg:col-span-2"
         >
