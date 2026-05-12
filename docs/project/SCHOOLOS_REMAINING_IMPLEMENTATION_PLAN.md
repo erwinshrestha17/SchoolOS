@@ -3,7 +3,7 @@
 **Status source:** `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md`  
 **Current stage:** Phase 2A backend complete + Phase 2 implemented foundations + Phase 3 operations admin foundations  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard  
-**Last updated:** 2026-05-11
+**Last updated:** 2026-05-12
 
 ---
 
@@ -46,7 +46,7 @@ Near-term rule:
 ```text
 Do not start broad new modules.
 Harden existing Phase 2 and Phase 3 foundations one vertical at a time.
-Highest priority: Phase 2A admin UI wired to completed backend APIs, then browser smoke tests and vertical hardening.
+Highest priority: full verification, Phase 2A admin UI wired to completed backend APIs, browser smoke tests, then vertical hardening.
 ```
 
 Explicitly deferred unless requested:
@@ -59,6 +59,7 @@ Full canteen inventory/vendor workflows
 AI/ML features
 Angular migration
 Microservices
+Biometric workflows
 ```
 
 ---
@@ -81,19 +82,50 @@ Microservices
 | M8C Canteen Management | Phase 3 admin foundation implemented | 45–55% |
 | M9 Accounting & Finance | Production Candidate Complete | 95–100% |
 | M10 Notices & Communication | Strong Phase 1 + chat foundation | 85–90% |
+| Student Identity QR Foundation | Approved cross-module foundation; not fully implemented | 20–30% |
 | Parent / Mobile Portal | Mostly deferred | 5–10% |
 | Driver App | Deferred | 0–5% |
 | AI / ML | Not started | 0% |
 
 ---
 
-## 3. Phase 0 — Foundation
+## 3. Immediate Stabilization Sprint
 
-### Status
+Do first:
+
+```text
+1. Run full verification gate.
+2. Fix any Prisma/schema/typecheck/test blockers.
+3. Stabilize Homework/Timetable service/schema/test alignment.
+4. Build Phase 2A Academics admin UI against completed backend APIs.
+5. Add authenticated Playwright Phase 2A and Accounting workflow smoke tests.
+6. Review production migrations and default Chart of Accounts/report mapping seeds.
+7. Harden one existing vertical at a time: HR/Payroll, Library, Transport, Canteen.
+8. Add request/correlation ID logging if not fully wired.
+9. Add queue failure visibility for notifications/reports/payroll/PDF work.
+10. Harden File Registry/object storage before uploads expand.
+```
+
+Avoid now:
+
+```text
+Broad new modules
+AI/ML
+Angular migration
+Microservices
+Parent/mobile before tenant ownership is fully verified
+Driver/live map before transport scaling is ready
+Canteen inventory/vendor workflows before wallet/accounting boundaries are hardened
+Biometrics before QR identity, consent, privacy, retention, encryption, audit, and deletion workflows are mature
+```
+
+---
+
+## 4. Phase 0 — Foundation
 
 Completed. Only continuous hardening remains.
 
-### Remaining Implementation
+Remaining:
 
 - Improve production verification stability.
 - Improve OpenAPI verification.
@@ -105,9 +137,7 @@ Completed. Only continuous hardening remains.
 
 ---
 
-## 4. Phase 1 — Pilot-Ready Core School System
-
-### Status
+## 5. Phase 1 — Pilot-Ready Core School System
 
 Completed / pilot-ready. Remaining work is hardening, polish, and staging/pilot validation.
 
@@ -122,6 +152,7 @@ Remaining:
 - Better student document audit trail polish.
 - More cross-tenant tests.
 - More Playwright coverage for student flows.
+- Student QR credential foundation and ID-card QR integration.
 
 ### M2 — Smart Attendance
 
@@ -133,6 +164,7 @@ Remaining:
 - More monthly register polish.
 - More teacher-specific permission tests.
 - Attendance report/export stabilization.
+- Optional QR attendance lookup only after QR identity foundation is stable.
 
 ### M3 — Fees & Receipts
 
@@ -180,60 +212,15 @@ Remaining:
 
 ---
 
-## 5. Phase 2 — Academic, HR, Timetable, Accounting Expansion
-
-### Status
+## 6. Phase 2 — Academic, HR, Timetable, Accounting Expansion
 
 Phase 2 foundations are implemented. Phase 2A backend is complete and contract-protected. Remaining work is mostly frontend/admin UI, browser smoke tests, vertical hardening, and deeper reports/exports.
 
-Modules:
-
-```text
-M4 Academics / Exams / CAS / Report Cards
-M6 Homework & Timetable
-M7 HR & Payroll
-M9 Accounting & Finance
-M10 Parent Communication Expansion
-```
-
----
-
-### 5.1 Phase 2A — M4 Academics, Exams, CAS, Report Cards
+### 6.1 Phase 2A — M4 Academics, Exams, CAS, Report Cards
 
 Current estimate: 80–90% implemented.
 
 Backend status: **Complete / contract-protected**.
-
-Completed backend sequence:
-
-```text
-Step 1 — Exam Terms + Assessment Components foundation
-Step 2 — Subject Marks Entry
-Step 3 — CAS Records
-Step 4 — Nepal Grading/GPA Result Preview
-Step 5 — Marks Lock/Unlock Workflow Hardening
-Step 6 — Report Card Generation Backend Hardening
-Step 7 — Promotion Readiness Backend Hardening
-Step 8 — Result Publishing + Parent Notification Backend Hardening
-Step 9 — Backend Final Hardening + Phase 2A Flow Contract
-```
-
-Verified backend results:
-
-```text
-pnpm --filter @schoolos/api test src/academics/phase2a-flow.contract.spec.ts
-  PASS: 1 suite / 9 tests
-
-pnpm --filter @schoolos/api test src/integrity/production-contracts.spec.ts
-  PASS: 1 suite / 11 tests
-
-pnpm typecheck
-  PASS: API + web
-
-pnpm test
-  PASS: API 76 suites / 494 tests
-  PASS: Web 71 tests
-```
 
 Remaining:
 
@@ -253,9 +240,65 @@ Remaining:
 - Deeper academic reports/export.
 - Final class/section/term/subject index review after UI usage patterns stabilize.
 
----
+### 6.2 Student Identity QR Foundation
 
-### 5.2 Phase 2B — M6 Homework and Timetable
+Current estimate: 20–30% implemented / approved foundation.
+
+Ownership: **M1 Admissions & Student Profiles**.
+
+Purpose: create one secure, reusable student identity foundation before deeper Phase 3 Library/Canteen/Transport QR workflows depend on it.
+
+Remaining:
+
+- Confirm immutable Student ID code generation during registration/admission.
+- Add `StudentQrCredential` model.
+- Add unique/index constraints for `tenantId + studentId`, `tokenHash`, `tenantId + status`.
+- Generate QR credential for admitted/active students.
+- Add QR image generation service.
+- Add QR code to student ID card PDF.
+- Add student detail QR management actions: generate, rotate, revoke.
+- Add authenticated QR scan/resolve API.
+- Add purpose-based scan responses:
+  - `LIBRARY`
+  - `CANTEEN`
+  - `TRANSPORT`
+  - `ATTENDANCE`
+  - `GENERAL_STUDENT_LOOKUP`
+- Add audit logs for generate, rotate, revoke, resolve, and scan actions.
+- Add permission and tenant-isolation tests.
+- Add QR borrower lookup for Library issue/return.
+- Add QR purchase/meal serving lookup for Canteen after wallet ledger is hardened.
+- Add parent/mobile wallet and purchase history later.
+
+Security rules:
+
+```text
+- QR must not contain student name, guardian phone, address, health data, wallet balance, or other PII.
+- QR should contain only a random secure token or URL containing a token.
+- Store only token hash in the database.
+- QR scan must require authentication.
+- QR scan must be tenant-scoped by tenantId.
+- QR scan response must be purpose-specific and role-limited.
+- Parents can only resolve their own child.
+- Teachers can only resolve assigned students unless permission allows more.
+- Canteen staff can only see canteen-safe data.
+- Librarians can only see library-safe data.
+- Transport drivers can only see assigned-route students.
+- Admin/principal access remains tenant-scoped and audited.
+- QR credentials must be revocable and rotatable.
+```
+
+Non-goal:
+
+```text
+No fingerprint registration.
+No face scan registration.
+No biometric attendance.
+No biometric canteen/library access.
+No biometric template storage or processing.
+```
+
+### 6.3 Phase 2B — M6 Homework and Timetable
 
 Current estimate: 60–70% implemented.
 
@@ -278,9 +321,7 @@ Remaining:
 - Homework submission review polish.
 - Cross-tenant timetable/homework tests.
 
----
-
-### 5.3 Phase 2C — M7 HR and Payroll
+### 6.4 Phase 2C — M7 HR and Payroll
 
 Current estimate: 65–75% implemented.
 
@@ -301,32 +342,11 @@ Remaining:
 - Contract termination workflow.
 - More HR/payroll permission tests.
 
----
-
-### 5.4 Phase 2D — M9 Accounting and Finance
+### 6.5 Phase 2D — M9 Accounting and Finance
 
 Current estimate: 95–100% implemented for the current backend/admin scope.
 
 Status: **Production Candidate Complete**.
-
-Completed:
-
-- AccountingPostingModule added.
-- AccountingPostingService centralized as ledger write boundary.
-- FinanceModule and AccountingModule wired through AccountingPostingModule.
-- FinanceService delegates ledger postings to AccountingPostingService.
-- Ledger boundary production contracts added/updated.
-- Audit logging required for ledger mutations.
-- Trial Balance backend.
-- General Ledger backend.
-- Cash Book backend.
-- Income Statement backend.
-- Balance Sheet backend.
-- VAT/TDS/PF summaries.
-- CSV report exports.
-- Fiscal period close/lock/reopen workflows.
-- Bank reconciliation foundation.
-- Frontend Accounting workspace.
 
 Remaining:
 
@@ -350,9 +370,7 @@ Non-negotiable M9 rules:
 9. Reports must come from backend ledger data.
 10. Audit posting, approval, reversal, closing, reopening, and exports.
 
----
-
-### 5.5 Phase 2E — Parent Communication Expansion
+### 6.6 Phase 2E — Parent Communication Expansion
 
 Current status: chat foundation implemented.
 
@@ -373,20 +391,17 @@ Remaining:
 
 ---
 
-## 6. Phase 3 — Extended School Operations
-
-### Status
+## 7. Phase 3 — Extended School Operations
 
 Admin foundations implemented for Library, Transport, and Canteen. Deeper production workflows, reports, parent/mobile, driver app, and live tracking UI remain.
 
----
-
-### 6.1 Phase 3A — M8A Library Management
+### 7.1 Phase 3A — M8A Library Management
 
 Current estimate: 45–55% implemented.
 
 Remaining:
 
+- QR borrower lookup using shared Student QR scan API.
 - Borrowed-students endpoint/page.
 - Fine records endpoint/page.
 - Library report endpoints.
@@ -404,14 +419,13 @@ Remaining:
 - Library permission tests.
 - Library Playwright tests.
 
----
-
-### 6.2 Phase 3B — M8B Transport Management
+### 7.2 Phase 3B — M8B Transport Management
 
 Current estimate: 45–55% implemented.
 
 Remaining:
 
+- Optional QR student lookup where useful after QR identity foundation is stable.
 - Live map UI.
 - WebSocket/SSE real-time transport updates.
 - Driver app.
@@ -434,14 +448,13 @@ Remaining:
 - Transport billing integration with M3 later.
 - Transport accounting integration with M9 later.
 
----
-
-### 6.3 Phase 3C — M8C Canteen Management
+### 7.3 Phase 3C — M8C Canteen Management
 
 Current estimate: 45–55% implemented.
 
 Remaining:
 
+- QR purchase/meal serving lookup using shared Student QR scan API.
 - Inventory management.
 - Vendor purchase tracking.
 - Supplier profile.
@@ -464,9 +477,7 @@ Remaining:
 - Canteen reports/export polish.
 - Canteen Playwright tests.
 
----
-
-### 6.4 Phase 3D — Parent and Mobile Expansion
+### 7.4 Phase 3D — Parent and Mobile Expansion
 
 Current estimate: 5–10% implemented / mostly deferred.
 
@@ -483,6 +494,9 @@ Remaining:
 - Parent timetable view.
 - Parent transport tracking view.
 - Parent canteen wallet/menu view.
+- Parent wallet balance and canteen purchase history.
+- Parent spending limits and blocked item/category controls where school policy allows.
+- Parent library borrowed/overdue view later.
 - Parent-class teacher chat mobile UI.
 - Push notification support.
 - Student age-aware portal.
@@ -495,15 +509,9 @@ Remaining:
 
 ---
 
-## 7. Phase 4 — AI, Analytics, Scale, Enterprise SaaS
-
-### Status
+## 8. Phase 4 — AI, Analytics, Scale, Enterprise SaaS
 
 Not started. Start only after reliable production data exists.
-
----
-
-### 7.1 Phase 4A — AI/ML Features
 
 Remaining:
 
@@ -516,13 +524,6 @@ Remaining:
 - Canteen demand forecasting.
 - Accounting anomaly detection.
 - Smart notice/message templates.
-
----
-
-### 7.2 Phase 4B — Advanced Data Platform
-
-Remaining:
-
 - Analytics warehouse.
 - Event tracking.
 - Longitudinal student data model.
@@ -533,63 +534,11 @@ Remaining:
 
 ---
 
-### 7.3 Phase 4C — Scale Optimization
-
-Remaining:
-
-- API/worker process separation.
-- Dedicated worker entrypoints.
-- Queue scaling.
-- Read replicas if needed.
-- Slow query monitoring.
-- Metrics endpoint.
-- Request/correlation ID logging.
-- Operational dashboards.
-- Partitioning/archive strategy.
-- Attendance record partitioning.
-- Notification delivery partitioning.
-- Transport log partitioning.
-- Audit log partitioning.
-- Journal line fiscal-year strategy.
-
----
-
-### 7.4 Phase 4D — Enterprise SaaS
-
-Remaining:
-
-- Multi-school group support.
-- Advanced SaaS subscription billing.
-- Plan/module entitlements.
-- Usage limits enforcement.
-- White-label branding.
-- Enterprise onboarding.
-- SLA/monitoring dashboard.
-- Platform billing reports.
-- Provider configuration UI.
-- API key management.
-- Webhook system.
-- Developer portal.
-- Compliance exports.
-
----
-
-## 8. M0 Platform Core Remaining
+## 9. M0 Platform Core Remaining
 
 M0 cuts across all phases.
 
 Current estimate: 65–75% implemented.
-
-Completed:
-
-- platform tenant server-side pagination.
-- tenant status reason workflow.
-- platform audit log UI.
-- centralized usage service.
-- plans/limits foundation.
-- tenant settings validation depth.
-- file registry lifecycle hardening.
-- reports foundation hardening.
 
 Remaining:
 
@@ -614,7 +563,7 @@ Do not mix these two systems.
 
 ---
 
-## 9. Scalability Remaining Work
+## 10. Scalability Remaining Work
 
 Overall scalability implementation estimate: 55–65%.
 
@@ -638,7 +587,7 @@ Remaining:
 Scalability gate for every new feature:
 
 ```text
-1. Which module owns this feature: M0 or M1-M10?
+1. Which module owns this feature: M0 or M1-M11?
 2. Which backend folder/API namespace/frontend route owns it?
 3. Which tenant owns this data?
 4. Which role/permission can access it?
@@ -660,7 +609,7 @@ Feature -> tenant isolation -> indexes -> pagination -> queue slow work -> audit
 
 ---
 
-## 10. UI/UX Remaining Work
+## 11. UI/UX Remaining Work
 
 Web admin UI is now broadly implemented across Phase 1, Phase 2 foundations, and Phase 3 admin foundations. Phase 2A backend is complete, so the next UI/UX priority is an Academics admin workflow wired to real APIs.
 
@@ -670,6 +619,9 @@ Remaining UI/UX:
 - Exam term and assessment component setup screens.
 - Marks entry and CAS workflow screens.
 - Result preview, lock/review, report-card generation, promotion readiness, and publishing screens.
+- Student QR management actions in student detail page.
+- QR scan action in Library issue/return screens.
+- QR scan action in Canteen serving/POS screen after wallet ledger is hardened.
 - Browser smoke/Playwright coverage for Phase 2A.
 - Parent/mobile portal.
 - Student mobile/PWA portal.
@@ -697,41 +649,12 @@ Full UI/UX roadmap: 60–70%
 
 ---
 
-## 11. Recommended Next Implementation Order
-
-Do next:
-
-1. Build Phase 2A Academics frontend/admin UI against the completed backend APIs.
-2. Add browser smoke/Playwright contracts for the full Phase 2A workflow.
-3. Stabilize and browser-test the completed Accounting UI.
-4. Review production seeds for default Chart of Accounts and report mappings.
-5. Add tenant isolation tests across Phase 2 and Phase 3.
-6. Harden reports and exports.
-7. Complete File Registry and storage-backed uploads.
-8. Harden Library, Transport, and Canteen admin foundations.
-9. Start parent/mobile portal only after backend ownership and permissions are stable.
-10. Add driver app and live transport map/WebSocket after transport APIs are hardened.
-11. Start AI/ML only after real production data exists.
-
-Avoid now:
-
-```text
-Broad new modules
-AI/ML
-Angular migration
-Microservices
-Parent/mobile before tenant ownership is fully verified
-Driver/live map before transport scaling is ready
-Canteen inventory/vendor workflows before wallet/accounting boundaries are hardened
-```
-
----
-
 ## 12. Final Summary
 
 ```text
 Phase 1: Completed; only hardening remains.
 Phase 2A backend: Completed / contract-protected; frontend/admin UI next.
+Student Identity QR: Approved M1 cross-module foundation; implement before deeper Library/Canteen/Transport QR workflows.
 Phase 2B/2C/2E: Foundations implemented; needs vertical hardening.
 Phase 2D M9: Production Candidate Complete.
 Phase 3: Admin foundations implemented; parent/mobile/driver/live tracking/inventory remain.
