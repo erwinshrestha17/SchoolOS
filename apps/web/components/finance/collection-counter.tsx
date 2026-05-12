@@ -177,10 +177,10 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading }: 
                   <div className="space-y-3">
                     <h5 className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-1">Fee Breakdown</h5>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {invoiceDetailQuery.data.lineItems?.map((item: any) => (
+                      {invoiceDetailQuery.data.lines?.map((item: any) => (
                         <div key={item.id} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl">
-                          <span className="text-xs font-bold text-slate-700">{item.feeHead?.name || 'General Fee'}</span>
-                          <span className="text-xs font-black text-slate-900">{formatCurrency(item.amount)}</span>
+                          <span className="text-xs font-bold text-slate-700">{item.feeHeadName || 'General Fee'}</span>
+                          <span className="text-xs font-black text-slate-900">{formatCurrency(item.netAmount)}</span>
                         </div>
                       ))}
                     </div>
