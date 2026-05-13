@@ -109,6 +109,33 @@ export class ActivityFeedController {
     return this.activityFeedService.getReactionAnalytics(auth);
   }
 
+  @Get('posts/:id')
+  @Permissions('activity_feed:read')
+  getPostDetail(@Param('id') postId: string, @CurrentAuth() auth: AuthContext) {
+    return this.activityFeedService.getPostDetail(postId, auth);
+  }
+
+  @Get('gallery')
+  @Permissions('activity_feed:read')
+  listGallery(
+    @CurrentAuth() auth: AuthContext,
+    @Query('studentId') studentId?: string,
+    @Query('classId') classId?: string,
+    @Query('sectionId') sectionId?: string,
+    @Query('category') category?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.activityFeedService.listGallery(auth, {
+      studentId,
+      classId,
+      sectionId,
+      category,
+      limit,
+      offset,
+    });
+  }
+
   @Post('posts')
   @Permissions('activity_feed:create')
   createPost(

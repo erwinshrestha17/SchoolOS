@@ -298,6 +298,7 @@ export function buildIdCardPdf(input: {
   guardianName?: string | null;
   guardianPhone?: string | null;
   academicYear?: string | null;
+  qrToken?: string | null;
 }) {
   const left = 200;
   const bottom = 432;
@@ -352,6 +353,14 @@ export function buildIdCardPdf(input: {
         )
       : '',
   ];
+
+  if (input.qrToken) {
+    contentParts.push(
+      `${left + width - 64} ${bottom + 116} 44 44 re S`,
+      text('QR', left + width - 48, bottom + 136, 8, 'F2'),
+      text(input.qrToken.slice(0, 8), left + width - 60, bottom + 110, 6, 'F1'),
+    );
+  }
 
   return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
 }

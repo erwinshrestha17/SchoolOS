@@ -71,6 +71,7 @@ const FEATURE_KEYS = [
   'feature.ai_teacher_assistant',
   'feature.ai_dropout_prediction',
   'feature.ai_natural_language_query',
+  'module.reports',
 ];
 
 const USAGE_KEYS = [
@@ -502,6 +503,39 @@ export class PlatformService {
     return this.toSubscriptionSummary(subscription);
   }
 
+  async updateSubscriptionStatus(
+    tenantId: string,
+    subscriptionId: string,
+    dto: { status: string; notes?: string },
+    actorUserId: string,
+  ) {
+    const delegate = this.requireDelegate('tenantSubscription');
+    const before = await delegate.findFirst({
+      where: { id: subscriptionId, tenantId },
+    });
+    if (!before) throw new NotFoundException('Subscription not found');
+
+    const subscription = await delegate.update({
+      where: { id: subscriptionId },
+      data: {
+        status: dto.status,
+        notes: dto.notes,
+      },
+    });
+
+    await this.platformAudit(
+      actorUserId,
+      'tenant_subscription_status_updated',
+      'subscriptions',
+      String(subscription.id),
+      before,
+      { status: dto.status, notes: dto.notes },
+      tenantId,
+    );
+
+    return this.toSubscriptionSummary(subscription);
+  }
+
   async setFeatureOverride(
     tenantId: string,
     dto: TenantFeatureOverrideDto,
@@ -755,6 +789,9 @@ export class PlatformService {
     if (paid.add(amount).gt(decimalValue(invoice.amount))) {
       throw new BadRequestException('Payment exceeds invoice balance');
     }
+    if (invoice.status === 'PAID') {
+      throw new BadRequestException('Invoice is already fully paid');
+    }
     await paymentDelegate.create({
       data: {
         tenantId,
@@ -991,13 +1028,41 @@ export class PlatformService {
   }
 
   async listReportExports(tenantId?: string) {
+    return this.listReportExportsPage({ tenantId, page: 1, limit: 100 });
+  }
+
+  async listReportExportsPage(query: {
+    tenantId?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<PaginatedResponse<any>> {
+    const page = Number(query.page) || 1;
+    const limit = Math.min(Number(query.limit) || 25, 100);
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ReportExportWhereInput = {};
+    if (query.tenantId) where.tenantId = query.tenantId;
+
     const delegate = this.delegate('reportExport');
-    if (!delegate) return [];
-    return delegate.findMany({
-      where: tenantId ? { tenantId } : undefined,
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
+    if (!delegate) return { items: [], total: 0, page, limit, hasNextPage: false };
+
+    const [items, total] = await Promise.all([
+      delegate.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      delegate.count({ where }),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
+    };
   }
 
   async recordReportExport(input: {

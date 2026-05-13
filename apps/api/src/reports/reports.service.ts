@@ -11,6 +11,8 @@ import type {
   ReportExportRequest,
   ReportExportResult,
 } from '@schoolos/core';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 import {
   StudentLifecycleStatus,
@@ -31,12 +33,13 @@ export interface ReportExecutor {
 
 @Injectable()
 export class ReportsService {
-  private readonly registry = new Map<string, ReportExecutor>();
+  public readonly registry = new Map<string, ReportExecutor>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly financeService: FinanceService,
+    @InjectQueue('reports') private readonly reportsQueue: Queue,
   ) {
     this.registerInternalReports();
   }
@@ -750,6 +753,314 @@ export class ReportsService {
         return [...rows, ...summaryRows];
       },
     });
+
+    this.register({
+      definition: {
+        key: 'cashier-close-report',
+        name: 'Cashier Close Report',
+        description: 'Daily summary of collections by cashier and payment method',
+        category: 'finance',
+        module: 'finance',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'fromDate', label: 'From Date', type: 'date', required: true },
+          { key: 'toDate', label: 'To Date', type: 'date', required: true },
+          { key: 'collectorUserId', label: 'Collector', type: 'select' },
+        ],
+        requiredPermissions: ['reports:read', 'payments:close'],
+      },
+      execute: async (actor, filters) => {
+        const from = new Date(String(filters.fromDate));
+        const to = new Date(String(filters.toDate));
+
+        const closes = await this.prisma.cashierClose.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            openedAt: { gte: from },
+            closedAt: { lte: to },
+            ...(filters.collectorUserId ? { collectorUserId: String(filters.collectorUserId) } : {}),
+          },
+          include: {
+            collectorUser: true,
+            closedBy: true,
+          },
+          orderBy: { openedAt: 'desc' },
+        });
+
+        return closes.map((c) => ({
+          'Close Number': c.closeNumber,
+          'Opened At': c.openedAt.toISOString(),
+          'Closed At': c.closedAt.toISOString(),
+          'Collector': c.collectorUser?.email || 'N/A',
+          'Payment Method': c.paymentMethod || 'All',
+          'Gross Collected': Number(c.grossCollected),
+          'Total Refunded': Number(c.totalRefunded),
+          'Net Collected': Number(c.netCollected),
+          'Expected Cash': Number(c.expectedCashAmount || 0),
+          'Actual Cash': Number(c.actualCashAmount || 0),
+          'Variance': Number(c.varianceAmount || 0),
+          'Variance Reason': c.varianceReason || '-',
+          'Payment Count': c.paymentCount,
+          'Refund Count': c.refundCount,
+          'Closed By': c.closedBy?.email || 'System',
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'staff-attendance-report',
+        name: 'Staff Attendance Report',
+        description: 'Detailed attendance report for staff members',
+        category: 'hr',
+        module: 'hr',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'month', label: 'Month', type: 'select', required: true, options: [
+            { label: 'January', value: '1' }, { label: 'February', value: '2' }, { label: 'March', value: '3' },
+            { label: 'April', value: '4' }, { label: 'May', value: '5' }, { label: 'June', value: '6' },
+            { label: 'July', value: '7' }, { label: 'August', value: '8' }, { label: 'September', value: '9' },
+            { label: 'October', value: '10' }, { label: 'November', value: '11' }, { label: 'December', value: '12' },
+          ]},
+          { key: 'year', label: 'Year', type: 'text', required: true },
+          { key: 'staffId', label: 'Staff Member', type: 'select', required: false },
+        ],
+        requiredPermissions: ['hr:staff:read'],
+      },
+      execute: async (actor, filters) => {
+        const month = Number(filters.month);
+        const year = Number(filters.year);
+        const startsOn = new Date(year, month - 1, 1);
+        const endsOn = new Date(year, month, 0);
+
+        const staff = await this.prisma.staff.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            ...(filters.staffId ? { id: String(filters.staffId) } : {}),
+          },
+          include: {
+            attendanceRecords: {
+              where: {
+                attendanceDate: { gte: startsOn, lte: endsOn },
+              },
+            },
+          },
+          orderBy: { firstName: 'asc' },
+        });
+
+        return staff.map((s) => {
+          const present = s.attendanceRecords.filter(r => r.status === 'PRESENT').length;
+          const absent = s.attendanceRecords.filter(r => r.status === 'ABSENT').length;
+          const leave = s.attendanceRecords.filter(r => r.status === 'LEAVE').length;
+          
+          return {
+            'Employee ID': s.employeeId,
+            'Full Name': `${s.firstName} ${s.lastName}`,
+            'Month': `${year}-${month.toString().padStart(2, '0')}`,
+            'Present Days': present,
+            'Absent Days': absent,
+            'Leave Days': leave,
+            'Total Working Days': s.attendanceRecords.length,
+          };
+        });
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'staff-leave-report',
+        name: 'Staff Leave Report',
+        description: 'Summary of leave requests and balances for staff',
+        category: 'hr',
+        module: 'hr',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'year', label: 'Year', type: 'text', required: true },
+          { key: 'staffId', label: 'Staff Member', type: 'select', required: false },
+        ],
+        requiredPermissions: ['hr:staff:read'],
+      },
+      execute: async (actor, filters) => {
+        const year = Number(filters.year);
+        const staff = await this.prisma.staff.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            ...(filters.staffId ? { id: String(filters.staffId) } : {}),
+          },
+          include: {
+            leaveBalances: {
+              where: { year },
+            },
+            leaveRequests: {
+              where: {
+                status: 'APPROVED',
+                startsOn: { gte: new Date(year, 0, 1), lte: new Date(year, 11, 31) },
+              },
+            },
+          },
+          orderBy: { firstName: 'asc' },
+        });
+
+        return staff.flatMap((s) => 
+          s.leaveBalances.map(b => ({
+            'Employee ID': s.employeeId,
+            'Full Name': `${s.firstName} ${s.lastName}`,
+            'Leave Type': b.leaveType,
+            'Allocated': Number(b.allocated),
+            'Used': Number(b.used),
+            'Remaining': Number(b.allocated) + Number(b.carried) - Number(b.used),
+          }))
+        );
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'payroll-register',
+        name: 'Payroll Register',
+        description: 'Detailed register of all payroll runs and lines',
+        category: 'payroll',
+        module: 'payroll',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'month', label: 'Month', type: 'select', required: false, options: [
+            { label: 'January', value: '1' }, { label: 'February', value: '2' }, { label: 'March', value: '3' },
+            { label: 'April', value: '4' }, { label: 'May', value: '5' }, { label: 'June', value: '6' },
+            { label: 'July', value: '7' }, { label: 'August', value: '8' }, { label: 'September', value: '9' },
+            { label: 'October', value: '10' }, { label: 'November', value: '11' }, { label: 'December', value: '12' },
+          ]},
+          { key: 'year', label: 'Year', type: 'text', required: false },
+        ],
+        requiredPermissions: ['payroll:read'],
+      },
+      execute: async (actor, filters) => {
+        const month = filters.month ? Number(filters.month) : undefined;
+        const year = filters.year ? Number(filters.year) : undefined;
+
+        const lines = await this.prisma.payrollLine.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            payrollRun: {
+              ...(month ? { periodMonth: month } : {}),
+              ...(year ? { periodYear: year } : {}),
+            }
+          },
+          include: {
+            staff: true,
+            payrollRun: true,
+          },
+          orderBy: [
+            { payrollRun: { periodYear: 'desc' } },
+            { payrollRun: { periodMonth: 'desc' } },
+            { staff: { firstName: 'asc' } },
+          ],
+        });
+
+        return lines.map((l) => ({
+          'Period': `${l.payrollRun.periodYear}-${String(l.payrollRun.periodMonth).padStart(2, '0')}`,
+          'Employee ID': l.staff.employeeId,
+          'Staff Name': `${l.staff.firstName} ${l.staff.lastName}`,
+          'Basic Salary': Number(l.basicSalary),
+          'Gross Salary': Number(l.grossSalary),
+          'PF Employee': Number(l.pfEmployee),
+          'PF Employer': Number(l.pfEmployer),
+          'TDS': Number(l.tds),
+          'Deductions': Number(l.deductions),
+          'Net Salary': Number(l.netSalary),
+          'Status': l.payrollRun.status,
+        }));
+      },
+    });
+    this.register({
+      definition: {
+        key: 'statutory-pf-summary',
+        name: 'Statutory PF Summary',
+        description: 'Monthly summary of PF contributions (Employer & Employee)',
+        category: 'payroll',
+        module: 'payroll',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'month', label: 'Month', type: 'select', required: true, options: [
+            { label: 'January', value: '1' }, { label: 'February', value: '2' }, { label: 'March', value: '3' },
+            { label: 'April', value: '4' }, { label: 'May', value: '5' }, { label: 'June', value: '6' },
+            { label: 'July', value: '7' }, { label: 'August', value: '8' }, { label: 'September', value: '9' },
+            { label: 'October', value: '10' }, { label: 'November', value: '11' }, { label: 'December', value: '12' },
+          ]},
+          { key: 'year', label: 'Year', type: 'text', required: true },
+        ],
+        requiredPermissions: ['payroll:read'],
+      },
+      execute: async (actor, filters) => {
+        const month = Number(filters.month);
+        const year = Number(filters.year);
+
+        const lines = await this.prisma.payrollLine.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            payrollRun: {
+              periodMonth: month,
+              periodYear: year,
+              status: { in: ['POSTED', 'PAID'] }
+            }
+          },
+          include: { staff: true },
+        });
+
+        return lines.map((l) => ({
+          'Employee ID': l.staff.employeeId,
+          'Staff Name': `${l.staff.firstName} ${l.staff.lastName}`,
+          'Basic Salary': Number(l.basicSalary),
+          'PF Employee (10%)': Number(l.pfEmployee),
+          'PF Employer (10%)': Number(l.pfEmployer),
+          'Total PF': Number(l.pfEmployee) + Number(l.pfEmployer),
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'statutory-tds-summary',
+        name: 'Statutory TDS Summary',
+        description: 'Monthly summary of TDS deductions',
+        category: 'payroll',
+        module: 'payroll',
+        formats: ['json', 'csv'],
+        filters: [
+          { key: 'month', label: 'Month', type: 'select', required: true, options: [
+            { label: 'January', value: '1' }, { label: 'February', value: '2' }, { label: 'March', value: '3' },
+            { label: 'April', value: '4' }, { label: 'May', value: '5' }, { label: 'June', value: '6' },
+            { label: 'July', value: '7' }, { label: 'August', value: '8' }, { label: 'September', value: '9' },
+            { label: 'October', value: '10' }, { label: 'November', value: '11' }, { label: 'December', value: '12' },
+          ]},
+          { key: 'year', label: 'Year', type: 'text', required: true },
+        ],
+        requiredPermissions: ['payroll:read'],
+      },
+      execute: async (actor, filters) => {
+        const month = Number(filters.month);
+        const year = Number(filters.year);
+
+        const lines = await this.prisma.payrollLine.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            payrollRun: {
+              periodMonth: month,
+              periodYear: year,
+              status: { in: ['POSTED', 'PAID'] }
+            }
+          },
+          include: { staff: true },
+        });
+
+        return lines.map((l) => ({
+          'Employee ID': l.staff.employeeId,
+          'Staff Name': `${l.staff.firstName} ${l.staff.lastName}`,
+          'PAN Number': l.staff.panNumber || 'N/A',
+          'Gross Salary': Number(l.grossSalary),
+          'TDS Deduction': Number(l.tds),
+        }));
+      },
+    });
   }
 
   register(executor: ReportExecutor) {
@@ -790,54 +1101,51 @@ export class ReportsService {
       );
     }
 
-    const data = await executor.execute(actor, request.filters, request.format);
+    if (request.format === 'json' && !request.async) {
+      const data = await executor.execute(actor, request.filters, request.format);
 
-    await this.auditService.record({
-      action: 'export_report',
-      resource: 'report',
-      resourceId: reportKey,
-      tenantId: actor.tenantId,
-      userId: actor.userId,
+      await this.auditService.record({
+        action: 'export_report',
+        resource: 'report',
+        resourceId: reportKey,
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        after: {
+          format: request.format,
+          filters: request.filters,
+        },
+      });
+
+      return {
+        status: 'COMPLETED',
+        data,
+      };
+    }
+
+    // Queue heavy or async export
+    const exportRecord = await this.prisma.reportExport.create({
+      data: {
+        tenantId: actor.tenantId,
+        reportKey,
+        format: request.format,
+        filters: request.filters as Prisma.InputJsonValue,
+        status: 'QUEUED',
+        requestedBy: actor.userId,
+      },
     });
-    await this.recordExportHistory({
-      tenantId: actor.tenantId,
+
+    const job = await this.reportsQueue.add('generateReport', {
+      exportId: exportRecord.id,
       reportKey,
+      filters: request.filters,
       format: request.format,
-      filters: request.filters as Prisma.InputJsonValue,
-      requestedBy: actor.userId,
+      actor,
     });
 
-    const fileName = `${reportKey}-${new Date().toISOString().split('T')[0]}`;
-
-    if (request.format === 'json') {
-      return {
-        format: 'json',
-        content: data,
-        fileName: `${fileName}.json`,
-        contentType: 'application/json',
-      };
-    }
-
-    if (request.format === 'csv') {
-      const csv = this.convertToCsv(data);
-      return {
-        format: 'csv',
-        content: Buffer.from(csv),
-        fileName: `${fileName}.csv`,
-        contentType: 'text/csv',
-      };
-    }
-
-    if (request.format === 'pdf') {
-      return {
-        format: 'pdf',
-        content: Buffer.from('PDF Placeholder'),
-        fileName: `${fileName}.pdf`,
-        contentType: 'application/pdf',
-      };
-    }
-
-    throw new ForbiddenException('Unsupported format');
+    return {
+      jobId: job.id,
+      status: 'QUEUED',
+    };
   }
 
   private convertToCsv(data: Array<Record<string, unknown>>): string {
@@ -887,5 +1195,34 @@ export class ReportsService {
         completedAt: new Date(),
       },
     });
+  }
+
+  async getExportHistory(
+    tenantId: string,
+    query: { page?: number; limit?: number },
+  ) {
+    const page = Number(query.page) || 1;
+    const limit = Math.min(Number(query.limit) || 25, 100);
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ReportExportWhereInput = { tenantId };
+
+    const [items, total] = await Promise.all([
+      this.prisma.reportExport.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.reportExport.count({ where }),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
+    };
   }
 }

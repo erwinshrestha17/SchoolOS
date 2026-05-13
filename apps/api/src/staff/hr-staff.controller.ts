@@ -20,6 +20,7 @@ import { UpdateStaffDto } from './dto/update-staff.dto';
 import { StaffService } from './staff.service';
 import { StaffDocumentService } from './staff-document.service';
 import { StaffLifecycleService } from './staff-lifecycle.service';
+import { StaffLeaveAccrualService } from '../hr/staff-leave-accrual.service';
 import {
   AddStaffDocumentDto,
   TerminateStaffDto,
@@ -33,7 +34,22 @@ export class HrStaffController {
     private readonly staffService: StaffService,
     private readonly documentService: StaffDocumentService,
     private readonly lifecycleService: StaffLifecycleService,
+    private readonly accrualService: StaffLeaveAccrualService,
   ) {}
+
+  @Post('accruals/process')
+  @Permissions('hr:manage')
+  processAccruals(
+    @Body() dto: { year: number; month: number },
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accrualService.processMonthlyAccruals(
+      auth.tenantId,
+      dto.year,
+      dto.month,
+      auth.userId,
+    );
+  }
 
   @Get()
   @Permissions('hr:staff:read')
@@ -100,7 +116,7 @@ export class HrStaffController {
     @Body() dto: TerminateStaffDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.staffService.terminateStaff(staffId, dto.reason, auth);
+    return this.staffService.terminateStaff(staffId, dto, auth);
   }
 
   @Get(':staffId/documents')

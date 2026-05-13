@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { ActivityPostStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -12,14 +12,6 @@ import {
   ModerateActivityPostDto,
 } from './dto/moderate-activity-post.dto';
 import { UpdateActivityPostDto } from './dto/update-activity-post.dto';
-
-export interface ActivityPostLifecycleRow {
-  id: string;
-  tenantId: string;
-  createdById: string;
-  moderationStatus: string;
-  softDeletedAt: Date | null;
-}
 
 @Injectable()
 export class ActivityPostLifecycleService {
@@ -41,31 +33,27 @@ export class ActivityPostLifecycleService {
     }
 
     if (
-      post.moderationStatus === 'APPROVED' ||
-      post.moderationStatus === 'PUBLISHED'
+      post.status === ActivityPostStatus.APPROVED ||
+      post.status === ActivityPostStatus.ARCHIVED
     ) {
       throw new ForbiddenException(
-        'Approved activity post cannot be silently edited',
+        'Approved or Archived activity post cannot be silently edited',
       );
     }
 
-    const updatedRows = await this.prisma.$queryRaw<ActivityPostLifecycleRow[]>(
-      Prisma.sql`
-        UPDATE "ActivityPost"
-        SET
-          "title" = COALESCE(${dto.title ?? null}, "title"),
-          "caption" = COALESCE(${dto.caption ?? null}, "caption"),
-          "editedAt" = now(),
-          "editedById" = ${actor.userId},
-          "moderationStatus" = CASE
-            WHEN "moderationStatus" = 'REJECTED' THEN 'PENDING'
-            ELSE "moderationStatus"
-          END
-        WHERE "id" = ${post.id}
-          AND "tenantId" = ${actor.tenantId}
-        RETURNING "id", "tenantId", "createdById", "moderationStatus", "softDeletedAt"
-      `,
-    );
+    const updated = await this.prisma.activityPost.update({
+      where: { id: postId },
+      data: {
+        title: dto.title,
+        caption: dto.caption,
+        editedAt: new Date(),
+        editedById: actor.userId,
+        status:
+          post.status === ActivityPostStatus.REJECTED
+            ? ActivityPostStatus.PENDING_APPROVAL
+            : undefined,
+      },
+    });
 
     await this.auditService.record({
       action: 'update',
@@ -74,16 +62,16 @@ export class ActivityPostLifecycleService {
       tenantId: actor.tenantId,
       userId: actor.userId,
       before: {
-        moderationStatus: post.moderationStatus,
+        status: post.status,
       },
       after: {
         titleChanged: dto.title !== undefined,
         captionChanged: dto.caption !== undefined,
-        moderationStatus: updatedRows[0]?.moderationStatus,
+        status: updated.status,
       },
     });
 
-    return updatedRows[0];
+    return updated;
   }
 
   async softDeletePost(
@@ -98,20 +86,17 @@ export class ActivityPostLifecycleService {
       return { id: post.id, deleted: false };
     }
 
-    const updatedRows = await this.prisma.$queryRaw<ActivityPostLifecycleRow[]>(
-      Prisma.sql`
-        UPDATE "ActivityPost"
-        SET
-          "softDeletedAt" = now(),
-          "moderationStatus" = 'REJECTED',
-          "moderationReason" = ${dto.reason},
-          "moderatedAt" = now(),
-          "moderatedById" = ${actor.userId}
-        WHERE "id" = ${post.id}
-          AND "tenantId" = ${actor.tenantId}
-        RETURNING "id", "tenantId", "createdById", "moderationStatus", "softDeletedAt"
-      `,
-    );
+    const updated = await this.prisma.activityPost.update({
+      where: { id: postId },
+      data: {
+        softDeletedAt: new Date(),
+        deletedById: actor.userId,
+        status: ActivityPostStatus.REJECTED,
+        moderationReason: dto.reason,
+        moderatedAt: new Date(),
+        moderatedById: actor.userId,
+      },
+    });
 
     await this.auditService.record({
       action: 'soft_delete',
@@ -119,11 +104,11 @@ export class ActivityPostLifecycleService {
       resourceId: post.id,
       tenantId: actor.tenantId,
       userId: actor.userId,
-      before: { moderationStatus: post.moderationStatus },
-      after: { reason: dto.reason, moderationStatus: 'REJECTED' },
+      before: { status: post.status },
+      after: { reason: dto.reason, status: ActivityPostStatus.REJECTED },
     });
 
-    return { ...updatedRows[0], deleted: true };
+    return { ...updated, deleted: true };
   }
 
   async restorePost(postId: string, actor: AuthContext) {
@@ -134,20 +119,17 @@ export class ActivityPostLifecycleService {
       return { id: post.id, restored: false };
     }
 
-    const updatedRows = await this.prisma.$queryRaw<ActivityPostLifecycleRow[]>(
-      Prisma.sql`
-        UPDATE "ActivityPost"
-        SET
-          "softDeletedAt" = NULL,
-          "moderationStatus" = 'PENDING',
-          "moderationReason" = NULL,
-          "moderatedAt" = now(),
-          "moderatedById" = ${actor.userId}
-        WHERE "id" = ${post.id}
-          AND "tenantId" = ${actor.tenantId}
-        RETURNING "id", "tenantId", "createdById", "moderationStatus", "softDeletedAt"
-      `,
-    );
+    const updated = await this.prisma.activityPost.update({
+      where: { id: postId },
+      data: {
+        softDeletedAt: null,
+        deletedById: null,
+        status: ActivityPostStatus.PENDING_APPROVAL,
+        moderationReason: null,
+        moderatedAt: new Date(),
+        moderatedById: actor.userId,
+      },
+    });
 
     await this.auditService.record({
       action: 'restore',
@@ -156,13 +138,13 @@ export class ActivityPostLifecycleService {
       tenantId: actor.tenantId,
       userId: actor.userId,
       before: {
-        moderationStatus: post.moderationStatus,
+        status: post.status,
         softDeletedAt: post.softDeletedAt,
       },
-      after: { moderationStatus: 'PENDING', softDeletedAt: null },
+      after: { status: ActivityPostStatus.PENDING_APPROVAL, softDeletedAt: null },
     });
 
-    return { ...updatedRows[0], restored: true };
+    return { ...updated, restored: true };
   }
 
   async moderatePost(
@@ -177,29 +159,23 @@ export class ActivityPostLifecycleService {
       throw new ForbiddenException('Deleted activity post cannot be moderated');
     }
 
-    if (dto.status === 'REJECTED' && !dto.reason?.trim()) {
+    if (dto.status === ActivityPostStatus.REJECTED && !dto.reason?.trim()) {
       throw new ForbiddenException('Rejection reason is required');
     }
 
-    const publishedAtExpression =
-      dto.status === 'APPROVED'
-        ? Prisma.sql`COALESCE("publishedAt", now())`
-        : Prisma.sql`"publishedAt"`;
-
-    const updatedRows = await this.prisma.$queryRaw<ActivityPostLifecycleRow[]>(
-      Prisma.sql`
-        UPDATE "ActivityPost"
-        SET
-          "moderationStatus" = ${dto.status},
-          "moderationReason" = ${dto.reason ?? null},
-          "moderatedAt" = now(),
-          "moderatedById" = ${actor.userId},
-          "publishedAt" = ${publishedAtExpression}
-        WHERE "id" = ${post.id}
-          AND "tenantId" = ${actor.tenantId}
-        RETURNING "id", "tenantId", "createdById", "moderationStatus", "softDeletedAt"
-      `,
-    );
+    const updated = await this.prisma.activityPost.update({
+      where: { id: postId },
+      data: {
+        status: dto.status,
+        moderationReason: dto.reason ?? null,
+        moderatedAt: new Date(),
+        moderatedById: actor.userId,
+        publishedAt:
+          dto.status === ActivityPostStatus.APPROVED
+            ? post.publishedAt ?? new Date()
+            : post.publishedAt,
+      },
+    });
 
     await this.auditService.record({
       action: 'moderate',
@@ -207,37 +183,29 @@ export class ActivityPostLifecycleService {
       resourceId: post.id,
       tenantId: actor.tenantId,
       userId: actor.userId,
-      before: { moderationStatus: post.moderationStatus },
-      after: { moderationStatus: dto.status, reason: dto.reason ?? null },
+      before: { status: post.status },
+      after: { status: dto.status, reason: dto.reason ?? null },
     });
 
-    return updatedRows[0];
+    return updated;
   }
 
   private async getPostOrThrow(postId: string, actor: AuthContext) {
-    const rows = await this.prisma.$queryRaw<ActivityPostLifecycleRow[]>(
-      Prisma.sql`
-        SELECT
-          "id",
-          "tenantId",
-          "createdById",
-          COALESCE(to_jsonb("ActivityPost") ->> 'moderationStatus', 'APPROVED') AS "moderationStatus",
-          (to_jsonb("ActivityPost") ->> 'softDeletedAt')::timestamp AS "softDeletedAt"
-        FROM "ActivityPost"
-        WHERE "id" = ${postId}
-          AND "tenantId" = ${actor.tenantId}
-        LIMIT 1
-      `,
-    );
+    const post = await this.prisma.activityPost.findFirst({
+      where: { id: postId, tenantId: actor.tenantId },
+    });
 
-    if (!rows[0]) {
+    if (!post) {
       throw new NotFoundException('Activity post not found in this tenant');
     }
 
-    return rows[0];
+    return post;
   }
 
-  private ensureCanModify(post: ActivityPostLifecycleRow, actor: AuthContext) {
+  private ensureCanModify(
+    post: { createdById: string | null },
+    actor: AuthContext,
+  ) {
     if (this.canManageAllActivity(actor)) {
       return;
     }

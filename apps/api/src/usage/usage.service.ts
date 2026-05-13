@@ -74,4 +74,62 @@ export class UsageService {
       totalStorageBytes: Number(storage._sum.sizeBytes || 0),
     };
   }
+
+  async verifyLimit(tenantId: string, usageKey: string, currentCount: number) {
+    const subscription = await this.prisma.tenantSubscription.findFirst({
+      where: {
+        tenantId,
+        status: { in: ['ACTIVE', 'TRIAL', 'GRACE'] },
+      },
+      include: {
+        plan: {
+          include: {
+            usageLimits: {
+              where: { usageKey },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!subscription) {
+      // If no active subscription, default to a very low limit or block
+      if (currentCount >= 10) {
+        throw new NotFoundException('No active subscription found. Free limit of 10 reached.');
+      }
+      return;
+    }
+
+    const limit = subscription.plan?.usageLimits?.[0];
+    if (limit && currentCount >= limit.limit) {
+      throw new NotFoundException(
+        `Plan limit reached for ${usageKey}. Limit: ${limit.limit}. Please upgrade your plan.`,
+      );
+    }
+  }
+
+  async incrementUsage(tenantId: string, usageKey: string, amount = 1) {
+    const now = new Date();
+    const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+
+    await this.prisma.usageCounter.upsert({
+      where: {
+        tenantId_usageKey_period_periodStart: {
+          tenantId,
+          usageKey,
+          period: 'MONTHLY',
+          periodStart,
+        },
+      },
+      update: { value: { increment: amount } },
+      create: {
+        tenantId,
+        usageKey,
+        period: 'MONTHLY',
+        periodStart,
+        value: amount,
+      },
+    });
+  }
 }

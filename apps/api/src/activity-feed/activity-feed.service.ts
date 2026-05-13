@@ -1,3 +1,4 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
   ForbiddenException,
@@ -11,7 +12,9 @@ import {
   NotificationChannel,
   Prisma,
   ActivityAttachment,
+  ActivityPostStatus,
 } from '@prisma/client';
+import { Queue } from 'bullmq';
 import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -41,6 +44,8 @@ export class ActivityFeedService {
     private readonly auditService: AuditService,
     private readonly eventEmitter: EventEmitter2,
     private readonly fileRegistryService: FileRegistryService,
+    @InjectQueue('activity-media')
+    private readonly mediaQueue: Queue,
   ) {}
 
   async listPosts(
@@ -70,6 +75,10 @@ export class ActivityFeedService {
     const posts = await this.prisma.activityPost.findMany({
       where: {
         tenantId: actor.tenantId,
+        softDeletedAt: null,
+        ...(canManageAllActivity(actor)
+          ? {}
+          : { status: ActivityPostStatus.APPROVED }),
         ...(filters.classId ? { classId: filters.classId } : {}),
         ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
         ...(filters.category
@@ -119,6 +128,118 @@ export class ActivityFeedService {
               : null,
           })),
         ),
+      })),
+    );
+  }
+
+  async getPostDetail(postId: string, actor: AuthContext) {
+    const visibilityFilter = await this.buildActorPostVisibilityFilter(actor);
+
+    const post = await this.prisma.activityPost.findFirst({
+      where: {
+        id: postId,
+        tenantId: actor.tenantId,
+        softDeletedAt: null,
+        ...(canManageAllActivity(actor)
+          ? {}
+          : { status: ActivityPostStatus.APPROVED }),
+        ...visibilityFilter,
+      },
+      include: {
+        class: true,
+        section: true,
+        attachments: {
+          orderBy: { sortOrder: 'asc' },
+        },
+        studentTags: {
+          include: {
+            student: true,
+          },
+        },
+        reactions: {
+          include: {
+            guardian: true,
+            student: true,
+          },
+        },
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Activity post not found');
+    }
+
+    return {
+      ...post,
+      attachments: await Promise.all(
+        post.attachments.map(async (attachment) => ({
+          ...attachment,
+          previewUrl: attachment.fileAssetId
+            ? await this.fileRegistryService.getSignedUrl(
+                actor.tenantId,
+                attachment.fileAssetId,
+              )
+            : null,
+        })),
+      ),
+    };
+  }
+
+  async listGallery(
+    actor: AuthContext,
+    filters: {
+      studentId?: string;
+      classId?: string;
+      sectionId?: string;
+      category?: string;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ) {
+    const visibilityFilter = await this.buildActorPostVisibilityFilter(
+      actor,
+      filters.studentId,
+    );
+
+    const attachments = await this.prisma.activityAttachment.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        activityPost: {
+          softDeletedAt: null,
+          ...(canManageAllActivity(actor)
+            ? {}
+            : { status: ActivityPostStatus.APPROVED }),
+          ...(filters.classId ? { classId: filters.classId } : {}),
+          ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+          ...(filters.category
+            ? { category: filters.category as ActivityCategory }
+            : {}),
+          ...visibilityFilter,
+        },
+      },
+      include: {
+        activityPost: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: filters.limit ?? 50,
+      skip: filters.offset ?? 0,
+    });
+
+    return Promise.all(
+      attachments.map(async (attachment) => ({
+        id: attachment.id,
+        postId: attachment.activityPostId,
+        fileName: attachment.fileName,
+        contentType: attachment.contentType,
+        sizeBytes: attachment.sizeBytes,
+        createdAt: attachment.createdAt,
+        previewUrl: attachment.fileAssetId
+          ? await this.fileRegistryService.getSignedUrl(
+              actor.tenantId,
+              attachment.fileAssetId,
+            )
+          : null,
+        postTitle: attachment.activityPost.title,
       })),
     );
   }
@@ -262,6 +383,24 @@ export class ActivityFeedService {
         studentTags: true,
       },
     });
+
+    // Update attachments with actual IDs for the queue
+    for (const attachment of post.attachments) {
+      await this.mediaQueue.add(
+        'compress',
+        {
+          tenantId: actor.tenantId,
+          attachmentId: attachment.id,
+          fileAssetId: attachment.fileAssetId,
+          requestedById: actor.userId,
+        },
+        {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 5000 },
+          removeOnComplete: true,
+        },
+      );
+    }
 
     // Update FileAssets with entityId
     await Promise.all(
@@ -756,8 +895,17 @@ export class ActivityFeedService {
     contentType: string;
     base64Content: string;
   }) {
-    if (!attachment.contentType.startsWith('image/')) {
-      throw new BadRequestException('Activity attachments must be images');
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/heic',
+      'image/heif',
+    ];
+    if (!allowedTypes.includes(attachment.contentType.toLowerCase())) {
+      throw new BadRequestException(
+        `Invalid file type ${attachment.contentType}. Only standard images are allowed.`,
+      );
     }
 
     const sizeBytes = Buffer.byteLength(attachment.base64Content, 'base64');

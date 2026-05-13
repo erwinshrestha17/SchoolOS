@@ -127,17 +127,29 @@ export class PlatformController {
     return this.platformService.updatePlan(planId, body, this.requireUser(req));
   }
 
-  @Post('tenants/:tenantId/subscriptions')
-  @Permissions('platform:subscriptions:manage')
+  @Post('tenants/:id/subscriptions')
+  @Permissions('platform:billing:manage')
   async assignSubscription(
-    @Param('tenantId') tenantId: string,
-    @Body() body: AssignTenantSubscriptionDto,
+    @Param('id') tenantId: string,
+    @Body() dto: AssignTenantSubscriptionDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    return this.platformService.assignSubscription(
+    return this.platformService.assignSubscription(tenantId, dto, this.requireUser(req).userId);
+  }
+
+  @Patch('tenants/:id/subscriptions/:subId')
+  @Permissions('platform:billing:manage')
+  async updateSubscriptionStatus(
+    @Param('id') tenantId: string,
+    @Param('subId') subId: string,
+    @Body() dto: { status: string; notes?: string },
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformService.updateSubscriptionStatus(
       tenantId,
-      body,
-      this.requireUser(req),
+      subId,
+      dto,
+      this.requireUser(req).userId,
     );
   }
 
@@ -312,8 +324,12 @@ export class PlatformController {
 
   @Get('report-exports')
   @Permissions('platform:reports:read')
-  async listReportExports(@Query('tenantId') tenantId?: string) {
-    return this.platformService.listReportExports(tenantId);
+  async listReportExports(
+    @Query('tenantId') tenantId?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.platformService.listReportExportsPage({ tenantId, page, limit });
   }
 
   @Get('tenants/:tenantId/onboarding')

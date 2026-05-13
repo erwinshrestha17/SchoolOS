@@ -12,6 +12,7 @@ import { CreateStaffDto } from './dto/create-staff.dto';
 import { StaffLifecycleDto } from './dto/staff-lifecycle.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { StaffLifecycleService } from './staff-lifecycle.service';
+import { UsageService } from '../usage/usage.service';
 
 @Injectable()
 export class StaffService {
@@ -20,6 +21,7 @@ export class StaffService {
     private readonly usersService: UsersService,
     private readonly auditService: AuditService,
     private readonly lifecycleService: StaffLifecycleService,
+    private readonly usageService: UsageService,
   ) {}
 
   async createStaff(dto: CreateStaffDto, actor: AuthContext) {
@@ -32,6 +34,11 @@ export class StaffService {
     if (existingStaff) {
       throw new ConflictException('Employee ID already exists');
     }
+
+    const currentCount = await this.prisma.staff.count({
+      where: { tenantId: actor.tenantId, status: 'ACTIVE' },
+    });
+    await this.usageService.verifyLimit(actor.tenantId, 'staff.count', currentCount);
 
     const managedUser = await this.usersService.createManagedUser({
       tenantId: actor.tenantId,
@@ -132,6 +139,8 @@ export class StaffService {
         roleIds: dto.roleIds,
       },
     });
+
+    await this.usageService.incrementUsage(actor.tenantId, 'staff.count');
 
     await this.lifecycleService.recordEvent(
       staff.id,
@@ -330,12 +339,24 @@ export class StaffService {
         staffCode: existing.staffCode,
         status: existing.status,
         email: existing.user.email,
+        firstName: existing.firstName,
+        lastName: existing.lastName,
+        joiningDate: existing.joiningDate,
+        contractType: existing.contractType,
+        department: existing.department,
+        designation: existing.designation,
       },
       after: {
         employeeId: updated.employeeId,
         staffCode: updated.staffCode,
         status: updated.status,
         email: updated.user.email,
+        firstName: updated.firstName,
+        lastName: updated.lastName,
+        joiningDate: updated.joiningDate,
+        contractType: updated.contractType,
+        department: updated.department,
+        designation: updated.designation,
       },
     });
 
@@ -349,15 +370,38 @@ export class StaffService {
   ) {
     const staff = await this.prisma.staff.findFirst({
       where: { id: staffId, tenantId: actor.tenantId },
+      include: { user: true },
     });
 
     if (!staff) {
       throw new NotFoundException('Staff member not found in this tenant');
     }
 
-    const updated = await this.prisma.staff.update({
-      where: { id: staff.id },
-      data: { status: dto.status },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Suspend user if status is Terminated, Resigned or Suspended
+      if (
+        [StaffStatus.TERMINATED, StaffStatus.RESIGNED, StaffStatus.SUSPENDED].includes(
+          dto.status,
+        )
+      ) {
+        await tx.user.update({
+          where: { id: staff.userId },
+          data: { status: 'SUSPENDED' },
+        });
+      } else if (dto.status === StaffStatus.ACTIVE) {
+        // Reactivate user if they were suspended and are now active
+        if (staff.user.status === 'SUSPENDED') {
+          await tx.user.update({
+            where: { id: staff.userId },
+            data: { status: 'ACTIVE' },
+          });
+        }
+      }
+
+      return tx.staff.update({
+        where: { id: staff.id },
+        data: { status: dto.status },
+      });
     });
 
     await this.auditService.record({
@@ -421,7 +465,11 @@ export class StaffService {
     return `${normalizeSlug(actor.tenantSlug)}-EMP-${String(count + 1).padStart(4, '0')}`;
   }
 
-  async terminateStaff(staffId: string, reason: string, actor: AuthContext) {
+  async terminateStaff(
+    staffId: string,
+    dto: { reason: string; effectiveDate?: string },
+    actor: AuthContext,
+  ) {
     const staff = await this.prisma.staff.findFirst({
       where: { id: staffId, tenantId: actor.tenantId },
       include: { user: true },
@@ -431,17 +479,25 @@ export class StaffService {
       throw new NotFoundException('Staff member not found');
     }
 
+    const effectiveDate = dto.effectiveDate
+      ? new Date(dto.effectiveDate)
+      : new Date();
+
     const updated = await this.prisma.$transaction(async (tx) => {
-      // Deactivate user
-      await tx.user.update({
-        where: { id: staff.userId },
-        data: { status: 'SUSPENDED' },
-      });
+      // Deactivate user if effective date is today or in the past
+      if (effectiveDate <= new Date()) {
+        await tx.user.update({
+          where: { id: staff.userId },
+          data: { status: 'SUSPENDED' },
+        });
+      }
 
       // Update staff status
       return tx.staff.update({
         where: { id: staff.id },
-        data: { status: StaffStatus.TERMINATED },
+        data: {
+          status: StaffStatus.TERMINATED,
+        },
       });
     });
 
@@ -450,8 +506,8 @@ export class StaffService {
       StaffLifecycleEventType.TERMINATED,
       actor,
       {
-        reason,
-        eventDate: new Date(),
+        reason: dto.reason,
+        eventDate: effectiveDate,
       },
     );
 
@@ -461,7 +517,11 @@ export class StaffService {
       tenantId: actor.tenantId,
       userId: actor.userId,
       resourceId: staff.id,
-      after: { status: StaffStatus.TERMINATED, reason },
+      after: {
+        status: StaffStatus.TERMINATED,
+        reason: dto.reason,
+        effectiveDate,
+      },
     });
 
     return updated;

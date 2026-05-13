@@ -67,6 +67,41 @@ export class HomeworkService {
       ...(query.status ? { status: query.status } : {}),
     };
 
+    // Scoping for students/guardians
+    if (actor.roles.includes('student')) {
+      const student = await this.prisma.student.findFirst({
+        where: { tenantId: actor.tenantId, userId: actor.userId },
+        select: { id: true, classId: true, sectionId: true },
+      });
+      if (student) {
+        where.classId = student.classId;
+        if (student.sectionId) {
+          where.OR = [{ sectionId: student.sectionId }, { sectionId: null }];
+        } else {
+          where.sectionId = null;
+        }
+      }
+    } else if (actor.roles.includes('parent')) {
+      const studentId = await this.resolveVisibleStudentId(
+        actor,
+        query.studentId,
+      );
+      if (studentId) {
+        const student = await this.prisma.student.findUnique({
+          where: { id: studentId },
+          select: { classId: true, sectionId: true },
+        });
+        if (student) {
+          where.classId = student.classId;
+          if (student.sectionId) {
+            where.OR = [{ sectionId: student.sectionId }, { sectionId: null }];
+          } else {
+            where.sectionId = null;
+          }
+        }
+      }
+    }
+
     if (query.studentId) {
       where.submissions = {
         some: { studentId: query.studentId },
@@ -87,8 +122,50 @@ export class HomeworkService {
     return { items, total };
   }
 
+  async markAsReviewed(
+    actor: AuthContext,
+    submissionId: string,
+    feedback?: string,
+  ) {
+    const submission = await this.prisma.homeworkSubmission.findFirst({
+      where: { id: submissionId, tenantId: actor.tenantId },
+      include: { assignment: true },
+    });
+    if (!submission) throw new NotFoundException('Submission not found');
+
+    const updated = await this.prisma.homeworkSubmission.update({
+      where: { id: submissionId },
+      data: {
+        status: HomeworkSubmissionStatus.REVIEWED,
+        feedback: feedback ?? submission.feedback,
+        gradedAt: new Date(),
+        gradedById: actor.userId,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'review',
+      resource: 'homework_submission',
+      resourceId: submissionId,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: updated,
+    });
+
+    return updated;
+  }
+
   async getAssignment(actor: AuthContext, id: string) {
     return this.findAssignmentOrThrow(actor, id);
+  }
+
+  async getSubmission(actor: AuthContext, id: string) {
+    const submission = await this.prisma.homeworkSubmission.findFirst({
+      where: { id, tenantId: actor.tenantId },
+      include: homeworkSubmissionInclude(),
+    });
+    if (!submission) throw new NotFoundException('Submission not found');
+    return submission;
   }
 
   async createAssignment(dto: CreateHomeworkDto, actor: AuthContext) {
@@ -1273,6 +1350,95 @@ export class HomeworkService {
     }
 
     return requestedStudentId ?? null;
+  }
+
+  async getHomeworkCompletionReport(
+    actor: AuthContext,
+    academicYearId: string,
+    classId?: string,
+    sectionId?: string,
+  ) {
+    const assignments = await this.prisma.homeworkAssignment.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        academicYearId,
+        ...(classId ? { classId } : {}),
+        ...(sectionId ? { sectionId } : {}),
+      },
+      include: {
+        submissions: {
+          select: { id: true, status: true },
+        },
+        class: true,
+        section: true,
+        subject: true,
+      },
+    });
+
+    return assignments.map((a) => {
+      const totalSubmissions = a.submissions.length;
+      const completed = a.submissions.filter(
+        (s) =>
+          s.status === HomeworkSubmissionStatus.SUBMITTED ||
+          s.status === HomeworkSubmissionStatus.REVIEWED,
+      ).length;
+      return {
+        id: a.id,
+        title: a.title,
+        class: a.class.name,
+        section: a.section?.name,
+        subject: a.subject.name,
+        dueDate: a.dueDate,
+        totalSubmissions,
+        completed,
+        completionRate:
+          totalSubmissions > 0 ? (completed / totalSubmissions) * 100 : 0,
+      };
+    });
+  }
+
+  async getMissingLateSubmissionsReport(
+    actor: AuthContext,
+    academicYearId: string,
+    classId?: string,
+  ) {
+    const submissions = await this.prisma.homeworkSubmission.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        assignment: {
+          academicYearId,
+          ...(classId ? { classId } : {}),
+        },
+        status: {
+          in: [
+            HomeworkSubmissionStatus.NOT_SUBMITTED,
+            HomeworkSubmissionStatus.LATE,
+          ],
+        },
+      },
+      include: {
+        student: true,
+        assignment: {
+          include: {
+            class: true,
+            section: true,
+            subject: true,
+          },
+        },
+      },
+      orderBy: { student: { firstName: 'asc' } },
+    });
+
+    return submissions.map((s) => ({
+      submissionId: s.id,
+      studentName: `${s.student.firstName} ${s.student.lastName}`,
+      assignmentTitle: s.assignment.title,
+      subject: s.assignment.subject.name,
+      class: s.assignment.class.name,
+      section: s.assignment.section?.name,
+      dueDate: s.assignment.dueDate,
+      status: s.status,
+    }));
   }
 }
 

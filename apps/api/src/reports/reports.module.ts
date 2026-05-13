@@ -6,9 +6,20 @@ import { AuditModule } from '../audit/audit.module';
 
 import { FinanceModule } from '../finance/finance.module';
 
+import { BullModule } from '@nestjs/bullmq';
+
+import { ReportsProcessor } from './reports.processor';
+
 @Module({
-  imports: [PrismaModule, AuditModule, FinanceModule],
-  providers: [ReportsService],
+  imports: [
+    PrismaModule,
+    AuditModule,
+    FinanceModule,
+    BullModule.registerQueue({
+      name: 'reports',
+    }),
+  ],
+  providers: [ReportsService, ReportsProcessor],
   controllers: [ReportsController],
   exports: [ReportsService],
 })

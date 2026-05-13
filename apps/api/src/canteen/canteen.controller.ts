@@ -14,6 +14,8 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { CanteenHardeningService } from './canteen-hardening.service';
 import {
   CanteenLowBalanceAlertDto,
@@ -47,7 +49,8 @@ import { StudentQrService } from '../students/student-qr.service';
 import { StudentQrResolvePurpose } from '@schoolos/core';
 
 @Controller('canteen')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.canteen')
 export class CanteenController {
   constructor(
     private readonly canteenService: CanteenService,

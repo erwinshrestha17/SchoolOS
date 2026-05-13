@@ -57,21 +57,37 @@ export class PayrollService {
       throw new NotFoundException('Staff member not found in this tenant');
     }
 
-    const contract = await this.prisma.staffContract.create({
-      data: {
-        tenantId: actor.tenantId,
-        staffId: dto.staffId,
-        contractNumber: dto.contractNumber,
-        position: dto.position,
-        startDate: new Date(dto.startDate),
-        endDate: dto.endDate ? new Date(dto.endDate) : null,
-        baseSalary: new Prisma.Decimal(dto.baseSalary),
-        allowances: new Prisma.Decimal(dto.allowances ?? 0),
-        deductions: new Prisma.Decimal(dto.deductions ?? 0),
-      },
-      include: {
-        staff: true,
-      },
+    const contract = await this.prisma.$transaction(async (tx) => {
+      // Deactivate current active contracts
+      await tx.staffContract.updateMany({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: dto.staffId,
+          status: 'ACTIVE',
+        },
+        data: {
+          status: 'INACTIVE',
+          endDate: new Date(),
+        },
+      });
+
+      return tx.staffContract.create({
+        data: {
+          tenantId: actor.tenantId,
+          staffId: dto.staffId,
+          contractNumber: dto.contractNumber,
+          position: dto.position,
+          startDate: new Date(dto.startDate),
+          endDate: dto.endDate ? new Date(dto.endDate) : null,
+          baseSalary: new Prisma.Decimal(dto.baseSalary),
+          allowances: new Prisma.Decimal(dto.allowances ?? 0),
+          deductions: new Prisma.Decimal(dto.deductions ?? 0),
+          status: 'ACTIVE',
+        },
+        include: {
+          staff: true,
+        },
+      });
     });
 
     await this.auditService.record({
@@ -287,13 +303,29 @@ export class PayrollService {
       );
     }
 
-    const updated = await this.prisma.salaryStructure.update({
-      where: { id: structure.id },
-      data: {
-        status: SalaryStructureStatus.ACTIVE,
-        activatedAt: new Date(),
-      },
-      include: { staff: true, components: true },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Archive current active structure
+      await tx.salaryStructure.updateMany({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: structure.staffId,
+          status: SalaryStructureStatus.ACTIVE,
+          id: { not: structure.id },
+        },
+        data: {
+          status: SalaryStructureStatus.ARCHIVED,
+          effectiveTo: new Date(),
+        },
+      });
+
+      return tx.salaryStructure.update({
+        where: { id: structure.id },
+        data: {
+          status: SalaryStructureStatus.ACTIVE,
+          activatedAt: new Date(),
+        },
+        include: { staff: true, components: true },
+      });
     });
 
     await this.auditService.record({
@@ -1345,6 +1377,67 @@ export class PayrollService {
 
     return run;
   }
+
+  async regeneratePayrollLines(id: string, actor: AuthContext) {
+    const run = await this.getPayrollRunOrThrow(id, actor);
+    const actions = getPayrollRunActions(run.status);
+
+    if (!actions.canEdit) {
+      throw new ConflictException(
+        `Payroll run in ${run.status} status cannot be edited`,
+      );
+    }
+
+    const { lines, totals } = await this.calculatePeriodPayrollLines(
+      run.periodYear,
+      run.periodMonth,
+      30, // Default working days, should ideally be stored in the run
+      actor,
+    );
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.payrollLine.deleteMany({
+        where: { tenantId: actor.tenantId, payrollRunId: run.id },
+      });
+
+      return tx.payrollRun.update({
+        where: { id: run.id },
+        data: {
+          grossAmount: new Prisma.Decimal(totals.grossAmount),
+          deductionAmount: new Prisma.Decimal(totals.deductionAmount),
+          netAmount: new Prisma.Decimal(totals.netAmount),
+          pfEmployeeAmount: new Prisma.Decimal(totals.pfEmployeeAmount),
+          pfEmployerAmount: new Prisma.Decimal(totals.pfEmployerAmount),
+          tdsAmount: new Prisma.Decimal(totals.tdsAmount),
+          status: PayrollRunStatus.GENERATED,
+          lines: {
+            create: lines.map((line) => ({
+              tenantId: actor.tenantId,
+              staffId: line.staffId,
+              contractId: line.contractId,
+              salaryStructureId: line.salaryStructureId,
+              basicSalary: new Prisma.Decimal(line.baseSalary),
+              earnings: new Prisma.Decimal(line.earnings),
+              grossSalary: new Prisma.Decimal(line.grossSalary),
+              allowances: new Prisma.Decimal(line.allowances),
+              leaveDeductions: new Prisma.Decimal(line.leaveDeductions),
+              pfEmployee: new Prisma.Decimal(line.pfEmployee),
+              pfEmployer: new Prisma.Decimal(line.pfEmployer),
+              tds: new Prisma.Decimal(line.tds),
+              otherDeductions: new Prisma.Decimal(line.otherDeductions),
+              deductions: new Prisma.Decimal(line.deductions),
+              netSalary: new Prisma.Decimal(line.netSalary),
+              paidDays: new Prisma.Decimal(line.attendanceDays),
+              unpaidDays: new Prisma.Decimal(line.unpaidLeaveDays),
+              attendanceDays: line.attendanceDays,
+              workingDays: line.workingDays,
+            })),
+          },
+        },
+        include: { lines: true },
+      });
+    });
+  }
 }
 
 interface PayrollLineInput {
@@ -1437,15 +1530,26 @@ export function calculatePayrollTotals(
 
 export function getPayrollRunActions(status: string) {
   return {
+    canEdit:
+      status === PayrollRunStatus.DRAFT ||
+      status === PayrollRunStatus.GENERATED ||
+      status === PayrollRunStatus.UNDER_REVIEW,
     canReview:
       status === PayrollRunStatus.DRAFT ||
       status === PayrollRunStatus.GENERATED,
     canApprove:
-      status === PayrollRunStatus.DRAFT ||
-      status === PayrollRunStatus.GENERATED ||
       status === PayrollRunStatus.UNDER_REVIEW ||
-      status === PayrollRunStatus.REVIEWED,
+      status === PayrollRunStatus.REVIEWED ||
+      status === PayrollRunStatus.GENERATED,
     canPost: status === PayrollRunStatus.APPROVED,
+    canPay: status === PayrollRunStatus.POSTED,
+    canReverse:
+      status === PayrollRunStatus.POSTED || status === PayrollRunStatus.PAID,
+    isLocked:
+      status === PayrollRunStatus.POSTED ||
+      status === PayrollRunStatus.PAID ||
+      status === PayrollRunStatus.CANCELLED ||
+      status === PayrollRunStatus.VOID,
   };
 }
 

@@ -33,4 +33,8 @@ export class TerminateStaffDto {
   @IsString()
   @IsNotEmpty()
   reason!: string;
+
+  @IsOptional()
+  @IsString()
+  effectiveDate?: string;
 }

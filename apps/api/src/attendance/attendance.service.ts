@@ -44,6 +44,8 @@ import { CreateAttendanceCorrectionDto } from './dto/create-attendance-correctio
 import { ReviewAttendanceCorrectionDto } from './dto/review-attendance-correction.dto';
 import { GetMonthlyRegisterDto } from './dto/get-monthly-register.dto';
 import { GetStudentHistoryDto } from './dto/get-student-history.dto';
+import { UpsertAttendanceDraftDto } from './dto/upsert-attendance-draft.dto';
+import { buildRosterPdf } from '../common/pdf/simple-pdf';
 
 @Injectable()
 export class AttendanceService {
@@ -1037,7 +1039,7 @@ export class AttendanceService {
     }
 
     if (dto.status === 'REJECTED') {
-      return this.prisma.attendanceCorrectionRequest.update({
+      const updated = await this.prisma.attendanceCorrectionRequest.update({
         where: { id },
         data: {
           status: 'REJECTED',
@@ -1046,6 +1048,17 @@ export class AttendanceService {
           reviewNote: dto.reviewNote,
         },
       });
+
+      await this.auditService.record({
+        action: 'reject',
+        resource: 'attendance_correction_request',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: id,
+        after: updated,
+      });
+
+      return updated;
     }
 
     // APPROVED
@@ -1115,7 +1128,7 @@ export class AttendanceService {
         });
       }
 
-      return tx.attendanceCorrectionRequest.update({
+      const updated = await tx.attendanceCorrectionRequest.update({
         where: { id },
         data: {
           status: 'APPROVED',
@@ -1124,10 +1137,25 @@ export class AttendanceService {
           reviewNote: dto.reviewNote,
         },
       });
+
+      await this.auditService.record({
+        action: 'approve',
+        resource: 'attendance_correction_request',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: id,
+        after: updated,
+      });
+
+      return updated;
     });
   }
 
-  async getParentSummary(studentId: string, actor: AuthContext) {
+  async getParentSummary(
+    studentId: string,
+    actor: AuthContext,
+    query?: { month?: number; year?: number },
+  ) {
     const studentScope = await buildStudentScopeFilter(this.prisma, actor);
     if (
       Object.keys(studentScope).length > 0 &&
@@ -1137,7 +1165,10 @@ export class AttendanceService {
     }
 
     const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const year = query?.year ?? now.getFullYear();
+    const month = query?.month ?? now.getMonth() + 1;
+    const firstDayOfMonth = new Date(year, month - 1, 1);
+    const lastDayOfMonth = new Date(year, month, 0);
 
     const [monthRecords, recentAbsences] = await Promise.all([
       this.prisma.attendanceRecord.findMany({
@@ -1145,7 +1176,10 @@ export class AttendanceService {
           tenantId: actor.tenantId,
           studentId,
           attendanceSession: {
-            attendanceDate: { gte: firstDayOfMonth },
+            attendanceDate: {
+              gte: firstDayOfMonth,
+              lte: lastDayOfMonth,
+            },
           },
         },
       }),
@@ -1899,6 +1933,94 @@ export class AttendanceService {
     };
   }
 
+  async cancelLeaveRequest(leaveRequestId: string, actor: AuthContext) {
+    const leave = await this.prisma.staffLeaveRequest.findFirst({
+      where: {
+        id: leaveRequestId,
+        tenantId: actor.tenantId,
+      },
+    });
+
+    if (!leave) {
+      throw new NotFoundException('Leave request not found');
+    }
+
+    if (leave.status === 'CANCELLED') {
+      return leave;
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const cancelled = await tx.staffLeaveRequest.update({
+        where: { id: leave.id },
+        data: {
+          status: 'CANCELLED',
+        },
+      });
+
+      // Restore balance if it was approved and paid
+      if (leave.status === 'APPROVED' && leave.isPaid) {
+        const year = leave.startsOn.getFullYear();
+        await tx.staffLeaveBalance.update({
+          where: {
+            tenantId_staffId_leaveType_year: {
+              tenantId: actor.tenantId,
+              staffId: leave.staffId,
+              leaveType: leave.leaveType,
+              year,
+            },
+          },
+          data: {
+            used: {
+              decrement: leave.days,
+            },
+          },
+        });
+
+        // Revert attendance records
+        for (const leaveDate of eachDateInclusive(leave.startsOn, leave.endsOn)) {
+          const attendanceDay = stripTime(leaveDate);
+          const existing = await tx.staffAttendance.findUnique({
+            where: {
+              tenantId_staffId_attendanceDate: {
+                tenantId: actor.tenantId,
+                staffId: leave.staffId,
+                attendanceDate: attendanceDay,
+              },
+            },
+          });
+
+          if (
+            existing &&
+            existing.status === AttendanceStatus.LEAVE &&
+            existing.leaveType === leave.leaveType
+          ) {
+            // Either delete or mark as ABSENT if it was generated by leave
+            // For safety, let's just delete it if it has the specific note
+            if (existing.note?.includes(leave.id)) {
+              await tx.staffAttendance.delete({
+                where: { id: existing.id },
+              });
+            }
+          }
+        }
+      }
+
+      return cancelled;
+    });
+
+    await this.auditService.record({
+      action: 'cancel',
+      resource: 'staff_leave_request',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      before: { status: leave.status },
+      after: { status: updated.status },
+    });
+
+    return updated;
+  }
+
   /**
    * Helper for Timetable substitution to check if a teacher is absent or on leave
    */
@@ -2282,7 +2404,11 @@ export class AttendanceService {
     };
   }
 
-  async exportMonthlyRegister(dto: GetMonthlyRegisterDto, actor: AuthContext) {
+  async exportMonthlyRegister(
+    dto: GetMonthlyRegisterDto,
+    format: 'csv' | 'pdf',
+    actor: AuthContext,
+  ) {
     const data = await this.getMonthlyRegister(dto, actor);
 
     const headers = [
@@ -2294,6 +2420,7 @@ export class AttendanceService {
       'LATE',
       'LEAVE',
       'HOLIDAY',
+      'TOTAL',
     ];
 
     const rows = data.matrix.map(
@@ -2319,15 +2446,62 @@ export class AttendanceService {
         student.totals.LATE.toString(),
         student.totals.LEAVE.toString(),
         student.totals.HOLIDAY.toString(),
+        student.totals.totalDays.toString(),
       ],
     );
 
-    const escapeCsv = (str: string) => `"${str.replace(/"/g, '""')}"`;
+    let content: string | Buffer;
+    if (format === 'csv') {
+      const escapeCsv = (str: string) => `"${str.replace(/"/g, '""')}"`;
+      content = [
+        headers.map(escapeCsv).join(','),
+        ...rows.map((row) => row.map(escapeCsv).join(',')),
+      ].join('\n');
+    } else {
+      // Basic PDF table generation using simple-pdf
+      content = buildRosterPdf({
+        schoolName: 'Attendance Register',
+        className: data.className,
+        sectionName: data.sectionName,
+        academicYear: dto.academicYearId,
+        headers,
+        rows: data.matrix.map((s: any) => ({
+          'Roll No': s.rollNumber ?? '',
+          'Student Name': s.name,
+          ...Object.fromEntries(
+            s.attendance.map((a: any, i: number) => [(i + 1).toString(), a.status[0]]),
+          ),
+          PRESENT: s.totals.PRESENT,
+          ABSENT: s.totals.ABSENT,
+          TOTAL: s.totals.totalDays,
+        })),
+      });
+    }
 
-    return [
-      headers.map(escapeCsv).join(','),
-      ...rows.map((row) => row.map(escapeCsv).join(',')),
-    ].join('\n');
+    // Save export history
+    await this.prisma.reportExport.create({
+      data: {
+        tenantId: actor.tenantId,
+        reportKey: 'attendance_monthly_register',
+        format,
+        filters: dto as any,
+        status: 'COMPLETED',
+        requestedBy: actor.userId,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'export',
+      resource: 'attendance_register',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        format,
+        filters: dto,
+      },
+    });
+
+    return content;
   }
 
   async processDailyEscalationWarnings(
@@ -2876,6 +3050,123 @@ export class AttendanceService {
         ];
       }),
     );
+  }
+
+  async upsertDraft(dto: UpsertAttendanceDraftDto, actor: AuthContext) {
+    const attendanceDate = stripTime(new Date(dto.attendanceDate));
+
+    return this.prisma.attendanceDraft.upsert({
+      where: {
+        tenantId_userId_classId_sectionId_attendanceDate: {
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          classId: dto.classId,
+          sectionId: dto.sectionId ?? null,
+          attendanceDate,
+        },
+      },
+      create: {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        classId: dto.classId,
+        sectionId: dto.sectionId ?? null,
+        attendanceDate,
+        academicYearId: dto.academicYearId,
+        payload: dto.payload as any,
+      },
+      update: {
+        payload: dto.payload as any,
+        lastSavedAt: new Date(),
+      },
+    });
+  }
+
+  async listDrafts(actor: AuthContext) {
+    return this.prisma.attendanceDraft.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+      },
+      include: {
+        class: true,
+        section: true,
+      },
+      orderBy: { lastSavedAt: 'desc' },
+    });
+  }
+
+  async deleteDraft(id: string, actor: AuthContext) {
+    return this.prisma.attendanceDraft.deleteMany({
+      where: {
+        id,
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+      },
+    });
+  }
+
+  async cleanupOldDrafts(tenantId: string) {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    return this.prisma.attendanceDraft.deleteMany({
+      where: {
+        tenantId,
+        lastSavedAt: { lt: thirtyDaysAgo },
+      },
+    });
+  }
+
+  async submitDraft(id: string, actor: AuthContext) {
+    const draft = await this.prisma.attendanceDraft.findFirst({
+      where: {
+        id,
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+      },
+    });
+
+    if (!draft) {
+      throw new NotFoundException('Attendance draft not found');
+    }
+
+    const payload = draft.payload as any;
+    
+    // Call submitAttendance with draft payload
+    const result = await this.submitAttendance(
+      {
+        academicYearId: draft.academicYearId,
+        classId: draft.classId,
+        sectionId: draft.sectionId ?? undefined,
+        attendanceDate: draft.attendanceDate.toISOString(),
+        exceptions: payload.exceptions,
+      },
+      actor,
+      {
+        source: 'sync_submission',
+        clientSubmissionId: `draft-${draft.id}`,
+        deviceId: null,
+        deviceLabel: 'Web Draft',
+        sessionFingerprint: null,
+        trustMetadata: {},
+      },
+    );
+
+    // Cleanup draft after successful submission
+    await this.prisma.attendanceDraft.delete({ where: { id: draft.id } });
+
+    return result;
+  }
+
+  private async ensureAttendanceReviewAuthority(actor: AuthContext) {
+    if (
+      !actor.permissions.includes('attendance:review_conflicts') &&
+      !actor.permissions.includes('attendance:manage_all')
+    ) {
+      throw new ForbiddenException(
+        'You do not have permission to review attendance conflicts/corrections',
+      );
+    }
   }
 }
 

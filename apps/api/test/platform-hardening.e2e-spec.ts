@@ -172,6 +172,34 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       const canActivate = await entitlementGuard.canActivate(context);
       expect(canActivate).toBe(true);
     });
+
+    it('enforces usage limits', async () => {
+      // Mock usage counter at limit
+      await prisma.usageCounter.create({
+        data: {
+          tenantId: freeTenantId,
+          usageKey: 'students.count',
+          period: 'MONTHLY',
+          periodStart: new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)),
+          value: 10,
+        },
+      });
+
+      // Mock plan limit
+      const plan = await prisma.platformPlan.findFirst({
+        where: { key: 'free-plan' },
+      });
+      await prisma.platformUsageLimit.create({
+        data: {
+          planId: plan!.id,
+          usageKey: 'students.count',
+          limit: 10,
+        },
+      });
+
+      const usageService = app.get<any>('UsageService' as any);
+      await expect(usageService.verifyLimit(freeTenantId, 'students.count', 10)).rejects.toThrow();
+    });
   });
 
   describe('SaaS Billing Lifecycle', () => {
@@ -227,6 +255,22 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       );
 
       expect(full.status).toBe('PAID');
+    });
+
+    it('updates subscription status', async () => {
+      const actor = { tenantId: 'platform', userId: 'admin' } as any;
+      const sub = await prisma.tenantSubscription.findFirst({
+        where: { tenantId: freeTenantId },
+      });
+
+      const updated = await platformService.updateSubscriptionStatus(
+        freeTenantId,
+        sub!.id,
+        { status: 'GRACE', notes: 'Payment overdue' },
+        actor.userId,
+      );
+
+      expect(updated.status).toBe('GRACE');
     });
   });
 

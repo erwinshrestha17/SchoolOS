@@ -15,6 +15,8 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { AcademicsFoundationService } from './academics-foundation.service';
 import { AcademicsService } from './academics.service';
 import { AssessmentComponentsService } from './assessment-components.service';
@@ -61,7 +63,8 @@ import { GradeCalculatorService } from './grade-calculator.service';
 import { ResultsService } from './results.service';
 
 @Controller('academics')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.exams')
 export class AcademicsController {
   constructor(
     private readonly academicsService: AcademicsService,

@@ -31,6 +31,14 @@ export class DuesQueryDto {
   @IsOptional()
   @IsUUID()
   studentId?: string;
+  
+  @IsOptional()
+  @IsUUID()
+  feePeriodId?: string;
+
+  @IsOptional()
+  @IsString()
+  agingBucket?: string;
 
   @IsOptional()
   @IsDateString()

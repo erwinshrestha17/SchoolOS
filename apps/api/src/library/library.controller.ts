@@ -14,6 +14,8 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { ArchiveLibraryBookDto } from './dto/archive-library-book.dto';
 import { CreateLibraryBookDto } from './dto/create-library-book.dto';
 import { CreateLibraryCopyDto } from './dto/create-library-copy.dto';
@@ -31,7 +33,8 @@ import { LibraryHardeningService } from './library-hardening.service';
 import { LibraryService } from './library.service';
 
 @Controller('library')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.library')
 export class LibraryController {
   constructor(
     private readonly libraryService: LibraryService,

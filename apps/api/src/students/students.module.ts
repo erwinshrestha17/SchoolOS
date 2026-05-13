@@ -5,6 +5,7 @@ import { CommunicationsModule } from '../communications/communications.module';
 import { StorageModule } from '../storage/storage.module';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { UsersModule } from '../users/users.module';
+import { UsageModule } from '../usage/usage.module';
 import { StudentDocumentAccessController } from './student-document-access.controller';
 import { StudentDocumentAccessService } from './student-document-access.service';
 import { StudentDocumentRetentionCron } from './student-document-retention.cron';
@@ -25,6 +26,7 @@ import { StudentQrController } from './student-qr.controller';
     AuditModule,
     StorageModule,
     FileRegistryModule,
+    UsageModule,
   ],
   providers: [
     StudentsService,

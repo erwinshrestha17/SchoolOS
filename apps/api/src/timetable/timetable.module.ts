@@ -8,6 +8,8 @@ import { TimetableController } from './timetable.controller';
 import { TimetableLifecycleService } from './timetable-lifecycle.service';
 import { TimetableService } from './timetable.service';
 
+import { TimetableSubstitutionService } from './timetable-substitution.service';
+
 @Module({
   imports: [AuthModule, CommunicationsModule, AuditModule, AttendanceModule],
   controllers: [TimetableController],
@@ -15,11 +17,13 @@ import { TimetableService } from './timetable.service';
     TimetableService,
     TimetableConflictService,
     TimetableLifecycleService,
+    TimetableSubstitutionService,
   ],
   exports: [
     TimetableService,
     TimetableConflictService,
     TimetableLifecycleService,
+    TimetableSubstitutionService,
   ],
 })
 export class TimetableModule {}

@@ -13,6 +13,8 @@ import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { AttendanceService } from './attendance.service';
 import { CreateStaffLeaveRequestDto } from './dto/create-staff-leave-request.dto';
@@ -29,9 +31,12 @@ import { CreateAttendanceCorrectionDto } from './dto/create-attendance-correctio
 import { ReviewAttendanceCorrectionDto } from './dto/review-attendance-correction.dto';
 import { GetMonthlyRegisterDto } from './dto/get-monthly-register.dto';
 import { GetStudentHistoryDto } from './dto/get-student-history.dto';
+import { UpsertAttendanceDraftDto } from './dto/upsert-attendance-draft.dto';
+import { GetParentSummaryDto } from './dto/get-parent-summary.dto';
 
 @Controller('attendance')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.attendance')
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
@@ -85,16 +90,22 @@ export class AttendanceController {
 
   @Get('register/export')
   @Permissions('attendance:read')
-  @Header('Content-Type', 'text/csv')
-  @Header(
-    'Content-Disposition',
-    'attachment; filename="attendance-register.csv"',
-  )
-  exportMonthlyRegister(
+  async exportMonthlyRegister(
     @Query() query: GetMonthlyRegisterDto,
+    @Query('format') format: 'csv' | 'pdf' = 'csv',
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.attendanceService.exportMonthlyRegister(query, auth);
+    const result = await this.attendanceService.exportMonthlyRegister(
+      query,
+      format,
+      auth,
+    );
+
+    if (format === 'pdf') {
+      return result; // Service will return Buffer
+    }
+
+    return result; // Service will return string
   }
 
   @Get('conflicts')
@@ -175,6 +186,15 @@ export class AttendanceController {
     return this.attendanceService.createLeaveRequest(dto, auth);
   }
 
+  @Post('staff/leave/:id/cancel')
+  @Permissions('attendance:staff:update')
+  cancelLeaveRequest(
+    @Param('id') leaveRequestId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.cancelLeaveRequest(leaveRequestId, auth);
+  }
+
   @Patch('staff/leave-requests/:id/review')
   @Permissions('hr:manage')
   reviewLeaveRequest(
@@ -201,6 +221,36 @@ export class AttendanceController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.attendanceService.syncAttendance(dto, auth);
+  }
+
+  @Post('drafts')
+  @Permissions('attendance:mark')
+  upsertDraft(
+    @Body() dto: UpsertAttendanceDraftDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.upsertDraft(dto, auth);
+  }
+
+  @Get('drafts')
+  @Permissions('attendance:mark')
+  listDrafts(@CurrentAuth() auth: AuthContext) {
+    return this.attendanceService.listDrafts(auth);
+  }
+
+  @Post('drafts/cleanup')
+  @Permissions('attendance:manage_all')
+  cleanupDrafts(@CurrentAuth() auth: AuthContext) {
+    return this.attendanceService.cleanupOldDrafts(auth.tenantId);
+  }
+
+  @Post('drafts/:id/submit')
+  @Permissions('attendance:mark')
+  submitDraft(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.submitDraft(id, auth);
   }
 
   @Patch('sessions/:id/override')
@@ -290,8 +340,9 @@ export class AttendanceController {
   @Permissions('attendance:read')
   getParentSummary(
     @Param('id') studentId: string,
+    @Query() query: GetParentSummaryDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.attendanceService.getParentSummary(studentId, auth);
+    return this.attendanceService.getParentSummary(studentId, auth, query);
   }
 }

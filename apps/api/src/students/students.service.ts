@@ -55,6 +55,7 @@ export class StudentsService {
     private readonly auditService: AuditService,
     private readonly storageService: StorageService,
     private readonly fileRegistryService: FileRegistryService,
+    private readonly usageService: UsageService,
   ) {}
 
   async createStudent(dto: CreateStudentDto, actor: AuthContext) {
@@ -68,6 +69,11 @@ export class StudentsService {
     if (!classroom) {
       throw new NotFoundException('Class not found in this tenant');
     }
+
+    const currentCount = await this.prisma.student.count({
+      where: { tenantId: actor.tenantId, lifecycleStatus: 'ACTIVE' },
+    });
+    await this.usageService.verifyLimit(actor.tenantId, 'students.count', currentCount);
 
     let linkedUserId: string | null = null;
 
@@ -148,6 +154,8 @@ export class StudentsService {
         hasLogin: Boolean(student.userId),
       },
     });
+
+    await this.usageService.incrementUsage(actor.tenantId, 'students.count');
 
     return {
       id: student.id,
@@ -1318,6 +1326,84 @@ export class StudentsService {
     };
   }
 
+  async previewMergeDuplicateStudent(
+    dto: MergeDuplicateStudentPreviewDto,
+    actor: AuthContext,
+  ) {
+    if (dto.sourceStudentId === dto.targetStudentId) {
+      throw new BadRequestException(
+        'Source and target students must be different records',
+      );
+    }
+
+    const [sourceStudent, targetStudent] = await Promise.all([
+      this.findTenantStudentForDuplicateMerge(dto.sourceStudentId, actor),
+      this.findTenantStudentForDuplicateMerge(dto.targetStudentId, actor),
+    ]);
+
+    const financialSummary = await this.prisma.student.findUnique({
+      where: { id: sourceStudent.id },
+      select: {
+        _count: {
+          select: {
+            invoices: true,
+            payments: true,
+            studentFeeAssignments: true,
+            guardianLinks: true,
+            studentDocuments: true,
+            generatedStudentDocuments: true,
+            notificationDeliveries: true,
+            developmentalMilestones: true,
+            moodLogs: true,
+            libraryIssues: true,
+            transportEnrollments: true,
+            transportLogs: true,
+          },
+        },
+      },
+    });
+
+    const mergeCounts = {
+      guardianLinks: financialSummary?._count.guardianLinks ?? 0,
+      documents: financialSummary?._count.studentDocuments ?? 0,
+      generatedDocuments: financialSummary?._count.generatedStudentDocuments ?? 0,
+      invoices: financialSummary?._count.invoices ?? 0,
+      payments: financialSummary?._count.payments ?? 0,
+      feeWaivers: await this.prisma.feeWaiver.count({
+        where: { tenantId: actor.tenantId, studentId: sourceStudent.id },
+      }),
+      notificationDeliveries: financialSummary?._count.notificationDeliveries ?? 0,
+      developmentalMilestones: financialSummary?._count.developmentalMilestones ?? 0,
+      moodLogs: financialSummary?._count.moodLogs ?? 0,
+      libraryIssues: financialSummary?._count.libraryIssues ?? 0,
+      transportEnrollments: financialSummary?._count.transportEnrollments ?? 0,
+      transportLogs: financialSummary?._count.transportLogs ?? 0,
+      conversations: await this.prisma.conversation.count({
+        where: { tenantId: actor.tenantId, studentId: sourceStudent.id },
+      }),
+      conversationParticipants: await this.prisma.conversationParticipant.count({
+        where: { tenantId: actor.tenantId, studentId: sourceStudent.id },
+      }),
+    };
+
+    return {
+      sourceStudent: {
+        id: sourceStudent.id,
+        studentSystemId: sourceStudent.studentSystemId,
+        fullNameEn: `${sourceStudent.firstNameEn} ${sourceStudent.lastNameEn}`,
+        lifecycleStatus: sourceStudent.lifecycleStatus,
+      },
+      targetStudent: {
+        id: targetStudent.id,
+        studentSystemId: targetStudent.studentSystemId,
+        fullNameEn: `${targetStudent.firstNameEn} ${targetStudent.lastNameEn}`,
+        lifecycleStatus: targetStudent.lifecycleStatus,
+      },
+      mergeCounts,
+      isProbableDuplicate: isProbableDuplicateStudent(sourceStudent, targetStudent),
+    };
+  }
+
   async mergeDuplicateStudent(
     dto: MergeDuplicateStudentDto,
     actor: AuthContext,
@@ -1333,46 +1419,15 @@ export class StudentsService {
       this.findTenantStudentForDuplicateMerge(dto.targetStudentId, actor),
     ]);
 
-    if (sourceStudent.lifecycleStatus !== StudentLifecycleStatus.ACTIVE) {
+    if (sourceStudent.lifecycleStatus !== StudentLifecycleStatus.ACTIVE && sourceStudent.lifecycleStatus !== StudentLifecycleStatus.ARCHIVED) {
       throw new ConflictException(
-        'Only active duplicate source records can be merged safely',
+        'Only active or archived duplicate source records can be merged safely',
       );
     }
 
     if (targetStudent.lifecycleStatus !== StudentLifecycleStatus.ACTIVE) {
       throw new ConflictException(
         'Duplicate records can only be merged into an active canonical student',
-      );
-    }
-
-    // CHECK FOR FINANCIAL RECORDS
-    const financialSummary = await this.prisma.student.findUnique({
-      where: { id: sourceStudent.id },
-      select: {
-        _count: {
-          select: {
-            invoices: true,
-            payments: true,
-            studentFeeAssignments: true,
-          },
-        },
-      },
-    });
-
-    if (
-      financialSummary &&
-      (financialSummary._count.invoices > 0 ||
-        financialSummary._count.payments > 0 ||
-        financialSummary._count.studentFeeAssignments > 0)
-    ) {
-      throw new ConflictException(
-        `Cannot merge student ${sourceStudent.studentSystemId} because they have existing financial records (Invoices: ${financialSummary._count.invoices}, Payments: ${financialSummary._count.payments}). Merging financial records requires manual reconciliation or zeroing out the source ledger first.`,
-      );
-    }
-
-    if (!isProbableDuplicateStudent(sourceStudent, targetStudent)) {
-      throw new BadRequestException(
-        'The selected student records do not match duplicate identity checks',
       );
     }
 
@@ -1569,8 +1624,10 @@ export class StudentsService {
             sourceStudentSystemId: sourceStudent.studentSystemId,
             targetStudentSystemId: targetStudent.studentSystemId,
             counts: {
-              guardianLinks: missingGuardianLinks.length,
-              documents: sourceDocs.length,
+              guardianLinks: guardianLinks.count,
+              documents: documents.count,
+              invoices: invoices.count,
+              payments: payments.count,
             },
           },
         },
@@ -1584,7 +1641,7 @@ export class StudentsService {
           toStatus: StudentLifecycleStatus.MERGED,
           reason: dto.reason,
           changedById: actor.userId,
-          feeClearanceWaived: false,
+          feeClearanceWaived: true,
           metadata: {
             mergeType: 'duplicate_student_merge',
             mergedIntoStudentId: targetStudent.id,
@@ -1625,7 +1682,7 @@ export class StudentsService {
         targetStudentSystemId: targetStudent.studentSystemId,
       },
       after: {
-        lifecycleStatus: StudentLifecycleStatus.DELETED,
+        lifecycleStatus: StudentLifecycleStatus.MERGED,
         mergeCounts,
       },
     });
@@ -1634,7 +1691,7 @@ export class StudentsService {
       sourceStudent: {
         id: sourceStudent.id,
         studentSystemId: sourceStudent.studentSystemId,
-        lifecycleStatus: StudentLifecycleStatus.DELETED,
+        lifecycleStatus: StudentLifecycleStatus.MERGED,
       },
       targetStudent: {
         id: targetStudent.id,
@@ -1876,16 +1933,45 @@ export class StudentsService {
       .filter((result) => result.issues.length === 0)
       .map(({ student }) => buildIemisRow(student));
 
+    const csv = buildCsv(headers, rows);
+    const exportedAt = new Date();
+
+    const exportRecord = await this.prisma.reportExport.create({
+      data: {
+        tenantId: actor.tenantId,
+        reportKey: 'iemis_student_export',
+        format: 'csv',
+        filters: {
+          totalStudents: students.length,
+          validStudents: rows.length,
+        },
+        requestedBy: actor.userId,
+        status: 'COMPLETED',
+        completedAt: exportedAt,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'export',
+      resource: 'iemis_export',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: exportRecord.id,
+      after: {
+        totalRecords: students.length,
+        validRecords: rows.length,
+        exportId: exportRecord.id,
+      },
+    });
+
     return {
       formatVersion: 'SCHOLOS-IEMIS-1.0',
-      exportedAt: new Date().toISOString(),
+      exportedAt: exportedAt.toISOString(),
+      exportId: exportRecord.id,
       totalRecords: students.length,
-      validRecords: validationResults.filter(
-        (result) => result.issues.length === 0,
-      ).length,
-      invalidRecords: validationResults.filter(
-        (result) => result.issues.length > 0,
-      ).length,
+      validRecords: rows.length,
+      invalidRecords: validationResults.filter((result) => result.issues.length > 0)
+        .length,
       issues: validationResults
         .filter((result) => result.issues.length > 0)
         .flatMap((result) =>
@@ -1908,6 +1994,24 @@ export class StudentsService {
     actor: AuthContext,
   ) {
     const student = await this.findTenantStudent(studentId, actor);
+
+    const ALLOWED_DOCUMENT_MIME_TYPES = new Set([
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ]);
+
+    if (
+      dto.contentType &&
+      !ALLOWED_DOCUMENT_MIME_TYPES.has(dto.contentType.toLowerCase())
+    ) {
+      throw new BadRequestException(
+        `File type ${dto.contentType} is not allowed for student documents. Only PDF, JPEG, PNG, WEBP, and DOC/DOCX are permitted.`,
+      );
+    }
 
     const stored = await this.storageService.saveBase64Object({
       tenantId: actor.tenantId,
@@ -2352,6 +2456,7 @@ export class StudentsService {
       actor,
       issuedAt: signedAt,
       version,
+      qrToken: (actor as any).qrToken, // Pass optional QR token if provided in context
     });
     const checksumSha256 = createHash('sha256').update(pdf).digest('hex');
     const stored = await this.storageService.saveBufferObject({
@@ -2832,8 +2937,9 @@ function buildStudentDocumentPdf(input: {
   actor: AuthContext;
   issuedAt: Date;
   version: number;
+  qrToken?: string;
 }) {
-  const { student, kind, actor, issuedAt, version } = input;
+  const { student, kind, actor, issuedAt, version, qrToken } = input;
   const latestEnrollment = student.enrollments[0];
   const primaryGuardian =
     student.guardianLinks.find((link) => link.isPrimary)?.guardian ??
@@ -2875,6 +2981,7 @@ function buildStudentDocumentPdf(input: {
       guardianName: primaryGuardian?.fullName,
       guardianPhone: primaryGuardian?.primaryPhone,
       academicYear: latestEnrollment?.academicYear.name,
+      qrToken,
     });
   }
 
@@ -3128,21 +3235,30 @@ function isProbableDuplicateStudent(
     firstNameEn: string;
     lastNameEn: string;
     dateOfBirth: Date;
+    admissionNumber?: string | null;
   },
   targetStudent: {
     firstNameEn: string;
     lastNameEn: string;
     dateOfBirth: Date;
+    admissionNumber?: string | null;
   },
 ) {
-  return (
+  const nameDobMatch =
     normalizeStudentIdentityName(sourceStudent.firstNameEn) ===
       normalizeStudentIdentityName(targetStudent.firstNameEn) &&
     normalizeStudentIdentityName(sourceStudent.lastNameEn) ===
       normalizeStudentIdentityName(targetStudent.lastNameEn) &&
     sourceStudent.dateOfBirth.toISOString().slice(0, 10) ===
-      targetStudent.dateOfBirth.toISOString().slice(0, 10)
-  );
+      targetStudent.dateOfBirth.toISOString().slice(0, 10);
+
+  const admissionMatch =
+    sourceStudent.admissionNumber &&
+    targetStudent.admissionNumber &&
+    sourceStudent.admissionNumber.trim().toLowerCase() ===
+      targetStudent.admissionNumber.trim().toLowerCase();
+
+  return nameDobMatch || admissionMatch;
 }
 
 function normalizeStudentIdentityName(value: string) {

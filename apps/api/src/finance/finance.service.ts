@@ -228,36 +228,61 @@ export class FinanceService {
   }
 
   async getDuesTableReport(query: DuesQueryDto, actor: AuthContext) {
-    const invoices = await this.prisma.invoice.findMany({
-      where: {
-        tenantId: actor.tenantId,
-        status: { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
-        ...(query.academicYearId
-          ? { academicYearId: query.academicYearId }
-          : {}),
-        ...(query.studentId ? { studentId: query.studentId } : {}),
-        ...(query.classId || query.sectionId
-          ? {
-              student: {
-                ...(query.classId ? { classId: query.classId } : {}),
-                ...(query.sectionId ? { sectionId: query.sectionId } : {}),
-              },
-            }
-          : {}),
-        ...(query.feeHeadId
-          ? {
-              lines: {
-                some: { feeHeadId: query.feeHeadId },
-              },
-            }
-          : {}),
-      },
-      include: {
-        student: { include: { class: true, sectionRef: true } },
-        lines: { include: { feeHead: true } },
-        payments: { include: { refunds: true } },
-      },
-    });
+    const page = query.page || 1;
+    const limit = query.limit || 50;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.InvoiceWhereInput = {
+      tenantId: actor.tenantId,
+      status: query.status ? query.status : { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
+      ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
+      ...(query.studentId ? { studentId: query.studentId } : {}),
+      ...(query.classId || query.sectionId
+        ? {
+            student: {
+              ...(query.classId ? { classId: query.classId } : {}),
+              ...(query.sectionId ? { sectionId: query.sectionId } : {}),
+            },
+          }
+        : {}),
+      ...(query.feeHeadId
+        ? {
+            lines: {
+              some: { feeHeadId: query.feeHeadId },
+            },
+          }
+        : {}),
+      ...(query.dueFrom || query.dueTo
+        ? {
+            dueDate: {
+              ...(query.dueFrom ? { gte: new Date(query.dueFrom) } : {}),
+              ...(query.dueTo ? { lte: new Date(query.dueTo) } : {}),
+            },
+          }
+        : {}),
+      ...(query.feePeriodId
+        ? {
+            billingRun: {
+              feeDueScheduleId: query.feePeriodId,
+            },
+          }
+        : {}),
+    };
+
+    const [invoices, totalCount] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where,
+        include: {
+          student: { include: { class: true, sectionRef: true } },
+          lines: { include: { feeHead: true } },
+          payments: { include: { refunds: true } },
+        },
+        orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.invoice.count({ where }),
+    ]);
 
     const waivers = await this.prisma.feeWaiver.findMany({
       where: {
@@ -277,45 +302,72 @@ export class FinanceService {
       }
     }
 
-    const rows = invoices.flatMap((invoice) => {
+    const allRows = invoices.flatMap((invoice) => {
+      const netPaidTotal = sumNetPaidAmount(invoice.payments);
+      let remainingPaid = netPaidTotal;
+
       return invoice.lines
         .filter(
           (line) => !query.feeHeadId || line.feeHeadId === query.feeHeadId,
         )
         .map((line) => {
-          const paidAmount = invoice.payments.reduce((sum, p) => {
-            // This is a simplification; ideally we track payment per line
-            // For now we prorate or assign to first lines
-            return sum.add(p.amount.sub(sumRefundedAmount(p.refunds)));
-          }, new Prisma.Decimal(0));
-
           const lineWaiver =
             waiverMap.get(`${invoice.id}_${line.feeHeadId}`) ||
             waiverMap.get(`${invoice.id}_all`)?.div(invoice.lines.length) ||
             new Prisma.Decimal(0);
 
-          const outstanding = line.totalAmount.sub(lineWaiver); // Simplification
+          const lineBilled = line.totalAmount;
+          const linePayable = lineBilled.sub(lineWaiver);
+          
+          let linePaid = new Prisma.Decimal(0);
+          if (remainingPaid.gt(0)) {
+            if (remainingPaid.gte(linePayable)) {
+              linePaid = linePayable;
+              remainingPaid = remainingPaid.sub(linePayable);
+            } else {
+              linePaid = remainingPaid;
+              remainingPaid = new Prisma.Decimal(0);
+            }
+          }
+
+          const outstanding = linePayable.sub(linePaid);
+          const agingBucket = getAgingBucket(invoice.dueDate);
 
           return {
+            studentId: invoice.studentId,
             studentName: `${invoice.student.firstNameEn} ${invoice.student.lastNameEn}`,
+            studentSystemId: invoice.student.studentSystemId,
             className: invoice.student.class.name,
+            sectionName: invoice.student.sectionRef?.name || '-',
             feeHead: line.feeHead.name,
-            billed: Number(line.totalAmount),
+            billed: Number(lineBilled),
             waived: Number(lineWaiver),
-            paid: 0, // Per-line payment tracking is complex without PaymentLine
+            paid: Number(linePaid),
             outstanding: Number(outstanding),
             dueDate: invoice.dueDate,
+            invoiceNumber: invoice.invoiceNumber,
+            agingBucket,
           };
         });
     });
 
+    const filteredRows = query.agingBucket 
+      ? allRows.filter(r => r.agingBucket === query.agingBucket)
+      : allRows;
+
     return {
-      rows,
+      rows: filteredRows,
+      pagination: {
+        total: totalCount,
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit),
+      },
       summary: {
-        totalBilled: rows.reduce((sum, r) => sum + r.billed, 0),
-        totalWaived: rows.reduce((sum, r) => sum + r.waived, 0),
-        totalPaid: rows.reduce((sum, r) => sum + r.paid, 0),
-        totalOutstanding: rows.reduce((sum, r) => sum + r.outstanding, 0),
+        totalBilled: filteredRows.reduce((sum, r) => sum + r.billed, 0),
+        totalWaived: filteredRows.reduce((sum, r) => sum + r.waived, 0),
+        totalPaid: filteredRows.reduce((sum, r) => sum + r.paid, 0),
+        totalOutstanding: filteredRows.reduce((sum, r) => sum + r.outstanding, 0),
       },
     };
   }
@@ -1908,11 +1960,17 @@ export class FinanceService {
     );
     const allPayments = invoices.flatMap((invoice) => invoice.payments);
     const totalPaid = allPayments.reduce(
-      (sum, payment) => sum.add(payment.amount),
+      (sum, payment) => {
+        if (payment.status === PaymentStatus.REVERSED) return sum;
+        return sum.add(payment.amount);
+      },
       new Prisma.Decimal(0),
     );
     const totalRefunded = allPayments.reduce(
-      (sum, payment) => sum.add(sumRefundedAmount(payment.refunds)),
+      (sum, payment) => {
+        if (payment.status === PaymentStatus.REVERSED) return sum;
+        return sum.add(sumRefundedAmount(payment.refunds));
+      },
       new Prisma.Decimal(0),
     );
     const totalWaived = waivers.reduce(
@@ -3108,7 +3166,44 @@ export class FinanceService {
       },
     });
 
-    return close;
+    return {
+      ...close,
+      methodBreakdown: parseCashierCloseMethodBreakdown(close.methodBreakdown),
+    };
+  }
+
+  async reopenCashierClose(closeId: string, dto: { reason: string }, actor: AuthContext) {
+    const close = await this.prisma.cashierClose.findFirst({
+      where: { id: closeId, tenantId: actor.tenantId },
+    });
+
+    if (!close) {
+      throw new NotFoundException('Cashier close not found');
+    }
+
+    // Business rule: Can only reopen if not already reopened or if needed.
+    // Here we just delete it (soft or hard depending on policy) or mark it.
+    // Requirement says "Audit close actions".
+    
+    await this.prisma.$transaction(async (tx) => {
+      await tx.cashierClose.delete({
+        where: { id: closeId },
+      });
+
+      await this.auditService.record({
+        action: 'reopen',
+        resource: 'cashier_close',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: closeId,
+        after: {
+          closeNumber: close.closeNumber,
+          reason: dto.reason,
+        },
+      });
+    });
+
+    return { success: true };
   }
 
   async runFinanceConsistencyCheck(actor: AuthContext) {
@@ -3926,6 +4021,16 @@ function ledgerEventOrder(
     REVERSAL: 5,
   };
   return orders[type] || 99;
+}
+
+function getAgingBucket(dueDate: Date, asOf: Date = new Date()): string {
+  const diffTime = asOf.getTime() - dueDate.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  if (diffDays <= 0) return '0';
+  if (diffDays <= 30) return '0-30';
+  if (diffDays <= 60) return '31-60';
+  if (diffDays <= 90) return '61-90';
+  return '90+';
 }
 
 function sumRefundedAmount(refunds: Array<{ amount: Prisma.Decimal }>) {

@@ -14,6 +14,7 @@ import {
   StudentQrStatus,
   Prisma,
   UserRole,
+  StudentLifecycleStatus,
 } from '@prisma/client';
 import { StudentQrResolvePurpose } from '@schoolos/core';
 
@@ -32,11 +33,17 @@ export class StudentQrService {
    */
   async generateQr(tenantId: string, studentId: string, auth: AuthContext) {
     const student = await this.prisma.student.findFirst({
-      where: { id: studentId, tenantId },
+      where: {
+        id: studentId,
+        tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      },
     });
 
     if (!student) {
-      throw new NotFoundException('Student not found');
+      throw new NotFoundException(
+        'Active student not found. QR can only be generated for active students.',
+      );
     }
 
     const existing = await this.prisma.studentQrCredential.findUnique({
@@ -266,6 +273,7 @@ export class StudentQrService {
       name: `${student.firstNameEn} ${student.lastNameEn}`,
       classSection: `${student.class.name}${student.sectionRef ? ' - ' + student.sectionRef.name : ''}`,
       photoUrl: student.photoUrl || null,
+      lifecycleStatus: student.lifecycleStatus,
     };
 
     switch (purpose) {
@@ -398,22 +406,25 @@ export class StudentQrService {
     const size = 128;
     const svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
   <rect width="${size}" height="${size}" fill="white"/>
-  <!-- Top-left Finder -->
-  <rect x="10" y="10" width="30" height="30" stroke="black" fill="none" stroke-width="4"/>
-  <rect x="20" y="20" width="10" height="10" fill="black"/>
-  <!-- Bottom-left Finder -->
-  <rect x="10" y="88" width="30" height="30" stroke="black" fill="none" stroke-width="4"/>
-  <rect x="20" y="98" width="10" height="10" fill="black"/>
-  <!-- Top-right Finder -->
-  <rect x="88" y="10" width="30" height="30" stroke="black" fill="none" stroke-width="4"/>
-  <rect x="98" y="20" width="10" height="10" fill="black"/>
-  <!-- Center Mock Patterns -->
-  <rect x="50" y="50" width="5" height="5" fill="black"/>
-  <rect x="60" y="50" width="5" height="5" fill="black"/>
-  <rect x="55" y="55" width="5" height="5" fill="black"/>
-  <rect x="50" y="65" width="5" height="5" fill="black"/>
-  <rect x="70" y="70" width="5" height="5" fill="black"/>
-  <text x="64" y="120" font-family="monospace" font-size="6" text-anchor="middle" fill="gray">${token.slice(0, 12)}...</text>
+  <!-- Finder patterns -->
+  <rect x="10" y="10" width="30" height="30" fill="none" stroke="black" stroke-width="4"/>
+  <rect x="18" y="18" width="14" height="14" fill="black"/>
+  <rect x="10" y="88" width="30" height="30" fill="none" stroke="black" stroke-width="4"/>
+  <rect x="18" y="96" width="14" height="14" fill="black"/>
+  <rect x="88" y="10" width="30" height="30" fill="none" stroke="black" stroke-width="4"/>
+  <rect x="96" y="18" width="14" height="14" fill="black"/>
+  <!-- Random data points based on token -->
+  <g fill="black">
+    ${Array.from(token.slice(0, 40))
+      .map((char, i) => {
+        const val = char.charCodeAt(0);
+        const x = 50 + (i % 10) * 6;
+        const y = 50 + Math.floor(i / 10) * 6;
+        return val % 2 === 0 ? `<rect x="${x}" y="${y}" width="4" height="4"/>` : '';
+      })
+      .join('')}
+  </g>
+  <text x="64" y="122" font-family="monospace" font-size="6" text-anchor="middle" fill="gray">${token.slice(0, 16)}...</text>
 </svg>`;
     return svg;
   }

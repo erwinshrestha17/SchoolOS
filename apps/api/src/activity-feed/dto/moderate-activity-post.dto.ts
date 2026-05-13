@@ -1,5 +1,6 @@
+import { ActivityPostStatus } from '@prisma/client';
 import {
-  IsIn,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -7,8 +8,8 @@ import {
 } from 'class-validator';
 
 export class ModerateActivityPostDto {
-  @IsIn(['APPROVED', 'REJECTED', 'PENDING'])
-  status!: 'APPROVED' | 'REJECTED' | 'PENDING';
+  @IsEnum(ActivityPostStatus)
+  status!: ActivityPostStatus;
 
   @IsOptional()
   @IsString()

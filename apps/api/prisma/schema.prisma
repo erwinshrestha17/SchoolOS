@@ -652,6 +652,14 @@ enum FileStatus {
   DELETED
 }
 
+enum ActivityPostStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
 enum PlatformPlanStatus {
   ACTIVE
   ARCHIVED
@@ -798,6 +806,7 @@ model Tenant {
   casRecords                    CasRecord[]
   reportCards                   ReportCard[]
   promotionRecords              PromotionRecord[]
+  attendanceDrafts              AttendanceDraft[]
   timetableSlots                TimetableSlot[]
   timetablePeriods              TimetablePeriod[]
   timetableRooms                Room[]
@@ -913,13 +922,18 @@ model User {
   createdNotices              Notice[]                     @relation("CreatedNotices")
   createdEvents               Event[]                      @relation("CreatedEvents")
   approvedWaivers             FeeWaiver[]                  @relation("ApprovedFeeWaivers")
-  createdActivityPosts        ActivityPost[]               @relation("CreatedActivityPosts")
+  createdActivityPosts           ActivityPost[]               @relation("CreatedActivityPosts")
+  moderatedActivityPosts         ActivityPost[]               @relation("ModeratedActivityPosts")
+  editedActivityPosts            ActivityPost[]               @relation("EditedActivityPosts")
+  deletedActivityPosts           ActivityPost[]               @relation("DeletedActivityPosts")
   notificationDeliveries      NotificationDelivery[]       @relation("NotificationActor")
   enteredMarks                MarkEntry[]                  @relation("EnteredMarks")
   reviewedStaffLeaveRequests  StaffLeaveRequest[]          @relation("ReviewedStaffLeaveRequests")
-  requestedMarkLockRequests   MarkLockRequest[]            @relation("RequestedMarkLock")
-  reviewedMarkLockRequests    MarkLockRequest[]            @relation("ReviewedMarkLock")
-  publishedReportCards        ReportCard[]                 @relation("PublishedReportCards")
+    requestedMarkLockRequests      MarkLockRequest[]             @relation("RequestedMarkLock")
+    reviewedMarkLockRequests       MarkLockRequest[]             @relation("ReviewedMarkLock")
+    publishedReportCards           ReportCard[]                  @relation("PublishedReportCards")
+    requestedReportCardCorrections ReportCardCorrectionRequest[] @relation("RequestedReportCardCorrection")
+    reviewedReportCardCorrections  ReportCardCorrectionRequest[] @relation("ReviewedReportCardCorrection")
   transportTripsCreated       TransportTrip[]              @relation("TransportTripCreatedBy")
   transportTripsCompleted     TransportTrip[]              @relation("TransportTripCompletedBy")
   transportStatusesMarked     TransportTripStudentStatus[] @relation("TransportTripStatusMarkedBy")
@@ -942,6 +956,7 @@ model User {
   reconciledBankStatements       BankStatement[]                  @relation("ReconciledBankStatements")
   verifiedStaffDocuments         StaffDocument[]                  @relation("VerifiedStaffDocuments")
   createdStaffLifecycleEvents    StaffLifecycleEvent[]            @relation("CreatedStaffLifecycleEvents")
+  attendanceDrafts               AttendanceDraft[]
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
@@ -2044,6 +2059,8 @@ model Invoice {
 
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, status, dueDate])
+  @@index([tenantId, studentId, status])
+  @@index([tenantId, academicYearId, studentId])
 }
 
 model InvoiceLine {
@@ -2095,6 +2112,7 @@ model Payment {
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, method, referenceNumber])
   @@index([tenantId, paidAt, status])
+  @@index([tenantId, studentId, paidAt])
 }
 
 model PaymentRefund {
@@ -2170,6 +2188,7 @@ model Receipt {
   reprintHistory ReceiptReprintHistory[]
 
   @@unique([tenantId, receiptNumber])
+  @@index([tenantId, issuedAt])
 }
 
 model ReceiptReprintHistory {
@@ -2725,44 +2744,59 @@ model FeeWaiver {
 }
 
 model ActivityPost {
-  id           String           @id @default(uuid())
-  tenantId     String
-  classId      String
-  sectionId    String?
-  createdById  String?
-  title        String
-  caption      String
-  category     ActivityCategory @default(GENERAL)
-  audienceType AudienceType     @default(CLASS)
-  publishedAt  DateTime?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id               String             @id @default(uuid())
+  tenantId         String
+  classId          String
+  sectionId        String?
+  createdById      String?
+  title            String
+  caption          String
+  category         ActivityCategory   @default(GENERAL)
+  audienceType     AudienceType       @default(CLASS)
+  status           ActivityPostStatus @default(PENDING_APPROVAL)
+  moderationReason String?
+  moderatedAt      DateTime?
+  moderatedById    String?
+  editedAt         DateTime?
+  editedById       String?
+  softDeletedAt    DateTime?
+  deletedById      String?
+  publishedAt      DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
   tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   class       Class                  @relation(fields: [classId], references: [id], onDelete: Restrict)
   section     Section?               @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   createdBy   User?                  @relation("CreatedActivityPosts", fields: [createdById], references: [id], onDelete: SetNull)
+  moderatedBy User?                  @relation("ModeratedActivityPosts", fields: [moderatedById], references: [id], onDelete: SetNull)
+  editedBy    User?                  @relation("EditedActivityPosts", fields: [editedById], references: [id], onDelete: SetNull)
+  deletedBy   User?                  @relation("DeletedActivityPosts", fields: [deletedById], references: [id], onDelete: SetNull)
   attachments ActivityAttachment[]
   studentTags ActivityPostStudent[]
   deliveries  NotificationDelivery[]
   reactions   ActivityReaction[]
 
   @@index([tenantId, classId, sectionId, publishedAt])
+  @@index([tenantId, status])
 }
 
 model ActivityAttachment {
-  id             String          @id @default(uuid())
-  tenantId       String
-  activityPostId String
-  fileName       String
-  contentType    String
-  sizeBytes      Int
-  provider       StorageProvider @default(LOCAL)
-  objectKey      String
-  publicUrl      String?
-  fileAssetId    String?
-  sortOrder      Int             @default(0)
-  createdAt      DateTime        @default(now())
+  id                 String          @id @default(uuid())
+  tenantId           String
+  activityPostId     String
+  fileName           String
+  contentType        String
+  sizeBytes          Int
+  provider           StorageProvider @default(LOCAL)
+  objectKey          String
+  publicUrl          String?
+  fileAssetId        String?
+  sortOrder          Int             @default(0)
+  processingStatus   String?         @default("PENDING")
+  optimizedObjectKey String?
+  optimizedSizeBytes Int?
+  createdAt          DateTime        @default(now())
 
   tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   activityPost ActivityPost @relation(fields: [activityPostId], references: [id], onDelete: Cascade)
@@ -3134,17 +3168,72 @@ model ReportCard {
   publishedById  String?
   unpublishedAt  DateTime?
   publishStatus  String?         @default("UNPUBLISHED")
+  version        Int             @default(1)
+  isCurrent      Boolean         @default(true)
+  fileId         String?
 
-  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
-  examTerm     ExamTerm     @relation(fields: [examTermId], references: [id], onDelete: Cascade)
-  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
-  section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
-  publishedBy  User?        @relation("PublishedReportCards", fields: [publishedById], references: [id], onDelete: SetNull)
+  tenant            Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear      AcademicYear                  @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  examTerm          ExamTerm                      @relation(fields: [examTermId], references: [id], onDelete: Cascade)
+  student           Student                       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class             Class                         @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section           Section?                      @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  publishedBy       User?                         @relation("PublishedReportCards", fields: [publishedById], references: [id], onDelete: SetNull)
+  file              FileAsset?                    @relation("ReportCardFile", fields: [fileId], references: [id], onDelete: SetNull)
+  history           ReportCardHistory[]
+  correctionRequests ReportCardCorrectionRequest[]
 
   @@unique([tenantId, academicYearId, examTermId, studentId])
   @@index([tenantId, classId, sectionId])
+}
+
+model ReportCardHistory {
+  id             String   @id @default(uuid())
+  reportCardId   String
+  tenantId       String
+  academicYearId String
+  examTermId     String
+  studentId      String
+  classId        String
+  sectionId      String?
+  totalMarks     Decimal  @db.Decimal(10, 2)
+  maxMarks       Decimal  @db.Decimal(10, 2)
+  percentage     Decimal  @db.Decimal(5, 2)
+  grade          String
+  gpa            Decimal  @db.Decimal(3, 2)
+  remarks        String?
+  version        Int
+  fileId         String?
+  createdAt      DateTime @default(now())
+  archivedAt     DateTime @default(now())
+
+  reportCard   ReportCard @relation(fields: [reportCardId], references: [id], onDelete: Cascade)
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  file         FileAsset?   @relation("ReportCardHistoryFile", fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, reportCardId])
+}
+
+model ReportCardCorrectionRequest {
+  id            String    @id @default(uuid())
+  tenantId      String
+  reportCardId  String
+  requestedById String
+  reviewedById  String?
+  status        String    @default("PENDING")
+  reason        String
+  reviewNote    String?
+  createdAt     DateTime  @default(now())
+  reviewedAt    DateTime?
+
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  reportCard  ReportCard @relation(fields: [reportCardId], references: [id], onDelete: Cascade)
+  requestedBy User       @relation("RequestedReportCardCorrection", fields: [requestedById], references: [id])
+  reviewedBy  User?      @relation("ReviewedReportCardCorrection", fields: [reviewedById], references: [id])
+
+  @@index([tenantId, reportCardId, status])
 }
 
 model ExamTimetableSlot {

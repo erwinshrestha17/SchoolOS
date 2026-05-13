@@ -14,6 +14,8 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { AssignTransportDriverDto } from './dto/assign-transport-driver.dto';
 import { BroadcastRouteDelayDto } from './dto/broadcast-route-delay.dto';
 import { CancelTransportTripDto } from './dto/cancel-transport-trip.dto';
@@ -33,7 +35,8 @@ import { TransportHardeningService } from './transport-hardening.service';
 import { TransportService } from './transport.service';
 
 @Controller('transport')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.transport')
 export class TransportController {
   constructor(
     private readonly transportService: TransportService,

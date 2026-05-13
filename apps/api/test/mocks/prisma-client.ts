@@ -454,6 +454,22 @@ export const DevelopmentalMilestoneStatus = {
   NEEDS_SUPPORT: 'NEEDS_SUPPORT',
 } as const;
 
+export const ActivityPostStatus = {
+  DRAFT: 'DRAFT',
+  PENDING_APPROVAL: 'PENDING_APPROVAL',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  ARCHIVED: 'ARCHIVED',
+} as const;
+
+export const ActivityAttachmentProcessingStatus = {
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+  READY: 'READY',
+} as const;
+
 export const AssessmentType = {
   THEORY: 'THEORY',
   PRACTICAL: 'PRACTICAL',

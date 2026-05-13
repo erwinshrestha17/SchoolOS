@@ -8,12 +8,12 @@ import { AuditService } from '../audit/audit.service';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TimetableLifecycleService } from './timetable-lifecycle.service';
-import { TimetableService } from './timetable.service';
+import { TimetableSubstitutionService } from './timetable-substitution.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { CreateSubstitutionDto } from './dto/timetable-setup.dto';
 
-describe('TimetableSubstitution (Service)', () => {
-  let service: TimetableService;
+describe('TimetableSubstitutionService', () => {
+  let service: TimetableSubstitutionService;
   let prisma: PrismaService;
   let attendanceService: AttendanceService;
 
@@ -42,7 +42,7 @@ describe('TimetableSubstitution (Service)', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        TimetableService,
+        TimetableSubstitutionService,
         {
           provide: PrismaService,
           useValue: {
@@ -82,7 +82,7 @@ describe('TimetableSubstitution (Service)', () => {
       ],
     }).compile();
 
-    service = module.get<TimetableService>(TimetableService);
+    service = module.get<TimetableSubstitutionService>(TimetableSubstitutionService);
     prisma = module.get<PrismaService>(PrismaService);
     attendanceService = module.get<AttendanceService>(AttendanceService);
   });

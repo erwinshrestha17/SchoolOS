@@ -86,4 +86,14 @@ export class PaymentsController {
   ) {
     return this.financeService.reversePayment(paymentId, dto, auth);
   }
+
+  @Post('cashier-close/:id/reopen')
+  @Permissions('payments:close')
+  reopenCashierClose(
+    @Param('id') closeId: string,
+    @Body() dto: { reason: string },
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.reopenCashierClose(closeId, dto, auth);
+  }
 }

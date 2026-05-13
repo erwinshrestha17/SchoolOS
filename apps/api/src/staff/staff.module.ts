@@ -7,12 +7,30 @@ import { StaffController } from './staff.controller';
 import { StaffService } from './staff.service';
 import { StaffDocumentService } from './staff-document.service';
 import { StaffLifecycleService } from './staff-lifecycle.service';
+import { StaffLeaveAccrualService } from '../hr/staff-leave-accrual.service';
 import { FileRegistryModule } from '../file-registry/file-registry.module';
+import { UsageModule } from '../usage/usage.module';
 
 @Module({
-  imports: [AuthModule, UsersModule, AuditModule, FileRegistryModule],
-  providers: [StaffService, StaffDocumentService, StaffLifecycleService],
+  imports: [
+    AuthModule,
+    UsersModule,
+    AuditModule,
+    FileRegistryModule,
+    UsageModule,
+  ],
+  providers: [
+    StaffService,
+    StaffDocumentService,
+    StaffLifecycleService,
+    StaffLeaveAccrualService,
+  ],
   controllers: [StaffController, HrStaffController],
-  exports: [StaffService, StaffDocumentService, StaffLifecycleService],
+  exports: [
+    StaffService,
+    StaffDocumentService,
+    StaffLifecycleService,
+    StaffLeaveAccrualService,
+  ],
 })
 export class StaffModule {}
