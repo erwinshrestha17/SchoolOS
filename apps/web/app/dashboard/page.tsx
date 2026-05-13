@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
-  AlertTriangle,
   CalendarCheck,
   Images,
   Megaphone,
@@ -11,9 +10,6 @@ import {
   Users,
   Wallet,
   Calculator,
-  ArrowRight,
-  TrendingUp,
-  CheckCircle2,
   type LucideIcon,
 } from 'lucide-react';
 import type {
@@ -42,7 +38,7 @@ const formatMoney = (amount: number) => {
 
 export default function DashboardPage() {
   const { session, status } = useSession();
-  
+
   const academicYearsQuery = useQuery({
     queryKey: ['dashboard-academic-years'],
     queryFn: api.listAcademicYears,
@@ -111,7 +107,7 @@ export default function DashboardPage() {
   const classCount = classesQuery.data?.length ?? 0;
   const activeFeePlanCount =
     feePlansQuery.data?.filter((plan) => plan.isActive).length ?? 0;
-  
+
   const setupWarnings = [
     !currentAcademicYear ? 'Create an academic year' : null,
     classCount === 0 ? 'Create at least one class' : null,
@@ -125,13 +121,13 @@ export default function DashboardPage() {
     totalMarkedToday > 0
       ? Math.round(((todayTotals?.present ?? 0) / totalMarkedToday) * 100)
       : 0;
-  
+
   const collectedThisMonth = sumReceiptsThisMonth(receiptsQuery.data ?? []);
   const outstandingFees = sumOutstandingFees(
     defaultersQuery.data ?? [],
     invoicesQuery.data ?? [],
   );
-  
+
   const failedDeliveries =
     deliveriesQuery.data?.filter(
       (delivery) => delivery.status.toUpperCase() === 'FAILED',
@@ -189,27 +185,12 @@ export default function DashboardPage() {
       : []),
   ];
 
-  const isInitialLoading = 
-    academicYearsQuery.isLoading || 
-    classesQuery.isLoading || 
-    studentsQuery.isLoading || 
-    attendanceQuery.isLoading || 
+  const isInitialLoading =
+    academicYearsQuery.isLoading ||
+    classesQuery.isLoading ||
+    studentsQuery.isLoading ||
+    attendanceQuery.isLoading ||
     receiptsQuery.isLoading;
-
-  const onboardingSteps = [
-    { id: 'profile', label: 'School Profile', isComplete: !!session?.tenant.name, href: '/dashboard/settings' },
-    { id: 'academic', label: 'Academic Year', isComplete: !!currentAcademicYear, href: '/dashboard/settings' },
-    { id: 'classes', label: 'Classes & Sections', isComplete: classCount > 0, href: '/dashboard/settings' },
-    { id: 'fees', label: 'Fee Setup', isComplete: activeFeePlanCount > 0, href: '/dashboard/settings' },
-    { id: 'staff', label: 'Staff Directory', isComplete: (academicYearsQuery.data?.length ?? 0) > 0 && true, href: '/dashboard/staff' }, // Placeholder logic for staff
-    { id: 'students', label: 'Student Import', isComplete: totalStudents > 0, href: '/dashboard/admissions' },
-    { id: 'attendance', label: 'Attendance Ready', isComplete: attendancePercent > 0, href: '/dashboard/attendance' },
-    { id: 'receipts', label: 'Receipt Config', isComplete: (receiptsQuery.data?.length ?? 0) > 0, href: '/dashboard/settings' },
-  ];
-
-  const completedSteps = onboardingSteps.filter(s => s.isComplete).length;
-  const onboardingProgress = Math.round((completedSteps / onboardingSteps.length) * 100);
-  const showOnboarding = onboardingProgress < 100;
 
   if (isInitialLoading) {
     return <LoadingState variant="page" label="Gathering school insights..." />;
@@ -217,6 +198,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      {/* Setup needs attention */}
       <header className="relative overflow-hidden rounded-3xl bg-slate-950 px-6 py-9 text-white shadow-xl lg:px-10">
         <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-2xl">
@@ -224,13 +206,27 @@ export default function DashboardPage() {
               School Dashboard
             </h1>
             <p className="mt-3 text-base leading-7 text-slate-300">
-              Namaste, <span className="font-bold text-white">{session?.user.email?.split('@')[0] ?? 'User'}</span>. Here is what needs attention across <span className="font-bold text-white">{session?.tenant.name}</span> today.
+              Namaste,{' '}
+              <span className="font-bold text-white">
+                {session?.user.email?.split('@')[0] ?? 'User'}
+              </span>
+              . Here is what needs attention across{' '}
+              <span className="font-bold text-white">
+                {session?.tenant.name}
+              </span>{' '}
+              today.
             </p>
             <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
-              <Badge variant="neutral" className="border-white/10 bg-white/10 text-white">
+              <Badge
+                variant="neutral"
+                className="border-white/10 bg-white/10 text-white"
+              >
                 {currentAcademicYear?.name ?? 'Academic year not set'}
               </Badge>
-              <Badge variant="neutral" className="border-white/10 bg-white/10 text-white">
+              <Badge
+                variant="neutral"
+                className="border-white/10 bg-white/10 text-white"
+              >
                 {todayLabel}
               </Badge>
             </div>
@@ -254,12 +250,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Decorative elements */}
         <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-primary-600/20 blur-3xl" />
         <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-indigo-600/20 blur-3xl" />
       </header>
 
-      {/* Today KPI Cards */}
       <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Students"
@@ -275,8 +269,8 @@ export default function DashboardPage() {
           loading={attendanceQuery.isLoading}
           trend={{
             value: attendancePercent,
-            label: "Presence rate",
-            isUp: attendancePercent >= 80
+            label: 'Presence rate',
+            isUp: attendancePercent >= 80,
           }}
           href="/dashboard/attendance"
         />
@@ -297,80 +291,138 @@ export default function DashboardPage() {
       </section>
 
       <div className="grid gap-8 lg:grid-cols-3">
-        {/* Attendance Snapshot */}
+        {operationalAlerts.length > 0 ? (
+          <SectionCard title="Setup needs attention" className="lg:col-span-3">
+            <div className="grid gap-3 md:grid-cols-3">
+              {operationalAlerts.slice(0, 3).map((alert) => (
+                <Link
+                  key={alert.title}
+                  href={alert.href}
+                  className="rounded-2xl border border-warning-200 bg-warning-50 p-4 text-sm transition hover:bg-warning-100"
+                >
+                  <p className="font-bold text-warning-900">{alert.title}</p>
+                  <p className="mt-1 text-warning-700">{alert.body}</p>
+                </Link>
+              ))}
+            </div>
+          </SectionCard>
+        ) : (
+          <SectionCard title="No alerts available yet" className="lg:col-span-3">
+            <p className="text-sm text-slate-500">
+              Setup, attendance, fee, and communication alerts will appear here.
+            </p>
+          </SectionCard>
+        )}
+
         <SectionCard title="Attendance Snapshot" description="Today's presence summary">
           <div className="space-y-6">
             <div className="flex items-end gap-2">
-              <span className="text-4xl font-extrabold text-slate-900">{attendancePercent}%</span>
-              <span className="mb-1 text-sm font-bold text-slate-400">Presence</span>
+              <span className="text-4xl font-extrabold text-slate-900">
+                {attendancePercent}%
+              </span>
+              <span className="mb-1 text-sm font-bold text-slate-400">
+                Presence
+              </span>
             </div>
-            
+
             <div className="space-y-4">
-              <AttendanceRow 
-                label="Present" 
-                count={todayTotals?.present ?? 0} 
-                total={totalMarkedToday} 
-                color="bg-success-500" 
+              <AttendanceRow
+                label="Present"
+                count={todayTotals?.present ?? 0}
+                total={totalMarkedToday}
+                color="bg-success-500"
               />
-              <AttendanceRow 
-                label="Absent" 
-                count={todayTotals?.absent ?? 0} 
-                total={totalMarkedToday} 
-                color="bg-danger-500" 
+              <AttendanceRow
+                label="Absent"
+                count={todayTotals?.absent ?? 0}
+                total={totalMarkedToday}
+                color="bg-danger-500"
               />
-              <AttendanceRow 
-                label="Late" 
-                count={todayTotals?.late ?? 0} 
-                total={totalMarkedToday} 
-                color="bg-warning-500" 
+              <AttendanceRow
+                label="Late"
+                count={todayTotals?.late ?? 0}
+                total={totalMarkedToday}
+                color="bg-warning-500"
               />
             </div>
-            <Link href="/dashboard/attendance" className="mt-4 block text-center text-sm font-bold text-primary-600 hover:text-primary-700">
+            <Link
+              href="/dashboard/attendance"
+              className="mt-4 block text-center text-sm font-bold text-primary-600 hover:text-primary-700"
+            >
               View Detailed Reports
             </Link>
           </div>
         </SectionCard>
 
-        {/* Fee Snapshot */}
         <SectionCard title="Fee Snapshot" description="Monthly target tracking">
           <div className="space-y-6">
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-extrabold text-slate-900">{formatMoney(collectedThisMonth)}</span>
-              <span className="mb-0.5 text-sm font-bold text-slate-400">Collected</span>
+              <span className="text-2xl font-extrabold text-slate-900">
+                {formatMoney(collectedThisMonth)}
+              </span>
+              <span className="mb-0.5 text-sm font-bold text-slate-400">
+                Collected
+              </span>
             </div>
-            
+
             <div className="space-y-4">
               <div>
                 <div className="mb-2 flex items-center justify-between text-sm">
-                  <span className="font-bold text-slate-500 uppercase tracking-wider text-[0.65rem]">Collection Target</span>
-                  <span className="font-bold text-slate-900">{Math.round((collectedThisMonth / (collectedThisMonth + outstandingFees)) * 100) || 0}%</span>
+                  <span className="font-bold text-slate-500 uppercase tracking-wider text-[0.65rem]">
+                    Collection Target
+                  </span>
+                  <span className="font-bold text-slate-900">
+                    {Math.round(
+                      (collectedThisMonth /
+                        (collectedThisMonth + outstandingFees)) *
+                        100,
+                    ) || 0}
+                    %
+                  </span>
                 </div>
                 <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
-                  <div 
-                    className="h-full rounded-full bg-primary-500 transition-all duration-1000" 
-                    style={{ width: `${Math.min(100, (collectedThisMonth / (collectedThisMonth + outstandingFees)) * 100) || 0}%` }}
+                  <div
+                    className="h-full rounded-full bg-primary-500 transition-all duration-1000"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        (collectedThisMonth /
+                          (collectedThisMonth + outstandingFees)) *
+                          100,
+                      ) || 0}%`,
+                    }}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 pt-2">
                 <div className="rounded-2xl bg-success-50 p-4">
-                  <p className="text-[0.65rem] font-bold uppercase tracking-wider text-success-700">Collected</p>
-                  <p className="mt-1 font-bold text-success-900">{formatMoney(collectedThisMonth)}</p>
+                  <p className="text-[0.65rem] font-bold uppercase tracking-wider text-success-700">
+                    Collected
+                  </p>
+                  <p className="mt-1 font-bold text-success-900">
+                    {formatMoney(collectedThisMonth)}
+                  </p>
                 </div>
                 <div className="rounded-2xl bg-danger-50 p-4">
-                  <p className="text-[0.65rem] font-bold uppercase tracking-wider text-danger-700">Outstanding</p>
-                  <p className="mt-1 font-bold text-danger-900">{formatMoney(outstandingFees)}</p>
+                  <p className="text-[0.65rem] font-bold uppercase tracking-wider text-danger-700">
+                    Outstanding
+                  </p>
+                  <p className="mt-1 font-bold text-danger-900">
+                    {formatMoney(outstandingFees)}
+                  </p>
                 </div>
               </div>
             </div>
-            <Link href="/dashboard/fees" className="mt-4 block text-center text-sm font-bold text-primary-600 hover:text-primary-700">
+            <Link
+              href="/dashboard/fees"
+              className="mt-4 block text-center text-sm font-bold text-primary-600 hover:text-primary-700"
+            >
               Manage Collections
             </Link>
           </div>
         </SectionCard>
 
-        {/* Quick Actions */}
         <SectionCard title="Quick Actions">
           <div className="grid grid-cols-2 gap-3">
             {[
@@ -397,12 +449,14 @@ export default function DashboardPage() {
           </div>
         </SectionCard>
 
-        {/* Notices Card */}
-        <SectionCard 
-          title="Notices & Announcements" 
+        <SectionCard
+          title="Notices & Announcements"
           className="lg:col-span-2"
           headerAction={
-            <Link href="/dashboard/notices" className="text-sm font-bold text-primary-600 hover:text-primary-700">
+            <Link
+              href="/dashboard/notices"
+              className="text-sm font-bold text-primary-600 hover:text-primary-700"
+            >
               Go to Communications
             </Link>
           }
@@ -410,22 +464,41 @@ export default function DashboardPage() {
           {noticesQuery.data && noticesQuery.data.length > 0 ? (
             <div className="divide-y divide-slate-50">
               {noticesQuery.data.slice(0, 4).map((notice) => (
-                <div key={notice.id} className="flex items-center gap-4 py-4 first:pt-0 last:pb-0">
-                   <div className={cn(
-                     "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-                     notice.priority.toUpperCase() === 'HIGH' ? 'bg-danger-50 text-danger-500' : 'bg-primary-50 text-primary-500'
-                   )}>
-                     <Megaphone size={20} />
-                   </div>
-                   <div className="flex-1 min-w-0">
-                     <p className="text-sm font-bold text-slate-900 truncate">{notice.title}</p>
-                     <p className="text-xs text-slate-500 mt-0.5">
-                       {notice.audienceType} • {formatSchoolDate(notice.publishedAt || notice.createdAt, 'BOTH')}
-                     </p>
-                   </div>
-                   <Badge variant={notice.priority.toUpperCase() === 'HIGH' ? 'destructive' : 'neutral'}>
-                     {notice.priority}
-                   </Badge>
+                <div
+                  key={notice.id}
+                  className="flex items-center gap-4 py-4 first:pt-0 last:pb-0"
+                >
+                  <div
+                    className={cn(
+                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+                      notice.priority.toUpperCase() === 'HIGH'
+                        ? 'bg-danger-50 text-danger-500'
+                        : 'bg-primary-50 text-primary-500',
+                    )}
+                  >
+                    <Megaphone size={20} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-900 truncate">
+                      {notice.title}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {notice.audienceType} •{' '}
+                      {formatSchoolDate(
+                        notice.publishedAt || notice.createdAt,
+                        'BOTH',
+                      )}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={
+                      notice.priority.toUpperCase() === 'HIGH'
+                        ? 'destructive'
+                        : 'neutral'
+                    }
+                  >
+                    {notice.priority}
+                  </Badge>
                 </div>
               ))}
             </div>
@@ -438,13 +511,12 @@ export default function DashboardPage() {
           )}
         </SectionCard>
 
-        {/* Recent Activity */}
         <SectionCard
           title="Recent Activity"
           description="Latest operations across modules"
           className="lg:col-span-1"
         >
-          <RecentActivityList 
+          <RecentActivityList
             admissions={admissionsQuery.data ?? []}
             receipts={receiptsQuery.data ?? []}
             activityPosts={activityPostsQuery.data ?? []}
@@ -456,31 +528,32 @@ export default function DashboardPage() {
   );
 }
 
-function AttendanceRow({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
+function AttendanceRow({
+  label,
+  count,
+  total,
+  color,
+}: {
+  label: string;
+  count: number;
+  total: number;
+  color: string;
+}) {
   const percent = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider">
         <span className="text-slate-500">{label}</span>
-        <span className="text-slate-900">{count} <span className="text-slate-400 font-medium">({percent}%)</span></span>
+        <span className="text-slate-900">
+          {count}{' '}
+          <span className="text-slate-400 font-medium">({percent}%)</span>
+        </span>
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-        <div className={cn("h-full rounded-full transition-all duration-1000", color)} style={{ width: `${percent}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function HealthRow({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
-  const percent = total > 0 ? Math.round((count / total) * 100) : 0;
-  return (
-    <div>
-      <div className="mb-1.5 flex items-center justify-between text-xs font-bold uppercase tracking-wider">
-        <span className="text-slate-500">{label}</span>
-        <span className="text-slate-900">{count}</span>
-      </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-        <div className={cn("h-full rounded-full transition-all duration-1000", color)} style={{ width: `${percent}%` }} />
+        <div
+          className={cn('h-full rounded-full transition-all duration-1000', color)}
+          style={{ width: `${percent}%` }}
+        />
       </div>
     </div>
   );
@@ -554,18 +627,34 @@ function RecentActivityList({
     .slice(0, 6);
 
   if (sortedItems.length === 0) {
-    return <EmptyState title="No recent operations yet" description="Activity from all modules will appear here once you start using the system." />;
+    return (
+      <EmptyState
+        title="No recent operations yet"
+        description="Activity from all modules will appear here once you start using the system."
+      />
+    );
   }
 
   return (
     <div className="divide-y divide-slate-50">
       {sortedItems.map((item, idx) => (
-        <div key={idx} className="flex items-center gap-4 py-4 transition first:pt-0 last:pb-0 hover:bg-slate-50/50">
-          <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", item.bg, item.color)}>
+        <div
+          key={idx}
+          className="flex items-center gap-4 py-4 transition first:pt-0 last:pb-0 hover:bg-slate-50/50"
+        >
+          <div
+            className={cn(
+              'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+              item.bg,
+              item.color,
+            )}
+          >
             <item.icon size={20} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-bold text-slate-900">{item.title}</p>
+            <p className="truncate text-sm font-bold text-slate-900">
+              {item.title}
+            </p>
             <p className="truncate text-xs text-slate-500">{item.body}</p>
           </div>
           <div className="text-right">
@@ -586,7 +675,12 @@ function sumReceiptsThisMonth(receipts: ReceiptView[]) {
 
   return (receipts || []).reduce((sum, receipt) => {
     const paidAt = new Date(receipt.payment?.paidAt ?? receipt.issuedAt);
-    if (paidAt.getMonth() !== currentMonth || paidAt.getFullYear() !== currentYear) return sum;
+    if (
+      paidAt.getMonth() !== currentMonth ||
+      paidAt.getFullYear() !== currentYear
+    ) {
+      return sum;
+    }
     const gross = receipt.amount ?? receipt.payment?.amount ?? 0;
     return sum + Math.max(0, gross - (receipt.refundedAmount ?? 0));
   }, 0);
@@ -600,8 +694,14 @@ function sumOutstandingFees(
     paidAmount?: number;
   }>,
 ) {
-  if (defaulters?.length > 0) return defaulters.reduce((sum, item) => sum + item.outstanding, 0);
+  if (defaulters?.length > 0) {
+    return defaulters.reduce((sum, item) => sum + item.outstanding, 0);
+  }
   return (invoices || [])
     .filter((invoice) => !['PAID', 'WAIVED'].includes(invoice.status.toUpperCase()))
-    .reduce((sum, invoice) => sum + Math.max(0, invoice.totalAmount - (invoice.paidAmount ?? 0)), 0);
+    .reduce(
+      (sum, invoice) =>
+        sum + Math.max(0, invoice.totalAmount - (invoice.paidAmount ?? 0)),
+      0,
+    );
 }
