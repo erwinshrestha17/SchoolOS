@@ -37,11 +37,10 @@ export default function AcademicsOverviewPage() {
     {
       id: 'setup',
       label: 'Setup',
-      description: 'Exam boundaries & Subjects',
+      description: 'Exam terms and subjects',
       icon: Settings,
       href: '/dashboard/academics/exam-terms',
       color: 'bg-indigo-50 text-indigo-600',
-      progress: totalSubjects > 0 && (examsQuery.data?.length ?? 0) > 0 ? 100 : 50,
       tasks: [
         { label: 'Configure Exam Terms', done: (examsQuery.data?.length ?? 0) > 0 },
         { label: 'Map Subjects', done: totalSubjects > 0 },
@@ -54,10 +53,9 @@ export default function AcademicsOverviewPage() {
       icon: ClipboardList,
       href: '/dashboard/academics/marks',
       color: 'bg-purple-50 text-purple-600',
-      progress: (examsQuery.data?.length ?? 0) > 0 ? 40 : 0,
       tasks: [
-        { label: 'Marks Entry', done: false },
-        { label: 'CAS Records', done: false },
+        { label: 'Marks Entry Ready', done: (examsQuery.data?.length ?? 0) > 0 && totalSubjects > 0 },
+        { label: 'CAS Entry Ready', done: totalSubjects > 0 },
       ]
     },
     {
@@ -67,10 +65,9 @@ export default function AcademicsOverviewPage() {
       icon: Lock,
       href: '/dashboard/academics/locks',
       color: 'bg-amber-50 text-amber-600',
-      progress: examsQuery.data?.some(e => e.isLocked) ? 100 : 0,
       tasks: [
-        { label: 'Secure Marks', done: examsQuery.data?.some(e => e.isLocked) },
-        { label: 'Audit Review', done: false },
+        { label: 'Secure Marks', done: Boolean(examsQuery.data?.some(e => e.isLocked)) },
+        { label: 'Audit Review', done: Boolean(examsQuery.data?.some(e => e.isLocked)) },
       ]
     },
     {
@@ -80,10 +77,9 @@ export default function AcademicsOverviewPage() {
       icon: FileText,
       href: '/dashboard/academics/report-cards',
       color: 'bg-rose-50 text-rose-600',
-      progress: reportCardsGenerated > 0 ? 100 : 0,
       tasks: [
         { label: 'Batch Generate', done: reportCardsGenerated > 0 },
-        { label: 'Distribution', done: false },
+        { label: 'Generation Results', done: reportCardsGenerated > 0 },
       ]
     },
     {
@@ -93,10 +89,9 @@ export default function AcademicsOverviewPage() {
       icon: GraduationCap,
       href: '/dashboard/academics/promotion',
       color: 'bg-emerald-50 text-emerald-600',
-      progress: 0,
       tasks: [
-        { label: 'Eligibility Review', done: false },
-        { label: 'Batch Move', done: false },
+        { label: 'Eligibility Review', done: reportCardsGenerated > 0 },
+        { label: 'Readiness Only', done: true },
       ]
     },
     {
@@ -106,17 +101,16 @@ export default function AcademicsOverviewPage() {
       icon: Megaphone,
       href: '/dashboard/academics/publishing',
       color: 'bg-orange-50 text-orange-600',
-      progress: 0,
       tasks: [
-        { label: 'Notify Parents', done: false },
-        { label: 'Dashboard Visibility', done: false },
+        { label: 'Publish Review', done: reportCardsGenerated > 0 },
+        { label: 'Guardian Warning', done: true },
       ]
     }
   ];
 
   return (
     <div className="space-y-12 pb-20 animate-fade-in">
-      {/* Premium Header */}
+      {/* Academic workflow header */}
       <section className="relative overflow-hidden rounded-[3rem] bg-slate-900 p-12 text-white shadow-2xl">
         <div className="relative z-10 lg:flex lg:items-center lg:justify-between">
           <div className="max-w-2xl">
@@ -149,16 +143,19 @@ export default function AcademicsOverviewPage() {
         <div className="absolute -bottom-40 left-1/4 h-80 w-80 rounded-full bg-blue-500/10 blur-[100px]" />
       </section>
 
-      {/* Mission Control Stepper */}
+      {/* Workflow stepper */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {workflowSteps.map((step, idx) => (
+        {workflowSteps.map((step, idx) => {
+          const progress = getStepProgress(step.tasks);
+
+          return (
           <Link key={step.id} href={step.href}>
             <div className="group relative h-full rounded-[2.5rem] border border-slate-200 bg-white p-8 transition-all hover:scale-[1.02] hover:shadow-2xl hover:shadow-slate-200 overflow-hidden">
               {/* Progress Indicator */}
               <div className="absolute top-0 right-0 h-1 bg-slate-100 w-full">
                 <div 
                   className={cn("h-full transition-all duration-1000", step.color.split(' ')[1].replace('text', 'bg'))}
-                  style={{ width: `${step.progress}%` }} 
+                  style={{ width: `${progress}%` }} 
                 />
               </div>
 
@@ -200,13 +197,14 @@ export default function AcademicsOverviewPage() {
                   Open Control
                   <ArrowRight size={14} />
                 </div>
-                {step.progress === 100 && (
+                {progress === 100 && (
                   <Badge variant="success" className="h-6 px-3 font-black text-[8px] uppercase tracking-widest">Complete</Badge>
                 )}
               </div>
             </div>
           </Link>
-        ))}
+          );
+        })}
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
@@ -243,8 +241,8 @@ export default function AcademicsOverviewPage() {
                    </div>
                 </div>
                 <div className="flex flex-col items-end">
-                   <span className="text-xl font-black text-indigo-600 tracking-tighter">100%</span>
-                   <span className="text-[8px] font-black uppercase tracking-widest text-indigo-400">Ready</span>
+                   <span className="text-xl font-black text-indigo-600 tracking-tighter">{getStepProgress(workflowSteps[0].tasks)}%</span>
+                   <span className="text-[8px] font-black uppercase tracking-widest text-indigo-400">{getStepProgress(workflowSteps[0].tasks) === 100 ? 'Ready' : 'Needs setup'}</span>
                 </div>
              </div>
              
@@ -260,7 +258,7 @@ export default function AcademicsOverviewPage() {
                 </div>
                 <div className="flex items-center gap-2">
                    <AlertCircle size={16} className="text-amber-400" />
-                   <span className="text-[8px] font-black uppercase tracking-widest text-amber-400">Waiting</span>
+                   <span className="text-[8px] font-black uppercase tracking-widest text-amber-400">{reportCardsGenerated > 0 ? 'Review' : 'Waiting'}</span>
                 </div>
              </div>
           </div>
@@ -268,6 +266,11 @@ export default function AcademicsOverviewPage() {
       </div>
     </div>
   );
+}
+
+function getStepProgress(tasks: Array<{ done: boolean }>) {
+  if (tasks.length === 0) return 0;
+  return Math.round((tasks.filter((task) => task.done).length / tasks.length) * 100);
 }
 
 function Badge({ children, variant, className }: { children: React.ReactNode; variant: 'success'; className?: string }) {

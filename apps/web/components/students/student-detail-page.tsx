@@ -46,6 +46,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   const [editingGuardianId, setEditingGuardianId] = useState<string | null>(null);
   const [lifecycleAction, setLifecycleAction] = useState<LifecycleAction | null>(null);
   const [lifecycleMessage, setLifecycleMessage] = useState('');
+  const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>('Overview');
 
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -53,6 +54,11 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
   useEffect(() => {
     if (searchParams.get('edit') === 'true') {
       setIsEditingStudent(true);
+    }
+
+    const requestedTab = searchParams.get('tab');
+    if (requestedTab && detailTabs.includes(requestedTab as DetailTab)) {
+      setActiveDetailTab(requestedTab as DetailTab);
     }
   }, [searchParams]);
 
@@ -152,7 +158,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
         message={lifecycleMessage}
       />
 
-      <Tabs defaultValue="Overview" className="space-y-8">
+      <Tabs value={activeDetailTab} onValueChange={(value) => setActiveDetailTab(value as DetailTab)} className="space-y-8">
         <TabsList className="flex h-auto flex-wrap gap-2 rounded-[2rem] border border-slate-200 bg-white/50 p-2 backdrop-blur-sm w-full justify-start">
           {detailTabs.map((tab) => (
             <TabsTrigger

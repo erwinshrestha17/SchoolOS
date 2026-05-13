@@ -133,9 +133,8 @@ export function AttendanceForm() {
   };
 
   const clearAll = () => {
-    const allAbsent: Record<string, AttendanceStatus> = {};
-    roster.forEach(s => { allAbsent[s.id] = 'ABSENT'; });
-    setExceptions(allAbsent);
+    setExceptions({});
+    setRemarks({});
   };
 
   return (
@@ -163,6 +162,7 @@ export function AttendanceForm() {
               value={academicYearId}
               onChange={(e) => setAcademicYearId(e.target.value)}
               className="premium-input bg-white"
+              aria-label="Academic Year"
             >
               <option value="">Select Year</option>
               {academicYearsQuery.data?.map((y) => (
@@ -177,6 +177,7 @@ export function AttendanceForm() {
               value={classId}
               onChange={(e) => { setClassId(e.target.value); setSectionId(''); }}
               className="premium-input bg-white"
+              aria-label="Class"
             >
               <option value="">Select Class</option>
               {classesQuery.data?.map((c) => (
@@ -191,6 +192,7 @@ export function AttendanceForm() {
               value={sectionId}
               onChange={(e) => setSectionId(e.target.value)}
               className="premium-input bg-white"
+              aria-label="Section"
             >
               <option value="">All Sections</option>
               {availableSections.map((s) => (
@@ -207,6 +209,7 @@ export function AttendanceForm() {
               max={today}
               onChange={(e) => setAttendanceDate(e.target.value)}
               className="premium-input bg-white"
+              aria-label="Date"
             />
           </div>
         </div>
@@ -224,6 +227,7 @@ export function AttendanceForm() {
              {roster.length > 0 && (
                <>
                 <button 
+                  type="button"
                   onClick={markAllPresent}
                   className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-xl hover:bg-emerald-100 transition-colors"
                 >
@@ -231,11 +235,12 @@ export function AttendanceForm() {
                   Mark All Present
                 </button>
                 <button 
+                  type="button"
                   onClick={clearAll}
                   className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors"
                 >
                   <Eraser size={14} />
-                  Clear All
+                  Clear Exceptions
                 </button>
                </>
              )}
@@ -256,6 +261,16 @@ export function AttendanceForm() {
           />
         ) : (
           <div className="space-y-6">
+            <div
+              className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-4"
+              data-testid="attendance-count-summary"
+            >
+              <SummaryPill label="Present" value={totals.present} className="text-emerald-700" />
+              <SummaryPill label="Absent" value={totals.absent} className="text-danger-700" />
+              <SummaryPill label="Late" value={totals.late} className="text-warning-700" />
+              <SummaryPill label="Leave / Other" value={totals.leave} className="text-info-700" />
+            </div>
+
             <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
               Everyone is present by default. Mark exceptions only when a student is absent,
               late, sick leave, excused leave, or unexcused leave.
@@ -312,6 +327,7 @@ export function AttendanceForm() {
           </div>
 
           <button
+            type="button"
             onClick={() => mutation.mutate({
               academicYearId,
               classId,
@@ -355,6 +371,7 @@ export function AttendanceForm() {
            </div>
          </div>
          <button 
+           type="button"
            onClick={() => syncMutation.mutate({
              academicYearId,
              classId,
@@ -369,7 +386,7 @@ export function AttendanceForm() {
            className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-primary-600 bg-white border border-primary-200 rounded-xl hover:bg-primary-50 transition-colors"
          >
             <Save size={14} />
-            Sync Attendance
+            Save / Sync Draft
           </button>
       </div>
       
@@ -383,7 +400,7 @@ export function AttendanceForm() {
              <p className="text-[0.65rem] mt-0.5">Final submission locks records for the day. Corrections require administrative approval.</p>
            </div>
          </div>
-         <button className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+         <button type="button" className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
             <Download size={14} />
             Download Sheet
           </button>
@@ -397,6 +414,23 @@ function SummaryStat({ label, value, color }: { label: string; value: number; co
     <div className="flex flex-col">
       <span className="text-[0.6rem] font-bold text-slate-500 uppercase tracking-[0.2em]">{label}</span>
       <span className={cn("text-xl font-black", color)}>{value}</span>
+    </div>
+  );
+}
+
+function SummaryPill({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: number;
+  className: string;
+}) {
+  return (
+    <div className="rounded-xl border border-white bg-white px-4 py-3 shadow-sm">
+      <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
+      <p className={cn('mt-1 text-2xl font-black tracking-tight', className)}>{value}</p>
     </div>
   );
 }

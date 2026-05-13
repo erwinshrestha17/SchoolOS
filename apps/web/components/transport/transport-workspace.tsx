@@ -22,6 +22,7 @@ import { LoadingState } from '../ui/loading-state';
 import { PageHeader } from '../ui/page-header';
 import { StatCard } from '../ui/stat-card';
 import { StatusBadge, type StatusTone } from '../ui/status-badge';
+import { ConfirmDialog } from '../ui/confirm-dialog';
 import { cn } from '../../lib/utils';
 const addDays = (date: Date, days: number) => {
   const result = new Date(date);
@@ -111,6 +112,10 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [pingForm, setPingForm] = useState<TransportLocationPingPayload>(emptyPingForm);
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirmingTripAction, setConfirmingTripAction] = useState<{
+    action: 'complete' | 'cancel';
+    tripId: string;
+  } | null>(null);
 
   const queryClient = useQueryClient();
   const routesQuery = useQuery({ queryKey: ['transport-routes'], queryFn: () => transportApi.listRoutes() });
@@ -298,7 +303,6 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
     activeTrips: reportsQuery.data?.activeTrips ?? activeTrips.length,
     activeAssignments: reportsQuery.data?.activeAssignments ?? 0,
     logsToday: reportsQuery.data?.logsToday ?? 0,
-    delayedRoutes: 0,
     studentsOnboard,
     studentsNotBoarded,
     vehiclesActive: vehicles.filter((vehicle) => vehicle.status === 'ACTIVE').length,
@@ -352,9 +356,9 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard title="Active Trips" value={stats.activeTrips} icon={<Navigation size={18} />} loading={activeTripsQuery.isLoading || reportsQuery.isLoading} />
-            <StatCard title="Active Enrollments" value={stats.activeAssignments} icon={<Users size={18} />} loading={reportsQuery.isLoading} />
-            <StatCard title="Logs Today" value={stats.logsToday} icon={<Bus size={18} />} loading={reportsQuery.isLoading} />
-            <StatCard title="Vehicles Active" value={stats.vehiclesActive} icon={<Bus size={18} />} loading={vehiclesQuery.isLoading} />
+            <StatCard title="Routes" value={routes.length} icon={<MapPin size={18} />} loading={routesQuery.isLoading} />
+            <StatCard title="Vehicles" value={vehicles.length} icon={<Bus size={18} />} loading={vehiclesQuery.isLoading} />
+            <StatCard title="Drivers Assigned" value={driverAssignments.length} icon={<ShieldCheck size={18} />} loading={driversQuery.isLoading} />
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
@@ -561,7 +565,14 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
         <TwoColumn>
           <div className="space-y-6">
           <Panel title="Trip Monitor" description="Active trips, student boarding state, and safe completion controls for admin operations.">
-            <TripList trips={activeTrips} emptyTitle="No active trips" onComplete={(tripId) => completeTripMutation.mutate(tripId)} onCancel={(tripId) => { if (confirm('Cancel this trip?')) cancelTripMutation.mutate({ tripId }); }} onSelect={setSelectedTripId} showLocationWarning />
+            <TripList
+              trips={activeTrips}
+              emptyTitle="No active trips"
+              onComplete={(tripId) => setConfirmingTripAction({ action: 'complete', tripId })}
+              onCancel={(tripId) => setConfirmingTripAction({ action: 'cancel', tripId })}
+              onSelect={setSelectedTripId}
+              showLocationWarning
+            />
           </Panel>
           <Panel title="Trip History" description="Current trip history returned by the backend; live route replay can come later.">
             <TripList trips={trips.slice(0, 8)} emptyTitle="No trip history" compact />
@@ -692,6 +703,29 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
           </div>
         </TwoColumn>
       )}
+
+      <ConfirmDialog
+        isOpen={Boolean(confirmingTripAction)}
+        onClose={() => setConfirmingTripAction(null)}
+        onConfirm={() => {
+          if (confirmingTripAction?.action === 'complete') {
+            completeTripMutation.mutate(confirmingTripAction.tripId);
+          }
+          if (confirmingTripAction?.action === 'cancel') {
+            cancelTripMutation.mutate({ tripId: confirmingTripAction.tripId, reason: 'Cancelled from admin transport console' });
+          }
+          setConfirmingTripAction(null);
+        }}
+        title={confirmingTripAction?.action === 'cancel' ? 'Cancel active trip?' : 'Complete active trip?'}
+        description={
+          confirmingTripAction?.action === 'cancel'
+            ? 'This cancels the trip and records the action through the backend. Use cancellation only when the trip will not continue.'
+            : 'This completes the active trip and closes boarding/drop tracking for this route run.'
+        }
+        confirmLabel={confirmingTripAction?.action === 'cancel' ? 'Cancel trip' : 'Complete trip'}
+        variant={confirmingTripAction?.action === 'cancel' ? 'destructive' : 'default'}
+        isConfirming={completeTripMutation.isPending || cancelTripMutation.isPending}
+      />
     </div>
   );
 }
@@ -752,6 +786,11 @@ function TripList({ trips, emptyTitle, onComplete, onCancel, onSelect, compact, 
                   )}
                 </div>
               )}
+              {showLocationWarning ? (
+                <p className="mt-2 text-xs font-semibold text-amber-600">
+                  Open Details or Location to verify the latest backend coordinate before parent updates.
+                </p>
+              ) : null}
             </div>
             <div className="flex gap-2">
               {onSelect ? <button type="button" className="btn-secondary" onClick={() => onSelect(trip.id)}>Details</button> : null}

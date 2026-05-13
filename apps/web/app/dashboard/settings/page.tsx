@@ -160,7 +160,7 @@ const ACCOUNTING_SETTING_KEYS: TenantSettingKey[] = [
 const COMMUNICATION_SETTING_KEYS: TenantSettingKey[] = [
   'default_notice_channel', 'parent_notification_enabled', 'consent_required_for_media', 
   'quiet_hours_enabled', 'chat_availability_enabled', 'chat_sunday_to_thursday_hours', 
-  'chat_friday_hours', 'chat_saturday_enabled', 'emergency_override_requires_admin'
+  'chat_friday_hours', 'chat_saturday_enabled', 'emergency_override_requires_admin', 'timezone'
 ];
 
 const SECURITY_SETTING_KEYS: TenantSettingKey[] = [
@@ -761,7 +761,7 @@ function SectionCommunication({ initialValues, onUpdate }: { initialValues: Tena
           <div className="flex gap-3">
             <AlertCircle className="text-primary-600 shrink-0" size={18} />
             <p className="text-sm text-primary-700 leading-relaxed">
-              <strong>Chat Expectations:</strong> Messages received outside these configured hours will be automatically <strong>queued</strong>. Teachers will see them once their next shift starts. Saturday is <strong>closed</strong> by default.
+              <strong>Chat Expectations:</strong> Messages outside school chat hours will be queued. Teachers will see them once their next shift starts. Saturday is <strong>closed</strong> by default.
             </p>
           </div>
         </div>
