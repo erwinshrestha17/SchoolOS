@@ -95,11 +95,11 @@ describe('M0 File & Report boundary contracts', () => {
     it('getSignedUrl handles student photo and activity attachment special paths', () => {
       const service = read('src/file-registry/file-registry.service.ts');
 
-      expect(service).toMatch(
-        /\/students\/\$\{encodeURIComponent\(\s*asset\.entityId\s*\)\}\/photo\/preview/,
-      );
-      expect(service).toMatch(
-        /\/activity-feed\/attachments\/\$\{encodeURIComponent\(\s*attachment\.id\s*\)\}\/preview/,
+      expect(service).toContain('/students/${encodeURIComponent(');
+      expect(service).toContain('asset.entityId');
+      expect(service).toContain(')}/photo/preview');
+      expect(service).toContain(
+        '/activity-feed/attachments/${encodeURIComponent(attachment.id)}/preview',
       );
     });
   });
