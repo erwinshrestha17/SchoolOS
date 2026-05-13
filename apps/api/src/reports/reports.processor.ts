@@ -16,13 +16,18 @@ export class ReportsProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<{
-    exportId: string;
-    reportKey: string;
-    filters: Record<string, unknown>;
-    format: string;
-    actor: AuthContext;
-  }, void>): Promise<void> {
+  async process(
+    job: Job<
+      {
+        exportId: string;
+        reportKey: string;
+        filters: Record<string, unknown>;
+        format: string;
+        actor: AuthContext;
+      },
+      void
+    >,
+  ): Promise<void> {
     const { exportId, reportKey, filters, format, actor } = job.data;
     this.logger.log(`Processing report ${reportKey} for export ${exportId}`);
 
@@ -36,11 +41,13 @@ export class ReportsProcessor extends WorkerHost {
       if (!executor) throw new Error('Report executor not found');
 
       const data = await executor.execute(actor, filters, format);
-      
+
       // In a real implementation, we would generate a file (CSV/PDF) and upload to R2/S3
       // For this hardening, we mark as COMPLETED and store summary or just simulate
-      
-      this.logger.log(`Successfully generated ${data.length} rows for report ${reportKey}`);
+
+      this.logger.log(
+        `Successfully generated ${data.length} rows for report ${reportKey}`,
+      );
 
       await this.prisma.reportExport.update({
         where: { id: exportId },
@@ -50,12 +57,17 @@ export class ReportsProcessor extends WorkerHost {
         },
       });
     } catch (error) {
-      this.logger.error(`Failed to process report ${reportKey}: ${error.message}`, error.stack);
+      const message = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(
+        `Failed to process report ${reportKey}: ${message}`,
+        stack,
+      );
       await this.prisma.reportExport.update({
         where: { id: exportId },
         data: {
           status: 'FAILED',
-          errorSummary: error.message,
+          errorSummary: message,
           completedAt: new Date(),
         },
       });

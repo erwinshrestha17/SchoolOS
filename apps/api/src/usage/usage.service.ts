@@ -96,7 +96,9 @@ export class UsageService {
     if (!subscription) {
       // If no active subscription, default to a very low limit or block
       if (currentCount >= 10) {
-        throw new NotFoundException('No active subscription found. Free limit of 10 reached.');
+        throw new NotFoundException(
+          'No active subscription found. Free limit of 10 reached.',
+        );
       }
       return;
     }
@@ -111,7 +113,9 @@ export class UsageService {
 
   async incrementUsage(tenantId: string, usageKey: string, amount = 1) {
     const now = new Date();
-    const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const periodStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+    );
 
     await this.prisma.usageCounter.upsert({
       where: {

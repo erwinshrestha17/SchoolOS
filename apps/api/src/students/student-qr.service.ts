@@ -420,7 +420,9 @@ export class StudentQrService {
         const val = char.charCodeAt(0);
         const x = 50 + (i % 10) * 6;
         const y = 50 + Math.floor(i / 10) * 6;
-        return val % 2 === 0 ? `<rect x="${x}" y="${y}" width="4" height="4"/>` : '';
+        return val % 2 === 0
+          ? `<rect x="${x}" y="${y}" width="4" height="4"/>`
+          : '';
       })
       .join('')}
   </g>

@@ -421,6 +421,16 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Review conflicting attendance submissions',
   },
   {
+    resource: 'attendance',
+    action: 'manage_all',
+    description: 'Manage all attendance sessions and review workflows',
+  },
+  {
+    resource: 'attendance:staff',
+    action: 'update',
+    description: 'Update staff attendance records',
+  },
+  {
     resource: 'fees',
     action: 'manage',
     description: 'Manage fee heads, plans, and student assignments',

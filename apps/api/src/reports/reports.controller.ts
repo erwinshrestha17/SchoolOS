@@ -45,11 +45,35 @@ export class ReportsController {
       actor,
     );
 
+    if (result.status === 'QUEUED') {
+      return res.status(202).json({
+        success: true,
+        message: 'Report export queued',
+        data: {
+          jobId: result.jobId,
+          status: result.status,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     if (result.format === 'json') {
       return res.json({
         success: true,
         message: 'Report exported successfully',
-        data: result.content,
+        data: result.content ?? result.data,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (
+      !result.contentType ||
+      !result.fileName ||
+      result.content === undefined
+    ) {
+      return res.status(500).json({
+        success: false,
+        message: 'Report export did not produce a downloadable file',
         timestamp: new Date().toISOString(),
       });
     }

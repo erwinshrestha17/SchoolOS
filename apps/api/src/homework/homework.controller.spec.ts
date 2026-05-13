@@ -24,8 +24,8 @@ function createController() {
     cancelHomework: jest.fn(),
     assignHomework: jest.fn(),
     closeHomework: jest.fn(),
-    sendHomeworkReminder: jest.fn(),
-    listHomeworkReminderBatches: jest.fn(),
+    previewReminders: jest.fn(),
+    sendReminders: jest.fn(),
     retryHomeworkReminderBatch: jest.fn(),
     createSubmission: jest.fn(),
     updateSubmission: jest.fn(),
@@ -72,7 +72,7 @@ describe('HomeworkController M6 contracts', () => {
     homeworkService.closeHomework.mockReturnValue({ status: 'CLOSED' });
     homeworkService.cancelHomework.mockReturnValue({ status: 'CANCELLED' });
 
-    expect(controller.assignHomework('homework-1', actor)).toEqual({
+    expect(controller.publishHomework('homework-1', actor)).toEqual({
       status: 'ASSIGNED',
     });
     expect(controller.closeHomework('homework-1', actor)).toEqual({
@@ -97,30 +97,24 @@ describe('HomeworkController M6 contracts', () => {
 
   it('delegates reminder send/list through service boundary', () => {
     const { controller, homeworkService } = createController();
-    const reminderDto = { reminderType: 'HOMEWORK_DUE_SOON' } as any;
-    homeworkService.sendHomeworkReminder.mockReturnValue({ id: 'batch-1' });
-    homeworkService.listHomeworkReminderBatches.mockReturnValue([
-      { id: 'batch-1' },
-    ]);
+    homeworkService.sendReminders.mockReturnValue({ id: 'batch-1' });
+    homeworkService.previewReminders.mockReturnValue([{ id: 'batch-1' }]);
 
-    expect(controller.sendReminder('homework-1', reminderDto, actor)).toEqual({
+    expect(controller.sendReminders('homework-1', actor)).toEqual({
       id: 'batch-1',
     });
-    expect(
-      controller.listAssignmentReminders('homework-1', {} as any, actor),
-    ).toEqual([
+    expect(controller.previewReminders('homework-1', actor)).toEqual([
       {
         id: 'batch-1',
       },
     ]);
-    expect(homeworkService.sendHomeworkReminder).toHaveBeenCalledWith(
+    expect(homeworkService.sendReminders).toHaveBeenCalledWith(
       'homework-1',
-      reminderDto,
       actor,
     );
-    expect(homeworkService.listHomeworkReminderBatches).toHaveBeenCalledWith(
+    expect(homeworkService.previewReminders).toHaveBeenCalledWith(
+      'homework-1',
       actor,
-      expect.objectContaining({ homeworkId: 'homework-1' }),
     );
   });
 

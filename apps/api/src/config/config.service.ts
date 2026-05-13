@@ -176,6 +176,10 @@ export class ConfigService {
     return process.env.R2_PUBLIC_BASE_URL;
   }
 
+  get r2Bucket() {
+    return process.env.R2_BUCKET;
+  }
+
   get port() {
     return Number(process.env.PORT ?? 4000);
   }

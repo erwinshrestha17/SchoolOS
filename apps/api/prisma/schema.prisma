@@ -805,6 +805,8 @@ model Tenant {
   markEntries                   MarkEntry[]
   casRecords                    CasRecord[]
   reportCards                   ReportCard[]
+  reportCardHistories           ReportCardHistory[]
+  reportCardCorrectionRequests  ReportCardCorrectionRequest[]
   promotionRecords              PromotionRecord[]
   attendanceDrafts              AttendanceDraft[]
   timetableSlots                TimetableSlot[]
@@ -1087,6 +1089,8 @@ model FileAsset {
   homeworkAttachments HomeworkAttachment[]
   studentPhoto        Student?             @relation("StudentPhoto")
   studentDocuments    StudentDocument[]    @relation("DocumentFile")
+  reportCards         ReportCard[]         @relation("ReportCardFile")
+  reportCardHistories ReportCardHistory[]  @relation("ReportCardHistoryFile")
 
   @@index([tenantId, module, entityId])
 }
@@ -1339,6 +1343,7 @@ model AcademicYear {
   examTerms                 ExamTerm[]
   casRecords                CasRecord[]
   reportCards               ReportCard[]
+  reportCardHistories       ReportCardHistory[]
   examTimetableSlots        ExamTimetableSlot[]
   promotionRecords          PromotionRecord[]
   timetableSlots            TimetableSlot[]
@@ -1347,6 +1352,7 @@ model AcademicYear {
   homeworkAssignments       HomeworkAssignment[]
   subjectWeeklyRequirements SubjectWeeklyRequirement[]
   conversations             Conversation[]
+  attendanceDrafts          AttendanceDraft[]
 
   @@unique([tenantId, name])
 }
@@ -1381,6 +1387,7 @@ model Class {
   subjectWeeklyRequirements SubjectWeeklyRequirement[]
   conversations             Conversation[]
   examTimetableSlots        ExamTimetableSlot[]
+  attendanceDrafts          AttendanceDraft[]
 
   @@unique([tenantId, name])
 }
@@ -1417,6 +1424,7 @@ model Section {
   subjectWeeklyRequirements SubjectWeeklyRequirement[]
   conversations             Conversation[]
   examTimetableSlots        ExamTimetableSlot[]
+  attendanceDrafts          AttendanceDraft[]
 
   @@unique([tenantId, classId, name])
 }
@@ -1530,6 +1538,7 @@ model Student {
   markEntries                  MarkEntry[]
   casRecords                   CasRecord[]
   reportCards                  ReportCard[]
+  reportCardHistories          ReportCardHistory[]
   promotionRecords             PromotionRecord[]
   homeworkSubmissions          HomeworkSubmission[]
   conversations                Conversation[]
@@ -2678,6 +2687,34 @@ model AttendanceSyncSubmission {
   @@unique([tenantId, clientSubmissionId])
   @@index([tenantId, syncStatus, attendanceDate])
   @@index([tenantId, academicYearId, classId, sectionId, attendanceDate])
+}
+
+model AttendanceDraft {
+  id             String   @id @default(uuid())
+  tenantId       String
+  userId         String
+  academicYearId String
+  classId        String
+  sectionId      String?
+  attendanceDate DateTime
+  payload        Json
+  serverVersion  Int      @default(1)
+  payloadHash    String?
+  lastSavedAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  expiresAt      DateTime?
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, userId, classId, sectionId, attendanceDate])
+  @@index([tenantId, userId, lastSavedAt])
+  @@index([tenantId, academicYearId, classId, sectionId, attendanceDate])
+  @@index([tenantId, expiresAt])
 }
 
 model FeeBillingRun {

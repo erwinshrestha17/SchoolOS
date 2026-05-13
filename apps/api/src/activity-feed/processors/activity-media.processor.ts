@@ -50,9 +50,9 @@ export class ActivityMediaProcessor extends WorkerHost {
       // In a real production environment, we would use 'sharp' here.
       // Since we don't have sharp installed, we simulate the compression.
       // The logic below establishes the architectural pattern.
-      
+
       this.logger.log(`Simulating compression for attachment ${attachmentId}`);
-      
+
       // Simulate some processing time
       await new Promise((resolve) => setTimeout(resolve, 500));
 

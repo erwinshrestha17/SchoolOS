@@ -239,13 +239,14 @@ export class StudentsController {
     @Query('token') token: string | undefined,
     @CurrentAuth() auth: AuthContext,
   ) {
+    const documentAuth: AuthContext & { qrToken?: string } = auth;
     if (token) {
-      (auth as any).qrToken = token;
+      documentAuth.qrToken = token;
     }
     const pdf = await this.studentsService.generateStudentDocumentPdf(
       studentId,
       kind,
-      auth,
+      documentAuth,
     );
 
     return new StreamableFile(pdf, {

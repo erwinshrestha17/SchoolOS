@@ -1044,7 +1044,8 @@ export class PlatformService {
     if (query.tenantId) where.tenantId = query.tenantId;
 
     const delegate = this.delegate('reportExport');
-    if (!delegate) return { items: [], total: 0, page, limit, hasNextPage: false };
+    if (!delegate)
+      return { items: [], total: 0, page, limit, hasNextPage: false };
 
     const [items, total] = await Promise.all([
       delegate.findMany({

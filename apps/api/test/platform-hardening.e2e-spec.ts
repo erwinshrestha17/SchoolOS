@@ -11,6 +11,7 @@ import { ConfigService } from '../src/config/config.service';
 import { EntitlementGuard } from '../src/auth/guards/entitlement.guard';
 import { PlatformService } from '../src/platform/platform.service';
 import { PlatformController } from '../src/platform/platform.controller';
+import { UsageService } from '../src/usage/usage.service';
 import { Reflector } from '@nestjs/core';
 import { getQueueToken } from '@nestjs/bullmq';
 import { PrismaMock, createPrismaMock, createQueueMock } from './test-helpers';
@@ -101,6 +102,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         tenantId: premiumTenantId,
         planId: premiumPlanId,
         status: 'ACTIVE',
+        startsAt: new Date(),
       },
     });
 
@@ -114,7 +116,12 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       { planId: freePlanId, featureKey: 'module.payroll', enabled: false },
     );
     await prisma.tenantSubscription.create({
-      data: { tenantId: freeTenantId, planId: freePlanId, status: 'ACTIVE' },
+      data: {
+        tenantId: freeTenantId,
+        planId: freePlanId,
+        status: 'ACTIVE',
+        startsAt: new Date(),
+      },
     });
   });
 
@@ -180,7 +187,9 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
           tenantId: freeTenantId,
           usageKey: 'students.count',
           period: 'MONTHLY',
-          periodStart: new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)),
+          periodStart: new Date(
+            Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1),
+          ),
           value: 10,
         },
       });
@@ -189,7 +198,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       const plan = await prisma.platformPlan.findFirst({
         where: { key: 'free-plan' },
       });
-      await prisma.platformUsageLimit.create({
+      await prisma.usageLimit.create({
         data: {
           planId: plan!.id,
           usageKey: 'students.count',
@@ -197,8 +206,10 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         },
       });
 
-      const usageService = app.get<any>('UsageService' as any);
-      await expect(usageService.verifyLimit(freeTenantId, 'students.count', 10)).rejects.toThrow();
+      const usageService = app.get(UsageService);
+      await expect(
+        usageService.verifyLimit(freeTenantId, 'students.count', 10),
+      ).rejects.toThrow();
     });
   });
 

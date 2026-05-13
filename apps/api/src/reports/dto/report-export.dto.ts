@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsObject, IsOptional } from 'class-validator';
+import { IsBoolean, IsEnum, IsObject, IsOptional } from 'class-validator';
 import type { ReportFormat } from '@schoolos/core';
 
 export class ReportExportDto {
@@ -8,4 +8,8 @@ export class ReportExportDto {
   @IsObject()
   @IsOptional()
   filters: Record<string, unknown> = {};
+
+  @IsOptional()
+  @IsBoolean()
+  async?: boolean;
 }

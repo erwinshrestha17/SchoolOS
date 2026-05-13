@@ -57,24 +57,28 @@ describe('payroll calculations', () => {
 
   it('enforces draft to reviewed to approved to posted workflow actions', () => {
     expect(getPayrollRunActions('DRAFT')).toEqual({
+      canEdit: true,
       canReview: true,
-      canApprove: true,
+      canApprove: false,
       canPost: false,
+      canPay: false,
+      canReverse: false,
+      isLocked: false,
     });
-    expect(getPayrollRunActions('UNDER_REVIEW')).toEqual({
+    expect(getPayrollRunActions('UNDER_REVIEW')).toMatchObject({
       canReview: false,
       canApprove: true,
       canPost: false,
     });
-    expect(getPayrollRunActions('APPROVED')).toEqual({
+    expect(getPayrollRunActions('APPROVED')).toMatchObject({
       canReview: false,
       canApprove: false,
       canPost: true,
     });
   });
 
-  it('allows approval from both DRAFT and REVIEWED statuses', () => {
-    expect(getPayrollRunActions('DRAFT').canApprove).toBe(true);
+  it('allows approval after review statuses', () => {
+    expect(getPayrollRunActions('DRAFT').canApprove).toBe(false);
     expect(getPayrollRunActions('REVIEWED').canApprove).toBe(true);
     expect(getPayrollRunActions('APPROVED').canApprove).toBe(false);
     expect(getPayrollRunActions('POSTED').canApprove).toBe(false);

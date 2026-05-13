@@ -33,7 +33,7 @@ describe('FinanceService - Dues & Reprints', () => {
             },
             tenant: { findUnique: jest.fn() },
             receiptReprintHistory: { create: jest.fn() },
-            invoice: { findMany: jest.fn() },
+            invoice: { findMany: jest.fn(), count: jest.fn() },
             feeWaiver: { findMany: jest.fn() },
           },
         },
@@ -126,6 +126,9 @@ describe('FinanceService - Dues & Reprints', () => {
       ];
 
       (prisma.invoice.findMany as jest.Mock).mockResolvedValue(mockInvoices);
+      (prisma.invoice.count as jest.Mock).mockResolvedValue(
+        mockInvoices.length,
+      );
       (prisma.feeWaiver.findMany as jest.Mock).mockResolvedValue([]);
 
       const result = await service.getDuesTableReport({}, actor as any);

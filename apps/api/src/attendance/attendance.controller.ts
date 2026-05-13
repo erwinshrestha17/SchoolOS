@@ -246,10 +246,7 @@ export class AttendanceController {
 
   @Post('drafts/:id/submit')
   @Permissions('attendance:mark')
-  submitDraft(
-    @Param('id') id: string,
-    @CurrentAuth() auth: AuthContext,
-  ) {
+  submitDraft(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.attendanceService.submitDraft(id, auth);
   }
 

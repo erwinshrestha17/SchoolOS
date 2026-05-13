@@ -34,7 +34,10 @@ import {
 import { ListStaffAttendanceSummaryDto } from './dto/list-staff-attendance-summary.dto';
 import { ReviewStaffLeaveRequestDto } from './dto/review-staff-leave-request.dto';
 import { SubmitStaffAttendanceDto } from './dto/submit-staff-attendance.dto';
-import { SubmitAttendanceDto } from './dto/submit-attendance.dto';
+import {
+  AttendanceExceptionDto,
+  SubmitAttendanceDto,
+} from './dto/submit-attendance.dto';
 import { SyncAttendanceDto } from './dto/sync-attendance.dto';
 import { UpsertCalendarDayDto } from './dto/upsert-calendar-day.dto';
 import { buildStudentScopeFilter } from '../common/security/parent-scope';
@@ -778,45 +781,56 @@ export class AttendanceService {
     const startDate = new Date(dto.year, dto.month - 1, 1);
     const endDate = new Date(dto.year, dto.month, 0);
 
-    const [students, sessions, calendarDays] = await Promise.all([
-      this.prisma.student.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          classId: dto.classId,
-          ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
-          enrollments: {
-            some: {
-              academicYearId: dto.academicYearId,
-              status: EnrollmentStatus.ACTIVE,
+    const [students, sessions, calendarDays, classroom, section] =
+      await Promise.all([
+        this.prisma.student.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            classId: dto.classId,
+            ...(dto.sectionId ? { sectionId: dto.sectionId } : {}),
+            enrollments: {
+              some: {
+                academicYearId: dto.academicYearId,
+                status: EnrollmentStatus.ACTIVE,
+              },
             },
           },
-        },
-        orderBy: [{ rollNumber: 'asc' }, { firstNameEn: 'asc' }],
-      }),
-      this.prisma.attendanceSession.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          classId: dto.classId,
-          sectionId: dto.sectionId ?? null,
-          attendanceDate: {
-            gte: startDate,
-            lte: endDate,
+          orderBy: [{ rollNumber: 'asc' }, { firstNameEn: 'asc' }],
+        }),
+        this.prisma.attendanceSession.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            classId: dto.classId,
+            sectionId: dto.sectionId ?? null,
+            attendanceDate: {
+              gte: startDate,
+              lte: endDate,
+            },
           },
-        },
-        include: {
-          records: true,
-        },
-      }),
-      this.prisma.schoolCalendarDay.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          calendarDate: {
-            gte: startDate,
-            lte: endDate,
+          include: {
+            records: true,
           },
-        },
-      }),
-    ]);
+        }),
+        this.prisma.schoolCalendarDay.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            calendarDate: {
+              gte: startDate,
+              lte: endDate,
+            },
+          },
+        }),
+        this.prisma.class.findFirst({
+          where: { id: dto.classId, tenantId: actor.tenantId },
+          select: { name: true },
+        }),
+        dto.sectionId
+          ? this.prisma.section.findFirst({
+              where: { id: dto.sectionId, tenantId: actor.tenantId },
+              select: { name: true },
+            })
+          : Promise.resolve(null),
+      ]);
 
     const sessionByDate = new Map(
       sessions.map((s) => [s.attendanceDate.toISOString().split('T')[0], s]),
@@ -839,6 +853,7 @@ export class AttendanceService {
           LEAVE: 0,
           HOLIDAY: 0,
           NOT_MARKED: 0,
+          totalDays: 0,
         },
       };
 
@@ -881,6 +896,7 @@ export class AttendanceService {
         } else {
           row.totals.NOT_MARKED++;
         }
+        row.totals.totalDays++;
       }
 
       return row;
@@ -889,6 +905,8 @@ export class AttendanceService {
     return {
       month: dto.month,
       year: dto.year,
+      className: classroom?.name ?? dto.classId,
+      sectionName: section?.name ?? null,
       daysCount,
       matrix,
     };
@@ -1977,7 +1995,10 @@ export class AttendanceService {
         });
 
         // Revert attendance records
-        for (const leaveDate of eachDateInclusive(leave.startsOn, leave.endsOn)) {
+        for (const leaveDate of eachDateInclusive(
+          leave.startsOn,
+          leave.endsOn,
+        )) {
           const attendanceDay = stripTime(leaveDate);
           const existing = await tx.staffAttendance.findUnique({
             where: {
@@ -2465,11 +2486,14 @@ export class AttendanceService {
         sectionName: data.sectionName,
         academicYear: dto.academicYearId,
         headers,
-        rows: data.matrix.map((s: any) => ({
+        rows: data.matrix.map((s) => ({
           'Roll No': s.rollNumber ?? '',
           'Student Name': s.name,
           ...Object.fromEntries(
-            s.attendance.map((a: any, i: number) => [(i + 1).toString(), a.status[0]]),
+            s.attendance.map((a, i: number) => [
+              (i + 1).toString(),
+              a.status[0],
+            ]),
           ),
           PRESENT: s.totals.PRESENT,
           ABSENT: s.totals.ABSENT,
@@ -2484,7 +2508,7 @@ export class AttendanceService {
         tenantId: actor.tenantId,
         reportKey: 'attendance_monthly_register',
         format,
-        filters: dto as any,
+        filters: dto as unknown as Prisma.InputJsonValue,
         status: 'COMPLETED',
         requestedBy: actor.userId,
       },
@@ -2967,15 +2991,14 @@ export class AttendanceService {
   }
 
   private ensureAttendanceReviewAuthority(actor: AuthContext) {
-    const allowedRoles = new Set([
-      'platform_super_admin',
-      'admin',
-      'principal',
-    ]);
+    const permissions = actor.permissions ?? [];
 
-    if (!actor.roles.some((role) => allowedRoles.has(role))) {
+    if (
+      !permissions.includes('attendance:review_conflicts') &&
+      !permissions.includes('attendance:manage_all')
+    ) {
       throw new ForbiddenException(
-        'Only principal, admin, or platform super admin may review attendance conflicts or override locked sessions',
+        'You do not have permission to review attendance conflicts/corrections',
       );
     }
   }
@@ -3055,28 +3078,35 @@ export class AttendanceService {
   async upsertDraft(dto: UpsertAttendanceDraftDto, actor: AuthContext) {
     const attendanceDate = stripTime(new Date(dto.attendanceDate));
 
-    return this.prisma.attendanceDraft.upsert({
+    const existing = await this.prisma.attendanceDraft.findFirst({
       where: {
-        tenantId_userId_classId_sectionId_attendanceDate: {
-          tenantId: actor.tenantId,
-          userId: actor.userId,
-          classId: dto.classId,
-          sectionId: dto.sectionId ?? null,
-          attendanceDate,
-        },
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        classId: dto.classId,
+        sectionId: dto.sectionId ?? null,
+        attendanceDate,
       },
-      create: {
+    });
+
+    if (existing) {
+      return this.prisma.attendanceDraft.update({
+        where: { id: existing.id },
+        data: {
+          payload: dto.payload as Prisma.InputJsonValue,
+          lastSavedAt: new Date(),
+        },
+      });
+    }
+
+    return this.prisma.attendanceDraft.create({
+      data: {
         tenantId: actor.tenantId,
         userId: actor.userId,
         classId: dto.classId,
         sectionId: dto.sectionId ?? null,
         attendanceDate,
         academicYearId: dto.academicYearId,
-        payload: dto.payload as any,
-      },
-      update: {
-        payload: dto.payload as any,
-        lastSavedAt: new Date(),
+        payload: dto.payload as Prisma.InputJsonValue,
       },
     });
   }
@@ -3092,6 +3122,7 @@ export class AttendanceService {
         section: true,
       },
       orderBy: { lastSavedAt: 'desc' },
+      take: 100,
     });
   }
 
@@ -3130,8 +3161,10 @@ export class AttendanceService {
       throw new NotFoundException('Attendance draft not found');
     }
 
-    const payload = draft.payload as any;
-    
+    const payload = draft.payload as {
+      exceptions?: AttendanceExceptionDto[];
+    };
+
     // Call submitAttendance with draft payload
     const result = await this.submitAttendance(
       {
@@ -3156,17 +3189,6 @@ export class AttendanceService {
     await this.prisma.attendanceDraft.delete({ where: { id: draft.id } });
 
     return result;
-  }
-
-  private async ensureAttendanceReviewAuthority(actor: AuthContext) {
-    if (
-      !actor.permissions.includes('attendance:review_conflicts') &&
-      !actor.permissions.includes('attendance:manage_all')
-    ) {
-      throw new ForbiddenException(
-        'You do not have permission to review attendance conflicts/corrections',
-      );
-    }
   }
 }
 

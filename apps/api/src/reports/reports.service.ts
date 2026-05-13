@@ -758,7 +758,8 @@ export class ReportsService {
       definition: {
         key: 'cashier-close-report',
         name: 'Cashier Close Report',
-        description: 'Daily summary of collections by cashier and payment method',
+        description:
+          'Daily summary of collections by cashier and payment method',
         category: 'finance',
         module: 'finance',
         formats: ['json', 'csv'],
@@ -778,7 +779,9 @@ export class ReportsService {
             tenantId: actor.tenantId,
             openedAt: { gte: from },
             closedAt: { lte: to },
-            ...(filters.collectorUserId ? { collectorUserId: String(filters.collectorUserId) } : {}),
+            ...(filters.collectorUserId
+              ? { collectorUserId: String(filters.collectorUserId) }
+              : {}),
           },
           include: {
             collectorUser: true,
@@ -791,14 +794,14 @@ export class ReportsService {
           'Close Number': c.closeNumber,
           'Opened At': c.openedAt.toISOString(),
           'Closed At': c.closedAt.toISOString(),
-          'Collector': c.collectorUser?.email || 'N/A',
+          Collector: c.collectorUser?.email || 'N/A',
           'Payment Method': c.paymentMethod || 'All',
           'Gross Collected': Number(c.grossCollected),
           'Total Refunded': Number(c.totalRefunded),
           'Net Collected': Number(c.netCollected),
           'Expected Cash': Number(c.expectedCashAmount || 0),
           'Actual Cash': Number(c.actualCashAmount || 0),
-          'Variance': Number(c.varianceAmount || 0),
+          Variance: Number(c.varianceAmount || 0),
           'Variance Reason': c.varianceReason || '-',
           'Payment Count': c.paymentCount,
           'Refund Count': c.refundCount,
@@ -816,14 +819,33 @@ export class ReportsService {
         module: 'hr',
         formats: ['json', 'csv'],
         filters: [
-          { key: 'month', label: 'Month', type: 'select', required: true, options: [
-            { label: 'January', value: '1' }, { label: 'February', value: '2' }, { label: 'March', value: '3' },
-            { label: 'April', value: '4' }, { label: 'May', value: '5' }, { label: 'June', value: '6' },
-            { label: 'July', value: '7' }, { label: 'August', value: '8' }, { label: 'September', value: '9' },
-            { label: 'October', value: '10' }, { label: 'November', value: '11' }, { label: 'December', value: '12' },
-          ]},
+          {
+            key: 'month',
+            label: 'Month',
+            type: 'select',
+            required: true,
+            options: [
+              { label: 'January', value: '1' },
+              { label: 'February', value: '2' },
+              { label: 'March', value: '3' },
+              { label: 'April', value: '4' },
+              { label: 'May', value: '5' },
+              { label: 'June', value: '6' },
+              { label: 'July', value: '7' },
+              { label: 'August', value: '8' },
+              { label: 'September', value: '9' },
+              { label: 'October', value: '10' },
+              { label: 'November', value: '11' },
+              { label: 'December', value: '12' },
+            ],
+          },
           { key: 'year', label: 'Year', type: 'text', required: true },
-          { key: 'staffId', label: 'Staff Member', type: 'select', required: false },
+          {
+            key: 'staffId',
+            label: 'Staff Member',
+            type: 'select',
+            required: false,
+          },
         ],
         requiredPermissions: ['hr:staff:read'],
       },
@@ -849,14 +871,20 @@ export class ReportsService {
         });
 
         return staff.map((s) => {
-          const present = s.attendanceRecords.filter(r => r.status === 'PRESENT').length;
-          const absent = s.attendanceRecords.filter(r => r.status === 'ABSENT').length;
-          const leave = s.attendanceRecords.filter(r => r.status === 'LEAVE').length;
-          
+          const present = s.attendanceRecords.filter(
+            (r) => r.status === 'PRESENT',
+          ).length;
+          const absent = s.attendanceRecords.filter(
+            (r) => r.status === 'ABSENT',
+          ).length;
+          const leave = s.attendanceRecords.filter(
+            (r) => r.status === 'LEAVE',
+          ).length;
+
           return {
             'Employee ID': s.employeeId,
             'Full Name': `${s.firstName} ${s.lastName}`,
-            'Month': `${year}-${month.toString().padStart(2, '0')}`,
+            Month: `${year}-${month.toString().padStart(2, '0')}`,
             'Present Days': present,
             'Absent Days': absent,
             'Leave Days': leave,
@@ -876,7 +904,12 @@ export class ReportsService {
         formats: ['json', 'csv'],
         filters: [
           { key: 'year', label: 'Year', type: 'text', required: true },
-          { key: 'staffId', label: 'Staff Member', type: 'select', required: false },
+          {
+            key: 'staffId',
+            label: 'Staff Member',
+            type: 'select',
+            required: false,
+          },
         ],
         requiredPermissions: ['hr:staff:read'],
       },
@@ -894,22 +927,25 @@ export class ReportsService {
             leaveRequests: {
               where: {
                 status: 'APPROVED',
-                startsOn: { gte: new Date(year, 0, 1), lte: new Date(year, 11, 31) },
+                startsOn: {
+                  gte: new Date(year, 0, 1),
+                  lte: new Date(year, 11, 31),
+                },
               },
             },
           },
           orderBy: { firstName: 'asc' },
         });
 
-        return staff.flatMap((s) => 
-          s.leaveBalances.map(b => ({
+        return staff.flatMap((s) =>
+          s.leaveBalances.map((b) => ({
             'Employee ID': s.employeeId,
             'Full Name': `${s.firstName} ${s.lastName}`,
             'Leave Type': b.leaveType,
-            'Allocated': Number(b.allocated),
-            'Used': Number(b.used),
-            'Remaining': Number(b.allocated) + Number(b.carried) - Number(b.used),
-          }))
+            Allocated: Number(b.allocated),
+            Used: Number(b.used),
+            Remaining: Number(b.allocated) + Number(b.carried) - Number(b.used),
+          })),
         );
       },
     });
@@ -923,12 +959,26 @@ export class ReportsService {
         module: 'payroll',
         formats: ['json', 'csv'],
         filters: [
-          { key: 'month', label: 'Month', type: 'select', required: false, options: [
-            { label: 'January', value: '1' }, { label: 'February', value: '2' }, { label: 'March', value: '3' },
-            { label: 'April', value: '4' }, { label: 'May', value: '5' }, { label: 'June', value: '6' },
-            { label: 'July', value: '7' }, { label: 'August', value: '8' }, { label: 'September', value: '9' },
-            { label: 'October', value: '10' }, { label: 'November', value: '11' }, { label: 'December', value: '12' },
-          ]},
+          {
+            key: 'month',
+            label: 'Month',
+            type: 'select',
+            required: false,
+            options: [
+              { label: 'January', value: '1' },
+              { label: 'February', value: '2' },
+              { label: 'March', value: '3' },
+              { label: 'April', value: '4' },
+              { label: 'May', value: '5' },
+              { label: 'June', value: '6' },
+              { label: 'July', value: '7' },
+              { label: 'August', value: '8' },
+              { label: 'September', value: '9' },
+              { label: 'October', value: '10' },
+              { label: 'November', value: '11' },
+              { label: 'December', value: '12' },
+            ],
+          },
           { key: 'year', label: 'Year', type: 'text', required: false },
         ],
         requiredPermissions: ['payroll:read'],
@@ -943,7 +993,7 @@ export class ReportsService {
             payrollRun: {
               ...(month ? { periodMonth: month } : {}),
               ...(year ? { periodYear: year } : {}),
-            }
+            },
           },
           include: {
             staff: true,
@@ -957,17 +1007,17 @@ export class ReportsService {
         });
 
         return lines.map((l) => ({
-          'Period': `${l.payrollRun.periodYear}-${String(l.payrollRun.periodMonth).padStart(2, '0')}`,
+          Period: `${l.payrollRun.periodYear}-${String(l.payrollRun.periodMonth).padStart(2, '0')}`,
           'Employee ID': l.staff.employeeId,
           'Staff Name': `${l.staff.firstName} ${l.staff.lastName}`,
           'Basic Salary': Number(l.basicSalary),
           'Gross Salary': Number(l.grossSalary),
           'PF Employee': Number(l.pfEmployee),
           'PF Employer': Number(l.pfEmployer),
-          'TDS': Number(l.tds),
-          'Deductions': Number(l.deductions),
+          TDS: Number(l.tds),
+          Deductions: Number(l.deductions),
           'Net Salary': Number(l.netSalary),
-          'Status': l.payrollRun.status,
+          Status: l.payrollRun.status,
         }));
       },
     });
@@ -975,17 +1025,32 @@ export class ReportsService {
       definition: {
         key: 'statutory-pf-summary',
         name: 'Statutory PF Summary',
-        description: 'Monthly summary of PF contributions (Employer & Employee)',
+        description:
+          'Monthly summary of PF contributions (Employer & Employee)',
         category: 'payroll',
         module: 'payroll',
         formats: ['json', 'csv'],
         filters: [
-          { key: 'month', label: 'Month', type: 'select', required: true, options: [
-            { label: 'January', value: '1' }, { label: 'February', value: '2' }, { label: 'March', value: '3' },
-            { label: 'April', value: '4' }, { label: 'May', value: '5' }, { label: 'June', value: '6' },
-            { label: 'July', value: '7' }, { label: 'August', value: '8' }, { label: 'September', value: '9' },
-            { label: 'October', value: '10' }, { label: 'November', value: '11' }, { label: 'December', value: '12' },
-          ]},
+          {
+            key: 'month',
+            label: 'Month',
+            type: 'select',
+            required: true,
+            options: [
+              { label: 'January', value: '1' },
+              { label: 'February', value: '2' },
+              { label: 'March', value: '3' },
+              { label: 'April', value: '4' },
+              { label: 'May', value: '5' },
+              { label: 'June', value: '6' },
+              { label: 'July', value: '7' },
+              { label: 'August', value: '8' },
+              { label: 'September', value: '9' },
+              { label: 'October', value: '10' },
+              { label: 'November', value: '11' },
+              { label: 'December', value: '12' },
+            ],
+          },
           { key: 'year', label: 'Year', type: 'text', required: true },
         ],
         requiredPermissions: ['payroll:read'],
@@ -1000,8 +1065,8 @@ export class ReportsService {
             payrollRun: {
               periodMonth: month,
               periodYear: year,
-              status: { in: ['POSTED', 'PAID'] }
-            }
+              status: { in: ['POSTED', 'PAID'] },
+            },
           },
           include: { staff: true },
         });
@@ -1026,12 +1091,26 @@ export class ReportsService {
         module: 'payroll',
         formats: ['json', 'csv'],
         filters: [
-          { key: 'month', label: 'Month', type: 'select', required: true, options: [
-            { label: 'January', value: '1' }, { label: 'February', value: '2' }, { label: 'March', value: '3' },
-            { label: 'April', value: '4' }, { label: 'May', value: '5' }, { label: 'June', value: '6' },
-            { label: 'July', value: '7' }, { label: 'August', value: '8' }, { label: 'September', value: '9' },
-            { label: 'October', value: '10' }, { label: 'November', value: '11' }, { label: 'December', value: '12' },
-          ]},
+          {
+            key: 'month',
+            label: 'Month',
+            type: 'select',
+            required: true,
+            options: [
+              { label: 'January', value: '1' },
+              { label: 'February', value: '2' },
+              { label: 'March', value: '3' },
+              { label: 'April', value: '4' },
+              { label: 'May', value: '5' },
+              { label: 'June', value: '6' },
+              { label: 'July', value: '7' },
+              { label: 'August', value: '8' },
+              { label: 'September', value: '9' },
+              { label: 'October', value: '10' },
+              { label: 'November', value: '11' },
+              { label: 'December', value: '12' },
+            ],
+          },
           { key: 'year', label: 'Year', type: 'text', required: true },
         ],
         requiredPermissions: ['payroll:read'],
@@ -1046,8 +1125,8 @@ export class ReportsService {
             payrollRun: {
               periodMonth: month,
               periodYear: year,
-              status: { in: ['POSTED', 'PAID'] }
-            }
+              status: { in: ['POSTED', 'PAID'] },
+            },
           },
           include: { staff: true },
         });
@@ -1101,8 +1180,12 @@ export class ReportsService {
       );
     }
 
-    if (request.format === 'json' && !request.async) {
-      const data = await executor.execute(actor, request.filters, request.format);
+    if (!request.async) {
+      const data = await executor.execute(
+        actor,
+        request.filters,
+        request.format,
+      );
 
       await this.auditService.record({
         action: 'export_report',
@@ -1115,10 +1198,34 @@ export class ReportsService {
           filters: request.filters,
         },
       });
+      await this.recordExportHistory({
+        tenantId: actor.tenantId,
+        reportKey,
+        format: request.format,
+        filters: request.filters as Prisma.InputJsonValue,
+        requestedBy: actor.userId,
+      });
+
+      if (request.format === 'json') {
+        return {
+          format: request.format,
+          status: 'COMPLETED',
+          content: data,
+          data,
+          fileName: `${reportKey}.json`,
+          contentType: 'application/json',
+        };
+      }
+
+      const csv = this.convertToCsv(data);
+      const content = Buffer.from(csv);
 
       return {
+        format: request.format,
         status: 'COMPLETED',
-        data,
+        content,
+        fileName: `${reportKey}.${request.format}`,
+        contentType: request.format === 'pdf' ? 'application/pdf' : 'text/csv',
       };
     }
 

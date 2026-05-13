@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { StaffStatus, Prisma } from '@prisma/client';
+import { StaffLeaveBalance, StaffStatus, Prisma } from '@prisma/client';
 
 @Injectable()
 export class StaffLeaveAccrualService {
@@ -16,8 +16,15 @@ export class StaffLeaveAccrualService {
    * Processes monthly leave accruals for all active staff in a tenant.
    * This would typically be called by a cron job or a manual trigger.
    */
-  async processMonthlyAccruals(tenantId: string, year: number, month: number, actorUserId: string) {
-    this.logger.log(`Processing monthly accruals for tenant ${tenantId}, period ${year}-${month}`);
+  async processMonthlyAccruals(
+    tenantId: string,
+    year: number,
+    month: number,
+    actorUserId: string,
+  ) {
+    this.logger.log(
+      `Processing monthly accruals for tenant ${tenantId}, period ${year}-${month}`,
+    );
 
     const activeStaff = await this.prisma.staff.findMany({
       where: {
@@ -32,7 +39,7 @@ export class StaffLeaveAccrualService {
       { leaveType: 'CASUAL', monthlyAmount: 0.5 },
     ];
 
-    const results = [];
+    const results: StaffLeaveBalance[] = [];
 
     for (const staff of activeStaff) {
       for (const rule of accrualRules) {

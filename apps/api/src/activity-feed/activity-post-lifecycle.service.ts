@@ -141,7 +141,10 @@ export class ActivityPostLifecycleService {
         status: post.status,
         softDeletedAt: post.softDeletedAt,
       },
-      after: { status: ActivityPostStatus.PENDING_APPROVAL, softDeletedAt: null },
+      after: {
+        status: ActivityPostStatus.PENDING_APPROVAL,
+        softDeletedAt: null,
+      },
     });
 
     return { ...updated, restored: true };
@@ -172,7 +175,7 @@ export class ActivityPostLifecycleService {
         moderatedById: actor.userId,
         publishedAt:
           dto.status === ActivityPostStatus.APPROVED
-            ? post.publishedAt ?? new Date()
+            ? (post.publishedAt ?? new Date())
             : post.publishedAt,
       },
     });

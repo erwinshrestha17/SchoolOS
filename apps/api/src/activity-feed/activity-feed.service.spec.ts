@@ -90,6 +90,7 @@ describe('ActivityFeedService', () => {
       auditService,
       { emit: jest.fn() } as any,
       fileRegistry,
+      { add: jest.fn() } as any,
     );
   });
 
@@ -235,7 +236,7 @@ describe('ActivityFeedService', () => {
         },
         actor,
       ),
-    ).rejects.toThrow('Activity attachments must be images');
+    ).rejects.toThrow('Only standard images are allowed');
     expect(storageService.saveBase64Object).not.toHaveBeenCalled();
   });
 

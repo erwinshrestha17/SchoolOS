@@ -45,6 +45,7 @@ describe('Student Documents Registry Integration (E2E)', () => {
       prisma as unknown as PrismaService,
       auditService as unknown as AuditService,
       { port: 4000 } as ConfigService,
+      { checkReadiness: jest.fn() } as unknown as StorageService,
     );
     studentRecordsService = new StudentRecordsService(
       prisma as unknown as PrismaService,

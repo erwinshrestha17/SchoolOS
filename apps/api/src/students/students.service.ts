@@ -31,12 +31,14 @@ import {
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { UsageService } from '../usage/usage.service';
 import { UsersService } from '../users/users.service';
 import { ArchiveStudentDto } from './dto/archive-student.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
 import { InviteGuardianDto } from './dto/invite-guardian.dto';
 import { MergeDuplicateStudentDto } from './dto/merge-duplicate-student.dto';
+import { MergeDuplicateStudentPreviewDto } from './dto/merge-duplicate-student-preview.dto';
 import { CreateGuardianIdentityVerificationDto } from './dto/create-guardian-identity-verification.dto';
 import { RequestStudentTransferDto } from './dto/request-student-transfer.dto';
 import { RevokeGeneratedStudentDocumentDto } from './dto/revoke-generated-student-document.dto';
@@ -73,7 +75,11 @@ export class StudentsService {
     const currentCount = await this.prisma.student.count({
       where: { tenantId: actor.tenantId, lifecycleStatus: 'ACTIVE' },
     });
-    await this.usageService.verifyLimit(actor.tenantId, 'students.count', currentCount);
+    await this.usageService.verifyLimit(
+      actor.tenantId,
+      'students.count',
+      currentCount,
+    );
 
     let linkedUserId: string | null = null;
 
@@ -1350,8 +1356,8 @@ export class StudentsService {
             payments: true,
             studentFeeAssignments: true,
             guardianLinks: true,
-            studentDocuments: true,
-            generatedStudentDocuments: true,
+            documents: true,
+            generatedDocuments: true,
             notificationDeliveries: true,
             developmentalMilestones: true,
             moodLogs: true,
@@ -1365,15 +1371,17 @@ export class StudentsService {
 
     const mergeCounts = {
       guardianLinks: financialSummary?._count.guardianLinks ?? 0,
-      documents: financialSummary?._count.studentDocuments ?? 0,
-      generatedDocuments: financialSummary?._count.generatedStudentDocuments ?? 0,
+      documents: financialSummary?._count.documents ?? 0,
+      generatedDocuments: financialSummary?._count.generatedDocuments ?? 0,
       invoices: financialSummary?._count.invoices ?? 0,
       payments: financialSummary?._count.payments ?? 0,
       feeWaivers: await this.prisma.feeWaiver.count({
         where: { tenantId: actor.tenantId, studentId: sourceStudent.id },
       }),
-      notificationDeliveries: financialSummary?._count.notificationDeliveries ?? 0,
-      developmentalMilestones: financialSummary?._count.developmentalMilestones ?? 0,
+      notificationDeliveries:
+        financialSummary?._count.notificationDeliveries ?? 0,
+      developmentalMilestones:
+        financialSummary?._count.developmentalMilestones ?? 0,
       moodLogs: financialSummary?._count.moodLogs ?? 0,
       libraryIssues: financialSummary?._count.libraryIssues ?? 0,
       transportEnrollments: financialSummary?._count.transportEnrollments ?? 0,
@@ -1381,9 +1389,11 @@ export class StudentsService {
       conversations: await this.prisma.conversation.count({
         where: { tenantId: actor.tenantId, studentId: sourceStudent.id },
       }),
-      conversationParticipants: await this.prisma.conversationParticipant.count({
-        where: { tenantId: actor.tenantId, studentId: sourceStudent.id },
-      }),
+      conversationParticipants: await this.prisma.conversationParticipant.count(
+        {
+          where: { tenantId: actor.tenantId, studentId: sourceStudent.id },
+        },
+      ),
     };
 
     return {
@@ -1400,7 +1410,10 @@ export class StudentsService {
         lifecycleStatus: targetStudent.lifecycleStatus,
       },
       mergeCounts,
-      isProbableDuplicate: isProbableDuplicateStudent(sourceStudent, targetStudent),
+      isProbableDuplicate: isProbableDuplicateStudent(
+        sourceStudent,
+        targetStudent,
+      ),
     };
   }
 
@@ -1419,7 +1432,10 @@ export class StudentsService {
       this.findTenantStudentForDuplicateMerge(dto.targetStudentId, actor),
     ]);
 
-    if (sourceStudent.lifecycleStatus !== StudentLifecycleStatus.ACTIVE && sourceStudent.lifecycleStatus !== StudentLifecycleStatus.ARCHIVED) {
+    if (
+      sourceStudent.lifecycleStatus !== StudentLifecycleStatus.ACTIVE &&
+      sourceStudent.lifecycleStatus !== StudentLifecycleStatus.ARCHIVED
+    ) {
       throw new ConflictException(
         'Only active or archived duplicate source records can be merged safely',
       );
@@ -1428,6 +1444,12 @@ export class StudentsService {
     if (targetStudent.lifecycleStatus !== StudentLifecycleStatus.ACTIVE) {
       throw new ConflictException(
         'Duplicate records can only be merged into an active canonical student',
+      );
+    }
+
+    if (!isProbableDuplicateStudent(sourceStudent, targetStudent)) {
+      throw new BadRequestException(
+        'Students do not look like probable duplicate records',
       );
     }
 
@@ -1970,8 +1992,9 @@ export class StudentsService {
       exportId: exportRecord.id,
       totalRecords: students.length,
       validRecords: rows.length,
-      invalidRecords: validationResults.filter((result) => result.issues.length > 0)
-        .length,
+      invalidRecords: validationResults.filter(
+        (result) => result.issues.length > 0,
+      ).length,
       issues: validationResults
         .filter((result) => result.issues.length > 0)
         .flatMap((result) =>
@@ -2456,7 +2479,7 @@ export class StudentsService {
       actor,
       issuedAt: signedAt,
       version,
-      qrToken: (actor as any).qrToken, // Pass optional QR token if provided in context
+      qrToken: (actor as AuthContext & { qrToken?: string }).qrToken,
     });
     const checksumSha256 = createHash('sha256').update(pdf).digest('hex');
     const stored = await this.storageService.saveBufferObject({

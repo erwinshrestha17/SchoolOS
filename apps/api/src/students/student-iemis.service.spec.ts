@@ -4,6 +4,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { StorageService } from '../storage/storage.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
+import { CommunicationsService } from '../communications/communications.service';
+import { UsageService } from '../usage/usage.service';
+import { UsersService } from '../users/users.service';
 import { StudentLifecycleStatus, EnrollmentStatus } from '@prisma/client';
 import { AuthContext } from '../auth/auth.types';
 
@@ -15,6 +18,8 @@ describe('StudentsService (iEMIS Export)', () => {
     userId: 'user-1',
     tenantId: 'tenant-1',
     tenantSlug: 'school-1',
+    email: 'admin@school.test',
+    authMethod: 'PASSWORD',
     roles: ['admin'],
     permissions: ['students:read'],
   };
@@ -38,6 +43,9 @@ describe('StudentsService (iEMIS Export)', () => {
           },
         },
         { provide: AuditService, useValue: { record: jest.fn() } },
+        { provide: UsersService, useValue: {} },
+        { provide: CommunicationsService, useValue: {} },
+        { provide: UsageService, useValue: { verifyLimit: jest.fn() } },
         { provide: StorageService, useValue: {} },
         { provide: FileRegistryService, useValue: {} },
       ],
@@ -88,7 +96,9 @@ describe('StudentsService (iEMIS Export)', () => {
     ];
 
     (prisma.student.findMany as jest.Mock).mockResolvedValue(mockStudents);
-    (prisma.reportExport.create as jest.Mock).mockResolvedValue({ id: 'export-1' });
+    (prisma.reportExport.create as jest.Mock).mockResolvedValue({
+      id: 'export-1',
+    });
 
     const result = await service.exportIemis(mockAuth);
 
@@ -129,14 +139,16 @@ describe('StudentsService (iEMIS Export)', () => {
     ];
 
     (prisma.student.findMany as jest.Mock).mockResolvedValue(mockStudents);
-    (prisma.reportExport.create as jest.Mock).mockResolvedValue({ id: 'export-2' });
+    (prisma.reportExport.create as jest.Mock).mockResolvedValue({
+      id: 'export-2',
+    });
 
     const result = await service.exportIemis(mockAuth);
 
     expect(result.validRecords).toBe(0);
     expect(result.invalidRecords).toBe(1);
-    expect(result.issues).toHaveLength(1);
-    expect(result.issues[0].issues.some(i => i.field === 'fullNameNp')).toBe(true);
-    expect(result.issues[0].issues.some(i => i.field === 'guardianContact')).toBe(true);
+    expect(result.issues.length).toBeGreaterThanOrEqual(2);
+    expect(result.issues.some((i) => i.field === 'fullNameNp')).toBe(true);
+    expect(result.issues.some((i) => i.field === 'guardianContact')).toBe(true);
   });
 });

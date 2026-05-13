@@ -234,7 +234,9 @@ export class FinanceService {
 
     const where: Prisma.InvoiceWhereInput = {
       tenantId: actor.tenantId,
-      status: query.status ? query.status : { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
+      status: query.status
+        ? query.status
+        : { in: [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL] },
       ...(query.academicYearId ? { academicYearId: query.academicYearId } : {}),
       ...(query.studentId ? { studentId: query.studentId } : {}),
       ...(query.classId || query.sectionId
@@ -263,7 +265,9 @@ export class FinanceService {
       ...(query.feePeriodId
         ? {
             billingRun: {
-              feeDueScheduleId: query.feePeriodId,
+              is: {
+                feePlanId: query.feePeriodId,
+              },
             },
           }
         : {}),
@@ -318,7 +322,7 @@ export class FinanceService {
 
           const lineBilled = line.totalAmount;
           const linePayable = lineBilled.sub(lineWaiver);
-          
+
           let linePaid = new Prisma.Decimal(0);
           if (remainingPaid.gt(0)) {
             if (remainingPaid.gte(linePayable)) {
@@ -351,8 +355,8 @@ export class FinanceService {
         });
     });
 
-    const filteredRows = query.agingBucket 
-      ? allRows.filter(r => r.agingBucket === query.agingBucket)
+    const filteredRows = query.agingBucket
+      ? allRows.filter((r) => r.agingBucket === query.agingBucket)
       : allRows;
 
     return {
@@ -367,7 +371,10 @@ export class FinanceService {
         totalBilled: filteredRows.reduce((sum, r) => sum + r.billed, 0),
         totalWaived: filteredRows.reduce((sum, r) => sum + r.waived, 0),
         totalPaid: filteredRows.reduce((sum, r) => sum + r.paid, 0),
-        totalOutstanding: filteredRows.reduce((sum, r) => sum + r.outstanding, 0),
+        totalOutstanding: filteredRows.reduce(
+          (sum, r) => sum + r.outstanding,
+          0,
+        ),
       },
     };
   }
@@ -1959,20 +1966,14 @@ export class FinanceService {
       new Prisma.Decimal(0),
     );
     const allPayments = invoices.flatMap((invoice) => invoice.payments);
-    const totalPaid = allPayments.reduce(
-      (sum, payment) => {
-        if (payment.status === PaymentStatus.REVERSED) return sum;
-        return sum.add(payment.amount);
-      },
-      new Prisma.Decimal(0),
-    );
-    const totalRefunded = allPayments.reduce(
-      (sum, payment) => {
-        if (payment.status === PaymentStatus.REVERSED) return sum;
-        return sum.add(sumRefundedAmount(payment.refunds));
-      },
-      new Prisma.Decimal(0),
-    );
+    const totalPaid = allPayments.reduce((sum, payment) => {
+      if (payment.status === PaymentStatus.REVERSED) return sum;
+      return sum.add(payment.amount);
+    }, new Prisma.Decimal(0));
+    const totalRefunded = allPayments.reduce((sum, payment) => {
+      if (payment.status === PaymentStatus.REVERSED) return sum;
+      return sum.add(sumRefundedAmount(payment.refunds));
+    }, new Prisma.Decimal(0));
     const totalWaived = waivers.reduce(
       (sum, waiver) => sum.add(waiver.amount),
       new Prisma.Decimal(0),
@@ -3172,7 +3173,11 @@ export class FinanceService {
     };
   }
 
-  async reopenCashierClose(closeId: string, dto: { reason: string }, actor: AuthContext) {
+  async reopenCashierClose(
+    closeId: string,
+    dto: { reason: string },
+    actor: AuthContext,
+  ) {
     const close = await this.prisma.cashierClose.findFirst({
       where: { id: closeId, tenantId: actor.tenantId },
     });
@@ -3184,7 +3189,7 @@ export class FinanceService {
     // Business rule: Can only reopen if not already reopened or if needed.
     // Here we just delete it (soft or hard depending on policy) or mark it.
     // Requirement says "Audit close actions".
-    
+
     await this.prisma.$transaction(async (tx) => {
       await tx.cashierClose.delete({
         where: { id: closeId },
@@ -4023,11 +4028,18 @@ function ledgerEventOrder(
   return orders[type] || 99;
 }
 
-function getAgingBucket(dueDate: Date, asOf: Date = new Date()): string {
-  const diffTime = asOf.getTime() - dueDate.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+function getAgingBucket(
+  dueDateOrDays: Date | number,
+  asOf: Date = new Date(),
+): string {
+  const diffDays =
+    dueDateOrDays instanceof Date
+      ? Math.ceil(
+          (asOf.getTime() - dueDateOrDays.getTime()) / (1000 * 60 * 60 * 24),
+        )
+      : dueDateOrDays;
   if (diffDays <= 0) return '0';
-  if (diffDays <= 30) return '0-30';
+  if (diffDays <= 30) return dueDateOrDays instanceof Date ? '0-30' : '1-30';
   if (diffDays <= 60) return '31-60';
   if (diffDays <= 90) return '61-90';
   return '90+';
@@ -4110,22 +4122,6 @@ function allocatePaymentAcrossLines(
 
     return { ...line, totalAmount: proportional };
   });
-}
-
-function getAgingBucket(daysOverdue: number) {
-  if (daysOverdue <= 30) {
-    return '1-30';
-  }
-
-  if (daysOverdue <= 60) {
-    return '31-60';
-  }
-
-  if (daysOverdue <= 90) {
-    return '61-90';
-  }
-
-  return '90+';
 }
 
 function resolveFiscalYear(date: Date) {

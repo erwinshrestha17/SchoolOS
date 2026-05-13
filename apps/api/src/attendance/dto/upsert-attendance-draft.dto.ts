@@ -1,4 +1,10 @@
-import { IsDateString, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  IsDateString,
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class UpsertAttendanceDraftDto {
   @IsDateString()
@@ -17,5 +23,6 @@ export class UpsertAttendanceDraftDto {
   sectionId?: string;
 
   @IsNotEmpty()
-  payload!: any;
+  @IsObject()
+  payload!: Record<string, unknown>;
 }

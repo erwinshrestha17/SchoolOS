@@ -129,7 +129,7 @@ export class HomeworkService {
   ) {
     const submission = await this.prisma.homeworkSubmission.findFirst({
       where: { id: submissionId, tenantId: actor.tenantId },
-      include: { assignment: true },
+      include: { homework: true },
     });
     if (!submission) throw new NotFoundException('Submission not found');
 
@@ -138,8 +138,8 @@ export class HomeworkService {
       data: {
         status: HomeworkSubmissionStatus.REVIEWED,
         feedback: feedback ?? submission.feedback,
-        gradedAt: new Date(),
-        gradedById: actor.userId,
+        reviewedAt: new Date(),
+        reviewedById: actor.userId,
       },
     });
 
@@ -1405,7 +1405,7 @@ export class HomeworkService {
     const submissions = await this.prisma.homeworkSubmission.findMany({
       where: {
         tenantId: actor.tenantId,
-        assignment: {
+        homework: {
           academicYearId,
           ...(classId ? { classId } : {}),
         },
@@ -1418,7 +1418,7 @@ export class HomeworkService {
       },
       include: {
         student: true,
-        assignment: {
+        homework: {
           include: {
             class: true,
             section: true,
@@ -1426,17 +1426,17 @@ export class HomeworkService {
           },
         },
       },
-      orderBy: { student: { firstName: 'asc' } },
+      orderBy: { student: { firstNameEn: 'asc' } },
     });
 
     return submissions.map((s) => ({
       submissionId: s.id,
-      studentName: `${s.student.firstName} ${s.student.lastName}`,
-      assignmentTitle: s.assignment.title,
-      subject: s.assignment.subject.name,
-      class: s.assignment.class.name,
-      section: s.assignment.section?.name,
-      dueDate: s.assignment.dueDate,
+      studentName: `${s.student.firstNameEn} ${s.student.lastNameEn}`,
+      assignmentTitle: s.homework.title,
+      subject: s.homework.subject.name,
+      class: s.homework.class.name,
+      section: s.homework.section?.name,
+      dueDate: s.homework.dueDate,
       status: s.status,
     }));
   }

@@ -25,6 +25,7 @@ export interface ReportDefinition {
     | "finance"
     | "students"
     | "hr"
+    | "payroll"
     | "inventory"
     | "attendance"
     | "platform";
@@ -37,11 +38,15 @@ export interface ReportDefinition {
 export interface ReportExportRequest {
   format: ReportFormat;
   filters: Record<string, any>;
+  async?: boolean;
 }
 
 export interface ReportExportResult {
-  format: ReportFormat;
-  content: any; // Buffer for binary, object for JSON
-  fileName: string;
-  contentType: string;
+  format?: ReportFormat;
+  content?: any; // Buffer for binary, object for JSON
+  fileName?: string;
+  contentType?: string;
+  data?: any;
+  status?: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
+  jobId?: string | number;
 }

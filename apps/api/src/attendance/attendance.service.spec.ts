@@ -34,6 +34,7 @@ const adminActor = {
 const teacherActor = {
   ...adminActor,
   roles: ['teacher'],
+  permissions: ['attendance:mark', 'attendance:read'],
 };
 
 describe('attendance production hardening', () => {

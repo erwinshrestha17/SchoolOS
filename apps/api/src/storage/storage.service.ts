@@ -76,7 +76,8 @@ export class StorageService {
 
   async checkReadiness() {
     if (this.configService.storageProvider === 'r2') {
-      if (!this.configService.r2Bucket) throw new Error('R2 bucket not configured');
+      if (!this.configService.r2Bucket)
+        throw new Error('R2 bucket not configured');
     } else {
       const localRoot = this.configService.localStorageRoot;
       const absolutePath = join(process.cwd(), localRoot);

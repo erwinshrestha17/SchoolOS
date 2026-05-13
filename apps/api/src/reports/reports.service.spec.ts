@@ -6,6 +6,7 @@ import { AuthContext } from '../auth/auth.types';
 import { FinanceService } from '../finance/finance.service';
 import { AuthMethod } from '@prisma/client';
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { getQueueToken } from '@nestjs/bullmq';
 
 describe('ReportsService', () => {
   let service: ReportsService;
@@ -137,6 +138,10 @@ describe('ReportsService', () => {
           useValue: {
             record: jest.fn(),
           },
+        },
+        {
+          provide: getQueueToken('reports'),
+          useValue: { add: jest.fn().mockResolvedValue({ id: 'job-1' }) },
         },
       ],
     }).compile();

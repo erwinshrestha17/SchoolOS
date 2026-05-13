@@ -4,6 +4,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { StorageService } from '../storage/storage.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
+import { CommunicationsService } from '../communications/communications.service';
+import { UsageService } from '../usage/usage.service';
+import { UsersService } from '../users/users.service';
 import { StudentLifecycleStatus, EnrollmentStatus } from '@prisma/client';
 import { AuthContext } from '../auth/auth.types';
 import { BadRequestException, ConflictException } from '@nestjs/common';
@@ -16,6 +19,8 @@ describe('StudentsService (Duplicate Merge)', () => {
     userId: 'user-1',
     tenantId: 'tenant-1',
     tenantSlug: 'school-1',
+    email: 'admin@school.test',
+    authMethod: 'PASSWORD',
     roles: ['admin'],
     permissions: ['students:manage_lifecycle'],
   };
@@ -69,10 +74,16 @@ describe('StudentsService (Duplicate Merge)', () => {
             transportEnrollment: { updateMany: jest.fn() },
             transportLog: { updateMany: jest.fn() },
             conversation: { updateMany: jest.fn(), count: jest.fn() },
-            conversationParticipant: { updateMany: jest.fn(), count: jest.fn() },
+            conversationParticipant: {
+              updateMany: jest.fn(),
+              count: jest.fn(),
+            },
           },
         },
         { provide: AuditService, useValue: { record: jest.fn() } },
+        { provide: UsersService, useValue: {} },
+        { provide: CommunicationsService, useValue: {} },
+        { provide: UsageService, useValue: { verifyLimit: jest.fn() } },
         { provide: StorageService, useValue: {} },
         { provide: FileRegistryService, useValue: {} },
       ],
@@ -80,6 +91,29 @@ describe('StudentsService (Duplicate Merge)', () => {
 
     service = module.get<StudentsService>(StudentsService);
     prisma = module.get<PrismaService>(PrismaService);
+    const delegates = [
+      prisma.studentGuardian,
+      prisma.studentDocument,
+      prisma.generatedStudentDocument,
+      prisma.invoice,
+      prisma.payment,
+      prisma.feeWaiver,
+      prisma.notificationDelivery,
+      prisma.developmentalMilestone,
+      prisma.moodLog,
+      prisma.libraryIssue,
+      prisma.transportEnrollment,
+      prisma.transportLog,
+      prisma.conversation,
+      prisma.conversationParticipant,
+      prisma.enrollment,
+    ] as unknown as Array<{ updateMany?: jest.Mock; createMany?: jest.Mock }>;
+
+    for (const delegate of delegates) {
+      delegate.updateMany?.mockResolvedValue({ count: 0 });
+      delegate.createMany?.mockResolvedValue({ count: 0 });
+    }
+    (prisma.studentDocument.findMany as jest.Mock).mockResolvedValue([]);
   });
 
   const sourceStudent = {
@@ -108,30 +142,33 @@ describe('StudentsService (Duplicate Merge)', () => {
     (prisma.student.findFirst as jest.Mock)
       .mockResolvedValueOnce(sourceStudent)
       .mockResolvedValueOnce(targetStudent);
-    
+
     (prisma.student.findUnique as jest.Mock).mockResolvedValue({
-        _count: {
-            invoices: 2,
-            payments: 1,
-            guardianLinks: 0,
-            studentDocuments: 0,
-            generatedStudentDocuments: 0,
-            notificationDeliveries: 0,
-            developmentalMilestones: 0,
-            moodLogs: 0,
-            libraryIssues: 0,
-            transportEnrollments: 0,
-            transportLogs: 0,
-        }
+      _count: {
+        invoices: 2,
+        payments: 1,
+        guardianLinks: 0,
+        documents: 0,
+        generatedDocuments: 0,
+        notificationDeliveries: 0,
+        developmentalMilestones: 0,
+        moodLogs: 0,
+        libraryIssues: 0,
+        transportEnrollments: 0,
+        transportLogs: 0,
+      },
     });
     (prisma.feeWaiver.count as jest.Mock).mockResolvedValue(0);
     (prisma.conversation.count as jest.Mock).mockResolvedValue(0);
     (prisma.conversationParticipant.count as jest.Mock).mockResolvedValue(0);
 
-    const result = await service.previewMergeDuplicateStudent({
-      sourceStudentId: 'source-1',
-      targetStudentId: 'target-1',
-    }, mockAuth);
+    const result = await service.previewMergeDuplicateStudent(
+      {
+        sourceStudentId: 'source-1',
+        targetStudentId: 'target-1',
+      },
+      mockAuth,
+    );
 
     expect(result.mergeCounts.invoices).toBe(2);
     expect(result.isProbableDuplicate).toBe(true);
@@ -141,34 +178,46 @@ describe('StudentsService (Duplicate Merge)', () => {
     (prisma.student.findFirst as jest.Mock)
       .mockResolvedValueOnce(sourceStudent)
       .mockResolvedValueOnce(targetStudent);
-    
+
     (prisma.studentDocument.findMany as jest.Mock).mockResolvedValue([]);
     (prisma.invoice.updateMany as jest.Mock).mockResolvedValue({ count: 2 });
     (prisma.payment.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
 
-    const result = await service.mergeDuplicateStudent({
-      sourceStudentId: 'source-1',
-      targetStudentId: 'target-1',
-      reason: 'Duplicate entry'
-    }, mockAuth);
+    const result = await service.mergeDuplicateStudent(
+      {
+        sourceStudentId: 'source-1',
+        targetStudentId: 'target-1',
+        reason: 'Duplicate entry',
+      },
+      mockAuth,
+    );
 
     expect(result.mergeCounts.invoices).toBe(2);
-    expect(prisma.student.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: sourceStudent.id },
-      data: expect.objectContaining({ lifecycleStatus: StudentLifecycleStatus.MERGED })
-    }));
+    expect(prisma.student.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: sourceStudent.id },
+        data: expect.objectContaining({
+          lifecycleStatus: StudentLifecycleStatus.MERGED,
+        }),
+      }),
+    );
     expect(prisma.studentMergeHistory.create).toHaveBeenCalled();
   });
 
   it('should fail if students are not probable duplicates', async () => {
-     (prisma.student.findFirst as jest.Mock)
+    (prisma.student.findFirst as jest.Mock)
       .mockResolvedValueOnce(sourceStudent)
       .mockResolvedValueOnce({ ...targetStudent, firstNameEn: 'Different' });
 
-     await expect(service.mergeDuplicateStudent({
-        sourceStudentId: 'source-1',
-        targetStudentId: 'target-1',
-        reason: 'Test'
-     }, mockAuth)).rejects.toThrow(BadRequestException);
+    await expect(
+      service.mergeDuplicateStudent(
+        {
+          sourceStudentId: 'source-1',
+          targetStudentId: 'target-1',
+          reason: 'Test',
+        },
+        mockAuth,
+      ),
+    ).rejects.toThrow(BadRequestException);
   });
 });

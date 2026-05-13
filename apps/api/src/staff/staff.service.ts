@@ -38,7 +38,11 @@ export class StaffService {
     const currentCount = await this.prisma.staff.count({
       where: { tenantId: actor.tenantId, status: 'ACTIVE' },
     });
-    await this.usageService.verifyLimit(actor.tenantId, 'staff.count', currentCount);
+    await this.usageService.verifyLimit(
+      actor.tenantId,
+      'staff.count',
+      currentCount,
+    );
 
     const managedUser = await this.usersService.createManagedUser({
       tenantId: actor.tenantId,
@@ -379,11 +383,7 @@ export class StaffService {
 
     const updated = await this.prisma.$transaction(async (tx) => {
       // Suspend user if status is Terminated, Resigned or Suspended
-      if (
-        [StaffStatus.TERMINATED, StaffStatus.RESIGNED, StaffStatus.SUSPENDED].includes(
-          dto.status,
-        )
-      ) {
+      if (isInactiveStaffStatus(dto.status)) {
         await tx.user.update({
           where: { id: staff.userId },
           data: { status: 'SUSPENDED' },
@@ -647,4 +647,14 @@ function mapStaffDetail(
       teacherRegistryId: staff.teacherRegistryId,
     },
   };
+}
+
+function isInactiveStaffStatus(
+  status: StaffStatus,
+): status is 'SUSPENDED' | 'TERMINATED' | 'RESIGNED' {
+  return (
+    status === StaffStatus.SUSPENDED ||
+    status === StaffStatus.TERMINATED ||
+    status === StaffStatus.RESIGNED
+  );
 }

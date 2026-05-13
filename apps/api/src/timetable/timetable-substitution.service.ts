@@ -357,7 +357,7 @@ export class TimetableSubstitutionService {
         dayOfWeek: slot.dayOfWeek,
         startsAt: slot.startsAt,
         endsAt: slot.endsAt,
-      }
+      },
     );
 
     // Check for existing assigned substitutions for this substitute teacher at the same time

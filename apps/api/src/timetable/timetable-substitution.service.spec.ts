@@ -82,7 +82,9 @@ describe('TimetableSubstitutionService', () => {
       ],
     }).compile();
 
-    service = module.get<TimetableSubstitutionService>(TimetableSubstitutionService);
+    service = module.get<TimetableSubstitutionService>(
+      TimetableSubstitutionService,
+    );
     prisma = module.get<PrismaService>(PrismaService);
     attendanceService = module.get<AttendanceService>(AttendanceService);
   });

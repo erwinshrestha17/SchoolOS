@@ -313,7 +313,11 @@ export class TimetableService {
     return updated;
   }
 
-  async restoreVersion(id: string, dto: RestoreTimetableVersionDto, actor: AuthContext) {
+  async restoreVersion(
+    id: string,
+    dto: RestoreTimetableVersionDto,
+    actor: AuthContext,
+  ) {
     const source = await this.findVersionOrThrow(dto.sourceVersionId, actor);
     const draft = await this.findVersionOrThrow(id, actor);
     this.ensureDraftVersion(draft.status);
@@ -337,7 +341,9 @@ export class TimetableService {
       await tx.timetableSlot.createMany({ data: slots });
       const updated = await tx.timetableVersion.update({
         where: { id },
-        data: { versionName: dto.versionName ?? `Restored from ${source.versionName}` },
+        data: {
+          versionName: dto.versionName ?? `Restored from ${source.versionName}`,
+        },
         include: { slots: { include: timetableSlotInclude() } },
       });
       await this.audit('restore', 'timetable_version', id, actor, updated);
@@ -828,6 +834,42 @@ export class TimetableService {
         ...(academicYearId ? { academicYearId } : {}),
       },
     });
+  }
+
+  async getTeacherWorkload(
+    teacherId: string,
+    query: WorkloadQueryDto,
+    actor: AuthContext,
+  ) {
+    await this.ensureStaff(actor, teacherId);
+    const [slots, rule] = await Promise.all([
+      this.prisma.timetableSlot.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: teacherId,
+          ...(query.academicYearId
+            ? { academicYearId: query.academicYearId }
+            : {}),
+          ...(query.versionId ? { versionId: query.versionId } : {}),
+        },
+        include: timetableSlotInclude(),
+        orderBy: [{ dayOfWeek: 'asc' }, { startsAt: 'asc' }],
+      }),
+      this.getTeacherWorkloadRule(teacherId, actor, query.academicYearId),
+    ]);
+    const teachingMinutes = slots.reduce(
+      (sum, slot) => sum + minutesBetween(slot.startsAt, slot.endsAt),
+      0,
+    );
+
+    return {
+      teacherId,
+      weeklyPeriods: slots.length,
+      teachingMinutes,
+      weeklyHours: Math.round((teachingMinutes / 60) * 10) / 10,
+      rule,
+      slots,
+    };
   }
 
   async upsertTeacherWorkloadRule(

@@ -50,7 +50,10 @@ describe('Activity Hardening Verification', () => {
     prisma = {
       class: { findFirst: jest.fn().mockResolvedValue({ id: 'c-1' }) },
       section: { findFirst: jest.fn().mockResolvedValue({ id: 's-1' }) },
-      student: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn() },
+      student: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn(),
+      },
       staff: { findFirst: jest.fn().mockResolvedValue({ id: 'staff-1' }) },
       guardian: { findFirst: jest.fn() },
       activityPost: {
@@ -125,7 +128,9 @@ describe('Activity Hardening Verification', () => {
 
       await expect(
         lifecycleService.updatePost('post-1', { title: 'New Title' }, actor),
-      ).rejects.toThrow('Approved or Archived activity post cannot be silently edited');
+      ).rejects.toThrow(
+        'Approved or Archived activity post cannot be silently edited',
+      );
     });
 
     it('requires a reason for rejecting a post', async () => {
@@ -179,7 +184,10 @@ describe('Activity Hardening Verification', () => {
     it('triggers compression job after post creation', async () => {
       prisma.class.findFirst.mockResolvedValue({ id: 'class-1' });
       prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
-      storageService.saveBase64Object.mockResolvedValue({ objectKey: 'orig.jpg', sizeBytes: 100 });
+      storageService.saveBase64Object.mockResolvedValue({
+        objectKey: 'orig.jpg',
+        sizeBytes: 100,
+      });
       fileRegistry.registerFile.mockResolvedValue({ id: 'file-1' });
       prisma.activityPost.create.mockResolvedValue({
         id: 'post-1',
@@ -194,7 +202,13 @@ describe('Activity Hardening Verification', () => {
           caption: 'Test',
           category: ActivityCategory.GENERAL,
           studentIds: [],
-          attachments: [{ fileName: 'a.jpg', contentType: 'image/jpeg', base64Content: 'abc' }],
+          attachments: [
+            {
+              fileName: 'a.jpg',
+              contentType: 'image/jpeg',
+              base64Content: 'abc',
+            },
+          ],
         },
         actor,
       );

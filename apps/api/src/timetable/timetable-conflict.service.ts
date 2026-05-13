@@ -322,7 +322,7 @@ export class TimetableConflictService {
       if (actual < req.requiredPeriodsPerWeek) {
         issues.push({
           type: 'SUBJECT_REQUIREMENT_MISSING',
-          severity: 'BLOCKING',
+          severity: 'WARNING',
           message: `Subject weekly requirement not met (${actual}/${req.requiredPeriodsPerWeek}).`,
           affectedPeriodIds: matchingSlots.map((slot) => slot.id),
           classId: req.classId,
@@ -523,7 +523,7 @@ export class TimetableConflictService {
       return [
         {
           type: 'SUBJECT_REQUIREMENT_MISSING',
-          severity: 'BLOCKING',
+          severity: 'WARNING',
           message: `Subject weekly requirement not met (${actual}/${requirement.requiredPeriodsPerWeek}).`,
           affectedPeriodIds: matchingSlots.map((slot) => slot.id),
           classId: requirement.classId,

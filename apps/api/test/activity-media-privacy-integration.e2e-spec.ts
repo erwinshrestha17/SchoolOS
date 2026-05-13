@@ -102,7 +102,11 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
   });
 
   let prisma: ActivityPrismaMock;
-  let storageService: { saveBase64Object: jest.Mock };
+  let storageService: {
+    saveBase64Object: jest.Mock;
+    getObjectBuffer: jest.Mock;
+    saveBufferObject: jest.Mock;
+  };
   let communicationsService: { recordDeliveryRecords: jest.Mock };
   let auditService: { record: jest.Mock };
   let eventEmitter: { emit: jest.Mock };
@@ -123,6 +127,13 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
         objectKey: `${tenantId}/activity/photo.jpg`,
         publicUrl: '/should-not-be-used-publicly/photo.jpg',
         sizeBytes: 42,
+      }),
+      getObjectBuffer: jest.fn().mockResolvedValue(Buffer.from('image-data')),
+      saveBufferObject: jest.fn().mockResolvedValue({
+        provider: StorageProvider.LOCAL,
+        objectKey: `${tenantId}/activity-feed/optimized/photo.jpg`,
+        publicUrl: null,
+        sizeBytes: 21,
       }),
     };
     communicationsService = {
@@ -153,6 +164,7 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
       auditService as unknown as AuditService,
       eventEmitter as unknown as EventEmitter2,
       fileRegistryService as unknown as FileRegistryService,
+      { add: jest.fn() } as never,
     );
     lifecycleService = new ActivityPostLifecycleService(
       prisma as unknown as PrismaService,
@@ -160,6 +172,7 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
     );
     mediaProcessor = new ActivityMediaProcessor(
       prisma as unknown as PrismaService,
+      storageService as unknown as StorageService,
     );
   });
 
@@ -358,7 +371,7 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
     expect(rejected).toEqual(
       expect.objectContaining({
         id: 'post-lifecycle',
-        moderationStatus: 'REJECTED',
+        status: 'REJECTED',
       }),
     );
 
@@ -376,7 +389,7 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
     );
     expect(prisma.__state.activityPosts[0]).toEqual(
       expect.objectContaining({
-        moderationStatus: 'REJECTED',
+        status: 'REJECTED',
         softDeletedAt: expect.any(Date),
       }),
     );
@@ -411,26 +424,24 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
       },
     } as Job);
 
-    expect(result).toEqual({
-      attachmentId: attachment.id,
-      fileAssetId: attachment.fileAssetId,
-      status: 'READY',
-    });
-    expect(prisma.activityAttachment.updateMany).toHaveBeenNthCalledWith(1, {
+    expect(result).toEqual(
+      expect.objectContaining({
+        attachmentId: attachment.id,
+        fileAssetId: attachment.fileAssetId,
+        status: 'READY',
+      }),
+    );
+    expect(prisma.activityAttachment.update).toHaveBeenNthCalledWith(1, {
       where: {
         id: attachment.id,
-        tenantId,
-        fileAssetId: attachment.fileAssetId,
       },
       data: { processingStatus: 'PROCESSING' },
     });
-    expect(prisma.activityAttachment.updateMany).toHaveBeenNthCalledWith(2, {
+    expect(prisma.activityAttachment.update).toHaveBeenNthCalledWith(2, {
       where: {
         id: attachment.id,
-        tenantId,
-        fileAssetId: attachment.fileAssetId,
       },
-      data: { processingStatus: 'READY' },
+      data: expect.objectContaining({ processingStatus: 'READY' }),
     });
     expect(prisma.__state.activityAttachments[0].processingStatus).toBe(
       'READY',
@@ -671,6 +682,16 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
             ) ?? null
         );
       }),
+      update: jest.fn(
+        async (q: { where: { id: string }; data: Record<string, unknown> }) => {
+          const post = state.activityPosts.find(
+            (item) => item.id === q.where.id,
+          );
+          if (!post) return null;
+          Object.assign(post, q.data);
+          return post;
+        },
+      ),
     },
     activityAttachment: {
       findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) => {
@@ -679,9 +700,27 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
             item.id === q.where?.id && item.tenantId === q.where?.tenantId,
         );
         return attachment
-          ? { ...attachment, activityPost: attachment.activityPost }
+          ? {
+              ...attachment,
+              activityPost: attachment.activityPost,
+              fileAsset: {
+                id: attachment.fileAssetId,
+                tenantId: attachment.tenantId,
+                objectKey: attachment.objectKey,
+              },
+            }
           : null;
       }),
+      update: jest.fn(
+        async (q: { where: { id: string }; data: Record<string, unknown> }) => {
+          const attachment = state.activityAttachments.find(
+            (item) => item.id === q.where.id,
+          );
+          if (!attachment) return null;
+          Object.assign(attachment, q.data);
+          return attachment;
+        },
+      ),
       updateMany: jest.fn(
         async (q: {
           where: Record<string, unknown>;
