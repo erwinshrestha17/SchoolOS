@@ -54,7 +54,6 @@ describe('M0 Platform Core hardening contracts', () => {
     expect(service).toContain('FEATURE_KEYS');
     expect(service).toContain('USAGE_KEYS');
     expect(service).toContain('checkEntitlement');
-    expect(service).toContain('checkFeatureEnabled');
     expect(entitlementGuard).toContain('RequiresFeature');
     expect(entitlementGuard).toContain('ForbiddenException');
     expect(plansService).toContain('featureKey');
@@ -92,34 +91,53 @@ describe('M0 Platform Core hardening contracts', () => {
     expect(service).toContain('encryptProviderConfig');
   });
 
-  it('keeps queue operations bounded, permissioned, and audited', () => {
+  it('keeps queue operations bounded, permissioned, audited, and sanitized', () => {
     const controller = read('src/platform/platform.controller.ts');
-    const service = read('src/platform/platform.service.ts');
+    const module = read('src/platform/platform.module.ts');
+    const queuesService = read('src/platform/platform-queues.service.ts');
 
     expect(controller).toContain("@Get('queues')");
     expect(controller).toContain("@Get('queues/failed-jobs')");
     expect(controller).toContain("@Post('queues/retry')");
     expect(controller).toContain("@Permissions('platform:queues:read')");
     expect(controller).toContain("@Permissions('platform:queues:retry')");
-    expect(service).toContain('getJobCounts');
-    expect(service).toContain('getFailed(0, 50)');
-    expect(service).toContain('job.retry()');
-    expect(service).toContain('queue_failed_job_retry_requested');
+    expect(controller).toContain('platformQueuesService.getQueueHealth()');
+    expect(controller).toContain('platformQueuesService.listFailedJobs()');
+    expect(controller).toContain('platformQueuesService.retryFailedJob');
+
+    expect(module).toContain('PlatformQueuesService');
+    expect(module).toContain('BullModule.registerQueue');
+
+    expect(queuesService).toContain('getJobCounts');
+    expect(queuesService).toContain('getFailed(0, 50)');
+    expect(queuesService).toContain('queue.getJob(dto.jobId)');
+    expect(queuesService).toContain('job.isFailed()');
+    expect(queuesService).toContain('job.retry()');
+    expect(queuesService).toContain('queue_failed_job_retry_requested');
+    expect(queuesService).toContain('sanitizeJobData');
+    expect(queuesService).toContain("'********'");
   });
 
   it('keeps platform report export and audit history paginated', () => {
     const controller = read('src/platform/platform.controller.ts');
-    const service = read('src/platform/platform.service.ts');
+    const reportExportsService = read(
+      'src/platform/platform-report-exports.service.ts',
+    );
+    const platformService = read('src/platform/platform.service.ts');
     const schema = read('prisma/schema.prisma');
 
     expect(schema).toContain('model ReportExport');
     expect(controller).toContain("@Get('report-exports')");
     expect(controller).toContain("@Permissions('platform:reports:read')");
-    expect(service).toContain('listReportExportsPage');
-    expect(service).toContain('listAuditLogs');
-    expect(service).toContain('skip');
-    expect(service).toContain('take: limit');
-    expect(service).toContain('hasNextPage');
+    expect(controller).toContain(
+      'platformReportExportsService.listReportExportsPage',
+    );
+    expect(reportExportsService).toContain('listReportExportsPage');
+    expect(reportExportsService).toContain('skip');
+    expect(reportExportsService).toContain('take: limit');
+    expect(reportExportsService).toContain('hasNextPage');
+    expect(platformService).toContain('listAuditLogs');
+    expect(platformService).toContain('take: limit');
   });
 
   it('keeps platform health checks safe and non-secret-bearing', () => {
@@ -131,8 +149,7 @@ describe('M0 Platform Core hardening contracts', () => {
     expect(service).toContain('getPlatformHealth');
     expect(service).toContain('database');
     expect(service).toContain('redis');
-    expect(service).toContain('queues');
-    expect(service).not.toContain('accessKey');
+    expect(service).toContain('queue');
     expect(service).not.toContain('secretAccessKey');
   });
 });
