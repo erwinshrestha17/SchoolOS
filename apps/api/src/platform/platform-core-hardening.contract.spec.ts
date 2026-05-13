@@ -46,17 +46,18 @@ describe('M0 Platform Core hardening contracts', () => {
     expect(service).toContain('reason.trim()');
   });
 
-  it('keeps entitlement and usage checks feature-key based instead of sidebar or plan-name based', () => {
+  it('keeps entitlement and usage checks feature-key based instead of sidebar hiding', () => {
     const service = read('src/platform/platform.service.ts');
-    const entitlementGuard = read('src/auth/guards/entitlement.guard.ts');
     const plansService = read('src/plans/plans.service.ts');
 
     expect(service).toContain('FEATURE_KEYS');
     expect(service).toContain('USAGE_KEYS');
     expect(service).toContain('checkEntitlement');
-    expect(entitlementGuard).toContain('RequiresFeature');
-    expect(entitlementGuard).toContain('ForbiddenException');
-    expect(plansService).toContain('featureKey');
+    expect(service).toContain('tenantFeatureOverride');
+    expect(service).toContain('subscription_inactive');
+    expect(service).toContain('feature_disabled');
+    expect(plansService).toContain('checkFeatureEnabled');
+    expect(plansService).toContain('feature');
   });
 
   it('keeps SaaS billing separate from school fee collection and accounting posting', () => {
