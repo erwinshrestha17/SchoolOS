@@ -339,11 +339,19 @@ export class PlatformController {
   @Permissions('platform:reports:read')
   async listReportExports(
     @Query('tenantId') tenantId?: string,
+    @Query('module') module?: string,
+    @Query('reportType') reportType?: string,
+    @Query('status') status?: string,
+    @Query('requestedBy') requestedBy?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    return this.platformService.listReportExportsPage({
+    return this.platformReportExportsService.listReportExportsPage({
       tenantId,
+      module,
+      reportType,
+      status,
+      requestedBy,
       page,
       limit,
     });
