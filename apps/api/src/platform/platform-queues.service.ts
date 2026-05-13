@@ -1,10 +1,27 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
-import type { Job, Queue } from 'bullmq';
+import type { Queue } from 'bullmq';
 import { AuditService } from '../audit/audit.service';
 import type { RetryFailedJobDto } from './dto/platform-core.dto';
 
-type QueueCounts = Partial<Record<'waiting' | 'active' | 'completed' | 'failed' | 'delayed', number>>;
+type QueueCounts = Partial<
+  Record<'waiting' | 'active' | 'completed' | 'failed' | 'delayed', number>
+>;
+
+type PlatformQueueHealth = {
+  name: string;
+  waiting: number;
+  active: number;
+  completed: number;
+  failed: number;
+  delayed: number;
+  paused: boolean;
+  workerHealth: 'healthy' | 'degraded' | 'unknown';
+};
 
 type PlatformFailedJobSummary = {
   id: string;
@@ -16,7 +33,8 @@ type PlatformFailedJobSummary = {
   data: unknown;
 };
 
-const SECRET_KEY_PATTERN = /(api[-_]?key|token|secret|password|credential|authorization|private[-_]?key)/i;
+const SECRET_KEY_PATTERN =
+  /(api[-_]?key|token|secret|password|credential|authorization|private[-_]?key)/i;
 const MAX_STRING_LENGTH = 500;
 const MAX_ARRAY_LENGTH = 25;
 const MAX_OBJECT_KEYS = 50;
@@ -42,12 +60,18 @@ export class PlatformQueuesService {
     ]);
   }
 
-  async getQueueHealth() {
-    const summaries = [];
+  async getQueueHealth(): Promise<PlatformQueueHealth[]> {
+    const summaries: PlatformQueueHealth[] = [];
 
     for (const [name, queue] of this.queues.entries()) {
       const [counts, paused, workers] = await Promise.all([
-        queue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed'),
+        queue.getJobCounts(
+          'waiting',
+          'active',
+          'completed',
+          'failed',
+          'delayed',
+        ),
         queue.isPaused(),
         this.getWorkersSafely(queue),
       ]);
@@ -60,7 +84,12 @@ export class PlatformQueuesService {
         failed: this.count(counts, 'failed'),
         delayed: this.count(counts, 'delayed'),
         paused,
-        workerHealth: workers === null ? 'unknown' : workers.length > 0 ? 'healthy' : 'degraded',
+        workerHealth:
+          workers === null
+            ? 'unknown'
+            : workers.length > 0
+              ? 'healthy'
+              : 'degraded',
       });
     }
 
@@ -97,7 +126,9 @@ export class PlatformQueuesService {
 
     const job = await queue.getJob(dto.jobId);
     if (!job) {
-      throw new NotFoundException(`Job ${dto.jobId} not found in queue ${dto.queueName}`);
+      throw new NotFoundException(
+        `Job ${dto.jobId} not found in queue ${dto.queueName}`,
+      );
     }
 
     const isFailed = await job.isFailed();
@@ -155,7 +186,9 @@ function sanitizeJobData(value: unknown, depth = 0): unknown {
   }
 
   if (typeof value === 'string') {
-    return value.length > MAX_STRING_LENGTH ? `${value.slice(0, MAX_STRING_LENGTH)}…` : value;
+    return value.length > MAX_STRING_LENGTH
+      ? `${value.slice(0, MAX_STRING_LENGTH)}…`
+      : value;
   }
 
   if (typeof value === 'number' || typeof value === 'boolean') {
@@ -163,14 +196,24 @@ function sanitizeJobData(value: unknown, depth = 0): unknown {
   }
 
   if (Array.isArray(value)) {
-    return value.slice(0, MAX_ARRAY_LENGTH).map((item) => sanitizeJobData(item, depth + 1));
+    return value
+      .slice(0, MAX_ARRAY_LENGTH)
+      .map((item) => sanitizeJobData(item, depth + 1));
   }
 
   if (typeof value === 'object') {
     const output: Record<string, unknown> = {};
-    for (const [key, nestedValue] of Object.entries(value as Record<string, unknown>).slice(0, MAX_OBJECT_KEYS)) {
-      output[key] = SECRET_KEY_PATTERN.test(key) ? '********' : sanitizeJobData(nestedValue, depth + 1);
+    const entries = Object.entries(value as Record<string, unknown>).slice(
+      0,
+      MAX_OBJECT_KEYS,
+    );
+
+    for (const [key, nestedValue] of entries) {
+      output[key] = SECRET_KEY_PATTERN.test(key)
+        ? '********'
+        : sanitizeJobData(nestedValue, depth + 1);
     }
+
     return output;
   }
 
