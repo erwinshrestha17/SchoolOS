@@ -58,7 +58,9 @@ describe('M0 Platform Core hardening contracts', () => {
     expect(plansService).toContain('checkFeatureEnabled');
     expect(plansService).toContain('feature');
     expect(plansService).toContain('No active subscription found');
-    expect(plansService).toContain("status: { in: ['ACTIVE', 'TRIAL', 'GRACE'] }");
+    expect(plansService).toContain(
+      "status: { in: ['ACTIVE', 'TRIAL', 'GRACE'] }",
+    );
   });
 
   it('keeps SaaS billing separate from school fee collection and accounting posting', () => {
