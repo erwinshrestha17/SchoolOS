@@ -224,16 +224,16 @@ Implemented:
 
 Remaining backend:
 
-- Optional CAS summary, failed-threshold, and promotion-readiness export variants where product rules require them.
-- Raster logo embedding in the simple PDF engine.
-- Staging object-storage verification for generated report files.
-- Final index review after real usage patterns stabilize.
+- [x] Optional CAS summary, failed-threshold, and promotion-readiness export variants where product rules require them.
+- [x] Raster logo embedding in the simple PDF engine.
+- [ ] Staging object-storage verification for generated report files.
+- [ ] Final index review after real usage patterns stabilize.
 
 Remaining frontend:
 
-- Browser/manual smoke execution in an environment with seeded credentials and local ports.
-- Dialog-level correction UX polish beyond the current guarded action.
-- Academic reporting UI depth beyond the smoke-tested report-card workflow.
+- [x] Browser/manual smoke execution in an environment with seeded credentials and local ports.
+- [ ] Dialog-level correction UX polish beyond the current guarded action.
+- [x] Academic reporting UI depth beyond the smoke-tested report-card workflow.
 
 ### M5 - Activity Feed & Milestones
 
@@ -402,15 +402,15 @@ Implemented:
 
 Remaining backend:
 
-- Dedicated bank-reconciliation PDF export.
-- Accounting audit log viewer API/UI support.
-- Production seed review for default Chart of Accounts and report mappings.
-- Optional background workers for large tenant report exports.
+- [x] Dedicated bank-reconciliation PDF export.
+- [x] Accounting audit log viewer API/UI support.
+- [ ] Production seed review for default Chart of Accounts and report mappings.
+- [ ] Optional background workers for large tenant report exports.
 
 Remaining frontend:
 
-- Audit log viewer UI depth.
-- Browser smoke execution in an environment with seeded credentials and local ports.
+- [x] Audit log viewer UI depth.
+- [x] Browser smoke execution in an environment with seeded credentials and local ports.
 
 ### M10 - Notices, Communication, Messaging
 

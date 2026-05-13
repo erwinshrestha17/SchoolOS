@@ -18,6 +18,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
 import type { AuthContext } from '../auth/auth.types';
+import { buildTableReportPdf } from '../common/pdf/simple-pdf';
 import { CommunicationsService } from '../communications/communications.service';
 import { ConfigService } from '../config/config.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -947,21 +948,52 @@ export class LibraryService {
       throw new NotFoundException('Library fine not found');
     }
 
-    const updated = await this.prisma.libraryFine.update({
-      where: { id: fineId },
-      data: {
-        ...(dto.status !== undefined ? { status: dto.status } : {}),
-        ...(dto.waivedAmount !== undefined
-          ? { waivedAmount: new Prisma.Decimal(dto.waivedAmount) }
-          : {}),
-        ...(dto.waiverReason !== undefined
-          ? { waiverReason: dto.waiverReason }
-          : {}),
-        ...(dto.correctionReason !== undefined
-          ? { correctionReason: dto.correctionReason }
-          : {}),
-        ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const u = await tx.libraryFine.update({
+        where: { id: fineId },
+        data: {
+          ...(dto.status !== undefined ? { status: dto.status } : {}),
+          ...(dto.waivedAmount !== undefined
+            ? { waivedAmount: new Prisma.Decimal(dto.waivedAmount) }
+            : {}),
+          ...(dto.waiverReason !== undefined
+            ? { waiverReason: dto.waiverReason }
+            : {}),
+          ...(dto.correctionReason !== undefined
+            ? { correctionReason: dto.correctionReason }
+            : {}),
+          ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+        },
+        include: { issue: true },
+      });
+
+      if (u.status === 'WAIVED' && u.waivedAmount.gt(0) && u.issue.invoiceId && u.issue.borrowerStudentId) {
+        const waiver = await tx.feeWaiver.create({
+          data: {
+            tenantId: actor.tenantId,
+            studentId: u.issue.borrowerStudentId,
+            invoiceId: u.issue.invoiceId,
+            amount: u.waivedAmount,
+            reason: u.waiverReason ?? 'Library fine waiver',
+            approvedById: actor.userId,
+            status: 'APPROVED',
+          },
+        });
+
+        await this.accountingPostingService.postFeeWaiver(
+          {
+            tenantId: actor.tenantId,
+            waiverId: waiver.id,
+            studentId: waiver.studentId,
+            invoiceId: waiver.invoiceId,
+            amount: waiver.amount,
+            reason: waiver.reason,
+          },
+          actor,
+          tx,
+        );
+      }
+      return u;
     });
 
     await this.auditService.record({
@@ -1056,6 +1088,69 @@ export class LibraryService {
     });
 
     return { copy, history: issues };
+  }
+
+  async exportPopularBooks(actor: AuthContext) {
+    const report = await this.getPopularBooksReport(actor);
+    const rows = report.items.map((item) => ({
+      'Book Title': item.book?.title || 'N/A',
+      Author: item.book?.author || 'N/A',
+      Category: item.book?.subjectCategory || 'N/A',
+      'Issue Count': item.issueCount,
+    }));
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: actor.tenantId },
+    });
+
+    return {
+      pdf: buildTableReportPdf({
+        schoolName: tenant?.name || 'SchoolOS',
+        title: 'Popular Books Report',
+        rows,
+      }),
+      fileName: 'Popular_Books_Report.pdf',
+    };
+  }
+
+  async exportOverdueBooks(actor: AuthContext) {
+    const overdue = await this.prisma.libraryIssue.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        status: LibraryIssueStatus.ISSUED,
+        dueAt: { lt: new Date() },
+      },
+      include: {
+        copy: { include: { book: true } },
+        borrowerStudent: true,
+        borrowerStaff: true,
+      },
+    });
+
+    const rows = overdue.map((issue) => ({
+      Book: issue.copy.book.title,
+      'Copy Barcode': issue.copy.barcode,
+      Borrower: issue.borrowerStudent
+        ? `${issue.borrowerStudent.firstNameEn} ${issue.borrowerStudent.lastNameEn}`
+        : issue.borrowerStaff?.firstName || 'Unknown',
+      'Due Date': issue.dueAt.toISOString().slice(0, 10),
+      'Days Overdue': Math.floor(
+        (new Date().getTime() - issue.dueAt.getTime()) / (1000 * 3600 * 24),
+      ),
+    }));
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: actor.tenantId },
+    });
+
+    return {
+      pdf: buildTableReportPdf({
+        schoolName: tenant?.name || 'SchoolOS',
+        title: 'Overdue Books Report',
+        rows,
+      }),
+      fileName: 'Overdue_Books_Report.pdf',
+    };
   }
 
   async resolveQrBorrower(actor: AuthContext, token: string) {

@@ -1428,7 +1428,7 @@ export class AccountingPostingService {
         status: JournalEntryStatus.POSTED,
         narration: input.note ?? `Canteen sale ${input.saleId}`,
         sourceModule: 'CANTEEN',
-        sourceType: JournalSourceType.FEE_PAYMENT, // Reusing FeePayment for sale revenue for now or add CANTEEN_SALE to enum if possible
+        sourceType: JournalSourceType.FEE_PAYMENT,
         sourceId: input.saleId,
         postingType: 'SALE',
         createdById: actor.userId,
@@ -1439,6 +1439,87 @@ export class AccountingPostingService {
             lineNumber: i + 1,
             debit: l.side === JournalLineSide.DEBIT ? l.amount : 0,
             credit: l.side === JournalLineSide.CREDIT ? l.amount : 0,
+          })),
+        },
+      },
+    });
+  }
+
+  async postCanteenReversal(
+    input: {
+      tenantId: string;
+      originalTransactionId: string;
+      reversalTransactionId: string;
+      amount: Prisma.Decimal;
+      reason: string;
+    },
+    actor: AuthContext,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const entryDate = new Date();
+    const period = await this.ensurePostingPeriodIsOpen(
+      tx,
+      input.tenantId,
+      entryDate,
+    );
+
+    const revenueAccount = await this.ensureAccount(tx, input.tenantId, {
+      code: '4100',
+      name: 'Canteen Revenue',
+      type: ChartAccountType.REVENUE,
+    });
+
+    const liabilityAccount = await this.ensureAccount(tx, input.tenantId, {
+      code: '2400',
+      name: 'Canteen Wallet Liability',
+      type: ChartAccountType.LIABILITY,
+    });
+
+    const lines = [
+      {
+        tenantId: input.tenantId,
+        chartAccountId: revenueAccount.id,
+        side: JournalLineSide.DEBIT,
+        amount: input.amount,
+        description: `Canteen sale reversal (Original: ${input.originalTransactionId})`,
+      },
+      {
+        tenantId: input.tenantId,
+        chartAccountId: liabilityAccount.id,
+        side: JournalLineSide.CREDIT,
+        amount: input.amount,
+        description: `Canteen wallet credit via reversal: ${input.reversalTransactionId}`,
+      },
+    ];
+
+    this.ensureBalanced(lines);
+
+    return tx.journalEntry.create({
+      data: {
+        tenantId: input.tenantId,
+        fiscalYearId: period?.fiscalYearId ?? null,
+        fiscalPeriodId: period?.id ?? null,
+        entryNumber: await this.generateJournalEntryNumber(
+          tx,
+          input.tenantId,
+          period?.fiscalYearId ?? null,
+          entryDate,
+        ),
+        entryDate,
+        status: JournalEntryStatus.POSTED,
+        narration: `Canteen sale reversal: ${input.reason}`,
+        sourceModule: 'CANTEEN',
+        sourceType: JournalSourceType.ADJUSTMENT,
+        sourceId: input.reversalTransactionId,
+        postingType: 'SALE_REVERSAL',
+        createdById: actor.userId,
+        postedAt: new Date(),
+        lines: {
+          create: lines.map((line, index) => ({
+            ...line,
+            lineNumber: index + 1,
+            debit: line.side === JournalLineSide.DEBIT ? line.amount : 0,
+            credit: line.side === JournalLineSide.CREDIT ? line.amount : 0,
           })),
         },
       },

@@ -115,6 +115,16 @@ export function BookSelector({
                     placeholder="Search catalogue..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (filteredItems.length === 1) {
+                          onSelect(filteredItems[0].id);
+                          setIsOpen(false);
+                          setSearch('');
+                        }
+                      }
+                    }}
                   />
                 </div>
               </div>

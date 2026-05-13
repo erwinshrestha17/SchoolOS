@@ -9,6 +9,7 @@ import {
   Prisma,
   StudentLifecycleStatus,
   StudentQrStatus,
+  TransportEnrollmentStatus,
 } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import QRCode from 'qrcode';
@@ -424,8 +425,49 @@ export class StudentQrService {
           canPurchase: balance.gt(0),
         };
       }
-      case StudentQrResolvePurpose.TRANSPORT:
-      case StudentQrResolvePurpose.ATTENDANCE:
+      case StudentQrResolvePurpose.TRANSPORT: {
+        const assignment = await this.prisma.transportStudentAssignment.findFirst({
+          where: {
+            tenantId,
+            studentId: student.id,
+            status: TransportEnrollmentStatus.ACTIVE,
+          },
+          include: {
+            route: true,
+            stop: true,
+          },
+        });
+
+        return {
+          ...baseResponse,
+          hasActiveTransport: !!assignment,
+          route: assignment?.route.name || null,
+          stop: assignment?.stop.name || null,
+        };
+      }
+      case StudentQrResolvePurpose.ATTENDANCE: {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const record = await this.prisma.attendanceRecord.findFirst({
+          where: {
+            tenantId,
+            studentId: student.id,
+            attendanceSession: {
+              attendanceDate: {
+                gte: today,
+                lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
+              },
+            },
+          },
+        });
+
+        return {
+          ...baseResponse,
+          attendanceToday: record?.status || 'NOT_MARKED',
+          markedAt: record?.createdAt.toISOString() || null,
+        };
+      }
       case StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP:
       default:
         return baseResponse;

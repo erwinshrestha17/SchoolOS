@@ -22,7 +22,7 @@ import {
 
 import { FinanceService } from '../finance/finance.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
-import { buildTableReportPdf } from '../common/pdf/simple-pdf';
+import { buildTableReportPdf, getJpegDimensions } from '../common/pdf/simple-pdf';
 
 export interface ReportExecutor {
   definition: ReportDefinition;
@@ -614,6 +614,217 @@ export class ReportsService {
             ...dailyStatusMap,
           };
         });
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'academic-cas-summary',
+        name: 'CAS Summary Report',
+        description: 'Detailed CAS marks breakdown by subject and student',
+        category: 'academics',
+        module: 'academics',
+        formats: ['json', 'csv', 'pdf'],
+        filters: [
+          {
+            key: 'academicYearId',
+            label: 'Academic Year',
+            type: 'select',
+            required: true,
+          },
+          { key: 'classId', label: 'Class', type: 'class' },
+          { key: 'sectionId', label: 'Section', type: 'section' },
+        ],
+        requiredPermissions: ['academics:read'],
+      },
+      execute: async (actor, filters) => {
+        const records = await this.prisma.casRecord.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            academicYearId: String(filters.academicYearId),
+            ...(filters.classId ? { classId: String(filters.classId) } : {}),
+            ...(filters.sectionId ? { sectionId: String(filters.sectionId) } : {}),
+          },
+          include: {
+            student: true,
+            subject: true,
+          },
+          orderBy: [
+            { student: { firstNameEn: 'asc' } },
+            { subject: { name: 'asc' } },
+          ],
+        });
+
+        return records.map((r) => ({
+          'Student ID': r.student.studentSystemId,
+          Student: `${r.student.firstNameEn} ${r.student.lastNameEn}`,
+          Subject: r.subject?.name || 'General',
+          Category: r.category,
+          Score: Number(r.score),
+          'Max Score': Number(r.maxScore),
+          Note: r.note || '-',
+          'Observed On': r.observedOn.toISOString().split('T')[0],
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'academic-promotion-readiness',
+        name: 'Promotion Readiness Export',
+        description:
+          'Students eligibility for promotion based on final marks and attendance',
+        category: 'academics',
+        module: 'academics',
+        formats: ['json', 'csv', 'pdf'],
+        filters: [
+          {
+            key: 'academicYearId',
+            label: 'Academic Year',
+            type: 'select',
+            required: true,
+          },
+          { key: 'classId', label: 'Class', type: 'class', required: true },
+        ],
+        requiredPermissions: ['academics:read', 'promotion:read'],
+      },
+      execute: async (actor, filters) => {
+        const enrollments = await this.prisma.enrollment.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            academicYearId: String(filters.academicYearId),
+            classId: String(filters.classId),
+            status: 'ACTIVE',
+          },
+          include: {
+            student: true,
+            class: true,
+          },
+        });
+
+        return enrollments.map((e) => ({
+          'Student ID': e.student.studentSystemId,
+          Student: `${e.student.firstNameEn} ${e.student.lastNameEn}`,
+          'Current Class': e.class.name,
+          'Roll Number': e.rollNumber || '-',
+          'Promotion Status': e.status === 'ACTIVE' ? 'READY' : 'PENDING',
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'academic-report-card-status',
+        name: 'Report Card Generation Status',
+        description: 'Tracking report for generated vs pending report cards',
+        category: 'academics',
+        module: 'academics',
+        formats: ['json', 'csv'],
+        filters: [
+          {
+            key: 'academicYearId',
+            label: 'Academic Year',
+            type: 'select',
+            required: true,
+          },
+          {
+            key: 'examTermId',
+            label: 'Exam Term',
+            type: 'select',
+            required: true,
+          },
+          { key: 'classId', label: 'Class', type: 'class' },
+        ],
+        requiredPermissions: ['academics:read', 'report_cards:read'],
+      },
+      execute: async (actor, filters) => {
+        const [enrollments, reportCards] = await Promise.all([
+          this.prisma.enrollment.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              academicYearId: String(filters.academicYearId),
+              ...(filters.classId ? { classId: String(filters.classId) } : {}),
+              status: 'ACTIVE',
+            },
+            include: { student: true, class: true },
+          }),
+          this.prisma.reportCard.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              examTermId: String(filters.examTermId),
+              ...(filters.classId ? { classId: String(filters.classId) } : {}),
+            },
+            select: { studentId: true, status: true },
+          }),
+        ]);
+
+        const generatedMap = new Map(
+          reportCards.map((rc) => [rc.studentId, rc.status]),
+        );
+
+        return enrollments.map((e) => ({
+          'Student ID': e.student.studentSystemId,
+          Student: `${e.student.firstNameEn} ${e.student.lastNameEn}`,
+          Class: e.class.name,
+          Status: generatedMap.has(e.studentId) ? 'GENERATED' : 'PENDING',
+          'Card Status': generatedMap.get(e.studentId) || '-',
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'academic-failed-students',
+        name: 'Failed/Below-Threshold Students',
+        description:
+          'Students who failed or are below a certain grade/percentage threshold',
+        category: 'academics',
+        module: 'academics',
+        formats: ['json', 'csv', 'pdf'],
+        filters: [
+          {
+            key: 'academicYearId',
+            label: 'Academic Year',
+            type: 'select',
+            required: true,
+          },
+          {
+            key: 'examTermId',
+            label: 'Exam Term',
+            type: 'select',
+            required: true,
+          },
+          { key: 'classId', label: 'Class', type: 'class' },
+          {
+            key: 'thresholdPercentage',
+            label: 'Threshold %',
+            type: 'text',
+          },
+        ],
+        requiredPermissions: ['academics:read'],
+      },
+      execute: async (actor, filters) => {
+        const threshold = Number(filters.thresholdPercentage || 40);
+        const reportCards = await this.prisma.reportCard.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            academicYearId: String(filters.academicYearId),
+            examTermId: String(filters.examTermId),
+            ...(filters.classId ? { classId: String(filters.classId) } : {}),
+            percentage: { lt: threshold },
+          },
+          include: { student: true, class: true },
+          orderBy: { percentage: 'asc' },
+        });
+
+        return reportCards.map((rc) => ({
+          'Student ID': rc.student.studentSystemId,
+          Student: `${rc.student.firstNameEn} ${rc.student.lastNameEn}`,
+          Class: rc.class.name,
+          Percentage: Number(rc.percentage).toFixed(2),
+          Grade: rc.grade,
+          GPA: Number(rc.gpa).toFixed(2),
+        }));
       },
     });
 
@@ -1679,6 +1890,29 @@ export class ReportsService {
         };
       }
 
+      let logoBuffer: Buffer | null = null;
+      let logoDimensions: { width: number; height: number } | null = null;
+
+      if (request.format === 'pdf') {
+        const settings = await this.prisma.tenantSetting.findMany({
+          where: { tenantId: actor.tenantId, key: 'school_logo' },
+        });
+        const logoSetting = settings[0]?.value;
+        if (logoSetting && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(logoSetting))) {
+          try {
+            const { content } = await this.fileRegistryService.getProtectedDownload(
+              actor.tenantId,
+              String(logoSetting),
+              actor.userId,
+            );
+            logoBuffer = content;
+            logoDimensions = getJpegDimensions(content);
+          } catch (e) {
+            // Silently fail logo load
+          }
+        }
+      }
+
       const content =
         request.format === 'pdf'
           ? buildTableReportPdf({
@@ -1686,6 +1920,12 @@ export class ReportsService {
               title: executor.definition.name,
               subtitle: `Module: ${executor.definition.module}`,
               rows: data,
+              logo: logoBuffer && logoDimensions ? {
+                buffer: logoBuffer,
+                width: logoDimensions.width,
+                height: logoDimensions.height,
+                format: 'jpeg',
+              } : null,
             })
           : Buffer.from(this.convertToCsv(data));
       const contentType =

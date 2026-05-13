@@ -3,8 +3,10 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  MessageEvent,
   NotFoundException,
 } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import {
   AudienceType,
   ConsentType,
@@ -914,17 +916,12 @@ export class TransportService {
       });
     }
 
-    await this.auditService.record({
-      action: 'location_update',
-      resource: 'transport_trip',
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      resourceId: trip.id,
-      after: {
-        driverAssignmentId: trip.driverAssignmentId,
-        recordedAt: payload.recordedAt,
-      },
-    });
+    await this.redisService
+      .getClient()
+      .publish(
+        this.locationUpdateChannel(actor.tenantId, trip.id),
+        JSON.stringify(payload),
+      );
 
     return payload;
   }
@@ -959,6 +956,31 @@ export class TransportService {
       ...(latest.heading ? { heading: latest.heading.toNumber() } : {}),
       recordedAt: latest.recordedAt.toISOString(),
     };
+  }
+
+  subscribeToTripLocation(
+    tripId: string,
+    actor: AuthContext,
+  ): Observable<MessageEvent> {
+    const channel = this.locationUpdateChannel(actor.tenantId, tripId);
+    const subClient = this.redisService.getClient().duplicate();
+
+    return new Observable((subscriber) => {
+      subClient.subscribe(channel, (err) => {
+        if (err) subscriber.error(err);
+      });
+
+      subClient.on('message', (ch, message) => {
+        if (ch === channel) {
+          subscriber.next({ data: JSON.parse(message) } as MessageEvent);
+        }
+      });
+
+      return () => {
+        subClient.unsubscribe(channel);
+        subClient.quit();
+      };
+    });
   }
 
   listLogs(actor: AuthContext, routeId?: string) {
@@ -1616,6 +1638,10 @@ export class TransportService {
 
   private latestLocationKey(tenantId: string, tripId: string) {
     return `transport:${tenantId}:trip:${tripId}:latest-location`;
+  }
+
+  private locationUpdateChannel(tenantId: string, tripId: string) {
+    return `transport:${tenantId}:trip:${tripId}:location-updates`;
   }
 }
 

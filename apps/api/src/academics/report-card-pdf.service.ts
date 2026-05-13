@@ -9,6 +9,7 @@ import { AuditService } from '../audit/audit.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { GradeCalculatorService } from './grade-calculator.service';
+import { buildReportCardPdf, getJpegDimensions } from '../common/pdf/simple-pdf';
 
 type ReportCardWithRelations = Prisma.ReportCardGetPayload<{
   include: {
@@ -163,31 +164,67 @@ export class ReportCardPdfService {
 
     const settingMap = new Map(settings.map((s) => [s.key, String(s.value)]));
     const primaryGuardian = reportCard.student.guardianLinks[0]?.guardian;
-    const pdf = buildPolishedReportCardPdf({
+
+    let logoBuffer: Buffer | null = null;
+    let logoDimensions: { width: number; height: number } | null = null;
+
+    const logoSetting = settingMap.get('school_logo');
+    if (logoSetting && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(logoSetting))) {
+      try {
+        const { content } = await this.fileRegistryService.getProtectedDownload(
+          actor.tenantId,
+          String(logoSetting),
+          actor.userId,
+        );
+        logoBuffer = content;
+        logoDimensions = getJpegDimensions(content);
+      } catch (e) {
+        // Silently fail logo load to prevent report card generation failure
+      }
+    }
+
+    const pdf = buildReportCardPdf({
       schoolName:
         settingMap.get('school_name') ?? tenant?.name ?? 'SchoolOS School',
-      schoolLogo: settingMap.get('school_logo') ?? null,
-      address: settingMap.get('school_address') ?? null,
-      contact: [settingMap.get('school_phone'), settingMap.get('school_email')]
-        .filter(Boolean)
-        .join(' | '),
-      principalName: settingMap.get('principal_name') ?? null,
-      footerText: settingMap.get('report_card_footer_text') ?? null,
       panNumber: tenant?.panNumber ?? null,
-      reportCard,
-      guardianName: primaryGuardian?.fullName ?? null,
-      attendance: {
-        totalDays: attendanceSessions,
-        present: attendanceRecords
-          .filter((r) => ['PRESENT', 'LATE'].includes(String(r.status)))
-          .reduce((sum, r) => sum + r._count._all, 0),
-        absent: attendanceRecords
-          .filter((r) =>
-            ['ABSENT', 'UNEXCUSED_LEAVE'].includes(String(r.status)),
-          )
-          .reduce((sum, r) => sum + r._count._all, 0),
+      examName: reportCard.examTerm.name,
+      academicYear: reportCard.academicYear.name,
+      student: {
+        id: reportCard.student.studentSystemId,
+        name: studentName,
+        className: reportCard.class.name,
+        sectionName: reportCard.section?.name,
+        rollNumber: reportCard.student.rollNumber,
       },
-      subjects: this.buildSubjectRows(marks),
+      subjects: this.buildSubjectRows(marks).map(s => ({
+        name: s.subject,
+        theory: s.components.find(c => c.type === 'THEORY') ? {
+          max: s.components.filter(c => c.type === 'THEORY').reduce((sum, c) => sum + c.max, 0),
+          obtained: s.components.filter(c => c.type === 'THEORY').reduce((sum, c) => sum + c.obtained, 0),
+          grade: s.grade,
+        } : undefined,
+        practical: s.components.find(c => c.type === 'PRACTICAL') ? {
+          max: s.components.filter(c => c.type === 'PRACTICAL').reduce((sum, c) => sum + c.max, 0),
+          obtained: s.components.filter(c => c.type === 'PRACTICAL').reduce((sum, c) => sum + c.obtained, 0),
+          grade: s.grade,
+        } : undefined,
+        totalGrade: s.grade,
+        gradePoint: s.grade === 'NG' ? 0 : 4, // Placeholder for actual GPA calc
+      })),
+      summary: {
+        totalMarks: Number(reportCard.totalMarks),
+        maxMarks: Number(reportCard.maxMarks),
+        percentage: Number(reportCard.percentage),
+        finalGrade: reportCard.grade,
+        finalGpa: Number(reportCard.gpa),
+        remarks: reportCard.remarks,
+      },
+      logo: logoBuffer && logoDimensions ? {
+        buffer: logoBuffer,
+        width: logoDimensions.width,
+        height: logoDimensions.height,
+        format: 'jpeg',
+      } : null,
     });
 
     if (!reportCard.fileId) {
@@ -303,297 +340,3 @@ export class ReportCardPdfService {
   }
 }
 
-function buildPolishedReportCardPdf(input: {
-  schoolName: string;
-  schoolLogo?: string | null;
-  address?: string | null;
-  contact?: string | null;
-  principalName?: string | null;
-  footerText?: string | null;
-  panNumber?: string | null;
-  reportCard: ReportCardWithRelations;
-  guardianName?: string | null;
-  attendance?: { totalDays: number; present: number; absent: number };
-  subjects: ReportPdfSubject[];
-}) {
-  const { reportCard } = input;
-  const fallbackName =
-    `${reportCard.student.firstNameEn ?? ''} ${reportCard.student.lastNameEn ?? ''}`.trim();
-
-  const studentName =
-    fallbackName.length > 0 ? fallbackName : reportCard.student.studentSystemId;
-
-  const parts: string[] = [
-    '0.7 w',
-    '36 36 540 720 re S',
-    '0.25 w',
-    '44 44 524 704 re S',
-    input.schoolLogo ? '54 704 42 34 re S' : '',
-    input.schoolLogo ? text('LOGO', 63, 721, 9, 'F2') : '',
-    text(input.schoolName, input.schoolLogo ? 108 : 54, 724, 18, 'F2'),
-    input.address
-      ? text(input.address, input.schoolLogo ? 108 : 54, 708, 8, 'F1')
-      : '',
-    input.contact
-      ? text(input.contact, input.schoolLogo ? 108 : 54, 696, 8, 'F1')
-      : '',
-    input.panNumber
-      ? text(
-          `PAN: ${input.panNumber}`,
-          input.schoolLogo ? 108 : 54,
-          684,
-          8,
-          'F1',
-        )
-      : '',
-    text('PROGRESS REPORT CARD', 376, 724, 14, 'F2'),
-    text(
-      `${reportCard.examTerm.name} | ${reportCard.academicYear.name}`,
-      376,
-      708,
-      9,
-      'F1',
-    ),
-    text(
-      `Status: ${reportCard.status} | Version ${reportCard.version}`,
-      376,
-      692,
-      8,
-      'F2',
-    ),
-    '36 680 m 576 680 l S',
-
-    labelValue('Student', studentName, 54, 656),
-    labelValue('Student ID', reportCard.student.studentSystemId, 350, 656),
-    labelValue('Class', reportCard.class.name, 54, 632),
-    labelValue('Section', reportCard.section?.name ?? 'N/A', 184, 632),
-    labelValue(
-      'Roll No.',
-      String(reportCard.student.rollNumber ?? '—'),
-      314,
-      632,
-    ),
-    labelValue('Guardian', input.guardianName ?? 'N/A', 54, 608),
-    labelValue(
-      'Generated',
-      reportCard.updatedAt.toISOString().slice(0, 10),
-      444,
-      608,
-    ),
-    '36 588 m 576 588 l S',
-
-    text('SUBJECT', 54, 570, 8, 'F2'),
-    text('COMPONENTS', 206, 570, 8, 'F2'),
-    text('OBTAINED', 390, 570, 8, 'F2'),
-    text('MAX', 456, 570, 8, 'F2'),
-    text('GRADE', 510, 570, 8, 'F2'),
-    '36 560 m 576 560 l S',
-  ];
-
-  let y = 542;
-  for (const subject of input.subjects.slice(0, 12)) {
-    const componentText = subject.components
-      .map(
-        (component) =>
-          `${component.name} ${component.obtained}/${component.max}`,
-      )
-      .join(', ');
-
-    parts.push(
-      text(truncate(subject.subject, 28), 54, y, 8, 'F1'),
-      text(truncate(componentText || 'No marks entered', 34), 206, y, 8, 'F1'),
-      text(subject.totalObtained.toFixed(1), 398, y, 8, 'F1'),
-      text(subject.totalMax.toFixed(1), 462, y, 8, 'F1'),
-      text(subject.grade, 518, y, 8, subject.grade === 'NG' ? 'F2' : 'F1'),
-    );
-    y -= 18;
-
-    if (y < 306) {
-      parts.push(
-        text(
-          'Additional subjects omitted from this one-page preview.',
-          54,
-          y,
-          8,
-          'F1',
-        ),
-      );
-      y -= 18;
-      break;
-    }
-  }
-
-  if (input.subjects.length === 0) {
-    parts.push(
-      text('No marks available for this report card.', 54, y, 9, 'F1'),
-    );
-    y -= 20;
-  }
-
-  y -= 8;
-  parts.push(
-    `36 ${y + 12} m 576 ${y + 12} l S`,
-    text('RESULT SUMMARY', 54, y - 8, 10, 'F2'),
-    labelValue(
-      'Total',
-      `${Number(reportCard.totalMarks).toFixed(2)} / ${Number(reportCard.maxMarks).toFixed(2)}`,
-      54,
-      y - 34,
-    ),
-    labelValue(
-      'Percentage',
-      `${Number(reportCard.percentage).toFixed(2)}%`,
-      214,
-      y - 34,
-    ),
-    labelValue('Final Grade', reportCard.grade, 374, y - 34),
-    labelValue('GPA', Number(reportCard.gpa).toFixed(2), 484, y - 34),
-  );
-
-  if (input.attendance && input.attendance.totalDays > 0) {
-    parts.push(
-      text('ATTENDANCE', 54, y - 62, 9, 'F2'),
-      labelValue(
-        'Present',
-        `${input.attendance.present} / ${input.attendance.totalDays}`,
-        54,
-        y - 84,
-      ),
-      labelValue('Absent', input.attendance.absent, 184, y - 84),
-      labelValue(
-        'Attendance %',
-        `${((input.attendance.present / input.attendance.totalDays) * 100).toFixed(1)}%`,
-        314,
-        y - 84,
-      ),
-    );
-  }
-
-  if (reportCard.remarks) {
-    parts.push(
-      text('Remarks', 54, y - 124, 9, 'F2'),
-      ...wrapPdfLine(reportCard.remarks, 54, y - 140, 470, 8),
-    );
-  }
-
-  parts.push(
-    '54 118 m 190 118 l S',
-    text('Class Teacher', 82, 102, 9, 'F1'),
-    '238 118 m 374 118 l S',
-    text('Exam Coordinator', 268, 102, 9, 'F1'),
-    '422 118 m 540 118 l S',
-    text(input.principalName ?? 'Principal', 442, 102, 9, 'F1'),
-    '36 82 m 576 82 l S',
-    text(
-      input.footerText ??
-        'This report card is generated by SchoolOS. Verify with the school office for official use.',
-      54,
-      64,
-      7,
-      'F1',
-    ),
-    text(
-      `Printed: ${reportCard.updatedAt.toISOString().replace('T', ' ').slice(0, 19)}`,
-      54,
-      50,
-      7,
-      'F1',
-    ),
-  );
-
-  return buildPdf(parts.filter(Boolean).join('\n'));
-}
-
-function labelValue(
-  label: string,
-  value: string | number | null | undefined,
-  x: number,
-  y: number,
-) {
-  return [
-    text(label.toUpperCase(), x, y, 6, 'F2'),
-    text(value ?? 'N/A', x, y - 12, 9, 'F1'),
-  ].join('\n');
-}
-
-function truncate(value: string, maxLength: number) {
-  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value;
-}
-
-function escapePdfText(value: string | number | null | undefined) {
-  return String(value ?? 'N/A')
-    .replace(/\\/g, '\\\\')
-    .replace(/\(/g, '\\(')
-    .replace(/\)/g, '\\)');
-}
-
-function text(
-  value: string | number | null | undefined,
-  x: number,
-  y: number,
-  size: number,
-  font: 'F1' | 'F2',
-) {
-  return `BT /${font} ${size} Tf ${x} ${y} Td (${escapePdfText(value)}) Tj ET`;
-}
-
-function wrapPdfLine(
-  value: string,
-  x: number,
-  y: number,
-  width: number,
-  size: number,
-) {
-  const maxChars = Math.max(32, Math.floor(width / (size * 0.52)));
-  const words = value.split(/\s+/);
-  const lines: string[] = [];
-  let current = '';
-
-  for (const word of words) {
-    const next = current ? `${current} ${word}` : word;
-    if (next.length > maxChars && current) {
-      lines.push(current);
-      current = word;
-      continue;
-    }
-    current = next;
-  }
-
-  if (current) lines.push(current);
-  return lines
-    .slice(0, 4)
-    .map((line, index) => text(line, x, y - index * 12, size, 'F1'));
-}
-
-function buildPdf(content: string) {
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>',
-    `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`,
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
-  ];
-
-  const chunks = ['%PDF-1.4\n'];
-  const offsets = [0];
-
-  for (const [index, object] of objects.entries()) {
-    offsets.push(Buffer.byteLength(chunks.join('')));
-    chunks.push(`${index + 1} 0 obj\n${object}\nendobj\n`);
-  }
-
-  const xrefOffset = Buffer.byteLength(chunks.join(''));
-  chunks.push(`xref\n0 ${objects.length + 1}\n`);
-  chunks.push('0000000000 65535 f \n');
-
-  for (const offset of offsets.slice(1)) {
-    chunks.push(`${String(offset).padStart(10, '0')} 00000 n \n`);
-  }
-
-  chunks.push(
-    `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`,
-  );
-
-  return Buffer.from(chunks.join(''));
-}

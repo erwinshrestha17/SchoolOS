@@ -6,13 +6,14 @@ import { api } from '../../lib/api';
 import { SectionCard } from '../ui/section-card';
 import { ReportTable } from './report-table';
 import { Select } from '../ui/select';
-import { Search, History } from 'lucide-react';
-
+import { Search, History, Eye } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 
 export function AccountingAuditWorkspace() {
   const [resourceFilter, setResourceFilter] = useState<string>('');
   const [actionFilter, setActionFilter] = useState<string>('');
   const [page, setPage] = useState(1);
+  const [selectedLog, setSelectedLog] = useState<any>(null);
 
   const query = useQuery({
     queryKey: ['accounting-audit-trail', resourceFilter, actionFilter, page],
@@ -75,7 +76,9 @@ export function AccountingAuditWorkspace() {
         </div>
 
         {query.isLoading ? (
-          <div className="py-20 text-center text-slate-500">Loading audit trail...</div>
+          <div className="py-20 text-center text-slate-500">
+            Loading audit trail...
+          </div>
         ) : query.data?.items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 rounded-[2rem] bg-slate-50 border border-dashed border-slate-200 text-center">
             <div className="h-16 w-16 rounded-3xl bg-slate-100 flex items-center justify-center text-slate-400 mb-4">
@@ -89,7 +92,13 @@ export function AccountingAuditWorkspace() {
         ) : (
           <div className="space-y-4">
             <ReportTable
-              headers={['Timestamp', 'Action', 'Resource', 'Actor ID', 'Details']}
+              headers={[
+                'Timestamp',
+                'Action',
+                'Resource',
+                'Actor ID',
+                'Details',
+              ]}
               rows={(query.data?.items ?? []).map((log: any) => ({
                 id: log.id,
                 cells: [
@@ -111,9 +120,13 @@ export function AccountingAuditWorkspace() {
                   { value: log.userId || 'SYSTEM' },
                   {
                     value: (
-                      <div className="text-xs max-w-xs overflow-hidden text-ellipsis whitespace-nowrap">
-                        {log.after ? JSON.stringify(log.after) : '-'}
-                      </div>
+                      <button
+                        onClick={() => setSelectedLog(log)}
+                        className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 hover:bg-slate-200"
+                      >
+                        <Eye size={12} />
+                        View Diff
+                      </button>
                     ),
                   },
                 ],
@@ -123,15 +136,17 @@ export function AccountingAuditWorkspace() {
             <div className="flex justify-between items-center px-4">
               <button
                 disabled={page === 1}
-                onClick={() => setPage(p => p - 1)}
+                onClick={() => setPage((p) => p - 1)}
                 className="px-4 py-2 text-sm font-semibold rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-50"
               >
                 Previous
               </button>
-              <span className="text-sm font-bold text-slate-500">Page {page}</span>
+              <span className="text-sm font-bold text-slate-500">
+                Page {page}
+              </span>
               <button
                 disabled={!query.data?.hasNextPage}
-                onClick={() => setPage(p => p + 1)}
+                onClick={() => setPage((p) => p + 1)}
                 className="px-4 py-2 text-sm font-semibold rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-50"
               >
                 Next
@@ -140,6 +155,63 @@ export function AccountingAuditWorkspace() {
           </div>
         )}
       </SectionCard>
+
+      <Dialog open={!!selectedLog} onOpenChange={() => setSelectedLog(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Audit Log Detail</DialogTitle>
+          </DialogHeader>
+          {selectedLog && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Action
+                  </label>
+                  <p className="font-bold text-slate-900">
+                    {selectedLog.action.toUpperCase()}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Resource
+                  </label>
+                  <p className="font-bold text-slate-900">
+                    {selectedLog.resource}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Before
+                  </label>
+                  <div className="rounded-2xl bg-slate-50 p-4 font-mono text-[10px] overflow-auto max-h-60 border border-slate-100">
+                    <pre>
+                      {selectedLog.before
+                        ? JSON.stringify(selectedLog.before, null, 2)
+                        : 'N/A'}
+                    </pre>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    After
+                  </label>
+                  <div className="rounded-2xl bg-slate-50 p-4 font-mono text-[10px] overflow-auto max-h-60 border border-slate-100">
+                    <pre>
+                      {selectedLog.after
+                        ? JSON.stringify(selectedLog.after, null, 2)
+                        : 'N/A'}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,14 +1,18 @@
 import {
-  Body,
   Controller,
   Get,
-  Header,
   Param,
-  Patch,
   Post,
+  Body,
+  Patch,
+  Delete,
   Query,
+  Sse,
+  Header,
+  MessageEvent,
   UseGuards,
 } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -322,6 +326,15 @@ export class TransportController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.transportService.getLatestTripLocation(tripId, auth);
+  }
+
+  @Sse('trips/:id/live')
+  @Permissions('transport:location:read')
+  streamTripLocation(
+    @Param('id') tripId: string,
+    @CurrentAuth() auth: AuthContext,
+  ): Observable<MessageEvent> {
+    return this.transportService.subscribeToTripLocation(tripId, auth);
   }
 
   @Get('logs')
