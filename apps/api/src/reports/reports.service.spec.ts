@@ -7,6 +7,7 @@ import { FinanceService } from '../finance/finance.service';
 import { AuthMethod } from '@prisma/client';
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 
 describe('ReportsService', () => {
   let service: ReportsService;
@@ -102,6 +103,12 @@ describe('ReportsService', () => {
                 },
               ]),
             },
+            reportExport: {
+              create: jest.fn(),
+              findMany: jest.fn().mockResolvedValue([]),
+              count: jest.fn().mockResolvedValue(0),
+              findFirst: jest.fn(),
+            },
           },
         },
         {
@@ -137,6 +144,15 @@ describe('ReportsService', () => {
           provide: AuditService,
           useValue: {
             record: jest.fn(),
+          },
+        },
+        {
+          provide: FileRegistryService,
+          useValue: {
+            registerGeneratedFile: jest
+              .fn()
+              .mockResolvedValue({ id: 'file-1' }),
+            getProtectedDownload: jest.fn(),
           },
         },
         {

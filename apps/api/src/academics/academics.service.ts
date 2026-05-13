@@ -732,15 +732,35 @@ export class AcademicsService {
     });
   }
 
-  async listReportCards(actor: AuthContext) {
+  async listReportCards(
+    actor: AuthContext,
+    filters: {
+      academicYearId?: string;
+      examTermId?: string;
+      classId?: string;
+      sectionId?: string;
+      status?: string;
+    } = {},
+  ) {
     return this.prisma.reportCard.findMany({
-      where: { tenantId: actor.tenantId },
+      where: {
+        tenantId: actor.tenantId,
+        ...(filters.academicYearId
+          ? { academicYearId: filters.academicYearId }
+          : {}),
+        ...(filters.examTermId ? { examTermId: filters.examTermId } : {}),
+        ...(filters.classId ? { classId: filters.classId } : {}),
+        ...(filters.sectionId ? { sectionId: filters.sectionId } : {}),
+        ...(filters.status ? { status: filters.status as never } : {}),
+      },
       include: {
         academicYear: true,
         examTerm: true,
         student: true,
         class: true,
         section: true,
+        history: { orderBy: { version: 'desc' }, take: 3 },
+        correctionRequests: { orderBy: { createdAt: 'desc' }, take: 3 },
       },
       orderBy: [{ updatedAt: 'desc' }],
       take: 100,

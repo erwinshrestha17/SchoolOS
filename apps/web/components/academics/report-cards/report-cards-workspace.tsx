@@ -7,7 +7,7 @@ import { FilterBar } from '@/components/ui/filter-bar';
 import { Select, TextArea } from '@/components/ui/form-field';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
-import { FileText, Play, Download, Search, CheckCircle2, History } from 'lucide-react';
+import { FileText, Play, Download, Search, CheckCircle2, History, RotateCcw } from 'lucide-react';
 import { SectionCard } from '@/components/ui/section-card';
 import { StatCard } from '@/components/ui/stat-card';
 
@@ -18,6 +18,9 @@ export function ReportCardsWorkspace() {
   const [classId, setClassId] = useState('');
   const [sectionId, setSectionId] = useState('');
   const [remarks, setRemarks] = useState('');
+  const [selectedReportCardId, setSelectedReportCardId] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const academicYearsQuery = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
   const examsQuery = useQuery({ queryKey: ['exam-terms'], queryFn: api.listExamTerms });
@@ -43,24 +46,49 @@ export function ReportCardsWorkspace() {
     mutationFn: api.batchGenerateReportCards,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['report-cards'] });
-      alert('Report cards generation started');
+      setMessage('Report cards generated from locked marks.');
+      setError(null);
     },
-    onError: (error: any) => alert(error.message || 'Failed to generate report cards'),
+    onError: (error: any) => {
+      setError(error.message || 'Failed to generate report cards');
+      setMessage(null);
+    },
+  });
+
+  const historyQuery = useQuery({
+    queryKey: ['report-card-history', selectedReportCardId],
+    queryFn: () => api.listReportCardHistory(selectedReportCardId as string),
+    enabled: !!selectedReportCardId,
+  });
+
+  const regenerateMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      api.regenerateReportCard(id, { reason, republish: false }),
+    onSuccess: () => {
+      setMessage('Corrected report card regenerated as a new version.');
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ['report-cards'] });
+      queryClient.invalidateQueries({ queryKey: ['report-card-history'] });
+    },
+    onError: (err: any) => {
+      setError(err.message || 'Could not regenerate report card');
+      setMessage(null);
+    },
   });
 
   const handleGenerate = () => {
     if (!academicYearId || !examTermId || !classId) {
-      alert('Please select academic year, exam term, and class');
+      setError('Please select academic year, exam term, and class');
       return;
     }
 
     const studentIds = (studentsQuery.data as any[])?.map((s: any) => s.id) ?? [];
     if (studentIds.length === 0) {
-      alert('No students found in selected class/section');
+      setError('No students found in selected class/section');
       return;
     }
 
-    if (confirm(`Are you sure you want to generate report cards for ${studentIds.length} students? This will lock their marks and update their performance records.`)) {
+    if (confirm(`Generate report cards for ${studentIds.length} students from locked backend marks?`)) {
       generateMutation.mutate({
         academicYearId,
         examTermId,
@@ -69,6 +97,15 @@ export function ReportCardsWorkspace() {
         lock: true,
       });
     }
+  };
+
+  const handleRegenerate = (id: string) => {
+    const reason = window.prompt('Reason for correcting/regenerating this locked report card');
+    if (!reason?.trim()) {
+      setError('A correction reason is required.');
+      return;
+    }
+    regenerateMutation.mutate({ id, reason });
   };
 
   const openPdf = async (reportCardId: string) => {
@@ -118,24 +155,46 @@ export function ReportCardsWorkspace() {
         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${
           row.status === 'LOCKED' ? 'bg-indigo-50 text-indigo-700' : 'bg-amber-50 text-amber-700'
         }`}>
-          {row.status}
+          {row.status}{row.publishStatus ? ` / ${row.publishStatus}` : ''}{row.version > 1 ? ` / v${row.version}` : ''}
         </span>
       ),
     },
     {
       header: 'Action',
-      className: 'w-24',
+      className: 'w-56',
       cell: (row: any) => (
-        <Button variant="outline" size="sm" onClick={() => openPdf(row.id)}>
-          <Download size={14} className="mr-2" />
-          PDF
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => openPdf(row.id)} data-testid="report-card-download-pdf">
+            <Download size={14} className="mr-2" />
+            PDF
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setSelectedReportCardId(row.id)}>
+            <History size={14} className="mr-2" />
+            History
+          </Button>
+          {row.status === 'LOCKED' && (
+            <Button variant="ghost" size="sm" onClick={() => handleRegenerate(row.id)} data-testid="report-card-regenerate">
+              <RotateCcw size={14} className="mr-2" />
+              Correct
+            </Button>
+          )}
+        </div>
       ),
     },
   ];
 
   return (
     <div className="space-y-8">
+      {message && (
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+          {message}
+        </div>
+      )}
+      {error && (
+        <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">
+          {error}
+        </div>
+      )}
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard
           title="Generated Reports"
@@ -235,6 +294,29 @@ export function ReportCardsWorkspace() {
                 Generating report cards will automatically lock marks for the selected students to ensure data integrity.
               </div>
             </div>
+          </SectionCard>
+          <SectionCard title="Generation History" description="Previous locked versions and correction requests.">
+            {selectedReportCardId ? (
+              <div className="space-y-3 text-sm" data-testid="report-card-history">
+                {(historyQuery.data?.history ?? []).map((item: any) => (
+                  <div key={item.id} className="rounded-xl border border-slate-100 bg-white p-3">
+                    <div className="font-bold text-slate-800">Version {item.version}</div>
+                    <div className="text-xs text-slate-500">Grade {item.grade} / GPA {Number(item.gpa).toFixed(2)}</div>
+                  </div>
+                ))}
+                {(historyQuery.data?.corrections ?? []).map((item: any) => (
+                  <div key={item.id} className="rounded-xl border border-amber-100 bg-amber-50 p-3">
+                    <div className="font-bold text-amber-800">{item.status}</div>
+                    <div className="text-xs text-amber-700">{item.reason}</div>
+                  </div>
+                ))}
+                {!historyQuery.isLoading && (historyQuery.data?.history ?? []).length === 0 && (historyQuery.data?.corrections ?? []).length === 0 && (
+                  <p className="text-slate-500">No corrections recorded yet.</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500">Select History on a report card to view previous versions.</p>
+            )}
           </SectionCard>
         </div>
       </div>

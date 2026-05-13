@@ -1304,6 +1304,9 @@ model ReportExport {
 
   @@index([tenantId, createdAt])
   @@index([scope, reportKey])
+  @@index([tenantId, reportKey, createdAt])
+  @@index([tenantId, requestedBy, createdAt])
+  @@index([tenantId, fileAssetId])
 }
 
 model TenantOnboardingChecklistOverride {

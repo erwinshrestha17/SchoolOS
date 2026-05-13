@@ -71,6 +71,39 @@ export class FileRegistryService {
     return asset;
   }
 
+  async registerGeneratedFile(input: {
+    tenantId: string;
+    generatedByUserId: string;
+    originalFilename: string;
+    content: Buffer;
+    mimeType: string;
+    module: string;
+    entityId?: string;
+    metadata?: Prisma.InputJsonValue;
+  }) {
+    const stored = await this.storageService.saveBufferObject({
+      tenantId: input.tenantId,
+      prefix: input.module,
+      fileName: input.originalFilename,
+      contentType: input.mimeType,
+      content: input.content,
+    });
+
+    const asset = await this.registerFile({
+      tenantId: input.tenantId,
+      uploadedByUserId: input.generatedByUserId,
+      originalFilename: input.originalFilename,
+      objectKey: stored.objectKey,
+      mimeType: input.mimeType,
+      sizeBytes: stored.sizeBytes,
+      module: input.module,
+      entityId: input.entityId,
+      metadata: input.metadata,
+    });
+
+    return this.markUploaded(input.tenantId, asset.id, input.generatedByUserId);
+  }
+
   async markUploaded(tenantId: string, assetId: string, userId: string) {
     const asset = await this.getFileMetadata(tenantId, assetId);
 
@@ -211,6 +244,20 @@ export class FileRegistryService {
     }
 
     return `${this.apiBaseUrl}/files/${encodeURIComponent(asset.id)}/preview`;
+  }
+
+  async getProtectedDownload(
+    tenantId: string,
+    assetId: string,
+    userId: string,
+  ) {
+    const asset = await this.getFileMetadata(tenantId, assetId);
+    await this.auditAccess(tenantId, assetId, userId, 'download');
+
+    return {
+      asset,
+      content: await this.storageService.getObjectBuffer(asset.objectKey),
+    };
   }
 
   private get apiBaseUrl() {

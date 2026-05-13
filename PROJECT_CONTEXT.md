@@ -37,14 +37,16 @@ Phase 1A completed / pilot-ready
 Phase 1B completed / pilot-ready
 M0 Platform Core Foundation Depth completed
 Phase 2A M4 Academics backend/admin UI completed
+Phase 2 Academics production polish implemented
 Student QR Foundation implemented / release hardening remains
 Phase 2D M9 Accounting production-candidate complete
-Current stage: M0 platform foundation complete + Phase 1 pilot-ready core + Phase 2 foundations + M4 academics backend/admin UI complete + Student QR foundation implemented + M9 production-candidate completion + Phase 3 operations admin foundations
+Phase 2 Accounting production polish implemented
+Current stage: M0 platform foundation complete + Phase 1 pilot-ready core + Phase 2 Academics/Accounting polish implemented + Student QR foundation implemented + Phase 3 operations admin foundations
 ```
 
 Targeted web-admin polish and Phase2F smoke coverage have been completed; next focus is the strict phase-gate plan in `docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`.
 
-The repo is ahead of older Phase 1B/Phase 2-transition notes. Phase 2A Academics backend/admin UI is complete. M9 Accounting is production-candidate complete. Student QR foundation is implemented. Foundations now exist for Homework/Timetable, HR/Payroll, Parent Communication/Messaging, Library, Transport, and Canteen.
+The repo is ahead of older Phase 1B/Phase 2-transition notes. Phase 2A Academics backend/admin UI is complete and Phase 2 Academics polish is implemented. M9 Accounting is production-candidate complete with Phase 2 PDF/snapshot/reconciliation polish. Student QR foundation is implemented. Foundations now exist for Homework/Timetable, HR/Payroll, Parent Communication/Messaging, Library, Transport, and Canteen.
 
 Current work should focus on stabilization, correctness, scale, permissions, tests, verification, and admin UX polish for existing modules rather than opening broad new product fronts.
 
@@ -54,7 +56,7 @@ Recommended near-term direction:
 Strict Phase Gate 0
 → stabilize verification, migrations, seed data, smoke tests, and stale docs
 → then harden controlled pilot reliability across M0 and Phase 1 core
-→ then polish Academics and Accounting
+→ then run local/staging smoke for Academics and Accounting polish
 → then deepen Homework/Timetable, HR/Payroll, Library, Transport, and Canteen one vertical at a time
 ```
 
@@ -96,7 +98,7 @@ Implemented or registered backend foundations now include:
 - M1 Admissions & Student Profiles
 - M2 Smart Attendance
 - M3 Fees & Receipts
-- M4 Academics, Exams, CAS, Report Cards backend/admin UI completion
+- M4 Academics, Exams, CAS, Report Cards backend/admin UI plus Phase 2 PDF/report/correction/snapshot polish
 - M5 Activity Feed & Milestones
 - M6 Homework & Timetable foundation
 - M7 Staff/HR and Payroll foundation
@@ -104,7 +106,7 @@ Implemented or registered backend foundations now include:
 - M8A Library Management admin/backend foundation with fines, reports, history, and QR lookup
 - M8B Transport Management admin/trip/location/report foundation
 - M8C Canteen Management admin/wallet/POS/inventory/vendor/report foundation
-- M9 Accounting & Finance production-candidate completion
+- M9 Accounting & Finance production-candidate completion plus Phase 2 PDF/snapshot/reconciliation polish
 - M10 Notices, Notifications, Communications, Messaging / Parent-Class Teacher foundation
 - M11 School Intelligence & Analytics roadmap only
 
@@ -125,9 +127,9 @@ Full SchoolOS product complete: No
 ```text
 Full SchoolOS vision: around 70-80% implemented
 Phase 1 pilot product: around 90-95% implemented
-M4 Academics backend/admin UI: complete
+M4 Academics backend/admin UI and Phase 2 polish: complete
 Student QR Foundation: implemented / release hardening remains
-M9 Accounting: production-candidate complete
+M9 Accounting: production-candidate complete with Phase 2 polish
 ```
 
 Approximate module status:

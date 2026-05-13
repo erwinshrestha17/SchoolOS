@@ -1,6 +1,6 @@
 # SchoolOS Master Project Memory
 
-**Status:** M0 Platform Core Foundation Complete + Phase 2A M4 Academics backend/admin UI complete + Student QR Foundation Implemented + Phase 3 Operations Admin Foundations Implemented + Phase 2D M9 Accounting Production Candidate Complete
+**Status:** M0 Platform Core Foundation Complete + Phase 2 Academics/Accounting Production Polish Implemented + Student QR Foundation Implemented + Phase 3 Operations Admin Foundations Implemented
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard
 
@@ -29,9 +29,11 @@ Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation: Completed across eight sprints; pilot hardening remains
 Phase 2A M4 Academics backend/admin UI: Completed
+Phase 2 Academics production polish: Implemented for report-card PDFs, corrections/history, exports, snapshots, and smoke coverage
 Student QR Foundation: Implemented; release hardening remains
 Phase 2D M9 Accounting: Production Candidate Complete
-Current stage: M0 platform foundation complete + Phase 1 pilot-ready core + Phase 2 foundations + M4 academics backend/admin UI complete + Student QR foundation implemented + M9 production-candidate completion + Phase 3 operations admin foundations
+Phase 2 Accounting production polish: Implemented for report PDFs, snapshots, reconciliation suggestions, and smoke coverage
+Current stage: M0 platform foundation complete + Phase 1 pilot-ready core + Phase 2 Academics/Accounting polish implemented + Student QR foundation implemented + Phase 3 operations admin foundations
 ```
 
 Targeted web-admin frontend polish and Phase 2F browser smoke coverage are now present on main.
@@ -52,7 +54,7 @@ Recommended near-term direction:
 Strict Phase Gate 0 from docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md
 → stabilize verification, migrations, seed data, smoke tests, and stale docs
 → then harden controlled pilot reliability across M0 and Phase 1 core
-→ then polish Academics and Accounting
+→ then run local/staging smoke for Academics and Accounting polish
 → then deepen Homework/Timetable, HR/Payroll, Library, Transport, and Canteen one vertical at a time
 ```
 
@@ -112,14 +114,14 @@ Rules:
 | M1 | Admissions & Student Profiles | Phase 1A/1B complete / pilot-ready |
 | M2 | Smart Attendance | Phase 1A/1B complete / pilot-ready |
 | M3 | Fees & Receipts | Phase 1A/1B complete / pilot-ready |
-| M4 | Exams, CAS & Report Cards | Phase 2A backend and admin UI complete |
+| M4 | Exams, CAS & Report Cards | Phase 2 backend/admin UI plus production PDF/report/correction/snapshot polish implemented |
 | M5 | Activity Feed & Milestones | Phase 1A/1B complete with media/moderation hardening foundations |
 | M6 | Homework & Timetable | Phase 2 backend/admin UI foundation implemented; attachment, queue, conflict, and role-view depth remains |
 | M7 | HR & Payroll | Phase 2 backend/admin UI foundation implemented; approval, reporting, self-service, and browser depth remains |
 | M8A | Library Management | Phase 3 admin/backend foundation implemented with fines, reports, history, and QR lookup |
 | M8B | Transport Management | Phase 3 admin/trip/location/report foundation implemented; live/driver/parent later |
 | M8C | Canteen Management | Phase 3 admin/wallet/POS/inventory/vendor/report foundation implemented; integrations and parent views later |
-| M9 | Accounting & Finance | Phase 2D production-candidate complete |
+| M9 | Accounting & Finance | Phase 2D production-candidate complete plus PDF/snapshot/reconciliation polish implemented |
 | M10 | Notices & Communication | Phase 1A/1B + parent-teacher chat foundation |
 | M11 | School Intelligence & Analytics | Roadmap only; implementation deferred |
 
@@ -243,10 +245,10 @@ Includes Auth/RBAC/tenant isolation, admissions, student profiles, attendance, f
 Status: **Partially complete**.
 
 ```text
-2A Academics, Exams, CAS, Report Cards — complete for backend/admin UI; PDF/report polish remains
+2A Academics, Exams, CAS, Report Cards — complete for backend/admin UI and production PDF/report/correction/snapshot polish
 2B Homework and Timetable — backend/admin UI foundation implemented; attachment, queue, conflict, and role-view depth remains
 2C HR and Payroll — backend/admin UI foundation implemented; approval, reporting, self-service, and browser depth remains
-2D M9 Accounting and Finance — production-candidate complete
+2D M9 Accounting and Finance — production-candidate complete with PDF/snapshot/reconciliation polish
 2E Parent Communication Expansion — foundation implemented / provider, moderation, retention, and mobile depth remains
 2F Student Identity QR Foundation — implemented foundation; release QA, ID-card PDF verification, and deeper scan tests remain
 ```
@@ -286,13 +288,12 @@ Step 8 — Result Publishing + Parent Notification Backend Hardening
 Step 9 — Backend Final Hardening + Phase 2A Flow Contract
 ```
 
-Next Phase 2A work:
+Remaining Phase 2A polish:
 
 ```text
-- Browser smoke/Playwright contracts for the full Phase 2A workflow.
-- Report card PDF visual polish.
-- Future locked report-card correction/regeneration workflow.
-- Deeper academic reports and exports.
+- Run browser smoke in local/staging where web ports, credentials, Postgres, Redis, and API are available.
+- Embed configured raster logos in PDFs if/when the simple PDF engine supports image embedding.
+- Add optional CAS summary, failed-threshold, and promotion-readiness exports only if product rules require them.
 ```
 
 ---
@@ -320,7 +321,7 @@ Remaining hardening:
 
 ```text
 - Verify immutable student identity code behavior across all admission paths.
-- Verify ID-card PDF QR rendering before release; apps/api/src/common/pdf/simple-pdf.ts had pre-existing uncommitted changes during this doc pass.
+- Verify ID-card PDF QR rendering before release; the simple PDF engine has been extended for Phase 2 report exports and should be visually checked with real QR assets.
 - Add deeper QR tenant, permission, role-purpose, and audit tests.
 - Add QR manual QA across Student profile, Library issue/return, and Canteen serving/POS.
 - Add optional Transport QR usage only where it improves operator flow.
@@ -333,9 +334,9 @@ Biometrics are explicitly out of scope until QR identity is stable, parent trust
 
 ## 9. M9 Accounting Completion and Rules
 
-M9 Accounting is **Production Candidate Complete**.
+M9 Accounting is **Production Candidate Complete** with Phase 2 production polish implemented.
 
-Completed scope includes ledger correctness, double-entry enforcement, Decimal-safe posting, immutable posted journals, source-based idempotent posting, reversal/correction workflows, fiscal period lifecycle, fiscal year close/reopen, opening balances, vouchers, trial balance, general ledger, cash book, income statement, balance sheet, VAT/TDS/PF summaries, CSV exports, bank reconciliation, frontend Accounting workspace, granular RBAC, audit coverage, tenant-scoped queries, and AccountingPostingService ledger boundary.
+Completed scope includes ledger correctness, double-entry enforcement, Decimal-safe posting, immutable posted journals, source-based idempotent posting, reversal/correction workflows, fiscal period lifecycle, fiscal year close/reopen, opening balances, vouchers, trial balance, general ledger, cash book, income statement, balance sheet, VAT/TDS/PF summaries, CSV/PDF exports, File Registry report snapshots, deterministic bank reconciliation suggestions, frontend Accounting workspace, granular RBAC, audit coverage, tenant-scoped queries, and AccountingPostingService ledger boundary.
 
 Non-negotiable M9 rules:
 
@@ -355,11 +356,9 @@ Non-negotiable M9 rules:
 Remaining M9 future enhancements:
 
 ```text
-- PDF accounting exports.
-- Saved report snapshots and File Registry integration for generated reports.
-- Advanced bank reconciliation auto-match rules.
+- Dedicated bank-reconciliation PDF export.
 - Accounting audit log viewer UI.
-- Seeded Playwright accounting workflow tests.
+- Browser smoke execution in local/staging where web ports and credentials are available.
 - Production seed review for default Chart of Accounts and report mappings.
 - Optional background export workers for large reports if tenant size requires it.
 ```
@@ -447,9 +446,9 @@ Feature -> tenant isolation -> indexes -> pagination -> queue slow work -> audit
 Full SchoolOS vision: around 70-80% implemented
 Phase 1 pilot product: around 90-95% implemented
 M0 Platform Core: 80-90% foundation complete / pilot hardening next
-Phase 2A M4 Academics: backend/admin UI complete / PDF and reporting polish remains
+Phase 2A M4 Academics: backend/admin UI plus PDF/report/correction/snapshot polish implemented
 Student QR Foundation: implemented / release hardening remains
-M9 Accounting: production-candidate complete
+M9 Accounting: production-candidate complete plus PDF/snapshot/reconciliation polish implemented
 ```
 
 Module estimates:

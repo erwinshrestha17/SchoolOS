@@ -44,8 +44,14 @@ export function BankReconciliationWorkspace() {
 
   const ledgerQuery = useQuery({
     queryKey: ['ledger-entries', selectedAccountId],
-    queryFn: () => api.listGeneralLedger({ chartAccountId: selectedAccountId }),
+    queryFn: () => api.listGeneralLedger({ accountId: selectedAccountId }),
     enabled: !!selectedAccountId
+  });
+
+  const suggestionsQuery = useQuery({
+    queryKey: ['bank-recon-suggestions', selectedAccountId],
+    queryFn: () => api.suggestReconciliationMatches(selectedAccountId),
+    enabled: false
   });
 
   const importMutation = useMutation({
@@ -151,9 +157,50 @@ export function BankReconciliationWorkspace() {
               {importing ? 'Processing...' : 'Import CSV Statement'}
               <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} disabled={importing} />
             </label>
+            <button
+              type="button"
+              onClick={() => suggestionsQuery.refetch()}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+              data-testid="bank-reconciliation-auto-match"
+            >
+              <Search size={16} />
+              Auto-match
+            </button>
           </div>
         )}
       </div>
+
+      {selectedAccountId && suggestionsQuery.data && (
+        <SectionCard title="Auto-match Suggestions" description="Deterministic suggestions. Confirm matches manually before reconciliation.">
+          <div className="space-y-2" data-testid="bank-reconciliation-suggestions">
+            {(suggestionsQuery.data as any[]).flatMap((row: any) =>
+              (row.candidates ?? []).slice(0, 2).map((candidate: any) => (
+                <div key={`${row.bankTransactionId}-${candidate.ledgerTransactionId}`} className="rounded-xl border border-slate-100 bg-white p-3 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-bold text-slate-800">{row.description}</div>
+                      <div className="text-xs text-slate-500">{candidate.confidence} / score {candidate.score} / {candidate.reason}</div>
+                    </div>
+                    <button
+                      className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white disabled:opacity-40"
+                      disabled={candidate.warningFlags?.includes('DUPLICATE_CANDIDATE') || candidate.confidence === 'LOW'}
+                      onClick={() => setIsConfirmingRecon({ statementId: row.bankTransactionId, journalLineId: candidate.ledgerTransactionId })}
+                    >
+                      Review
+                    </button>
+                  </div>
+                  {candidate.warningFlags?.length > 0 && (
+                    <div className="mt-2 text-xs font-bold text-amber-700">{candidate.warningFlags.join(', ')}</div>
+                  )}
+                </div>
+              )),
+            )}
+            {(suggestionsQuery.data as any[]).every((row: any) => (row.candidates ?? []).length === 0) && (
+              <p className="text-sm text-slate-500">No safe auto-match suggestions found.</p>
+            )}
+          </div>
+        </SectionCard>
+      )}
 
       {selectedAccountId && summaryQuery.data && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

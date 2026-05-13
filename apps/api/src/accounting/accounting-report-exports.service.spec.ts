@@ -2,6 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AccountingReportExportsService } from './accounting-report-exports.service';
 import { AccountingReportsService } from './accounting-reports.service';
 import { ChartAccountType, JournalLineSide, Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
+import { AuditService } from '../audit/audit.service';
 
 describe('AccountingReportExportsService', () => {
   let service: AccountingReportExportsService;
@@ -24,6 +27,24 @@ describe('AccountingReportExportsService', () => {
           provide: AccountingReportsService,
           useValue: mockReportsService,
         },
+        {
+          provide: PrismaService,
+          useValue: {
+            tenant: {
+              findUnique: jest.fn().mockResolvedValue({ name: 'Test School' }),
+            },
+            reportExport: { create: jest.fn() },
+          },
+        },
+        {
+          provide: FileRegistryService,
+          useValue: {
+            registerGeneratedFile: jest
+              .fn()
+              .mockResolvedValue({ id: 'file-1' }),
+          },
+        },
+        { provide: AuditService, useValue: { record: jest.fn() } },
       ],
     }).compile();
 
@@ -326,7 +347,7 @@ describe('AccountingReportExportsService', () => {
     const methods = Object.getOwnPropertyNames(
       Object.getPrototypeOf(service),
     ).filter((m) => m.startsWith('export'));
-    expect(methods.length).toBe(6);
+    expect(methods.length).toBe(12);
 
     // Each method name corresponds to a report service method
     expect(methods).toContain('exportTrialBalanceCsv');
@@ -335,6 +356,39 @@ describe('AccountingReportExportsService', () => {
     expect(methods).toContain('exportIncomeStatementCsv');
     expect(methods).toContain('exportBalanceSheetCsv');
     expect(methods).toContain('exportTaxSummaryCsv');
+    expect(methods).toContain('exportTrialBalancePdf');
+    expect(methods).toContain('exportGeneralLedgerPdf');
+    expect(methods).toContain('exportCashBookPdf');
+    expect(methods).toContain('exportIncomeStatementPdf');
+    expect(methods).toContain('exportBalanceSheetPdf');
+    expect(methods).toContain('exportTaxSummaryPdf');
+  });
+
+  it('exports a valid Trial Balance PDF and records a protected snapshot', async () => {
+    reportsService.getTrialBalance.mockResolvedValue({
+      rows: [],
+      totalOpeningDebit: new Prisma.Decimal(0),
+      totalOpeningCredit: new Prisma.Decimal(0),
+      totalPeriodDebit: new Prisma.Decimal(0),
+      totalPeriodCredit: new Prisma.Decimal(0),
+      totalClosingDebit: new Prisma.Decimal(0),
+      totalClosingCredit: new Prisma.Decimal(0),
+      isBalanced: true,
+      imbalanceAmount: new Prisma.Decimal(0),
+      generatedAt: new Date(),
+    } as any);
+
+    const pdf = await service.exportTrialBalancePdf(
+      'tenant-1',
+      { fiscalYearId: 'fy-1' },
+      {
+        tenantId: 'tenant-1',
+        tenantSlug: 'test',
+        userId: 'user-1',
+      } as any,
+    );
+
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
   });
 
   it('returns empty CSV for reports with no data rows', async () => {

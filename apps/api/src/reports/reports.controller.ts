@@ -97,4 +97,20 @@ export class ReportsController {
   ) {
     return this.reportsService.getExportHistory(auth.tenantId, { page, limit });
   }
+
+  @Get('export-history/:id/download')
+  @Permissions('reports:read')
+  async downloadExportHistory(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const snapshot = await this.reportsService.downloadExportSnapshot(id, auth);
+    res.setHeader('Content-Type', snapshot.mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${snapshot.fileName.replace(/"/g, '')}"`,
+    );
+    return res.send(snapshot.content);
+  }
 }

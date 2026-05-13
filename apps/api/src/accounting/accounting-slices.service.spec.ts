@@ -49,6 +49,7 @@ describe('AccountingService - Slices 2-5', () => {
       },
       journalLine: {
         findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         groupBy: jest.fn().mockResolvedValue([]),
         aggregate: jest
           .fn()
@@ -649,6 +650,108 @@ describe('AccountingService - Slices 2-5', () => {
         },
         orderBy: { statementDate: 'asc' },
       });
+    });
+  });
+
+  describe('suggestBankReconciliationMatches', () => {
+    it('suggests an exact match without auto-reconciling', async () => {
+      prisma.bankStatement.findMany
+        .mockResolvedValueOnce([
+          {
+            id: 'bs-1',
+            statementDate: new Date('2026-05-01'),
+            description: 'Receipt JE-1',
+            reference: 'JE-1',
+            debitAmount: 100,
+            creditAmount: 0,
+            isReconciled: false,
+          },
+        ])
+        .mockResolvedValueOnce([]);
+      prisma.journalLine.findMany.mockResolvedValue([
+        {
+          id: 'jl-1',
+          journalEntryId: 'je-1',
+          debit: 100,
+          credit: 0,
+          journalEntry: {
+            id: 'je-1',
+            entryDate: new Date('2026-05-01'),
+            entryNumber: 'JE-1',
+            narration: 'Receipt JE-1',
+            status: 'POSTED',
+          },
+        },
+      ]);
+
+      const result = await service.suggestBankReconciliationMatches(
+        'bank-acc',
+        actor,
+      );
+
+      expect(result[0].candidates[0]).toEqual(
+        expect.objectContaining({
+          confidence: 'EXACT',
+          ledgerTransactionId: 'jl-1',
+          suggestedAction: 'REVIEW_AND_CONFIRM',
+        }),
+      );
+      expect(prisma.bankStatement.update).not.toHaveBeenCalled();
+      expect(auditService.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'suggest_reconciliation_matches' }),
+      );
+    });
+
+    it('flags duplicate candidates for manual review', async () => {
+      prisma.bankStatement.findMany
+        .mockResolvedValueOnce([
+          {
+            id: 'bs-1',
+            statementDate: new Date('2026-05-01'),
+            description: 'Receipt JE-1',
+            reference: 'JE-1',
+            debitAmount: 100,
+            creditAmount: 0,
+            isReconciled: false,
+          },
+        ])
+        .mockResolvedValueOnce([]);
+      prisma.journalLine.findMany.mockResolvedValue([
+        {
+          id: 'jl-1',
+          journalEntryId: 'je-1',
+          debit: 100,
+          credit: 0,
+          journalEntry: {
+            id: 'je-1',
+            entryDate: new Date('2026-05-01'),
+            entryNumber: 'JE-1',
+            narration: 'Receipt JE-1',
+          },
+        },
+        {
+          id: 'jl-2',
+          journalEntryId: 'je-2',
+          debit: 100,
+          credit: 0,
+          journalEntry: {
+            id: 'je-2',
+            entryDate: new Date('2026-05-01'),
+            entryNumber: 'JE-1',
+            narration: 'Receipt JE-1',
+          },
+        },
+      ]);
+
+      const result = await service.suggestBankReconciliationMatches(
+        'bank-acc',
+        actor,
+      );
+
+      expect(result[0].candidates[0].warningFlags).toContain(
+        'DUPLICATE_CANDIDATE',
+      );
+      expect(result[0].candidates[0].suggestedAction).toBe('MANUAL_REVIEW');
     });
   });
 });

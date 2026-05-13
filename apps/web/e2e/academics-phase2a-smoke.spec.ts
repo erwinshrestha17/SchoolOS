@@ -87,7 +87,12 @@ test.describe.serial('SchoolOS Phase 2A Academics Admin Flow Smoke Tests', () =>
   test('Report Cards: Batch generation', async ({ page }) => {
     await page.goto('/dashboard/academics/report-cards');
     await expect(page.getByRole('heading', { name: /Report Cards/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Batch Generate/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Start Generation/i })).toBeVisible();
+    const downloadButtons = page.locator('[data-testid="report-card-download-pdf"]');
+    if ((await downloadButtons.count()) > 0) {
+      await expect(downloadButtons.first()).toBeVisible();
+    }
+    await expect(page.getByTestId('report-card-history').or(page.getByText(/Select History on a report card/i))).toBeVisible();
   });
 
   test('Promotion Readiness: Eligibility check', async ({ page }) => {

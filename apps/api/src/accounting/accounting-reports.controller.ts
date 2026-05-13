@@ -142,6 +142,22 @@ export class AccountingReportsController {
     this.sendCsvResponse(res, csv, 'trial-balance');
   }
 
+  @Get('trial-balance/export.pdf')
+  @ApiOperation({ summary: 'Export trial balance to PDF' })
+  @Permissions('accounting:exports:create', 'accounting:reports:trial-balance')
+  async exportTrialBalancePdf(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: TrialBalanceQueryDto,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.exportsService.exportTrialBalancePdf(
+      auth.tenantId,
+      query,
+      auth,
+    );
+    this.sendPdfResponse(res, pdf, 'trial-balance');
+  }
+
   @Get('general-ledger/export')
   @ApiOperation({ summary: 'Export general ledger to CSV' })
   @Permissions('accounting:exports:create', 'accounting:reports:general-ledger')
@@ -158,6 +174,22 @@ export class AccountingReportsController {
     this.sendCsvResponse(res, csv, 'general-ledger');
   }
 
+  @Get('general-ledger/export.pdf')
+  @ApiOperation({ summary: 'Export general ledger to PDF' })
+  @Permissions('accounting:exports:create', 'accounting:reports:general-ledger')
+  async exportGeneralLedgerPdf(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: GeneralLedgerQueryDto,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.exportsService.exportGeneralLedgerPdf(
+      auth.tenantId,
+      query,
+      auth,
+    );
+    this.sendPdfResponse(res, pdf, 'general-ledger');
+  }
+
   @Get('cash-book/export')
   @ApiOperation({ summary: 'Export cash book to CSV' })
   @Permissions('accounting:exports:create', 'accounting:reports:cash-book')
@@ -172,6 +204,22 @@ export class AccountingReportsController {
     );
     await this.recordExportAudit(auth, 'Cash Book', query);
     this.sendCsvResponse(res, csv, 'cash-book');
+  }
+
+  @Get('cash-book/export.pdf')
+  @ApiOperation({ summary: 'Export cash book to PDF' })
+  @Permissions('accounting:exports:create', 'accounting:reports:cash-book')
+  async exportCashBookPdf(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: CashBookQueryDto,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.exportsService.exportCashBookPdf(
+      auth.tenantId,
+      query,
+      auth,
+    );
+    this.sendPdfResponse(res, pdf, 'cash-book');
   }
 
   @Get('income-statement/export')
@@ -193,6 +241,25 @@ export class AccountingReportsController {
     this.sendCsvResponse(res, csv, 'income-statement');
   }
 
+  @Get('income-statement/export.pdf')
+  @ApiOperation({ summary: 'Export income statement to PDF' })
+  @Permissions(
+    'accounting:exports:create',
+    'accounting:reports:income-statement',
+  )
+  async exportIncomeStatementPdf(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: IncomeStatementQueryDto,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.exportsService.exportIncomeStatementPdf(
+      auth.tenantId,
+      query,
+      auth,
+    );
+    this.sendPdfResponse(res, pdf, 'income-statement');
+  }
+
   @Get('balance-sheet/export')
   @ApiOperation({ summary: 'Export balance sheet to CSV' })
   @Permissions('accounting:exports:create', 'accounting:reports:balance-sheet')
@@ -209,6 +276,22 @@ export class AccountingReportsController {
     this.sendCsvResponse(res, csv, 'balance-sheet');
   }
 
+  @Get('balance-sheet/export.pdf')
+  @ApiOperation({ summary: 'Export balance sheet to PDF' })
+  @Permissions('accounting:exports:create', 'accounting:reports:balance-sheet')
+  async exportBalanceSheetPdf(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: BalanceSheetQueryDto,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.exportsService.exportBalanceSheetPdf(
+      auth.tenantId,
+      query,
+      auth,
+    );
+    this.sendPdfResponse(res, pdf, 'balance-sheet');
+  }
+
   @Get('tax-summary/export')
   @ApiOperation({ summary: 'Export tax summary to CSV' })
   @Permissions('accounting:exports:create', 'accounting:reports:tax-summary')
@@ -223,6 +306,22 @@ export class AccountingReportsController {
     );
     await this.recordExportAudit(auth, 'Tax Summary', query);
     this.sendCsvResponse(res, csv, 'tax-summary');
+  }
+
+  @Get('tax-summary/export.pdf')
+  @ApiOperation({ summary: 'Export tax summary to PDF' })
+  @Permissions('accounting:exports:create', 'accounting:reports:tax-summary')
+  async exportTaxSummaryPdf(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: TaxSummaryQueryDto,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.exportsService.exportTaxSummaryPdf(
+      auth.tenantId,
+      query,
+      auth,
+    );
+    this.sendPdfResponse(res, pdf, 'tax-summary');
   }
 
   private async recordExportAudit(
@@ -253,6 +352,16 @@ export class AccountingReportsController {
       `attachment; filename="${fileNamePrefix}-${date}.csv"`,
     );
     res.send(csv);
+  }
+
+  private sendPdfResponse(res: Response, pdf: Buffer, fileNamePrefix: string) {
+    const date = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${fileNamePrefix}-${date}.pdf"`,
+    );
+    res.send(pdf);
   }
 
   @Get('mappings')

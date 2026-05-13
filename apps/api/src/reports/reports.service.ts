@@ -21,6 +21,8 @@ import {
 } from '@prisma/client';
 
 import { FinanceService } from '../finance/finance.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
+import { buildTableReportPdf } from '../common/pdf/simple-pdf';
 
 export interface ReportExecutor {
   definition: ReportDefinition;
@@ -39,6 +41,7 @@ export class ReportsService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly financeService: FinanceService,
+    private readonly fileRegistryService: FileRegistryService,
     @InjectQueue('reports') private readonly reportsQueue: Queue,
   ) {
     this.registerInternalReports();
@@ -179,6 +182,270 @@ export class ReportsService {
             Status: e.status,
           };
         });
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'academic-class-result-summary',
+        name: 'Class Result Summary',
+        description: 'Class-level report-card outcomes for an exam term',
+        category: 'academics',
+        module: 'academics',
+        formats: ['json', 'csv', 'pdf'],
+        filters: [
+          {
+            key: 'academicYearId',
+            label: 'Academic Year',
+            type: 'select',
+            required: true,
+          },
+          {
+            key: 'examTermId',
+            label: 'Exam Term',
+            type: 'select',
+            required: true,
+          },
+          { key: 'classId', label: 'Class', type: 'class' },
+          { key: 'sectionId', label: 'Section', type: 'section' },
+        ],
+        requiredPermissions: ['academics:read'],
+      },
+      execute: async (actor, filters) => {
+        const cards = await this.prisma.reportCard.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            academicYearId: String(filters.academicYearId),
+            examTermId: String(filters.examTermId),
+            ...(filters.classId ? { classId: String(filters.classId) } : {}),
+            ...(filters.sectionId
+              ? { sectionId: String(filters.sectionId) }
+              : {}),
+          },
+          include: { student: true, class: true, section: true },
+          orderBy: [
+            { class: { name: 'asc' } },
+            { student: { firstNameEn: 'asc' } },
+          ],
+        });
+
+        return cards.map((card) => ({
+          'Student ID': card.student.studentSystemId,
+          Student: `${card.student.firstNameEn} ${card.student.lastNameEn}`,
+          Class: card.class.name,
+          Section: card.section?.name ?? '-',
+          'Roll Number': card.student.rollNumber ?? '-',
+          Status: card.status,
+          'Publish Status': card.publishStatus ?? 'UNPUBLISHED',
+          'Total Marks': Number(card.totalMarks),
+          'Max Marks': Number(card.maxMarks),
+          Percentage: Number(card.percentage),
+          Grade: card.grade,
+          GPA: Number(card.gpa),
+          Version: card.version,
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'academic-subject-performance',
+        name: 'Subject-wise Performance',
+        description: 'Subject marks and grade spread by exam term',
+        category: 'academics',
+        module: 'academics',
+        formats: ['json', 'csv', 'pdf'],
+        filters: [
+          {
+            key: 'examTermId',
+            label: 'Exam Term',
+            type: 'select',
+            required: true,
+          },
+          { key: 'classId', label: 'Class', type: 'class' },
+          { key: 'sectionId', label: 'Section', type: 'section' },
+          { key: 'subjectId', label: 'Subject', type: 'select' },
+        ],
+        requiredPermissions: ['academics:read'],
+      },
+      execute: async (actor, filters) => {
+        const marks = await this.prisma.markEntry.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            examTermId: String(filters.examTermId),
+            ...(filters.subjectId
+              ? { subjectId: String(filters.subjectId) }
+              : {}),
+            student: {
+              ...(filters.classId ? { classId: String(filters.classId) } : {}),
+              ...(filters.sectionId
+                ? { sectionId: String(filters.sectionId) }
+                : {}),
+            },
+          },
+          include: { student: true, subject: true, assessmentComponent: true },
+          orderBy: [
+            { subject: { code: 'asc' } },
+            { student: { firstNameEn: 'asc' } },
+          ],
+        });
+
+        return marks.map((mark) => ({
+          Subject: `${mark.subject.code} - ${mark.subject.name}`,
+          Component: mark.assessmentComponent.name,
+          'Student ID': mark.student.studentSystemId,
+          Student: `${mark.student.firstNameEn} ${mark.student.lastNameEn}`,
+          'Marks Obtained': Number(mark.marksObtained),
+          'Max Marks': Number(mark.assessmentComponent.maxMarks),
+          Percentage:
+            Number(mark.assessmentComponent.maxMarks) > 0
+              ? (
+                  (Number(mark.marksObtained) /
+                    Number(mark.assessmentComponent.maxMarks)) *
+                  100
+                ).toFixed(2)
+              : '0.00',
+          Status: mark.status,
+          Locked: mark.isLocked ? 'YES' : 'NO',
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'academic-grade-distribution',
+        name: 'Grade Distribution',
+        description: 'Report-card grade counts for an exam term',
+        category: 'academics',
+        module: 'academics',
+        formats: ['json', 'csv', 'pdf'],
+        filters: [
+          {
+            key: 'academicYearId',
+            label: 'Academic Year',
+            type: 'select',
+            required: true,
+          },
+          {
+            key: 'examTermId',
+            label: 'Exam Term',
+            type: 'select',
+            required: true,
+          },
+          { key: 'classId', label: 'Class', type: 'class' },
+          { key: 'sectionId', label: 'Section', type: 'section' },
+        ],
+        requiredPermissions: ['academics:read'],
+      },
+      execute: async (actor, filters) => {
+        const groups = await this.prisma.reportCard.groupBy({
+          by: ['grade'],
+          where: {
+            tenantId: actor.tenantId,
+            academicYearId: String(filters.academicYearId),
+            examTermId: String(filters.examTermId),
+            ...(filters.classId ? { classId: String(filters.classId) } : {}),
+            ...(filters.sectionId
+              ? { sectionId: String(filters.sectionId) }
+              : {}),
+          },
+          _count: { _all: true },
+          orderBy: { grade: 'asc' },
+        });
+
+        return groups.map((group) => ({
+          Grade: group.grade,
+          Count: group._count._all,
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'academic-missing-marks',
+        name: 'Missing Marks Report',
+        description: 'Students/components that do not yet have submitted marks',
+        category: 'academics',
+        module: 'academics',
+        formats: ['json', 'csv', 'pdf'],
+        filters: [
+          {
+            key: 'academicYearId',
+            label: 'Academic Year',
+            type: 'select',
+            required: true,
+          },
+          {
+            key: 'examTermId',
+            label: 'Exam Term',
+            type: 'select',
+            required: true,
+          },
+          { key: 'classId', label: 'Class', type: 'class', required: true },
+          { key: 'sectionId', label: 'Section', type: 'section' },
+          { key: 'subjectId', label: 'Subject', type: 'select' },
+        ],
+        requiredPermissions: ['academics:read'],
+      },
+      execute: async (actor, filters) => {
+        const [enrollments, components, marks] = await Promise.all([
+          this.prisma.enrollment.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              academicYearId: String(filters.academicYearId),
+              classId: String(filters.classId),
+              ...(filters.sectionId
+                ? { sectionId: String(filters.sectionId) }
+                : {}),
+              status: 'ACTIVE',
+            },
+            include: { student: true, class: true, section: true },
+          }),
+          this.prisma.assessmentComponent.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              examTermId: String(filters.examTermId),
+              subject: {
+                classId: String(filters.classId),
+                ...(filters.subjectId ? { id: String(filters.subjectId) } : {}),
+              },
+            },
+            include: { subject: true },
+          }),
+          this.prisma.markEntry.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              examTermId: String(filters.examTermId),
+            },
+            select: {
+              studentId: true,
+              assessmentComponentId: true,
+              status: true,
+            },
+          }),
+        ]);
+        const markKey = new Set(
+          marks
+            .filter((mark) => mark.status !== 'MISSING')
+            .map((mark) => `${mark.studentId}:${mark.assessmentComponentId}`),
+        );
+
+        return enrollments.flatMap((enrollment) =>
+          components
+            .filter(
+              (component) =>
+                !markKey.has(`${enrollment.studentId}:${component.id}`),
+            )
+            .map((component) => ({
+              'Student ID': enrollment.student.studentSystemId,
+              Student: `${enrollment.student.firstNameEn} ${enrollment.student.lastNameEn}`,
+              Class: enrollment.class.name,
+              Section: enrollment.section?.name ?? '-',
+              Subject: `${component.subject.code} - ${component.subject.name}`,
+              Component: component.name,
+              Status: 'MISSING',
+            })),
+        );
       },
     });
 
@@ -1198,15 +1465,15 @@ export class ReportsService {
           filters: request.filters,
         },
       });
-      await this.recordExportHistory({
-        tenantId: actor.tenantId,
-        reportKey,
-        format: request.format,
-        filters: request.filters as Prisma.InputJsonValue,
-        requestedBy: actor.userId,
-      });
-
       if (request.format === 'json') {
+        await this.recordExportHistory({
+          tenantId: actor.tenantId,
+          reportKey,
+          format: request.format,
+          filters: request.filters as Prisma.InputJsonValue,
+          requestedBy: actor.userId,
+        });
+
         return {
           format: request.format,
           status: 'COMPLETED',
@@ -1217,15 +1484,37 @@ export class ReportsService {
         };
       }
 
-      const csv = this.convertToCsv(data);
-      const content = Buffer.from(csv);
+      const content =
+        request.format === 'pdf'
+          ? buildTableReportPdf({
+              schoolName: actor.tenantSlug,
+              title: executor.definition.name,
+              subtitle: `Module: ${executor.definition.module}`,
+              rows: data,
+            })
+          : Buffer.from(this.convertToCsv(data));
+      const contentType =
+        request.format === 'pdf' ? 'application/pdf' : 'text/csv';
+      const fileName = `${reportKey}.${request.format}`;
+
+      await this.recordExportHistory({
+        tenantId: actor.tenantId,
+        reportKey,
+        format: request.format,
+        filters: request.filters as Prisma.InputJsonValue,
+        requestedBy: actor.userId,
+        content,
+        contentType,
+        fileName,
+        module: executor.definition.module,
+      });
 
       return {
         format: request.format,
         status: 'COMPLETED',
         content,
-        fileName: `${reportKey}.${request.format}`,
-        contentType: request.format === 'pdf' ? 'application/pdf' : 'text/csv',
+        fileName,
+        contentType,
       };
     }
 
@@ -1279,6 +1568,10 @@ export class ReportsService {
     format: string;
     filters: Prisma.InputJsonValue;
     requestedBy: string;
+    content?: Buffer;
+    contentType?: string;
+    fileName?: string;
+    module?: string;
   }) {
     const delegate = (
       this.prisma as unknown as {
@@ -1290,6 +1583,25 @@ export class ReportsService {
     if (!delegate?.create) {
       return;
     }
+    let fileAssetId: string | undefined;
+    if (input.content && input.contentType && input.fileName) {
+      const asset = await this.fileRegistryService.registerGeneratedFile({
+        tenantId: input.tenantId,
+        generatedByUserId: input.requestedBy,
+        originalFilename: input.fileName,
+        content: input.content,
+        mimeType: input.contentType,
+        module: 'reports',
+        metadata: {
+          module: input.module ?? 'reports',
+          reportKey: input.reportKey,
+          format: input.format,
+          filters: input.filters,
+        },
+      });
+      fileAssetId = asset.id;
+    }
+
     await delegate.create({
       data: {
         tenantId: input.tenantId,
@@ -1297,6 +1609,7 @@ export class ReportsService {
         reportKey: input.reportKey,
         format: input.format,
         filters: input.filters,
+        fileAssetId,
         requestedBy: input.requestedBy,
         status: 'COMPLETED',
         completedAt: new Date(),
@@ -1330,6 +1643,49 @@ export class ReportsService {
       page,
       limit,
       hasNextPage: page * limit < total,
+    };
+  }
+
+  async downloadExportSnapshot(
+    exportId: string,
+    actor: AuthContext,
+  ): Promise<{ fileName: string; mimeType: string; content: Buffer }> {
+    const exportRecord = await this.prisma.reportExport.findFirst({
+      where: { id: exportId, tenantId: actor.tenantId },
+    });
+
+    if (!exportRecord) {
+      throw new NotFoundException('Report snapshot not found');
+    }
+
+    if (!exportRecord.fileAssetId) {
+      throw new NotFoundException('Report snapshot file is not available');
+    }
+
+    const { asset, content } =
+      await this.fileRegistryService.getProtectedDownload(
+        actor.tenantId,
+        exportRecord.fileAssetId,
+        actor.userId,
+      );
+
+    await this.auditService.record({
+      action: 'download_report_snapshot',
+      resource: 'report_export',
+      resourceId: exportRecord.id,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        reportKey: exportRecord.reportKey,
+        format: exportRecord.format,
+        fileAssetId: exportRecord.fileAssetId,
+      },
+    });
+
+    return {
+      fileName: asset.originalFilename,
+      mimeType: asset.mimeType,
+      content,
     };
   }
 }

@@ -5,12 +5,20 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
+import { AuditService } from '../audit/audit.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { GradeCalculatorService } from './grade-calculator.service';
 
 type ReportCardWithRelations = Prisma.ReportCardGetPayload<{
   include: {
-    student: true;
+    student: {
+      include: {
+        guardianLinks: {
+          include: { guardian: true };
+        };
+      };
+    };
     class: true;
     section: true;
     examTerm: true;
@@ -47,6 +55,8 @@ export class ReportCardPdfService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gradeCalculator: GradeCalculatorService,
+    private readonly auditService: AuditService,
+    private readonly fileRegistryService: FileRegistryService,
   ) {}
 
   async getReportCardPdf(reportCardId: string, actor: AuthContext) {
@@ -56,7 +66,14 @@ export class ReportCardPdfService {
         tenantId: actor.tenantId,
       },
       include: {
-        student: true,
+        student: {
+          include: {
+            guardianLinks: {
+              include: { guardian: true },
+              orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+            },
+          },
+        },
         class: true,
         section: true,
         examTerm: true,
@@ -68,8 +85,31 @@ export class ReportCardPdfService {
       throw new NotFoundException('Report card not found in this tenant');
     }
 
-    const [tenant, marks, unpaid] = await Promise.all([
+    const [
+      tenant,
+      settings,
+      marks,
+      attendanceSessions,
+      attendanceRecords,
+      unpaid,
+    ] = await Promise.all([
       this.prisma.tenant.findUnique({ where: { id: actor.tenantId } }),
+      this.prisma.tenantSetting.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          key: {
+            in: [
+              'school_name',
+              'school_address',
+              'school_phone',
+              'school_email',
+              'school_logo',
+              'principal_name',
+              'report_card_footer_text',
+            ],
+          },
+        },
+      }),
       this.prisma.markEntry.findMany({
         where: {
           tenantId: actor.tenantId,
@@ -85,6 +125,28 @@ export class ReportCardPdfService {
           { assessmentComponent: { name: 'asc' } },
         ],
       }),
+      this.prisma.attendanceSession.count({
+        where: {
+          tenantId: actor.tenantId,
+          academicYearId: reportCard.academicYearId,
+          classId: reportCard.classId,
+          sectionId: reportCard.sectionId ?? null,
+        },
+      }),
+      this.prisma.attendanceRecord.groupBy({
+        by: ['status'],
+        where: {
+          tenantId: actor.tenantId,
+          studentId: reportCard.studentId,
+          attendanceSession: {
+            tenantId: actor.tenantId,
+            academicYearId: reportCard.academicYearId,
+            classId: reportCard.classId,
+            sectionId: reportCard.sectionId ?? null,
+          },
+        },
+        _count: { _all: true },
+      }),
       this.prisma.invoice.count({
         where: {
           tenantId: actor.tenantId,
@@ -99,12 +161,84 @@ export class ReportCardPdfService {
       throw new ConflictException('Report card is blocked by unpaid fees');
     }
 
-    return buildPolishedReportCardPdf({
-      schoolName: tenant?.name ?? 'SchoolOS School',
+    const settingMap = new Map(settings.map((s) => [s.key, String(s.value)]));
+    const primaryGuardian = reportCard.student.guardianLinks[0]?.guardian;
+    const pdf = buildPolishedReportCardPdf({
+      schoolName:
+        settingMap.get('school_name') ?? tenant?.name ?? 'SchoolOS School',
+      schoolLogo: settingMap.get('school_logo') ?? null,
+      address: settingMap.get('school_address') ?? null,
+      contact: [settingMap.get('school_phone'), settingMap.get('school_email')]
+        .filter(Boolean)
+        .join(' | '),
+      principalName: settingMap.get('principal_name') ?? null,
+      footerText: settingMap.get('report_card_footer_text') ?? null,
       panNumber: tenant?.panNumber ?? null,
       reportCard,
+      guardianName: primaryGuardian?.fullName ?? null,
+      attendance: {
+        totalDays: attendanceSessions,
+        present: attendanceRecords
+          .filter((r) => ['PRESENT', 'LATE'].includes(String(r.status)))
+          .reduce((sum, r) => sum + r._count._all, 0),
+        absent: attendanceRecords
+          .filter((r) =>
+            ['ABSENT', 'UNEXCUSED_LEAVE'].includes(String(r.status)),
+          )
+          .reduce((sum, r) => sum + r._count._all, 0),
+      },
       subjects: this.buildSubjectRows(marks),
     });
+
+    if (!reportCard.fileId) {
+      const asset = await this.fileRegistryService.registerGeneratedFile({
+        tenantId: actor.tenantId,
+        generatedByUserId: actor.userId,
+        originalFilename: `report-card-${reportCard.student.studentSystemId}-${reportCard.version}.pdf`,
+        content: pdf,
+        mimeType: 'application/pdf',
+        module: 'academics',
+        entityId: reportCard.id,
+        metadata: {
+          reportType: 'REPORT_CARD',
+          reportCardId: reportCard.id,
+          version: reportCard.version,
+          academicYearId: reportCard.academicYearId,
+          examTermId: reportCard.examTermId,
+          studentId: reportCard.studentId,
+        },
+      });
+      await this.prisma.reportCard.update({
+        where: { id: reportCard.id },
+        data: { fileId: asset.id },
+      });
+      await this.prisma.reportExport.create({
+        data: {
+          tenantId: actor.tenantId,
+          reportKey: 'academics.report-card',
+          format: 'pdf',
+          filters: {
+            reportCardId: reportCard.id,
+            version: reportCard.version,
+          },
+          status: 'COMPLETED',
+          fileAssetId: asset.id,
+          requestedBy: actor.userId,
+          completedAt: new Date(),
+        },
+      });
+    }
+
+    await this.auditService.record({
+      action: 'ACADEMICS_REPORT_CARD_PDF_DOWNLOADED',
+      resource: 'report_card',
+      resourceId: reportCard.id,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: { version: reportCard.version },
+    });
+
+    return pdf;
   }
 
   private buildSubjectRows(marks: MarkWithRelations[]) {
@@ -171,8 +305,15 @@ export class ReportCardPdfService {
 
 function buildPolishedReportCardPdf(input: {
   schoolName: string;
+  schoolLogo?: string | null;
+  address?: string | null;
+  contact?: string | null;
+  principalName?: string | null;
+  footerText?: string | null;
   panNumber?: string | null;
   reportCard: ReportCardWithRelations;
+  guardianName?: string | null;
+  attendance?: { totalDays: number; present: number; absent: number };
   subjects: ReportPdfSubject[];
 }) {
   const { reportCard } = input;
@@ -187,17 +328,39 @@ function buildPolishedReportCardPdf(input: {
     '36 36 540 720 re S',
     '0.25 w',
     '44 44 524 704 re S',
-    text(input.schoolName, 54, 724, 18, 'F2'),
-    input.panNumber ? text(`PAN: ${input.panNumber}`, 54, 708, 8, 'F1') : '',
-    text('PROGRESS REPORT CARD', 382, 724, 14, 'F2'),
+    input.schoolLogo ? '54 704 42 34 re S' : '',
+    input.schoolLogo ? text('LOGO', 63, 721, 9, 'F2') : '',
+    text(input.schoolName, input.schoolLogo ? 108 : 54, 724, 18, 'F2'),
+    input.address
+      ? text(input.address, input.schoolLogo ? 108 : 54, 708, 8, 'F1')
+      : '',
+    input.contact
+      ? text(input.contact, input.schoolLogo ? 108 : 54, 696, 8, 'F1')
+      : '',
+    input.panNumber
+      ? text(
+          `PAN: ${input.panNumber}`,
+          input.schoolLogo ? 108 : 54,
+          684,
+          8,
+          'F1',
+        )
+      : '',
+    text('PROGRESS REPORT CARD', 376, 724, 14, 'F2'),
     text(
       `${reportCard.examTerm.name} | ${reportCard.academicYear.name}`,
-      382,
+      376,
       708,
       9,
       'F1',
     ),
-    text(`Status: ${reportCard.status}`, 382, 692, 8, 'F2'),
+    text(
+      `Status: ${reportCard.status} | Version ${reportCard.version}`,
+      376,
+      692,
+      8,
+      'F2',
+    ),
     '36 680 m 576 680 l S',
 
     labelValue('Student', studentName, 54, 656),
@@ -210,23 +373,24 @@ function buildPolishedReportCardPdf(input: {
       314,
       632,
     ),
+    labelValue('Guardian', input.guardianName ?? 'N/A', 54, 608),
     labelValue(
       'Generated',
       reportCard.updatedAt.toISOString().slice(0, 10),
       444,
-      632,
+      608,
     ),
-    '36 612 m 576 612 l S',
+    '36 588 m 576 588 l S',
 
-    text('SUBJECT', 54, 594, 8, 'F2'),
-    text('COMPONENTS', 206, 594, 8, 'F2'),
-    text('OBTAINED', 390, 594, 8, 'F2'),
-    text('MAX', 456, 594, 8, 'F2'),
-    text('GRADE', 510, 594, 8, 'F2'),
-    '36 584 m 576 584 l S',
+    text('SUBJECT', 54, 570, 8, 'F2'),
+    text('COMPONENTS', 206, 570, 8, 'F2'),
+    text('OBTAINED', 390, 570, 8, 'F2'),
+    text('MAX', 456, 570, 8, 'F2'),
+    text('GRADE', 510, 570, 8, 'F2'),
+    '36 560 m 576 560 l S',
   ];
 
-  let y = 566;
+  let y = 542;
   for (const subject of input.subjects.slice(0, 12)) {
     const componentText = subject.components
       .map(
@@ -244,7 +408,7 @@ function buildPolishedReportCardPdf(input: {
     );
     y -= 18;
 
-    if (y < 290) {
+    if (y < 306) {
       parts.push(
         text(
           'Additional subjects omitted from this one-page preview.',
@@ -286,10 +450,29 @@ function buildPolishedReportCardPdf(input: {
     labelValue('GPA', Number(reportCard.gpa).toFixed(2), 484, y - 34),
   );
 
+  if (input.attendance && input.attendance.totalDays > 0) {
+    parts.push(
+      text('ATTENDANCE', 54, y - 62, 9, 'F2'),
+      labelValue(
+        'Present',
+        `${input.attendance.present} / ${input.attendance.totalDays}`,
+        54,
+        y - 84,
+      ),
+      labelValue('Absent', input.attendance.absent, 184, y - 84),
+      labelValue(
+        'Attendance %',
+        `${((input.attendance.present / input.attendance.totalDays) * 100).toFixed(1)}%`,
+        314,
+        y - 84,
+      ),
+    );
+  }
+
   if (reportCard.remarks) {
     parts.push(
-      text('Remarks', 54, y - 76, 9, 'F2'),
-      ...wrapPdfLine(reportCard.remarks, 54, y - 92, 470, 8),
+      text('Remarks', 54, y - 124, 9, 'F2'),
+      ...wrapPdfLine(reportCard.remarks, 54, y - 140, 470, 8),
     );
   }
 
@@ -299,17 +482,18 @@ function buildPolishedReportCardPdf(input: {
     '238 118 m 374 118 l S',
     text('Exam Coordinator', 268, 102, 9, 'F1'),
     '422 118 m 540 118 l S',
-    text('Principal', 460, 102, 9, 'F1'),
+    text(input.principalName ?? 'Principal', 442, 102, 9, 'F1'),
     '36 82 m 576 82 l S',
     text(
-      'This report card is generated by SchoolOS. Verify with the school office for official use.',
+      input.footerText ??
+        'This report card is generated by SchoolOS. Verify with the school office for official use.',
       54,
       64,
       7,
       'F1',
     ),
     text(
-      `Printed: ${new Date().toISOString().replace('T', ' ').slice(0, 19)}`,
+      `Printed: ${reportCard.updatedAt.toISOString().replace('T', ' ').slice(0, 19)}`,
       54,
       50,
       7,

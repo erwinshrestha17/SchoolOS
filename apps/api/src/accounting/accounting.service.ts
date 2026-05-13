@@ -42,6 +42,11 @@ import {
 
 export interface UnsafeBankStatement {
   id: string;
+  statementDate: Date;
+  description: string;
+  reference?: string | null;
+  debitAmount?: Prisma.Decimal | number | string | null;
+  creditAmount?: Prisma.Decimal | number | string | null;
   isReconciled: boolean;
   [key: string]: unknown;
 }
@@ -1825,6 +1830,156 @@ export class AccountingService {
     });
   }
 
+  async suggestBankReconciliationMatches(
+    accountId: string,
+    actor: AuthContext,
+  ) {
+    const statements = (await this.getUnreconciledStatements(
+      accountId,
+      actor,
+    )) as UnsafeBankStatement[];
+
+    const reconciledLinks = (await this.bankStatements.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        accountId,
+        isReconciled: true,
+        journalLineId: { not: null },
+      },
+      select: { journalLineId: true },
+    })) as Array<{ journalLineId: string | null }>;
+    const usedJournalLineIds = new Set(
+      reconciledLinks
+        .map((row) => row.journalLineId)
+        .filter((id): id is string => Boolean(id)),
+    );
+
+    const journalLines = await this.prisma.journalLine.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        chartAccountId: accountId,
+        journalEntry: { status: JournalEntryStatus.POSTED },
+        id: { notIn: Array.from(usedJournalLineIds) },
+      },
+      include: { journalEntry: true },
+      orderBy: { journalEntry: { entryDate: 'asc' } },
+      take: 1000,
+    });
+
+    const suggestions = statements.map((statement) => {
+      const statementAmount = bankStatementSignedAmount(statement);
+      const candidates = journalLines
+        .map((line) => {
+          const lineAmount = new Prisma.Decimal(line.debit).gt(0)
+            ? new Prisma.Decimal(line.debit)
+            : new Prisma.Decimal(line.credit).mul(-1);
+          const amountMatches = lineAmount.equals(statementAmount);
+          const dateDistance = daysBetween(
+            statement.statementDate,
+            line.journalEntry.entryDate,
+          );
+          const referenceMatches =
+            Boolean(statement.reference) &&
+            normalizeMatchText(
+              line.journalEntry.entryNumber ?? line.journalEntry.sourceId,
+            ).includes(normalizeMatchText(statement.reference));
+          const narrationScore = textSimilarity(
+            statement.description,
+            `${line.journalEntry.narration ?? ''} ${line.journalEntry.entryNumber ?? ''}`,
+          );
+
+          let score = 0;
+          const matchedFields: string[] = [];
+          if (amountMatches) {
+            score += 50;
+            matchedFields.push('amount');
+          }
+          if (dateDistance === 0) {
+            score += 25;
+            matchedFields.push('date');
+          } else if (dateDistance <= 3) {
+            score += 15;
+            matchedFields.push('date_tolerance');
+          }
+          if (referenceMatches) {
+            score += 20;
+            matchedFields.push('reference');
+          }
+          if (narrationScore >= 0.5) {
+            score += Math.round(narrationScore * 15);
+            matchedFields.push('narration');
+          }
+
+          return {
+            candidateJournalId: line.journalEntryId,
+            ledgerTransactionId: line.id,
+            bankTransactionId: statement.id,
+            score,
+            confidence:
+              amountMatches && dateDistance === 0 && referenceMatches
+                ? 'EXACT'
+                : score >= 80
+                  ? 'HIGH'
+                  : score >= 60
+                    ? 'MEDIUM'
+                    : 'LOW',
+            matchedFields,
+            warningFlags: [] as string[],
+            suggestedAction:
+              score >= 80 ? 'REVIEW_AND_CONFIRM' : 'MANUAL_REVIEW',
+            reason: buildMatchReason(
+              amountMatches,
+              dateDistance,
+              narrationScore,
+            ),
+          };
+        })
+        .filter((candidate) => candidate.score >= 50)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5);
+
+      const topScore = candidates[0]?.score;
+      if (
+        topScore !== undefined &&
+        candidates.filter((candidate) => candidate.score === topScore).length >
+          1
+      ) {
+        for (const candidate of candidates.filter(
+          (candidate) => candidate.score === topScore,
+        )) {
+          candidate.warningFlags.push('DUPLICATE_CANDIDATE');
+          candidate.suggestedAction = 'MANUAL_REVIEW';
+        }
+      }
+
+      return {
+        bankTransactionId: statement.id,
+        amount: statementAmount.toFixed(2),
+        statementDate: statement.statementDate,
+        reference: statement.reference,
+        description: statement.description,
+        candidates,
+      };
+    });
+
+    await this.auditService.record({
+      action: 'suggest_reconciliation_matches',
+      resource: 'bank_statement',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: accountId,
+      after: {
+        statementCount: statements.length,
+        suggestionCount: suggestions.reduce(
+          (sum, row) => sum + row.candidates.length,
+          0,
+        ),
+      },
+    });
+
+    return suggestions;
+  }
+
   async reconcileStatement(
     statementId: string,
     journalLineId: string,
@@ -2025,6 +2180,61 @@ function buildFiscalPeriods(tenantId: string, startDate: Date, endDate: Date) {
   }
 
   return periods;
+}
+
+function bankStatementSignedAmount(statement: UnsafeBankStatement) {
+  const debit = new Prisma.Decimal(statement.debitAmount ?? 0);
+  const credit = new Prisma.Decimal(statement.creditAmount ?? 0);
+  return debit.gt(0) ? debit : credit.mul(-1);
+}
+
+function daysBetween(a: Date, b: Date) {
+  const dayMs = 24 * 60 * 60 * 1000;
+  return Math.abs(
+    Math.round(
+      (Date.UTC(a.getUTCFullYear(), a.getUTCMonth(), a.getUTCDate()) -
+        Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate())) /
+        dayMs,
+    ),
+  );
+}
+
+function normalizeMatchText(value: string | null | undefined) {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function textSimilarity(
+  a: string | null | undefined,
+  b: string | null | undefined,
+) {
+  const aTokens = new Set(normalizeMatchText(a).split(/\s+/).filter(Boolean));
+  const bTokens = new Set(normalizeMatchText(b).split(/\s+/).filter(Boolean));
+  if (aTokens.size === 0 || bTokens.size === 0) return 0;
+  const intersection = Array.from(aTokens).filter((token) =>
+    bTokens.has(token),
+  );
+  return intersection.length / Math.max(aTokens.size, bTokens.size);
+}
+
+function buildMatchReason(
+  amountMatches: boolean,
+  dateDistance: number,
+  narrationScore: number,
+) {
+  return [
+    amountMatches ? 'amount matched' : 'amount differs',
+    dateDistance === 0
+      ? 'same date'
+      : dateDistance <= 3
+        ? `date within ${dateDistance} day(s)`
+        : 'date outside tolerance',
+    narrationScore >= 0.5 ? 'narration/reference similar' : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
 }
 
 function getDefaultSchoolChartAccounts() {

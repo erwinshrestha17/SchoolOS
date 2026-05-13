@@ -89,12 +89,18 @@ test.describe.serial('SchoolOS Accounting Workflow Smoke Tests', () => {
     await expect(page.getByText(/Report Filters/i)).toBeVisible();
     await expect(page.getByText(/Fiscal Year/i)).toBeVisible();
     await expect(page.getByText(/Custom Date Range/i)).toBeVisible();
+    await expect(page.getByTestId('accounting-report-pdf-export')).toBeVisible();
+    await expect(page.getByTestId('accounting-report-snapshots')).toBeVisible();
   });
 
   test('Reconciliation: Bank reconciliation workspace loads', async ({ page }) => {
     await page.goto('/dashboard/accounting/reconciliation');
     await expect(page.getByRole('heading', { name: /Bank Reconciliation/i })).toBeVisible();
     await expect(page.getByText(/Select account to reconcile/i)).toBeVisible();
+    const autoMatch = page.getByTestId('bank-reconciliation-auto-match');
+    if ((await autoMatch.count()) > 0) {
+      await expect(autoMatch).toBeVisible();
+    }
   });
 
   test('Management: Fiscal management page loads', async ({ page }) => {

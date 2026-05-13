@@ -41,6 +41,10 @@ import { BulkUpsertMarksDto } from './dto/bulk-upsert-marks.dto';
 import { ListMarksDto } from './dto/list-marks.dto';
 import { UpdateMarkDto } from './dto/update-mark.dto';
 import { GenerateReportCardDto } from './dto/generate-report-card.dto';
+import {
+  ApplyReportCardCorrectionDto,
+  RequestReportCardCorrectionDto,
+} from './dto/report-card-correction.dto';
 import { PromoteStudentDto } from './dto/promote-student.dto';
 import { BatchPromoteDto } from './dto/batch-promote.dto';
 import { ListCasRecordsDto } from './dto/list-cas-records.dto';
@@ -354,8 +358,21 @@ export class AcademicsController {
 
   @Get('report-cards')
   @Permissions('academics:read')
-  listReportCards(@CurrentAuth() auth: AuthContext) {
-    return this.academicsService.listReportCards(auth);
+  listReportCards(
+    @CurrentAuth() auth: AuthContext,
+    @Query('academicYearId') academicYearId?: string,
+    @Query('examTermId') examTermId?: string,
+    @Query('classId') classId?: string,
+    @Query('sectionId') sectionId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.academicsService.listReportCards(auth, {
+      academicYearId,
+      examTermId,
+      classId,
+      sectionId,
+      status,
+    });
   }
 
   @Post('report-cards')
@@ -374,6 +391,39 @@ export class AcademicsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.reportCardsService.batchGenerateReportCards(dto, auth);
+  }
+
+  @Post('report-cards/:id/corrections')
+  @Permissions('academics:manage_report_cards')
+  requestReportCardCorrection(
+    @Param('id') reportCardId: string,
+    @Body() dto: RequestReportCardCorrectionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.reportCardsService.requestCorrection(reportCardId, dto, auth);
+  }
+
+  @Post('report-cards/:id/regenerate')
+  @Permissions('academics:manage_report_cards')
+  regenerateCorrectedReportCard(
+    @Param('id') reportCardId: string,
+    @Body() dto: ApplyReportCardCorrectionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.reportCardsService.applyCorrectionAndRegenerate(
+      reportCardId,
+      dto,
+      auth,
+    );
+  }
+
+  @Get('report-cards/:id/history')
+  @Permissions('academics:read')
+  listReportCardHistory(
+    @Param('id') reportCardId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.reportCardsService.listHistory(reportCardId, auth);
   }
 
   @Get('subjects/:id/syllabus')

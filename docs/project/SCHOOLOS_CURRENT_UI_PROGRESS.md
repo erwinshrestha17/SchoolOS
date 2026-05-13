@@ -5,17 +5,40 @@ This file records the latest web-admin UI/UX implementation progress so large ro
 ## Current UI Sprint
 
 ```text
-Current UI sprint: Phase Gate 0 UI verification and Operations vertical hardening.
+Current UI sprint: Phase 2 Academics and Accounting Production Polish implemented; browser smoke execution remains environment-gated.
 ```
 
 Current repo reality:
 
 ```text
-Library, Transport, and Canteen admin route foundations are present in apps/web.
-Next UI work is not broad route creation; it is smoke verification, QR/manual QA, report/export polish, scan/POS speed polish, and role-specific depth.
+Academics and Accounting now have Phase 2 report-card/report export polish, saved snapshot surfaces, and smoke coverage updates.
+Next UI work is not broad route creation; it is environment-backed smoke execution, QR/manual QA, audit viewer depth, scan/POS speed polish, and role-specific depth.
 ```
 
 ## Current Sprint (Completed)
+
+### UI-6F — Academics and Accounting Production Polish
+
+Status: **Completed**.
+
+Focus: Completing the highest-value admin production surfaces for M4 Academics and M9 Accounting.
+
+Completed:
+
+- **Academics Report Cards:**
+  - Added clearer report-card status, PDF download, generation history, and correction/regeneration actions.
+  - Added readable loading, empty, and error states around report-card generation/download flows.
+  - Updated Academics Playwright smoke coverage for exams, marks, CAS, results, report cards, download visibility, and history.
+- **Accounting Reports:**
+  - Added PDF export actions for backend-supported accounting reports.
+  - Added saved snapshot/history panel backed by report export history.
+  - Preserved backend financial truth: UI triggers exports and displays backend totals, but does not calculate official totals.
+- **Bank Reconciliation:**
+  - Added an auto-match suggestion action and review-only suggestion panel.
+  - Low-confidence and duplicate suggestions are surfaced for manual review instead of automatic reconciliation.
+- **Verification:**
+  - Web typecheck and full repo tests passed.
+  - Browser E2E execution is blocked in the current sandbox by local-port binding restrictions and must be rerun in local/staging.
 
 ### UI-6E — Deeper Finance/Accounting Reports Visual Polish, Academics Marks/CAS Keyboard UX
 
@@ -69,7 +92,7 @@ Completed:
 
 ```text
 Phase Gate 0 UI Verification:
-credential-gated route smoke, permission-denied states, stale link cleanup, and QR manual QA.
+run credential-gated browser smoke in local/staging, permission-denied states, stale link cleanup, QR manual QA, and accounting audit viewer depth.
 ```
 
 ## Following Sprint

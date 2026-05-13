@@ -501,6 +501,18 @@ export class AccountingController {
     return this.accountingService.getUnreconciledStatements(accountId, auth);
   }
 
+  @Get('bank-reconciliation/:accountId/auto-match')
+  @Permissions('accounting:reports:read')
+  suggestReconciliationMatches(
+    @Param('accountId') accountId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.accountingService.suggestBankReconciliationMatches(
+      accountId,
+      auth,
+    );
+  }
+
   @Post('bank-reconciliation/reconcile')
   @Permissions('accounting:settings:update')
   reconcileStatement(

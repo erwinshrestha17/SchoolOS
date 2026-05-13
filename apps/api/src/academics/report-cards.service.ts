@@ -12,6 +12,10 @@ import { SettingsService } from '../settings/settings.service';
 import { BatchGenerateReportCardsDto } from './dto/batch-generate-report-cards.dto';
 import { GenerateReportCardDto } from './dto/generate-report-card.dto';
 import {
+  ApplyReportCardCorrectionDto,
+  RequestReportCardCorrectionDto,
+} from './dto/report-card-correction.dto';
+import {
   GradeCalculatorService,
   type ComponentScoreInput,
   type SubjectGradeResult,
@@ -290,6 +294,281 @@ export class ReportCardsService {
     return {
       generated: reports.length,
       reports,
+    };
+  }
+
+  async requestCorrection(
+    reportCardId: string,
+    dto: RequestReportCardCorrectionDto,
+    actor: AuthContext,
+  ) {
+    const reason = dto.reason?.trim();
+    if (!reason) {
+      throw new ConflictException('Correction reason is required');
+    }
+
+    const reportCard = await this.prisma.reportCard.findFirst({
+      where: { id: reportCardId, tenantId: actor.tenantId },
+    });
+
+    if (!reportCard) {
+      throw new NotFoundException('Report card not found in this tenant');
+    }
+
+    const request = await this.prisma.reportCardCorrectionRequest.create({
+      data: {
+        tenantId: actor.tenantId,
+        reportCardId,
+        requestedById: actor.userId,
+        reason,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'ACADEMICS_REPORT_CARD_CORRECTION_REQUESTED',
+      resource: 'report_card',
+      resourceId: reportCardId,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: { reason, requestId: request.id, version: reportCard.version },
+    });
+
+    return request;
+  }
+
+  async applyCorrectionAndRegenerate(
+    reportCardId: string,
+    dto: ApplyReportCardCorrectionDto,
+    actor: AuthContext,
+  ) {
+    const reason = dto.reason?.trim();
+    if (!reason) {
+      throw new ConflictException('Correction reason is required');
+    }
+
+    const reportCard = await this.prisma.reportCard.findFirst({
+      where: { id: reportCardId, tenantId: actor.tenantId },
+      include: { examTerm: true },
+    });
+
+    if (!reportCard) {
+      throw new NotFoundException('Report card not found in this tenant');
+    }
+
+    if (reportCard.status !== GradeLockStatus.LOCKED) {
+      throw new ConflictException(
+        'Only locked report cards use the correction workflow',
+      );
+    }
+
+    if (!reportCard.examTerm.isLocked) {
+      throw new ConflictException(
+        'Corrected report cards can only be regenerated after marks are locked again',
+      );
+    }
+
+    const recalculated = await this.calculateRegeneratedValues(
+      {
+        academicYearId: reportCard.academicYearId,
+        examTermId: reportCard.examTermId,
+        studentId: reportCard.studentId,
+        remarks: dto.remarks,
+        lock: true,
+      },
+      actor,
+    );
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const request = await tx.reportCardCorrectionRequest.create({
+        data: {
+          tenantId: actor.tenantId,
+          reportCardId,
+          requestedById: actor.userId,
+          reviewedById: actor.userId,
+          status: 'APPROVED',
+          reason,
+          reviewNote: dto.reviewNote ?? null,
+          reviewedAt: new Date(),
+        },
+      });
+
+      const history = await tx.reportCardHistory.create({
+        data: {
+          reportCardId,
+          tenantId: actor.tenantId,
+          academicYearId: reportCard.academicYearId,
+          examTermId: reportCard.examTermId,
+          studentId: reportCard.studentId,
+          classId: reportCard.classId,
+          sectionId: reportCard.sectionId,
+          totalMarks: reportCard.totalMarks,
+          maxMarks: reportCard.maxMarks,
+          percentage: reportCard.percentage,
+          grade: reportCard.grade,
+          gpa: reportCard.gpa,
+          remarks: reportCard.remarks,
+          version: reportCard.version,
+          fileId: reportCard.fileId,
+        },
+      });
+
+      const nextVersion = reportCard.version + 1;
+      const updated = await tx.reportCard.update({
+        where: { id: reportCardId },
+        data: {
+          totalMarks: new Prisma.Decimal(recalculated.overall.totalObtained),
+          maxMarks: new Prisma.Decimal(recalculated.overall.totalFullMarks),
+          percentage: new Prisma.Decimal(recalculated.overall.percentage),
+          grade: recalculated.overall.grade,
+          gpa: new Prisma.Decimal(recalculated.overall.gpa),
+          remarks: recalculated.remarks,
+          status: GradeLockStatus.LOCKED,
+          lockedAt: new Date(),
+          version: nextVersion,
+          fileId: null,
+          publishStatus: dto.republish
+            ? 'PUBLISHED'
+            : reportCard.publishStatus === 'PUBLISHED'
+              ? 'CORRECTED_DRAFT'
+              : reportCard.publishStatus,
+          publishedAt: dto.republish ? new Date() : reportCard.publishedAt,
+          publishedById: dto.republish
+            ? actor.userId
+            : reportCard.publishedById,
+        },
+        include: {
+          academicYear: true,
+          examTerm: true,
+          student: true,
+          class: true,
+          section: true,
+        },
+      });
+
+      return { request, history, reportCard: updated };
+    });
+
+    await this.auditService.record({
+      action: 'ACADEMICS_REPORT_CARD_CORRECTION_APPLIED',
+      resource: 'report_card',
+      resourceId: reportCardId,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        reason,
+        previousVersion: reportCard.version,
+        newVersion: result.reportCard.version,
+        historyId: result.history.id,
+        requestId: result.request.id,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'ACADEMICS_REPORT_CARD_REGENERATED',
+      resource: 'report_card',
+      resourceId: reportCardId,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        version: result.reportCard.version,
+        republished: Boolean(dto.republish),
+        publishStatus: result.reportCard.publishStatus,
+      },
+    });
+
+    return result.reportCard;
+  }
+
+  async listHistory(reportCardId: string, actor: AuthContext) {
+    const reportCard = await this.prisma.reportCard.findFirst({
+      where: { id: reportCardId, tenantId: actor.tenantId },
+      select: { id: true },
+    });
+
+    if (!reportCard) {
+      throw new NotFoundException('Report card not found in this tenant');
+    }
+
+    const [history, corrections] = await Promise.all([
+      this.prisma.reportCardHistory.findMany({
+        where: { tenantId: actor.tenantId, reportCardId },
+        orderBy: { version: 'desc' },
+      }),
+      this.prisma.reportCardCorrectionRequest.findMany({
+        where: { tenantId: actor.tenantId, reportCardId },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    return { history, corrections };
+  }
+
+  private async calculateRegeneratedValues(
+    dto: GenerateReportCardDto,
+    actor: AuthContext,
+  ) {
+    const student = await this.prisma.student.findFirst({
+      where: { id: dto.studentId, tenantId: actor.tenantId },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    const [components, marks] = await Promise.all([
+      this.prisma.assessmentComponent.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          examTermId: dto.examTermId,
+          subject: { classId: student.classId },
+        },
+        include: { subject: true },
+        orderBy: [{ subject: { code: 'asc' } }, { name: 'asc' }],
+      }),
+      this.prisma.markEntry.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          examTermId: dto.examTermId,
+          studentId: dto.studentId,
+        },
+        include: { assessmentComponent: true, subject: true },
+      }),
+    ]);
+
+    if (components.length === 0) {
+      throw new ConflictException(
+        'No assessment components configured for this exam term and student class',
+      );
+    }
+
+    if (marks.some((mark) => !mark.isLocked)) {
+      throw new ConflictException(
+        'Report card regeneration requires all available marks to be locked',
+      );
+    }
+
+    const subjectGrades = this.calculateSubjectGrades(components, marks);
+    const overall = this.gradeCalculator.calculateOverallGpa(subjectGrades);
+
+    if (overall.resultStatus === 'INCOMPLETE') {
+      throw new ConflictException(
+        'Cannot regenerate report card while required marks are incomplete',
+      );
+    }
+
+    if (overall.resultStatus === 'WITHHELD') {
+      throw new ConflictException(
+        'Cannot regenerate report card while any result is withheld',
+      );
+    }
+
+    return {
+      overall,
+      remarks: this.buildRemarks(
+        dto.remarks,
+        subjectGrades,
+        overall.resultStatus,
+      ),
     };
   }
 

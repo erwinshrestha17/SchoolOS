@@ -560,6 +560,18 @@ export const api = {
     request<ReportCardSummary>('/academics/report-cards', { method: 'POST', json: body }),
   batchGenerateReportCards: (body: JsonBody) =>
     request<ReportCardSummary[]>('/academics/report-cards/batch', { method: 'POST', json: body }),
+  requestReportCardCorrection: (id: string, body: JsonBody) =>
+    request<any>(`/academics/report-cards/${encodeURIComponent(id)}/corrections`, {
+      method: 'POST',
+      json: body,
+    }),
+  regenerateReportCard: (id: string, body: JsonBody) =>
+    request<ReportCardSummary>(`/academics/report-cards/${encodeURIComponent(id)}/regenerate`, {
+      method: 'POST',
+      json: body,
+    }),
+  listReportCardHistory: (id: string) =>
+    request<any>(`/academics/report-cards/${encodeURIComponent(id)}/history`),
   listPromotionReadiness: (params: {
     academicYearId: string;
     classId?: string | null;
@@ -1299,7 +1311,7 @@ export const api = {
   listPfSummary: () => request<any>('/accounting/reports/pf-summary'),
   exportAccountingCsv: async (report: string) => {
     const response = await fetch(
-      `${API_BASE_URL}/accounting/exports/${encodeURIComponent(report)}.csv`,
+      `${API_BASE_URL}/accounting/reports/${encodeURIComponent(report)}/export`,
       { credentials: 'include' },
     );
 
@@ -1317,6 +1329,14 @@ export const api = {
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
+  },
+  exportAccountingPdf: async (report: string, params?: JsonBody) => {
+    const response = await fetch(
+      `${API_BASE_URL}/accounting/reports/${report}/export.pdf${params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : ''}`,
+      { credentials: 'include' },
+    );
+
+    await openPdfBlob(response);
   },
   closeAccountingPeriod: (id: string) =>
     request<AccountingPeriodSummary>(`/accounting/closing/${id}`, {
@@ -1343,19 +1363,21 @@ export const api = {
       json: body,
     }),
   importBankStatement: (accountId: string, lines: any[]) =>
-    request<any>(`/accounting/bank-reconciliation/accounts/${accountId}/import`, {
+    request<any>(`/accounting/bank-reconciliation/${accountId}/import`, {
       method: 'POST',
       json: { lines },
     }),
   getUnreconciledStatements: (accountId: string) =>
-    request<any[]>(`/accounting/bank-reconciliation/accounts/${accountId}/unreconciled`),
+    request<any[]>(`/accounting/bank-reconciliation/${accountId}/unreconciled`),
+  suggestReconciliationMatches: (accountId: string) =>
+    request<any[]>(`/accounting/bank-reconciliation/${accountId}/auto-match`),
   reconcileStatement: (statementId: string, journalLineId: string) =>
-    request<any>(`/accounting/bank-reconciliation/statements/${statementId}/reconcile`, {
+    request<any>('/accounting/bank-reconciliation/reconcile', {
       method: 'POST',
-      json: { journalLineId },
+      json: { statementId, journalLineId },
     }),
   getReconciliationSummary: (accountId: string) =>
-    request<any>(`/accounting/bank-reconciliation/accounts/${accountId}/summary`),
+    request<any>(`/accounting/bank-reconciliation/${accountId}/summary`),
   listJournalEntries: () => request<JournalEntryView[]>('/accounting/journals'),
   createManualJournal: (body: JsonBody) =>
     request<JournalEntryView>('/accounting/journals', {
@@ -1682,6 +1704,23 @@ export const api = {
   listReports: () => request<ReportDefinition[]>('/reports'),
   exportReport: (reportKey: string, payload: ReportExportRequest) =>
     downloadReport(reportKey, payload),
+  listReportSnapshots: (params?: { page?: number; limit?: number }) =>
+    request<any>(withQuery('/reports/export-history', params ?? {})),
+  downloadReportSnapshot: async (id: string) => {
+    const response = await fetch(
+      `${API_BASE_URL}/reports/export-history/${encodeURIComponent(id)}/download`,
+      { credentials: 'include' },
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(parseApiErrorMessage(text) || 'Download failed');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  },
 
   // Staff Self-Service
   getMyProfile: () => request<any>('/staff/me'),

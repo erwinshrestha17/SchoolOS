@@ -5,6 +5,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 
 import { FinanceModule } from '../finance/finance.module';
+import { FileRegistryModule } from '../file-registry/file-registry.module';
 
 import { BullModule } from '@nestjs/bullmq';
 
@@ -15,6 +16,7 @@ import { ReportsProcessor } from './reports.processor';
     PrismaModule,
     AuditModule,
     FinanceModule,
+    FileRegistryModule,
     BullModule.registerQueue({
       name: 'reports',
     }),

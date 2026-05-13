@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { AccountingReportsService } from './accounting-reports.service';
 import { convertToCsv, formatCsvDecimal } from '../common/csv-utils';
+import { buildTableReportPdf } from '../common/pdf/simple-pdf';
+import { PrismaService } from '../prisma/prisma.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
+import { AuditService } from '../audit/audit.service';
+import type { AuthContext } from '../auth/auth.types';
+import { Prisma } from '@prisma/client';
 import { TrialBalanceQueryDto } from './dto/trial-balance-query.dto';
 import { GeneralLedgerQueryDto } from './dto/general-ledger-query.dto';
 import { CashBookQueryDto } from './dto/cash-book-query.dto';
@@ -10,7 +16,12 @@ import { TaxSummaryQueryDto } from './dto/tax-summary-query.dto';
 
 @Injectable()
 export class AccountingReportExportsService {
-  constructor(private readonly reportsService: AccountingReportsService) {}
+  constructor(
+    private readonly reportsService: AccountingReportsService,
+    private readonly prisma: PrismaService,
+    private readonly fileRegistryService: FileRegistryService,
+    private readonly auditService: AuditService,
+  ) {}
 
   async exportTrialBalanceCsv(
     tenantId: string,
@@ -47,6 +58,40 @@ export class AccountingReportExportsService {
     });
 
     return convertToCsv(rows);
+  }
+
+  async exportTrialBalancePdf(
+    tenantId: string,
+    query: TrialBalanceQueryDto,
+    actor: AuthContext,
+  ) {
+    const data = await this.reportsService.getTrialBalance(tenantId, query);
+    const rows: Array<Record<string, unknown>> = data.rows.map((row) => ({
+      Code: row.accountCode,
+      Account: row.accountName,
+      Type: row.accountType,
+      Debit: formatCsvDecimal(row.closingDebit),
+      Credit: formatCsvDecimal(row.closingCredit),
+      Balance: formatCsvDecimal(row.netBalance),
+    }));
+    rows.push({
+      Code: 'TOTAL',
+      Account: data.isBalanced ? 'Balanced' : 'Imbalanced',
+      Type: '',
+      Debit: formatCsvDecimal(data.totalClosingDebit),
+      Credit: formatCsvDecimal(data.totalClosingCredit),
+      Balance: formatCsvDecimal(data.imbalanceAmount),
+    });
+
+    return this.buildAndSnapshotPdf({
+      tenantId,
+      actor,
+      reportKey: 'accounting.trial-balance',
+      title: 'Trial Balance',
+      subtitle: this.periodSubtitle(query),
+      filters: query as unknown as Prisma.InputJsonValue,
+      rows,
+    });
   }
 
   async exportGeneralLedgerCsv(
@@ -96,6 +141,53 @@ export class AccountingReportExportsService {
     return convertToCsv(rows);
   }
 
+  async exportGeneralLedgerPdf(
+    tenantId: string,
+    query: GeneralLedgerQueryDto,
+    actor: AuthContext,
+  ) {
+    const data = await this.reportsService.getGeneralLedger(tenantId, {
+      ...query,
+      limit: 10000,
+    });
+    const rows: Array<Record<string, unknown>> = [
+      {
+        Date: 'OPENING',
+        Journal: '',
+        Description: `${formatCsvDecimal(data.openingBalance)} ${data.openingBalanceSide}`,
+        Debit: '',
+        Credit: '',
+        Balance: '',
+      },
+      ...data.rows.map((row) => ({
+        Date: row.entryDate,
+        Journal: row.entryNumber ?? '',
+        Description: row.description ?? '',
+        Debit: formatCsvDecimal(row.debit),
+        Credit: formatCsvDecimal(row.credit),
+        Balance: `${formatCsvDecimal(row.runningBalance)} ${row.runningBalanceSide}`,
+      })),
+      {
+        Date: 'CLOSING',
+        Journal: '',
+        Description: data.accountCode ?? data.accountId ?? '',
+        Debit: formatCsvDecimal(data.totals.debit),
+        Credit: formatCsvDecimal(data.totals.credit),
+        Balance: `${formatCsvDecimal(data.closingBalance)} ${data.closingBalanceSide}`,
+      },
+    ];
+
+    return this.buildAndSnapshotPdf({
+      tenantId,
+      actor,
+      reportKey: 'accounting.general-ledger',
+      title: 'General Ledger',
+      subtitle: this.periodSubtitle(query),
+      filters: query as unknown as Prisma.InputJsonValue,
+      rows,
+    });
+  }
+
   async exportCashBookCsv(
     tenantId: string,
     query: CashBookQueryDto,
@@ -138,6 +230,45 @@ export class AccountingReportExportsService {
     });
 
     return convertToCsv(rows);
+  }
+
+  async exportCashBookPdf(
+    tenantId: string,
+    query: CashBookQueryDto,
+    actor: AuthContext,
+  ) {
+    const data = await this.reportsService.getCashBook(tenantId, {
+      ...query,
+      limit: 10000,
+    });
+    const rows: Array<Record<string, unknown>> = data.rows.map((row) => ({
+      Date: row.entryDate,
+      Journal: row.entryNumber ?? '',
+      Description: row.narration ?? '',
+      Receipt: formatCsvDecimal(row.receiptAmount),
+      Payment: formatCsvDecimal(row.paymentAmount),
+      Balance: `${formatCsvDecimal(row.runningBalance)} ${row.runningBalanceSide}`,
+    }));
+    rows.push({
+      Date: 'TOTAL',
+      Journal: '',
+      Description: data.account
+        ? `${data.account.code} - ${data.account.name}`
+        : '',
+      Receipt: formatCsvDecimal(data.totalReceipts),
+      Payment: formatCsvDecimal(data.totalPayments),
+      Balance: `${formatCsvDecimal(data.closingBalance)} ${data.closingBalanceSide}`,
+    });
+
+    return this.buildAndSnapshotPdf({
+      tenantId,
+      actor,
+      reportKey: 'accounting.cash-book',
+      title: 'Cash Book',
+      subtitle: this.periodSubtitle(query),
+      filters: query as unknown as Prisma.InputJsonValue,
+      rows,
+    });
   }
 
   async exportIncomeStatementCsv(
@@ -185,6 +316,46 @@ export class AccountingReportExportsService {
     });
 
     return convertToCsv(rows);
+  }
+
+  async exportIncomeStatementPdf(
+    tenantId: string,
+    query: IncomeStatementQueryDto,
+    actor: AuthContext,
+  ) {
+    const data = await this.reportsService.getIncomeStatement(tenantId, query);
+    const rows: Array<Record<string, unknown>> = data.sections.flatMap(
+      (section) => [
+        ...section.accounts.map((acc) => ({
+          Section: section.section,
+          Code: acc.accountCode,
+          Account: acc.accountName,
+          Amount: formatCsvDecimal(acc.amount),
+        })),
+        {
+          Section: section.section,
+          Code: '',
+          Account: `Total ${section.section}`,
+          Amount: formatCsvDecimal(section.total),
+        },
+      ],
+    );
+    rows.push({
+      Section: 'SUMMARY',
+      Code: '',
+      Account: `Net ${data.resultType}`,
+      Amount: formatCsvDecimal(data.netSurplusOrDeficit),
+    });
+
+    return this.buildAndSnapshotPdf({
+      tenantId,
+      actor,
+      reportKey: 'accounting.income-statement',
+      title: 'Income Statement',
+      subtitle: this.periodSubtitle(query),
+      filters: query as unknown as Prisma.InputJsonValue,
+      rows,
+    });
   }
 
   async exportBalanceSheetCsv(
@@ -250,6 +421,46 @@ export class AccountingReportExportsService {
     });
 
     return convertToCsv(rows);
+  }
+
+  async exportBalanceSheetPdf(
+    tenantId: string,
+    query: BalanceSheetQueryDto,
+    actor: AuthContext,
+  ) {
+    const data = await this.reportsService.getBalanceSheet(tenantId, query);
+    const rows: Array<Record<string, unknown>> = data.sections.flatMap(
+      (section) => [
+        ...section.accounts.map((acc) => ({
+          Section: section.section,
+          Code: acc.accountCode,
+          Account: acc.accountName,
+          Amount: formatCsvDecimal(acc.amount),
+        })),
+        {
+          Section: section.section,
+          Code: '',
+          Account: `Total ${section.section}`,
+          Amount: formatCsvDecimal(section.total),
+        },
+      ],
+    );
+    rows.push({
+      Section: 'CHECK',
+      Code: '',
+      Account: data.isBalanced ? 'Balanced' : 'Imbalanced',
+      Amount: formatCsvDecimal(data.imbalanceAmount),
+    });
+
+    return this.buildAndSnapshotPdf({
+      tenantId,
+      actor,
+      reportKey: 'accounting.balance-sheet',
+      title: 'Balance Sheet',
+      subtitle: this.periodSubtitle(query),
+      filters: query as unknown as Prisma.InputJsonValue,
+      rows,
+    });
   }
 
   async exportTaxSummaryCsv(
@@ -340,5 +551,118 @@ export class AccountingReportExportsService {
     }
 
     return convertToCsv(rows);
+  }
+
+  async exportTaxSummaryPdf(
+    tenantId: string,
+    query: TaxSummaryQueryDto,
+    actor: AuthContext,
+  ) {
+    const csv = await this.exportTaxSummaryCsv(tenantId, query);
+    const [headerLine, ...lines] = csv.split('\n');
+    const headers = headerLine.split(',');
+    const rows = lines
+      .filter(Boolean)
+      .map((line) =>
+        Object.fromEntries(
+          line
+            .split(',')
+            .map((value, index) => [
+              headers[index],
+              value.replace(/^"|"$/g, '').replace(/""/g, '"'),
+            ]),
+        ),
+      );
+
+    return this.buildAndSnapshotPdf({
+      tenantId,
+      actor,
+      reportKey: 'accounting.tax-summary',
+      title: 'VAT/TDS/PF Summary',
+      subtitle: this.periodSubtitle(query),
+      filters: query as unknown as Prisma.InputJsonValue,
+      rows,
+    });
+  }
+
+  private async buildAndSnapshotPdf(input: {
+    tenantId: string;
+    actor: AuthContext;
+    reportKey: string;
+    title: string;
+    subtitle: string;
+    filters: Prisma.InputJsonValue;
+    rows: Array<Record<string, unknown>>;
+  }) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: input.tenantId },
+    });
+    const content = buildTableReportPdf({
+      schoolName: tenant?.name ?? input.actor.tenantSlug,
+      title: input.title,
+      subtitle: input.subtitle,
+      rows: input.rows,
+    });
+    const fileName = `${input.reportKey.replace(/\./g, '-')}-${new Date()
+      .toISOString()
+      .slice(0, 10)}.pdf`;
+    const asset = await this.fileRegistryService.registerGeneratedFile({
+      tenantId: input.tenantId,
+      generatedByUserId: input.actor.userId,
+      originalFilename: fileName,
+      content,
+      mimeType: 'application/pdf',
+      module: 'accounting',
+      metadata: {
+        reportKey: input.reportKey,
+        format: 'pdf',
+        filters: input.filters,
+      },
+    });
+
+    await this.prisma.reportExport.create({
+      data: {
+        tenantId: input.tenantId,
+        reportKey: input.reportKey,
+        format: 'pdf',
+        filters: input.filters,
+        status: 'COMPLETED',
+        fileAssetId: asset.id,
+        requestedBy: input.actor.userId,
+        completedAt: new Date(),
+      },
+    });
+
+    await this.auditService.record({
+      action: 'export_accounting_report',
+      resource: 'accounting_report',
+      resourceId: input.reportKey,
+      tenantId: input.tenantId,
+      userId: input.actor.userId,
+      after: {
+        format: 'pdf',
+        filters: input.filters,
+        fileAssetId: asset.id,
+      },
+    });
+
+    return content;
+  }
+
+  private periodSubtitle(query: {
+    fiscalYearId?: string;
+    fiscalPeriodId?: string;
+    fromDate?: string;
+    toDate?: string;
+  }) {
+    return [
+      query.fiscalYearId ? `Fiscal Year: ${query.fiscalYearId}` : null,
+      query.fiscalPeriodId ? `Period: ${query.fiscalPeriodId}` : null,
+      query.fromDate || query.toDate
+        ? `Date Range: ${query.fromDate ?? 'start'} to ${query.toDate ?? 'end'}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(' | ');
   }
 }

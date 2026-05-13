@@ -17,13 +17,13 @@ Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
 M0 Platform Core: Foundation complete; pilot hardening remains
-M4 Academics: Backend and admin UI implemented
+M4 Academics: Backend/admin UI plus Phase 2 PDF, correction/history, export, snapshot, and smoke polish implemented
 M6 Homework/Timetable: Backend and admin UI foundations implemented
 M7 HR/Payroll: Backend and admin UI foundations implemented
 M8A Library: Admin/backend foundation implemented
 M8B Transport: Admin/trip/location foundation implemented
 M8C Canteen: Admin/wallet/POS/inventory foundation implemented
-M9 Accounting: Production-candidate complete for current scope
+M9 Accounting: Production-candidate complete for current scope with Phase 2 PDF, snapshot, reconciliation suggestion, and smoke polish implemented
 M10 Communication/Chat: Foundation implemented
 M11 Intelligence/AI: Not started
 ```
@@ -41,11 +41,9 @@ Full SchoolOS product complete: No
 Important working-tree note:
 
 ```text
-This documentation pass did not modify runtime code.
-Before this pass, the worktree already had modified files:
-- apps/api/src/common/pdf/simple-pdf.ts
-- pnpm-lock.yaml
-Do not treat QR-in-PDF or lockfile behavior as verified by this documentation update.
+Phase 2 Academics and Accounting production polish has been implemented and verified through the core gate.
+`pnpm verify:production` is blocked only at browser E2E local-port binding in the current sandbox.
+`pnpm smoke:phase1` still requires local Postgres, Redis, API, and web services.
 ```
 
 Near-term rule:
@@ -79,14 +77,14 @@ Biometric workflows
 | M1 Admissions & Student Profiles | Pilot-ready plus Student QR foundation | 90-95% |
 | M2 Smart Attendance | Pilot-ready | 85-90% |
 | M3 Fees & Receipts | Pilot-ready | 85-90% |
-| M4 Academics / Exams / CAS / Report Cards | Backend and admin UI implemented | 95-100% |
+| M4 Academics / Exams / CAS / Report Cards | Backend/admin UI plus Phase 2 PDF/report/correction/snapshot polish implemented | 98-100% |
 | M5 Activity Feed & Milestones | Strong Phase 1 foundation | 75-85% |
 | M6 Homework & Timetable | Backend/admin UI foundation implemented | 70-80% |
 | M7 HR & Payroll | Backend/admin UI foundation implemented | 75-85% |
 | M8A Library Management | Admin/backend foundation implemented | 65-75% |
 | M8B Transport Management | Admin/trip/location foundation implemented | 60-70% |
 | M8C Canteen Management | Admin/wallet/POS/inventory foundation implemented | 65-75% |
-| M9 Accounting & Finance | Production-candidate complete | 95-100% |
+| M9 Accounting & Finance | Production-candidate complete with Phase 2 PDF/snapshot/reconciliation polish implemented | 98-100% |
 | M10 Notices & Communication | Strong Phase 1 + chat foundation | 85-90% |
 | M11 School Intelligence / AI | Roadmap only | 0% |
 
@@ -218,22 +216,24 @@ Implemented:
 - Nepal grading/GPA result preview.
 - Marks lock/unlock workflow.
 - Report card generation/history/correction models.
+- Polished report-card PDF downloads, File Registry snapshots, academic CSV/PDF reports, and explicit locked correction/regeneration flow.
 - Promotion readiness and result publishing.
 - Academics dashboard and full admin routes for setup, marks, CAS, locks, results, report cards, promotion, publishing.
+- Report-card download/history/correction UI polish and Playwright smoke coverage updates.
 - Keyboard-friendly marks and CAS entry.
 
 Remaining backend:
 
-- Report-card PDF visual polish.
-- Locked report-card correction/regeneration workflow.
-- Deeper academic reports/exports.
+- Optional CAS summary, failed-threshold, and promotion-readiness export variants where product rules require them.
+- Raster logo embedding in the simple PDF engine.
+- Staging object-storage verification for generated report files.
 - Final index review after real usage patterns stabilize.
 
 Remaining frontend:
 
-- Full browser/manual smoke of the complete academic flow.
-- PDF preview/download polish.
-- Academic reporting UI depth.
+- Browser/manual smoke execution in an environment with seeded credentials and local ports.
+- Dialog-level correction UX polish beyond the current guarded action.
+- Academic reporting UI depth beyond the smoke-tested report-card workflow.
 
 ### M5 - Activity Feed & Milestones
 
@@ -396,23 +396,21 @@ Implemented:
 - Double-entry enforcement, Decimal-safe posting, immutable posted journals.
 - Source-based idempotent posting, reversal/correction workflows.
 - Fiscal close/reopen, opening balances, vouchers.
-- Trial balance, general ledger, cash book, income statement, balance sheet, VAT/TDS/PF summaries, CSV exports.
-- Bank reconciliation and accounting report mapping.
-- Accounting dashboard, accounts, journals, reports, reconciliation, management routes.
+- Trial balance, general ledger, cash book, income statement, balance sheet, VAT/TDS/PF summaries, CSV/PDF exports.
+- File Registry report snapshots, bank reconciliation, deterministic auto-match suggestions, and accounting report mapping.
+- Accounting dashboard, accounts, journals, reports, reconciliation, management routes with PDF/snapshot/suggestion surfaces.
 
 Remaining backend:
 
-- PDF accounting exports.
-- Saved report snapshots and File Registry integration.
-- Advanced bank auto-match rules.
+- Dedicated bank-reconciliation PDF export.
 - Accounting audit log viewer API/UI support.
 - Production seed review for default Chart of Accounts and report mappings.
+- Optional background workers for large tenant report exports.
 
 Remaining frontend:
 
-- Seeded Playwright accounting workflow tests.
-- Advanced accounting report visual polish.
-- Audit log viewer UI.
+- Audit log viewer UI depth.
+- Browser smoke execution in an environment with seeded credentials and local ports.
 
 ### M10 - Notices, Communication, Messaging
 
@@ -517,24 +515,24 @@ Purpose: complete the two highest-value production modules already closest to co
 
 Backend tasks:
 
-1. Polish report-card PDFs.
-2. Implement locked report-card correction/regeneration.
-3. Add deeper academic reports/exports.
-4. Add accounting PDF exports.
-5. Add saved accounting/academic report snapshots through File Registry.
-6. Add advanced bank reconciliation auto-match rules.
+1. Done: polished report-card PDFs.
+2. Done: implemented locked report-card correction/regeneration with history.
+3. Done: added backend-driven academic reports/exports.
+4. Done: added accounting PDF exports for core reports and tax summaries.
+5. Done: added saved accounting/academic report snapshots through File Registry.
+6. Done: added deterministic bank reconciliation auto-match suggestions.
 
 Frontend tasks:
 
-1. Complete end-to-end Academics manual/browser smoke.
-2. Polish report-card preview/download.
-3. Polish Accounting reports and audit viewer.
-4. Add seeded Playwright coverage for accounting workflows.
+1. Done: updated end-to-end Academics browser smoke.
+2. Done: polished report-card download/history/correction surfaces.
+3. Done: polished Accounting report PDF/snapshot and reconciliation suggestion surfaces.
+4. Done: added/updated seeded Playwright coverage for accounting workflows.
 
 Exit criteria:
 
 ```text
-Academics and Accounting are production-grade admin modules for the current Nepal school scope.
+Academics and Accounting are production-grade admin modules for the current Nepal school scope once browser smoke is run in a local/staging environment that can bind web ports and connect to Postgres/Redis/API.
 ```
 
 ### Phase 3 - Homework, Timetable, HR, and Payroll Depth

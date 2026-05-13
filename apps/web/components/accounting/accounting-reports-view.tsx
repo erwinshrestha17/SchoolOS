@@ -3,7 +3,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { 
   BarChart3, FileText, PieChart, History, 
-  Wallet, Calculator, AlertCircle, FileSpreadsheet, ArrowRight
+  Wallet, Calculator, FileSpreadsheet, FileDown
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { SectionCard } from '../ui/section-card';
@@ -57,6 +57,11 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
     }
   });
 
+  const snapshotsQuery = useQuery({
+    queryKey: ['report-snapshots', activeReport],
+    queryFn: () => api.listReportSnapshots({ limit: 8 }),
+  });
+
   const exportMutation = useMutation({ 
     mutationFn: (report: string) => api.exportAccountingCsv(report),
     onSuccess: () => {
@@ -67,8 +72,15 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
     }
   });
 
+  const pdfMutation = useMutation({
+    mutationFn: (report: string) => api.exportAccountingPdf(report, filters),
+    onError: (err) => {
+      console.error('PDF export failed:', err);
+    }
+  });
+
   const isExportSupported = (report: string) => {
-    return ['trial-balance', 'general-ledger', 'income-statement', 'balance-sheet'].includes(report);
+    return ['trial-balance', 'general-ledger', 'cash-book', 'income-statement', 'balance-sheet', 'tax-summary'].includes(report);
   };
 
   const renderReportContent = () => {
@@ -244,12 +256,15 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
         description="Comprehensive financial statements and ledger reports generated from real-time accounting data."
         actions={
           <div className="flex items-center gap-3">
-            {!isExportSupported(activeReport) && (
-              <div className="hidden lg:flex items-center gap-2 text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100">
-                <AlertCircle size={12} />
-                CSV Export Pending
-              </div>
-            )}
+            <button
+              onClick={() => pdfMutation.mutate(activeReport)}
+              disabled={pdfMutation.isPending || !isExportSupported(activeReport)}
+              className="group inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 transition-all disabled:opacity-30 disabled:grayscale"
+              data-testid="accounting-report-pdf-export"
+            >
+              <FileDown size={18} className="transition-transform group-hover:scale-110" />
+              {pdfMutation.isPending ? 'Generating...' : 'Download PDF'}
+            </button>
             <button
               onClick={() => exportMutation.mutate(activeReport)}
               disabled={exportMutation.isPending || !isExportSupported(activeReport)}
@@ -321,6 +336,27 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
             </div>
             <div className="animate-in fade-in duration-700">
               {renderReportContent()}
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Saved Snapshots" description="Protected report files generated through File Registry.">
+            <div className="space-y-2" data-testid="accounting-report-snapshots">
+              {((snapshotsQuery.data as any)?.items ?? [])
+                .filter((item: any) => String(item.reportKey ?? '').includes(activeReport))
+                .slice(0, 5)
+                .map((item: any) => (
+                  <button
+                    key={item.id}
+                    onClick={() => api.downloadReportSnapshot(item.id)}
+                    className="flex w-full items-center justify-between rounded-lg border border-slate-100 bg-white px-3 py-2 text-left text-sm hover:bg-slate-50"
+                  >
+                    <span className="font-bold text-slate-700">{item.reportKey}</span>
+                    <span className="text-xs text-slate-400">{item.format?.toUpperCase()} - {new Date(item.createdAt).toLocaleDateString()}</span>
+                  </button>
+                ))}
+              {(((snapshotsQuery.data as any)?.items ?? []).filter((item: any) => String(item.reportKey ?? '').includes(activeReport)).length === 0) && (
+                <p className="text-sm text-slate-500">No saved snapshots for this report yet.</p>
+              )}
             </div>
           </SectionCard>
         </div>

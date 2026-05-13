@@ -531,6 +531,61 @@ export function buildRosterPdf(input: {
   return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
 }
 
+export function buildTableReportPdf(input: {
+  schoolName: string;
+  title: string;
+  subtitle?: string | null;
+  generatedAt?: Date;
+  rows: Array<Record<string, unknown>>;
+  maxColumns?: number;
+}) {
+  const headers = Object.keys(input.rows[0] ?? {}).slice(
+    0,
+    input.maxColumns ?? 6,
+  );
+  const widths = headers.map(() => 492 / Math.max(headers.length, 1));
+  const contentParts = [
+    ...pageFrame(
+      fitText(input.title.toUpperCase(), 24),
+      input.schoolName,
+      input.subtitle ?? 'Generated report export',
+    ),
+    text(
+      `Generated: ${formatDateTime(input.generatedAt ?? new Date())}`,
+      48,
+      672,
+      8,
+      'F1',
+    ),
+    tableHeader(
+      48,
+      640,
+      headers.length ? headers : ['Status'],
+      widths.length ? widths : [492],
+    ),
+  ];
+
+  let y = 616;
+  const rows = input.rows.length ? input.rows : [{ Status: 'No rows found' }];
+  for (const row of rows.slice(0, 30)) {
+    let x = 60;
+    for (const [index, header] of headers.entries()) {
+      const value = row[header];
+      contentParts.push(text(fitText(formatPdfCell(value), 18), x, y, 7, 'F1'));
+      x += widths[index] ?? 82;
+    }
+    y -= 16;
+  }
+
+  contentParts.push(
+    '48 76 m 540 76 l S',
+    text(`Rows in export: ${input.rows.length}`, 48, 54, 8, 'F2'),
+    text('Protected SchoolOS report snapshot', 360, 54, 8, 'F1'),
+  );
+
+  return buildPdfFromContent(contentParts.filter(Boolean).join('\n'));
+}
+
 function escapePdfText(text: string | number | null | undefined) {
   const safeText = String(text ?? 'N/A');
   return safeText
@@ -644,6 +699,16 @@ function formatIsoDate(value: Date) {
 
 function formatDateTime(value: Date) {
   return value.toISOString().replace('T', ' ').slice(0, 19);
+}
+
+function formatPdfCell(value: unknown) {
+  if (value instanceof Date) {
+    return formatIsoDate(value);
+  }
+  if (typeof value === 'object' && value !== null && 'toString' in value) {
+    return String(value);
+  }
+  return String(value ?? '');
 }
 
 function fitText(value: string, maxLength: number) {

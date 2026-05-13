@@ -3,6 +3,7 @@ import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { CommunicationsModule } from '../communications/communications.module';
 import { FinanceModule } from '../finance/finance.module';
+import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { SettingsModule } from '../settings/settings.module';
 import { UsageModule } from '../usage/usage.module';
 import { AcademicsController } from './academics.controller';
@@ -29,6 +30,7 @@ import {
     CommunicationsModule,
     AuditModule,
     FinanceModule,
+    FileRegistryModule,
     SettingsModule,
     UsageModule,
   ],

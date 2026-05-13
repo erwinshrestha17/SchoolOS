@@ -6,11 +6,14 @@ import {
   Post,
   Get,
   Param,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { FileRegistryService } from './file-registry.service';
 import { StorageService } from '../storage/storage.service';
@@ -62,6 +65,7 @@ export class FileRegistryController {
   ) {}
 
   @Post('upload')
+  @Permissions()
   async uploadFile(
     @CurrentAuth() auth: AuthContext,
     @Body() dto: UploadFileDto,
@@ -113,6 +117,27 @@ export class FileRegistryController {
       sizeBytes: asset.sizeBytes,
       url,
     };
+  }
+
+  @Get(':id/download')
+  async downloadFile(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const { asset, content } =
+      await this.fileRegistryService.getProtectedDownload(
+        auth.tenantId,
+        id,
+        auth.userId,
+      );
+
+    res.setHeader('Content-Type', asset.mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${asset.originalFilename.replace(/"/g, '')}"`,
+    );
+    return res.send(content);
   }
 
   private validateUpload(dto: UploadFileDto) {

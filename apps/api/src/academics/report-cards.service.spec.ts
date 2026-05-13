@@ -12,15 +12,7 @@ import { UsageService } from '../usage/usage.service';
 
 describe('ReportCardsService', () => {
   let service: ReportCardsService;
-  let prisma: {
-    academicYear: { findFirst: jest.Mock };
-    examTerm: { findFirst: jest.Mock };
-    student: { findFirst: jest.Mock };
-    tenantSetting: { findFirst: jest.Mock };
-    assessmentComponent: { findMany: jest.Mock };
-    markEntry: { findMany: jest.Mock };
-    reportCard: { findUnique: jest.Mock; upsert: jest.Mock };
-  };
+  let prisma: any;
   let auditService: { record: jest.Mock };
   let financeService: { getStudentFeeLedger: jest.Mock };
 
@@ -50,7 +42,21 @@ describe('ReportCardsService', () => {
       tenantSetting: { findFirst: jest.fn() },
       assessmentComponent: { findMany: jest.fn() },
       markEntry: { findMany: jest.fn() },
-      reportCard: { findUnique: jest.fn(), upsert: jest.fn() },
+      reportCard: {
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        upsert: jest.fn(),
+        update: jest.fn(),
+      },
+      reportCardCorrectionRequest: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+      },
+      reportCardHistory: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+      },
+      $transaction: jest.fn(async (callback) => callback(prisma)),
     };
     auditService = { record: jest.fn() };
     financeService = { getStudentFeeLedger: jest.fn() };
@@ -284,5 +290,102 @@ describe('ReportCardsService', () => {
         actor,
       ),
     ).rejects.toThrow(ConflictException);
+  });
+
+  it('requires a reason before requesting a locked report-card correction', async () => {
+    await expect(
+      service.requestCorrection('report-card-1', { reason: ' ' }, actor),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  it('creates an auditable correction request for a tenant-scoped report card', async () => {
+    prisma.reportCard.findFirst.mockResolvedValue({
+      id: 'report-card-1',
+      tenantId: actor.tenantId,
+      version: 1,
+    });
+    prisma.reportCardCorrectionRequest.create.mockResolvedValue({
+      id: 'corr-1',
+      reportCardId: 'report-card-1',
+    });
+
+    const result = await service.requestCorrection(
+      'report-card-1',
+      { reason: 'Corrected Science marks after review' },
+      actor,
+    );
+
+    expect(result.id).toBe('corr-1');
+    expect(prisma.reportCard.findFirst).toHaveBeenCalledWith({
+      where: { id: 'report-card-1', tenantId: actor.tenantId },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'ACADEMICS_REPORT_CARD_CORRECTION_REQUESTED',
+        resourceId: 'report-card-1',
+      }),
+    );
+  });
+
+  it('regenerates a locked report card by preserving history in a transaction', async () => {
+    mockValidBase();
+    prisma.reportCard.findFirst.mockResolvedValue({
+      id: 'report-card-1',
+      tenantId: actor.tenantId,
+      academicYearId: dto.academicYearId,
+      examTermId: dto.examTermId,
+      studentId: dto.studentId,
+      classId: 'class-1',
+      sectionId: 'section-1',
+      totalMarks: new Prisma.Decimal(70),
+      maxMarks: new Prisma.Decimal(100),
+      percentage: new Prisma.Decimal(70),
+      grade: 'B+',
+      gpa: new Prisma.Decimal(3.2),
+      remarks: null,
+      version: 1,
+      status: GradeLockStatus.LOCKED,
+      fileId: 'file-old',
+      publishStatus: 'PUBLISHED',
+      publishedAt: new Date('2026-01-01'),
+      publishedById: 'user-old',
+      examTerm: { isLocked: true },
+    });
+    prisma.reportCardCorrectionRequest.create.mockResolvedValue({
+      id: 'corr-1',
+    });
+    prisma.reportCardHistory.create.mockResolvedValue({ id: 'hist-1' });
+    prisma.reportCard.update.mockResolvedValue({
+      id: 'report-card-1',
+      version: 2,
+      publishStatus: 'CORRECTED_DRAFT',
+    });
+
+    const result = await service.applyCorrectionAndRegenerate(
+      'report-card-1',
+      { reason: 'Reviewed mark correction' },
+      actor,
+    );
+
+    expect(result.version).toBe(2);
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.reportCardHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reportCardId: 'report-card-1',
+          version: 1,
+          fileId: 'file-old',
+        }),
+      }),
+    );
+    expect(prisma.reportCard.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          version: 2,
+          fileId: null,
+          publishStatus: 'CORRECTED_DRAFT',
+        }),
+      }),
+    );
   });
 });
