@@ -122,7 +122,11 @@ export class StudentQrService {
       };
     }
 
-    const issued = await this.issueCredential(tenantId, studentId, existing?.id);
+    const issued = await this.issueCredential(
+      tenantId,
+      studentId,
+      existing?.id,
+    );
 
     await this.auditService.record({
       action: 'QR_GENERATED',
@@ -148,7 +152,9 @@ export class StudentQrService {
     reason?: string,
   ): Promise<PrintableQrResult> {
     if (!reason?.trim()) {
-      throw new BadRequestException('A reason is required to rotate a student QR');
+      throw new BadRequestException(
+        'A reason is required to rotate a student QR',
+      );
     }
 
     await this.assertActiveStudent(tenantId, studentId);
@@ -161,9 +167,14 @@ export class StudentQrService {
       throw new NotFoundException('QR credential not found');
     }
 
-    const issued = await this.issueCredential(tenantId, studentId, existing.id, {
-      rotatedAt: new Date(),
-    });
+    const issued = await this.issueCredential(
+      tenantId,
+      studentId,
+      existing.id,
+      {
+        rotatedAt: new Date(),
+      },
+    );
 
     await this.auditService.record({
       action: 'QR_ROTATED',
@@ -194,7 +205,9 @@ export class StudentQrService {
     reason?: string,
   ) {
     if (!reason?.trim()) {
-      throw new BadRequestException('A reason is required to revoke a student QR');
+      throw new BadRequestException(
+        'A reason is required to revoke a student QR',
+      );
     }
 
     const existing = await this.prisma.studentQrCredential.findUnique({
@@ -391,7 +404,8 @@ export class StudentQrService {
         ]);
 
         const balance = wallet?.balance ?? new Prisma.Decimal(0);
-        const threshold = wallet?.lowBalanceThreshold ?? new Prisma.Decimal(100);
+        const threshold =
+          wallet?.lowBalanceThreshold ?? new Prisma.Decimal(100);
 
         return {
           ...baseResponse,

@@ -25,7 +25,7 @@ describe('M0 Queue & Provider safety contracts', () => {
       const service = read('src/platform/platform.service.ts');
 
       expect(service).toContain('toProviderSummary');
-      expect(service).toContain('config[key] = \'********\'');
+      expect(service).toContain("config[key] = '********'");
     });
 
     it('upsertProvider auto-detects secret keys if not provided', () => {
@@ -60,15 +60,15 @@ describe('M0 Queue & Provider safety contracts', () => {
       const service = read('src/platform/platform-queues.service.ts');
 
       expect(service).toContain('workerHealth');
-      expect(service).toContain('\'healthy\' : \'degraded\'');
+      expect(service).toContain("'healthy' : 'degraded'");
     });
 
     it('getQueueHealth includes waiting, active, and failed counts', () => {
       const service = read('src/platform/platform-queues.service.ts');
 
-      expect(service).toContain('waiting: this.count(counts, \'waiting\')');
-      expect(service).toContain('active: this.count(counts, \'active\')');
-      expect(service).toContain('failed: this.count(counts, \'failed\')');
+      expect(service).toContain("waiting: this.count(counts, 'waiting')");
+      expect(service).toContain("active: this.count(counts, 'active')");
+      expect(service).toContain("failed: this.count(counts, 'failed')");
     });
   });
 
@@ -80,7 +80,7 @@ describe('M0 Queue & Provider safety contracts', () => {
 
       expect(service).toContain('sanitizeJobData(job.data)');
       expect(service).toContain('SECRET_KEY_PATTERN.test(key)');
-      expect(service).toContain('\'********\'');
+      expect(service).toContain("'********'");
     });
 
     it('sanitizeJobData truncates long strings and deep objects', () => {
@@ -88,7 +88,7 @@ describe('M0 Queue & Provider safety contracts', () => {
 
       expect(service).toContain('MAX_STRING_LENGTH = 500');
       expect(service).toContain('depth > 4');
-      expect(service).toContain('\'[Truncated]\'');
+      expect(service).toContain("'[Truncated]'");
     });
 
     it('retryFailedJob validates job is actually failed before retry', () => {

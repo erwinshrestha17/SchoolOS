@@ -25,7 +25,9 @@ describe('PlatformQueuesService', () => {
     const notificationsQueue = makeQueue(queueOverrides.notifications as any);
     const financeQueue = makeQueue(queueOverrides.finance as any);
     const payrollQueue = makeQueue(queueOverrides.payroll as any);
-    const activityMediaQueue = makeQueue(queueOverrides['activity-media'] as any);
+    const activityMediaQueue = makeQueue(
+      queueOverrides['activity-media'] as any,
+    );
     const homeworkQueue = makeQueue(queueOverrides.homework as any);
 
     const service = new PlatformQueuesService(

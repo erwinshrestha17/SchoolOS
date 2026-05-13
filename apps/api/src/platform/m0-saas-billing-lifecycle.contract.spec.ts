@@ -35,9 +35,9 @@ describe('M0 SaaS billing lifecycle contracts', () => {
       // School fee models (M3/M9)
       expect(schema).toContain('model Invoice');
       expect(schema).toContain('model Payment');
-      
+
       // Verification that they are different
-      expect(schema).not.toContain('model SaaSInvoice extends Invoice'); 
+      expect(schema).not.toContain('model SaaSInvoice extends Invoice');
     });
   });
 
@@ -48,10 +48,10 @@ describe('M0 SaaS billing lifecycle contracts', () => {
       const service = read('src/platform/platform.service.ts');
 
       expect(service).toContain('status:');
-      expect(service).toContain('invoice.status !== \'PAID\'');
-      expect(service).toContain('invoice.status !== \'CANCELLED\'');
+      expect(service).toContain("invoice.status !== 'PAID'");
+      expect(service).toContain("invoice.status !== 'CANCELLED'");
       expect(service).toContain('toDate(invoice.dueDate) < new Date()');
-      expect(service).toContain('? \'OVERDUE\'');
+      expect(service).toContain("? 'OVERDUE'");
     });
 
     it('PlatformService sums payments using Decimal precision', () => {
@@ -98,7 +98,7 @@ describe('M0 SaaS billing lifecycle contracts', () => {
 
       expect(service).toContain('nextInvoiceNumber');
       expect(service).toContain('`SO-${new Date().getUTCFullYear()}-');
-      expect(service).toContain('padStart(5, \'0\')');
+      expect(service).toContain("padStart(5, '0')");
     });
   });
 

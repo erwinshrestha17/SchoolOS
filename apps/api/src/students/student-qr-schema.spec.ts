@@ -7,7 +7,8 @@ describe('StudentQrCredential Prisma schema contract', () => {
     'utf8',
   );
 
-  const model = schema.match(/model StudentQrCredential \{[\s\S]*?\n\}/)?.[0] ?? '';
+  const model =
+    schema.match(/model StudentQrCredential \{[\s\S]*?\n\}/)?.[0] ?? '';
 
   it('declares the QR credential model and status enum', () => {
     expect(schema).toContain('enum StudentQrStatus');

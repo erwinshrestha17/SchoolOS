@@ -1,5 +1,9 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { Prisma, StudentLifecycleStatus, StudentQrStatus } from '@prisma/client';
+import {
+  Prisma,
+  StudentLifecycleStatus,
+  StudentQrStatus,
+} from '@prisma/client';
 import { StudentQrResolvePurpose } from '@schoolos/core';
 import { hashToken } from '../auth/auth.utils';
 import { StudentQrService } from './student-qr.service';
@@ -116,12 +120,12 @@ describe('StudentQrService', () => {
         tokenHash: expect.any(String),
       }),
     });
-    expect(prisma.studentQrCredential.create.mock.calls[0][0].data).not.toHaveProperty(
-      'token',
-    );
-    expect(prisma.studentQrCredential.create.mock.calls[0][0].data).not.toHaveProperty(
-      'rawToken',
-    );
+    expect(
+      prisma.studentQrCredential.create.mock.calls[0][0].data,
+    ).not.toHaveProperty('token');
+    expect(
+      prisma.studentQrCredential.create.mock.calls[0][0].data,
+    ).not.toHaveProperty('rawToken');
     expect(result).toHaveProperty('rawToken');
     expect(result.rawToken).toBeDefined();
     expect(result.credential).not.toHaveProperty('tokenHash');
@@ -315,7 +319,12 @@ describe('StudentQrService', () => {
       id: baseCredential.id,
     }));
 
-    await service.rotateQr('tenant-1', 'student-1', adminAuth, 'Card lost by student');
+    await service.rotateQr(
+      'tenant-1',
+      'student-1',
+      adminAuth,
+      'Card lost by student',
+    );
 
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -340,7 +349,12 @@ describe('StudentQrService', () => {
       revokedAt: new Date(),
     });
 
-    await service.revokeQr('tenant-1', 'student-1', adminAuth, 'Disciplinary action');
+    await service.revokeQr(
+      'tenant-1',
+      'student-1',
+      adminAuth,
+      'Disciplinary action',
+    );
 
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({

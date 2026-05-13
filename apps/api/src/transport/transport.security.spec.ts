@@ -48,15 +48,26 @@ describe('Transport Security Boundaries', () => {
       },
     };
 
-    service = new TransportService(prisma as any, {} as any, {} as any, {} as any, {} as any);
-    hardeningService = new TransportHardeningService(prisma as any, {} as any, {} as any, service);
+    service = new TransportService(
+      prisma as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+    hardeningService = new TransportHardeningService(
+      prisma as any,
+      {} as any,
+      {} as any,
+      service,
+    );
   });
 
   describe('Driver Boundary', () => {
     it('allows driver to record location for their assigned trip', async () => {
       const tripId = 'trip-1';
       const assignmentId = 'assignment-1';
-      
+
       prisma.transportTrip.findFirst.mockResolvedValue({
         id: tripId,
         status: TransportTripStatus.ACTIVE,
@@ -69,7 +80,7 @@ describe('Transport Security Boundaries', () => {
         staff: { userId: driverActor.userId },
       });
 
-      // We only test the permission check part of recordLocationPing indirectly 
+      // We only test the permission check part of recordLocationPing indirectly
       // by calling the private assertion if we could, but here we'll mock the whole flow
       // Actually, since we want to prove the boundary, we check if ForbiddenException is thrown for wrong driver
     });
@@ -77,7 +88,7 @@ describe('Transport Security Boundaries', () => {
     it('denies driver from recording location for another driver trip', async () => {
       const tripId = 'trip-2';
       const assignmentId = 'assignment-2';
-      
+
       prisma.transportTrip.findFirst.mockResolvedValue({
         id: tripId,
         status: TransportTripStatus.ACTIVE,
@@ -91,14 +102,18 @@ describe('Transport Security Boundaries', () => {
       });
 
       await expect(
-        service.recordLocationPing(tripId, { latitude: 0, longitude: 0 }, driverActor)
+        service.recordLocationPing(
+          tripId,
+          { latitude: 0, longitude: 0 },
+          driverActor,
+        ),
       ).rejects.toThrow(ForbiddenException);
     });
 
     it('allows admin to record location for any trip (emergency override)', async () => {
       const tripId = 'trip-1';
       const assignmentId = 'assignment-1';
-      
+
       prisma.transportTrip.findFirst.mockResolvedValue({
         id: tripId,
         status: TransportTripStatus.ACTIVE,
@@ -114,7 +129,7 @@ describe('Transport Security Boundaries', () => {
   describe('Parent Visibility Boundary', () => {
     it('allows parent to view active trip of their own child', async () => {
       const studentId = 'student-1';
-      
+
       prisma.studentGuardian.findFirst.mockResolvedValue({
         studentId,
         student: { id: studentId, firstNameEn: 'Child' },
@@ -132,18 +147,21 @@ describe('Transport Security Boundaries', () => {
         stop: { name: 'Home' },
       });
 
-      const result = await hardeningService.getParentStudentActiveTrip(studentId, parentActor);
+      const result = await hardeningService.getParentStudentActiveTrip(
+        studentId,
+        parentActor,
+      );
       expect(result.student.id).toBe(studentId);
       expect(result.trip).toBeDefined();
     });
 
     it('denies parent from viewing active trip of another child', async () => {
       const studentId = 'other-student';
-      
+
       prisma.studentGuardian.findFirst.mockResolvedValue(null);
 
       await expect(
-        hardeningService.getParentStudentActiveTrip(studentId, parentActor)
+        hardeningService.getParentStudentActiveTrip(studentId, parentActor),
       ).rejects.toThrow(ForbiddenException);
     });
   });

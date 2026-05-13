@@ -71,7 +71,9 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
     };
 
     prisma.saaSInvoice.create.mockResolvedValue(invoice);
-    jest.spyOn(service as any, 'nextInvoiceNumber').mockResolvedValue('SaaS-000001');
+    jest
+      .spyOn(service as any, 'nextInvoiceNumber')
+      .mockResolvedValue('SaaS-000001');
     jest.spyOn(service as any, 'toInvoiceSummary').mockReturnValue({
       id: invoice.id,
       tenantId: invoice.tenantId,
@@ -332,7 +334,14 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
   });
 
   it('audits tenant subscription status transitions including trial active suspended expired and cancelled states', async () => {
-    for (const status of ['TRIAL', 'ACTIVE', 'GRACE', 'SUSPENDED', 'EXPIRED', 'CANCELLED']) {
+    for (const status of [
+      'TRIAL',
+      'ACTIVE',
+      'GRACE',
+      'SUSPENDED',
+      'EXPIRED',
+      'CANCELLED',
+    ]) {
       prisma.tenantSubscription.findFirst.mockResolvedValueOnce({
         id: `before-${status}`,
         tenantId: 'tenant-1',

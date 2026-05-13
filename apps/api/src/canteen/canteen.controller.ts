@@ -414,8 +414,6 @@ export class CanteenController {
     return this.canteenService.topUpWallet(studentId, dto, auth);
   }
 
-
-
   @Get('wallets/student/:studentId/transactions')
   @Permissions('canteen:wallets:read')
   transactionHistory(

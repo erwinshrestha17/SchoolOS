@@ -153,14 +153,14 @@ describe('M0 Entitlement enforcement contracts', () => {
     it('feature override rejects unknown feature keys', () => {
       const service = read('src/platform/platform.service.ts');
 
-      expect(service).toContain("FEATURE_KEYS.includes(dto.featureKey)");
+      expect(service).toContain('FEATURE_KEYS.includes(dto.featureKey)');
       expect(service).toContain('Unknown feature key');
     });
 
     it('usage increment rejects unknown usage keys', () => {
       const service = read('src/platform/platform.service.ts');
 
-      expect(service).toContain("USAGE_KEYS.includes(dto.usageKey)");
+      expect(service).toContain('USAGE_KEYS.includes(dto.usageKey)');
       expect(service).toContain('Unknown usage key');
     });
   });
@@ -198,7 +198,9 @@ describe('M0 Entitlement enforcement contracts', () => {
     it('platform controller exposes entitlement check endpoint', () => {
       const controller = read('src/platform/platform.controller.ts');
 
-      expect(controller).toContain("@Get('tenants/:tenantId/entitlements/:featureKey')");
+      expect(controller).toContain(
+        "@Get('tenants/:tenantId/entitlements/:featureKey')",
+      );
       expect(controller).toContain('checkEntitlement');
     });
 
@@ -207,7 +209,9 @@ describe('M0 Entitlement enforcement contracts', () => {
 
       expect(service).toContain('PlatformEntitlementCheck');
       expect(service).toContain("reason: 'tenant_inactive'");
-      expect(service).toContain("reason: isAllowed ? 'allowed' : 'feature_disabled'");
+      expect(service).toContain(
+        "reason: isAllowed ? 'allowed' : 'feature_disabled'",
+      );
     });
 
     it('entitlement check includes subscription status for context', () => {

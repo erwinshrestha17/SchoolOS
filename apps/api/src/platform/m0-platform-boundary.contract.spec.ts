@@ -28,18 +28,29 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
       expect(guard).toContain('platform_support');
       expect(guard).toContain('platform_billing_admin');
       expect(guard).toContain('ForbiddenException');
-      expect(guard).toContain('Access restricted to platform administrators only');
+      expect(guard).toContain(
+        'Access restricted to platform administrators only',
+      );
     });
 
     it('PlatformGuard import exists in platform controller', () => {
       const controller = read('src/platform/platform.controller.ts');
-      expect(controller).toContain("import { PlatformGuard }");
+      expect(controller).toContain('import { PlatformGuard }');
       expect(controller).toContain('@UseGuards(JwtAuthGuard, PlatformGuard)');
     });
 
     it('school-level role definitions do not contain platform permission keys', () => {
       const permissions = read('../../packages/core/src/permissions.ts');
-      const schoolRoles = ['admin', 'teacher', 'principal', 'accountant', 'librarian', 'driver', 'student', 'parent'];
+      const schoolRoles = [
+        'admin',
+        'teacher',
+        'principal',
+        'accountant',
+        'librarian',
+        'driver',
+        'student',
+        'parent',
+      ];
 
       for (const role of schoolRoles) {
         const roleRegex = new RegExp(`${role}:\\s*\\[([\\s\\S]*?)\\]`, 'm');
@@ -59,9 +70,7 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
       const permissions = read('../../packages/core/src/permissions.ts');
 
       expect(permissions).toContain('TENANT_PERMISSION_KEYS');
-      expect(permissions).toContain(
-        '!PLATFORM_PERMISSION_KEYS.includes(key)',
-      );
+      expect(permissions).toContain('!PLATFORM_PERMISSION_KEYS.includes(key)');
     });
   });
 
@@ -75,7 +84,12 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
       const classGuardMatch = controller.match(
         /@UseGuards\(JwtAuthGuard,\s*PlatformGuard\)\s*\nexport class PlatformController/,
       );
-      expect(classGuardMatch || controller.includes("@UseGuards(JwtAuthGuard, PlatformGuard)\nexport class PlatformController")).toBeTruthy();
+      expect(
+        classGuardMatch ||
+          controller.includes(
+            '@UseGuards(JwtAuthGuard, PlatformGuard)\nexport class PlatformController',
+          ),
+      ).toBeTruthy();
     });
 
     it('every public method has a @Permissions decorator', () => {

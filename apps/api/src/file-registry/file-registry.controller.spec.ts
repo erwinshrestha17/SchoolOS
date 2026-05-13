@@ -21,7 +21,10 @@ describe('FileRegistryController upload safety', () => {
     storageService = {
       saveBase64Object: jest.fn(),
     };
-    controller = new FileRegistryController(fileRegistryService, storageService);
+    controller = new FileRegistryController(
+      fileRegistryService,
+      storageService,
+    );
   });
 
   it.each([

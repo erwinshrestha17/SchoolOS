@@ -24,7 +24,7 @@ export class UsageInterceptor implements NestInterceptor {
         // Only track for non-platform tenants
         if (tenantId && tenantId !== 'platform') {
           try {
-            // We don't verifyLimit here to avoid blocking requests, 
+            // We don't verifyLimit here to avoid blocking requests,
             // just increment for tracking. Gating is done at feature level.
             await this.usageService.incrementUsage(tenantId, 'api.requests', 1);
           } catch (error) {

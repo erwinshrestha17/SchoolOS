@@ -14,7 +14,9 @@ export class LibraryCron {
 
   @Cron(CronExpression.EVERY_DAY_AT_9AM)
   async processOverdueNotifications() {
-    this.logger.log('Starting daily library overdue notification processing...');
+    this.logger.log(
+      'Starting daily library overdue notification processing...',
+    );
 
     const tenants = await this.prisma.tenant.findMany({
       where: { isActive: true },
@@ -37,15 +39,16 @@ export class LibraryCron {
       }
 
       try {
-        const result = await this.libraryHardeningService.sendOverdueRemindersIdempotent({
-          userId: actorUser.id,
-          tenantId: tenant.id,
-          tenantSlug: tenant.slug,
-          email: actorUser.email,
-          authMethod: actorUser.authMethod,
-          roles: ['platform_super_admin'],
-          permissions: ['library:reports:read'],
-        });
+        const result =
+          await this.libraryHardeningService.sendOverdueRemindersIdempotent({
+            userId: actorUser.id,
+            tenantId: tenant.id,
+            tenantSlug: tenant.slug,
+            email: actorUser.email,
+            authMethod: actorUser.authMethod,
+            roles: ['platform_super_admin'],
+            permissions: ['library:reports:read'],
+          });
 
         if (result.skipped) {
           this.logger.log(

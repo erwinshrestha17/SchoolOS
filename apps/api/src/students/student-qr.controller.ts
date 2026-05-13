@@ -8,17 +8,17 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthContext } from '../auth/auth.types';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
-import { ResolveStudentQrDto, RotateStudentQrDto, RevokeStudentQrDto } from './dto/student-qr.dto';
+import {
+  ResolveStudentQrDto,
+  RotateStudentQrDto,
+  RevokeStudentQrDto,
+} from './dto/student-qr.dto';
 import { StudentQrService } from './student-qr.service';
 
 @ApiTags('Student QR')

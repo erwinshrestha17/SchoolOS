@@ -273,7 +273,8 @@ export class TransportController {
   @Permissions('transport:trips:update', 'transport:operate')
   markTripDelay(
     @Param('id') tripId: string,
-    @Body() dto: { isDelayed: boolean; delayReason?: string; delayMinutes?: number },
+    @Body()
+    dto: { isDelayed: boolean; delayReason?: string; delayMinutes?: number },
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.transportService.markTripDelay(tripId, dto, auth);

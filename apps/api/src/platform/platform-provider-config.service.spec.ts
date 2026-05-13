@@ -134,7 +134,9 @@ describe('PlatformService provider config hardening', () => {
 
     prisma.providerConfig.findUnique.mockResolvedValue(null);
     prisma.providerConfig.upsert.mockResolvedValue(persisted);
-    jest.spyOn(service as any, 'validateProvider').mockImplementation(() => undefined);
+    jest
+      .spyOn(service as any, 'validateProvider')
+      .mockImplementation(() => undefined);
     jest.spyOn(service as any, 'encryptProviderConfig').mockReturnValue({
       apiKey: 'encrypted-secret-value',
       senderId: 'SchoolOS',
@@ -152,7 +154,9 @@ describe('PlatformService provider config hardening', () => {
       secretKeys: ['apiKey'],
     });
 
-    await expect(service.upsertProvider(dto, 'platform-user-1')).resolves.toEqual(
+    await expect(
+      service.upsertProvider(dto, 'platform-user-1'),
+    ).resolves.toEqual(
       expect.objectContaining({
         id: 'provider-1',
         config: expect.objectContaining({ apiKey: '********' }),
@@ -237,8 +241,12 @@ describe('PlatformService provider config hardening', () => {
 
     prisma.providerConfig.findUnique.mockResolvedValue(null);
     prisma.providerConfig.upsert.mockResolvedValue(persisted);
-    jest.spyOn(service as any, 'validateProvider').mockImplementation(() => undefined);
-    jest.spyOn(service as any, 'detectSecretKeys').mockReturnValue(['password']);
+    jest
+      .spyOn(service as any, 'validateProvider')
+      .mockImplementation(() => undefined);
+    jest
+      .spyOn(service as any, 'detectSecretKeys')
+      .mockReturnValue(['password']);
     jest.spyOn(service as any, 'encryptProviderConfig').mockReturnValue({
       password: 'encrypted-password',
       host: 'smtp.local',

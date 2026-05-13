@@ -52,7 +52,10 @@ describe('FileRegistryService tenant scoping', () => {
   });
 
   it('registers file metadata under the authenticated tenant and audits registration', async () => {
-    prisma.fileAsset.create.mockResolvedValue({ ...asset, status: FileStatus.PENDING });
+    prisma.fileAsset.create.mockResolvedValue({
+      ...asset,
+      status: FileStatus.PENDING,
+    });
 
     await expect(
       service.registerFile({
@@ -95,9 +98,9 @@ describe('FileRegistryService tenant scoping', () => {
   it('returns metadata only for the owning tenant', async () => {
     prisma.fileAsset.findUnique.mockResolvedValue(asset);
 
-    await expect(service.getFileMetadata('tenant-1', 'file-1')).resolves.toEqual(
-      asset,
-    );
+    await expect(
+      service.getFileMetadata('tenant-1', 'file-1'),
+    ).resolves.toEqual(asset);
 
     expect(prisma.fileAsset.findUnique).toHaveBeenCalledWith({
       where: { id: 'file-1' },
@@ -115,9 +118,9 @@ describe('FileRegistryService tenant scoping', () => {
   it('treats missing and soft-deleted files as not found', async () => {
     prisma.fileAsset.findUnique.mockResolvedValueOnce(null);
 
-    await expect(service.getFileMetadata('tenant-1', 'missing')).rejects.toThrow(
-      NotFoundException,
-    );
+    await expect(
+      service.getFileMetadata('tenant-1', 'missing'),
+    ).rejects.toThrow(NotFoundException);
 
     prisma.fileAsset.findUnique.mockResolvedValueOnce({
       ...asset,
@@ -141,7 +144,9 @@ describe('FileRegistryService tenant scoping', () => {
 
     await expect(
       service.markUploaded('tenant-1', 'file-1', 'user-1'),
-    ).resolves.toEqual(expect.objectContaining({ status: FileStatus.UPLOADED }));
+    ).resolves.toEqual(
+      expect.objectContaining({ status: FileStatus.UPLOADED }),
+    );
 
     expect(prisma.fileAsset.update).toHaveBeenCalledWith({
       where: { id: 'file-1' },

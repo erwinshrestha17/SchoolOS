@@ -358,7 +358,12 @@ export function buildIdCardPdf(input: {
 
   if (input.qrToken) {
     contentParts.push(
-      renderQrTokenAsPdfBlocks(input.qrToken, left + width - 72, bottom + 96, 56),
+      renderQrTokenAsPdfBlocks(
+        input.qrToken,
+        left + width - 72,
+        bottom + 96,
+        56,
+      ),
       text('SCAN ID', left + width - 68, bottom + 86, 6, 'F2'),
     );
   }

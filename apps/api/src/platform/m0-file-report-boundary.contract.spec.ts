@@ -24,9 +24,13 @@ describe('M0 File & Report boundary contracts', () => {
     it('getFileMetadata rejects cross-tenant access with ForbiddenException', () => {
       const service = read('src/file-registry/file-registry.service.ts');
 
-      expect(service).toContain('getFileMetadata(tenantId: string, assetId: string)');
+      expect(service).toContain(
+        'getFileMetadata(tenantId: string, assetId: string)',
+      );
       expect(service).toContain('asset.tenantId !== tenantId');
-      expect(service).toContain('throw new ForbiddenException(\'Access denied\')');
+      expect(service).toContain(
+        "throw new ForbiddenException('Access denied')",
+      );
     });
 
     it('registerFile enforces tenantId at creation', () => {
@@ -51,7 +55,9 @@ describe('M0 File & Report boundary contracts', () => {
       const controller = read('src/file-registry/file-registry.controller.ts');
 
       expect(controller).toContain('DANGEROUS_EXTENSIONS');
-      expect(controller).toContain('/\\.(exe|bat|cmd|com|scr|js|mjs|sh|ps1|php|jar)$/i');
+      expect(controller).toContain(
+        '/\\.(exe|bat|cmd|com|scr|js|mjs|sh|ps1|php|jar)$/i',
+      );
       expect(controller).toContain('Dangerous file extension rejected');
     });
 
@@ -88,8 +94,12 @@ describe('M0 File & Report boundary contracts', () => {
     it('getSignedUrl handles student photo and activity attachment special paths', () => {
       const service = read('src/file-registry/file-registry.service.ts');
 
-      expect(service).toContain('/students/${encodeURIComponent(asset.entityId)}/photo/preview');
-      expect(service).toContain('/activity-feed/attachments/${encodeURIComponent(attachment.id)}/preview');
+      expect(service).toContain(
+        '/students/${encodeURIComponent(asset.entityId)}/photo/preview',
+      );
+      expect(service).toContain(
+        '/activity-feed/attachments/${encodeURIComponent(attachment.id)}/preview',
+      );
     });
   });
 
@@ -100,7 +110,9 @@ describe('M0 File & Report boundary contracts', () => {
       const service = read('src/platform/platform.service.ts');
 
       expect(service).toContain('listReportExportsPage');
-      expect(service).toContain('if (query.tenantId) where.tenantId = query.tenantId');
+      expect(service).toContain(
+        'if (query.tenantId) where.tenantId = query.tenantId',
+      );
     });
 
     it('recordReportExport captures requesting user and completion status', () => {

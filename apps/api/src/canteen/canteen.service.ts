@@ -930,8 +930,6 @@ export class CanteenService {
     return updated;
   }
 
-
-
   async listPosSales(actor: AuthContext, options: ListPosSalesQuery = {}) {
     const { skip, take, page } = this.pagination(options);
     const range = this.dateRange(options);

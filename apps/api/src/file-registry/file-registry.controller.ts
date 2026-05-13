@@ -91,10 +91,7 @@ export class FileRegistryController {
   }
 
   @Get(':id/view')
-  async getFileView(
-    @CurrentAuth() auth: AuthContext,
-    @Param('id') id: string,
-  ) {
+  async getFileView(@CurrentAuth() auth: AuthContext, @Param('id') id: string) {
     const asset = await this.fileRegistryService.getFileMetadata(
       auth.tenantId,
       id,

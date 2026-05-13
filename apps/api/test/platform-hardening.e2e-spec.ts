@@ -293,18 +293,18 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       const initialValue = initialUsage ? Number(initialUsage.value) : 0;
 
       // Make a dummy request (platform/me is public-ish but needs auth)
-      // Since we are doing internal testing, we can manually trigger the interceptor or 
+      // Since we are doing internal testing, we can manually trigger the interceptor or
       // just assume the app.init() registered it.
-      
+
       // Let's call an endpoint via supertest if possible, or just check the service
       // Better: test the interceptor directly if needed, but here we want to see it in action.
-      
+
       // For this test, we'll just verify the service logic we added to others.
     });
 
     it('enforces storage limits in FileRegistryService', async () => {
       const fileRegistryService = app.get(FileRegistryService);
-      
+
       // Mock plan limit
       const plan = await prisma.platformPlan.findFirst({
         where: { key: 'free-plan' },

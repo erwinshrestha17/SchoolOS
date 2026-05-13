@@ -19,7 +19,11 @@ describe('PlatformReportExportsService', () => {
     service = new PlatformReportExportsService({} as any);
 
     await expect(
-      service.listReportExportsPage({ tenantId: 'tenant-1', page: 1, limit: 25 }),
+      service.listReportExportsPage({
+        tenantId: 'tenant-1',
+        page: 1,
+        limit: 25,
+      }),
     ).resolves.toEqual({
       items: [],
       total: 0,

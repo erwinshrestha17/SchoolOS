@@ -120,58 +120,58 @@ export class TimetableLifecycleService {
       rooms,
       classes,
     ] = await Promise.all([
-        this.prisma.teacherAvailability.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            staffId: { in: staffIds },
-            OR: [
-              { academicYearId: version.academicYearId },
-              { academicYearId: null },
-            ],
+      this.prisma.teacherAvailability.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: { in: staffIds },
+          OR: [
+            { academicYearId: version.academicYearId },
+            { academicYearId: null },
+          ],
+        },
+      }),
+      this.prisma.teacherWorkloadLimit.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          staffId: { in: staffIds },
+          OR: [
+            { academicYearId: version.academicYearId },
+            { academicYearId: null },
+          ],
+        },
+      }),
+      this.prisma.subjectWeeklyRequirement.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          academicYearId: version.academicYearId,
+          classId: version.classId! ?? undefined,
+          sectionId: version.sectionId ?? undefined,
+          subjectId: { in: subjectIds },
+        },
+      }),
+      this.prisma.timetablePeriod.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          academicYearId: version.academicYearId,
+          isActive: true,
+        },
+        select: { id: true, startsAt: true, endsAt: true, dayOfWeek: true },
+      }),
+      this.prisma.room.findMany({
+        where: { tenantId: actor.tenantId, id: { in: roomIds } },
+        select: { id: true, capacity: true },
+      }),
+      this.prisma.class.findMany({
+        where: { tenantId: actor.tenantId, id: { in: classIds } },
+        select: {
+          id: true,
+          students: {
+            where: { lifecycleStatus: 'ACTIVE' },
+            select: { id: true },
           },
-        }),
-        this.prisma.teacherWorkloadLimit.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            staffId: { in: staffIds },
-            OR: [
-              { academicYearId: version.academicYearId },
-              { academicYearId: null },
-            ],
-          },
-        }),
-        this.prisma.subjectWeeklyRequirement.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            academicYearId: version.academicYearId,
-            classId: version.classId! ?? undefined,
-            sectionId: version.sectionId ?? undefined,
-            subjectId: { in: subjectIds },
-          },
-        }),
-        this.prisma.timetablePeriod.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            academicYearId: version.academicYearId,
-            isActive: true,
-          },
-          select: { id: true, startsAt: true, endsAt: true, dayOfWeek: true },
-        }),
-        this.prisma.room.findMany({
-          where: { tenantId: actor.tenantId, id: { in: roomIds } },
-          select: { id: true, capacity: true },
-        }),
-        this.prisma.class.findMany({
-          where: { tenantId: actor.tenantId, id: { in: classIds } },
-          select: {
-            id: true,
-            students: {
-              where: { lifecycleStatus: 'ACTIVE' },
-              select: { id: true },
-            },
-          },
-        }),
-      ]);
+        },
+      }),
+    ]);
 
     const roomCapacities = rooms.reduce(
       (acc, r) => ({ ...acc, [r.id]: r.capacity }),
