@@ -54,7 +54,7 @@ describe('M0 Platform Core hardening contracts', () => {
     expect(service).toContain('USAGE_KEYS');
     expect(service).toContain('checkEntitlement');
     expect(service).toContain('tenantFeatureOverride');
-    expect(service).toContain('subscription_inactive');
+    expect(service).toContain('tenant_inactive');
     expect(service).toContain('feature_disabled');
     expect(plansService).toContain('checkFeatureEnabled');
     expect(plansService).toContain('feature');
