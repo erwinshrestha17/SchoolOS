@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Param,
   Put,
   Body,
   Query,
@@ -362,6 +363,62 @@ export class AccountingReportsController {
       `attachment; filename="${fileNamePrefix}-${date}.pdf"`,
     );
     res.send(pdf);
+  }
+
+  @Get('bank-reconciliation/:accountId/export')
+  @ApiOperation({ summary: 'Export bank reconciliation to CSV' })
+  @Permissions('accounting:exports:create', 'accounting:reports:read')
+  async exportBankReconciliationCsv(
+    @CurrentAuth() auth: AuthContext,
+    @Param('accountId') accountId: string,
+    @Res() res: Response,
+  ) {
+    const csv = await this.exportsService.exportBankReconciliationCsv(
+      auth.tenantId,
+      accountId,
+      auth,
+    );
+    await this.recordExportAudit(auth, 'Bank Reconciliation', { accountId });
+    this.sendCsvResponse(res, csv, 'bank-reconciliation');
+  }
+
+  @Get('bank-reconciliation/:accountId/export.pdf')
+  @ApiOperation({ summary: 'Export bank reconciliation to PDF' })
+  @Permissions('accounting:exports:create', 'accounting:reports:read')
+  async exportBankReconciliationPdf(
+    @CurrentAuth() auth: AuthContext,
+    @Param('accountId') accountId: string,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.exportsService.exportBankReconciliationPdf(
+      auth.tenantId,
+      accountId,
+      auth,
+    );
+    this.sendPdfResponse(res, pdf, 'bank-reconciliation');
+  }
+
+  @Get('audit-trail')
+  @ApiOperation({ summary: 'Get accounting audit trail' })
+  @Permissions('accounting:reports:read')
+  async getAccountingAuditTrail(
+    @CurrentAuth() auth: AuthContext,
+    @Query('resource') resource?: string,
+    @Query('action') action?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.auditService.queryAccountingAuditTrail({
+      tenantId: auth.tenantId,
+      resource,
+      action,
+      fromDate,
+      toDate,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   @Get('mappings')

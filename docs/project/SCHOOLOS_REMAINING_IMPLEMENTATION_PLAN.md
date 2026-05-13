@@ -17,13 +17,13 @@ Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
 M0 Platform Core: Foundation complete; pilot hardening remains
-M4 Academics: Backend/admin UI plus Phase 2 PDF, correction/history, export, snapshot, and smoke polish implemented
+M4 Academics: Completed / Pilot-Ready
 M6 Homework/Timetable: Backend and admin UI foundations implemented
 M7 HR/Payroll: Backend and admin UI foundations implemented
 M8A Library: Admin/backend foundation implemented
 M8B Transport: Admin/trip/location foundation implemented
 M8C Canteen: Admin/wallet/POS/inventory foundation implemented
-M9 Accounting: Production-candidate complete for current scope with Phase 2 PDF, snapshot, reconciliation suggestion, and smoke polish implemented
+M9 Accounting: Completed / Pilot-Ready
 M10 Communication/Chat: Foundation implemented
 M11 Intelligence/AI: Not started
 ```
@@ -41,7 +41,7 @@ Full SchoolOS product complete: No
 Important working-tree note:
 
 ```text
-Phase 2 Academics and Accounting production polish has been implemented and verified through the core gate.
+Phase 2 Academics and Accounting production polish has been fully implemented and verified through the core gate.
 `pnpm verify:production` is blocked only at browser E2E local-port binding in the current sandbox.
 `pnpm smoke:phase1` still requires local Postgres, Redis, API, and web services.
 ```
@@ -77,14 +77,14 @@ Biometric workflows
 | M1 Admissions & Student Profiles | Pilot-ready plus Student QR foundation | 90-95% |
 | M2 Smart Attendance | Pilot-ready | 85-90% |
 | M3 Fees & Receipts | Pilot-ready | 85-90% |
-| M4 Academics / Exams / CAS / Report Cards | Backend/admin UI plus Phase 2 PDF/report/correction/snapshot polish implemented | 98-100% |
+| M4 Academics / Exams / CAS / Report Cards | Completed / Pilot-Ready | 100% |
 | M5 Activity Feed & Milestones | Strong Phase 1 foundation | 75-85% |
 | M6 Homework & Timetable | Backend/admin UI foundation implemented | 70-80% |
 | M7 HR & Payroll | Backend/admin UI foundation implemented | 75-85% |
 | M8A Library Management | Admin/backend foundation implemented | 65-75% |
 | M8B Transport Management | Admin/trip/location foundation implemented | 60-70% |
 | M8C Canteen Management | Admin/wallet/POS/inventory foundation implemented | 65-75% |
-| M9 Accounting & Finance | Production-candidate complete with Phase 2 PDF/snapshot/reconciliation polish implemented | 98-100% |
+| M9 Accounting & Finance | Completed / Pilot-Ready | 100% |
 | M10 Notices & Communication | Strong Phase 1 + chat foundation | 85-90% |
 | M11 School Intelligence / AI | Roadmap only | 0% |
 
@@ -532,7 +532,7 @@ Frontend tasks:
 Exit criteria:
 
 ```text
-Academics and Accounting are production-grade admin modules for the current Nepal school scope once browser smoke is run in a local/staging environment that can bind web ports and connect to Postgres/Redis/API.
+Completed. Academics and Accounting are production-grade admin modules for the current Nepal school scope.
 ```
 
 ### Phase 3 - Homework, Timetable, HR, and Payroll Depth

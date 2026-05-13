@@ -27,6 +27,7 @@ describe('ReportsService', () => {
       'classes:read',
       'attendance:read',
       'ledger:read',
+      'academics:read',
     ],
     tenantSlug: 'everest',
   };
@@ -108,6 +109,45 @@ describe('ReportsService', () => {
               findMany: jest.fn().mockResolvedValue([]),
               count: jest.fn().mockResolvedValue(0),
               findFirst: jest.fn(),
+            },
+            casRecord: {
+              findMany: jest.fn().mockResolvedValue([
+                {
+                  student: {
+                    studentSystemId: 'SCH-001',
+                    firstNameEn: 'Erwin',
+                    lastNameEn: 'Shrestha',
+                  },
+                  subject: {
+                    code: 'ENG',
+                    name: 'English',
+                  },
+                  category: 'PROJECT',
+                  observedOn: new Date('2024-05-01'),
+                  score: 8,
+                  maxScore: 10,
+                  note: 'Good',
+                },
+              ]),
+            },
+            reportCard: {
+              findMany: jest.fn().mockResolvedValue([
+                {
+                  student: {
+                    studentSystemId: 'SCH-001',
+                    firstNameEn: 'Erwin',
+                    lastNameEn: 'Shrestha',
+                    rollNumber: 1,
+                  },
+                  class: { name: 'Grade 1' },
+                  section: { name: 'A' },
+                  percentage: 85.5,
+                  grade: 'A',
+                  gpa: 3.6,
+                  status: 'LOCKED',
+                  version: 1,
+                },
+              ]),
             },
           },
         },
@@ -271,5 +311,50 @@ describe('ReportsService', () => {
     );
     expect(csvString).toContain('"2024-05-01","INVOICE","INV-001"');
     expect(audit.record).toHaveBeenCalled();
+  });
+
+  it('exports academic-cas-summary in CSV format', async () => {
+    const result = await service.exportReport(
+      'academic-cas-summary',
+      {
+        format: 'csv',
+        filters: {
+          academicYearId: 'ay1',
+          classId: 'c1',
+        },
+      },
+      actor,
+    );
+
+    expect(result.format).toBe('csv');
+    const csvString = result.content.toString();
+    expect(csvString).toContain(
+      'Student ID,Student,Subject,Category,Observed On,Score,Max Score,Percentage,Note',
+    );
+    expect(csvString).toContain('"SCH-001","Erwin Shrestha","ENG - English"');
+    expect(csvString).toContain('"PROJECT","2024-05-01","8","10","80.00","Good"');
+  });
+
+  it('exports academic-promotion-readiness in CSV format', async () => {
+    const result = await service.exportReport(
+      'academic-promotion-readiness',
+      {
+        format: 'csv',
+        filters: {
+          academicYearId: 'ay1',
+          examTermId: 'et1',
+        },
+      },
+      actor,
+    );
+
+    expect(result.format).toBe('csv');
+    const csvString = result.content.toString();
+    expect(csvString).toContain(
+      'Student ID,Student,Class,Section,Roll Number,Percentage,Grade,GPA,Promotion Eligible,Status,Version',
+    );
+    expect(csvString).toContain(
+      '"SCH-001","Erwin Shrestha","Grade 1","A","1","85.50","A","3.60","YES","LOCKED","1"',
+    );
   });
 });

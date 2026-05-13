@@ -5,13 +5,13 @@ This file records the latest web-admin UI/UX implementation progress so large ro
 ## Current UI Sprint
 
 ```text
-Current UI sprint: Phase 2 Academics and Accounting Production Polish implemented; browser smoke execution remains environment-gated.
+Current UI sprint: Phase 2 Academics and Accounting Production Polish completed; browser smoke execution remains environment-gated.
 ```
 
 Current repo reality:
 
 ```text
-Academics and Accounting now have Phase 2 report-card/report export polish, saved snapshot surfaces, and smoke coverage updates.
+Academics and Accounting now have Phase 2 report-card/report export polish, saved snapshot surfaces, audit viewer, bank reconciliation export, and smoke coverage updates.
 Next UI work is not broad route creation; it is environment-backed smoke execution, QR/manual QA, audit viewer depth, scan/POS speed polish, and role-specific depth.
 ```
 

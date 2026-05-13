@@ -1338,6 +1338,14 @@ export const api = {
 
     await openPdfBlob(response);
   },
+  exportBankReconciliationPdf: async (accountId: string) => {
+    const response = await fetch(
+      `${API_BASE_URL}/accounting/reports/bank-reconciliation/${encodeURIComponent(accountId)}/export.pdf`,
+      { credentials: 'include' },
+    );
+
+    await openPdfBlob(response);
+  },
   closeAccountingPeriod: (id: string) =>
     request<AccountingPeriodSummary>(`/accounting/closing/${id}`, {
       method: 'POST',
@@ -1403,6 +1411,21 @@ export const api = {
       method: 'POST',
       json: body,
     }),
+  getAccountingAuditTrail: (params?: {
+    resource?: string;
+    action?: string;
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    limit?: number;
+  }) =>
+    request<PaginatedResult<any>>(
+      withQuery('/accounting/reports/audit-trail', {
+        ...params,
+        page: params?.page?.toString(),
+        limit: params?.limit?.toString(),
+      }),
+    ),
   listConversations: () =>
     request<ConversationSummary[]>('/messaging/conversations'),
   createConversation: (body: JsonBody) =>

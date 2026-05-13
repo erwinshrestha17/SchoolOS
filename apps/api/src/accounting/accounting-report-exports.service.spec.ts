@@ -347,7 +347,7 @@ describe('AccountingReportExportsService', () => {
     const methods = Object.getOwnPropertyNames(
       Object.getPrototypeOf(service),
     ).filter((m) => m.startsWith('export'));
-    expect(methods.length).toBe(12);
+    expect(methods.length).toBe(14);
 
     // Each method name corresponds to a report service method
     expect(methods).toContain('exportTrialBalanceCsv');
@@ -362,6 +362,8 @@ describe('AccountingReportExportsService', () => {
     expect(methods).toContain('exportIncomeStatementPdf');
     expect(methods).toContain('exportBalanceSheetPdf');
     expect(methods).toContain('exportTaxSummaryPdf');
+    expect(methods).toContain('exportBankReconciliationCsv');
+    expect(methods).toContain('exportBankReconciliationPdf');
   });
 
   it('exports a valid Trial Balance PDF and records a protected snapshot', async () => {

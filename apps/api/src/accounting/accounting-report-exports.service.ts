@@ -585,6 +585,112 @@ export class AccountingReportExportsService {
     });
   }
 
+  async exportBankReconciliationCsv(
+    tenantId: string,
+    accountId: string,
+    _actor: AuthContext,
+  ): Promise<string> {
+    const account = await this.prisma.chartAccount.findFirst({
+      where: { id: accountId, tenantId },
+    });
+    if (!account) {
+      return convertToCsv([{ Status: 'Account not found' }]);
+    }
+
+    const statements = await this.prisma.bankStatement.findMany({
+      where: { tenantId, accountId },
+      orderBy: { statementDate: 'asc' },
+    });
+
+    // Fetch matched journal entry numbers for reconciled statements
+    const journalLineIds = statements
+      .map((s) => s.journalLineId)
+      .filter((id): id is string => Boolean(id));
+    const matchedEntries =
+      journalLineIds.length > 0
+        ? await this.prisma.journalLine.findMany({
+            where: { id: { in: journalLineIds } },
+            include: { journalEntry: { select: { entryNumber: true } } },
+          })
+        : [];
+    const entryNumberMap = new Map(
+      matchedEntries.map((jl) => [jl.id, jl.journalEntry.entryNumber]),
+    );
+
+    const rows: Array<Record<string, unknown>> = statements.map((s) => ({
+      Date: s.statementDate.toISOString().slice(0, 10),
+      Description: s.description,
+      Reference: s.reference ?? '',
+      Debit: formatCsvDecimal(s.debitAmount),
+      Credit: formatCsvDecimal(s.creditAmount),
+      Reconciled: s.isReconciled ? 'YES' : 'NO',
+      'Matched Journal': s.journalLineId
+        ? (entryNumberMap.get(s.journalLineId) ?? s.journalLineId)
+        : '',
+      'Reconciled At': s.reconciledAt
+        ? s.reconciledAt.toISOString().slice(0, 10)
+        : '',
+    }));
+
+    const reconciledCount = statements.filter((s) => s.isReconciled).length;
+    rows.push({
+      Date: '',
+      Description: 'SUMMARY',
+      Reference: '',
+      Debit: '',
+      Credit: '',
+      Reconciled: `${reconciledCount}/${statements.length}`,
+      'Matched Journal': '',
+      'Reconciled At': '',
+    });
+
+    return convertToCsv(rows);
+  }
+
+  async exportBankReconciliationPdf(
+    tenantId: string,
+    accountId: string,
+    actor: AuthContext,
+  ) {
+    const account = await this.prisma.chartAccount.findFirst({
+      where: { id: accountId, tenantId },
+    });
+
+    const statements = await this.prisma.bankStatement.findMany({
+      where: { tenantId, accountId },
+      orderBy: { statementDate: 'asc' },
+    });
+
+    const rows: Array<Record<string, unknown>> = statements.map((s) => ({
+      Date: s.statementDate.toISOString().slice(0, 10),
+      Description: s.description.slice(0, 30),
+      Ref: s.reference ?? '',
+      Dr: formatCsvDecimal(s.debitAmount),
+      Cr: formatCsvDecimal(s.creditAmount),
+      Recon: s.isReconciled ? 'YES' : 'NO',
+    }));
+
+    const reconciledCount = statements.filter((s) => s.isReconciled).length;
+    rows.push({
+      Date: 'TOTAL',
+      Description: `${reconciledCount}/${statements.length} reconciled`,
+      Ref: '',
+      Dr: '',
+      Cr: '',
+      Recon: '',
+    });
+
+    return this.buildAndSnapshotPdf({
+      tenantId,
+      actor,
+      reportKey: 'accounting.bank-reconciliation',
+      title: 'Bank Reconciliation',
+      subtitle: account ? `${account.code} - ${account.name}` : 'Bank account',
+      filters: { accountId },
+      rows,
+    });
+  }
+
   private async buildAndSnapshotPdf(input: {
     tenantId: string;
     actor: AuthContext;

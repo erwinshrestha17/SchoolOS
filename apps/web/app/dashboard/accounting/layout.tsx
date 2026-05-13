@@ -22,6 +22,7 @@ export default function AccountingLayout({ children }: { children: ReactNode }) 
     { href: '/dashboard/accounting/reports', label: 'Reports', icon: BarChart3 },
     { href: '/dashboard/accounting/reconciliation', label: 'Reconciliation', icon: Wallet },
     { href: '/dashboard/accounting/management', label: 'Fiscal Management', icon: Settings },
+    { href: '/dashboard/accounting/audit', label: 'Audit Trail', icon: History },
   ];
 
   return (

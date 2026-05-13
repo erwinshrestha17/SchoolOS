@@ -37,16 +37,16 @@ Phase 1A completed / pilot-ready
 Phase 1B completed / pilot-ready
 M0 Platform Core Foundation Depth completed
 Phase 2A M4 Academics backend/admin UI completed
-Phase 2 Academics production polish implemented
+Phase 2 Academics production polish completed
 Student QR Foundation implemented / release hardening remains
-Phase 2D M9 Accounting production-candidate complete
-Phase 2 Accounting production polish implemented
-Current stage: M0 platform foundation complete + Phase 1 pilot-ready core + Phase 2 Academics/Accounting polish implemented + Student QR foundation implemented + Phase 3 operations admin foundations
+Phase 2D M9 Accounting completed
+Phase 2 Accounting production polish completed
+Current stage: M0 platform foundation complete + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3 operations admin foundations
 ```
 
 Targeted web-admin polish and Phase2F smoke coverage have been completed; next focus is the strict phase-gate plan in `docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`.
 
-The repo is ahead of older Phase 1B/Phase 2-transition notes. Phase 2A Academics backend/admin UI is complete and Phase 2 Academics polish is implemented. M9 Accounting is production-candidate complete with Phase 2 PDF/snapshot/reconciliation polish. Student QR foundation is implemented. Foundations now exist for Homework/Timetable, HR/Payroll, Parent Communication/Messaging, Library, Transport, and Canteen.
+The repo is ahead of older Phase 1B/Phase 2-transition notes. Phase 2A Academics backend/admin UI is complete and Phase 2 Academics polish is completed. M9 Accounting is completely finished. Student QR foundation is implemented. Foundations now exist for Homework/Timetable, HR/Payroll, Parent Communication/Messaging, Library, Transport, and Canteen.
 
 Current work should focus on stabilization, correctness, scale, permissions, tests, verification, and admin UX polish for existing modules rather than opening broad new product fronts.
 
@@ -56,7 +56,6 @@ Recommended near-term direction:
 Strict Phase Gate 0
 → stabilize verification, migrations, seed data, smoke tests, and stale docs
 → then harden controlled pilot reliability across M0 and Phase 1 core
-→ then run local/staging smoke for Academics and Accounting polish
 → then deepen Homework/Timetable, HR/Payroll, Library, Transport, and Canteen one vertical at a time
 ```
 

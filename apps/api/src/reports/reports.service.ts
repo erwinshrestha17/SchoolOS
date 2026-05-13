@@ -1407,6 +1407,201 @@ export class ReportsService {
         }));
       },
     });
+
+    // ─── Remaining Academic Reports ──────────────────────────────────
+
+    this.register({
+      definition: {
+        key: 'academic-cas-summary',
+        name: 'CAS Summary Report',
+        description:
+          'Continuous Assessment records summary by student and subject',
+        category: 'academics',
+        module: 'academics',
+        formats: ['json', 'csv', 'pdf'],
+        filters: [
+          {
+            key: 'academicYearId',
+            label: 'Academic Year',
+            type: 'select',
+            required: true,
+          },
+          { key: 'classId', label: 'Class', type: 'class', required: true },
+          { key: 'sectionId', label: 'Section', type: 'section' },
+          { key: 'subjectId', label: 'Subject', type: 'select' },
+        ],
+        requiredPermissions: ['academics:read'],
+      },
+      execute: async (actor, filters) => {
+        const records = await this.prisma.casRecord.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            academicYearId: String(filters.academicYearId),
+            classId: String(filters.classId),
+            ...(filters.sectionId
+              ? { sectionId: String(filters.sectionId) }
+              : {}),
+            ...(filters.subjectId
+              ? { subjectId: String(filters.subjectId) }
+              : {}),
+          },
+          include: {
+            student: true,
+            subject: true,
+          },
+          orderBy: [{ observedOn: 'asc' }],
+        });
+
+        return records.map((record) => ({
+          'Student ID': record.student.studentSystemId,
+          Student: `${record.student.firstNameEn} ${record.student.lastNameEn}`,
+          Subject: record.subject
+            ? `${record.subject.code} - ${record.subject.name}`
+            : 'General',
+          Category: record.category,
+          'Observed On': record.observedOn.toISOString().split('T')[0],
+          Score: Number(record.score),
+          'Max Score': Number(record.maxScore),
+          Percentage:
+            Number(record.maxScore) > 0
+              ? (
+                  (Number(record.score) / Number(record.maxScore)) *
+                  100
+                ).toFixed(2)
+              : '0.00',
+          Note: record.note ?? '-',
+        }));
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'academic-promotion-readiness',
+        name: 'Promotion Readiness Report',
+        description:
+          'Students eligible for promotion based on report card outcomes',
+        category: 'academics',
+        module: 'academics',
+        formats: ['json', 'csv', 'pdf'],
+        filters: [
+          {
+            key: 'academicYearId',
+            label: 'Academic Year',
+            type: 'select',
+            required: true,
+          },
+          {
+            key: 'examTermId',
+            label: 'Exam Term',
+            type: 'select',
+            required: true,
+          },
+          { key: 'classId', label: 'Class', type: 'class' },
+          { key: 'sectionId', label: 'Section', type: 'section' },
+        ],
+        requiredPermissions: ['academics:read'],
+      },
+      execute: async (actor, filters) => {
+        const cards = await this.prisma.reportCard.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            academicYearId: String(filters.academicYearId),
+            examTermId: String(filters.examTermId),
+            ...(filters.classId ? { classId: String(filters.classId) } : {}),
+            ...(filters.sectionId
+              ? { sectionId: String(filters.sectionId) }
+              : {}),
+            status: 'LOCKED',
+          },
+          include: { student: true, class: true, section: true },
+          orderBy: [
+            { class: { name: 'asc' } },
+            { student: { firstNameEn: 'asc' } },
+          ],
+        });
+
+        return cards.map((card) => {
+          const percentage = Number(card.percentage);
+          const passThreshold = 32; // Nepal standard minimum
+          const isEligible = percentage >= passThreshold;
+
+          return {
+            'Student ID': card.student.studentSystemId,
+            Student: `${card.student.firstNameEn} ${card.student.lastNameEn}`,
+            Class: card.class.name,
+            Section: card.section?.name ?? '-',
+            'Roll Number': card.student.rollNumber ?? '-',
+            Percentage: percentage.toFixed(2),
+            Grade: card.grade,
+            GPA: Number(card.gpa).toFixed(2),
+            'Promotion Eligible': isEligible ? 'YES' : 'NO',
+            Status: card.status,
+            Version: card.version,
+          };
+        });
+      },
+    });
+
+    this.register({
+      definition: {
+        key: 'academic-below-threshold',
+        name: 'Below-Threshold Students',
+        description:
+          'Students failing or below the promotion threshold requiring remedial support',
+        category: 'academics',
+        module: 'academics',
+        formats: ['json', 'csv', 'pdf'],
+        filters: [
+          {
+            key: 'academicYearId',
+            label: 'Academic Year',
+            type: 'select',
+            required: true,
+          },
+          {
+            key: 'examTermId',
+            label: 'Exam Term',
+            type: 'select',
+            required: true,
+          },
+          { key: 'classId', label: 'Class', type: 'class' },
+          {
+            key: 'threshold',
+            label: 'Threshold %',
+            type: 'text',
+          },
+        ],
+        requiredPermissions: ['academics:read'],
+      },
+      execute: async (actor, filters) => {
+        const threshold = filters.threshold ? Number(filters.threshold) : 32;
+
+        const cards = await this.prisma.reportCard.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            academicYearId: String(filters.academicYearId),
+            examTermId: String(filters.examTermId),
+            ...(filters.classId ? { classId: String(filters.classId) } : {}),
+          },
+          include: { student: true, class: true, section: true },
+          orderBy: [{ percentage: 'asc' }, { student: { firstNameEn: 'asc' } }],
+        });
+
+        return cards
+          .filter((card) => Number(card.percentage) < threshold)
+          .map((card) => ({
+            'Student ID': card.student.studentSystemId,
+            Student: `${card.student.firstNameEn} ${card.student.lastNameEn}`,
+            Class: card.class.name,
+            Section: card.section?.name ?? '-',
+            Percentage: Number(card.percentage).toFixed(2),
+            Grade: card.grade,
+            GPA: Number(card.gpa).toFixed(2),
+            Remarks: card.remarks ?? '-',
+            'Remedial Required': 'YES',
+          }));
+      },
+    });
   }
 
   register(executor: ReportExecutor) {

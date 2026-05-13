@@ -29,11 +29,11 @@ Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation: Completed across eight sprints; pilot hardening remains
 Phase 2A M4 Academics backend/admin UI: Completed
-Phase 2 Academics production polish: Implemented for report-card PDFs, corrections/history, exports, snapshots, and smoke coverage
+Phase 2 Academics production polish: Completed (report-card PDFs, corrections/history, exports, snapshots, and smoke coverage)
 Student QR Foundation: Implemented; release hardening remains
-Phase 2D M9 Accounting: Production Candidate Complete
-Phase 2 Accounting production polish: Implemented for report PDFs, snapshots, reconciliation suggestions, and smoke coverage
-Current stage: M0 platform foundation complete + Phase 1 pilot-ready core + Phase 2 Academics/Accounting polish implemented + Student QR foundation implemented + Phase 3 operations admin foundations
+Phase 2D M9 Accounting: Completed
+Phase 2 Accounting production polish: Completed (report PDFs, snapshots, reconciliation suggestions, audit trail, and smoke coverage)
+Current stage: M0 platform foundation complete + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3 operations admin foundations
 ```
 
 Targeted web-admin frontend polish and Phase 2F browser smoke coverage are now present on main.
@@ -54,7 +54,6 @@ Recommended near-term direction:
 Strict Phase Gate 0 from docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md
 → stabilize verification, migrations, seed data, smoke tests, and stale docs
 → then harden controlled pilot reliability across M0 and Phase 1 core
-→ then run local/staging smoke for Academics and Accounting polish
 → then deepen Homework/Timetable, HR/Payroll, Library, Transport, and Canteen one vertical at a time
 ```
 

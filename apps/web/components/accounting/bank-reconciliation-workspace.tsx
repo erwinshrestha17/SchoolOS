@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { SectionCard } from '../ui/section-card';
 import { Select } from '../ui/select';
-import { Loader2, Upload, CheckCircle2, AlertTriangle, ArrowRightLeft, Search, Landmark } from 'lucide-react';
+import { Loader2, Upload, CheckCircle2, AlertTriangle, ArrowRightLeft, Search, Landmark, Download } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { ReportTable } from './report-table';
 import { Input } from '../ui/input';
@@ -165,6 +165,14 @@ export function BankReconciliationWorkspace() {
             >
               <Search size={16} />
               Auto-match
+            </button>
+            <button
+              type="button"
+              onClick={() => api.exportBankReconciliationPdf(selectedAccountId)}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-all"
+            >
+              <Download size={16} />
+              Export PDF
             </button>
           </div>
         )}
