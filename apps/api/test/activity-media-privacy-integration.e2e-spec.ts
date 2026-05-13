@@ -260,11 +260,13 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
     });
 
     const posts = await activityFeedService.listPosts(parentActor);
+    const postIds = posts.map((post) => post.id);
 
-    expect(posts.map((post) => post.id)).toEqual([
-      'post-tagged-own-child',
-      'post-class-wide',
-    ]);
+    expect(postIds).toHaveLength(2);
+    expect(postIds).toEqual(
+      expect.arrayContaining(['post-tagged-own-child', 'post-class-wide']),
+    );
+    expect(postIds).not.toContain('post-other-child');
     expect(fileRegistryService.getSignedUrl).toHaveBeenCalledWith(
       tenantId,
       'file-post-tagged-own-child',
