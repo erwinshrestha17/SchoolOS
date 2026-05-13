@@ -54,7 +54,11 @@ export class PlatformReportExportsService {
   }
 
   async listReportExports(tenantId?: string) {
-    const page = await this.listReportExportsPage({ tenantId, page: 1, limit: 100 });
+    const page = await this.listReportExportsPage({
+      tenantId,
+      page: 1,
+      limit: 100,
+    });
     return page.items;
   }
 
@@ -87,7 +91,9 @@ export class PlatformReportExportsService {
 
   private delegate(name: string): DynamicDelegate | null {
     return (
-      (this.prisma as unknown as Record<string, DynamicDelegate | undefined>)[name] ?? null
+      (this.prisma as unknown as Record<string, DynamicDelegate | undefined>)[
+        name
+      ] ?? null
     );
   }
 }
