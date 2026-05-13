@@ -10,7 +10,6 @@ import {
   CalendarCheck,
   Wallet,
   Images,
-  GraduationCap,
   UserCog,
   Calculator,
   BookOpen,
@@ -53,13 +52,7 @@ const homeworkPermissions: PermissionKey[] = ['homework:read'];
 export const dashboardNavGroups: NavGroup[] = [
   {
     label: 'Overview',
-    items: [
-      {
-        href: '/dashboard',
-        label: 'Dashboard',
-        icon: LayoutDashboard,
-      },
-    ],
+    items: [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }],
   },
   {
     label: 'Students & Admissions',
@@ -132,9 +125,15 @@ export const dashboardNavGroups: NavGroup[] = [
     items: [
       {
         href: '/dashboard/hr',
-        label: 'HR & Payroll',
+        label: 'HR / Staff',
         icon: UserCog,
-        permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
+        permissions: ['hr:read'],
+      },
+      {
+        href: '/dashboard/payroll',
+        label: 'Payroll',
+        icon: CalendarDays,
+        permissions: ['payroll:read', 'payroll:manage'],
       },
     ],
   },
@@ -174,12 +173,9 @@ export const dashboardNavGroups: NavGroup[] = [
     items: [
       {
         href: '/dashboard/notices',
-        label: 'Communications',
+        label: 'Notices & Communications',
         icon: Megaphone,
-        permissions: [
-          'notices:read',
-          'notices:create',
-        ],
+        permissions: ['notices:read', 'notices:create'],
       },
       {
         href: '/dashboard/activity',
@@ -187,6 +183,7 @@ export const dashboardNavGroups: NavGroup[] = [
         icon: Images,
         permissions: ['activity_feed:read', 'activity_feed:create'],
       },
+      { href: '/dashboard/messages', label: 'Messages', icon: MessageSquare },
     ],
   },
   {
@@ -259,7 +256,7 @@ export function Sidebar({
 
   const visibleGroups = filterNavGroups(dashboardNavGroups);
   const visiblePlatformItems = platformNavItems.filter((item) =>
-    canSeeNavItem(item, session)
+    canSeeNavItem(item, session),
   );
 
   return (
@@ -282,7 +279,7 @@ export function Sidebar({
       <aside
         className={cn(
           'fixed inset-y-0 left-0 z-50 lg:hidden sidebar-transition',
-          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+          mobileOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
         <SidebarContent
@@ -294,7 +291,7 @@ export function Sidebar({
         />
       </aside>
 
-      <aside className="hidden lg:flex h-screen sticky top-0 z-30">
+      <aside className="hidden h-screen sticky top-0 z-30 lg:flex">
         <SidebarContent
           collapsed={collapsed}
           groups={visibleGroups}
@@ -327,7 +324,7 @@ function SidebarContent({
     <div
       className={cn(
         'flex h-full flex-col bg-sidebar-900 text-white sidebar-transition',
-        collapsed ? 'w-[72px]' : 'w-[280px]'
+        collapsed ? 'w-[72px]' : 'w-[280px]',
       )}
     >
       <div className="flex h-16 items-center gap-3 border-b border-white/[0.06] px-4">
@@ -338,7 +335,7 @@ function SidebarContent({
         <div
           className={cn(
             'sidebar-label',
-            collapsed ? 'w-0 opacity-0' : 'opacity-100'
+            collapsed ? 'w-0 opacity-0' : 'opacity-100',
           )}
         >
           <span className="block truncate text-sm font-bold text-white tracking-tight">
@@ -451,14 +448,14 @@ function NavEntry({
           'shrink-0 transition-colors',
           active && !item.disabled
             ? 'text-primary-400'
-            : 'text-slate-500 group-hover:text-slate-300'
+            : 'text-slate-500 group-hover:text-slate-300',
         )}
       />
 
       <span
         className={cn(
           'sidebar-label font-medium',
-          collapsed ? 'w-0 opacity-0' : 'opacity-100'
+          collapsed ? 'w-0 opacity-0' : 'opacity-100',
         )}
       >
         {item.label}
@@ -484,7 +481,7 @@ function NavEntry({
       ? 'bg-primary-600/10 text-primary-50 shadow-sm'
       : 'text-slate-400 hover:bg-white/[0.04] hover:text-white',
     item.disabled &&
-      'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-400'
+      'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-400',
   );
 
   if (item.disabled) {
@@ -509,7 +506,7 @@ function NavEntry({
 
 function canSeeNavItem(
   item: NavItem,
-  session: ReturnType<typeof useSession>['session']
+  session: ReturnType<typeof useSession>['session'],
 ) {
   const hasPlatformRole =
     item.platformRoles?.some((role) => session?.user.roles.includes(role)) ??
