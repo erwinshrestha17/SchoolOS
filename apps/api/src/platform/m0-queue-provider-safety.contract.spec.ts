@@ -60,7 +60,9 @@ describe('M0 Queue & Provider safety contracts', () => {
       const service = read('src/platform/platform-queues.service.ts');
 
       expect(service).toContain('workerHealth');
-      expect(service).toContain("'healthy' : 'degraded'");
+      expect(service).toContain("'healthy'");
+      expect(service).toContain("'degraded'");
+      expect(service).toContain("'unknown'");
     });
 
     it('getQueueHealth includes waiting, active, and failed counts', () => {
