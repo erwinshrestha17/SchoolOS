@@ -1,6 +1,6 @@
 # SchoolOS Master Project Memory
 
-**Status:** M0 Platform Core Foundation Complete + Phase 2A M4 Academics backend complete + Phase 2D M9 Accounting Production Candidate Complete + Targeted Frontend Polish Complete
+**Status:** M0 Platform Core Foundation Complete + Phase 2A M4 Academics backend/admin UI complete + Student QR Foundation Implemented + Phase 3 Operations Admin Foundations Implemented + Phase 2D M9 Accounting Production Candidate Complete
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard
 
@@ -27,10 +27,11 @@ Do not recreate separate phase structure, scalability, student QR, M9, M11, pric
 Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
-M0 Platform Core Foundation: Completed across eight sprints
-Phase 2A M4 Academics backend: Completed / Contract-Protected
+M0 Platform Core Foundation: Completed across eight sprints; pilot hardening remains
+Phase 2A M4 Academics backend/admin UI: Completed
+Student QR Foundation: Implemented; release hardening remains
 Phase 2D M9 Accounting: Production Candidate Complete
-Current stage: Phase 2A backend complete + M0 platform foundation complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations + Targeted Frontend Polish Complete
+Current stage: M0 platform foundation complete + Phase 1 pilot-ready core + Phase 2 foundations + M4 academics backend/admin UI complete + Student QR foundation implemented + M9 production-candidate completion + Phase 3 operations admin foundations
 ```
 
 Targeted web-admin frontend polish and Phase 2F browser smoke coverage are now present on main.
@@ -48,11 +49,11 @@ Full SchoolOS product complete: No
 Recommended near-term direction:
 
 ```text
-UI-6D Deeper Finance/Accounting Reports Visual Polish, Academics Marks/CAS Keyboard UX, and Real-Credential Manual QA
-→ Polish finance/accounting report visuals
-→ Implement Academics marks/CAS keyboard UX
-→ Conduct manual QA with real credentials
-→ Prepare controlled pilot staging
+Strict Phase Gate 0 from docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md
+→ stabilize verification, migrations, seed data, smoke tests, and stale docs
+→ then harden controlled pilot reliability across M0 and Phase 1 core
+→ then polish Academics and Accounting
+→ then deepen Homework/Timetable, HR/Payroll, Library, Transport, and Canteen one vertical at a time
 ```
 
 Do not expand Phase 2/3 modules broadly at once. Existing Phase 3 admin modules may be polished and hardened, but parent/mobile and driver-facing experiences remain separate future scope.
@@ -113,11 +114,11 @@ Rules:
 | M3 | Fees & Receipts | Phase 1A/1B complete / pilot-ready |
 | M4 | Exams, CAS & Report Cards | Phase 2A backend and admin UI complete |
 | M5 | Activity Feed & Milestones | Phase 1A/1B complete with media/moderation hardening foundations |
-| M6 | Homework & Timetable | Phase 2 foundation implemented; stabilization priority |
-| M7 | HR & Payroll | Phase 2 foundation implemented; deeper tests and UI polish needed |
-| M8A | Library Management | Phase 3 admin foundation implemented |
-| M8B | Transport Management | Phase 3 admin/trip/location foundation implemented; live/driver/parent later |
-| M8C | Canteen Management | Phase 3 admin/wallet/POS foundation implemented; inventory/vendor later |
+| M6 | Homework & Timetable | Phase 2 backend/admin UI foundation implemented; attachment, queue, conflict, and role-view depth remains |
+| M7 | HR & Payroll | Phase 2 backend/admin UI foundation implemented; approval, reporting, self-service, and browser depth remains |
+| M8A | Library Management | Phase 3 admin/backend foundation implemented with fines, reports, history, and QR lookup |
+| M8B | Transport Management | Phase 3 admin/trip/location/report foundation implemented; live/driver/parent later |
+| M8C | Canteen Management | Phase 3 admin/wallet/POS/inventory/vendor/report foundation implemented; integrations and parent views later |
 | M9 | Accounting & Finance | Phase 2D production-candidate complete |
 | M10 | Notices & Communication | Phase 1A/1B + parent-teacher chat foundation |
 | M11 | School Intelligence & Analytics | Roadmap only; implementation deferred |
@@ -242,12 +243,12 @@ Includes Auth/RBAC/tenant isolation, admissions, student profiles, attendance, f
 Status: **Partially complete**.
 
 ```text
-2A Academics, Exams, CAS, Report Cards — complete (backend and admin UI)
-2B Homework and Timetable — foundation implemented; stabilization priority
-2C HR and Payroll — foundation implemented; deeper lifecycle/accounting tests needed
+2A Academics, Exams, CAS, Report Cards — complete for backend/admin UI; PDF/report polish remains
+2B Homework and Timetable — backend/admin UI foundation implemented; attachment, queue, conflict, and role-view depth remains
+2C HR and Payroll — backend/admin UI foundation implemented; approval, reporting, self-service, and browser depth remains
 2D M9 Accounting and Finance — production-candidate complete
-2E Parent Communication Expansion — foundation implemented / further hardening later
-2F Student Identity QR Foundation — approved cross-module foundation; implement before deeper Library/Canteen/Transport QR usage
+2E Parent Communication Expansion — foundation implemented / provider, moderation, retention, and mobile depth remains
+2F Student Identity QR Foundation — implemented foundation; release QA, ID-card PDF verification, and deeper scan tests remain
 ```
 
 ### Phase 3 — Extended School Operations
@@ -255,10 +256,10 @@ Status: **Partially complete**.
 Status: **Admin foundations implemented; production depth incomplete**.
 
 ```text
-Library admin foundation
-Transport admin/trip/location foundation
-Canteen admin/wallet/POS foundation
-Parent/mobile, driver app, live transport map/WebSocket/SSE, full canteen inventory/vendor/profit-loss later
+Library admin/backend foundation with fines, reports, history, and QR lookup
+Transport admin/trip/location/report foundation
+Canteen admin/wallet/POS/inventory/vendor/report foundation
+Parent/mobile, driver app, live transport map/WebSocket/SSE, and deeper accounting/billing integrations later
 ```
 
 ### Phase 4 — AI, Analytics, Scale, and Enterprise SaaS
@@ -298,19 +299,32 @@ Next Phase 2A work:
 
 ## 8. Student Identity QR Foundation
 
-Status: **Approved cross-module foundation. Implementation should happen before deeper Phase 3 QR-dependent workflows.**
+Status: **Implemented foundation; release hardening remains.**
 
 Student QR identity belongs to M1 Admissions & Student Profiles, not Library-only, Canteen-only, or Transport-only.
 
-Approved near-term direction:
+Implemented foundation:
 
 ```text
-- Immutable Student ID code generated during registration/admission.
-- Revocable QR credential per student.
-- QR code on student ID cards.
-- Authenticated QR scan/resolve API.
-- Purpose-based QR scan responses.
-- Reuse QR identity in Library, Canteen, optional Transport, and parent/mobile views.
+- StudentQrCredential model and StudentQrStatus enum.
+- Secure QR credential generation with token hashing.
+- Generate, rotate, revoke, and resolve API.
+- Purpose-based scan responses for general, Library, Canteen, Transport, and Attendance contexts.
+- Student profile QR management card.
+- Shared QR resolver UI foundation.
+- Library borrower QR lookup.
+- Canteen QR resolve endpoint.
+```
+
+Remaining hardening:
+
+```text
+- Verify immutable student identity code behavior across all admission paths.
+- Verify ID-card PDF QR rendering before release; apps/api/src/common/pdf/simple-pdf.ts had pre-existing uncommitted changes during this doc pass.
+- Add deeper QR tenant, permission, role-purpose, and audit tests.
+- Add QR manual QA across Student profile, Library issue/return, and Canteen serving/POS.
+- Add optional Transport QR usage only where it improves operator flow.
+- Add parent/mobile QR-related views later, after Phase 5 opens.
 ```
 
 Biometrics are explicitly out of scope until QR identity is stable, parent trust is established, legal/privacy rules are reviewed, and the product has strong consent, retention, encryption, audit, and deletion workflows.
@@ -433,7 +447,8 @@ Feature -> tenant isolation -> indexes -> pagination -> queue slow work -> audit
 Full SchoolOS vision: around 70-80% implemented
 Phase 1 pilot product: around 90-95% implemented
 M0 Platform Core: 80-90% foundation complete / pilot hardening next
-Phase 2A M4 Academics backend: complete / contract-protected
+Phase 2A M4 Academics: backend/admin UI complete / PDF and reporting polish remains
+Student QR Foundation: implemented / release hardening remains
 M9 Accounting: production-candidate complete
 ```
 
@@ -449,12 +464,12 @@ Module estimates:
 | M5 Activity Feed | 75-85% |
 | M10 Notices & Communication | 85-90% |
 | M4 Academics | 100% |
-| M6 Homework & Timetable | 60-70% |
-| M7 HR & Payroll | 65-75% |
+| M6 Homework & Timetable | 70-80% |
+| M7 HR & Payroll | 75-85% |
 | M9 Accounting | 95-100% |
-| M8A Library | 45-55% |
-| M8B Transport | 45-55% |
-| M8C Canteen | 45-55% |
+| M8A Library | 65-75% |
+| M8B Transport | 60-70% |
+| M8C Canteen | 65-75% |
 | M11 Intelligence / AI | 0% implementation |
 
 Biggest risks:
@@ -462,9 +477,9 @@ Biggest risks:
 ```text
 - Docker-backed smoke is pending because Postgres, Redis, and API must be running.
 - M0 platform/school route denial, SaaS billing lifecycle, entitlement enforcement, and queue retry coverage need deeper E2E/regression tests.
-- 2. Current Action Priority  
-The immediate objective is to shift focus to deeper report card PDF generation, advanced accounting polish, and overall staging pilot verification, as the M4 Academics admin UI has been successfully completed and wired.
-- Existing Phase 2/3 breadth without enough depth outside M4 and M9.
+- Phase Gate 0 in the remaining implementation plan must be completed before broad new scope.
+- Existing Phase 2/3 breadth needs vertical hardening outside M4 and M9.
+- Student QR foundation exists, but QR-in-PDF release behavior and cross-module manual QA still need verification.
 - Homework/Timetable schema/service/test stability after recent verification follow-ups.
 - Pilot operations exposing real-world data-entry, fee, attendance, guardian-contact, PDF, and slow-network issues.
 - Parent/mobile portal, driver app, live map/WebSocket, full canteen inventory/vendor workflows, and AI/ML implementation remain intentionally unbuilt.

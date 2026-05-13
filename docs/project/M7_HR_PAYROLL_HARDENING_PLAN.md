@@ -1,5 +1,11 @@
 # Implementation Plan - Harden M7 HR and Payroll Backend
 
+**Last reviewed:** 2026-05-13
+
+**Current status:** Backend/admin UI foundation implemented; remaining work is deeper payroll/leave/report/browser hardening.
+
+For project-wide phase order, follow `docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`. This file is a module-specific checklist only.
+
 This plan outlines the steps to harden the HR and Payroll modules in SchoolOS, ensuring production-grade depth, security, and accounting integration.
 
 ## 1. Schema Enhancements
@@ -41,9 +47,20 @@ This plan outlines the steps to harden the HR and Payroll modules in SchoolOS, e
 - [x] **RBAC**: Enforced permissions for all new endpoints (`hr:staff:terminate`, `payroll:run:reverse`, etc.).
 
 ## 7. Verification
-- [ ] `pnpm db:generate` (Environment permission issues detected, but code is valid)
+- [ ] `pnpm db:generate`
 - [ ] `pnpm db:validate`
 - [ ] `pnpm verify:openapi`
 - [ ] `pnpm --filter @schoolos/api typecheck`
 - [ ] `pnpm test:e2e`
 - [ ] `pnpm build`
+- [ ] Add/run HR and payroll browser smoke coverage.
+
+## 8. Remaining M7 Hardening
+
+- [ ] Payroll approval/posting lock depth.
+- [ ] Leave accrual edge cases and audit workflow depth.
+- [ ] Sensitive staff field encryption/masking review.
+- [ ] Payroll register/report export hardening.
+- [ ] Payslip PDF visual polish.
+- [ ] Staff self-service finalization.
+- [ ] More HR/payroll permission and tenant-isolation tests.

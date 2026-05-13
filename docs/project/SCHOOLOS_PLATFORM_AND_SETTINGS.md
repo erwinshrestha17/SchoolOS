@@ -12,6 +12,7 @@ Current repo/backend audit:
 
 ```text
 docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
+docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md
 ```
 
 ---
@@ -33,7 +34,7 @@ If the setting changes SaaS ownership, billing, infrastructure, provider credent
 
 ```text
 M0 Platform Core Foundation: Completed across eight sprints
-Current work: M0 pilot hardening, regression coverage, smoke verification, and one-vertical-at-a-time Phase 2 depth.
+Current work: Phase Gate 0 stabilization, M0 pilot hardening, regression coverage, smoke verification, and one-vertical-at-a-time depth.
 ```
 
 M0 is now implemented as a real platform foundation inside the existing NestJS modular monolith. It is not a separate microservice and should not be split unless future scale, team ownership, deployment isolation, or compliance requirements clearly justify that cost.
@@ -116,9 +117,9 @@ Remaining M0 hardening work:
 Deeper BullMQ failed-job inspection per deployed queue topology
 Async report/export generation expansion module by module
 Provider test connection limitations remain intentionally conservative/no paid external calls
-Demo Nepal tenant seed expansion
-Credentialed web E2E coverage where seeded credentials are available
-Platform/school route denial browser tests
+Seed data coverage for every dashboard module route used in smoke tests
+Credentialed web E2E coverage where seeded credentials and local ports are available
+Deeper platform/school route denial browser tests
 SaaS billing lifecycle tests: invoice -> payment -> overdue/cancel/suspend
 Entitlement enforcement tests against real school APIs
 Object storage readiness verification against staging provider

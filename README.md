@@ -21,8 +21,9 @@ PROJECT_CONTEXT.md
 ARCHITECTURE.md
 DEVELOPMENT_RULES.md
 docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
-docs/project/SCHOOLOS_SETTINGS_BOUNDARIES.md
-docs/project/SCHOOLOS_SCALABILITY_ROADMAP.md
+docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md
+docs/project/SCHOOLOS_PLATFORM_AND_SETTINGS.md
+docs/project/SCHOOLOS_CURRENT_UI_PROGRESS.md
 ```
 
 Legacy long planning files have been merged into the master memory and should stay as redirects/summaries unless a focused update is needed:
@@ -44,9 +45,10 @@ Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation Depth: Completed
-Phase 2A M4 Academics backend: Completed / Contract-Protected
+Phase 2A M4 Academics backend/admin UI: Completed
+Student QR Foundation: Implemented; release hardening remains
 Phase 2D M9 Accounting: Production Candidate Complete
-Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations + Targeted Frontend Polish Complete
+Current stage: M0 platform foundation complete + Phase 1 pilot-ready core + Phase 2 foundations + M4 academics backend/admin UI complete + Student QR foundation implemented + M9 production-candidate completion + Phase 3 operations admin foundations
 ```
 
 Targeted web-admin polish and Phase2F browser smoke coverage are now present on main.
@@ -64,12 +66,11 @@ Full SchoolOS product complete: No
 Recommended next direction:
 
 ```text
-Repo Verification & Stabilization Sprint
-→ fix any remaining Prisma/schema/typecheck/test blockers
-→ stabilize Homework/Timetable after recent verification follow-ups
-→ wire Phase 2A Academics admin UI to completed APIs
-→ add authenticated Playwright browser smoke tests
-→ prepare controlled pilot staging
+Strict Phase Gate 0 from docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md
+→ stabilize verification, migrations, seed data, smoke tests, and stale docs
+→ harden controlled pilot reliability across M0 and Phase 1 core
+→ polish Academics and Accounting
+→ deepen Homework/Timetable, HR/Payroll, Library, Transport, and Canteen one vertical at a time
 ```
 
 Do not start broad new product fronts until the full verification gate is clean.
@@ -151,13 +152,13 @@ Rules:
 | M1 | Admissions & Student Profiles | Phase 1A/1B complete / pilot-ready |
 | M2 | Smart Attendance | Phase 1A/1B complete / pilot-ready |
 | M3 | Fees & Receipts | Phase 1A/1B complete / pilot-ready |
-| M4 | Exams, CAS & Report Cards | Phase 2A backend complete / admin UI next |
+| M4 | Exams, CAS & Report Cards | Phase 2A backend/admin UI complete; PDF/report polish remains |
 | M5 | Activity Feed & Milestones | Phase 1A/1B complete; media/moderation hardening ongoing |
-| M6 | Homework & Timetable | Phase 2 foundation implemented; stabilization priority |
-| M7 | HR & Payroll | Phase 2 foundation implemented; deeper tests and UI polish needed |
-| M8A | Library Management | Phase 3 admin foundation implemented |
-| M8B | Transport Management | Phase 3 admin/trip/location foundation implemented; live/driver/parent later |
-| M8C | Canteen Management | Phase 3 admin/wallet/POS foundation implemented; inventory/vendor later |
+| M6 | Homework & Timetable | Backend/admin UI foundation implemented; attachment, queue, conflict, and role-view depth remains |
+| M7 | HR & Payroll | Backend/admin UI foundation implemented; approval, reporting, self-service, and browser depth remains |
+| M8A | Library Management | Admin/backend foundation with fines, reports, history, and QR lookup |
+| M8B | Transport Management | Admin/trip/location/report foundation; live/driver/parent later |
+| M8C | Canteen Management | Admin/wallet/POS/inventory/vendor/report foundation; integrations and parent views later |
 | M9 | Accounting & Finance | Phase 2D production-candidate complete |
 | M10 | Notices & Communication | Phase 1A/1B + parent-teacher chat foundation |
 | M11 | School Intelligence & Analytics | Roadmap only; implementation deferred |
@@ -169,7 +170,8 @@ Rules:
 ```text
 Full SchoolOS vision: around 70-80% implemented
 Phase 1 pilot product: around 90-95% implemented
-Phase 2A M4 Academics backend: complete / contract-protected
+Phase 2A M4 Academics backend/admin UI: complete
+Student QR Foundation: implemented / release hardening remains
 M9 Accounting: production-candidate complete
 ```
 
@@ -191,6 +193,7 @@ M7 HR & Payroll
 M8A Library
 M8B Transport
 M8C Canteen
+Student QR cross-module manual QA
 Authenticated browser smoke tests
 Staging/pilot verification
 ```

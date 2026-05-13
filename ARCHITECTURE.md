@@ -52,9 +52,10 @@ Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation Depth: Completed
-Phase 2A M4 Academics backend: Completed / Contract-Protected
+Phase 2A M4 Academics backend/admin UI: Completed
+Student QR Foundation: Implemented / release hardening remains
 Phase 2D M9 Accounting: Production Candidate Complete
-Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
+Current stage: M0 platform foundation complete + Phase 1 pilot-ready core + Phase 2 foundations + M4 academics backend/admin UI complete + Student QR foundation implemented + M9 production-candidate completion + Phase 3 operations admin foundations
 ```
 
 Current readiness:
@@ -116,10 +117,11 @@ docs/
 Current implementation snapshot:
 
 - Phase 1 school operations are pilot-ready in `apps/web` and `apps/api`.
-- Phase 2A Academics backend is complete and contract-protected.
+- Phase 2A Academics backend/admin UI is complete and contract-protected.
+- Student QR identity foundation is implemented, with release hardening and PDF verification still required.
 - Phase 2D M9 Accounting is production-candidate complete.
 - Phase 2 foundations exist for Homework/Timetable, HR/Payroll, and Parent-Class Teacher Chat.
-- Phase 3 admin foundations exist for Library, Transport, and Canteen.
+- Phase 3 admin/backend foundations exist for Library, Transport, and Canteen, with reports, QR/scan foundations, and inventory/location/POS depth depending on the vertical.
 - Deferred surfaces remain: parent/mobile portal, driver app, live transport map/WebSocket UI, full canteen inventory/vendor workflows, and AI/ML.
 
 Suggested frontend namespaces inside `apps/web`:

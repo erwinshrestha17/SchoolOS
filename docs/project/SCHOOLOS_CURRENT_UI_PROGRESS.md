@@ -5,7 +5,14 @@ This file records the latest web-admin UI/UX implementation progress so large ro
 ## Current UI Sprint
 
 ```text
-Current UI sprint: UI-7A Operations UX Foundation — Library, Transport, Canteen.
+Current UI sprint: Phase Gate 0 UI verification and Operations vertical hardening.
+```
+
+Current repo reality:
+
+```text
+Library, Transport, and Canteen admin route foundations are present in apps/web.
+Next UI work is not broad route creation; it is smoke verification, QR/manual QA, report/export polish, scan/POS speed polish, and role-specific depth.
 ```
 
 ## Current Sprint (Completed)
@@ -61,7 +68,8 @@ Completed:
 ## Next Recommended Sprint
 
 ```text
-UI-7A: Operations UX Foundation — Library, Transport, Canteen.
+Phase Gate 0 UI Verification:
+credential-gated route smoke, permission-denied states, stale link cleanup, and QR manual QA.
 ```
 
 ## Following Sprint
@@ -223,8 +231,6 @@ Completed:
 
 - HR/Payroll browser smoke tests (deeper coverage).
 - Accounting browser smoke tests (improved/partially covered by Phase 2F, but deeper coverage still needed).
-- Deeper fees/accounting report visual polish.
-- Academics marks/CAS keyboard-entry polish.
 - QR-specific Library/Canteen manual QA.
 - Platform tenant-action manual QA.
 - Payroll PDF/payslip visual polish.
@@ -234,6 +240,9 @@ Completed:
 - Trial Balance / Balance Sheet PDF export styling.
 - Homework file attachments after File Registry.
 - Advanced timetable conflict visualization.
+- Library barcode/QR scan polish and Playwright tests.
+- Transport live map only after real-time backend design is complete.
+- Canteen inventory/vendor UI depth and POS/QR speed polish.
 - Full mobile/PWA later.
 
 - pnpm lint: passed

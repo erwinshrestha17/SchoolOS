@@ -681,7 +681,7 @@ function wrapPdfLine(
 type QrCodeMatrix = {
   modules: {
     size: number;
-    data: boolean[];
+    data: ArrayLike<boolean | number>;
   };
 };
 
@@ -693,25 +693,28 @@ function renderQrTokenAsPdfBlocks(
 ) {
   const qr = QRCode.create(token, {
     errorCorrectionLevel: 'M',
-    margin: 1,
-  }) as QrCodeMatrix;
+  }) as unknown as QrCodeMatrix;
+
   const matrixSize = qr.modules.size;
   const cell = size / matrixSize;
-  const parts = [
-    '0 g',
-    `${x} ${y} ${size} ${size} re S`,
-    '0 0 0 rg',
-  ];
+  const parts = ['0 g', `${x} ${y} ${size} ${size} re S`, '0 0 0 rg'];
 
   for (let row = 0; row < matrixSize; row++) {
     for (let col = 0; col < matrixSize; col++) {
-      if (!qr.modules.data[row * matrixSize + col]) {
+      const isDark = Boolean(qr.modules.data[row * matrixSize + col]);
+
+      if (!isDark) {
         continue;
       }
 
       const px = x + col * cell;
       const py = y + size - (row + 1) * cell;
-      parts.push(`${px.toFixed(2)} ${py.toFixed(2)} ${cell.toFixed(2)} ${cell.toFixed(2)} re f`);
+
+      parts.push(
+        `${px.toFixed(2)} ${py.toFixed(2)} ${cell.toFixed(
+          2,
+        )} ${cell.toFixed(2)} re f`,
+      );
     }
   }
 

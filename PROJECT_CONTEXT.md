@@ -36,25 +36,26 @@ Phase 0 completed
 Phase 1A completed / pilot-ready
 Phase 1B completed / pilot-ready
 M0 Platform Core Foundation Depth completed
-Phase 2A M4 Academics backend completed / contract-protected
+Phase 2A M4 Academics backend/admin UI completed
+Student QR Foundation implemented / release hardening remains
 Phase 2D M9 Accounting production-candidate complete
-Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations + Targeted Frontend Polish Complete + Real-Credential Pilot QA Hardening Complete
+Current stage: M0 platform foundation complete + Phase 1 pilot-ready core + Phase 2 foundations + M4 academics backend/admin UI complete + Student QR foundation implemented + M9 production-candidate completion + Phase 3 operations admin foundations
 ```
 
-Targeted web-admin polish and Phase2F smoke coverage have been completed; next focus is deeper report polish, real-credential QA, and stabilization.
+Targeted web-admin polish and Phase2F smoke coverage have been completed; next focus is the strict phase-gate plan in `docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`.
 
-The repo is ahead of older Phase 1B/Phase 2-transition notes. Phase 2A Academics backend is complete. M9 Accounting is production-candidate complete. Foundations now exist for Homework/Timetable, HR/Payroll, Parent Communication/Messaging, Library, Transport, and Canteen.
+The repo is ahead of older Phase 1B/Phase 2-transition notes. Phase 2A Academics backend/admin UI is complete. M9 Accounting is production-candidate complete. Student QR foundation is implemented. Foundations now exist for Homework/Timetable, HR/Payroll, Parent Communication/Messaging, Library, Transport, and Canteen.
 
 Current work should focus on stabilization, correctness, scale, permissions, tests, verification, and admin UX polish for existing modules rather than opening broad new product fronts.
 
 Recommended near-term direction:
 
 ```text
-Visual Polish & Keyboard UX Sprint
-→ execute final visual polish for Finance/Accounting Reports
-→ implement keyboard-friendly marks/CAS entry for Academics
-→ stabilize Homework/Timetable after recent verification follow-ups
-→ perform final staging/pilot environment verification
+Strict Phase Gate 0
+→ stabilize verification, migrations, seed data, smoke tests, and stale docs
+→ then harden controlled pilot reliability across M0 and Phase 1 core
+→ then polish Academics and Accounting
+→ then deepen Homework/Timetable, HR/Payroll, Library, Transport, and Canteen one vertical at a time
 ```
 
 Explicitly deferred unless requested:
@@ -95,13 +96,14 @@ Implemented or registered backend foundations now include:
 - M1 Admissions & Student Profiles
 - M2 Smart Attendance
 - M3 Fees & Receipts
-- M4 Academics, Exams, CAS, Report Cards backend completion
+- M4 Academics, Exams, CAS, Report Cards backend/admin UI completion
 - M5 Activity Feed & Milestones
 - M6 Homework & Timetable foundation
 - M7 Staff/HR and Payroll foundation
-- M8A Library Management admin foundation
-- M8B Transport Management admin/trip/location foundation
-- M8C Canteen Management admin/wallet/POS foundation
+- Student QR identity foundation
+- M8A Library Management admin/backend foundation with fines, reports, history, and QR lookup
+- M8B Transport Management admin/trip/location/report foundation
+- M8C Canteen Management admin/wallet/POS/inventory/vendor/report foundation
 - M9 Accounting & Finance production-candidate completion
 - M10 Notices, Notifications, Communications, Messaging / Parent-Class Teacher foundation
 - M11 School Intelligence & Analytics roadmap only
@@ -123,7 +125,8 @@ Full SchoolOS product complete: No
 ```text
 Full SchoolOS vision: around 70-80% implemented
 Phase 1 pilot product: around 90-95% implemented
-M4 Academics backend: complete / contract-protected
+M4 Academics backend/admin UI: complete
+Student QR Foundation: implemented / release hardening remains
 M9 Accounting: production-candidate complete
 ```
 
@@ -131,17 +134,17 @@ Approximate module status:
 
 ```text
 Auth/Security/Tenant: 90-95%
-M0 Platform Core: 65-75%
+M0 Platform Core: 80-90%
 M1 Students: 90-95%
 M2 Attendance: 85-90%
 M3 Fees: 85-90%
-M4 Academics: 80-90%
+M4 Academics: 95-100%
 M5 Activity: 75-85%
-M6 Homework/Timetable: 60-70%
-M7 HR/Payroll: 65-75%
-M8A Library: 45-55%
-M8B Transport: 45-55%
-M8C Canteen: 45-55%
+M6 Homework/Timetable: 70-80%
+M7 HR/Payroll: 75-85%
+M8A Library: 65-75%
+M8B Transport: 60-70%
+M8C Canteen: 65-75%
 M9 Accounting: 95-100%
 M10 Communications: 85-90%
 M11 Intelligence/AI: 0% implementation

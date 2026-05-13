@@ -1,11 +1,16 @@
 # SchoolOS Current Repo Status Analysis
 
-This document is the short current-state audit for backend implementation, modules, phases, and repo readiness.
+**Last updated:** 2026-05-13
 
-For the full source of truth, read:
+**Scope:** Full repo documentation review against `apps/api`, `apps/web`, `packages/core`, Prisma schema, and available tests.
+
+This document is the short current-state audit for backend implementation, frontend implementation, remaining module work, and strict implementation order.
+
+For the long-running source of truth, read:
 
 ```text
 docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
+docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md
 ```
 
 Do not treat older Phase 1B / Phase 2-transition notes as current unless they are explicitly marked as historical.
@@ -18,308 +23,242 @@ Do not treat older Phase 1B / Phase 2-transition notes as current unless they ar
 Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
-M0 Platform Core Foundation: Completed across eight sprints
-Phase 2A M4 Academics backend: Completed / Contract-Protected
-Phase 2D M9 Accounting: Production Candidate Complete
-Current stage: Phase 2A backend complete + M0 platform foundation complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations + Targeted Frontend Polish Complete + Real-Credential Pilot QA Hardening Complete
+M0 Platform Core: Foundation complete; pilot hardening remains
+Phase 2A M4 Academics: Backend and admin UI implemented
+Phase 2B M6 Homework/Timetable: Backend and admin UI foundations implemented
+Phase 2C M7 HR/Payroll: Backend and admin UI foundations implemented
+Phase 2D M9 Accounting: Production-candidate complete for current scope
+Phase 2E M10 Parent communication/chat: Foundation implemented
+Student QR Identity: Backend model/API/service and admin UI foundation implemented
+Phase 3 M8A/M8B/M8C: Admin/backend foundations implemented with more depth than older docs showed
+Phase 4 M11 Intelligence/AI: Roadmap only
 ```
 
-Targeted web-admin frontend polish and Phase2F browser smoke coverage are now present on main.
-
-Readiness:
+Current readiness:
 
 ```text
 Demo-ready: Yes
 Internal QA-ready: Yes
-Controlled pilot-ready: Yes, after staging checks
+Controlled pilot-ready: Yes, after staging checks and smoke verification
 Multi-school production-ready: Not yet
 Full SchoolOS product complete: No
 ```
 
-Latest stabilization result on 2026-05-13:
+Latest practical caveat:
 
 ```text
-Repo stabilization sprint completed for current M0, M1, M6, M7, M8A, M8B, and M8C drift.
-Prisma generate/validate, OpenAPI verification, lint, typecheck, unit tests, E2E tests, build, and verify:production pass locally.
-Prisma migrate status can reach the configured database only with elevated local access and reports unapplied local migrations, including the stabilization migration.
-smoke:phase1 was not run because API, web, Postgres, and Redis were not running in the local workspace.
-```
-
-CTO verdict:
-
-```text
-SchoolOS is beyond MVP and nearing pilot-readiness.
-The main branch is stabilized for controlled pilot QA.
-Real-credential smoke tests are prepared and verified in the codebase.
-The seed script is idempotent and provides comprehensive local QA data.
-Next focus is the final visual polish wave for accounting reports and academics entry.
-Maintain the current three-plane architecture and avoid architectural drift.
+This pass is documentation and repo analysis only. It did not rerun the full verification gate.
+The working tree already contained unrelated changes in apps/api/src/common/pdf/simple-pdf.ts and pnpm-lock.yaml before this documentation update.
+Treat any QR-in-PDF behavior touched by that file as needing verification before release.
 ```
 
 ---
 
-## Current Module Completion Estimate
+## Repository Implementation Map
+
+Backend modules are registered in `apps/api/src/app.module.ts` and include Auth/RBAC, M0 Platform, M1-M10 school modules, Prisma, Redis/BullMQ, storage, reports, file registry, usage, plans, and settings.
+
+Frontend routes in `apps/web/app` include dashboard workspaces for students, admissions, attendance, fees/finance, activity, notices, messaging, academics, homework, timetable, HR, payroll, accounting, library, transport, canteen, settings, and platform control.
+
+Shared contracts live in `packages/core/src`.
+
+Available verification coverage includes API unit/E2E tests, web tests, and Playwright smoke specs for phase 1, academics, accounting, dashboard/platform route behavior, and UX keyboard flows.
+
+---
+
+## Module-by-Module Implemented vs Remaining
+
+| Module | Backend Implemented | Frontend Implemented | Remaining Backend | Remaining Frontend |
+|---|---|---|---|---|
+| Auth / Security / Tenant | Cookie-first auth, bearer support, RBAC, tenant context, platform/tenant separation, super-admin override audit, throttling. | Login/register/session-aware dashboard shell. | Deeper request/correlation logging, more denial/override regression tests, production secret/session review. | Permission-denied polish across every route and slow-session recovery. |
+| M0 Platform Core | Tenant management, plans/features, entitlements/usage, SaaS billing records, providers, queue health/retry, file registry, reports/exports, health, onboarding. | `/platform/dashboard`, `/platform/schools`, tenant detail, platform settings, audit surfaces. | Deeper BullMQ failed-job inspection by deployed queue topology, SaaS lifecycle automation, entitlement enforcement tests against school APIs, staging object-storage checks. | More platform tenant-action QA, richer queue/provider failure surfaces, browser coverage for critical platform mutations. |
+| M1 Admissions & Students | Admissions, profiles, guardians, documents, lifecycle, search, photo/document access, duplicate/merge foundations, StudentIdentity, StudentQrCredential model/service/API. | Admissions workspace, student directory/detail/profile tabs, document/profile actions, QR card management. | iEMIS final mapping, duplicate merge polish, storage-backed photo/document hardening, QR release verification, more tenant-isolation tests. | QR manual QA, photo/logo upload UX polish, student document audit visibility, parent-safe student views later. |
+| M2 Attendance | Attendance sessions/records, corrections, sync submissions/conflicts, drafts, monthly/history analytics, exports, teacher-scope tests. | Attendance daily workflow and register routes. | Offline sync persistence hardening, attendance export/report stabilization, parent summary API later. | Parent attendance view later, slow-network/offline UX, correction workflow polish. |
+| M3 Fees & Receipts | Fee heads/plans, invoices, payments, receipts, cashier close, refunds/reversals, ledger/report foundations, M9 consistency coverage. | Fees/finance workspaces, collection counter, ledger, receipt/reprint/correction UI foundations. | Online payment gateway readiness, receipt reprint history depth, cashier-close verification, better export/PDF coverage. | Fee-head/period dues table polish, gateway payment UX, finance report export polish. |
+| M4 Academics / Exams / CAS / Report Cards | Exam terms, assessment components, marks, CAS, grading/GPA preview, locks/unlocks, report cards/history/corrections, promotion readiness, publishing, parent notification hooks, contract tests. | Academics hub and routes for setup, marks, CAS, locks, results, report cards, promotion, publishing; keyboard marks/CAS polish. | Report-card PDF visual polish, locked report-card correction/regeneration workflow, deeper academic reports/exports, index review after usage stabilizes. | Full manual/browser smoke of the complete academic flow, PDF preview/download polish. |
+| M5 Activity Feed & Milestones | Posts, targeting, attachments/media access, lifecycle, reactions, milestones/mood foundations, media privacy tests. | Activity dashboard route. | Object-storage/direct upload hardening, compression queue depth, moderation/approval workflow, edit/delete/soft-delete polish. | Activity detail/media gallery, parent activity view, moderation UI. |
+| M6 Homework & Timetable | Homework lifecycle/submissions/review/reminders/reports/attachment access; timetable periods, rooms, versions, slots, compare/restore, validation, teacher availability/workload, weekly requirements, substitutions. | Homework list/new/detail/review; timetable overview, builder, versions, substitutions. | Reminder queue hardening, attachment upload through File Registry, leave integration, deeper conflict/service tests. | Timetable builder polish, conflict visualization, teacher/student/parent views, homework attachment UX. |
+| M7 HR & Payroll | Staff, documents, lifecycle, contracts, HR attendance, leave balances/requests/accrual, payroll runs/lines, salary structures, payslips, payroll-to-accounting and reversal foundations. | HR staff/detail/attendance/contracts/leave; payroll dashboard/runs/salary structures/payslips/reports. | Approval/posting locks, leave accrual edge cases, sensitive field encryption review, payroll/register export depth, more permission tests. | HR/payroll browser smoke, staff self-service finalization, payslip PDF polish, payroll reports polish. |
+| M8A Library | Books, copies, issue/return, overdue, fines, settings, borrowed students, QR borrower lookup, reports, CSV export, book/copy history. | Library dashboard, books, copies, issues, overdue, fines, reports. | Fee/accounting integration, overdue queue hardening, staff borrower depth, more permission/tenant tests. | Barcode/QR scan polish, report export polish, Playwright coverage. |
+| M8B Transport | Routes/stops, vehicles, driver/student assignments, trip lifecycle, student boarding statuses, latest location, cleanup, parent active-trip endpoint, delays/logs/reports/CSV. | Transport dashboard, routes, vehicles, assignments, trips, latest location. | Driver GPS ingestion hardening, Redis Pub/Sub/SSE/WebSocket fanout, location retention/partition strategy, ETA/geofence/deviation later, billing/accounting integration later. | Live map UI, driver app, parent child-tracking UI, route dashboard and report polish. |
+| M8C Canteen | Menu, meal plans, enrollments, serving, wallets, POS, spending controls, QR resolve, suppliers, inventory, purchase bills, stock movement, wastage, reports/CSV. | Canteen dashboard, menu, plans, enrollments, serving, wallets, POS, controls, reports. | Wallet immutability review, POS receipt generation, fee/accounting integration, low-balance queue depth, inventory/vendor edge-case tests. | QR scan/manual QA, inventory/vendor UI depth, parent wallet/menu/spending views, report polish. |
+| M9 Accounting & Finance | Chart of accounts, journals, fiscal years/periods, posting service, reversals/corrections, fiscal close/reopen, opening balances, reports, bank reconciliation, CSV exports, audit. | Accounting dashboard, accounts, journals, reports, reconciliation, management. | PDF exports, saved report snapshots/File Registry integration, advanced bank auto-match, audit log viewer, production seed review. | Seeded Playwright accounting workflow depth, advanced report visual polish. |
+| M10 Notices / Communication / Messaging | Notices, events, consent templates/preferences, deliveries/retries/read tracking, notification center, unread recipients, parent-teacher chat availability/escalation/abuse foundations. | Notices/detail, notification surfaces, messages/messaging routes. | Real SMS/FCM/email providers, delivery retry failure dashboard, attachment signed URLs, retention/audit policy depth, guardian ownership tests. | Parent/mobile chat UI later, moderation/escalation UI depth, unread recipient polish. |
+| M11 Intelligence / AI | Roadmap only. | None. | Do not implement until reliable production data and approved M11 foundations exist. | None until Phase 4. |
+
+---
+
+## Updated Completion Estimate
 
 | Module | Estimated Completion | Current Implementation State |
 |---|---:|---|
-| Auth / RBAC / Tenant Isolation | 90-95% | Cookie-first auth, bearer support, RBAC, tenant context, super-admin override audit. |
-| M0 Platform Core | 80-90% | Platform tenant management, entitlements/usage, SaaS billing foundation, providers/queues, file registry, reports/exports, health, onboarding implemented; deeper queue topology, E2E, seed, async reporting hardening remains. |
-| M1 Admissions & Student Profiles | 90-95% | Admission, student profile/detail/edit, guardian edit, lifecycle, documents, photo/document access, roster exports. |
-| M2 Smart Attendance | 85-90% | 3-tap attendance, history, monthly register, exports, correction/sync guardrails. |
-| M3 Fees & Receipts | 85-90% | Invoices, payments, receipts, ledger, cashier close, reports, reversal/correction foundation. |
-| M4 Academics / Exams / CAS / Report Cards | 80-90% | Backend complete and contract-protected; admin frontend/browser tests still needed. |
-| M5 Activity Feed & Milestones | 75-85% | Posts, targeting, media access, moderation/soft-delete, compression queue scaffold, consent direction. |
-| M6 Homework & Timetable | 60-70% | Foundation, conflict/lifecycle services, guardrails; recent schema/service/test drift needs verification. |
-| M7 HR & Payroll | 65-75% | Staff lifecycle, contracts, salary structures, payroll lifecycle, payroll-to-accounting tests. |
-| M8A Library | 45-55% | Admin catalog/copy/issue/return/report foundation; deeper fines/reports/tests later. |
-| M8B Transport | 45-55% | Route/vehicle/driver/student assignment, trips, GPS latest-location cache foundation; driver/live map later. |
-| M8C Canteen | 45-55% | Menu, meal plans, serving, wallet, POS, spending control, report foundation; inventory/vendor/accounting later. |
-| M9 Accounting & Finance | 95-100% | Production-candidate complete: ledger, reports, fiscal periods, reversals, bank reconciliation, UI. |
-| M10 Notices / Communication / Chat | 85-90% | Notices, delivery, retry/read tracking, consent, notification center, parent-teacher chat foundation. |
-| M11 School Intelligence / AI | 0% | Roadmap only; implementation deferred until reliable production data exists. |
+| Auth / RBAC / Tenant Isolation | 90-95% | Strong backend and browser-session foundation; production security/denial coverage remains. |
+| M0 Platform Core | 80-90% | Foundation complete; harden queue topology, entitlement enforcement, SaaS lifecycle, staging checks. |
+| M1 Admissions & Student Profiles | 90-95% | Pilot-ready plus Student QR foundation; storage, iEMIS, duplicate merge, QR QA remain. |
+| M2 Smart Attendance | 85-90% | Pilot-ready attendance and reports; offline/parent/report depth remains. |
+| M3 Fees & Receipts | 85-90% | Pilot-ready collection/receipts/cashier close; gateway/export/reprint depth remains. |
+| M4 Academics / Exams / CAS / Report Cards | 95-100% | Backend and admin UI implemented; PDF/report/correction polish remains. |
+| M5 Activity Feed & Milestones | 75-85% | Strong foundation; object storage/media compression/moderation/parent views remain. |
+| M6 Homework & Timetable | 70-80% | Backend and admin UI foundations are deeper than earlier estimates; attachments, reminders, conflict UX, role views remain. |
+| M7 HR & Payroll | 75-85% | Backend hardening and admin UI foundations present; payroll/leave/report/browser depth remains. |
+| M8A Library | 65-75% | Admin/backend foundation plus reports/fines/history/QR lookup; integrations and scan polish remain. |
+| M8B Transport | 60-70% | Admin/trip/location/report foundation; live map, driver app, real-time fanout, parent tracking remain. |
+| M8C Canteen | 65-75% | Admin/wallet/POS/inventory/vendor/report foundation; integrations, parent views, QR/manual QA remain. |
+| M9 Accounting & Finance | 95-100% | Production-candidate for current scope; PDF/snapshots/advanced reconciliation remain. |
+| M10 Notices / Communication / Chat | 85-90% | Strong school communication and chat foundation; providers/mobile/moderation depth remains. |
+| M11 Intelligence / AI | 0% | Roadmap only. |
 
 ---
 
-## M0 Platform Core Completion Snapshot
+## Strict Phase-Wise Implementation Plan
 
-M0 Platform Core was completed across eight implementation sprints:
+This order is mandatory for future implementation unless the project owner explicitly changes it. Do not start a later phase because it is more interesting.
 
-```text
-1. Platform Tenant Management
-2. Entitlements + Usage
-3. SaaS Billing
-4. Providers + Queues
-5. File Registry
-6. Reports / Exports
-7. Observability / Ops
-8. Pilot Onboarding
-```
+### Phase Gate 0 - Stabilize Main Before New Scope
 
-Implemented M0 capabilities:
+Exit criteria:
 
 ```text
-- Tenant list/detail/dashboard/status flows.
-- Reason-required tenant suspend/activate behavior.
-- Audited support override reason.
-- Plan, feature, subscription, override, and usage-counter foundations.
-- Explainable entitlement checks and usage-limit surfaces.
-- Manual tenant billing profile.
-- SaaS invoices, invoice lines, payments, and cancellation rules.
-- Provider config masking and secret-safe response shape.
-- Queue health and audited retry endpoint.
-- Upload validation and dangerous extension blocking.
-- Private/protected file URL response shape.
-- Report export history and audited export persistence where available.
-- Platform health summary for DB, Redis, queues, and object storage readiness.
-- Computed tenant onboarding checklist.
-- School settings onboarding page.
-- Platform tenant onboarding visibility.
+1. Prisma generate and validate pass.
+2. OpenAPI gate passes.
+3. Lint, typecheck, unit tests, API E2E, web E2E, build, verify:production pass.
+4. Local/staging smoke:phase1 runs with API, web, Postgres, and Redis.
+5. Pending migrations are applied or intentionally parked with written reason.
+6. Seed data supports every dashboard module route used in browser smoke.
+7. No stale docs claim a module is "next" when it is already implemented.
 ```
 
-Implemented M0 models:
+Allowed work: verification fixes, migration fixes, seed fixes, tenant isolation fixes, doc alignment.
+
+Blocked work: AI, Angular migration, microservices, parent/mobile, driver app, broad new modules.
+
+### Phase 1 - Pilot Reliability for Existing Core
+
+Scope:
 
 ```text
-PlatformPlan
-PlatformPlanFeature
-TenantSubscription
-TenantFeatureOverride
-UsageLimit
-UsageCounter
-TenantBillingProfile
-SaaSInvoice
-SaaSInvoiceLine
-SaaSPayment
-ProviderConfig
-ReportExport
-TenantOnboardingChecklistOverride
+Auth/Security, M0, M1, M2, M3, M5, M10, settings, reports, file registry, notifications.
 ```
 
-Verification snapshot from the M0 completion pass:
+Backend requirements:
 
 ```text
-Passed:
-- pnpm db:generate
-- pnpm db:validate
-- pnpm verify:openapi
-- pnpm lint
-- pnpm typecheck
-- pnpm test
-- pnpm test:e2e
-- pnpm build
-- pnpm verify:production
-
-Notes:
-- verify:production passed after rerun with approval because sandbox blocked Playwright local port binding.
-- pnpm smoke:phase1 did not pass because local Postgres, Redis, and API were not running.
-- Focused platform/auth/report/settings tests passed.
+Staging secrets/session review, storage readiness, request/correlation logging, notification provider failure visibility, export/report history, tenant isolation tests, platform denial tests, entitlement enforcement tests.
 ```
 
-Remaining M0 hardening risks:
+Frontend requirements:
 
 ```text
-- Queue health has the production API/audit surface, but live BullMQ failed-job inspection should be wired deeper per deployed queue topology.
-- Report/export history is standardized, but heavy async generation can be expanded module by module.
-- Provider test connection is intentionally conservative and avoids paid/external calls.
-- Demo Nepal tenant seed is now comprehensive and supports all dashboard modules.
-- Authenticated browser smoke tests (Phase 2F) are verified with real seeded credentials.
-- Platform/school route denial browser tests are implemented and verified.
-- SaaS billing lifecycle and entitlement enforcement tests are present but can be deepened.
+Permission-denied states, slow-network states, smoke coverage for dashboard/students/attendance/finance/notices/settings/platform, QR manual QA for student profile.
 ```
 
----
+Exit criteria: controlled pilot can run one real school without engineering handholding for daily admissions, attendance, fees, notices, activity, settings, and platform operations.
 
-## Phase-Wise Status
+### Phase 2 - Complete High-Value Academic and Finance Polish
 
-### Phase 0 — Foundation
-
-Status: **Completed**.
-
-Includes monorepo, NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, auth/RBAC, tenant context, Docker/dev verification, and production verification foundations.
-
-### M0 — Platform Core / SaaS Starter
-
-Status: **Foundation completed across eight sprints; pilot hardening next**.
-
-Implemented enough for platform owner operations, tenant visibility, plan/usage foundations, SaaS billing records, provider/queue readiness, report export history, health summary, and tenant onboarding visibility.
-
-Remaining work is hardening, deeper E2E coverage, queue topology detail, and production seed/staging verification — not broad architectural rewrite.
-
-### Phase 1A — Core Live-School Workflows
-
-Status: **Completed / Pilot-Ready**.
-
-Implemented enough for live-school basics:
+Scope:
 
 ```text
-Students/admissions
-Attendance
-Fees/receipts
-Activity feed
-Notices/communication
-Dashboard shell
+M4 Academics and M9 Accounting.
 ```
 
-### Phase 1B — Operational Depth
-
-Status: **Completed / Pilot-Ready with polish still useful**.
-
-Implemented detail pages, edits, lifecycle actions, reports/exports, notification center, global search, cashier close, document/photo/media foundations, and PDF functionality.
-
-Remaining polish:
+Backend requirements:
 
 ```text
-Final iEMIS export validation
-Duplicate merge depth
-Logo/photo UX polish
-Final PDF visual polish
-Full authenticated Playwright smoke coverage
+Report-card PDF polish, locked correction/regeneration workflow, academic exports, accounting PDF exports, saved report snapshots through File Registry, advanced bank reconciliation rules, audit viewer API if needed.
 ```
 
-### Phase 2 — Academics, Timetable/Homework, HR/Payroll, Accounting, Communication Expansion
-
-Status: **Partially complete**.
-
-Strongest completed areas:
+Frontend requirements:
 
 ```text
-Phase 2A M4 Academics backend: complete / contract-protected
-Phase 2D M9 Accounting: production-candidate complete
+End-to-end academics smoke, report-card preview/download polish, accounting report visual polish, seeded accounting workflow Playwright tests.
 ```
 
-Foundations needing depth:
+Exit criteria: academics and accounting can be sold as production-grade admin modules for the current Nepal school scope.
+
+### Phase 3 - Harden Phase 2 Operations Depth
+
+Scope:
 
 ```text
-M6 Homework & Timetable
-M7 HR & Payroll
-M10 Parent-Class Teacher Chat
+M6 Homework/Timetable and M7 HR/Payroll.
 ```
 
-### Phase 3 — Extended Operations
-
-Status: **Admin foundations implemented; production depth incomplete**.
-
-Implemented foundations:
+Backend requirements:
 
 ```text
-Library admin foundation
-Transport admin/trip/location foundation
-Canteen admin/wallet/POS foundation
+Homework File Registry uploads, reminder queue hardening, timetable leave integration, deeper conflict validations, payroll approval/posting locks, leave accrual edge cases, sensitive staff field review, payroll reports/exports.
 ```
 
-Deferred:
+Frontend requirements:
 
 ```text
-Parent/mobile portal
-Driver app
-Live map / WebSocket / SSE transport UI
-Full canteen inventory/vendor/profit-loss
-Deeper Phase 3 reports and accounting integrations
+Timetable builder polish, conflict visualization, teacher views, homework attachment UX, HR/payroll browser smoke, staff self-service completion, payslip PDF polish.
 ```
 
-### Phase 4 — AI, Analytics, Scale, Enterprise
+Exit criteria: academic coordinators, teachers, HR admins, and accountants can run these modules without relying on direct database/admin intervention.
 
-Status: **Roadmap only**.
+### Phase 4 - Harden Extended Operations Verticals
 
-Do not implement AI/ML yet. Start only after reliable production data and M11 intelligence foundations exist.
-
----
-
-## Commit / PR History Interpretation
-
-Recent repo history shows these waves:
+Scope:
 
 ```text
-1. Bootstrap and production foundation.
-2. Architecture/project memory/phase docs.
-3. Phase 2A Academics implementation and hardening.
-4. Phase 3 Library/Transport/Canteen foundations.
-5. M0 Platform Core implementation and hardening.
-6. Module guardrail and DB-trigger hardening across M1-M10.
-7. M9 Accounting and Payroll/Finance integration coverage.
-8. Verification-fix wave around Homework/Timetable, Academics controller return types, and Timetable tests.
+M8A Library, M8B Transport, M8C Canteen.
 ```
 
-Important latest observation:
+Backend requirements:
 
 ```text
-M0 Platform Core foundation now includes platform tenant management, entitlements, usage, SaaS billing records, provider/queue readiness, file registry hardening, report exports, health, and onboarding surfaces.
-The next sprint should be repo stabilization, smoke verification, and focused vertical hardening — not broad new product expansion.
+Library fee/accounting integration, canteen fee/accounting integration, transport billing/accounting integration where product-approved, QR scan audit depth, inventory/vendor edge cases, GPS ingestion pressure protection, retention cleanup, report exports, permission tests.
 ```
 
----
-
-## Current Highest Risks
-
-1. **Local port connectivity in sandboxes** — automated Playwright runs may need specific environment permissions to bind to local ports.
-2. **M0 E2E depth** — SaaS billing lifecycle and queue retry browser/API coverage can still be deepened.
-3. **Homework/Timetable stability** — recent PRs mention schema/service/test drift; verification passed but needs monitoring.
-4. **Breadth without equal depth** — Phase 2/3 foundations exist, but not all are production-complete.
-5. **Visual Polish** — Accounting reports and academics entry keyboard UX are the remaining high-impact polish items.
-6. **Staging readiness** — pilot seed data is ready, but staging checks, backup/restore rehearsal, and observability still matter.
-7. **Parent/mobile/driver/live tracking** — intentionally deferred and should not be accidentally treated as complete.
-
----
-
-## Recommended Next Sprint
+Frontend requirements:
 
 ```text
-Repo Verification + M0 Pilot Hardening Sprint
-→ run full verification gate
-→ run Docker-backed smoke with Postgres, Redis, and API running
-→ add platform/school route denial browser tests
-→ add SaaS billing lifecycle tests
-→ add entitlement enforcement tests against real school APIs
-→ deepen BullMQ failed-job inspection by deployed queue topology
-→ stabilize Homework/Timetable if verification shows drift
-→ wire Phase 2A Academics admin UI to completed APIs
-→ prepare controlled pilot staging
+Library barcode/QR scan UX, transport live map only after real-time backend design is ready, canteen QR/POS speed polish, inventory/vendor UI depth, operation-specific Playwright tests.
 ```
 
-Do not start Angular migration, AI, broad parent/mobile, live transport map, or new module expansion before this sprint is clean.
+Exit criteria: operations modules are reliable admin products, not just demos.
+
+### Phase 5 - Parent, Mobile, Driver, and Live Experiences
+
+Start only after Phases 0-4 are green.
+
+Scope:
+
+```text
+Parent portal, mobile/PWA shell, parent chat UI, parent academic/fee/attendance views, driver app, parent transport tracking, push notifications.
+```
+
+Rules:
+
+```text
+Parent/driver/mobile APIs must be purpose-limited, tenant-scoped, child/route-owned, and audited.
+Do not expose admin-shaped data directly to parent/mobile clients.
+```
+
+### Phase 6 - Enterprise Scale and M11 Intelligence
+
+Start only after reliable production data exists.
+
+Scope:
+
+```text
+M11 read models, analytics snapshots, explainable rules, human-reviewed recommendations, opt-in cross-school aggregates, then AI/ML/LLM features.
+```
+
+Rules:
+
+```text
+No automated punishment or official action from AI output.
+No cross-school analytics without anonymization, aggregation, explicit opt-in, and platform audit.
+```
 
 ---
 
 ## Required Verification Gate
+
+Run after every meaningful backend/module hardening change:
 
 ```bash
 pnpm db:generate
@@ -334,30 +273,4 @@ pnpm verify:production
 pnpm smoke:phase1
 ```
 
-Run the full gate after every meaningful backend/module hardening change.
-
----
-
-## Completion Time Estimate
-
-Controlled pilot:
-
-```text
-2-4 weeks
-```
-
-Strong v1 production without AI:
-
-```text
-4-6 months solo
-8-12 weeks with a focused 4-6 person team
-```
-
-Full SchoolOS vision including parent/mobile, live transport, enterprise SaaS, and AI:
-
-```text
-6-9 months solo from current state
-4-6 months with a proper small team
-```
-
-These estimates assume the repo is stabilized first and future work proceeds one vertical at a time.
+For frontend-heavy work, also run the relevant Playwright spec or `pnpm test:web:e2e` when credentials and local ports are available.
