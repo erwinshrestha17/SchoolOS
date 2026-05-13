@@ -161,6 +161,7 @@ describe('StudentsController M1 contracts', () => {
     const result = await controller.getGeneratedDocument(
       'student-1',
       'id-card',
+      undefined,
       actor,
     );
 

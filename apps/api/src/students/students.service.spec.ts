@@ -241,7 +241,7 @@ describe('students lifecycle hardening', () => {
       }),
     );
     expect(result.sourceStudent.lifecycleStatus).toBe(
-      StudentLifecycleStatus.DELETED,
+      StudentLifecycleStatus.MERGED,
     );
   });
 
@@ -252,7 +252,10 @@ describe('students lifecycle hardening', () => {
     });
     const targetStudent = buildStudent({
       id: 'student-target',
+      studentSystemId: 'SCH-2026-9999',
       firstNameEn: 'Sita',
+      dateOfBirth: new Date('2014-01-02T00:00:00.000Z'),
+      admissionNumber: 'ADM-9999',
     });
     const prisma = buildPrisma({
       studentFindFirstQueue: [sourceStudent, targetStudent],
@@ -1343,6 +1346,9 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
     getSignedUrl: jest.fn(),
     listFilesByEntity: jest.fn().mockResolvedValue([]),
   };
+  const usageService = {
+    verifyLimit: jest.fn(),
+  };
 
   return {
     service: new StudentsService(
@@ -1352,6 +1358,7 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
       auditService as never,
       storageService as never,
       fileRegistryService as never,
+      usageService as never,
     ),
     prisma,
     auditService,
@@ -1578,6 +1585,9 @@ function buildPrisma(options: {
       findMany: jest
         .fn()
         .mockResolvedValue(options.attendanceRecordFindManyResult ?? []),
+    },
+    reportExport: {
+      create: jest.fn().mockResolvedValue({ id: 'export-1' }),
     },
     $transaction: jest
       .fn()

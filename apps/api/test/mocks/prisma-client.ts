@@ -335,6 +335,33 @@ export const StudentDocumentKind = {
   OTHER: 'OTHER',
 } as const;
 
+export const StaffDocumentKind = {
+  ID_CARD: 'ID_CARD',
+  CITIZENSHIP: 'CITIZENSHIP',
+  CONTRACT: 'CONTRACT',
+  ACADEMIC_CERTIFICATE: 'ACADEMIC_CERTIFICATE',
+  PAN_CARD: 'PAN_CARD',
+  OFFER_LETTER: 'OFFER_LETTER',
+  OTHER: 'OTHER',
+} as const;
+
+export const StaffLifecycleEventType = {
+  HIRED: 'HIRED',
+  PROMOTED: 'PROMOTED',
+  TRANSFERRED: 'TRANSFERRED',
+  ON_LEAVE: 'ON_LEAVE',
+  RETURNED: 'RETURNED',
+  TERMINATED: 'TERMINATED',
+  RESIGNED: 'RESIGNED',
+  STATUS_CHANGE: 'STATUS_CHANGE',
+  CONTRACT_RENEWAL: 'CONTRACT_RENEWAL',
+} as const;
+
+export const StudentQrStatus = {
+  ACTIVE: 'ACTIVE',
+  REVOKED: 'REVOKED',
+} as const;
+
 export const NoticePriority = {
   NORMAL: 'NORMAL',
   URGENT: 'URGENT',
@@ -346,6 +373,13 @@ export const AudienceType = {
   CLASS: 'CLASS',
   SECTION: 'SECTION',
   ROLE: 'ROLE',
+} as const;
+
+export const LibraryFineStatus = {
+  UNPAID: 'UNPAID',
+  PAID: 'PAID',
+  WAIVED: 'WAIVED',
+  VOID: 'VOID',
 } as const;
 
 export const EventType = {
@@ -418,6 +452,22 @@ export const DevelopmentalMilestoneStatus = {
   PROGRESSING: 'PROGRESSING',
   ACHIEVED: 'ACHIEVED',
   NEEDS_SUPPORT: 'NEEDS_SUPPORT',
+} as const;
+
+export const ActivityPostStatus = {
+  DRAFT: 'DRAFT',
+  PENDING_APPROVAL: 'PENDING_APPROVAL',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  ARCHIVED: 'ARCHIVED',
+} as const;
+
+export const ActivityAttachmentProcessingStatus = {
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+  READY: 'READY',
 } as const;
 
 export const AssessmentType = {

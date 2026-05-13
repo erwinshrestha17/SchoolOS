@@ -1,6 +1,10 @@
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, relative, resolve } from 'path';
-import ts from 'typescript';
+import {
+  permissionCatalog,
+  systemRoleDefinitions,
+  systemRolePermissions,
+} from '@schoolos/core';
 import {
   PERMISSION_CATALOG,
   SYSTEM_ROLE_DEFINITIONS,
@@ -10,12 +14,15 @@ import {
 import { applyTenantScopeToArgs } from '../prisma/prisma.service';
 
 const sourceRoot = resolve(__dirname, '..');
-const workspaceRoot = resolve(sourceRoot, '..', '..', '..');
-const corePermissions = loadCorePermissions();
 const immutablePrismaModels = ['journalEntry', 'journalLine', 'receipt'];
 const immutableMutationPattern = new RegExp(
   `\\.(${immutablePrismaModels.join('|')})\\.(update|updateMany|delete|deleteMany|upsert)\\b`,
 );
+const corePermissions = {
+  permissionCatalog,
+  systemRoleDefinitions,
+  systemRolePermissions,
+};
 
 function permissionKeys(
   catalog: readonly { resource: string; action: string }[],
@@ -50,28 +57,6 @@ function readSourceFiles(
 
     return [{ path: fullPath, content: readFileSync(fullPath, 'utf8') }];
   });
-}
-
-function loadCorePermissions() {
-  const source = readFileSync(
-    join(workspaceRoot, 'packages/core/src/permissions.ts'),
-    'utf8',
-  );
-  const compiled = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2023,
-    },
-  }).outputText;
-  const module = { exports: {} as Record<string, unknown> };
-
-  new Function('exports', 'module', compiled)(module.exports, module);
-
-  return module.exports as {
-    permissionCatalog: readonly { resource: string; action: string }[];
-    systemRoleDefinitions: readonly { name: string }[];
-    systemRolePermissions: Record<string, string[]>;
-  };
 }
 
 describe('production data integrity contracts', () => {

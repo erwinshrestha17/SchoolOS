@@ -125,13 +125,17 @@ describe('AttendanceController M2 contracts', () => {
     const { controller, service } = createController();
     service.getParentSummary.mockReturnValue({ studentId: 'student-1' });
 
-    const result = controller.getParentSummary('student-1', actor);
+    const result = controller.getParentSummary('student-1', {} as never, actor);
 
-    expect(service.getParentSummary).toHaveBeenCalledWith('student-1', actor);
+    expect(service.getParentSummary).toHaveBeenCalledWith(
+      'student-1',
+      actor,
+      {},
+    );
     expect(result).toEqual({ studentId: 'student-1' });
   });
 
-  it('delegates monthly register export with filters and current actor', () => {
+  it('delegates monthly register export with filters and current actor', async () => {
     const { controller, service } = createController();
     const query = {
       academicYearId: 'year-1',
@@ -142,9 +146,17 @@ describe('AttendanceController M2 contracts', () => {
     };
     service.exportMonthlyRegister.mockReturnValue('csv');
 
-    const result = controller.exportMonthlyRegister(query as never, actor);
+    const result = await controller.exportMonthlyRegister(
+      query as never,
+      'csv',
+      actor,
+    );
 
-    expect(service.exportMonthlyRegister).toHaveBeenCalledWith(query, actor);
+    expect(service.exportMonthlyRegister).toHaveBeenCalledWith(
+      query,
+      'csv',
+      actor,
+    );
     expect(result).toBe('csv');
   });
 

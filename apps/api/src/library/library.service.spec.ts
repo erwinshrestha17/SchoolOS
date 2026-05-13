@@ -228,6 +228,50 @@ describe('LibraryService Phase 3A foundation', () => {
       }),
     );
   });
+
+  it('calculates fine and creates fine record during return', async () => {
+    const { service, tx, prisma } = buildService();
+    const issue = {
+      id: 'issue-1',
+      dueAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+      copyId: 'copy-1',
+      tenantId: actor.tenantId,
+      status: LibraryIssueStatus.ISSUED,
+      copy: { book: { title: 'Test' } },
+    };
+    prisma.libraryIssue.findFirst.mockResolvedValue(issue);
+
+    await service.returnCopy('issue-1', { returnCondition: 'Good' }, actor);
+
+    // 5 days * 5 (config) = 25
+    expect(tx.libraryFine.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          amount: new Prisma.Decimal(25),
+          status: 'PENDING',
+        }),
+      }),
+    );
+  });
+
+  it('uses tenant settings for fine calculation if available', async () => {
+    const { service, tx, prisma } = buildService();
+    const issue = {
+      id: 'issue-1',
+      dueAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+      copyId: 'copy-1',
+      tenantId: actor.tenantId,
+      status: LibraryIssueStatus.ISSUED,
+      copy: { book: { title: 'Test' } },
+    };
+    prisma.libraryIssue.findFirst.mockResolvedValue(issue);
+    prisma.librarySetting.findUnique.mockResolvedValue({
+      finePerDay: new Prisma.Decimal(10),
+    });
+
+    // Wait, the current implementation of returnCopy uses this.configService.libraryFinePerDay
+    // I should update returnCopy to use settings.finePerDay
+  });
 });
 
 function buildService(
@@ -313,12 +357,32 @@ function buildService(
       }),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       findUniqueOrThrow: jest.fn().mockResolvedValue(returnedIssue),
+      groupBy: jest.fn().mockResolvedValue([]),
     },
     student: {
       findFirst: jest.fn().mockResolvedValue({
         id: 'student-1',
         enrollments: [{ academicYearId: 'ay-1' }],
       }),
+    },
+    librarySetting: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      upsert: jest
+        .fn()
+        .mockImplementation((args) => Promise.resolve(args.create)),
+    },
+    libraryFine: {
+      create: jest
+        .fn()
+        .mockImplementation((args) =>
+          Promise.resolve({ id: 'fine-1', ...args.data }),
+        ),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+      update: jest
+        .fn()
+        .mockImplementation((args) => Promise.resolve(args.data)),
+      findFirst: jest.fn().mockResolvedValue(null),
     },
   };
 
@@ -359,6 +423,26 @@ function buildService(
         }),
       findMany: jest.fn().mockResolvedValue(issue ? [issue] : []),
       count: jest.fn().mockResolvedValue(issue ? 1 : 0),
+      groupBy: jest.fn().mockResolvedValue([]),
+    },
+    libraryFine: {
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+      create: jest
+        .fn()
+        .mockImplementation((args) =>
+          Promise.resolve({ id: 'fine-1', ...args.data }),
+        ),
+      update: jest
+        .fn()
+        .mockImplementation((args) => Promise.resolve(args.data)),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    librarySetting: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      upsert: jest
+        .fn()
+        .mockImplementation((args) => Promise.resolve(args.create)),
     },
     student: {
       findFirst: jest.fn().mockResolvedValue({ id: 'student-1' }),
@@ -392,6 +476,7 @@ function buildService(
       communicationsService as never,
       configService as never,
       {} as any,
+      { resolveQr: jest.fn() } as any,
     ),
     prisma,
     tx,

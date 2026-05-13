@@ -6,10 +6,17 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { AuthContext } from '../auth/auth.types';
 import { randomBytes } from 'crypto';
 import { hashToken } from '../auth/auth.utils';
-import { LibraryIssueStatus, StudentQrStatus, Prisma } from '@prisma/client';
-import { StudentQrResolvePurpose } from './dto/student-qr.dto';
+import {
+  LibraryIssueStatus,
+  StudentQrStatus,
+  Prisma,
+  UserRole,
+  StudentLifecycleStatus,
+} from '@prisma/client';
+import { StudentQrResolvePurpose } from '@schoolos/core';
 
 @Injectable()
 export class StudentQrService {
@@ -24,13 +31,19 @@ export class StudentQrService {
    * Generates a new QR credential for a student if one doesn't exist or is revoked.
    * If an active one exists, it returns the existing one (idempotent).
    */
-  async generateQr(tenantId: string, studentId: string, actorUserId: string) {
+  async generateQr(tenantId: string, studentId: string, auth: AuthContext) {
     const student = await this.prisma.student.findFirst({
-      where: { id: studentId, tenantId },
+      where: {
+        id: studentId,
+        tenantId,
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      },
     });
 
     if (!student) {
-      throw new NotFoundException('Student not found');
+      throw new NotFoundException(
+        'Active student not found. QR can only be generated for active students.',
+      );
     }
 
     const existing = await this.prisma.studentQrCredential.findUnique({
@@ -64,21 +77,17 @@ export class StudentQrService {
       action: 'QR_GENERATED',
       resource: 'student_qr',
       tenantId,
-      userId: actorUserId,
+      userId: auth.userId,
       after: { studentId },
     });
 
     return { credential, rawToken: token };
   }
 
-  /**
-   * Rotates a student's QR credential (e.g. for lost card).
-   * Invalidates the old token and generates a new one.
-   */
   async rotateQr(
     tenantId: string,
     studentId: string,
-    actorUserId: string,
+    auth: AuthContext,
     reason?: string,
   ) {
     const existing = await this.prisma.studentQrCredential.findUnique({
@@ -106,20 +115,17 @@ export class StudentQrService {
       action: 'QR_ROTATED',
       resource: 'student_qr',
       tenantId,
-      userId: actorUserId,
+      userId: auth.userId,
       after: { studentId, reason },
     });
 
     return { credential, rawToken: token };
   }
 
-  /**
-   * Revokes a student's QR credential.
-   */
   async revokeQr(
     tenantId: string,
     studentId: string,
-    actorUserId: string,
+    auth: AuthContext,
     reason?: string,
   ) {
     const existing = await this.prisma.studentQrCredential.findUnique({
@@ -142,21 +148,18 @@ export class StudentQrService {
       action: 'QR_REVOKED',
       resource: 'student_qr',
       tenantId,
-      userId: actorUserId,
+      userId: auth.userId,
       after: { studentId, reason },
     });
 
     return credential;
   }
 
-  /**
-   * Resolves a scanned QR token for a specific purpose.
-   */
   async resolveQr(
     tenantId: string,
     token: string,
     purpose: StudentQrResolvePurpose,
-    actorUserId: string,
+    auth: AuthContext,
   ) {
     const tokenHash = hashToken(token);
     const credential = await this.prisma.studentQrCredential.findUnique({
@@ -166,6 +169,11 @@ export class StudentQrService {
           include: {
             class: true,
             sectionRef: true,
+            guardianLinks: {
+              include: {
+                guardian: true,
+              },
+            },
           },
         },
       },
@@ -180,7 +188,7 @@ export class StudentQrService {
         action: 'QR_RESOLVE_FAILED',
         resource: 'student_qr',
         tenantId,
-        userId: actorUserId,
+        userId: auth.userId,
         after: {
           purpose,
           reason: !credential
@@ -193,6 +201,58 @@ export class StudentQrService {
       throw new ForbiddenException('Invalid or revoked QR token');
     }
 
+    const student = credential.student;
+
+    // Security check: Parent can only resolve their own child
+    if (auth.roles.includes('parent')) {
+      const isLinked = student.guardianLinks.some(
+        (link) => link.guardian.userId === auth.userId,
+      );
+      if (!isLinked) {
+        await this.auditService.record({
+          action: 'QR_RESOLVE_FAILED',
+          resource: 'student_qr',
+          tenantId,
+          userId: auth.userId,
+          after: { studentId: student.id, purpose, reason: 'unrelated_parent' },
+        });
+        throw new ForbiddenException('Parent cannot resolve unrelated child');
+      }
+    }
+
+    // Security check: Teacher cannot resolve unassigned student unless permission allows
+    if (
+      auth.roles.includes('teacher') &&
+      !auth.permissions.includes('students:qr:resolve_all')
+    ) {
+      const isAssigned = await this.prisma.subjectTeacherAssignment.findFirst({
+        where: {
+          tenantId,
+          staff: { userId: auth.userId },
+          classId: student.classId,
+          OR: [
+            { sectionId: student.sectionId },
+            { sectionId: null }, // Broad class assignment
+          ],
+        },
+      });
+
+      if (!isAssigned) {
+        await this.auditService.record({
+          action: 'QR_RESOLVE_FAILED',
+          resource: 'student_qr',
+          tenantId,
+          userId: auth.userId,
+          after: {
+            studentId: student.id,
+            purpose,
+            reason: 'unassigned_teacher',
+          },
+        });
+        throw new ForbiddenException('Teacher not assigned to this student');
+      }
+    }
+
     await this.prisma.studentQrCredential.update({
       where: { id: credential.id },
       data: { lastScannedAt: new Date() },
@@ -202,17 +262,18 @@ export class StudentQrService {
       action: 'QR_RESOLVED',
       resource: 'student_qr',
       tenantId,
-      userId: actorUserId,
+      userId: auth.userId,
       after: { studentId: credential.studentId, purpose },
     });
 
-    const student = credential.student;
+    // Response shaping: no guardian phone, no address, no health data by default
     const baseResponse = {
       studentId: student.id,
       studentCode: student.studentSystemId,
       name: `${student.firstNameEn} ${student.lastNameEn}`,
       classSection: `${student.class.name}${student.sectionRef ? ' - ' + student.sectionRef.name : ''}`,
       photoUrl: student.photoUrl || null,
+      lifecycleStatus: student.lifecycleStatus,
     };
 
     switch (purpose) {
@@ -239,7 +300,7 @@ export class StudentQrService {
           ...baseResponse,
           activeIssues,
           overdueBooks,
-          canBorrow: activeIssues < 5, // Default limit if we can't get config
+          canBorrow: activeIssues < 5,
         };
       }
       case StudentQrResolvePurpose.CANTEEN: {
@@ -257,15 +318,9 @@ export class StudentQrService {
         };
       }
       case StudentQrResolvePurpose.TRANSPORT:
-        return {
-          ...baseResponse,
-          // Placeholder: Transport integration needed
-        };
+        return baseResponse;
       case StudentQrResolvePurpose.ATTENDANCE:
-        return {
-          ...baseResponse,
-          // Placeholder: Attendance integration needed
-        };
+        return baseResponse;
       case StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP:
       default:
         return baseResponse;
@@ -351,22 +406,27 @@ export class StudentQrService {
     const size = 128;
     const svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
   <rect width="${size}" height="${size}" fill="white"/>
-  <!-- Top-left Finder -->
-  <rect x="10" y="10" width="30" height="30" stroke="black" fill="none" stroke-width="4"/>
-  <rect x="20" y="20" width="10" height="10" fill="black"/>
-  <!-- Bottom-left Finder -->
-  <rect x="10" y="88" width="30" height="30" stroke="black" fill="none" stroke-width="4"/>
-  <rect x="20" y="98" width="10" height="10" fill="black"/>
-  <!-- Top-right Finder -->
-  <rect x="88" y="10" width="30" height="30" stroke="black" fill="none" stroke-width="4"/>
-  <rect x="98" y="20" width="10" height="10" fill="black"/>
-  <!-- Center Mock Patterns -->
-  <rect x="50" y="50" width="5" height="5" fill="black"/>
-  <rect x="60" y="50" width="5" height="5" fill="black"/>
-  <rect x="55" y="55" width="5" height="5" fill="black"/>
-  <rect x="50" y="65" width="5" height="5" fill="black"/>
-  <rect x="70" y="70" width="5" height="5" fill="black"/>
-  <text x="64" y="120" font-family="monospace" font-size="6" text-anchor="middle" fill="gray">${token.slice(0, 12)}...</text>
+  <!-- Finder patterns -->
+  <rect x="10" y="10" width="30" height="30" fill="none" stroke="black" stroke-width="4"/>
+  <rect x="18" y="18" width="14" height="14" fill="black"/>
+  <rect x="10" y="88" width="30" height="30" fill="none" stroke="black" stroke-width="4"/>
+  <rect x="18" y="96" width="14" height="14" fill="black"/>
+  <rect x="88" y="10" width="30" height="30" fill="none" stroke="black" stroke-width="4"/>
+  <rect x="96" y="18" width="14" height="14" fill="black"/>
+  <!-- Random data points based on token -->
+  <g fill="black">
+    ${Array.from(token.slice(0, 40))
+      .map((char, i) => {
+        const val = char.charCodeAt(0);
+        const x = 50 + (i % 10) * 6;
+        const y = 50 + Math.floor(i / 10) * 6;
+        return val % 2 === 0
+          ? `<rect x="${x}" y="${y}" width="4" height="4"/>`
+          : '';
+      })
+      .join('')}
+  </g>
+  <text x="64" y="122" font-family="monospace" font-size="6" text-anchor="middle" fill="gray">${token.slice(0, 16)}...</text>
 </svg>`;
     return svg;
   }

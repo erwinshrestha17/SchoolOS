@@ -14,6 +14,8 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { AssignTransportDriverDto } from './dto/assign-transport-driver.dto';
 import { BroadcastRouteDelayDto } from './dto/broadcast-route-delay.dto';
 import { CancelTransportTripDto } from './dto/cancel-transport-trip.dto';
@@ -33,7 +35,8 @@ import { TransportHardeningService } from './transport-hardening.service';
 import { TransportService } from './transport.service';
 
 @Controller('transport')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.transport')
 export class TransportController {
   constructor(
     private readonly transportService: TransportService,
@@ -208,7 +211,7 @@ export class TransportController {
   }
 
   @Patch('trips/:id/complete')
-  @Permissions('transport:trips:update')
+  @Permissions('transport:trips:update', 'transport:operate')
   completeTrip(
     @Param('id') tripId: string,
     @Body() dto: CompleteTransportTripDto,
@@ -228,7 +231,7 @@ export class TransportController {
   }
 
   @Patch('trips/:id/students/boarded')
-  @Permissions('transport:trips:update')
+  @Permissions('transport:trips:update', 'transport:operate')
   markStudentBoarded(
     @Param('id') tripId: string,
     @Body() dto: MarkTransportStudentStatusDto,
@@ -238,7 +241,7 @@ export class TransportController {
   }
 
   @Patch('trips/:id/students/dropped')
-  @Permissions('transport:trips:update')
+  @Permissions('transport:trips:update', 'transport:operate')
   markStudentDropped(
     @Param('id') tripId: string,
     @Body() dto: MarkTransportStudentStatusDto,
@@ -248,7 +251,7 @@ export class TransportController {
   }
 
   @Patch('trips/:id/students/absent')
-  @Permissions('transport:trips:update')
+  @Permissions('transport:trips:update', 'transport:operate')
   markStudentAbsent(
     @Param('id') tripId: string,
     @Body() dto: MarkTransportStudentStatusDto,
@@ -274,13 +277,22 @@ export class TransportController {
   }
 
   @Post('trips/:id/location')
-  @Permissions('transport:location:update')
+  @Permissions('transport:location:update', 'transport:operate')
   recordLocationPing(
     @Param('id') tripId: string,
     @Body() dto: TransportLocationPingDto,
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.transportService.recordLocationPing(tripId, dto, auth);
+  }
+
+  @Post('location/cleanup')
+  @Permissions('transport:manage')
+  cleanupLocationHistory(
+    @CurrentAuth() auth: AuthContext,
+    @Query('days') days?: number,
+  ) {
+    return this.transportService.cleanupLocationHistory(auth, days);
   }
 
   @Get('trips/:id/location/latest')
@@ -311,7 +323,7 @@ export class TransportController {
   }
 
   @Post('delays')
-  @Permissions('transport:trips:update')
+  @Permissions('transport:trips:update', 'transport:operate')
   broadcastDelay(
     @Body() dto: BroadcastRouteDelayDto,
     @CurrentAuth() auth: AuthContext,

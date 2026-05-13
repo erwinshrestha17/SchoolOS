@@ -28,10 +28,10 @@ export function SectionCard({
         <div className="flex items-center justify-between border-b border-slate-100 p-5 lg:p-6">
           <div>
             {title && (
-              <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+              <h3 className="text-xl font-black italic uppercase tracking-tight text-slate-900">{title}</h3>
             )}
             {description && (
-              <p className="mt-1 text-sm text-slate-500">{description}</p>
+              <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">{description}</p>
             )}
           </div>
           {headerAction && (

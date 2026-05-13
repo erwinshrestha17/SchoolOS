@@ -68,11 +68,11 @@ test.describe.serial('SchoolOS Accounting Workflow Smoke Tests', () => {
     await expect(page.getByText(/Liabilities/i)).toBeVisible();
   });
 
-  test('Reports: Reports hub loads', async ({ page }) => {
+  test('Reports: Reports hub and filters', async ({ page }) => {
     await page.goto('/dashboard/accounting/reports');
     await expect(page.getByRole('heading', { name: /Accounting Reports/i })).toBeVisible();
     
-    // Verify core reports are listed
+    // Verify report selection buttons
     const reports = [
       'Trial Balance',
       'General Ledger',
@@ -82,8 +82,13 @@ test.describe.serial('SchoolOS Accounting Workflow Smoke Tests', () => {
     ];
 
     for (const report of reports) {
-      await expect(page.getByText(new RegExp(report, 'i'))).toBeVisible();
+      await expect(page.getByRole('button', { name: new RegExp(report, 'i') })).toBeVisible();
     }
+
+    // Verify filter section
+    await expect(page.getByText(/Report Filters/i)).toBeVisible();
+    await expect(page.getByText(/Fiscal Year/i)).toBeVisible();
+    await expect(page.getByText(/Custom Date Range/i)).toBeVisible();
   });
 
   test('Reconciliation: Bank reconciliation workspace loads', async ({ page }) => {

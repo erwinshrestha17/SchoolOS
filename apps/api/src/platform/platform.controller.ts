@@ -134,15 +134,31 @@ export class PlatformController {
   }
 
   @Post('tenants/:tenantId/subscriptions')
-  @Permissions('platform:subscriptions:manage')
+  @Permissions('platform:billing:manage')
   async assignSubscription(
     @Param('tenantId') tenantId: string,
-    @Body() body: AssignTenantSubscriptionDto,
+    @Body() dto: AssignTenantSubscriptionDto,
     @Req() req: AuthenticatedRequest,
   ) {
     return this.platformService.assignSubscription(
       tenantId,
-      body,
+      dto,
+      this.requireUser(req),
+    );
+  }
+
+  @Patch('tenants/:tenantId/subscriptions/:subId')
+  @Permissions('platform:billing:manage')
+  async updateSubscriptionStatus(
+    @Param('tenantId') tenantId: string,
+    @Param('subId') subId: string,
+    @Body() dto: { status: string; notes?: string },
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformService.updateSubscriptionStatus(
+      tenantId,
+      subId,
+      dto,
       this.requireUser(req),
     );
   }
@@ -326,7 +342,7 @@ export class PlatformController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    return this.platformReportExportsService.listReportExportsPage({
+    return this.platformService.listReportExportsPage({
       tenantId,
       page,
       limit,

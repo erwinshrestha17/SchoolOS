@@ -10,6 +10,7 @@ import { AuthModule } from '../auth/auth.module';
 import { UsageModule } from '../usage/usage.module';
 import { ConfigModule } from '../config/config.module';
 import { RedisModule } from '../redis/redis.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [

@@ -13,6 +13,8 @@ export interface MockState {
   students: Record<string, unknown>[];
   enrollments: Record<string, unknown>[];
   staff: Record<string, unknown>[];
+  staffDocuments: Record<string, unknown>[];
+  staffLifecycleEvents: Record<string, unknown>[];
   staffLeaveBalances: Record<string, unknown>[];
   academicYears: Record<string, unknown>[];
   chartAccounts: Record<string, unknown>[];
@@ -41,6 +43,27 @@ export interface MockState {
   feeWaivers: Record<string, unknown>[];
   generatedStudentDocuments: Record<string, unknown>[];
   studentLifecycleTransitions: Record<string, unknown>[];
+  platformPlans: Record<string, unknown>[];
+  platformPlanFeatures: Record<string, unknown>[];
+  tenantSubscriptions: Record<string, unknown>[];
+  tenantFeatureOverrides: Record<string, unknown>[];
+  usageLimits: Record<string, unknown>[];
+  usageCounters: Record<string, unknown>[];
+  saaSInvoices: Record<string, unknown>[];
+  saaSInvoiceLines: Record<string, unknown>[];
+  saaSPayments: Record<string, unknown>[];
+  providerConfigs: Record<string, unknown>[];
+  reportExports: Record<string, unknown>[];
+  studentGuardians: Record<string, unknown>[];
+  transportRoutes: Record<string, unknown>[];
+  transportStops: Record<string, unknown>[];
+  transportVehicles: Record<string, unknown>[];
+  transportTrips: Record<string, unknown>[];
+  transportTripStudentStatuses: Record<string, unknown>[];
+  transportStudentAssignments: Record<string, unknown>[];
+  transportDriverAssignments: Record<string, unknown>[];
+  transportLocationPings: Record<string, unknown>[];
+  guardianConsents: Record<string, unknown>[];
   [key: string]: Record<string, unknown>[];
 }
 
@@ -114,6 +137,17 @@ export function createQueueMock(): Record<string, unknown> {
     onApplicationShutdown: jest.fn(() => Promise.resolve()),
     close: jest.fn(() => Promise.resolve(undefined)),
     disconnect: jest.fn(() => Promise.resolve(undefined)),
+    getJobCounts: jest.fn(() =>
+      Promise.resolve({
+        waiting: 0,
+        active: 0,
+        completed: 0,
+        failed: 0,
+        delayed: 0,
+      }),
+    ),
+    isPaused: jest.fn(() => Promise.resolve(false)),
+    getWorkers: jest.fn(() => Promise.resolve([])),
     on: jest.fn(),
     once: jest.fn(),
     off: jest.fn(),
@@ -208,6 +242,8 @@ export function createPrismaMock() {
     ] as Record<string, unknown>[],
     enrollments: [] as Record<string, unknown>[],
     staff: [] as Record<string, unknown>[],
+    staffDocuments: [] as Record<string, unknown>[],
+    staffLifecycleEvents: [] as Record<string, unknown>[],
     staffLeaveBalances: [] as Record<string, unknown>[],
     academicYears: [] as Record<string, unknown>[],
     chartAccounts: [] as Record<string, unknown>[],
@@ -240,6 +276,27 @@ export function createPrismaMock() {
     teacherAvailability: [] as Record<string, unknown>[],
     teacherWorkloadLimits: [] as Record<string, unknown>[],
     subjectWeeklyRequirements: [] as Record<string, unknown>[],
+    platformPlans: [] as Record<string, unknown>[],
+    platformPlanFeatures: [] as Record<string, unknown>[],
+    tenantSubscriptions: [] as Record<string, unknown>[],
+    tenantFeatureOverrides: [] as Record<string, unknown>[],
+    usageLimits: [] as Record<string, unknown>[],
+    usageCounters: [] as Record<string, unknown>[],
+    saaSInvoices: [] as Record<string, unknown>[],
+    saaSInvoiceLines: [] as Record<string, unknown>[],
+    saaSPayments: [] as Record<string, unknown>[],
+    providerConfigs: [] as Record<string, unknown>[],
+    reportExports: [] as Record<string, unknown>[],
+    studentGuardians: [] as Record<string, unknown>[],
+    transportRoutes: [] as Record<string, unknown>[],
+    transportStops: [] as Record<string, unknown>[],
+    transportVehicles: [] as Record<string, unknown>[],
+    transportTrips: [] as Record<string, unknown>[],
+    transportTripStudentStatuses: [] as Record<string, unknown>[],
+    transportStudentAssignments: [] as Record<string, unknown>[],
+    transportDriverAssignments: [] as Record<string, unknown>[],
+    transportLocationPings: [] as Record<string, unknown>[],
+    guardianConsents: [] as Record<string, unknown>[],
   };
 
   const nextId = (prefix: string) =>
@@ -263,6 +320,35 @@ export function createPrismaMock() {
           ),
         })),
     };
+  }
+
+  function matchesWhere(item: any, where?: Record<string, any>): boolean {
+    if (!where) return true;
+
+    return Object.entries(where).every(([key, value]) => {
+      if (value === undefined) return true;
+      if (key === 'OR' && Array.isArray(value)) {
+        return value.some((clause) => matchesWhere(item, clause));
+      }
+      if (key === 'AND' && Array.isArray(value)) {
+        return value.every((clause) => matchesWhere(item, clause));
+      }
+      if (value && typeof value === 'object' && 'some' in value) {
+        const itemArray = item?.[key] as any[];
+        return Array.isArray(itemArray)
+          ? itemArray.some((subItem) => matchesWhere(subItem, value.some))
+          : false;
+      }
+      if (value && typeof value === 'object' && 'in' in value) {
+        return value.in.includes(item?.[key]);
+      }
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        return matchesWhere(item?.[key], value);
+      }
+      return (
+        item?.[key] === value || (value === null && item?.[key] === undefined)
+      );
+    });
   }
 
   function attachUserRoles(
@@ -371,6 +457,13 @@ export function createPrismaMock() {
             .length,
         ),
       ),
+      deleteMany: jest.fn((q: PrismaQuery) => {
+        const before = state.tenants.length;
+        state.tenants = state.tenants.filter(
+          (t) => !q.where?.id || t.id !== q.where.id,
+        );
+        return Promise.resolve({ count: before - state.tenants.length });
+      }),
     },
     user: {
       findUnique: jest.fn((q: PrismaQuery) => {
@@ -2075,15 +2168,261 @@ export function createPrismaMock() {
     'healthRecord',
     'incidentReport',
     'studentMergeHistory',
+    'platformPlan',
+    'platformPlanFeature',
+    'tenantSubscription',
+    'tenantFeatureOverride',
+    'usageLimit',
+    'usageCounter',
+    'saaSInvoice',
+    'saaSInvoiceLine',
+    'saaSPayment',
+    'providerConfig',
+    'reportExport',
+    'studentGuardian',
+    'transportRoute',
+    'transportStop',
+    'transportVehicle',
+    'transportTrip',
+    'transportTripStudentStatus',
+    'transportStudentAssignment',
+    'transportDriverAssignment',
+    'transportLocationPing',
+    'guardianConsent',
+    'staffDocument',
+    'staffLifecycleEvent',
   ];
 
   for (const model of dummyModels) {
     if (!prisma[model]) {
+      // Basic pluralization for state key
+      const stateKey = model.endsWith('Status')
+        ? model + 'es'
+        : model.endsWith('s')
+          ? model
+          : model + 's';
+      const actualStateKey = (state as any)[stateKey]
+        ? stateKey
+        : (state as any)[model + 's']
+          ? model + 's'
+          : (state as any)[model + 'es']
+            ? model + 'es'
+            : model + 's';
+
       prisma[model] = {
-        updateMany: jest.fn(() => Promise.resolve({ count: 0 })),
-        findMany: jest.fn(() => Promise.resolve([])),
-        findFirst: jest.fn(() => Promise.resolve(null)),
-        create: jest.fn((q: any) => Promise.resolve(q.data || {})),
+        update: jest.fn((q: any) => {
+          const items = (state as any)[actualStateKey] || [];
+          let found;
+          if (q.where?.id) {
+            found = items.find((i: any) => i.id === q.where.id);
+          } else {
+            const whereKeys = Object.keys(q.where || {});
+            if (
+              whereKeys.length === 1 &&
+              typeof q.where[whereKeys[0]] === 'object'
+            ) {
+              const compound = q.where[whereKeys[0]];
+              found = items.find((i: any) => {
+                return Object.entries(compound).every(
+                  ([ck, cv]) => i[ck] === cv,
+                );
+              });
+            } else {
+              found = items.find((item: any) => {
+                return Object.entries(q.where).every(
+                  ([key, value]) => item[key] === value,
+                );
+              });
+            }
+          }
+          if (found && q.data) {
+            Object.assign(found, q.data);
+          }
+          return Promise.resolve(found ? { ...found } : null);
+        }),
+        updateMany: jest.fn((q: any) => Promise.resolve({ count: 0 })),
+        deleteMany: jest.fn((q: any) => {
+          if ((state as any)[actualStateKey]) {
+            (state as any)[actualStateKey] = [];
+          }
+          return Promise.resolve({ count: 0 });
+        }),
+        findMany: jest.fn((q: any) => {
+          let items = (state as any)[actualStateKey] || [];
+          if (q?.where) {
+            items = items.filter((item: any) => matchesWhere(item, q.where));
+          }
+          if (q?.take) items = items.slice(0, q.take);
+          return Promise.resolve(items);
+        }),
+        findFirst: jest.fn((q: any) => {
+          const items = (state as any)[actualStateKey] || [];
+          let found = items.find((item: any) => matchesWhere(item, q?.where));
+
+          if (found && q.include) {
+            found = { ...found };
+            if (model === 'tenantSubscription' && q.include.plan) {
+              found.plan = state.platformPlans.find(
+                (p) => p.id === found.planId,
+              );
+              if (found.plan) {
+                found.plan = { ...found.plan };
+                if (q.include.plan.include?.features) {
+                  const featureWhere = q.include.plan.include.features.where;
+                  found.plan.features = state.platformPlanFeatures.filter(
+                    (f) =>
+                      f.planId === found.plan.id &&
+                      matchesWhere(f, featureWhere),
+                  );
+                }
+                if (q.include.plan.include?.usageLimits) {
+                  found.plan.usageLimits = state.usageLimits.filter(
+                    (l) => l.planId === found.plan.id,
+                  );
+                }
+              }
+            }
+            if (model === 'saaSInvoice' && q.include.lines) {
+              found.lines = state.saaSInvoiceLines.filter(
+                (l) => l.invoiceId === found.id,
+              );
+            }
+            if (model === 'saaSInvoice' && q.include.payments) {
+              found.payments = state.saaSPayments.filter(
+                (p) => p.invoiceId === found.id,
+              );
+            }
+          }
+          return Promise.resolve(found ? { ...found } : null);
+        }),
+        findUnique: jest.fn((q: any) => {
+          const items = (state as any)[actualStateKey] || [];
+          if (!q?.where) return Promise.resolve(null);
+
+          let found;
+          const whereKeys = Object.keys(q.where);
+          if (
+            whereKeys.length === 1 &&
+            typeof q.where[whereKeys[0]] === 'object' &&
+            q.where[whereKeys[0]] !== null
+          ) {
+            const compound = q.where[whereKeys[0]];
+            found = items.find((item: any) => {
+              return Object.entries(compound).every(
+                ([ck, cv]) => item[ck] === cv,
+              );
+            });
+          } else {
+            found = items.find((item: any) => {
+              return Object.entries(q.where).every(
+                ([key, value]) => item[key] === value,
+              );
+            });
+          }
+
+          if (found && q.include) {
+            found = { ...found };
+            if (model === 'tenantSubscription' && q.include.plan) {
+              found.plan = state.platformPlans.find(
+                (p) => p.id === found.planId,
+              );
+              if (found.plan) {
+                found.plan = { ...found.plan };
+                if (q.include.plan.include?.features) {
+                  const featureWhere = q.include.plan.include.features.where;
+                  found.plan.features = state.platformPlanFeatures.filter(
+                    (f) =>
+                      f.planId === found.plan.id &&
+                      matchesWhere(f, featureWhere),
+                  );
+                }
+                if (q.include.plan.include?.usageLimits) {
+                  found.plan.usageLimits = state.usageLimits.filter(
+                    (l) => l.planId === found.plan.id,
+                  );
+                }
+              }
+            }
+            if (model === 'saaSInvoice' && q.include.lines) {
+              found.lines = state.saaSInvoiceLines.filter(
+                (l) => l.invoiceId === found.id,
+              );
+            }
+            if (model === 'saaSInvoice' && q.include.payments) {
+              found.payments = state.saaSPayments.filter(
+                (p) => p.invoiceId === found.id,
+              );
+            }
+          }
+          return Promise.resolve(found ? { ...found } : null);
+        }),
+        create: jest.fn((q: any) => {
+          const data = q.data || {};
+          const item = {
+            id: data.id || nextId(model),
+            ...data,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+
+          // Handle nested lines for SaaSInvoice
+          if (model === 'saaSInvoice' && data.lines?.create) {
+            const lines = (
+              Array.isArray(data.lines.create)
+                ? data.lines.create
+                : [data.lines.create]
+            ).map((l: any) => ({
+              id: nextId('saaSInvoiceLine'),
+              ...l,
+              invoiceId: item.id,
+            }));
+            state.saaSInvoiceLines.push(...lines);
+            item.lines = lines;
+          }
+
+          if ((state as any)[actualStateKey]) {
+            (state as any)[actualStateKey].push(item);
+          }
+          return Promise.resolve(item);
+        }),
+        upsert: jest.fn((q: any) => {
+          const items = (state as any)[actualStateKey] || [];
+          // Simplistic upsert for mock: always create or find first
+          const item = items[0] || { id: nextId(model), ...q.create };
+          if (items.length === 0 && (state as any)[actualStateKey]) {
+            (state as any)[actualStateKey].push(item);
+          }
+          return Promise.resolve(item);
+        }),
+        count: jest.fn((q: any) => {
+          let items = (state as any)[actualStateKey] || [];
+          if (q?.where) {
+            items = items.filter((item: any) => {
+              return Object.entries(q.where).every(([key, value]) => {
+                if (value === undefined) return true;
+                if (
+                  value &&
+                  typeof value === 'object' &&
+                  'in' in (value as any)
+                ) {
+                  return (value as any).in.includes(item[key]);
+                }
+                if (
+                  value &&
+                  typeof value === 'object' &&
+                  !Array.isArray(value)
+                ) {
+                  const itemVal = item[key];
+                  return Object.entries(value as any).every(([nk, nv]) => {
+                    return itemVal && itemVal[nk] === nv;
+                  });
+                }
+                return item[key] === value;
+              });
+            });
+          }
+          return Promise.resolve(items.length);
+        }),
       };
     }
   }

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
 import { SectionCard } from '@/components/ui/section-card';
-import { Wallet, Edit3, FileText, ChevronLeft } from 'lucide-react';
+import { CalendarCheck, FolderOpen, QrCode, Wallet, Edit3, FileText, ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type ProfileHeaderProps = {
@@ -20,7 +20,7 @@ export function ProfileHeader({ profile, onEdit, onOpenIdCard, pdfError }: Profi
   const studentName = student.fullNameEn || `${student.firstNameEn} ${student.lastNameEn}`;
   
   return (
-    <SectionCard className="overflow-hidden border-none bg-slate-900 text-white shadow-2xl">
+    <SectionCard className="sticky top-4 z-20 overflow-hidden border-none bg-slate-900 text-white shadow-2xl">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-5">
           <Avatar 
@@ -67,6 +67,27 @@ export function ProfileHeader({ profile, onEdit, onOpenIdCard, pdfError }: Profi
           >
             <Wallet size={18} />
             Collect Fees
+          </Link>
+          <Link
+            href={`/dashboard/students/${encodeURIComponent(student.id)}?tab=Attendance`}
+            className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20"
+          >
+            <CalendarCheck size={18} />
+            Attendance
+          </Link>
+          <Link
+            href={`/dashboard/students/${encodeURIComponent(student.id)}?tab=Documents`}
+            className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20"
+          >
+            <FolderOpen size={18} />
+            Documents
+          </Link>
+          <Link
+            href={`/dashboard/students/${encodeURIComponent(student.id)}?tab=Documents`}
+            className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20"
+          >
+            <QrCode size={18} />
+            QR
           </Link>
           <button
             type="button"

@@ -44,7 +44,7 @@ describe('Attendance report integration depth', () => {
       expect.arrayContaining([{ day: 3, status: 'HOLIDAY' }]),
     );
 
-    const csv = await service.exportMonthlyRegister(query, actor);
+    const csv = await service.exportMonthlyRegister(query, 'csv', actor);
 
     expect(csv).toContain('"Roll No","Student Name"');
     expect(csv).toContain('"1","Aarav Shrestha"');
@@ -84,8 +84,15 @@ function makePrisma() {
 
   return {
     student: { findMany: jest.fn(async () => students) },
+    class: {
+      findFirst: jest.fn(async () => ({ id: classId, name: 'Grade 1' })),
+    },
+    section: {
+      findFirst: jest.fn(async () => ({ id: sectionId, name: 'A' })),
+    },
     attendanceSession: { findMany: jest.fn(async () => sessions) },
     schoolCalendarDay: { findMany: jest.fn(async () => calendarDays) },
+    reportExport: { create: jest.fn(async () => ({ id: 'export-1' })) },
   };
 
   function makeStudent(

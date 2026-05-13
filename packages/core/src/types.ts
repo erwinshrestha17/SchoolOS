@@ -112,6 +112,14 @@ export type StudentProfile = {
   } | null;
 };
 
+export enum StudentQrResolvePurpose {
+  GENERAL_STUDENT_LOOKUP = 'GENERAL_STUDENT_LOOKUP',
+  LIBRARY = 'LIBRARY',
+  CANTEEN = 'CANTEEN',
+  TRANSPORT = 'TRANSPORT',
+  ATTENDANCE = 'ATTENDANCE',
+}
+
 export type StudentProfileEnrollment = {
   id: string;
   academicYearId: string;

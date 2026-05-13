@@ -646,6 +646,11 @@ function CopiesPanel(props: {
   isSaving: boolean;
   error: Error | null;
 }) {
+  const [pendingStatusChange, setPendingStatusChange] = useState<{
+    copy: LibraryCopy;
+    status: LibraryCopyStatus;
+  } | null>(null);
+
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
       <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
@@ -674,7 +679,19 @@ function CopiesPanel(props: {
                 <div className="flex flex-wrap gap-2">
                   <button type="button" onClick={() => props.onEdit(copy)} className="btn-secondary">Edit</button>
                   {copy.status !== 'ISSUED' && copyStatuses.filter((status) => status !== copy.status).map((status) => (
-                    <button key={status} type="button" onClick={() => props.onStatusChange(copy, status)} className="btn-secondary">
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => {
+                        if (status === 'LOST' || status === 'DAMAGED') {
+                          setPendingStatusChange({ copy, status });
+                          return;
+                        }
+
+                        props.onStatusChange(copy, status);
+                      }}
+                      className={status === 'LOST' || status === 'DAMAGED' ? 'btn-secondary text-red-600' : 'btn-secondary'}
+                    >
                       Mark {formatStatus(status)}
                     </button>
                   ))}
@@ -683,6 +700,20 @@ function CopiesPanel(props: {
             </div>
           ))}
         </div>
+        <ConfirmDialog
+          isOpen={Boolean(pendingStatusChange)}
+          onClose={() => setPendingStatusChange(null)}
+          onConfirm={() => {
+            if (pendingStatusChange) {
+              props.onStatusChange(pendingStatusChange.copy, pendingStatusChange.status);
+            }
+            setPendingStatusChange(null);
+          }}
+          title={`Mark copy ${formatStatus(pendingStatusChange?.status ?? '')}?`}
+          description="This changes the physical copy status used by issue/return workflows. Use this only after confirming the book is actually lost or damaged."
+          confirmLabel="Confirm status change"
+          variant="destructive"
+        />
       </section>
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">

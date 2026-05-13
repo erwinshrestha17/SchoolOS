@@ -103,6 +103,7 @@ export class CreateCanteenPosSaleDto {
   @IsOptional() @IsString() staffId?: string;
   @IsString() paymentMethod!: string;
   @IsOptional() @IsString() notes?: string;
+  @IsOptional() @IsString() idempotencyKey?: string;
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateCanteenPosSaleItemDto)

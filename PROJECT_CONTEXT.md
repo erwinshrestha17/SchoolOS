@@ -38,8 +38,10 @@ Phase 1B completed / pilot-ready
 M0 Platform Core Foundation Depth completed
 Phase 2A M4 Academics backend completed / contract-protected
 Phase 2D M9 Accounting production-candidate complete
-Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
+Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations + Targeted Frontend Polish Complete + Real-Credential Pilot QA Hardening Complete
 ```
+
+Targeted web-admin polish and Phase2F smoke coverage have been completed; next focus is deeper report polish, real-credential QA, and stabilization.
 
 The repo is ahead of older Phase 1B/Phase 2-transition notes. Phase 2A Academics backend is complete. M9 Accounting is production-candidate complete. Foundations now exist for Homework/Timetable, HR/Payroll, Parent Communication/Messaging, Library, Transport, and Canteen.
 
@@ -48,12 +50,11 @@ Current work should focus on stabilization, correctness, scale, permissions, tes
 Recommended near-term direction:
 
 ```text
-Repo Verification & Stabilization Sprint
-→ fix any remaining Prisma/schema/typecheck/test blockers
+Visual Polish & Keyboard UX Sprint
+→ execute final visual polish for Finance/Accounting Reports
+→ implement keyboard-friendly marks/CAS entry for Academics
 → stabilize Homework/Timetable after recent verification follow-ups
-→ wire Phase 2A Academics admin UI to completed APIs
-→ add authenticated Playwright browser smoke tests
-→ prepare controlled pilot staging
+→ perform final staging/pilot environment verification
 ```
 
 Explicitly deferred unless requested:

@@ -70,7 +70,6 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmingSaleId, setConfirmingSaleId] = useState<string | null>(null);
   const [confirmingEnrollmentId, setConfirmingEnrollmentId] = useState<string | null>(null);
-  const [isTopUpOpen, setIsTopUpOpen] = useState(false);
 
   const queryClient = useQueryClient();
   const menuQuery = useQuery({ queryKey: ['canteen-menu'], queryFn: () => canteenApi.listMenuItems({ status: '' }) });
@@ -244,7 +243,7 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
         <TwoColumn>
           <Panel title="Student enrollments" description="Track student meal plan enrollment and cancellation.">
             <div className="space-y-3">
-              {enrollments.map((enrollment) => <RecordCard key={enrollment.id} title={studentLabel(enrollment.student) || enrollment.studentId} subtitle={`${enrollment.mealPlan?.name ?? enrollment.mealPlanId} • starts ${enrollment.startsOn?.slice(0, 10)}`} badge={<CanteenStatusBadge status={enrollment.status} />} action={enrollment.status === 'ACTIVE' ? <button className="btn-secondary" onClick={() => cancelEnrollmentMutation.mutate(enrollment.id)}>Cancel</button> : undefined} />)}
+              {enrollments.map((enrollment) => <RecordCard key={enrollment.id} title={studentLabel(enrollment.student) || enrollment.studentId} subtitle={`${enrollment.mealPlan?.name ?? enrollment.mealPlanId} • starts ${enrollment.startsOn?.slice(0, 10)}`} badge={<CanteenStatusBadge status={enrollment.status} />} action={enrollment.status === 'ACTIVE' ? <button type="button" className="btn-secondary text-red-600" onClick={() => setConfirmingEnrollmentId(enrollment.id)}>Cancel</button> : undefined} />)}
             </div>
             {enrollments.length === 0 && !enrollmentsQuery.isLoading ? <EmptyState title="No enrollments" description="Enroll students into meal plans." /> : null}
           </Panel>
@@ -297,7 +296,7 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
         <TwoColumn>
           <Panel title="Wallet balance" description="Create wallet, view balance, and review transaction history.">
             <StudentSelector students={studentsQuery.data ?? []} selectedId={walletStudentId} onSelect={setWalletStudentId} label="Student" />
-            <div className="mt-3 flex gap-2"><button className="btn-secondary" disabled={!walletStudentId || createWalletMutation.isPending} onClick={() => createWalletMutation.mutate(walletStudentId)}>Create / load wallet</button></div>
+            <div className="mt-3 flex gap-2"><button type="button" className="btn-secondary" disabled={!walletStudentId || createWalletMutation.isPending} onClick={() => createWalletMutation.mutate(walletStudentId)}>Create / load wallet</button></div>
             {walletQuery.data ? <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm text-slate-500">Balance</p><p className="text-2xl font-black text-slate-900">{money(walletQuery.data.balance)}</p><p className="text-xs text-slate-400">Low balance threshold: {money(walletQuery.data.lowBalanceThreshold)}</p></div>{isWalletLow(walletQuery.data.balance, walletQuery.data.lowBalanceThreshold) ? <CanteenStatusBadge status="WALLET_LOW" /> : null}</div></div> : <EmptyState title="No wallet selected" description="Select a student to view or create a wallet." />}
             <div className="mt-4 space-y-3">{(transactionsQuery.data ?? []).slice(0, 6).map((tx) => <RecordCard key={tx.id} title={`${tx.type} • ${money(tx.amount)}`} subtitle={`Balance after: ${money(tx.balanceAfter)} • ${tx.note ?? 'No note'}`} />)}</div>
           </Panel>
@@ -315,7 +314,12 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
       {activeTab === 'pos' && (
         <TwoColumn>
           <Panel title="POS sales" description="Create, complete, or cancel canteen POS sales.">
-            <SaleList sales={sales} emptyTitle="No POS sales" onComplete={(saleId) => completeSaleMutation.mutate(saleId)} onCancel={(saleId) => cancelSaleMutation.mutate(saleId)} />
+            <SaleList
+              sales={sales}
+              emptyTitle="No POS sales"
+              onComplete={(saleId) => setConfirmingSaleId(`complete:${saleId}`)}
+              onCancel={(saleId) => setConfirmingSaleId(`cancel:${saleId}`)}
+            />
           </Panel>
           <Panel title="Create POS sale" description="Wallet spending limits and balance checks are enforced by backend.">
             <QRResolver
@@ -398,6 +402,40 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
           </Panel>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={Boolean(confirmingEnrollmentId)}
+        onClose={() => setConfirmingEnrollmentId(null)}
+        onConfirm={() => {
+          if (confirmingEnrollmentId) cancelEnrollmentMutation.mutate(confirmingEnrollmentId);
+          setConfirmingEnrollmentId(null);
+        }}
+        title="Cancel meal enrollment?"
+        description="This stops the active meal plan enrollment for the selected student. Existing serving and billing records remain auditable."
+        confirmLabel="Cancel enrollment"
+        variant="destructive"
+        isConfirming={cancelEnrollmentMutation.isPending}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(confirmingSaleId)}
+        onClose={() => setConfirmingSaleId(null)}
+        onConfirm={() => {
+          const [action, saleId] = confirmingSaleId?.split(':') ?? [];
+          if (action === 'complete' && saleId) completeSaleMutation.mutate(saleId);
+          if (action === 'cancel' && saleId) cancelSaleMutation.mutate(saleId);
+          setConfirmingSaleId(null);
+        }}
+        title={confirmingSaleId?.startsWith('cancel:') ? 'Cancel POS sale?' : 'Complete POS sale?'}
+        description={
+          confirmingSaleId?.startsWith('cancel:')
+            ? 'This marks the draft sale as cancelled. Use this only when the canteen transaction should not be collected.'
+            : 'This completes the sale using backend wallet, spending-limit, and payment checks. Review student warnings before continuing.'
+        }
+        confirmLabel={confirmingSaleId?.startsWith('cancel:') ? 'Cancel sale' : 'Complete sale'}
+        variant={confirmingSaleId?.startsWith('cancel:') ? 'destructive' : 'default'}
+        isConfirming={completeSaleMutation.isPending || cancelSaleMutation.isPending}
+      />
     </div>
   );
 }
@@ -407,7 +445,7 @@ function Panel({ title, description, children }: { title: string; description: s
 function Notice({ tone, message, onDismiss }: { tone: 'success' | 'error'; message: string; onDismiss?: () => void }) { return <div className={cn('flex items-center justify-between rounded-2xl border px-4 py-3 text-sm', tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700')}><span>{message}</span>{onDismiss ? <button type="button" className="font-semibold" onClick={onDismiss}>Dismiss</button> : null}</div>; }
 function InfoCard({ lines }: { lines: string[] }) { return <section className="rounded-[2rem] border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"><ul className="list-disc space-y-1 pl-5">{lines.map((line) => <li key={line}>{line}</li>)}</ul></section>; }
 function RecordCard({ title, subtitle, action, badge }: { title: string; subtitle: string; action?: React.ReactNode; badge?: React.ReactNode }) { return <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-bold text-slate-900">{title}</h3><p className="text-sm text-slate-500">{subtitle}</p></div><div className="flex flex-wrap items-center gap-2">{badge}{action}</div></div></div>; }
-function SaleList({ sales, emptyTitle, onComplete, onCancel }: { sales: Array<{ id: string; status: string; paymentMethod: string; totalAmount: string | number; studentId?: string | null; items?: Array<{ itemName: string; quantity: number }> }>; emptyTitle: string; onComplete?: (saleId: string) => void; onCancel?: (saleId: string) => void }) { if (sales.length === 0) return <EmptyState title={emptyTitle} description="Canteen sales will appear here." />; return <div className="space-y-3">{sales.map((sale) => <RecordCard key={sale.id} title={`${sale.paymentMethod} • ${money(sale.totalAmount)}`} subtitle={sale.items?.map((item) => `${item.itemName} x${item.quantity}`).join(', ') || sale.studentId || 'Walk-in sale'} badge={<CanteenStatusBadge status={sale.status} />} action={sale.status === 'DRAFT' ? <div className="flex gap-2">{onComplete ? <button className="btn-primary" onClick={() => onComplete(sale.id)}>Complete</button> : null}{onCancel ? <button className="btn-secondary" onClick={() => onCancel(sale.id)}>Cancel</button> : null}</div> : undefined} />)}</div>; }
+function SaleList({ sales, emptyTitle, onComplete, onCancel }: { sales: Array<{ id: string; status: string; paymentMethod: string; totalAmount: string | number; studentId?: string | null; items?: Array<{ itemName: string; quantity: number }> }>; emptyTitle: string; onComplete?: (saleId: string) => void; onCancel?: (saleId: string) => void }) { if (sales.length === 0) return <EmptyState title={emptyTitle} description="Canteen sales will appear here." />; return <div className="space-y-3">{sales.map((sale) => <RecordCard key={sale.id} title={`${sale.paymentMethod} • ${money(sale.totalAmount)}`} subtitle={sale.items?.map((item) => `${item.itemName} x${item.quantity}`).join(', ') || sale.studentId || 'Walk-in sale'} badge={<CanteenStatusBadge status={sale.status} />} action={sale.status === 'DRAFT' ? <div className="flex gap-2">{onComplete ? <button type="button" className="btn-primary" onClick={() => onComplete(sale.id)}>Complete</button> : null}{onCancel ? <button type="button" className="btn-secondary" onClick={() => onCancel(sale.id)}>Cancel</button> : null}</div> : undefined} />)}</div>; }
 function LowBalanceList({ wallets }: { wallets: Array<{ id: string; balance: string | number; lowBalanceThreshold: string | number; studentId: string; student?: { firstNameEn?: string; lastNameEn?: string; studentSystemId?: string } | null }> }) { if (wallets.length === 0) return <EmptyState title="No low balance wallets" description="Low balance wallet report returned no students." />; return <Panel title="Wallet Low" description="Students returned by the backend low-balance wallet report."><div className="space-y-3">{wallets.map((wallet) => <RecordCard key={wallet.id} title={studentLabel(wallet.student) || wallet.studentId} subtitle={`Balance ${money(wallet.balance)} • threshold ${money(wallet.lowBalanceThreshold)}`} badge={<CanteenStatusBadge status="WALLET_LOW" />} />)}</div></Panel>; }
 function ReportPanel({ title, loading, rows }: { title: string; loading: boolean; rows: string[] }) { return <Panel title={title} description="Backend report result.">{loading ? <LoadingState label="Loading report..." /> : rows.length ? <div className="space-y-2">{rows.map((row) => <p key={row} className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">{row}</p>)}</div> : <EmptyState title="No data" description="No report rows returned." />}</Panel>; }
 function TextInput({ label, value, onChange, type = 'text', required }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean }) { return <label className="block text-sm font-semibold text-slate-700">{label}<input required={required} type={type} value={value} onChange={(event) => onChange(event.target.value)} className="input-control mt-1" /></label>; }

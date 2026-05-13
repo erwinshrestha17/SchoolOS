@@ -1,9 +1,9 @@
 # SchoolOS Remaining Implementation Plan
 
 **Status source:** `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md`  
-**Current stage:** Phase 2A backend complete + Phase 2 implemented foundations + Phase 3 operations admin foundations  
+**Current stage:** Phase 2A backend complete + Phase 2 foundations + Phase 3 operations admin foundations + Finance & Academics UX Polish Pass Complete + Real-Credential Pilot QA Hardening Complete
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard  
-**Last updated:** 2026-05-12
+**Last updated:** 2026-05-13
 
 ---
 
@@ -47,6 +47,13 @@ Near-term rule:
 Do not start broad new modules.
 Harden existing Phase 2 and Phase 3 foundations one vertical at a time.
 Highest priority: full verification, Phase 2A admin UI wired to completed backend APIs, browser smoke tests, then vertical hardening.
+```
+
+Stabilization update on 2026-05-13:
+
+```text
+Current repo verification is clean through Prisma generate/validate, OpenAPI verification, lint, typecheck, unit tests, E2E tests, build, and verify:production.
+Remaining environment-only gap: apply unapplied local migrations and run smoke:phase1 with API, web, Postgres, and Redis running.
 ```
 
 Explicitly deferred unless requested:
@@ -94,16 +101,21 @@ Biometric workflows
 Do first:
 
 ```text
-1. Run full verification gate.
-2. Fix any Prisma/schema/typecheck/test blockers.
-3. Stabilize Homework/Timetable service/schema/test alignment.
-4. Build Phase 2A Academics admin UI against completed backend APIs.
-5. Add authenticated Playwright Phase 2A and Accounting workflow smoke tests.
-6. Review production migrations and default Chart of Accounts/report mapping seeds.
-7. Harden one existing vertical at a time: HR/Payroll, Library, Transport, Canteen.
-8. Add request/correlation ID logging if not fully wired.
-9. Add queue failure visibility for notifications/reports/payroll/PDF work.
-10. Harden File Registry/object storage before uploads expand.
+1. Harden Operations UX Foundation — Library, Transport, Canteen.
+2. Stabilize Homework/Timetable service/schema/test alignment.
+3. Perform final staging/pilot environment verification.
+4. Add request/correlation ID logging if not fully wired.
+5. Add queue failure visibility for notifications/reports/payroll/PDF work.
+6. Harden File Registry/object storage before uploads expand.
+```
+
+Completed in recent UX Polish Sprint:
+
+```text
+- Final visual polish for Finance/Accounting Reports.
+- Keyboard-friendly marks/CAS entry for Academics.
+- DataTable grid keyboard navigation support.
+- Standardized premium design system tokens.
 ```
 
 Avoid now:
@@ -613,29 +625,15 @@ Feature -> tenant isolation -> indexes -> pagination -> queue slow work -> audit
 
 Web admin UI is now broadly implemented across Phase 1, Phase 2 foundations, and Phase 3 admin foundations. Phase 2A backend is complete, so the next UI/UX priority is an Academics admin workflow wired to real APIs.
 
-Remaining UI/UX:
-
-- Phase 2A Academics admin workspace.
-- Exam term and assessment component setup screens.
-- Marks entry and CAS workflow screens.
-- Result preview, lock/review, report-card generation, promotion readiness, and publishing screens.
-- Student QR management actions in student detail page.
-- QR scan action in Library issue/return screens.
-- QR scan action in Canteen serving/POS screen after wallet ledger is hardened.
-- Browser smoke/Playwright coverage for Phase 2A.
-- Parent/mobile portal.
-- Student mobile/PWA portal.
-- Teacher mobile workflows.
-- Driver app.
-- Live transport map.
-- WebSocket/SSE tracking UI.
-- Full canteen inventory/vendor UI.
-- Advanced reports/exports UX.
-- Developer portal.
-- Full accessibility pass.
-- Full browser smoke coverage.
-- Permission-denied states.
-- Slow-network UX review for Nepal schools.
+- Targeted web-admin frontend polish pass (Completed).
+- Phase 2F browser smoke coverage (Completed - credential-gated).
+- Deeper finance/accounting report visual polish.
+- Admissions wizard route-specific polish with seeded data.
+- Academics marks/CAS keyboard-entry polish.
+- Library/Canteen QR-specific flows.
+- Platform tenant actions manual QA.
+- Mobile/PWA later.
+- Live transport map/driver app later.
 
 Estimated UI/UX status:
 
@@ -653,13 +651,14 @@ Full UI/UX roadmap: 60–70%
 
 ```text
 Phase 1: Completed; only hardening remains.
-Phase 2A backend: Completed / contract-protected; frontend/admin UI next.
-Student Identity QR: Approved M1 cross-module foundation; implement before deeper Library/Canteen/Transport QR workflows.
+Phase 2A backend: Completed / contract-protected.
+Student Identity QR: Approved M1 cross-module foundation.
 Phase 2B/2C/2E: Foundations implemented; needs vertical hardening.
 Phase 2D M9: Production Candidate Complete.
 Phase 3: Admin foundations implemented; parent/mobile/driver/live tracking/inventory remain.
 Phase 4: Not started.
 M0 Platform Core: Partially implemented; SaaS/platform depth remains.
+Stabilization: Real-credential pilot QA hardening complete.
 ```
 
-SchoolOS should now prioritize production hardening and Phase 2A frontend/admin UI over broad feature expansion.
+SchoolOS should now prioritize final visual polish and keyboard UX over broad feature expansion.

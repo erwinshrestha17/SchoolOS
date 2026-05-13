@@ -13,12 +13,15 @@ import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { ArchiveStudentDto } from './dto/archive-student.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
 import { InviteGuardianDto } from './dto/invite-guardian.dto';
 import { MergeDuplicateStudentDto } from './dto/merge-duplicate-student.dto';
+import { MergeDuplicateStudentPreviewDto } from './dto/merge-duplicate-student-preview.dto';
 import { CreateGuardianIdentityVerificationDto } from './dto/create-guardian-identity-verification.dto';
 import { RequestStudentTransferDto } from './dto/request-student-transfer.dto';
 import { RevokeGeneratedStudentDocumentDto } from './dto/revoke-generated-student-document.dto';
@@ -30,7 +33,8 @@ import { sanitizeStudentProfileResponse } from './student-profile-sanitizer';
 import { StudentsService } from './students.service';
 
 @Controller('students')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.students')
 export class StudentsController {
   constructor(private readonly studentsService: StudentsService) {}
 
@@ -115,6 +119,15 @@ export class StudentsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.studentsService.mergeDuplicateStudent(dto, auth);
+  }
+
+  @Post('duplicates/merge/preview')
+  @Permissions('students:manage_lifecycle')
+  previewMergeDuplicateStudent(
+    @Body() dto: MergeDuplicateStudentPreviewDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.previewMergeDuplicateStudent(dto, auth);
   }
 
   @Get(':id/fee-clearance')
@@ -223,12 +236,17 @@ export class StudentsController {
   async getGeneratedDocument(
     @Param('id') studentId: string,
     @Param('kind') kind: string,
+    @Query('token') token: string | undefined,
     @CurrentAuth() auth: AuthContext,
   ) {
+    const documentAuth: AuthContext & { qrToken?: string } = auth;
+    if (token) {
+      documentAuth.qrToken = token;
+    }
     const pdf = await this.studentsService.generateStudentDocumentPdf(
       studentId,
       kind,
-      auth,
+      documentAuth,
     );
 
     return new StreamableFile(pdf, {

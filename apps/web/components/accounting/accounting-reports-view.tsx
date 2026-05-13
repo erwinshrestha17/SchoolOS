@@ -15,6 +15,8 @@ import { AuditInfo } from '../ui/audit-info';
 import { ReportFilters } from './report-filters';
 import { ReportTable } from './report-table';
 
+import { PageHeader } from '../ui/page-header';
+
 type ReportType = 'trial-balance' | 'income-statement' | 'balance-sheet' | 'general-ledger' | 'cash-book' | 'tax-summary';
 
 export function AccountingReportsView({ initialReport = 'trial-balance' }: { initialReport?: ReportType }) {
@@ -72,21 +74,25 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
   const renderReportContent = () => {
     if (reportQuery.isLoading) {
       return (
-        <PageState
-          tone="loading"
-          title="Generating Financial Report"
-          description="Backend is processing ledger data for the selected period."
-        />
+        <div className="py-20">
+          <PageState
+            tone="loading"
+            title="Generating Financial Report"
+            description="Backend is processing ledger data for the selected period."
+          />
+        </div>
       );
     }
 
     if (reportQuery.isError) {
       return (
-        <PageState
-          tone="danger"
-          title="Report Generation Failed"
-          description={reportQuery.error?.message ?? 'Could not retrieve data from the financial ledger.'}
-        />
+        <div className="py-10">
+          <PageState
+            tone="danger"
+            title="Report Generation Failed"
+            description={reportQuery.error?.message ?? 'Could not retrieve data from the financial ledger.'}
+          />
+        </div>
       );
     }
 
@@ -94,11 +100,13 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
 
     if (!data || (Array.isArray(data) && data.length === 0)) {
       return (
-        <PageState
-          tone="info"
-          title="No Transactions Found"
-          description="There are no ledger entries for the selected report and period."
-        />
+        <div className="py-10">
+          <PageState
+            tone="info"
+            title="No Transactions Found"
+            description="There are no ledger entries for the selected report and period."
+          />
+        </div>
       );
     }
 
@@ -231,41 +239,15 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-10">
-      <AuditInfo>
-        These reports are generated from backend ledger records. Posted journals are immutable; use reversal workflows for corrections.
-      </AuditInfo>
-
-      <SectionCard>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex flex-wrap gap-2">
-            {[
-              { id: 'trial-balance', label: 'Trial Balance', icon: BarChart3 },
-              { id: 'income-statement', label: 'Income Statement', icon: FileText },
-              { id: 'balance-sheet', label: 'Balance Sheet', icon: PieChart },
-              { id: 'general-ledger', label: 'General Ledger', icon: History },
-              { id: 'cash-book', label: 'Cash Book', icon: Wallet },
-              { id: 'tax-summary', label: 'VAT/TDS/PF', icon: Calculator },
-            ].map((report) => (
-              <button
-                key={report.id}
-                onClick={() => handleReportChange(report.id as ReportType)}
-                className={cn(
-                  "inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all",
-                  activeReport === report.id
-                    ? "bg-slate-900 text-white shadow-xl shadow-slate-900/10"
-                    : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-                )}
-              >
-                <report.icon size={16} />
-                {report.label}
-              </button>
-            ))}
-          </div>
+      <PageHeader 
+        title="Accounting Reports" 
+        description="Comprehensive financial statements and ledger reports generated from real-time accounting data."
+        actions={
           <div className="flex items-center gap-3">
             {!isExportSupported(activeReport) && (
-              <div className="flex items-center gap-2 text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100">
+              <div className="hidden lg:flex items-center gap-2 text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100">
                 <AlertCircle size={12} />
-                CSV Export Pending for this report
+                CSV Export Pending
               </div>
             )}
             <button
@@ -274,27 +256,75 @@ export function AccountingReportsView({ initialReport = 'trial-balance' }: { ini
               className="group inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all disabled:opacity-30 disabled:grayscale"
             >
               <FileSpreadsheet size={18} className="transition-transform group-hover:scale-110" />
-              {exportMutation.isPending ? 'Generating CSV...' : 'Download CSV'}
+              {exportMutation.isPending ? 'Generating...' : 'Download CSV'}
             </button>
           </div>
-        </div>
-        <div className="mt-6 border-t border-slate-100 pt-6">
-          <ReportFilters onFilterChange={(f) => setFilters(prev => ({ ...prev, ...f }))} />
-        </div>
-      </SectionCard>
+        }
+      />
 
-      <SectionCard className="border-none shadow-2xl shadow-slate-200/50">
-        <div className="mb-4 flex items-center justify-between">
-           <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">
-             {activeReport.replace('-', ' ')} Preview
-           </h3>
-           <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-              <History size={14} />
-              Generated {new Date().toLocaleString()}
-           </div>
+      <AuditInfo>
+        Financial truth is derived from the backend ledger. Posted journals are immutable; use reversal/correction workflows for any adjustments.
+      </AuditInfo>
+
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        <div className="xl:col-span-1 space-y-4">
+          <SectionCard title="Select Report" className="h-full">
+            <div className="flex flex-col gap-2">
+              {[
+                { id: 'trial-balance', label: 'Trial Balance', icon: BarChart3, desc: 'Balance check for all accounts' },
+                { id: 'income-statement', label: 'Income Statement', icon: FileText, desc: 'Revenue vs Expenses (P&L)' },
+                { id: 'balance-sheet', label: 'Balance Sheet', icon: PieChart, desc: 'Assets, Liabilities & Equity' },
+                { id: 'general-ledger', label: 'General Ledger', icon: History, desc: 'Detailed transaction history' },
+                { id: 'cash-book', label: 'Cash Book', icon: Wallet, desc: 'Cash and bank movements' },
+                { id: 'tax-summary', label: 'VAT/TDS/PF', icon: Calculator, desc: 'Tax and statutory summaries' },
+              ].map((report) => (
+                <button
+                  key={report.id}
+                  onClick={() => handleReportChange(report.id as ReportType)}
+                  className={cn(
+                    "flex flex-col gap-0.5 rounded-xl px-4 py-3 text-left transition-all",
+                    activeReport === report.id
+                      ? "bg-slate-900 text-white shadow-xl shadow-slate-900/10"
+                      : "bg-white border border-slate-100 text-slate-600 hover:bg-slate-50 hover:border-slate-200"
+                  )}
+                >
+                  <div className="flex items-center gap-2 font-bold text-sm">
+                    <report.icon size={16} />
+                    {report.label}
+                  </div>
+                  <span className={cn("text-[10px]", activeReport === report.id ? "text-slate-400" : "text-slate-400")}>
+                    {report.desc}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </SectionCard>
         </div>
-        {renderReportContent()}
-      </SectionCard>
+
+        <div className="xl:col-span-3 space-y-6">
+          <SectionCard>
+             <ReportFilters onFilterChange={(f) => setFilters(prev => ({ ...prev, ...f }))} />
+          </SectionCard>
+
+          <SectionCard className="border-none shadow-2xl shadow-slate-200/50 min-h-[400px]">
+            <div className="mb-6 flex items-center justify-between">
+               <div>
+                 <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">
+                   {activeReport.replace('-', ' ')}
+                 </h3>
+                 <p className="text-xs font-medium text-slate-400 mt-0.5">Report Preview</p>
+               </div>
+               <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-3 py-1.5 rounded-lg">
+                  <History size={12} />
+                  Generated {new Date().toLocaleTimeString()}
+               </div>
+            </div>
+            <div className="animate-in fade-in duration-700">
+              {renderReportContent()}
+            </div>
+          </SectionCard>
+        </div>
+      </div>
     </div>
   );
 }

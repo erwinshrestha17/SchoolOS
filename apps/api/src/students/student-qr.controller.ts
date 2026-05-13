@@ -43,11 +43,7 @@ export class StudentQrController {
     @Param('studentId') studentId: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.studentQrService.generateQr(
-      auth.tenantId,
-      studentId,
-      auth.userId,
-    );
+    return this.studentQrService.generateQr(auth.tenantId, studentId, auth);
   }
 
   @Post(':studentId/qr/rotate')
@@ -62,7 +58,7 @@ export class StudentQrController {
     return this.studentQrService.rotateQr(
       auth.tenantId,
       studentId,
-      auth.userId,
+      auth,
       dto.reason,
     );
   }
@@ -79,7 +75,7 @@ export class StudentQrController {
     return this.studentQrService.revokeQr(
       auth.tenantId,
       studentId,
-      auth.userId,
+      auth,
       dto.reason,
     );
   }
@@ -98,7 +94,7 @@ export class StudentQrController {
       auth.tenantId,
       dto.token,
       dto.purpose,
-      auth.userId,
+      auth,
     );
   }
 

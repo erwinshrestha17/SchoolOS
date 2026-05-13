@@ -41,6 +41,18 @@ export interface CanteenSalePostingInput {
   note?: string | null;
   entryDate?: Date;
 }
+export interface CanteenPurchasePostingInput {
+  tenantId: string;
+  purchaseBillId: string;
+  supplierId: string;
+  amount: Prisma.Decimal;
+  taxAmount?: Prisma.Decimal;
+  discountAmount?: Prisma.Decimal;
+  netAmount: Prisma.Decimal;
+  paymentAccountCode?: string;
+  note?: string | null;
+  entryDate?: Date;
+}
 
 export interface PayrollPostingInput {
   tenantId: string;
@@ -1419,6 +1431,94 @@ export class AccountingPostingService {
         sourceType: JournalSourceType.FEE_PAYMENT, // Reusing FeePayment for sale revenue for now or add CANTEEN_SALE to enum if possible
         sourceId: input.saleId,
         postingType: 'SALE',
+        createdById: actor.userId,
+        postedAt: new Date(),
+        lines: {
+          create: lines.map((l, i) => ({
+            ...l,
+            lineNumber: i + 1,
+            debit: l.side === JournalLineSide.DEBIT ? l.amount : 0,
+            credit: l.side === JournalLineSide.CREDIT ? l.amount : 0,
+          })),
+        },
+      },
+    });
+  }
+
+  async postCanteenPurchase(
+    input: CanteenPurchasePostingInput,
+    actor: AuthContext,
+    tx: Prisma.TransactionClient = this.prisma,
+  ) {
+    const entryDate = input.entryDate ?? new Date();
+    const period = await this.ensurePostingPeriodIsOpen(
+      tx,
+      input.tenantId,
+      entryDate,
+    );
+
+    const existing = await this.ensureNoDuplicateSource(
+      tx,
+      input.tenantId,
+      'CANTEEN',
+      JournalSourceType.INVOICE,
+      input.purchaseBillId,
+      'PURCHASE',
+    );
+
+    if (existing) {
+      return existing;
+    }
+
+    const inventoryExpense = await this.ensureAccount(tx, input.tenantId, {
+      code: '5200',
+      name: 'Canteen Inventory Purchases',
+      type: ChartAccountType.EXPENSE,
+    });
+
+    const creditAccount = await this.ensureAccount(tx, input.tenantId, {
+      code: input.paymentAccountCode ?? '1010',
+      name: 'Cash/Bank',
+      type: ChartAccountType.ASSET,
+    });
+
+    const lines = [
+      {
+        tenantId: input.tenantId,
+        chartAccountId: inventoryExpense.id,
+        side: JournalLineSide.DEBIT,
+        amount: input.netAmount,
+        description: `Canteen purchase bill: ${input.purchaseBillId}`,
+      },
+      {
+        tenantId: input.tenantId,
+        chartAccountId: creditAccount.id,
+        side: JournalLineSide.CREDIT,
+        amount: input.netAmount,
+        description: `Payment for purchase bill ${input.purchaseBillId}`,
+      },
+    ];
+
+    this.ensureBalanced(lines);
+
+    return tx.journalEntry.create({
+      data: {
+        tenantId: input.tenantId,
+        fiscalYearId: period?.fiscalYearId ?? null,
+        fiscalPeriodId: period?.id ?? null,
+        entryNumber: await this.generateJournalEntryNumber(
+          tx,
+          input.tenantId,
+          period?.fiscalYearId ?? null,
+          entryDate,
+        ),
+        entryDate,
+        status: JournalEntryStatus.POSTED,
+        narration: input.note ?? `Canteen purchase ${input.purchaseBillId}`,
+        sourceModule: 'CANTEEN',
+        sourceType: JournalSourceType.INVOICE,
+        sourceId: input.purchaseBillId,
+        postingType: 'PURCHASE',
         createdById: actor.userId,
         postedAt: new Date(),
         lines: {

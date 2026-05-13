@@ -40,6 +40,8 @@ function createController() {
     deleteTeacherAvailability: jest.fn(),
     getTeacherWorkload: jest.fn(),
     listTeacherWorkload: jest.fn(),
+  };
+  const substitutionService = {
     listSubstitutions: jest.fn(),
     createSubstitution: jest.fn(),
     updateSubstitution: jest.fn(),
@@ -49,8 +51,12 @@ function createController() {
   };
 
   return {
-    controller: new TimetableController(timetableService as never),
+    controller: new TimetableController(
+      timetableService as never,
+      substitutionService as never,
+    ),
     timetableService,
+    substitutionService,
   };
 }
 
@@ -232,7 +238,7 @@ describe('TimetableController M6 contracts', () => {
   });
 
   it('delegates substitution workflow and status transitions through service boundary', () => {
-    const { controller, timetableService } = createController();
+    const { controller, substitutionService } = createController();
     const createDto = {
       timetableSlotId: 'slot-1',
       absentTeacherId: 'teacher-1',
@@ -241,13 +247,17 @@ describe('TimetableController M6 contracts', () => {
       reason: 'Absent on leave',
     };
     const assignDto = { substituteTeacherId: 'teacher-2' };
-    timetableService.createSubstitution.mockReturnValue({ status: 'ASSIGNED' });
-    timetableService.updateSubstitution.mockReturnValue({ status: 'DRAFT' });
-    timetableService.assignSubstitution.mockReturnValue({ status: 'ASSIGNED' });
-    timetableService.cancelSubstitution.mockReturnValue({
+    substitutionService.createSubstitution.mockReturnValue({
+      status: 'ASSIGNED',
+    });
+    substitutionService.updateSubstitution.mockReturnValue({ status: 'DRAFT' });
+    substitutionService.assignSubstitution.mockReturnValue({
+      status: 'ASSIGNED',
+    });
+    substitutionService.cancelSubstitution.mockReturnValue({
       status: 'CANCELLED',
     });
-    timetableService.completeSubstitution.mockReturnValue({
+    substitutionService.completeSubstitution.mockReturnValue({
       status: 'COMPLETED',
     });
 
@@ -266,25 +276,25 @@ describe('TimetableController M6 contracts', () => {
     expect(controller.completeSubstitution('sub-1', actor)).toEqual({
       status: 'COMPLETED',
     });
-    expect(timetableService.createSubstitution).toHaveBeenCalledWith(
+    expect(substitutionService.createSubstitution).toHaveBeenCalledWith(
       createDto,
       actor,
     );
-    expect(timetableService.updateSubstitution).toHaveBeenCalledWith(
+    expect(substitutionService.updateSubstitution).toHaveBeenCalledWith(
       'sub-1',
       createDto,
       actor,
     );
-    expect(timetableService.assignSubstitution).toHaveBeenCalledWith(
+    expect(substitutionService.assignSubstitution).toHaveBeenCalledWith(
       'sub-1',
       assignDto,
       actor,
     );
-    expect(timetableService.cancelSubstitution).toHaveBeenCalledWith(
+    expect(substitutionService.cancelSubstitution).toHaveBeenCalledWith(
       'sub-1',
       actor,
     );
-    expect(timetableService.completeSubstitution).toHaveBeenCalledWith(
+    expect(substitutionService.completeSubstitution).toHaveBeenCalledWith(
       'sub-1',
       actor,
     );

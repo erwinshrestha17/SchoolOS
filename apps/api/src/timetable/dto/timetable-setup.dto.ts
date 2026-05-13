@@ -164,6 +164,35 @@ export class CreateTimetableVersionDto {
   effectiveTo?: string;
 }
 
+export class UpdateTimetableVersionDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  versionName?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  effectiveFrom?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  effectiveTo?: string;
+
+  @IsOptional()
+  @IsEnum(TimetableVersionStatus)
+  status?: TimetableVersionStatus;
+}
+
+export class RestoreTimetableVersionDto {
+  @IsString()
+  sourceVersionId!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  versionName?: string;
+}
+
 export class CreateVersionSlotDto {
   @IsString()
   classId!: string;

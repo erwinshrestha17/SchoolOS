@@ -43,6 +43,10 @@ import {
 import { ConfigService } from '../config/config.service';
 import { RedisService } from '../redis/redis.service';
 import { encryptSensitiveField } from '../common/security/field-encryption';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { PlansService } from '../plans/plans.service';
+import { PlatformFailedJobSummary } from '@schoolos/core';
 
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['TRIAL', 'ACTIVE', 'GRACE']);
 
@@ -67,6 +71,7 @@ const FEATURE_KEYS = [
   'feature.ai_teacher_assistant',
   'feature.ai_dropout_prediction',
   'feature.ai_natural_language_query',
+  'module.reports',
 ];
 
 const USAGE_KEYS = [
@@ -170,13 +175,29 @@ type DynamicDelegate = {
 
 @Injectable()
 export class PlatformService {
+  private readonly queues: Map<string, Queue>;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly usageService: UsageService,
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
-  ) {}
+    private readonly plansService: PlansService,
+    @InjectQueue('notifications') private readonly notificationsQueue: Queue,
+    @InjectQueue('finance') private readonly financeQueue: Queue,
+    @InjectQueue('payroll') private readonly payrollQueue: Queue,
+    @InjectQueue('activity-media') private readonly activityQueue: Queue,
+    @InjectQueue('homework') private readonly homeworkQueue: Queue,
+  ) {
+    this.queues = new Map([
+      ['notifications', notificationsQueue],
+      ['finance', financeQueue],
+      ['payroll', payrollQueue],
+      ['activity-media', activityQueue],
+      ['homework', homeworkQueue],
+    ]);
+  }
 
   async getDashboardSummary(): Promise<PlatformDashboardSummary> {
     const [totalTenants, activeTenants, usage] = await Promise.all([
@@ -482,6 +503,39 @@ export class PlatformService {
     return this.toSubscriptionSummary(subscription);
   }
 
+  async updateSubscriptionStatus(
+    tenantId: string,
+    subscriptionId: string,
+    dto: { status: string; notes?: string },
+    actorUserId: string,
+  ) {
+    const delegate = this.requireDelegate('tenantSubscription');
+    const before = await delegate.findFirst({
+      where: { id: subscriptionId, tenantId },
+    });
+    if (!before) throw new NotFoundException('Subscription not found');
+
+    const subscription = await delegate.update({
+      where: { id: subscriptionId },
+      data: {
+        status: dto.status,
+        notes: dto.notes,
+      },
+    });
+
+    await this.platformAudit(
+      actorUserId,
+      'tenant_subscription_status_updated',
+      'subscriptions',
+      String(subscription.id),
+      before,
+      { status: dto.status, notes: dto.notes },
+      tenantId,
+    );
+
+    return this.toSubscriptionSummary(subscription);
+  }
+
   async setFeatureOverride(
     tenantId: string,
     dto: TenantFeatureOverrideDto,
@@ -535,46 +589,19 @@ export class PlatformService {
         reason: 'tenant_inactive',
       };
     }
-    const subscription = await this.getRawActiveSubscription(tenantId);
-    if (!subscription) {
-      return {
-        allowed: false,
-        tenantId,
-        featureKey,
-        reason: 'no_subscription',
-      };
-    }
-    const subscriptionStatus = String(subscription.status);
-    if (!ACTIVE_SUBSCRIPTION_STATUSES.has(subscriptionStatus)) {
-      return {
-        allowed: false,
-        tenantId,
-        featureKey,
-        reason: 'subscription_inactive',
-        subscriptionStatus,
-      };
-    }
-    const override = await this.delegate('tenantFeatureOverride')?.findUnique({
-      where: { tenantId_featureKey: { tenantId, featureKey } },
-    });
-    if (override) {
-      return {
-        allowed: Boolean(override.enabled),
-        tenantId,
-        featureKey,
-        reason: override.enabled ? 'allowed' : 'feature_disabled',
-        subscriptionStatus,
-      };
-    }
-    const feature = asRecords(asRecord(subscription.plan).features).find(
-      (item: DynamicRecord) => item.featureKey === featureKey,
-    );
-    return {
-      allowed: Boolean(feature?.enabled),
+
+    const isAllowed = await this.plansService.checkFeatureEnabled(
       tenantId,
       featureKey,
-      reason: feature?.enabled ? 'allowed' : 'feature_disabled',
-      subscriptionStatus,
+    );
+    const subscription = await this.getRawActiveSubscription(tenantId);
+
+    return {
+      allowed: isAllowed,
+      tenantId,
+      featureKey,
+      reason: isAllowed ? 'allowed' : 'feature_disabled',
+      subscriptionStatus: subscription?.status as string | null,
     };
   }
 
@@ -762,6 +789,9 @@ export class PlatformService {
     if (paid.add(amount).gt(decimalValue(invoice.amount))) {
       throw new BadRequestException('Payment exceeds invoice balance');
     }
+    if (invoice.status === 'PAID') {
+      throw new BadRequestException('Invoice is already fully paid');
+    }
     await paymentDelegate.create({
       data: {
         tenantId,
@@ -891,45 +921,90 @@ export class PlatformService {
   }
 
   async getQueueHealth(): Promise<PlatformQueueSummary[]> {
-    return [
-      'notifications.delivery',
-      'reports.generate',
-      'pdf.generate',
-      'finance.billing',
-      'payroll.posting',
-      'academics.report-cards',
-      'activity.media',
-      'transport.location',
-      'platform.maintenance',
-    ].map((name) => ({
-      name,
-      waiting: 0,
-      active: 0,
-      completed: 0,
-      failed: 0,
-      delayed: 0,
-      paused: false,
-      workerHealth: 'unknown' as const,
-    }));
+    const summaries: PlatformQueueSummary[] = [];
+
+    for (const [name, queue] of this.queues.entries()) {
+      const [counts, paused, workers] = await Promise.all([
+        queue.getJobCounts(
+          'waiting',
+          'active',
+          'completed',
+          'failed',
+          'delayed',
+        ),
+        queue.isPaused(),
+        queue.getWorkers(),
+      ]);
+
+      summaries.push({
+        name,
+        waiting: counts.waiting,
+        active: counts.active,
+        completed: counts.completed,
+        failed: counts.failed,
+        delayed: counts.delayed,
+        paused,
+        workerHealth: workers.length > 0 ? 'healthy' : 'degraded',
+      });
+    }
+
+    return summaries;
   }
 
-  async listFailedJobs() {
-    return [];
+  async listFailedJobs(): Promise<PlatformFailedJobSummary[]> {
+    const allFailed: PlatformFailedJobSummary[] = [];
+
+    for (const [name, queue] of this.queues.entries()) {
+      const failedJobs = await queue.getFailed(0, 50);
+      for (const job of failedJobs) {
+        allFailed.push({
+          id: String(job.id),
+          queueName: name,
+          name: job.name,
+          failedReason: job.failedReason,
+          attemptsMade: job.attemptsMade,
+          timestamp: job.timestamp,
+          data: job.data,
+        });
+      }
+    }
+
+    return allFailed.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
   }
 
   async retryFailedJob(dto: RetryFailedJobDto, actorUserId: string) {
+    const queue = this.queues.get(dto.queueName);
+    if (!queue) {
+      throw new NotFoundException(`Queue ${dto.queueName} not found`);
+    }
+
+    const job = await queue.getJob(dto.jobId);
+    if (!job) {
+      throw new NotFoundException(
+        `Job ${dto.jobId} not found in queue ${dto.queueName}`,
+      );
+    }
+
+    const isFailed = await job.isFailed();
+    if (!isFailed) {
+      throw new BadRequestException(`Job ${dto.jobId} is not in failed state`);
+    }
+
+    await job.retry();
+
     await this.platformAudit(
       actorUserId,
       'queue_failed_job_retry_requested',
       'queues',
       `${dto.queueName}:${dto.jobId}`,
-      null,
+      { status: 'failed', failedReason: job.failedReason },
       {
         queueName: dto.queueName,
         jobId: dto.jobId,
-        reason: dto.reason ?? null,
+        reason: dto.reason ?? 'manual_retry',
       },
     );
+
     return { success: true };
   }
 
@@ -953,13 +1028,42 @@ export class PlatformService {
   }
 
   async listReportExports(tenantId?: string) {
+    return this.listReportExportsPage({ tenantId, page: 1, limit: 100 });
+  }
+
+  async listReportExportsPage(query: {
+    tenantId?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<PaginatedResponse<any>> {
+    const page = Number(query.page) || 1;
+    const limit = Math.min(Number(query.limit) || 25, 100);
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ReportExportWhereInput = {};
+    if (query.tenantId) where.tenantId = query.tenantId;
+
     const delegate = this.delegate('reportExport');
-    if (!delegate) return [];
-    return delegate.findMany({
-      where: tenantId ? { tenantId } : undefined,
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
+    if (!delegate)
+      return { items: [], total: 0, page, limit, hasNextPage: false };
+
+    const [items, total] = await Promise.all([
+      delegate.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      delegate.count({ where }),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
+    };
   }
 
   async recordReportExport(input: {

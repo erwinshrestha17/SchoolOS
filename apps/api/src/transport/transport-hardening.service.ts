@@ -222,7 +222,15 @@ export class TransportHardeningService {
       },
       include: {
         trip: { include: { route: true, vehicle: true } },
-        student: true,
+        student: {
+          select: {
+            id: true,
+            firstNameEn: true,
+            lastNameEn: true,
+            photoUrl: true,
+            rollNumber: true,
+          },
+        },
         stop: true,
       },
       orderBy: [{ createdAt: 'desc' }],

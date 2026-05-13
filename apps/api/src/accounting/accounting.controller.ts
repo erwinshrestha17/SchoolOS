@@ -15,6 +15,8 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { FinanceService } from '../finance/finance.service';
 import { AccountingService } from './accounting.service';
 import { AccountingActionDto } from './dto/accounting-action.dto';
@@ -44,7 +46,8 @@ import {
 } from './dto/voucher.dto';
 
 @Controller('accounting')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.accounting')
 export class AccountingController {
   constructor(
     private readonly accountingService: AccountingService,

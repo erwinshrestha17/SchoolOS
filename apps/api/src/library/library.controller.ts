@@ -14,6 +14,8 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { ArchiveLibraryBookDto } from './dto/archive-library-book.dto';
 import { CreateLibraryBookDto } from './dto/create-library-book.dto';
 import { CreateLibraryCopyDto } from './dto/create-library-copy.dto';
@@ -22,11 +24,17 @@ import { MarkLibraryCopyStatusDto } from './dto/mark-library-copy-status.dto';
 import { ReturnLibraryCopyDto } from './dto/return-library-copy.dto';
 import { UpdateLibraryBookDto } from './dto/update-library-book.dto';
 import { UpdateLibraryCopyDto } from './dto/update-library-copy.dto';
+import {
+  CreateLibraryFineDto,
+  UpdateLibraryFineDto,
+} from './dto/library-fine.dto';
+import { UpdateLibrarySettingDto } from './dto/update-library-setting.dto';
 import { LibraryHardeningService } from './library-hardening.service';
 import { LibraryService } from './library.service';
 
 @Controller('library')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.library')
 export class LibraryController {
   constructor(
     private readonly libraryService: LibraryService,
@@ -242,5 +250,96 @@ export class LibraryController {
   @Permissions('library:reports:read')
   exportIssuedBooksCsv(@CurrentAuth() auth: AuthContext) {
     return this.libraryHardeningService.exportIssuedBooksCsv(auth);
+  }
+
+  @Get('borrowed-students')
+  @Permissions('library:issues:read')
+  getBorrowedStudents(
+    @CurrentAuth() auth: AuthContext,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.libraryService.getBorrowedStudents(auth, { page, limit });
+  }
+
+  @Get('fines')
+  @Permissions('library:reports:read')
+  listFines(
+    @CurrentAuth() auth: AuthContext,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.libraryService.listFines(auth, { page, limit });
+  }
+
+  @Post('fines')
+  @Permissions('library:reports:read')
+  createFine(
+    @CurrentAuth() auth: AuthContext,
+    @Body() dto: CreateLibraryFineDto,
+  ) {
+    return this.libraryService.createFine(auth, dto);
+  }
+
+  @Patch('fines/:id')
+  @Permissions('library:reports:read')
+  updateFine(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') fineId: string,
+    @Body() dto: UpdateLibraryFineDto,
+  ) {
+    return this.libraryService.updateFine(auth, fineId, dto);
+  }
+
+  @Get('reports/popular')
+  @Permissions('library:reports:read')
+  getPopularBooksReport(
+    @CurrentAuth() auth: AuthContext,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.libraryService.getPopularBooksReport(auth, { page, limit });
+  }
+
+  @Get('books/:id/history')
+  @Permissions('library:books:read')
+  getBookHistory(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') bookId: string,
+  ) {
+    return this.libraryService.getBookHistory(auth, bookId);
+  }
+
+  @Get('copies/:id/history')
+  @Permissions('library:copies:read')
+  getCopyHistory(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') copyId: string,
+  ) {
+    return this.libraryService.getCopyHistory(auth, copyId);
+  }
+
+  @Get('settings')
+  @Permissions('library:books:read')
+  getSettings(@CurrentAuth() auth: AuthContext) {
+    return this.libraryService.getLibrarySettings(auth);
+  }
+
+  @Patch('settings')
+  @Permissions('library:books:update')
+  updateSettings(
+    @CurrentAuth() auth: AuthContext,
+    @Body() dto: UpdateLibrarySettingDto,
+  ) {
+    return this.libraryService.updateLibrarySettings(auth, dto);
+  }
+
+  @Post('qr-lookup')
+  @Permissions('library:issues:create')
+  resolveQrBorrower(
+    @CurrentAuth() auth: AuthContext,
+    @Body('token') token: string,
+  ) {
+    return this.libraryService.resolveQrBorrower(auth, token);
   }
 }

@@ -16,7 +16,22 @@ import { Avatar } from '../ui/avatar';
 import { LoadingState } from '../ui/loading-state';
 import { EmptyState } from '../ui/empty-state';
 import { cn } from '../../lib/utils';
-import { Search, Filter, Download, UserPlus, Wallet, FileText, ChevronRight, MoreHorizontal, UserCheck, UserX, GraduationCap, ArrowRightLeft, XCircle, RotateCcw } from 'lucide-react';
+import {
+  BookOpenText,
+  ContactRound,
+  Download,
+  FileText,
+  Filter,
+  FolderOpen,
+  MoreHorizontal,
+  RotateCcw,
+  Search,
+  UserCheck,
+  UserPlus,
+  Users,
+  Wallet,
+  ChevronRight,
+} from 'lucide-react';
 import { StatusBadge } from '../ui/status-badge';
 
 type StudentDirectoryProps = {
@@ -74,12 +89,6 @@ export function StudentDirectory({
   }, [academicYearId, currentAcademicYear]);
 
   useEffect(() => {
-    if (!classId && classes[0]) {
-      setClassId(classes[0].id);
-    }
-  }, [classId, classes]);
-
-  useEffect(() => {
     if (!sectionId) return;
     const existingSection = sections.find((section) => section.id === sectionId);
     const existingSectionClassId = existingSection?.classId ?? existingSection?.class?.id;
@@ -119,7 +128,9 @@ export function StudentDirectory({
           student.studentSystemId,
           studentClassName,
           studentSectionName,
+          primaryGuardianName(student, admission),
           ...(student.guardians ?? []).map((guardian) => guardian.primaryPhone),
+          ...(admission?.guardians ?? []).map((guardian) => guardian.primaryPhone),
         ]
           .filter(Boolean)
           .join(' ')
@@ -266,8 +277,10 @@ export function StudentDirectory({
             >
               <option value="">All Statuses</option>
               <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
               <option value="TRANSFERRED">Transferred</option>
-              <option value="ALUMNI">Alumni</option>
+              <option value="ALUMNI">Graduated</option>
+              <option value="GRADUATED">Graduated</option>
               <option value="WITHDRAWN">Withdrawn</option>
               <option value="DEACTIVATED">Deactivated</option>
             </select>
@@ -280,7 +293,8 @@ export function StudentDirectory({
                 className="premium-input pl-9 text-sm"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Name or SCH-ID"
+                placeholder="Name or SCH-ID, guardian, or phone"
+                aria-label="Search students by name, student code, guardian name, or phone"
               />
             </div>
           </div>
@@ -293,7 +307,7 @@ export function StudentDirectory({
         noPadding
       >
         {filteredStudents.length > 0 ? (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100" data-testid="student-directory-results">
             {filteredStudents.map((student) => {
               const admission = admissionBySystemId.get(student.studentSystemId);
               const studentName = getStudentName(student, admission);
@@ -332,8 +346,8 @@ export function StudentDirectory({
                           </>
                         )}
                       </div>
-                      <p className="mt-1 text-[0.7rem] text-slate-400">
-                         Guardian: <span className="text-slate-600 font-bold">{primaryGuardian?.fullName || 'N/A'}</span> • {primaryGuardian?.primaryPhone || 'N/A'}
+                      <p className="mt-1 text-[0.7rem] text-slate-500">
+                         Guardian: <span className="text-slate-700 font-bold">{primaryGuardian?.fullName || 'Not recorded'}</span> • {primaryGuardian?.primaryPhone || 'No phone'}
                       </p>
                     </div>
                   </div>
@@ -354,24 +368,49 @@ export function StudentDirectory({
                       Fees Ledger
                     </Link>
                     <div className="relative group/actions">
-                      <button className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-900">
+                      <button
+                        type="button"
+                        aria-label={`Open actions for ${studentName}`}
+                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+                      >
                         <MoreHorizontal size={16} />
                       </button>
                       <div className="absolute right-0 top-full z-10 mt-2 hidden w-48 origin-top-right rounded-2xl border border-slate-200 bg-white p-2 shadow-xl group-hover/actions:block animate-in fade-in zoom-in-95">
-                         <button
-                          type="button"
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50"
-                          onClick={() => onOpenPdf(student.id, 'id-card')}
-                        >
-                          <FileText size={14} className="text-slate-400" />
-                          Generate ID Card
-                        </button>
                         <Link
                           href={`/dashboard/students/${encodeURIComponent(student.id)}?edit=true`}
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50"
                         >
                           <UserPlus size={14} className="text-slate-400" />
                           Edit Student
+                        </Link>
+                        <Link
+                          href={`/dashboard/students/${encodeURIComponent(student.id)}?tab=Guardians`}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50"
+                        >
+                          <ContactRound size={14} className="text-slate-400" />
+                          Edit Guardian
+                        </Link>
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50"
+                          onClick={() => onOpenPdf(student.id, 'id-card')}
+                        >
+                          <FileText size={14} className="text-slate-400" />
+                          ID Card
+                        </button>
+                        <Link
+                          href={`/dashboard/students/${encodeURIComponent(student.id)}?tab=Documents`}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50"
+                        >
+                          <FolderOpen size={14} className="text-slate-400" />
+                          Documents
+                        </Link>
+                        <Link
+                          href={`/dashboard/students/${encodeURIComponent(student.id)}?tab=Attendance`}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50"
+                        >
+                          <BookOpenText size={14} className="text-slate-400" />
+                          Attendance
                         </Link>
                       </div>
                     </div>
@@ -382,8 +421,8 @@ export function StudentDirectory({
           </div>
         ) : (
           <EmptyState
-            title={search || status || classId ? "No students match your filters" : "No students in directory"}
-            description={search || status || classId ? "Try adjusting your filters or search query to find the student record." : "Enroll your first student to get started with the SchoolOS directory."}
+            title={search || status || classId || sectionId ? "No students found" : "No students in directory"}
+            description={search || status || classId || sectionId ? "Add a student or adjust filters to find the student record." : "Enroll your first student to get started with the SchoolOS directory."}
             action={!(search || status || classId) && (
                <Link
                 href="/dashboard/admissions"
@@ -424,8 +463,13 @@ function initials(name: string) {
     .join('');
 }
 
-function School({ size }: { size: number }) {
-  return <SchoolIcon size={size} />;
-}
+function primaryGuardianName(
+  student: StudentProfile,
+  admission: AdmissionSummary | undefined | null,
+) {
+  const primaryGuardian =
+    (student.guardians ?? admission?.guardians ?? []).find((guardian) => guardian.isPrimary) ??
+    (student.guardians ?? admission?.guardians ?? [])[0];
 
-import { School as SchoolIcon, Users } from 'lucide-react';
+  return primaryGuardian?.fullName ?? '';
+}

@@ -117,6 +117,14 @@ async function main() {
   await seedSubjects(tenant.id);
   await seedAcademicData(tenant.id, academicYear.id);
   await seedTenantSettings(tenant.id);
+  await seedPlatformUser(tenant.id);
+  const student = await seedStudentAndEnrollment(tenant.id, academicYear.id);
+  if (student) {
+    await seedFinanceData(tenant.id, academicYear.id, student.id);
+  }
+  await seedLibraryData(tenant.id);
+  await seedTransportData(tenant.id);
+  await seedCanteenData(tenant.id);
 
   console.log('');
   console.log('✅ SchoolOS seed completed successfully.');
@@ -703,6 +711,257 @@ async function seedAcademicData(tenantId: string, academicYearId: string) {
     },
   });
 }
+
+async function seedPlatformUser(tenantId: string) {
+  console.log('Seeding platform operator user...');
+  const platformEmail = process.env.PLATFORM_SEED_EMAIL ?? 'platform@schoolos.com';
+  const platformPassword =
+    process.env.PLATFORM_SEED_PASSWORD ?? 'platform123';
+  const roleName = 'platform_super_admin';
+
+  const role = await prisma.role.findUnique({
+    where: {
+      tenantId_name: {
+        tenantId,
+        name: roleName,
+      },
+    },
+  });
+
+  if (!role) {
+    console.warn(`Role ${roleName} not found, skipping platform user seed.`);
+    return;
+  }
+
+  await ensureSeedUserWithRole({
+    tenantId,
+    email: platformEmail,
+    password: platformPassword,
+    roleId: role.id,
+  });
+}
+
+async function seedStudentAndEnrollment(
+  tenantId: string,
+  academicYearId: string,
+) {
+  console.log('Seeding sample student and enrollment...');
+
+  const class1 = await prisma.class.findFirst({
+    where: { tenantId, name: 'Class 1' },
+  });
+  const sectionA = class1
+    ? await prisma.section.findFirst({
+        where: { tenantId, classId: class1.id, name: 'A' },
+      })
+    : null;
+
+  if (!class1 || !sectionA) {
+    return null;
+  }
+
+  const studentEmail = 'student.sample@schoolos.com';
+  const student = await prisma.student.upsert({
+    where: { studentIdentityCode: 'STU001' },
+    update: {
+      firstNameEn: 'Aryan',
+      lastNameEn: 'Sharma',
+      gender: 'MALE',
+      dateOfBirth: new Date('2015-05-15T00:00:00.000Z'),
+      admissionDate: new Date(),
+      classId: class1.id,
+      sectionId: sectionA.id,
+    },
+    create: {
+      tenantId,
+      studentSystemId: 'S2024-001',
+      studentIdentityCode: 'STU001',
+      firstNameEn: 'Aryan',
+      lastNameEn: 'Sharma',
+      gender: 'MALE',
+      dateOfBirth: new Date('2015-05-15T00:00:00.000Z'),
+      admissionDate: new Date(),
+      classId: class1.id,
+      sectionId: sectionA.id,
+    },
+  });
+
+  const existingEnrollment = await prisma.enrollment.findFirst({
+    where: {
+      tenantId,
+      academicYearId,
+      studentId: student.id,
+    },
+  });
+
+  if (existingEnrollment) {
+    await prisma.enrollment.update({
+      where: { id: existingEnrollment.id },
+      data: {
+        classId: class1.id,
+        sectionId: sectionA.id,
+        status: EnrollmentStatus.ACTIVE,
+      },
+    });
+  } else {
+    await prisma.enrollment.create({
+      data: {
+        tenantId,
+        academicYearId,
+        studentId: student.id,
+        classId: class1.id,
+        sectionId: sectionA.id,
+        status: EnrollmentStatus.ACTIVE,
+        admissionDate: new Date(),
+        mediumOfInstruction: 'English',
+      },
+    });
+  }
+
+  return student;
+}
+
+async function seedFinanceData(
+  tenantId: string,
+  academicYearId: string,
+  studentId: string,
+) {
+  console.log('Seeding sample finance data...');
+
+  const tuitionFee = await prisma.feeHead.findFirst({
+    where: { tenantId, code: 'TUITION' },
+  });
+
+  if (!tuitionFee) return;
+
+  const invoiceNumber = 'INV-2024-001';
+  await prisma.invoice.upsert({
+    where: {
+      tenantId_invoiceNumber: {
+        tenantId,
+        invoiceNumber,
+      },
+    },
+    update: {
+      status: 'ISSUED',
+      totalAmount: new Prisma.Decimal(5000),
+      subtotal: new Prisma.Decimal(5000),
+      vatAmount: new Prisma.Decimal(0),
+    },
+    create: {
+      tenantId,
+      studentId,
+      academicYearId,
+      invoiceNumber,
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      status: 'ISSUED',
+      totalAmount: new Prisma.Decimal(5000),
+      subtotal: new Prisma.Decimal(5000),
+      vatAmount: new Prisma.Decimal(0),
+      lines: {
+        create: [
+          {
+            tenantId,
+            feeHeadId: tuitionFee.id,
+            description: 'Monthly Tuition Fee - April',
+            unitAmount: new Prisma.Decimal(5000),
+            totalAmount: new Prisma.Decimal(5000),
+            vatAmount: new Prisma.Decimal(0),
+          },
+        ],
+      },
+    },
+  });
+}
+
+async function seedLibraryData(tenantId: string) {
+  console.log('Seeding sample library data...');
+
+  const isbn = '978-0132350884';
+  const book = await prisma.libraryBook.upsert({
+    where: {
+      tenantId_isbn: {
+        tenantId,
+        isbn,
+      },
+    },
+    update: {
+      title: 'Clean Code',
+      author: 'Robert C. Martin',
+    },
+    create: {
+      tenantId,
+      title: 'Clean Code',
+      author: 'Robert C. Martin',
+      isbn,
+      subjectCategory: 'Computer Science',
+    },
+  });
+
+  await prisma.libraryCopy.upsert({
+    where: {
+      id: 'copy-clean-code-001',
+    },
+    update: {},
+    create: {
+      id: 'copy-clean-code-001',
+      tenantId,
+      bookId: book.id,
+      barcode: 'LIB-CC-001',
+      status: 'AVAILABLE',
+      shelfLocation: 'Shelf A1',
+    },
+  });
+}
+
+async function seedTransportData(tenantId: string) {
+  console.log('Seeding sample transport data...');
+
+  const routeCode = 'R01';
+  await prisma.transportRoute.upsert({
+    where: {
+      tenantId_code: {
+        tenantId,
+        code: routeCode,
+      },
+    },
+    update: {
+      name: 'North Route',
+    },
+    create: {
+      tenantId,
+      name: 'North Route',
+      code: routeCode,
+      isActive: true,
+    },
+  });
+}
+
+async function seedCanteenData(tenantId: string) {
+  console.log('Seeding sample canteen data...');
+
+  const itemName = 'Veg Lunch Set';
+  await prisma.canteenMenuItem.upsert({
+    where: {
+      id: 'canteen-veg-lunch',
+    },
+    update: {
+      name: itemName,
+      category: 'Lunch',
+      unitPrice: new Prisma.Decimal(150),
+    },
+    create: {
+      id: 'canteen-veg-lunch',
+      tenantId,
+      name: itemName,
+      category: 'Lunch',
+      unitPrice: new Prisma.Decimal(150),
+      isMealItem: true,
+    },
+  });
+}
+
+import { EnrollmentStatus } from '@prisma/client';
 
 main()
   .catch((error) => {

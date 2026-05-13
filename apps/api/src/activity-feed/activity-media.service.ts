@@ -3,7 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ActivityAttachment, StorageProvider } from '@prisma/client';
+import {
+  ActivityAttachment,
+  ActivityPostStatus,
+  StorageProvider,
+} from '@prisma/client';
 import { createReadStream } from 'fs';
 import { access } from 'fs/promises';
 import { join, normalize } from 'path';
@@ -66,26 +70,37 @@ export class ActivityMediaService {
       throw new ForbiddenException('Activity media is outside this tenant');
     }
 
+    const objectKey =
+      action === 'preview' && attachment.optimizedObjectKey
+        ? attachment.optimizedObjectKey
+        : fileAsset.objectKey;
+
     if (
       attachment.provider === StorageProvider.R2 &&
-      fileAsset.objectKey.startsWith('http')
+      objectKey.startsWith('http')
     ) {
       return {
-        redirectUrl: fileAsset.objectKey,
+        redirectUrl: objectKey,
         fileName: attachment.fileName,
         contentType: attachment.contentType,
-        sizeBytes: attachment.sizeBytes,
+        sizeBytes:
+          action === 'preview' && attachment.optimizedSizeBytes
+            ? attachment.optimizedSizeBytes
+            : attachment.sizeBytes,
       };
     }
 
-    const absolutePath = this.resolveLocalObjectPath(fileAsset.objectKey);
+    const absolutePath = this.resolveLocalObjectPath(objectKey);
     await access(absolutePath);
 
     return {
       stream: createReadStream(absolutePath),
       fileName: attachment.fileName,
       contentType: attachment.contentType,
-      sizeBytes: attachment.sizeBytes,
+      sizeBytes:
+        action === 'preview' && attachment.optimizedSizeBytes
+          ? attachment.optimizedSizeBytes
+          : attachment.sizeBytes,
     };
   }
 
@@ -201,11 +216,20 @@ export class ActivityMediaService {
         classId: string;
         sectionId: string | null;
         studentTags: Array<{ studentId: string }>;
+        status: ActivityPostStatus;
+        softDeletedAt: Date | null;
       };
     },
   ) {
     if (!isParentOnly(actor) && !isStudentOnly(actor)) {
       return;
+    }
+
+    if (
+      attachment.activityPost.softDeletedAt ||
+      attachment.activityPost.status !== ActivityPostStatus.APPROVED
+    ) {
+      throw new ForbiddenException('Activity post is no longer available');
     }
 
     const visibleStudentIds = isParentOnly(actor)

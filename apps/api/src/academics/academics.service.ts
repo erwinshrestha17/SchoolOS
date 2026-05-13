@@ -1217,10 +1217,10 @@ export class AcademicsService {
       // Create or update target enrollment
       const targetEnrollment = await tx.enrollment.upsert({
         where: {
-          tenantId_studentId_academicYearId: {
+          tenantId_academicYearId_studentId: {
             tenantId: actor.tenantId,
-            studentId: dto.studentId,
             academicYearId: dto.targetAcademicYearId,
+            studentId: dto.studentId,
           },
         },
         update: {
@@ -1367,10 +1367,10 @@ export class AcademicsService {
 
             await tx.enrollment.upsert({
               where: {
-                tenantId_studentId_academicYearId: {
+                tenantId_academicYearId_studentId: {
                   tenantId: actor.tenantId,
-                  studentId: student.id,
                   academicYearId: dto.targetAcademicYearId,
+                  studentId: student.id,
                 },
               },
               update: {

@@ -119,6 +119,41 @@ export function MarksEntryWorkspace() {
     });
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>, row: number, col: number) => {
+    const { key, shiftKey } = e;
+    
+    let nextRow = row;
+    let nextCol = col;
+
+    if (key === 'ArrowDown' || (key === 'Enter' && !shiftKey)) {
+      nextRow++;
+      e.preventDefault();
+    } else if (key === 'ArrowUp' || (key === 'Enter' && shiftKey)) {
+      nextRow--;
+      e.preventDefault();
+    } else if (key === 'ArrowRight' && (e.currentTarget as any).selectionEnd === (e.currentTarget as any).value.length) {
+      nextCol++;
+    } else if (key === 'ArrowLeft' && (e.currentTarget as any).selectionStart === 0) {
+      nextCol--;
+    } else if (key === 'Escape') {
+      (e.currentTarget as HTMLElement).blur();
+      return;
+    } else {
+      return;
+    }
+
+    const nextTarget = document.querySelector(
+      `[data-row="${nextRow}"][data-col="${nextCol}"]`
+    ) as HTMLElement;
+
+    if (nextTarget) {
+      nextTarget.focus();
+      if (nextTarget instanceof HTMLInputElement) {
+        nextTarget.select();
+      }
+    }
+  };
+
   const columns = [
     {
       header: 'Roll',
@@ -137,22 +172,25 @@ export function MarksEntryWorkspace() {
     {
       header: 'Marks',
       className: 'w-32',
-      cell: (student: any) => (
+      cell: (student: any, rowIndex: number) => (
         <Input
           type="number"
           value={marks[student.id] || ''}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMarks(prev => ({ ...prev, [student.id]: e.target.value }))}
+          onKeyDown={(e) => handleKeyDown(e, rowIndex, 0)}
+          data-row={rowIndex}
+          data-col={0}
           disabled={isExamLocked || statuses[student.id] === 'ABSENT' || statuses[student.id] === 'EXCUSED'}
           max={maxMarks}
           min={0}
-          className="h-10 rounded-xl text-center font-bold"
+          className="h-10 rounded-xl text-center font-bold transition-all focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500"
         />
       ),
     },
     {
       header: 'Status',
       className: 'w-32',
-      cell: (student: any) => (
+      cell: (student: any, rowIndex: number) => (
         <Select
           value={statuses[student.id] || 'PRESENT'}
           onChange={(e) => {
@@ -162,6 +200,9 @@ export function MarksEntryWorkspace() {
               setMarks(prev => ({ ...prev, [student.id]: '0' }));
             }
           }}
+          onKeyDown={(e) => handleKeyDown(e, rowIndex, 1)}
+          data-row={rowIndex}
+          data-col={1}
           disabled={isExamLocked}
           className="h-10 rounded-xl text-xs font-bold"
         >
@@ -193,10 +234,13 @@ export function MarksEntryWorkspace() {
     },
     {
       header: 'Remarks',
-      cell: (student: any) => (
+      cell: (student: any, rowIndex: number) => (
         <Input
           value={remarks[student.id] || ''}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRemarks(prev => ({ ...prev, [student.id]: e.target.value }))}
+          onKeyDown={(e) => handleKeyDown(e, rowIndex, 2)}
+          data-row={rowIndex}
+          data-col={2}
           disabled={isExamLocked}
           placeholder="Note..."
           className="h-10 rounded-xl"

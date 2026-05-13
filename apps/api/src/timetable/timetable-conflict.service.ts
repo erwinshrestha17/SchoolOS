@@ -537,7 +537,7 @@ export class TimetableConflictService {
       return [
         {
           type: 'SUBJECT_REQUIREMENT_EXCEEDED',
-          severity: 'WARNING',
+          severity: 'BLOCKING',
           message: `Subject weekly requirement exceeded (${actual}/${requirement.requiredPeriodsPerWeek}).`,
           affectedPeriodIds: matchingSlots.map((slot) => slot.id),
           classId: requirement.classId,

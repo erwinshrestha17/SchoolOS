@@ -1,13 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
-export enum StudentQrResolvePurpose {
-  GENERAL_STUDENT_LOOKUP = 'GENERAL_STUDENT_LOOKUP',
-  LIBRARY = 'LIBRARY',
-  CANTEEN = 'CANTEEN',
-  TRANSPORT = 'TRANSPORT',
-  ATTENDANCE = 'ATTENDANCE',
-}
+import { StudentQrResolvePurpose } from '@schoolos/core';
 
 export class ResolveStudentQrDto {
   @ApiProperty({

@@ -34,16 +34,22 @@ import {
   UpdateSubstitutionDto,
   UpdateTeacherAvailabilityDto,
   UpdateTimetablePeriodDto,
+  UpdateTimetableVersionDto,
+  RestoreTimetableVersionDto,
   UpdateVersionSlotDto,
   UpsertTeacherWorkloadLimitDto,
   WorkloadQueryDto,
 } from './dto/timetable-setup.dto';
 import { TimetableService } from './timetable.service';
+import { TimetableSubstitutionService } from './timetable-substitution.service';
 
 @Controller('timetable')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
 export class TimetableController {
-  constructor(private readonly timetableService: TimetableService) {}
+  constructor(
+    private readonly timetableService: TimetableService,
+    private readonly substitutionService: TimetableSubstitutionService,
+  ) {}
 
   @Get()
   @Permissions('timetable:read')
@@ -54,14 +60,7 @@ export class TimetableController {
     return this.timetableService.listTimetable(auth, classId);
   }
 
-  @Post()
-  @Permissions('timetable:create')
-  createLegacySlot(
-    @Body() dto: CreateTimetableSlotDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.timetableService.createTimetableSlot(dto, auth);
-  }
+  // --- Periods ---
 
   @Get('periods')
   @Permissions('timetable:read')
@@ -97,6 +96,8 @@ export class TimetableController {
     return this.timetableService.deletePeriod(id, auth);
   }
 
+  // --- Rooms ---
+
   @Get('rooms')
   @Permissions('timetable:read')
   listRooms(@CurrentAuth() auth: AuthContext) {
@@ -125,6 +126,8 @@ export class TimetableController {
     return this.timetableService.deleteRoom(id, auth);
   }
 
+  // --- Versions ---
+
   @Get('versions')
   @Permissions('timetable:read')
   listVersions(
@@ -149,25 +152,37 @@ export class TimetableController {
     return this.timetableService.getVersion(id, auth);
   }
 
-  @Post('versions/:id/slots')
-  @Permissions('timetable:create')
-  createVersionSlot(
+  @Patch('versions/:id')
+  @Permissions('timetable:update')
+  updateVersion(
     @Param('id') id: string,
-    @Body() dto: CreateVersionSlotDto,
+    @Body() dto: UpdateTimetableVersionDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.timetableService.createVersionSlot(id, dto, auth);
+    return this.timetableService.updateVersion(id, dto, auth);
   }
 
-  @Post('versions/:id/entries')
+  @Post('versions/:id/restore')
   @Permissions('timetable:create')
-  createVersionEntry(
+  restoreVersion(
     @Param('id') id: string,
-    @Body() dto: CreateVersionSlotDto,
+    @Body() dto: RestoreTimetableVersionDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.timetableService.createVersionSlot(id, dto, auth);
+    return this.timetableService.restoreVersion(id, dto, auth);
   }
+
+  @Get('versions/:id/compare/:targetId')
+  @Permissions('timetable:read')
+  compareVersions(
+    @Param('id') id: string,
+    @Param('targetId') targetId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.compareVersions(id, targetId, auth);
+  }
+
+  // --- Version Lifecycle ---
 
   @Post('versions/:id/validate')
   @Permissions('timetable:read')
@@ -181,24 +196,9 @@ export class TimetableController {
     return this.timetableService.publishVersion(id, auth);
   }
 
-  @Post('versions/:id/publish')
-  @Permissions('timetable:publish')
-  publishVersionPost(
-    @Param('id') id: string,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.timetableService.publishVersion(id, auth);
-  }
-
   @Patch('versions/:id/lock')
   @Permissions('timetable:publish')
   lockVersion(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
-    return this.timetableService.lockVersion(id, auth);
-  }
-
-  @Post('versions/:id/lock')
-  @Permissions('timetable:publish')
-  lockVersionPost(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.timetableService.lockVersion(id, auth);
   }
 
@@ -208,19 +208,22 @@ export class TimetableController {
     return this.timetableService.archiveVersion(id, auth);
   }
 
-  @Post('versions/:id/archive')
-  @Permissions('timetable:publish')
-  archiveVersionPost(
-    @Param('id') id: string,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.timetableService.archiveVersion(id, auth);
-  }
-
   @Patch('versions/:id/reopen-draft')
   @Permissions('timetable:publish')
   reopenVersion(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.timetableService.reopenVersion(id, auth);
+  }
+
+  // --- Slots ---
+
+  @Post('versions/:id/slots')
+  @Permissions('timetable:create')
+  createVersionSlot(
+    @Param('id') id: string,
+    @Body() dto: CreateVersionSlotDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.createVersionSlot(id, dto, auth);
   }
 
   @Patch('slots/:id')
@@ -239,27 +242,7 @@ export class TimetableController {
     return this.timetableService.deleteSlot(id, auth);
   }
 
-  @Patch('entries/:id')
-  @Permissions('timetable:update')
-  updateEntry(
-    @Param('id') id: string,
-    @Body() dto: UpdateVersionSlotDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.timetableService.updateSlot(id, dto, auth);
-  }
-
-  @Delete('entries/:id')
-  @Permissions('timetable:delete')
-  deleteEntry(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
-    return this.timetableService.deleteSlot(id, auth);
-  }
-
-  @Post('entries/:id/archive')
-  @Permissions('timetable:delete')
-  archiveEntry(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
-    return this.timetableService.deleteSlot(id, auth);
-  }
+  // --- Teacher Availability ---
 
   @Get('teacher-availability')
   @Permissions('timetable:read')
@@ -277,20 +260,6 @@ export class TimetableController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.timetableService.getTeacherAvailability(teacherId, auth);
-  }
-
-  @Post('teacher-availability/:teacherId')
-  @Permissions('timetable:manage')
-  createTeacherAvailability(
-    @Param('teacherId') teacherId: string,
-    @Body() dto: TeacherAvailabilityDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.timetableService.createTeacherAvailability(
-      teacherId,
-      dto,
-      auth,
-    );
   }
 
   @Post('teachers/:teacherId/availability')
@@ -317,16 +286,6 @@ export class TimetableController {
     return this.timetableService.updateTeacherAvailability(id, dto, auth);
   }
 
-  @Patch('availability/:id')
-  @Permissions('timetable:manage')
-  updateTeacherAvailabilityLegacy(
-    @Param('id') id: string,
-    @Body() dto: UpdateTeacherAvailabilityDto,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.timetableService.updateTeacherAvailability(id, dto, auth);
-  }
-
   @Delete('teacher-availability/:id')
   @Permissions('timetable:manage')
   deleteTeacherAvailability(
@@ -336,14 +295,7 @@ export class TimetableController {
     return this.timetableService.deleteTeacherAvailability(id, auth);
   }
 
-  @Delete('availability/:id')
-  @Permissions('timetable:manage')
-  deleteTeacherAvailabilityLegacy(
-    @Param('id') id: string,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.timetableService.deleteTeacherAvailability(id, auth);
-  }
+  // --- Workload Rules ---
 
   @Get('workload-rules')
   @Permissions('timetable:read')
@@ -392,6 +344,8 @@ export class TimetableController {
     return this.timetableService.updateTeacherWorkloadRule(id, dto, auth);
   }
 
+  // --- Subject Weekly Requirements ---
+
   @Get('subject-weekly-requirements')
   @Permissions('timetable:read')
   listSubjectWeeklyRequirements(
@@ -429,6 +383,14 @@ export class TimetableController {
     return this.timetableService.deleteSubjectWeeklyRequirement(id, auth);
   }
 
+  // --- Workload & Timetable Reports ---
+
+  @Get('workload')
+  @Permissions('timetable:read')
+  listTeacherWorkload(@CurrentAuth() auth: AuthContext) {
+    return this.timetableService.listTeacherWorkload(auth);
+  }
+
   @Get('teachers/:teacherId/workload')
   @Permissions('timetable:read')
   getTeacherWorkload(
@@ -439,11 +401,33 @@ export class TimetableController {
     return this.timetableService.getTeacherWorkload(teacherId, query, auth);
   }
 
-  @Get('workload')
+  @Get('reports/teacher/:teacherId')
   @Permissions('timetable:read')
-  listTeacherWorkload(@CurrentAuth() auth: AuthContext) {
-    return this.timetableService.listTeacherWorkload(auth);
+  getTeacherTimetable(
+    @Param('teacherId') teacherId: string,
+    @Query() query: WorkloadQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.getTeacherTimetable(teacherId, query, auth);
   }
+
+  @Get('reports/class/:classId')
+  @Permissions('timetable:read')
+  exportClassTimetable(
+    @Param('classId') classId: string,
+    @Query('sectionId') sectionId: string,
+    @Query('academicYearId') academicYearId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.exportClassTimetable(
+      classId,
+      sectionId || null,
+      academicYearId,
+      auth,
+    );
+  }
+
+  // --- Substitutions ---
 
   @Get('substitutions')
   @Permissions('timetable:read')
@@ -451,7 +435,7 @@ export class TimetableController {
     @CurrentAuth() auth: AuthContext,
     @Query() query: SubstitutionQueryDto,
   ) {
-    return this.timetableService.listSubstitutions(auth, query);
+    return this.substitutionService.listSubstitutions(auth, query);
   }
 
   @Post('substitutions')
@@ -460,7 +444,7 @@ export class TimetableController {
     @Body() dto: CreateSubstitutionDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.timetableService.createSubstitution(dto, auth);
+    return this.substitutionService.createSubstitution(dto, auth);
   }
 
   @Patch('substitutions/:id')
@@ -470,7 +454,7 @@ export class TimetableController {
     @Body() dto: UpdateSubstitutionDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.timetableService.updateSubstitution(id, dto, auth);
+    return this.substitutionService.updateSubstitution(id, dto, auth);
   }
 
   @Patch('substitutions/:id/assign')
@@ -480,7 +464,7 @@ export class TimetableController {
     @Body() dto: AssignSubstitutionDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.timetableService.assignSubstitution(id, dto, auth);
+    return this.substitutionService.assignSubstitution(id, dto, auth);
   }
 
   @Patch('substitutions/:id/cancel')
@@ -489,16 +473,7 @@ export class TimetableController {
     @Param('id') id: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.timetableService.cancelSubstitution(id, auth);
-  }
-
-  @Post('substitutions/:id/cancel')
-  @Permissions('timetable:substitute')
-  cancelSubstitutionPost(
-    @Param('id') id: string,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    return this.timetableService.cancelSubstitution(id, auth);
+    return this.substitutionService.cancelSubstitution(id, auth);
   }
 
   @Patch('substitutions/:id/complete')
@@ -507,6 +482,6 @@ export class TimetableController {
     @Param('id') id: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.timetableService.completeSubstitution(id, auth);
+    return this.substitutionService.completeSubstitution(id, auth);
   }
 }

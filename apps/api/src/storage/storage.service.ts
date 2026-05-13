@@ -62,6 +62,29 @@ export class StorageService {
       sizeBytes: input.content.byteLength,
     };
   }
+
+  async getObjectBuffer(objectKey: string) {
+    if (this.configService.storageProvider === 'r2') {
+      throw new Error('R2 getObjectBuffer not implemented');
+    }
+
+    const localRoot = this.configService.localStorageRoot;
+    const absolutePath = join(process.cwd(), localRoot, objectKey);
+    const { readFile } = await import('fs/promises');
+    return readFile(absolutePath);
+  }
+
+  async checkReadiness() {
+    if (this.configService.storageProvider === 'r2') {
+      if (!this.configService.r2Bucket)
+        throw new Error('R2 bucket not configured');
+    } else {
+      const localRoot = this.configService.localStorageRoot;
+      const absolutePath = join(process.cwd(), localRoot);
+      await mkdir(absolutePath, { recursive: true });
+    }
+    return true;
+  }
 }
 
 function sanitizeSegment(value: string) {

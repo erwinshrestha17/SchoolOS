@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ConfigService } from '../config/config.service';
+import { StorageService } from '../storage/storage.service';
 import { FileStatus, Prisma } from '@prisma/client';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class FileRegistryService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly configService: ConfigService,
+    private readonly storageService: StorageService,
   ) {}
 
   async registerFile(input: {
@@ -27,6 +29,8 @@ export class FileRegistryService {
     entityId?: string;
     metadata?: Prisma.InputJsonValue;
   }) {
+    await this.storageService.checkReadiness();
+
     const asset = await this.prisma.fileAsset.create({
       data: {
         tenantId: input.tenantId,
