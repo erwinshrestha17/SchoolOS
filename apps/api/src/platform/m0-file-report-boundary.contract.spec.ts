@@ -44,7 +44,8 @@ describe('M0 File & Report boundary contracts', () => {
       const service = read('src/file-registry/file-registry.service.ts');
 
       expect(service).toContain('listFilesByEntity(tenantId: string');
-      expect(service).toContain('where: { tenantId,');
+      expect(service).toMatch(/where:\s*{\s*tenantId,/);
+      expect(service).toContain('softDeletedAt: null');
     });
   });
 
@@ -94,11 +95,11 @@ describe('M0 File & Report boundary contracts', () => {
     it('getSignedUrl handles student photo and activity attachment special paths', () => {
       const service = read('src/file-registry/file-registry.service.ts');
 
-      expect(service).toContain(
-        '/students/${encodeURIComponent(asset.entityId)}/photo/preview',
+      expect(service).toMatch(
+        /\/students\/\$\{encodeURIComponent\(\s*asset\.entityId\s*\)\}\/photo\/preview/,
       );
-      expect(service).toContain(
-        '/activity-feed/attachments/${encodeURIComponent(attachment.id)}/preview',
+      expect(service).toMatch(
+        /\/activity-feed\/attachments\/\$\{encodeURIComponent\(\s*attachment\.id\s*\)\}\/preview/,
       );
     });
   });
