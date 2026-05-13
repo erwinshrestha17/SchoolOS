@@ -29,8 +29,18 @@ type QrCredentialRecord = {
   lastScannedAt: Date | null;
 };
 
+type SafeQrCredential = {
+  id: string;
+  studentId: string;
+  status: StudentQrStatus;
+  createdAt: string;
+  rotatedAt: string | null;
+  revokedAt: string | null;
+  lastScannedAt: string | null;
+};
+
 type PrintableQrResult = {
-  credential: ReturnType<StudentQrService['sanitizeCredential']>;
+  credential: SafeQrCredential;
   qrImageSvg?: string;
   qrImageAvailable: boolean;
   qrImageMessage?: string;
@@ -274,7 +284,13 @@ export class StudentQrService {
         (link) => link.guardian.userId === auth.userId,
       );
       if (!isLinked) {
-        await this.recordResolveDenied(tenantId, auth, student.id, purpose, 'unrelated_parent');
+        await this.recordResolveDenied(
+          tenantId,
+          auth,
+          student.id,
+          purpose,
+          'unrelated_parent',
+        );
         throw new ForbiddenException('Parent cannot resolve unrelated child');
       }
     }
@@ -293,7 +309,13 @@ export class StudentQrService {
       });
 
       if (!isAssigned) {
-        await this.recordResolveDenied(tenantId, auth, student.id, purpose, 'unassigned_teacher');
+        await this.recordResolveDenied(
+          tenantId,
+          auth,
+          student.id,
+          purpose,
+          'unassigned_teacher',
+        );
         throw new ForbiddenException('Teacher not assigned to this student');
       }
     }
@@ -447,7 +469,7 @@ export class StudentQrService {
     return { credential, rawToken };
   }
 
-  private sanitizeCredential(credential: QrCredentialRecord) {
+  private sanitizeCredential(credential: QrCredentialRecord): SafeQrCredential {
     return {
       id: credential.id,
       studentId: credential.studentId,
@@ -476,7 +498,7 @@ export class StudentQrService {
   }
 
   private hasPermission(auth: AuthContext, permission: string) {
-    return auth.permissions.includes(permission as never);
+    return auth.permissions.includes(permission);
   }
 
   private recordResolveDenied(
