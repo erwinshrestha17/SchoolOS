@@ -96,6 +96,44 @@ describe('PlatformQueuesService', () => {
     });
   });
 
+  it('keeps queue health visible when one queue check fails', async () => {
+    const { service } = buildService({
+      notifications: {
+        getJobCounts: jest
+          .fn()
+          .mockRejectedValue(new Error('Redis connection refused')),
+      },
+      finance: {
+        getJobCounts: jest.fn().mockResolvedValue({
+          waiting: 1,
+          active: 2,
+          completed: 3,
+          failed: 4,
+          delayed: 5,
+        }),
+      },
+    });
+
+    await expect(service.getQueueHealth()).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'notifications',
+          workerHealth: 'unknown',
+          error: 'Redis connection refused',
+        }),
+        expect.objectContaining({
+          name: 'finance',
+          waiting: 1,
+          active: 2,
+          completed: 3,
+          failed: 4,
+          delayed: 5,
+          workerHealth: 'healthy',
+        }),
+      ]),
+    );
+  });
+
   it('audits successful failed-job retry requests with the required reason', async () => {
     const retry = jest.fn().mockResolvedValue(undefined);
     const job = {

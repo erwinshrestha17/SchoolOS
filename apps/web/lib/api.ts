@@ -123,6 +123,18 @@ const API_BASE_URL =
 
 let refreshPromise: Promise<boolean> | null = null;
 
+export class ApiRequestError extends Error {
+  statusCode: number;
+  requestId?: string;
+
+  constructor(message: string, statusCode: number, requestId?: string) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.statusCode = statusCode;
+    this.requestId = requestId;
+  }
+}
+
 type JsonBody = Record<string, unknown>;
 
 export type AuthChallengeResponse = {
@@ -139,11 +151,13 @@ type RequestOptions = RequestInit & {
 };
 
 async function request<T>(path: string, init?: RequestOptions) {
+  const requestId = createRequestId();
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      'X-Request-Id': requestId,
       ...(init?.headers ?? {}),
     },
     body: init?.json ? JSON.stringify(init.json) : init?.body,
@@ -165,11 +179,26 @@ async function request<T>(path: string, init?: RequestOptions) {
       clearStoredSession();
     }
 
-    throw new Error(parseApiErrorMessage(text) || `Request failed with status ${response.status}`);
+    const responseRequestId = response.headers.get('x-request-id') ?? requestId;
+
+    throw new ApiRequestError(
+      parseApiErrorMessage(text) ||
+        `Request failed with status ${response.status}`,
+      response.status,
+      responseRequestId,
+    );
   }
 
   const payload = (await response.json()) as ApiResponse<T>;
   return payload.data;
+}
+
+function createRequestId() {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function parseApiErrorMessage(text: string) {

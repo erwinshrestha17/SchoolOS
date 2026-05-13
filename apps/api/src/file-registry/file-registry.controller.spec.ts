@@ -9,6 +9,7 @@ describe('FileRegistryController upload safety', () => {
   const auth = {
     tenantId: 'tenant-1',
     userId: 'user-1',
+    permissions: ['homework:create', 'homework:submit'],
   } as any;
 
   const ext = (...codes: number[]) => String.fromCharCode(...codes);
@@ -129,5 +130,36 @@ describe('FileRegistryController upload safety', () => {
         module: 'homework',
       }),
     );
+  });
+
+  it('rejects uploads for unsupported modules', async () => {
+    await expect(
+      controller.uploadFile(auth, {
+        fileName: 'report.pdf',
+        contentType: 'application/pdf',
+        base64Content: Buffer.from('safe-content').toString('base64'),
+        module: 'unknown-module',
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(storageService.saveBase64Object).not.toHaveBeenCalled();
+    expect(fileRegistryService.registerFile).not.toHaveBeenCalled();
+  });
+
+  it('requires a permission that matches the requested upload module', async () => {
+    await expect(
+      controller.uploadFile(
+        { ...auth, permissions: ['homework:submit'] } as any,
+        {
+          fileName: 'worksheet.pdf',
+          contentType: 'application/pdf',
+          base64Content: Buffer.from('safe-content').toString('base64'),
+          module: 'homework',
+        },
+      ),
+    ).rejects.toThrow('Insufficient permissions for upload module');
+
+    expect(storageService.saveBase64Object).not.toHaveBeenCalled();
+    expect(fileRegistryService.registerFile).not.toHaveBeenCalled();
   });
 });

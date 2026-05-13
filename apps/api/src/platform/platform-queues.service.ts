@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -21,6 +22,7 @@ type PlatformQueueHealth = {
   delayed: number;
   paused: boolean;
   workerHealth: 'healthy' | 'degraded' | 'unknown';
+  error?: string;
 };
 
 type PlatformFailedJobSummary = {
@@ -41,6 +43,7 @@ const MAX_OBJECT_KEYS = 50;
 
 @Injectable()
 export class PlatformQueuesService {
+  private readonly logger = new Logger(PlatformQueuesService.name);
   private readonly queues: Map<string, Queue>;
 
   constructor(
@@ -64,33 +67,57 @@ export class PlatformQueuesService {
     const summaries: PlatformQueueHealth[] = [];
 
     for (const [name, queue] of this.queues.entries()) {
-      const [counts, paused, workers] = await Promise.all([
-        queue.getJobCounts(
-          'waiting',
-          'active',
-          'completed',
-          'failed',
-          'delayed',
-        ),
-        queue.isPaused(),
-        this.getWorkersSafely(queue),
-      ]);
+      try {
+        const [counts, paused, workers] = await Promise.all([
+          queue.getJobCounts(
+            'waiting',
+            'active',
+            'completed',
+            'failed',
+            'delayed',
+          ),
+          queue.isPaused(),
+          this.getWorkersSafely(queue),
+        ]);
 
-      summaries.push({
-        name,
-        waiting: this.count(counts, 'waiting'),
-        active: this.count(counts, 'active'),
-        completed: this.count(counts, 'completed'),
-        failed: this.count(counts, 'failed'),
-        delayed: this.count(counts, 'delayed'),
-        paused,
-        workerHealth:
-          workers === null
-            ? 'unknown'
-            : workers.length > 0
-              ? 'healthy'
-              : 'degraded',
-      });
+        summaries.push({
+          name,
+          waiting: this.count(counts, 'waiting'),
+          active: this.count(counts, 'active'),
+          completed: this.count(counts, 'completed'),
+          failed: this.count(counts, 'failed'),
+          delayed: this.count(counts, 'delayed'),
+          paused,
+          workerHealth:
+            workers === null
+              ? 'unknown'
+              : workers.length > 0
+                ? 'healthy'
+                : 'degraded',
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Queue health unavailable';
+
+        this.logger.warn(
+          JSON.stringify({
+            queueName: name,
+            error: message,
+          }),
+        );
+
+        summaries.push({
+          name,
+          waiting: 0,
+          active: 0,
+          completed: 0,
+          failed: 0,
+          delayed: 0,
+          paused: false,
+          workerHealth: 'unknown',
+          error: message,
+        });
+      }
     }
 
     return summaries;

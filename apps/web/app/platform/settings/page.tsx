@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, KeyRound, RefreshCw, Server, ShieldCheck } from 'lucide-react';
-import { api } from '../../../lib/api';
+import { ApiRequestError, api } from '../../../lib/api';
 import type {
   PlatformHealthSummary,
   PlatformPlanSummary,
@@ -15,12 +15,17 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 
+function isRejected(result: PromiseSettledResult<unknown>): result is PromiseRejectedResult {
+  return result.status === 'rejected';
+}
+
 export default function PlatformSettings() {
   const [providers, setProviders] = useState<PlatformProviderConfigSummary[]>([]);
   const [queues, setQueues] = useState<PlatformQueueSummary[]>([]);
   const [health, setHealth] = useState<PlatformHealthSummary | null>(null);
   const [plans, setPlans] = useState<PlatformPlanSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [providerForm, setProviderForm] = useState({
     type: 'SMS',
@@ -30,25 +35,57 @@ export default function PlatformSettings() {
     config: '{"apiToken":"replace-me","senderId":"SchoolOS"}',
   });
 
-  const load = useMemo(
-    () => async () => {
-      try {
-        const [nextProviders, nextQueues, nextHealth, nextPlans] = await Promise.all([
-          api.listPlatformProviders(),
-          api.getPlatformQueueHealth(),
-          api.getPlatformHealth(),
-          api.listPlatformPlans(),
-        ]);
-        setProviders(nextProviders);
-        setQueues(nextQueues);
-        setHealth(nextHealth);
-        setPlans(nextPlans);
-      } catch (err: any) {
-        setError(err.message ?? 'Failed to load platform settings');
-      }
-    },
-    [],
-  );
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    const [providerResult, queueResult, healthResult, planResult] =
+      await Promise.allSettled([
+        api.listPlatformProviders(),
+        api.getPlatformQueueHealth(),
+        api.getPlatformHealth(),
+        api.listPlatformPlans(),
+      ]);
+
+    const settledResults: PromiseSettledResult<unknown>[] = [
+      providerResult,
+      queueResult,
+      healthResult,
+      planResult,
+    ];
+    const failures = settledResults.filter(isRejected);
+
+    if (providerResult.status === 'fulfilled') {
+      setProviders(providerResult.value);
+    }
+
+    if (queueResult.status === 'fulfilled') {
+      setQueues(queueResult.value);
+    }
+
+    if (healthResult.status === 'fulfilled') {
+      setHealth(healthResult.value);
+    }
+
+    if (planResult.status === 'fulfilled') {
+      setPlans(planResult.value);
+    }
+
+    if (failures.length > 0) {
+      const firstReason = failures[0].reason;
+      const requestId =
+        firstReason instanceof ApiRequestError ? firstReason.requestId : null;
+      const suffix = requestId ? ` Request ID: ${requestId}` : '';
+
+      setError(
+        `${failures.length} platform settings panel${
+          failures.length === 1 ? '' : 's'
+        } could not load.${suffix}`,
+      );
+    }
+
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -81,6 +118,7 @@ export default function PlatformSettings() {
       </header>
 
       {error && <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>}
+      {loading && <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-500">Loading platform health...</div>}
 
       <section className="grid gap-4 lg:grid-cols-4">
         {Object.entries(health?.checks ?? {}).map(([key, check]) => (
@@ -146,6 +184,11 @@ export default function PlatformSettings() {
                 <div>
                   <p className="text-sm font-semibold text-slate-900">{queue.name}</p>
                   <p className="text-xs text-slate-500">failed {queue.failed} · waiting {queue.waiting} · active {queue.active}</p>
+                  {queue.error && (
+                    <p className="mt-1 text-xs font-semibold text-amber-700">
+                      Visibility degraded: {queue.error}
+                    </p>
+                  )}
                 </div>
                 <Button variant="outline" size="sm" className="gap-2">
                   <RefreshCw size={14} />

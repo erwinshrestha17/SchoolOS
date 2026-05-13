@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto';
 import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
 import { ResponseEnvelopeInterceptor } from './common/interceptors/response-envelope.interceptor';
 import { ConfigService } from './config/config.service';
 import type { NextFunction, Request, Response } from 'express';
@@ -80,7 +81,10 @@ async function bootstrap() {
     }),
   );
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.useGlobalInterceptors(new ResponseEnvelopeInterceptor());
+  app.useGlobalInterceptors(
+    new RequestLoggingInterceptor(),
+    new ResponseEnvelopeInterceptor(),
+  );
 
   app.setGlobalPrefix('api/v1');
 

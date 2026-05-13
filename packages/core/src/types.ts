@@ -2409,6 +2409,7 @@ export type PlatformQueueSummary = {
   delayed: number;
   paused: boolean;
   workerHealth: 'healthy' | 'degraded' | 'unknown';
+  error?: string;
 };
 
 export type PlatformFailedJobSummary = {

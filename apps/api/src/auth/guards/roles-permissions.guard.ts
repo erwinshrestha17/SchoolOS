@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   ForbiddenException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -89,6 +90,8 @@ function hasRequiredPermission(
 
 @Injectable()
 export class RolesPermissionsGuard implements CanActivate {
+  private readonly logger = new Logger(RolesPermissionsGuard.name);
+
   constructor(private readonly reflector: Reflector) {}
 
   async canActivate(context: ExecutionContext) {
@@ -129,6 +132,19 @@ export class RolesPermissionsGuard implements CanActivate {
       );
 
     if (!hasRole || !hasPermission) {
+      this.logger.warn(
+        JSON.stringify({
+          requestId: request.requestId,
+          path: request.originalUrl ?? request.url,
+          method: request.method,
+          userId: auth.userId,
+          tenantId: auth.tenantId,
+          requiredRoles,
+          requiredPermissions,
+          roleMatched: hasRole,
+          permissionMatched: hasPermission,
+        }),
+      );
       throw new ForbiddenException('Insufficient permissions');
     }
 

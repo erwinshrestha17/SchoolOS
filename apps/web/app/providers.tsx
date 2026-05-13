@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PropsWithChildren, useState } from 'react';
 import { SessionProvider } from '../components/session-provider';
+import { ApiRequestError } from '../lib/api';
 
 export function Providers({ children }: PropsWithChildren) {
   const [queryClient] = useState(
@@ -11,7 +12,16 @@ export function Providers({ children }: PropsWithChildren) {
         defaultOptions: {
           queries: {
             staleTime: 60_000,
-            retry: 1,
+            retry: (failureCount, error) => {
+              if (
+                error instanceof ApiRequestError &&
+                [401, 403, 404].includes(error.statusCode)
+              ) {
+                return false;
+              }
+
+              return failureCount < 1;
+            },
           },
         },
       }),

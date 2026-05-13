@@ -3,6 +3,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from './button';
+import { ApiRequestError } from '../../lib/api';
 
 interface Props {
   children: ReactNode;
@@ -34,6 +35,11 @@ export class ErrorBoundary extends Component<Props, State> {
         return this.props.fallback;
       }
 
+      const requestId =
+        this.state.error instanceof ApiRequestError
+          ? this.state.error.requestId
+          : undefined;
+
       return (
         <div className="flex min-h-[400px] flex-col items-center justify-center rounded-2xl border border-danger-100 bg-danger-50/30 p-8 text-center">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-danger-100 text-danger-600">
@@ -43,6 +49,11 @@ export class ErrorBoundary extends Component<Props, State> {
           <p className="mt-2 max-w-sm text-sm text-slate-500 leading-relaxed">
             An unexpected error occurred while rendering this section.
           </p>
+          {requestId && (
+            <p className="mt-3 rounded-lg bg-white px-3 py-2 font-mono text-xs text-slate-500">
+              Request ID: {requestId}
+            </p>
+          )}
           <div className="mt-8 flex gap-3">
             <Button
               onClick={() => this.setState({ hasError: false, error: null })}

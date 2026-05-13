@@ -2,13 +2,13 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Post,
   Get,
   Param,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
-import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import type { AuthContext } from '../auth/auth.types';
@@ -45,6 +45,13 @@ const SAFE_MIME_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]);
 const DANGEROUS_EXTENSIONS = /\.(exe|bat|cmd|com|scr|js|mjs|sh|ps1|php|jar)$/i;
+const MODULE_UPLOAD_PERMISSIONS: Record<string, string[]> = {
+  activity: ['activity_feed:create'],
+  homework: ['homework:create', 'homework:update'],
+  'homework-submission': ['homework:submit'],
+  reports: ['reports:export'],
+  students: ['student_documents:manage'],
+};
 
 @Controller('files')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -55,12 +62,13 @@ export class FileRegistryController {
   ) {}
 
   @Post('upload')
-  @Permissions('homework:submit')
   async uploadFile(
     @CurrentAuth() auth: AuthContext,
     @Body() dto: UploadFileDto,
   ) {
     this.validateUpload(dto);
+    this.validateModulePermission(dto.module, auth.permissions);
+
     const stored = await this.storageService.saveBase64Object({
       tenantId: auth.tenantId,
       prefix: dto.module,
@@ -117,6 +125,24 @@ export class FileRegistryController {
     const sizeBytes = Buffer.byteLength(dto.base64Content, 'base64');
     if (sizeBytes > MAX_UPLOAD_BYTES) {
       throw new BadRequestException('File exceeds upload size limit');
+    }
+  }
+
+  private validateModulePermission(moduleName: string, permissions: string[]) {
+    const requiredPermissions = MODULE_UPLOAD_PERMISSIONS[moduleName];
+
+    if (!requiredPermissions) {
+      throw new BadRequestException('Unsupported upload module');
+    }
+
+    if (
+      !requiredPermissions.some((permission) =>
+        permissions.includes(permission),
+      )
+    ) {
+      throw new ForbiddenException(
+        'Insufficient permissions for upload module',
+      );
     }
   }
 }
