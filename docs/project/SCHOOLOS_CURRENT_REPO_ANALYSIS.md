@@ -21,8 +21,10 @@ Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation: Completed across eight sprints
 Phase 2A M4 Academics backend: Completed / Contract-Protected
 Phase 2D M9 Accounting: Production Candidate Complete
-Current stage: Phase 2A backend complete + M0 platform foundation complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
+Current stage: Phase 2A backend complete + M0 platform foundation complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations + Targeted Frontend Polish Complete
 ```
+
+Targeted web-admin frontend polish and Phase2F browser smoke coverage are now present on main.
 
 Readiness:
 
@@ -283,7 +285,7 @@ The next sprint should be repo stabilization, smoke verification, and focused ve
 2. **M0 E2E depth** — platform/school route denial, entitlement enforcement, SaaS billing lifecycle, and queue retry browser/API coverage need depth.
 3. **Homework/Timetable stability** — recent PRs mention schema/service/test drift and Prisma generation concerns.
 4. **Breadth without equal depth** — Phase 2/3 foundations exist, but not all are production-complete.
-5. **Browser workflow coverage** — backend is ahead of authenticated Playwright coverage.
+5. **Browser workflow coverage** — Improved via Phase 2F targeted polish and smoke update, but still requires real seeded credentials/manual QA for deeper finance/accounting, academics marks/CAS, QR, and platform tenant actions.
 6. **Staging readiness** — pilot seed data, staging checks, backup/restore rehearsal, and observability still matter.
 7. **Parent/mobile/driver/live tracking** — intentionally deferred and should not be accidentally treated as complete.
 

@@ -1,7 +1,7 @@
 # SchoolOS Remaining Implementation Plan
 
 **Status source:** `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md`  
-**Current stage:** Phase 2A backend complete + Phase 2 implemented foundations + Phase 3 operations admin foundations  
+**Current stage:** Phase 2A backend complete + Phase 2 implemented foundations + Phase 3 operations admin foundations + Targeted Frontend Polish Complete
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard  
 **Last updated:** 2026-05-12
 
@@ -613,29 +613,15 @@ Feature -> tenant isolation -> indexes -> pagination -> queue slow work -> audit
 
 Web admin UI is now broadly implemented across Phase 1, Phase 2 foundations, and Phase 3 admin foundations. Phase 2A backend is complete, so the next UI/UX priority is an Academics admin workflow wired to real APIs.
 
-Remaining UI/UX:
-
-- Phase 2A Academics admin workspace.
-- Exam term and assessment component setup screens.
-- Marks entry and CAS workflow screens.
-- Result preview, lock/review, report-card generation, promotion readiness, and publishing screens.
-- Student QR management actions in student detail page.
-- QR scan action in Library issue/return screens.
-- QR scan action in Canteen serving/POS screen after wallet ledger is hardened.
-- Browser smoke/Playwright coverage for Phase 2A.
-- Parent/mobile portal.
-- Student mobile/PWA portal.
-- Teacher mobile workflows.
-- Driver app.
-- Live transport map.
-- WebSocket/SSE tracking UI.
-- Full canteen inventory/vendor UI.
-- Advanced reports/exports UX.
-- Developer portal.
-- Full accessibility pass.
-- Full browser smoke coverage.
-- Permission-denied states.
-- Slow-network UX review for Nepal schools.
+- Targeted web-admin frontend polish pass (Completed).
+- Phase 2F browser smoke coverage (Completed - credential-gated).
+- Deeper finance/accounting report visual polish.
+- Admissions wizard route-specific polish with seeded data.
+- Academics marks/CAS keyboard-entry polish.
+- Library/Canteen QR-specific flows.
+- Platform tenant actions manual QA.
+- Mobile/PWA later.
+- Live transport map/driver app later.
 
 Estimated UI/UX status:
 

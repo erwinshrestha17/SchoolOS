@@ -46,8 +46,10 @@ Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation Depth: Completed
 Phase 2A M4 Academics backend: Completed / Contract-Protected
 Phase 2D M9 Accounting: Production Candidate Complete
-Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
+Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations + Targeted Frontend Polish Complete
 ```
+
+Targeted web-admin polish and Phase2F browser smoke coverage are now present on main.
 
 Current product readiness:
 

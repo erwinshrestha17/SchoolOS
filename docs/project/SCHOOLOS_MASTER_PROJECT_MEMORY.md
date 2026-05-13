@@ -1,6 +1,6 @@
 # SchoolOS Master Project Memory
 
-**Status:** M0 Platform Core Foundation Complete + Phase 2A M4 Academics backend complete + Phase 2D M9 Accounting Production Candidate Complete + Phase 2/3 foundations in progress  
+**Status:** M0 Platform Core Foundation Complete + Phase 2A M4 Academics backend complete + Phase 2D M9 Accounting Production Candidate Complete + Targeted Frontend Polish Complete
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard
 
@@ -30,8 +30,10 @@ Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation: Completed across eight sprints
 Phase 2A M4 Academics backend: Completed / Contract-Protected
 Phase 2D M9 Accounting: Production Candidate Complete
-Current stage: Phase 2A backend complete + M0 platform foundation complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
+Current stage: Phase 2A backend complete + M0 platform foundation complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations + Targeted Frontend Polish Complete
 ```
+
+Targeted web-admin frontend polish and Phase 2F browser smoke coverage are now present on main.
 
 Readiness:
 
@@ -46,17 +48,11 @@ Full SchoolOS product complete: No
 Recommended near-term direction:
 
 ```text
-Repo Verification + M0 Pilot Hardening Sprint
-→ run full verification gate
-→ run Docker-backed smoke with Postgres, Redis, and API running
-→ add platform/school route denial browser tests
-→ add SaaS billing lifecycle tests
-→ add entitlement enforcement tests against real school APIs
-→ deepen BullMQ failed-job inspection by deployed queue topology
-→ stabilize Homework/Timetable after recent verification follow-ups
-→ wire Phase 2A Academics admin UI to completed APIs
-→ add authenticated Playwright browser smoke tests
-→ prepare controlled pilot staging
+UI-6D Deeper Finance/Accounting Reports Visual Polish, Academics Marks/CAS Keyboard UX, and Real-Credential Manual QA
+→ Polish finance/accounting report visuals
+→ Implement Academics marks/CAS keyboard UX
+→ Conduct manual QA with real credentials
+→ Prepare controlled pilot staging
 ```
 
 Do not expand Phase 2/3 modules broadly at once. Existing Phase 3 admin modules may be polished and hardened, but parent/mobile and driver-facing experiences remain separate future scope.
