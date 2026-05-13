@@ -7,10 +7,6 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "baseUrl": ".",
-    "paths": {
-      "@schoolos/core": ["packages/core/src/index.ts"],
-      "@schoolos/core/*": ["packages/core/src/*"]
-    }
+    "baseUrl": "."
   }
 }
