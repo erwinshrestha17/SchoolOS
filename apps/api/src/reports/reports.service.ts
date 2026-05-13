@@ -798,14 +798,6 @@ export class ReportsService {
       resourceId: reportKey,
       tenantId: actor.tenantId,
       userId: actor.userId,
-      after: {
-        reportKey,
-        format: request.format,
-        filters: request.filters,
-        fromDate: request.filters.fromDate,
-        toDate: request.filters.toDate,
-        filterCount: Object.keys(request.filters).length,
-      },
     });
     await this.recordExportHistory({
       tenantId: actor.tenantId,
@@ -886,7 +878,7 @@ export class ReportsService {
     await delegate.create({
       data: {
         tenantId: input.tenantId,
-        scope: 'tenant',
+        scope: input.tenantId === 'platform' ? 'platform' : 'tenant',
         reportKey: input.reportKey,
         format: input.format,
         filters: input.filters,

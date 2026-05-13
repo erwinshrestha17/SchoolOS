@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  JournalLineSide,
   PayrollLineStatus,
   PayrollPaymentStatus,
   PayrollRunStatus,
@@ -583,7 +584,9 @@ export class PayrollService {
       );
     });
 
-    const leaveByStaff = new Map<string, number>();
+    const paidLeaveByStaff = new Map<string, number>();
+    const unpaidLeaveByStaff = new Map<string, number>();
+
     leaveRequests.forEach((leave) => {
       const overlap = getOverlapDays(
         leave.startsOn,
@@ -591,10 +594,17 @@ export class PayrollService {
         period.startsOn,
         period.endsOn,
       );
-      leaveByStaff.set(
-        leave.staffId,
-        (leaveByStaff.get(leave.staffId) ?? 0) + overlap,
-      );
+      if (leave.isPaid) {
+        paidLeaveByStaff.set(
+          leave.staffId,
+          (paidLeaveByStaff.get(leave.staffId) ?? 0) + overlap,
+        );
+      } else {
+        unpaidLeaveByStaff.set(
+          leave.staffId,
+          (unpaidLeaveByStaff.get(leave.staffId) ?? 0) + overlap,
+        );
+      }
     });
 
     const payrollSources = [
@@ -624,9 +634,13 @@ export class PayrollService {
 
     const lines = payrollSources.map((source) => {
       const presentDays = attendanceByStaff.get(source.staffId) ?? 0;
-      const approvedPaidLeaveDays = leaveByStaff.get(source.staffId) ?? 0;
+      const approvedPaidLeaveDays = paidLeaveByStaff.get(source.staffId) ?? 0;
+      const approvedUnpaidLeaveDays = unpaidLeaveByStaff.get(source.staffId) ?? 0;
+      
       const totalEffectiveDays = presentDays + approvedPaidLeaveDays;
       const unpaidLeaveDays = Math.max(0, workingDays - totalEffectiveDays);
+      // Ensure we count explicit unpaid leave if it exceeds the working day gap
+      const finalUnpaidDays = Math.max(unpaidLeaveDays, approvedUnpaidLeaveDays);
 
       const baseSalary = new Prisma.Decimal(source.baseSalary);
       const allowances = new Prisma.Decimal(source.allowances);
@@ -964,6 +978,114 @@ export class PayrollService {
     });
 
     return paid;
+  }
+ 
+  async reversePayrollRun(
+    id: string,
+    dto: PayrollActionDto,
+    actor: AuthContext,
+  ) {
+    if (!dto.reason) {
+      throw new ConflictException('Reversal reason is required');
+    }
+ 
+    const run = await this.getPayrollRunOrThrow(id, actor);
+ 
+    if (
+      run.status !== PayrollRunStatus.POSTED &&
+      run.status !== PayrollRunStatus.PAID
+    ) {
+      throw new ConflictException(
+        'Only posted or paid payroll runs can be reversed',
+      );
+    }
+ 
+    const reversed = await this.prisma.$transaction(async (tx) => {
+      // 1. Reverse Disbursement if paid
+      if (run.disbursementJournalEntryId) {
+        const originalEntry = await tx.journalEntry.findUnique({
+          where: { id: run.disbursementJournalEntryId },
+          include: { lines: true },
+        });
+        if (originalEntry) {
+          await this.accountingPostingService.postReversal(
+            {
+              tenantId: actor.tenantId,
+              originalEntryId: originalEntry.id,
+              reversalDate: new Date(),
+              narration: `Reversal of Payroll Disbursement for ${run.periodMonth}/${run.periodYear}`,
+              reason: dto.reason!,
+              lines: originalEntry.lines.map((l) => ({
+                chartAccountId: l.chartAccountId,
+                side:
+                  l.side === JournalLineSide.DEBIT
+                    ? JournalLineSide.CREDIT
+                    : JournalLineSide.DEBIT,
+                amount: l.amount,
+                description: `Reversal of ${l.description}`,
+              })),
+            },
+            actor,
+            tx,
+          );
+        }
+      }
+ 
+      // 2. Reverse Accrual
+      if (run.journalEntryId) {
+        const originalEntry = await tx.journalEntry.findUnique({
+          where: { id: run.journalEntryId },
+          include: { lines: true },
+        });
+        if (originalEntry) {
+          await this.accountingPostingService.postReversal(
+            {
+              tenantId: actor.tenantId,
+              originalEntryId: originalEntry.id,
+              reversalDate: new Date(),
+              narration: `Reversal of Payroll Accrual for ${run.periodMonth}/${run.periodYear}`,
+              reason: dto.reason!,
+              lines: originalEntry.lines.map((l) => ({
+                chartAccountId: l.chartAccountId,
+                side:
+                  l.side === JournalLineSide.DEBIT
+                    ? JournalLineSide.CREDIT
+                    : JournalLineSide.DEBIT,
+                amount: l.amount,
+                description: `Reversal of ${l.description}`,
+              })),
+            },
+            actor,
+            tx,
+          );
+        }
+      }
+ 
+      // 3. Update Payroll Run Status
+      return tx.payrollRun.update({
+        where: { id: run.id },
+        data: {
+          status: PayrollRunStatus.CANCELLED,
+          reversalReason: dto.reason,
+          reversalAt: new Date(),
+          reversedById: actor.userId,
+        },
+      });
+    });
+ 
+    await this.auditService.record({
+      action: 'reverse',
+      resource: 'payroll_run',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: reversed.id,
+      after: {
+        status: reversed.status,
+        reason: dto.reason,
+      },
+    });
+ 
+    return reversed;
   }
 
   async getPayrollRun(id: string, actor: AuthContext) {

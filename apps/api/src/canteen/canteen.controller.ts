@@ -33,7 +33,18 @@ import {
   UpdateCanteenStatusDto,
   UpsertCanteenSpendingControlDto,
 } from './dto/canteen.dto';
+import {
+  CanteenCorrectionDto,
+  CanteenReversalDto,
+  CreateCanteenInventoryItemDto,
+  CreateCanteenPurchaseBillDto,
+  CreateCanteenSupplierDto,
+  CreateCanteenWastageDto,
+  ManualStockAdjustmentDto,
+} from './dto/canteen-hardened.dto';
 import { CanteenService } from './canteen.service';
+import { StudentQrService } from '../students/student-qr.service';
+import { StudentQrResolvePurpose } from '@schoolos/core';
 
 @Controller('canteen')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -41,7 +52,22 @@ export class CanteenController {
   constructor(
     private readonly canteenService: CanteenService,
     private readonly canteenHardeningService: CanteenHardeningService,
+    private readonly studentQrService: StudentQrService,
   ) {}
+
+  @Get('qr-resolve/:token')
+  @Permissions('canteen:serving:create')
+  resolveStudentQr(
+    @Param('token') token: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentQrService.resolveQr(
+      auth.tenantId,
+      token,
+      StudentQrResolvePurpose.CANTEEN,
+      auth,
+    );
+  }
 
   @Post('menu-items')
   @Permissions('canteen:menu:create')
@@ -224,10 +250,100 @@ export class CanteenController {
   @Post('servings')
   @Permissions('canteen:serving:create')
   serveMeal(
-    @Body() dto: ServeCanteenMealDto,
+    @Body() dto: ServeCanteenMealDto & { overrideReason?: string },
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.canteenService.serveMeal(dto, auth);
+  }
+
+  @Post('wallets/transactions/:id/reverse')
+  @Permissions('canteen:wallets:update')
+  reverseWalletTransaction(
+    @Param('id') id: string,
+    @Body() dto: CanteenReversalDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.canteenService.reverseWalletTransaction(id, dto, auth);
+  }
+
+  @Post('wallets/transactions/:id/correct')
+  @Permissions('canteen:wallets:update')
+  correctWalletTransaction(
+    @Param('id') id: string,
+    @Body() dto: CanteenCorrectionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.canteenService.correctWalletTransaction(id, dto, auth);
+  }
+
+  @Post('suppliers')
+  @Permissions('canteen:inventory:update')
+  createSupplier(
+    @Body() dto: CreateCanteenSupplierDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.canteenService.createSupplier(dto, auth);
+  }
+
+  @Get('suppliers')
+  @Permissions('canteen:inventory:read')
+  listSuppliers(
+    @CurrentAuth() auth: AuthContext,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.canteenService.listSuppliers(auth, { page, limit });
+  }
+
+  @Post('inventory-items')
+  @Permissions('canteen:inventory:update')
+  createInventoryItem(
+    @Body() dto: CreateCanteenInventoryItemDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.canteenService.createInventoryItem(dto, auth);
+  }
+
+  @Get('inventory-items')
+  @Permissions('canteen:inventory:read')
+  listInventoryItems(
+    @CurrentAuth() auth: AuthContext,
+    @Query('category') category?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.canteenService.listInventoryItems(auth, {
+      category,
+      page,
+      limit,
+    });
+  }
+
+  @Post('purchase-bills')
+  @Permissions('canteen:inventory:update')
+  createPurchaseBill(
+    @Body() dto: CreateCanteenPurchaseBillDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.canteenService.createPurchaseBill(dto, auth);
+  }
+
+  @Post('wastage')
+  @Permissions('canteen:inventory:update')
+  recordWastage(
+    @Body() dto: CreateCanteenWastageDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.canteenService.recordWastage(dto, auth);
+  }
+
+  @Post('stock-adjustment')
+  @Permissions('canteen:inventory:update')
+  manualStockAdjustment(
+    @Body() dto: ManualStockAdjustmentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.canteenService.manualStockAdjustment(dto, auth);
   }
 
   @Get('servings')

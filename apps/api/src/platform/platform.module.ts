@@ -7,6 +7,7 @@ import { AuthModule } from '../auth/auth.module';
 import { UsageModule } from '../usage/usage.module';
 import { ConfigModule } from '../config/config.module';
 import { RedisModule } from '../redis/redis.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -16,6 +17,13 @@ import { RedisModule } from '../redis/redis.module';
     UsageModule,
     ConfigModule,
     RedisModule,
+    BullModule.registerQueue(
+      { name: 'notifications' },
+      { name: 'finance' },
+      { name: 'payroll' },
+      { name: 'activity-media' },
+      { name: 'homework' },
+    ),
   ],
   controllers: [PlatformController],
   providers: [PlatformService],

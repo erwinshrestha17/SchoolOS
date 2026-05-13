@@ -28,6 +28,10 @@ import { MarkLibraryCopyStatusDto } from './dto/mark-library-copy-status.dto';
 import { ReturnLibraryCopyDto } from './dto/return-library-copy.dto';
 import { UpdateLibraryBookDto } from './dto/update-library-book.dto';
 import { UpdateLibraryCopyDto } from './dto/update-library-copy.dto';
+import { CreateLibraryFineDto, UpdateLibraryFineDto } from './dto/library-fine.dto';
+import { UpdateLibrarySettingDto } from './dto/update-library-setting.dto';
+import { StudentQrService } from '../students/student-qr.service';
+import { StudentQrResolvePurpose } from '@schoolos/core';
 
 interface PaginationQuery {
   page?: string;
@@ -58,6 +62,7 @@ export class LibraryService {
     private readonly communicationsService: CommunicationsService,
     private readonly configService: ConfigService,
     private readonly accountingPostingService: AccountingPostingService,
+    private readonly studentQrService: StudentQrService,
   ) {}
 
   async listBooks(actor: AuthContext, options: ListBooksQuery = {}) {
@@ -598,10 +603,11 @@ export class LibraryService {
     let calculatedFine = 0;
     const now = new Date();
     if (now > issue.dueAt && !dto.markLost) {
+      const settings = await this.getLibrarySettings(actor);
       const daysOverdue = Math.ceil(
         (now.getTime() - issue.dueAt.getTime()) / (1000 * 60 * 60 * 24),
       );
-      calculatedFine = daysOverdue * this.configService.libraryFinePerDay;
+      calculatedFine = daysOverdue * Number(settings.finePerDay);
     }
 
     const fineAmount = new Prisma.Decimal(dto.fineAmount ?? calculatedFine);
@@ -618,6 +624,18 @@ export class LibraryService {
                 : `Library fine: ${issue.copy.book.title}`,
             })
           : null;
+
+      if (fineAmount.gt(0)) {
+        await tx.libraryFine.create({
+          data: {
+            tenantId: actor.tenantId,
+            issueId: issue.id,
+            amount: fineAmount,
+            status: 'PENDING',
+            notes: dto.notes ?? null,
+          },
+        });
+      }
 
       const activeIssue = await tx.libraryIssue.updateMany({
         where: {
@@ -747,8 +765,262 @@ export class LibraryService {
     return {
       activeIssues,
       overdueBooks,
-      canBorrow: activeIssues < this.configService.libraryMaxBooksPerStudent,
+      canBorrow: activeIssues < (await this.getLibrarySettings(actor)).maxBooksPerStudent,
     };
+  }
+
+  async getLibrarySettings(actor: AuthContext) {
+    const settings = await this.prisma.librarySetting.findUnique({
+      where: { tenantId: actor.tenantId },
+    });
+
+    if (settings) return settings;
+
+    // Default settings if not exist
+    return {
+      finePerDay: new Prisma.Decimal(this.configService.libraryFinePerDay),
+      maxFineAmount: null,
+      gracePeriodDays: 0,
+      lostBookChargeMultiplier: new Prisma.Decimal(1),
+      maxBooksPerStudent: this.configService.libraryMaxBooksPerStudent,
+    };
+  }
+
+  async updateLibrarySettings(actor: AuthContext, dto: UpdateLibrarySettingDto) {
+    const settings = await this.prisma.librarySetting.upsert({
+      where: { tenantId: actor.tenantId },
+      update: {
+        ...(dto.finePerDay !== undefined ? { finePerDay: new Prisma.Decimal(dto.finePerDay) } : {}),
+        ...(dto.maxFineAmount !== undefined ? { maxFineAmount: dto.maxFineAmount ? new Prisma.Decimal(dto.maxFineAmount) : null } : {}),
+        ...(dto.gracePeriodDays !== undefined ? { gracePeriodDays: dto.gracePeriodDays } : {}),
+        ...(dto.lostBookChargeMultiplier !== undefined ? { lostBookChargeMultiplier: new Prisma.Decimal(dto.lostBookChargeMultiplier) } : {}),
+      },
+      create: {
+        tenantId: actor.tenantId,
+        finePerDay: new Prisma.Decimal(dto.finePerDay ?? this.configService.libraryFinePerDay),
+        maxFineAmount: dto.maxFineAmount ? new Prisma.Decimal(dto.maxFineAmount) : null,
+        gracePeriodDays: dto.gracePeriodDays ?? 0,
+        lostBookChargeMultiplier: new Prisma.Decimal(dto.lostBookChargeMultiplier ?? 1),
+      },
+    });
+
+    await this.auditService.record({
+      action: 'update_settings',
+      resource: 'library_settings',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: settings,
+    });
+
+    return settings;
+  }
+
+  async getBorrowedStudents(actor: AuthContext, options: PaginationQuery = {}) {
+    const { skip, take, page } = this.pagination(options);
+    const where: Prisma.StudentWhereInput = {
+      tenantId: actor.tenantId,
+      libraryIssues: {
+        some: {
+          status: LibraryIssueStatus.ISSUED,
+        },
+      },
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.student.findMany({
+        where,
+        include: {
+          libraryIssues: {
+            where: { status: LibraryIssueStatus.ISSUED },
+            include: { copy: { include: { book: true } } },
+          },
+          class: true,
+          sectionRef: true,
+        },
+        orderBy: [{ firstNameEn: 'asc' }],
+        skip,
+        take,
+      }),
+      this.prisma.student.count({ where }),
+    ]);
+
+    return { items, meta: { page, limit: take, total } };
+  }
+
+  async listFines(actor: AuthContext, options: PaginationQuery = {}) {
+    const { skip, take, page } = this.pagination(options);
+    const where: Prisma.LibraryFineWhereInput = {
+      tenantId: actor.tenantId,
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.libraryFine.findMany({
+        where,
+        include: {
+          issue: {
+            include: {
+              copy: { include: { book: true } },
+              borrowerStudent: true,
+              borrowerStaff: true,
+            },
+          },
+        },
+        orderBy: [{ createdAt: 'desc' }],
+        skip,
+        take,
+      }),
+      this.prisma.libraryFine.count({ where }),
+    ]);
+
+    return { items, meta: { page, limit: take, total } };
+  }
+
+  async createFine(actor: AuthContext, dto: CreateLibraryFineDto) {
+    const issue = await this.prisma.libraryIssue.findFirst({
+      where: { id: dto.issueId, tenantId: actor.tenantId },
+    });
+
+    if (!issue) {
+      throw new NotFoundException('Library issue not found');
+    }
+
+    const fine = await this.prisma.libraryFine.create({
+      data: {
+        tenantId: actor.tenantId,
+        issueId: dto.issueId,
+        amount: new Prisma.Decimal(dto.amount),
+        status: 'PENDING',
+        notes: dto.notes ?? null,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'create',
+      resource: 'library_fine',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: fine.id,
+      after: fine,
+    });
+
+    return fine;
+  }
+
+  async updateFine(actor: AuthContext, fineId: string, dto: UpdateLibraryFineDto) {
+    const existing = await this.prisma.libraryFine.findFirst({
+      where: { id: fineId, tenantId: actor.tenantId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Library fine not found');
+    }
+
+    const updated = await this.prisma.libraryFine.update({
+      where: { id: fineId },
+      data: {
+        ...(dto.status !== undefined ? { status: dto.status } : {}),
+        ...(dto.waivedAmount !== undefined ? { waivedAmount: new Prisma.Decimal(dto.waivedAmount) } : {}),
+        ...(dto.waiverReason !== undefined ? { waiverReason: dto.waiverReason } : {}),
+        ...(dto.correctionReason !== undefined ? { correctionReason: dto.correctionReason } : {}),
+        ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+      },
+    });
+
+    await this.auditService.record({
+      action: 'update',
+      resource: 'library_fine',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: updated.id,
+      before: existing,
+      after: updated,
+    });
+
+    return updated;
+  }
+
+  async getPopularBooksReport(actor: AuthContext, options: PaginationQuery = {}) {
+    const { skip, take } = this.pagination(options);
+    
+    // Aggregation for popular books
+    const popular = await this.prisma.libraryIssue.groupBy({
+      by: ['copyId'],
+      where: { tenantId: actor.tenantId },
+      _count: {
+        id: true,
+      },
+      orderBy: {
+        _count: {
+          id: 'desc',
+        },
+      },
+      take: 20, // Top 20
+    });
+
+    const items = await Promise.all(
+      popular.map(async (p) => {
+        const copy = await this.prisma.libraryCopy.findUnique({
+          where: { id: p.copyId },
+          include: { book: true },
+        });
+        return {
+          book: copy?.book,
+          issueCount: p._count.id,
+        };
+      }),
+    );
+
+    return { items, meta: { total: items.length } };
+  }
+
+  async getBookHistory(actor: AuthContext, bookId: string) {
+    const book = await this.prisma.libraryBook.findFirst({
+      where: { id: bookId, tenantId: actor.tenantId },
+    });
+
+    if (!book) throw new NotFoundException('Book not found');
+
+    const issues = await this.prisma.libraryIssue.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        copy: { bookId },
+      },
+      include: {
+        copy: true,
+        borrowerStudent: true,
+        borrowerStaff: true,
+      },
+      orderBy: { issuedAt: 'desc' },
+    });
+
+    return { book, history: issues };
+  }
+
+  async getCopyHistory(actor: AuthContext, copyId: string) {
+    const copy = await this.prisma.libraryCopy.findFirst({
+      where: { id: copyId, tenantId: actor.tenantId },
+      include: { book: true },
+    });
+
+    if (!copy) throw new NotFoundException('Copy not found');
+
+    const issues = await this.prisma.libraryIssue.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        copyId,
+      },
+      include: {
+        borrowerStudent: true,
+        borrowerStaff: true,
+      },
+      orderBy: { issuedAt: 'desc' },
+    });
+
+    return { copy, history: issues };
+  }
+
+  async resolveQrBorrower(actor: AuthContext, token: string) {
+    return this.studentQrService.resolveQr(actor.tenantId, token, StudentQrResolvePurpose.LIBRARY, actor);
   }
 
   private async ensureBorrower(

@@ -24,6 +24,16 @@ function createController() {
     issueCopy: jest.fn(),
     returnCopy: jest.fn(),
     listOverdue: jest.fn(),
+    getBorrowedStudents: jest.fn(),
+    listFines: jest.fn(),
+    createFine: jest.fn(),
+    updateFine: jest.fn(),
+    getPopularBooksReport: jest.fn(),
+    getBookHistory: jest.fn(),
+    getCopyHistory: jest.fn(),
+    getLibrarySettings: jest.fn(),
+    updateLibrarySettings: jest.fn(),
+    resolveQrBorrower: jest.fn(),
   };
   const libraryHardeningService = {
     archiveBook: jest.fn(),
@@ -252,5 +262,26 @@ describe('LibraryController M8A contracts', () => {
     expect(libraryHardeningService.exportIssuedBooksCsv).toHaveBeenCalledWith(
       actor,
     );
+  });
+
+  it('delegates new hardening endpoints to service methods', () => {
+    const { controller, libraryService } = createController();
+    libraryService.getBorrowedStudents.mockReturnValue({ items: [] });
+    libraryService.listFines.mockReturnValue({ items: [] });
+    libraryService.getPopularBooksReport.mockReturnValue({ items: [] });
+    libraryService.getLibrarySettings.mockReturnValue({ finePerDay: '10' });
+    libraryService.resolveQrBorrower.mockReturnValue({ name: 'Student' });
+
+    expect(controller.getBorrowedStudents(actor, '1', '10')).toEqual({ items: [] });
+    expect(controller.listFines(actor, '1', '10')).toEqual({ items: [] });
+    expect(controller.getPopularBooksReport(actor, '1', '10')).toEqual({ items: [] });
+    expect(controller.getSettings(actor)).toEqual({ finePerDay: '10' });
+    expect(controller.resolveQrBorrower(actor, 'token')).toEqual({ name: 'Student' });
+
+    expect(libraryService.getBorrowedStudents).toHaveBeenCalledWith(actor, { page: '1', limit: '10' });
+    expect(libraryService.listFines).toHaveBeenCalledWith(actor, { page: '1', limit: '10' });
+    expect(libraryService.getPopularBooksReport).toHaveBeenCalledWith(actor, { page: '1', limit: '10' });
+    expect(libraryService.getLibrarySettings).toHaveBeenCalledWith(actor);
+    expect(libraryService.resolveQrBorrower).toHaveBeenCalledWith(actor, 'token');
   });
 });

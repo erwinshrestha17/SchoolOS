@@ -684,6 +684,23 @@ export class CommunicationsService {
   private async resolveAudienceRecipients(
     input: DeliveryRecordInput,
   ): Promise<DeliveryRecipient[]> {
+    if (input.staffIds?.length) {
+      const staff = await this.prisma.staff.findMany({
+        where: {
+          tenantId: input.actor.tenantId,
+          id: { in: input.staffIds },
+        },
+        include: { user: true },
+      });
+      return staff.map((s) => ({
+        studentId: '',
+        guardianId: null,
+        userId: s.userId,
+        email: s.user?.email ?? null,
+        phone: s.user?.phone ?? null,
+      }));
+    }
+
     if (input.audienceType === AudienceType.ROLE) {
       if (!input.roleNames?.length) {
         return [];
@@ -889,6 +906,7 @@ interface DeliveryRecordInput {
   sectionId?: string | null;
   studentIds?: string[];
   guardianIds?: string[];
+  staffIds?: string[];
   roleNames?: string[];
   title: string;
   body: string;

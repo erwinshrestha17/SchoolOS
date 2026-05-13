@@ -1,11 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import {
-  AudienceType,
   CanteenEnrollmentStatus,
   CanteenMealServingStatus,
   ConsentType,
   NotificationChannel,
-  Prisma,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -22,9 +22,10 @@ export class CanteenHardeningService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly communicationsService: CommunicationsService,
+    @InjectQueue('canteen-alerts') private readonly alertsQueue: Queue,
   ) {}
 
-  pauseEnrollment(id: string, dto: CanteenReasonDto, actor: AuthContext) {
+  async pauseEnrollment(id: string, dto: CanteenReasonDto, actor: AuthContext) {
     return this.transitionEnrollment(
       id,
       CanteenEnrollmentStatus.PAUSED,
@@ -34,7 +35,7 @@ export class CanteenHardeningService {
     );
   }
 
-  resumeEnrollment(id: string, dto: CanteenReasonDto, actor: AuthContext) {
+  async resumeEnrollment(id: string, dto: CanteenReasonDto, actor: AuthContext) {
     return this.transitionEnrollment(
       id,
       CanteenEnrollmentStatus.ACTIVE,
@@ -44,7 +45,7 @@ export class CanteenHardeningService {
     );
   }
 
-  endEnrollment(id: string, dto: CanteenReasonDto, actor: AuthContext) {
+  async endEnrollment(id: string, dto: CanteenReasonDto, actor: AuthContext) {
     return this.transitionEnrollment(
       id,
       CanteenEnrollmentStatus.ENDED,
@@ -95,46 +96,35 @@ export class CanteenHardeningService {
     );
 
     let queued = 0;
-    let skipped = 0;
-
     for (const wallet of lowBalanceWallets) {
-      const sourceId = `canteen-low-balance:${wallet.studentId}:${wallet.lowBalanceThreshold.toString()}:${windowKey}`;
-      const existing = await this.prisma.notificationDelivery.count({
-        where: {
+      await this.alertsQueue.add(
+        'low-balance-notification',
+        {
           tenantId: actor.tenantId,
-          sourceType: 'canteen_low_balance',
-          sourceId,
+          studentId: wallet.studentId,
+          balance: wallet.balance.toString(),
+          threshold: wallet.lowBalanceThreshold.toString(),
+          windowKey,
+          actor,
         },
-      });
-
-      if (existing > 0) {
-        skipped += 1;
-        continue;
-      }
-
-      await this.communicationsService.recordDeliveryRecords({
-        actor,
-        sourceType: 'canteen_low_balance',
-        sourceId,
-        audienceType: AudienceType.ALL,
-        studentIds: [wallet.studentId],
-        title: 'Canteen wallet low balance',
-        body: `Canteen wallet balance is ${wallet.balance.toString()}, below the threshold ${wallet.lowBalanceThreshold.toString()}.`,
-        channels: [NotificationChannel.PUSH, NotificationChannel.SMS],
-        requiredConsentTypes: [ConsentType.MESSAGING],
-      });
+        {
+          jobId: `canteen-low-balance:${wallet.studentId}:${windowKey}`,
+          removeOnComplete: true,
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 1000 },
+        },
+      );
       queued += 1;
     }
 
     await this.auditService.record({
-      action: 'send_low_balance_alerts',
+      action: 'queue_low_balance_alerts',
       resource: 'canteen_wallet',
       tenantId: actor.tenantId,
       userId: actor.userId,
       after: {
         walletCount: lowBalanceWallets.length,
         queued,
-        skipped,
         windowKey,
       },
     });
@@ -143,7 +133,6 @@ export class CanteenHardeningService {
       windowKey,
       walletCount: lowBalanceWallets.length,
       queued,
-      skipped,
     };
   }
 

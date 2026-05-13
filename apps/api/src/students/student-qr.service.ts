@@ -6,10 +6,16 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { AuthContext } from '../auth/auth.types';
 import { randomBytes } from 'crypto';
 import { hashToken } from '../auth/auth.utils';
-import { LibraryIssueStatus, StudentQrStatus, Prisma } from '@prisma/client';
-import { StudentQrResolvePurpose } from './dto/student-qr.dto';
+import {
+  LibraryIssueStatus,
+  StudentQrStatus,
+  Prisma,
+  UserRole,
+} from '@prisma/client';
+import { StudentQrResolvePurpose } from '@schoolos/core';
 
 @Injectable()
 export class StudentQrService {
@@ -24,7 +30,7 @@ export class StudentQrService {
    * Generates a new QR credential for a student if one doesn't exist or is revoked.
    * If an active one exists, it returns the existing one (idempotent).
    */
-  async generateQr(tenantId: string, studentId: string, actorUserId: string) {
+  async generateQr(tenantId: string, studentId: string, auth: AuthContext) {
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, tenantId },
     });
@@ -64,21 +70,17 @@ export class StudentQrService {
       action: 'QR_GENERATED',
       resource: 'student_qr',
       tenantId,
-      userId: actorUserId,
+      userId: auth.userId,
       after: { studentId },
     });
 
     return { credential, rawToken: token };
   }
 
-  /**
-   * Rotates a student's QR credential (e.g. for lost card).
-   * Invalidates the old token and generates a new one.
-   */
   async rotateQr(
     tenantId: string,
     studentId: string,
-    actorUserId: string,
+    auth: AuthContext,
     reason?: string,
   ) {
     const existing = await this.prisma.studentQrCredential.findUnique({
@@ -106,20 +108,17 @@ export class StudentQrService {
       action: 'QR_ROTATED',
       resource: 'student_qr',
       tenantId,
-      userId: actorUserId,
+      userId: auth.userId,
       after: { studentId, reason },
     });
 
     return { credential, rawToken: token };
   }
 
-  /**
-   * Revokes a student's QR credential.
-   */
   async revokeQr(
     tenantId: string,
     studentId: string,
-    actorUserId: string,
+    auth: AuthContext,
     reason?: string,
   ) {
     const existing = await this.prisma.studentQrCredential.findUnique({
@@ -142,21 +141,18 @@ export class StudentQrService {
       action: 'QR_REVOKED',
       resource: 'student_qr',
       tenantId,
-      userId: actorUserId,
+      userId: auth.userId,
       after: { studentId, reason },
     });
 
     return credential;
   }
 
-  /**
-   * Resolves a scanned QR token for a specific purpose.
-   */
   async resolveQr(
     tenantId: string,
     token: string,
     purpose: StudentQrResolvePurpose,
-    actorUserId: string,
+    auth: AuthContext,
   ) {
     const tokenHash = hashToken(token);
     const credential = await this.prisma.studentQrCredential.findUnique({
@@ -166,6 +162,11 @@ export class StudentQrService {
           include: {
             class: true,
             sectionRef: true,
+            guardianLinks: {
+              include: {
+                guardian: true,
+              },
+            },
           },
         },
       },
@@ -180,7 +181,7 @@ export class StudentQrService {
         action: 'QR_RESOLVE_FAILED',
         resource: 'student_qr',
         tenantId,
-        userId: actorUserId,
+        userId: auth.userId,
         after: {
           purpose,
           reason: !credential
@@ -193,6 +194,54 @@ export class StudentQrService {
       throw new ForbiddenException('Invalid or revoked QR token');
     }
 
+    const student = credential.student;
+
+    // Security check: Parent can only resolve their own child
+    if (auth.roles.includes('parent')) {
+      const isLinked = student.guardianLinks.some(
+        (link) => link.guardian.userId === auth.userId,
+      );
+      if (!isLinked) {
+        await this.auditService.record({
+          action: 'QR_RESOLVE_FAILED',
+          resource: 'student_qr',
+          tenantId,
+          userId: auth.userId,
+          after: { studentId: student.id, purpose, reason: 'unrelated_parent' },
+        });
+        throw new ForbiddenException('Parent cannot resolve unrelated child');
+      }
+    }
+
+    // Security check: Teacher cannot resolve unassigned student unless permission allows
+    if (
+      auth.roles.includes('teacher') &&
+      !auth.permissions.includes('student:qr:resolve:all')
+    ) {
+      const isAssigned = await this.prisma.subjectTeacherAssignment.findFirst({
+        where: {
+          tenantId,
+          teacherId: auth.userId,
+          classId: student.classId,
+          OR: [
+            { sectionId: student.sectionId },
+            { sectionId: null }, // Broad class assignment
+          ],
+        },
+      });
+
+      if (!isAssigned) {
+        await this.auditService.record({
+          action: 'QR_RESOLVE_FAILED',
+          resource: 'student_qr',
+          tenantId,
+          userId: auth.userId,
+          after: { studentId: student.id, purpose, reason: 'unassigned_teacher' },
+        });
+        throw new ForbiddenException('Teacher not assigned to this student');
+      }
+    }
+
     await this.prisma.studentQrCredential.update({
       where: { id: credential.id },
       data: { lastScannedAt: new Date() },
@@ -202,11 +251,11 @@ export class StudentQrService {
       action: 'QR_RESOLVED',
       resource: 'student_qr',
       tenantId,
-      userId: actorUserId,
+      userId: auth.userId,
       after: { studentId: credential.studentId, purpose },
     });
 
-    const student = credential.student;
+    // Response shaping: no guardian phone, no address, no health data by default
     const baseResponse = {
       studentId: student.id,
       studentCode: student.studentSystemId,
@@ -239,7 +288,7 @@ export class StudentQrService {
           ...baseResponse,
           activeIssues,
           overdueBooks,
-          canBorrow: activeIssues < 5, // Default limit if we can't get config
+          canBorrow: activeIssues < 5,
         };
       }
       case StudentQrResolvePurpose.CANTEEN: {
@@ -257,15 +306,9 @@ export class StudentQrService {
         };
       }
       case StudentQrResolvePurpose.TRANSPORT:
-        return {
-          ...baseResponse,
-          // Placeholder: Transport integration needed
-        };
+        return baseResponse;
       case StudentQrResolvePurpose.ATTENDANCE:
-        return {
-          ...baseResponse,
-          // Placeholder: Attendance integration needed
-        };
+        return baseResponse;
       case StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP:
       default:
         return baseResponse;

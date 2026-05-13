@@ -335,6 +335,17 @@ export const StudentDocumentKind = {
   OTHER: 'OTHER',
 } as const;
 
+export const StaffDocumentKind = {
+  CITIZENSHIP: 'CITIZENSHIP',
+  PASSPORT: 'PASSPORT',
+  ACADEMIC_CERTIFICATE: 'ACADEMIC_CERTIFICATE',
+  EXPERIENCE_LETTER: 'EXPERIENCE_LETTER',
+  CONTRACT: 'CONTRACT',
+  PHOTO: 'PHOTO',
+  PAN_CARD: 'PAN_CARD',
+  OTHER: 'OTHER',
+} as const;
+
 export const NoticePriority = {
   NORMAL: 'NORMAL',
   URGENT: 'URGENT',
@@ -346,6 +357,13 @@ export const AudienceType = {
   CLASS: 'CLASS',
   SECTION: 'SECTION',
   ROLE: 'ROLE',
+} as const;
+
+export const LibraryFineStatus = {
+  UNPAID: 'UNPAID',
+  PAID: 'PAID',
+  WAIVED: 'WAIVED',
+  VOID: 'VOID',
 } as const;
 
 export const EventType = {

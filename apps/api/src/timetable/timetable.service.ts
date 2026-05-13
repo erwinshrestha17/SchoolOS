@@ -34,6 +34,8 @@ import {
   UpdateRoomDto,
   UpdateSubstitutionDto,
   UpdateTimetablePeriodDto,
+  UpdateTimetableVersionDto,
+  RestoreTimetableVersionDto,
   UpdateVersionSlotDto,
   WorkloadQueryDto,
   ListTeacherAvailabilityQueryDto,
@@ -159,7 +161,8 @@ export class TimetableService {
   }
 
   async deletePeriod(id: string, actor: AuthContext) {
-    await this.findPeriodOrThrow(id, actor);
+    const period = await this.findPeriodOrThrow(id, actor);
+    await this.ensurePeriodNotLocked(id, actor);
     await this.prisma.timetablePeriod.delete({ where: { id } });
     await this.audit('delete', 'timetable_period', id, actor, { id });
     return { deleted: true, id };
@@ -202,7 +205,8 @@ export class TimetableService {
   }
 
   async deleteRoom(id: string, actor: AuthContext) {
-    await this.findRoomOrThrow(id, actor);
+    const room = await this.findRoomOrThrow(id, actor);
+    await this.ensureRoomNotLocked(id, actor);
     await this.prisma.room.delete({ where: { id } });
     await this.audit('delete', 'room', id, actor, { id });
     return { deleted: true, id };
@@ -257,6 +261,7 @@ export class TimetableService {
         versionName: dto.versionName,
         effectiveFrom,
         effectiveTo,
+        status: TimetableVersionStatus.DRAFT,
       },
       include: {
         academicYear: true,
@@ -266,6 +271,95 @@ export class TimetableService {
       },
     });
     await this.audit('create', 'timetable_version', version.id, actor, version);
+    return version;
+  }
+
+  async updateVersion(
+    id: string,
+    dto: UpdateTimetableVersionDto,
+    actor: AuthContext,
+  ) {
+    const version = await this.findVersionOrThrow(id, actor);
+    this.ensureDraftVersion(version.status);
+
+    const effectiveFrom = dto.effectiveFrom
+      ? parseDate(dto.effectiveFrom, 'effectiveFrom')
+      : version.effectiveFrom;
+    const effectiveTo = dto.effectiveTo
+      ? parseDate(dto.effectiveTo, 'effectiveTo')
+      : version.effectiveTo;
+
+    if (effectiveTo && effectiveTo < effectiveFrom) {
+      throw new ConflictException('effectiveTo cannot be before effectiveFrom');
+    }
+
+    const updated = await this.prisma.timetableVersion.update({
+      where: { id },
+      data: {
+        versionName: dto.versionName ?? version.versionName,
+        effectiveFrom,
+        effectiveTo,
+        status: dto.status ?? version.status,
+      },
+      include: {
+        academicYear: true,
+        class: true,
+        section: true,
+        slots: { include: timetableSlotInclude() },
+      },
+    });
+
+    await this.audit('update', 'timetable_version', id, actor, updated);
+    return updated;
+  }
+
+  async restoreVersion(dto: RestoreTimetableVersionDto, actor: AuthContext) {
+    const sourceVersion = await this.findVersionOrThrow(
+      dto.sourceVersionId,
+      actor,
+    );
+
+    // Create a new draft version from the source
+    const newVersion = await this.prisma.timetableVersion.create({
+      data: {
+        tenantId: actor.tenantId,
+        academicYearId: sourceVersion.academicYearId,
+        classId: sourceVersion.classId,
+        sectionId: sourceVersion.sectionId,
+        versionName:
+          dto.versionName ?? `Restored from ${sourceVersion.versionName}`,
+        effectiveFrom: new Date(), // Default to today
+        status: TimetableVersionStatus.DRAFT,
+      },
+    });
+
+    // Copy all slots
+    if (sourceVersion.slots.length > 0) {
+      await this.prisma.timetableSlot.createMany({
+        data: sourceVersion.slots.map((slot) => ({
+          tenantId: actor.tenantId,
+          versionId: newVersion.id,
+          academicYearId: slot.academicYearId,
+          classId: slot.classId,
+          sectionId: slot.sectionId,
+          subjectId: slot.subjectId,
+          staffId: slot.staffId,
+          periodId: slot.periodId,
+          roomId: slot.roomId,
+          dayOfWeek: slot.dayOfWeek,
+          startsAt: slot.startsAt,
+          endsAt: slot.endsAt,
+          room: slot.room,
+        })),
+      });
+    }
+
+    const version = await this.findVersionOrThrow(newVersion.id, actor);
+    await this.audit('restore', 'timetable_version', version.id, actor, {
+      sourceVersionId: dto.sourceVersionId,
+      newVersionId: version.id,
+    });
+
     return version;
   }
 
@@ -1428,10 +1522,11 @@ export class TimetableService {
       substitutionId,
       actor,
     );
+    // Notify Class/Section
     await this.communicationsService.recordDeliveryRecords({
       actor,
       sourceType,
-      sourceId: `${substitutionId}:${sourceType}:${Date.now()}`,
+      sourceId: `${substitutionId}:${sourceType}:class:${Date.now()}`,
       audienceType: substitution.timetableSlot.sectionId
         ? AudienceType.SECTION
         : AudienceType.CLASS,
@@ -1439,10 +1534,26 @@ export class TimetableService {
       sectionId: substitution.timetableSlot.sectionId,
       title:
         sourceType === 'substitution_cancelled'
-          ? 'Substitution cancelled'
-          : 'Substitution assigned',
-      body: `${substitution.timetableSlot.subject.name} substitution for ${substitution.date.toLocaleDateString('en-NP')} has been updated.`,
+          ? 'Class Substitution Update'
+          : 'New Substitute Teacher',
+      body: `Your ${substitution.timetableSlot.subject.name} class on ${substitution.date.toLocaleDateString('en-NP')} will be handled by ${substitution.substituteTeacher.firstName} ${substitution.substituteTeacher.lastName}.`,
       channels: [NotificationChannel.PUSH],
+      requiredConsentTypes: [ConsentType.MESSAGING],
+    });
+
+    // Notify Substitute Teacher
+    await this.communicationsService.recordDeliveryRecords({
+      actor,
+      sourceType,
+      sourceId: `${substitutionId}:${sourceType}:teacher:${Date.now()}`,
+      audienceType: AudienceType.ALL,
+      staffIds: [substitution.substituteTeacherId],
+      title:
+        sourceType === 'substitution_cancelled'
+          ? 'Substitution Cancelled'
+          : 'New Substitution Assigned',
+      body: `You have been assigned as a substitute for ${substitution.timetableSlot.subject.name} (${substitution.timetableSlot.class.name}${substitution.timetableSlot.section ? ' ' + substitution.timetableSlot.section.name : ''}) on ${substitution.date.toLocaleDateString('en-NP')} at ${substitution.timetableSlot.startsAt}.`,
+      channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
       requiredConsentTypes: [ConsentType.MESSAGING],
     });
   }
@@ -1643,7 +1754,37 @@ export class TimetableService {
   private ensureDraftVersion(status: TimetableVersionStatus) {
     if (status !== TimetableVersionStatus.DRAFT) {
       throw new ConflictException(
-        'Only draft timetable versions can be edited',
+        `Cannot modify a ${status.toLowerCase()} timetable version. Only draft versions can be edited.`,
+      );
+    }
+  }
+
+  private async ensurePeriodNotLocked(periodId: string, actor: AuthContext) {
+    const lockedVersion = await this.prisma.timetableVersion.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        status: TimetableVersionStatus.LOCKED,
+        slots: { some: { periodId } },
+      },
+    });
+    if (lockedVersion) {
+      throw new ConflictException(
+        'Cannot delete period because it is used in a locked timetable version',
+      );
+    }
+  }
+
+  private async ensureRoomNotLocked(roomId: string, actor: AuthContext) {
+    const lockedVersion = await this.prisma.timetableVersion.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        status: TimetableVersionStatus.LOCKED,
+        slots: { some: { roomId } },
+      },
+    });
+    if (lockedVersion) {
+      throw new ConflictException(
+        'Cannot delete room because it is used in a locked timetable version',
       );
     }
   }

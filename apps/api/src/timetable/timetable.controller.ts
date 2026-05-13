@@ -34,6 +34,8 @@ import {
   UpdateSubstitutionDto,
   UpdateTeacherAvailabilityDto,
   UpdateTimetablePeriodDto,
+  UpdateTimetableVersionDto,
+  RestoreTimetableVersionDto,
   UpdateVersionSlotDto,
   UpsertTeacherWorkloadLimitDto,
   WorkloadQueryDto,
@@ -147,6 +149,25 @@ export class TimetableController {
   @Permissions('timetable:read')
   getVersion(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.timetableService.getVersion(id, auth);
+  }
+
+  @Patch('versions/:id')
+  @Permissions('timetable:update')
+  updateVersion(
+    @Param('id') id: string,
+    @Body() dto: UpdateTimetableVersionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.updateVersion(id, dto, auth);
+  }
+
+  @Post('versions/restore')
+  @Permissions('timetable:create')
+  restoreVersion(
+    @Body() dto: RestoreTimetableVersionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.timetableService.restoreVersion(dto, auth);
   }
 
   @Post('versions/:id/slots')

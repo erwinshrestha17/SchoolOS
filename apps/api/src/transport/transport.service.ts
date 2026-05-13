@@ -56,10 +56,31 @@ export class TransportService {
     private readonly redisService: RedisService,
   ) {}
 
-  listRoutes(actor: AuthContext, query?: string) {
+  async listRoutes(actor: AuthContext, query?: string) {
+    const isRestricted = !canOperateAnyTransportTrip(actor);
+
     return this.prisma.transportRoute.findMany({
       where: {
         tenantId: actor.tenantId,
+        ...(isRestricted
+          ? {
+              OR: [
+                {
+                  driverAssignments: {
+                    some: { staff: { userId: actor.userId }, endsAt: null },
+                  },
+                },
+                {
+                  trips: {
+                    some: {
+                      status: TransportTripStatus.ACTIVE,
+                      driverAssignment: { staff: { userId: actor.userId } },
+                    },
+                  },
+                },
+              ],
+            }
+          : {}),
         ...(query
           ? {
               OR: [
@@ -156,13 +177,35 @@ export class TransportService {
     return route;
   }
 
-  listStops(actor: AuthContext, routeId?: string) {
+  async listStops(actor: AuthContext, routeId?: string) {
+    const isRestricted = !canOperateAnyTransportTrip(actor);
+
     return this.prisma.transportStop.findMany({
       where: {
         tenantId: actor.tenantId,
         ...(routeId ? { routeId } : {}),
+        ...(isRestricted
+          ? {
+              route: {
+                OR: [
+                  {
+                    driverAssignments: {
+                      some: { staff: { userId: actor.userId }, endsAt: null },
+                    },
+                  },
+                  {
+                    trips: {
+                      some: {
+                        status: TransportTripStatus.ACTIVE,
+                        driverAssignment: { staff: { userId: actor.userId } },
+                      },
+                    },
+                  },
+                ],
+              },
+            }
+          : {}),
       },
-      include: { route: true },
       orderBy: [{ routeId: 'asc' }, { sequence: 'asc' }],
       take: 200,
     });
@@ -241,10 +284,31 @@ export class TransportService {
     return stop;
   }
 
-  listVehicles(actor: AuthContext, query?: string) {
+  async listVehicles(actor: AuthContext, query?: string) {
+    const isRestricted = !canOperateAnyTransportTrip(actor);
+
     return this.prisma.transportVehicle.findMany({
       where: {
         tenantId: actor.tenantId,
+        ...(isRestricted
+          ? {
+              OR: [
+                {
+                  assignments: {
+                    some: { staff: { userId: actor.userId }, endsAt: null },
+                  },
+                },
+                {
+                  trips: {
+                    some: {
+                      status: TransportTripStatus.ACTIVE,
+                      driverAssignment: { staff: { userId: actor.userId } },
+                    },
+                  },
+                },
+              ],
+            }
+          : {}),
         ...(query
           ? { registrationNumber: { contains: query, mode: 'insensitive' } }
           : {}),
@@ -400,17 +464,56 @@ export class TransportService {
     return assignment;
   }
 
-  listStudentAssignments(
+  async listStudentAssignments(
     actor: AuthContext,
     filters: { routeId?: string; studentId?: string },
   ) {
+    const isRestricted = !canOperateAnyTransportTrip(actor);
+
     return this.prisma.transportStudentAssignment.findMany({
       where: {
         tenantId: actor.tenantId,
         ...(filters.routeId ? { routeId: filters.routeId } : {}),
         ...(filters.studentId ? { studentId: filters.studentId } : {}),
+        ...(isRestricted
+          ? {
+              route: {
+                OR: [
+                  {
+                    driverAssignments: {
+                      some: { staff: { userId: actor.userId }, endsAt: null },
+                    },
+                  },
+                  {
+                    trips: {
+                      some: {
+                        status: TransportTripStatus.ACTIVE,
+                        driverAssignment: { staff: { userId: actor.userId } },
+                      },
+                    },
+                  },
+                ],
+              },
+            }
+          : {}),
       },
-      include: { route: true, stop: true, student: true },
+      include: {
+        route: true,
+        stop: true,
+        student: {
+          select: {
+            id: true,
+            firstNameEn: true,
+            lastNameEn: true,
+            photoUrl: true,
+            rollNumber: true,
+            emergencyName: true,
+            emergencyPhone: true,
+            medicalConditions: true,
+            severeAllergies: true,
+          },
+        },
+      },
       orderBy: [{ createdAt: 'desc' }],
       take: 100,
     });
@@ -566,17 +669,33 @@ export class TransportService {
     const trip = await this.getTrip(actor.tenantId, tripId);
 
     if (trip.status === TransportTripStatus.COMPLETED) {
-      throw new ConflictException('Trip is already completed');
+      return trip; // Idempotent
     }
 
     if (trip.status !== TransportTripStatus.ACTIVE) {
-      throw new ConflictException('Only active trips can be completed');
+      throw new ConflictException(
+        `Only active trips can be completed. Current status: ${trip.status}`,
+      );
     }
     await this.assertDriverCanOperateAssignment(
       actor,
       trip.driverAssignmentId,
       'complete this trip',
     );
+
+    // Final check for un-dropped students
+    const unDroppedCount = await this.prisma.transportTripStudentStatus.count({
+      where: {
+        tripId: trip.id,
+        status: TransportStudentTripStatus.BOARDED,
+      },
+    });
+
+    if (unDroppedCount > 0 && !dto.notes?.includes('FORCE_COMPLETE')) {
+      throw new ConflictException(
+        `Cannot complete trip while ${unDroppedCount} students are still boarded. Mark them as dropped or provide notes with FORCE_COMPLETE.`,
+      );
+    }
 
     await this.prisma.transportTrip.updateMany({
       where: { tenantId: actor.tenantId, id: trip.id },
@@ -598,7 +717,7 @@ export class TransportService {
       tenantId: actor.tenantId,
       userId: actor.userId,
       resourceId: trip.id,
-      after: { status: 'COMPLETED' },
+      after: { status: 'COMPLETED', unDroppedCount },
     });
 
     return this.getTrip(actor.tenantId, trip.id);
@@ -676,7 +795,22 @@ export class TransportService {
     actor: AuthContext,
     filters: { routeId?: string; vehicleId?: string },
   ) {
-    return this.listTripRows(actor.tenantId, filters);
+    const isRestricted = !canOperateAnyTransportTrip(actor);
+    const driverStaffId = isRestricted ? actor.userId : undefined; // This is actually userId, need to check if we can filter by driverAssignment.staff.userId
+
+    return this.prisma.transportTrip.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        ...(filters.routeId ? { routeId: filters.routeId } : {}),
+        ...(filters.vehicleId ? { vehicleId: filters.vehicleId } : {}),
+        ...(isRestricted
+          ? { driverAssignment: { staff: { userId: actor.userId } } }
+          : {}),
+      },
+      include: { route: true, vehicle: true, driverAssignment: true },
+      orderBy: [{ startedAt: 'desc' }],
+      take: 100,
+    });
   }
 
   async recordLocationPing(
@@ -929,12 +1063,14 @@ export class TransportService {
   }
 
   async getReports(actor: AuthContext) {
+    const today = startOfToday();
     const [
       activeAssignments,
       activeTrips,
       logsToday,
       vehicleAlerts,
       driverAlerts,
+      routeStats,
     ] = await Promise.all([
       this.prisma.transportStudentAssignment.count({
         where: {
@@ -948,16 +1084,26 @@ export class TransportService {
       this.prisma.transportLog.count({
         where: {
           tenantId: actor.tenantId,
-          occurredAt: { gte: startOfToday() },
+          occurredAt: { gte: today },
         },
       }),
       this.prisma.transportVehicle.findMany({
         where: {
           tenantId: actor.tenantId,
-          fitnessCertificateExp: {
-            lte: addDays(new Date(), 30),
-            gte: new Date(),
-          },
+          OR: [
+            {
+              fitnessCertificateExp: {
+                lte: addDays(new Date(), 30),
+                gte: new Date(),
+              },
+            },
+            {
+              documentExpiry: {
+                lte: addDays(new Date(), 30),
+                gte: new Date(),
+              },
+            },
+          ],
         },
       }),
       this.prisma.transportDriverAssignment.findMany({
@@ -967,15 +1113,77 @@ export class TransportService {
         },
         include: { staff: true, vehicle: true },
       }),
+      this.prisma.transportRoute.findMany({
+        where: { tenantId: actor.tenantId, isActive: true },
+        select: {
+          id: true,
+          name: true,
+          _count: {
+            select: {
+              enrollments: {
+                where: { status: TransportEnrollmentStatus.ACTIVE },
+              },
+              trips: {
+                where: {
+                  status: TransportTripStatus.ACTIVE,
+                },
+              },
+            },
+          },
+        },
+      }),
     ]);
 
     return {
       activeAssignments,
       activeTrips,
       logsToday,
-      vehicleFitnessAlerts: vehicleAlerts,
-      driverLicenseAlerts: driverAlerts,
+      vehicleAlerts,
+      driverAlerts,
+      routeStats: routeStats.map((r) => ({
+        id: r.id,
+        name: r.name,
+        activeStudentCount: r._count.enrollments,
+        isCurrentlyRunning: r._count.trips > 0,
+      })),
+      timestamp: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Retention strategy: Clean up location history older than 90 days.
+   * PostgreSQL remains source of truth for trip events, but high-volume pings
+   * can be rotated/partitioned or cleaned up.
+   */
+  async cleanupLocationHistory(actor: AuthContext, daysToKeep = 90) {
+    if (
+      !actor.roles.includes('platform_super_admin') &&
+      !actor.roles.includes('admin')
+    ) {
+      throw new ForbiddenException(
+        'Only administrators can trigger location history cleanup',
+      );
+    }
+
+    const cutOff = new Date();
+    cutOff.setDate(cutOff.getDate() - daysToKeep);
+
+    const deleted = await this.prisma.transportLocationPing.deleteMany({
+      where: {
+        tenantId: actor.tenantId,
+        recordedAt: { lt: cutOff },
+      },
+    });
+
+    await this.auditService.record({
+      action: 'cleanup',
+      resource: 'transport_location_history',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: { deletedCount: deleted.count, daysToKeep },
+    });
+
+    return deleted;
   }
 
   private async updateTripStudentStatus(
@@ -1003,12 +1211,30 @@ export class TransportService {
       trip.id,
       studentId,
     );
+
+    // Lifecycle enforcement
+    if (status === 'BOARDED' && existing.status !== 'PENDING') {
+      throw new ConflictException(
+        `Cannot board student in ${existing.status} status`,
+      );
+    }
+    if (status === 'DROPPED' && existing.status !== 'BOARDED') {
+      throw new ConflictException(
+        `Cannot drop student from ${existing.status} status. Must be BOARDED first.`,
+      );
+    }
+    if (status === 'ABSENT' && existing.status !== 'PENDING') {
+      throw new ConflictException(
+        `Cannot mark absent from ${existing.status} status`,
+      );
+    }
+
     const now = new Date();
 
     await this.prisma.transportTripStudentStatus.updateMany({
       where: { tenantId: actor.tenantId, id: existing.id },
       data: {
-        status,
+        status: status as any,
         ...(status === TransportStudentTripStatus.BOARDED
           ? { boardedAt: now }
           : {}),
@@ -1059,6 +1285,18 @@ export class TransportService {
   ) {
     const status = await this.prisma.transportTripStudentStatus.findFirst({
       where: { tenantId, tripId, studentId },
+      include: {
+        student: {
+          select: {
+            id: true,
+            firstNameEn: true,
+            lastNameEn: true,
+            photoUrl: true,
+            emergencyName: true,
+            emergencyPhone: true,
+          },
+        },
+      },
     });
 
     if (!status) {
@@ -1264,9 +1502,6 @@ function canOperateAnyTransportTrip(actor: AuthContext) {
   return (
     actor.roles.some((role) =>
       ['platform_super_admin', 'admin', 'principal'].includes(role),
-    ) ||
-    actor.permissions.includes('transport:manage') ||
-    actor.permissions.includes('transport:trips:update') ||
-    actor.permissions.includes('transport:trips:create')
+    ) || actor.permissions.includes('transport:manage')
   );
 }

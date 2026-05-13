@@ -14,6 +14,8 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
 import { CreateSalaryStructureDto } from './dto/create-salary-structure.dto';
 import { PayrollActionDto } from './dto/payroll-action.dto';
@@ -23,7 +25,8 @@ import { PayrollSalarySlipService } from './payroll-salary-slip.service';
 import { PayrollService } from './payroll.service';
 
 @Controller('payroll')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.payroll')
 export class PayrollController {
   constructor(
     private readonly payrollService: PayrollService,
@@ -163,6 +166,16 @@ export class PayrollController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.payrollService.markPayrollRunPaid(id, dto, auth);
+  }
+
+  @Post('runs/:id/reverse')
+  @Permissions('payroll:run:reverse')
+  reverseRun(
+    @Param('id') id: string,
+    @Body() dto: PayrollActionDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.reversePayrollRun(id, dto, auth);
   }
 
   @Get('payslips')

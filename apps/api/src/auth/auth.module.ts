@@ -7,6 +7,8 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from './guards/roles-permissions.guard';
+import { EntitlementGuard } from './guards/entitlement.guard';
+import { PlansModule } from '../plans/plans.module';
 
 @Global()
 @Module({
@@ -15,9 +17,10 @@ import { RolesPermissionsGuard } from './guards/roles-permissions.guard';
     ConfigModule,
     AuditModule,
     NotificationsModule,
+    PlansModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard, RolesPermissionsGuard],
-  exports: [AuthService, JwtAuthGuard, RolesPermissionsGuard, JwtModule],
+  providers: [AuthService, JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard],
+  exports: [AuthService, JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard, JwtModule],
 })
 export class AuthModule {}

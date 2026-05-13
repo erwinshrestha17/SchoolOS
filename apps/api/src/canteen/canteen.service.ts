@@ -33,6 +33,16 @@ import {
   UpdateCanteenStatusDto,
   UpsertCanteenSpendingControlDto,
 } from './dto/canteen.dto';
+import {
+  CanteenCorrectionDto,
+  CanteenReversalDto,
+  CreateCanteenInventoryItemDto,
+  CreateCanteenPurchaseBillDto,
+  CreateCanteenSupplierDto,
+  CreateCanteenWastageDto,
+  ManualStockAdjustmentDto,
+  OverrideAllergyDto,
+} from './dto/canteen-hardened.dto';
 
 type Tx = Prisma.TransactionClient;
 interface PaginationQuery {
@@ -404,7 +414,7 @@ export class CanteenService {
     return updated;
   }
 
-  async serveMeal(dto: ServeCanteenMealDto, actor: AuthContext) {
+  async serveMeal(dto: ServeCanteenMealDto & { overrideReason?: string }, actor: AuthContext) {
     await this.ensureStudent(actor.tenantId, dto.studentId);
     const mealDate = this.dateOnly(dto.mealDate ?? this.todayIso());
     const serving = await this.prisma.$transaction(async (tx) => {
@@ -443,6 +453,14 @@ export class CanteenService {
         actor.tenantId,
         dto.studentId,
       );
+
+      if (dietaryWarning && !dto.overrideReason) {
+        throw new BadRequestException({
+          message: 'Dietary warning detected. Override reason required.',
+          dietaryWarning,
+        });
+      }
+
       return tx.canteenMealServing.create({
         data: {
           tenantId: actor.tenantId,
@@ -453,6 +471,8 @@ export class CanteenService {
           mealDate,
           servedByUserId: actor.userId,
           dietaryWarning,
+          overrideReason: dto.overrideReason ?? null,
+          overriddenById: dto.overrideReason ? actor.userId : null,
           notes: dto.notes ?? null,
         },
       });
@@ -466,6 +486,102 @@ export class CanteenService {
       serving,
     );
     return serving;
+  }
+
+  async reverseWalletTransaction(id: string, dto: CanteenReversalDto, actor: AuthContext) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const original = await tx.canteenWalletTransaction.findFirst({
+        where: { id, tenantId: actor.tenantId },
+      });
+      if (!original) throw new NotFoundException('Transaction not found');
+      if (original.reversalOfId || original.correctionOfId) {
+        throw new ConflictException('Cannot reverse a reversal or correction');
+      }
+      const existingReversal = await tx.canteenWalletTransaction.findFirst({
+        where: { reversalOfId: id },
+      });
+      if (existingReversal) throw new ConflictException('Transaction already reversed');
+
+      const wallet = await tx.canteenWallet.findUniqueOrThrow({
+        where: { id: original.walletId },
+      });
+
+      // Calculate reversal amount (opposite of original)
+      const reversalAmount = original.amount.mul(-1);
+      const newBalance = wallet.balance.add(reversalAmount);
+
+      const updatedWallet = await tx.canteenWallet.update({
+        where: { id: wallet.id },
+        data: { balance: newBalance },
+      });
+
+      const reversal = await tx.canteenWalletTransaction.create({
+        data: {
+          tenantId: actor.tenantId,
+          walletId: wallet.id,
+          studentId: original.studentId,
+          type: reversalAmount.gt(0) ? CanteenWalletTransactionType.TOP_UP : CanteenWalletTransactionType.DEDUCTION,
+          source: CanteenWalletTransactionSource.CORRECTION,
+          amount: reversalAmount.abs(),
+          balanceAfter: newBalance,
+          reversalOfId: id,
+          reason: dto.reason,
+          createdByUserId: actor.userId,
+        },
+      });
+
+      // Note: Reversal might need accounting posting as well if original was posted
+      // For now, we assume original was posted and we need a reversal journal
+      // This would require postCanteenReversal in AccountingPostingService
+
+      return { wallet: updatedWallet, transaction: reversal };
+    });
+
+    await this.audit(actor, 'reverse', 'canteen_wallet_transaction', id, null, result.transaction);
+    return result;
+  }
+
+  async correctWalletTransaction(id: string, dto: CanteenCorrectionDto, actor: AuthContext) {
+    // Correction is essentially a reversal + a new transaction, or just an adjustment movement
+    // Here we implement it as an adjustment movement linked to the original
+    const result = await this.prisma.$transaction(async (tx) => {
+      const original = await tx.canteenWalletTransaction.findFirst({
+        where: { id, tenantId: actor.tenantId },
+      });
+      if (!original) throw new NotFoundException('Transaction not found');
+      
+      const wallet = await tx.canteenWallet.findUniqueOrThrow({
+        where: { id: original.walletId },
+      });
+
+      const adjustmentAmount = new Prisma.Decimal(dto.amount).sub(original.amount);
+      const newBalance = wallet.balance.add(adjustmentAmount);
+
+      const updatedWallet = await tx.canteenWallet.update({
+        where: { id: wallet.id },
+        data: { balance: newBalance },
+      });
+
+      const correction = await tx.canteenWalletTransaction.create({
+        data: {
+          tenantId: actor.tenantId,
+          walletId: wallet.id,
+          studentId: original.studentId,
+          type: adjustmentAmount.gt(0) ? CanteenWalletTransactionType.TOP_UP : CanteenWalletTransactionType.DEDUCTION,
+          source: CanteenWalletTransactionSource.CORRECTION,
+          amount: adjustmentAmount.abs(),
+          balanceAfter: newBalance,
+          correctionOfId: id,
+          reason: dto.reason,
+          createdByUserId: actor.userId,
+        },
+      });
+
+      return { wallet: updatedWallet, transaction: correction };
+    });
+
+    await this.audit(actor, 'correct', 'canteen_wallet_transaction', id, null, result.transaction);
+    return result;
   }
 
   async listDailyServings(actor: AuthContext, options: ListServingsQuery = {}) {
@@ -600,6 +716,15 @@ export class CanteenService {
     if (!dto.items?.length) {
       throw new BadRequestException('At least one sale item is required');
     }
+
+    if (dto.idempotencyKey) {
+      const existing = await this.prisma.canteenPosSale.findFirst({
+        where: { tenantId: actor.tenantId, idempotencyKey: dto.idempotencyKey },
+        include: { items: true },
+      });
+      if (existing) return existing;
+    }
+
     const paymentMethod = this.parsePaymentMethod(dto.paymentMethod);
     if (paymentMethod === CanteenPaymentMethod.WALLET && !dto.studentId) {
       throw new BadRequestException('studentId is required for wallet payment');
@@ -636,6 +761,7 @@ export class CanteenService {
           totalAmount: subtotal,
           createdByUserId: actor.userId,
           notes: dto.notes ?? null,
+          idempotencyKey: dto.idempotencyKey ?? null,
           items: {
             create: items.map((item) => ({
               tenantId: actor.tenantId,
@@ -1136,6 +1262,227 @@ export class CanteenService {
       throw new BadRequestException(`Invalid meal plan status: ${status}`);
     }
     return normalized as CanteenMealPlanStatus;
+  }
+
+  async createSupplier(dto: CreateCanteenSupplierDto, actor: AuthContext) {
+    const supplier = await this.prisma.canteenSupplier.create({
+      data: {
+        tenantId: actor.tenantId,
+        ...dto,
+      },
+    });
+    await this.audit(actor, 'create', 'canteen_supplier', supplier.id, null, supplier);
+    return supplier;
+  }
+
+  async listSuppliers(actor: AuthContext, options: PaginationQuery = {}) {
+    const { skip, take, page } = this.pagination(options);
+    const where = { tenantId: actor.tenantId, isActive: true };
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.canteenSupplier.findMany({ where, skip, take, orderBy: { name: 'asc' } }),
+      this.prisma.canteenSupplier.count({ where }),
+    ]);
+    return { items, meta: { page, limit: take, total } };
+  }
+
+  async createInventoryItem(dto: CreateCanteenInventoryItemDto, actor: AuthContext) {
+    const item = await this.prisma.canteenInventoryItem.create({
+      data: {
+        tenantId: actor.tenantId,
+        name: dto.name,
+        sku: dto.sku ?? null,
+        category: dto.category,
+        unit: dto.unit,
+        minStockLevel: dto.minStockLevel ? new Prisma.Decimal(dto.minStockLevel) : new Prisma.Decimal(0),
+        unitCost: dto.unitCost ? new Prisma.Decimal(dto.unitCost) : new Prisma.Decimal(0),
+        defaultSupplierId: dto.defaultSupplierId ?? null,
+      },
+    });
+    await this.audit(actor, 'create', 'canteen_inventory_item', item.id, null, item);
+    return item;
+  }
+
+  async listInventoryItems(actor: AuthContext, options: PaginationQuery & { category?: string } = {}) {
+    const { skip, take, page } = this.pagination(options);
+    const where = { 
+      tenantId: actor.tenantId, 
+      isActive: true,
+      ...(options.category ? { category: options.category } : {}),
+    };
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.canteenInventoryItem.findMany({ where, skip, take, orderBy: { name: 'asc' } }),
+      this.prisma.canteenInventoryItem.count({ where }),
+    ]);
+    return { items, meta: { page, limit: take, total } };
+  }
+
+  async createPurchaseBill(dto: CreateCanteenPurchaseBillDto, actor: AuthContext) {
+    const bill = await this.prisma.$transaction(async (tx) => {
+      let totalAmount = new Prisma.Decimal(0);
+      const itemsData = [];
+
+      for (const item of dto.items) {
+        const lineTotal = new Prisma.Decimal(item.quantity).mul(new Prisma.Decimal(item.unitCost));
+        totalAmount = totalAmount.add(lineTotal);
+        itemsData.push({
+          tenantId: actor.tenantId,
+          inventoryItemId: item.inventoryItemId,
+          quantity: new Prisma.Decimal(item.quantity),
+          unitCost: new Prisma.Decimal(item.unitCost),
+          lineTotal,
+          expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,
+          batchNumber: item.batchNumber ?? null,
+        });
+      }
+
+      const netAmount = totalAmount.add(new Prisma.Decimal(dto.taxAmount ?? 0)).sub(new Prisma.Decimal(dto.discountAmount ?? 0));
+
+      const createdBill = await tx.canteenPurchaseBill.create({
+        data: {
+          tenantId: actor.tenantId,
+          supplierId: dto.supplierId,
+          billNumber: dto.billNumber,
+          billDate: new Date(dto.billDate),
+          totalAmount,
+          taxAmount: new Prisma.Decimal(dto.taxAmount ?? 0),
+          discountAmount: new Prisma.Decimal(dto.discountAmount ?? 0),
+          netAmount,
+          notes: dto.notes ?? null,
+          createdByUserId: actor.userId,
+          items: {
+            create: itemsData,
+          },
+        },
+        include: { items: true },
+      });
+
+      await this.accountingPostingService.postCanteenPurchase(
+        {
+          tenantId: actor.tenantId,
+          purchaseBillId: createdBill.id,
+          supplierId: createdBill.supplierId,
+          amount: totalAmount,
+          taxAmount: createdBill.taxAmount,
+          discountAmount: createdBill.discountAmount,
+          netAmount: createdBill.netAmount,
+          note: createdBill.notes,
+          entryDate: createdBill.billDate,
+        },
+        actor,
+        tx,
+      );
+
+      // Update stock levels and record movements
+      for (const item of itemsData) {
+        const invItem = await tx.canteenInventoryItem.update({
+          where: { id: item.inventoryItemId },
+          data: {
+            currentStock: { increment: item.quantity },
+            unitCost: item.unitCost, // Update last purchase cost
+          },
+        });
+
+        await tx.canteenStockMovement.create({
+          data: {
+            tenantId: actor.tenantId,
+            inventoryItemId: item.inventoryItemId,
+            type: 'IN',
+            quantity: item.quantity,
+            balanceAfter: invItem.currentStock,
+            referenceType: 'PURCHASE',
+            referenceId: createdBill.id,
+            movementDate: new Date(),
+            createdByUserId: actor.userId,
+          },
+        });
+      }
+
+      return createdBill;
+    });
+
+    await this.audit(actor, 'create', 'canteen_purchase_bill', bill.id, null, bill);
+    return bill;
+  }
+
+  async recordWastage(dto: CreateCanteenWastageDto, actor: AuthContext) {
+    const wastage = await this.prisma.$transaction(async (tx) => {
+      const item = await tx.canteenInventoryItem.findFirstOrThrow({
+        where: { id: dto.inventoryItemId, tenantId: actor.tenantId },
+      });
+
+      const quantity = new Prisma.Decimal(dto.quantity);
+      const totalCost = item.unitCost.mul(quantity);
+
+      const createdWastage = await tx.canteenWastage.create({
+        data: {
+          tenantId: actor.tenantId,
+          inventoryItemId: dto.inventoryItemId,
+          quantity,
+          unitCost: item.unitCost,
+          totalCost,
+          reason: dto.reason,
+          wastageDate: new Date(dto.wastageDate),
+          notes: dto.notes ?? null,
+          createdByUserId: actor.userId,
+        },
+      });
+
+      const updatedItem = await tx.canteenInventoryItem.update({
+        where: { id: item.id },
+        data: { currentStock: { decrement: quantity } },
+      });
+
+      await tx.canteenStockMovement.create({
+        data: {
+          tenantId: actor.tenantId,
+          inventoryItemId: item.id,
+          type: 'OUT',
+          quantity,
+          balanceAfter: updatedItem.currentStock,
+          referenceType: 'WASTAGE',
+          referenceId: createdWastage.id,
+          reason: dto.reason,
+          movementDate: new Date(),
+          createdByUserId: actor.userId,
+        },
+      });
+
+      return createdWastage;
+    });
+
+    await this.audit(actor, 'record_wastage', 'canteen_inventory_item', dto.inventoryItemId, null, wastage);
+    return wastage;
+  }
+
+  async manualStockAdjustment(dto: ManualStockAdjustmentDto, actor: AuthContext) {
+    const adjustment = await this.prisma.$transaction(async (tx) => {
+      const item = await tx.canteenInventoryItem.findFirstOrThrow({
+        where: { id: dto.inventoryItemId, tenantId: actor.tenantId },
+      });
+
+      const quantity = new Prisma.Decimal(dto.quantity);
+      const updatedItem = await tx.canteenInventoryItem.update({
+        where: { id: item.id },
+        data: { currentStock: { increment: quantity } },
+      });
+
+      return tx.canteenStockMovement.create({
+        data: {
+          tenantId: actor.tenantId,
+          inventoryItemId: item.id,
+          type: quantity.gt(0) ? 'IN' : 'OUT',
+          quantity: quantity.abs(),
+          balanceAfter: updatedItem.currentStock,
+          referenceType: 'MANUAL',
+          reason: dto.reason,
+          movementDate: new Date(),
+          createdByUserId: actor.userId,
+        },
+      });
+    });
+
+    await this.audit(actor, 'adjust_stock', 'canteen_inventory_item', dto.inventoryItemId, null, adjustment);
+    return adjustment;
   }
 
   private parseEnrollmentStatus(status: string) {

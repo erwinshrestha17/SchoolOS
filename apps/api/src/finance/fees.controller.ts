@@ -12,6 +12,8 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import type { AuthContext } from '../auth/auth.types';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { CreateFeeHeadDto } from './dto/create-fee-head.dto';
 import { CreateFeePlanDto } from './dto/create-fee-plan.dto';
 import { CreateDiscountRuleDto } from './dto/create-discount-rule.dto';
@@ -26,7 +28,8 @@ import { DuesQueryDto } from './dto/dues-query.dto';
 import { FinanceService } from './finance.service';
 
 @Controller('fees')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.fees')
 export class FeesController {
   constructor(private readonly financeService: FinanceService) {}
 
