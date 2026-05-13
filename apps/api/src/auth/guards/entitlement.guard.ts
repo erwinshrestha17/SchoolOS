@@ -17,10 +17,10 @@ export class EntitlementGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const featureKey = this.reflector.getAllAndOverride<string>(ENTITLEMENT_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const featureKey = this.reflector.getAllAndOverride<string>(
+      ENTITLEMENT_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     if (!featureKey) {
       return true;
@@ -38,7 +38,10 @@ export class EntitlementGuard implements CanActivate {
       return true;
     }
 
-    const isAllowed = await this.plansService.checkFeatureEnabled(tenantId, featureKey);
+    const isAllowed = await this.plansService.checkFeatureEnabled(
+      tenantId,
+      featureKey,
+    );
 
     if (!isAllowed) {
       throw new ForbiddenException(

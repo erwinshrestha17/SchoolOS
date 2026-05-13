@@ -367,13 +367,21 @@ function buildService(
     },
     librarySetting: {
       findUnique: jest.fn().mockResolvedValue(null),
-      upsert: jest.fn().mockImplementation((args) => Promise.resolve(args.create)),
+      upsert: jest
+        .fn()
+        .mockImplementation((args) => Promise.resolve(args.create)),
     },
     libraryFine: {
-      create: jest.fn().mockImplementation((args) => Promise.resolve({ id: 'fine-1', ...args.data })),
+      create: jest
+        .fn()
+        .mockImplementation((args) =>
+          Promise.resolve({ id: 'fine-1', ...args.data }),
+        ),
       findMany: jest.fn().mockResolvedValue([]),
       count: jest.fn().mockResolvedValue(0),
-      update: jest.fn().mockImplementation((args) => Promise.resolve(args.data)),
+      update: jest
+        .fn()
+        .mockImplementation((args) => Promise.resolve(args.data)),
       findFirst: jest.fn().mockResolvedValue(null),
     },
   };
@@ -420,13 +428,21 @@ function buildService(
     libraryFine: {
       findMany: jest.fn().mockResolvedValue([]),
       count: jest.fn().mockResolvedValue(0),
-      create: jest.fn().mockImplementation((args) => Promise.resolve({ id: 'fine-1', ...args.data })),
-      update: jest.fn().mockImplementation((args) => Promise.resolve(args.data)),
+      create: jest
+        .fn()
+        .mockImplementation((args) =>
+          Promise.resolve({ id: 'fine-1', ...args.data }),
+        ),
+      update: jest
+        .fn()
+        .mockImplementation((args) => Promise.resolve(args.data)),
       findFirst: jest.fn().mockResolvedValue(null),
     },
     librarySetting: {
       findUnique: jest.fn().mockResolvedValue(null),
-      upsert: jest.fn().mockImplementation((args) => Promise.resolve(args.create)),
+      upsert: jest
+        .fn()
+        .mockImplementation((args) => Promise.resolve(args.create)),
     },
     student: {
       findFirst: jest.fn().mockResolvedValue({ id: 'student-1' }),

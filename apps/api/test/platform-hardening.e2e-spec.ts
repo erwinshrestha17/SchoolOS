@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ForbiddenException, ExecutionContext } from '@nestjs/common';
+import {
+  INestApplication,
+  ForbiddenException,
+  ExecutionContext,
+} from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
@@ -9,11 +13,7 @@ import { PlatformService } from '../src/platform/platform.service';
 import { PlatformController } from '../src/platform/platform.controller';
 import { Reflector } from '@nestjs/core';
 import { getQueueToken } from '@nestjs/bullmq';
-import {
-  PrismaMock,
-  createPrismaMock,
-  createQueueMock,
-} from './test-helpers';
+import { PrismaMock, createPrismaMock, createQueueMock } from './test-helpers';
 
 describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
   let app: INestApplication;
@@ -69,38 +69,52 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
 
     freeTenantId = 'free-school-id';
     await prisma.tenant.create({
-      data: { id: freeTenantId, name: 'Free School', slug: 'free-school', plan: 'free' },
+      data: {
+        id: freeTenantId,
+        name: 'Free School',
+        slug: 'free-school',
+        plan: 'free',
+      },
     });
 
     premiumTenantId = 'premium-school-id';
     await prisma.tenant.create({
-      data: { id: premiumTenantId, name: 'Premium School', slug: 'premium-school', plan: 'premium' },
+      data: {
+        id: premiumTenantId,
+        name: 'Premium School',
+        slug: 'premium-school',
+        plan: 'premium',
+      },
     });
 
     // Premium Plan
     const premiumPlanId = 'plan-premium';
     await prisma.platformPlan.create({
-      data: { id: premiumPlanId, key: 'premium-plan', name: 'Premium Plan' }
+      data: { id: premiumPlanId, key: 'premium-plan', name: 'Premium Plan' },
     });
     prisma.__state.platformPlanFeatures.push(
       { planId: premiumPlanId, featureKey: 'module.payroll', enabled: true },
-      { planId: premiumPlanId, featureKey: 'module.fees', enabled: true }
+      { planId: premiumPlanId, featureKey: 'module.fees', enabled: true },
     );
     await prisma.tenantSubscription.create({
-      data: { tenantId: premiumTenantId, planId: premiumPlanId, status: 'ACTIVE' }
+      data: {
+        tenantId: premiumTenantId,
+        planId: premiumPlanId,
+        status: 'ACTIVE',
+      },
     });
 
     // Free Plan
     const freePlanId = 'plan-free';
     await prisma.platformPlan.create({
-      data: { id: freePlanId, key: 'free-plan', name: 'Free Plan' }
+      data: { id: freePlanId, key: 'free-plan', name: 'Free Plan' },
     });
     prisma.__state.platformPlanFeatures.push(
       { planId: freePlanId, featureKey: 'module.fees', enabled: true },
-      { planId: freePlanId, featureKey: 'module.payroll', enabled: false }
+      { planId: freePlanId, featureKey: 'module.payroll', enabled: false },
     );
     await prisma.tenantSubscription.create({
-      data: { tenantId: freeTenantId, planId: freePlanId, status: 'ACTIVE' }
+      data: { tenantId: freeTenantId, planId: freePlanId, status: 'ACTIVE' },
     });
   });
 
@@ -124,25 +138,36 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
   describe('Entitlement Enforcement', () => {
     it('allows access to enabled modules', async () => {
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue('module.fees');
-      
+
       const context = createMockContext(freeTenantId);
       const canActivate = await entitlementGuard.canActivate(context);
       expect(canActivate).toBe(true);
     });
 
     it('denies access to disabled modules', async () => {
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue('module.payroll');
-      
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue('module.payroll');
+
       const context = createMockContext(freeTenantId);
-      await expect(entitlementGuard.canActivate(context)).rejects.toThrow(ForbiddenException);
+      await expect(entitlementGuard.canActivate(context)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('honors manual feature overrides', async () => {
       await prisma.tenantFeatureOverride.create({
-        data: { tenantId: freeTenantId, featureKey: 'module.payroll', enabled: true, reason: 'Test' }
+        data: {
+          tenantId: freeTenantId,
+          featureKey: 'module.payroll',
+          enabled: true,
+          reason: 'Test',
+        },
       });
 
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue('module.payroll');
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue('module.payroll');
       const context = createMockContext(freeTenantId);
       const canActivate = await entitlementGuard.canActivate(context);
       expect(canActivate).toBe(true);
@@ -152,34 +177,55 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
   describe('SaaS Billing Lifecycle', () => {
     it('manages invoice lifecycle from ISSUED to PAID', async () => {
       const actor = { tenantId: 'platform', userId: 'admin' } as any;
-      
+
       // 1. Create
-      const invoice = await platformService.createSaaSInvoice(freeTenantId, {
-        issueDate: new Date(),
-        dueDate: new Date(Date.now() + 86400000), // 1 day in future
-        lines: [{ lineType: 'SUBSCRIPTION', description: 'Sub', quantity: 1, unitAmount: 5000 }]
-      }, actor);
-      
+      const invoice = await platformService.createSaaSInvoice(
+        freeTenantId,
+        {
+          issueDate: new Date().toISOString(),
+          dueDate: new Date(Date.now() + 86400000).toISOString(), // 1 day in future
+          lines: [
+            {
+              lineType: 'SUBSCRIPTION',
+              description: 'Sub',
+              quantity: 1,
+              unitAmount: '5000',
+            },
+          ],
+        },
+        actor,
+      );
+
       expect(invoice).toBeDefined();
       expect(invoice.id).toBeDefined();
       expect(invoice.status).toBe('ISSUED');
 
       // 2. Partial Payment
-      const partial = await platformService.recordSaaSPayment(freeTenantId, invoice.id, {
-        amount: 2000,
-        paymentDate: new Date(),
-        method: 'BANK_TRANSFER'
-      }, actor);
-      
+      const partial = await platformService.recordSaaSPayment(
+        freeTenantId,
+        invoice.id,
+        {
+          amount: '2000',
+          paymentDate: new Date().toISOString(),
+          method: 'BANK_TRANSFER',
+        },
+        actor,
+      );
+
       expect(partial.status).toBe('PARTIAL');
 
       // 3. Full Payment
-      const full = await platformService.recordSaaSPayment(freeTenantId, invoice.id, {
-        amount: 3000,
-        paymentDate: new Date(),
-        method: 'BANK_TRANSFER'
-      }, actor);
-      
+      const full = await platformService.recordSaaSPayment(
+        freeTenantId,
+        invoice.id,
+        {
+          amount: '3000',
+          paymentDate: new Date().toISOString(),
+          method: 'BANK_TRANSFER',
+        },
+        actor,
+      );
+
       expect(full.status).toBe('PAID');
     });
   });
@@ -201,12 +247,15 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
           configEncrypted: { key: 'secret', sender: 'test' },
           secretKeys: ['key'],
           enabled: true,
-          updatedBy: 'test'
-        }
+          updatedBy: 'test',
+        },
       });
 
       const providers = await platformController.listProviders();
       const testProvider = providers.find((p: any) => p.name === 'MaskTest');
+      if (!testProvider) {
+        throw new Error('Expected MaskTest provider to be returned');
+      }
       expect(testProvider.config.key).toBe('********');
     });
   });

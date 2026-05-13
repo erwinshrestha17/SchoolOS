@@ -28,7 +28,10 @@ import { MarkLibraryCopyStatusDto } from './dto/mark-library-copy-status.dto';
 import { ReturnLibraryCopyDto } from './dto/return-library-copy.dto';
 import { UpdateLibraryBookDto } from './dto/update-library-book.dto';
 import { UpdateLibraryCopyDto } from './dto/update-library-copy.dto';
-import { CreateLibraryFineDto, UpdateLibraryFineDto } from './dto/library-fine.dto';
+import {
+  CreateLibraryFineDto,
+  UpdateLibraryFineDto,
+} from './dto/library-fine.dto';
 import { UpdateLibrarySettingDto } from './dto/update-library-setting.dto';
 import { StudentQrService } from '../students/student-qr.service';
 import { StudentQrResolvePurpose } from '@schoolos/core';
@@ -765,7 +768,7 @@ export class LibraryService {
     return {
       activeIssues,
       overdueBooks,
-      canBorrow: activeIssues < (await this.getLibrarySettings(actor)).maxBooksPerStudent,
+      canBorrow: activeIssues < this.configService.libraryMaxBooksPerStudent,
     };
   }
 
@@ -786,21 +789,46 @@ export class LibraryService {
     };
   }
 
-  async updateLibrarySettings(actor: AuthContext, dto: UpdateLibrarySettingDto) {
+  async updateLibrarySettings(
+    actor: AuthContext,
+    dto: UpdateLibrarySettingDto,
+  ) {
     const settings = await this.prisma.librarySetting.upsert({
       where: { tenantId: actor.tenantId },
       update: {
-        ...(dto.finePerDay !== undefined ? { finePerDay: new Prisma.Decimal(dto.finePerDay) } : {}),
-        ...(dto.maxFineAmount !== undefined ? { maxFineAmount: dto.maxFineAmount ? new Prisma.Decimal(dto.maxFineAmount) : null } : {}),
-        ...(dto.gracePeriodDays !== undefined ? { gracePeriodDays: dto.gracePeriodDays } : {}),
-        ...(dto.lostBookChargeMultiplier !== undefined ? { lostBookChargeMultiplier: new Prisma.Decimal(dto.lostBookChargeMultiplier) } : {}),
+        ...(dto.finePerDay !== undefined
+          ? { finePerDay: new Prisma.Decimal(dto.finePerDay) }
+          : {}),
+        ...(dto.maxFineAmount !== undefined
+          ? {
+              maxFineAmount: dto.maxFineAmount
+                ? new Prisma.Decimal(dto.maxFineAmount)
+                : null,
+            }
+          : {}),
+        ...(dto.gracePeriodDays !== undefined
+          ? { gracePeriodDays: dto.gracePeriodDays }
+          : {}),
+        ...(dto.lostBookChargeMultiplier !== undefined
+          ? {
+              lostBookChargeMultiplier: new Prisma.Decimal(
+                dto.lostBookChargeMultiplier,
+              ),
+            }
+          : {}),
       },
       create: {
         tenantId: actor.tenantId,
-        finePerDay: new Prisma.Decimal(dto.finePerDay ?? this.configService.libraryFinePerDay),
-        maxFineAmount: dto.maxFineAmount ? new Prisma.Decimal(dto.maxFineAmount) : null,
+        finePerDay: new Prisma.Decimal(
+          dto.finePerDay ?? this.configService.libraryFinePerDay,
+        ),
+        maxFineAmount: dto.maxFineAmount
+          ? new Prisma.Decimal(dto.maxFineAmount)
+          : null,
         gracePeriodDays: dto.gracePeriodDays ?? 0,
-        lostBookChargeMultiplier: new Prisma.Decimal(dto.lostBookChargeMultiplier ?? 1),
+        lostBookChargeMultiplier: new Prisma.Decimal(
+          dto.lostBookChargeMultiplier ?? 1,
+        ),
       },
     });
 
@@ -906,7 +934,11 @@ export class LibraryService {
     return fine;
   }
 
-  async updateFine(actor: AuthContext, fineId: string, dto: UpdateLibraryFineDto) {
+  async updateFine(
+    actor: AuthContext,
+    fineId: string,
+    dto: UpdateLibraryFineDto,
+  ) {
     const existing = await this.prisma.libraryFine.findFirst({
       where: { id: fineId, tenantId: actor.tenantId },
     });
@@ -919,9 +951,15 @@ export class LibraryService {
       where: { id: fineId },
       data: {
         ...(dto.status !== undefined ? { status: dto.status } : {}),
-        ...(dto.waivedAmount !== undefined ? { waivedAmount: new Prisma.Decimal(dto.waivedAmount) } : {}),
-        ...(dto.waiverReason !== undefined ? { waiverReason: dto.waiverReason } : {}),
-        ...(dto.correctionReason !== undefined ? { correctionReason: dto.correctionReason } : {}),
+        ...(dto.waivedAmount !== undefined
+          ? { waivedAmount: new Prisma.Decimal(dto.waivedAmount) }
+          : {}),
+        ...(dto.waiverReason !== undefined
+          ? { waiverReason: dto.waiverReason }
+          : {}),
+        ...(dto.correctionReason !== undefined
+          ? { correctionReason: dto.correctionReason }
+          : {}),
         ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
       },
     });
@@ -939,9 +977,12 @@ export class LibraryService {
     return updated;
   }
 
-  async getPopularBooksReport(actor: AuthContext, options: PaginationQuery = {}) {
+  async getPopularBooksReport(
+    actor: AuthContext,
+    options: PaginationQuery = {},
+  ) {
     const { skip, take } = this.pagination(options);
-    
+
     // Aggregation for popular books
     const popular = await this.prisma.libraryIssue.groupBy({
       by: ['copyId'],
@@ -1020,7 +1061,12 @@ export class LibraryService {
   }
 
   async resolveQrBorrower(actor: AuthContext, token: string) {
-    return this.studentQrService.resolveQr(actor.tenantId, token, StudentQrResolvePurpose.LIBRARY, actor);
+    return this.studentQrService.resolveQr(
+      actor.tenantId,
+      token,
+      StudentQrResolvePurpose.LIBRARY,
+      actor,
+    );
   }
 
   private async ensureBorrower(

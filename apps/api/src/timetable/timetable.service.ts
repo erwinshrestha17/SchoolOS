@@ -1522,6 +1522,10 @@ export class TimetableService {
       substitutionId,
       actor,
     );
+    const substituteName = substitution.substituteTeacher
+      ? `${substitution.substituteTeacher.firstName} ${substitution.substituteTeacher.lastName}`
+      : 'a substitute teacher';
+
     // Notify Class/Section
     await this.communicationsService.recordDeliveryRecords({
       actor,
@@ -1536,26 +1540,28 @@ export class TimetableService {
         sourceType === 'substitution_cancelled'
           ? 'Class Substitution Update'
           : 'New Substitute Teacher',
-      body: `Your ${substitution.timetableSlot.subject.name} class on ${substitution.date.toLocaleDateString('en-NP')} will be handled by ${substitution.substituteTeacher.firstName} ${substitution.substituteTeacher.lastName}.`,
+      body: `Your ${substitution.timetableSlot.subject.name} class on ${substitution.date.toLocaleDateString('en-NP')} will be handled by ${substituteName}.`,
       channels: [NotificationChannel.PUSH],
       requiredConsentTypes: [ConsentType.MESSAGING],
     });
 
     // Notify Substitute Teacher
-    await this.communicationsService.recordDeliveryRecords({
-      actor,
-      sourceType,
-      sourceId: `${substitutionId}:${sourceType}:teacher:${Date.now()}`,
-      audienceType: AudienceType.ALL,
-      staffIds: [substitution.substituteTeacherId],
-      title:
-        sourceType === 'substitution_cancelled'
-          ? 'Substitution Cancelled'
-          : 'New Substitution Assigned',
-      body: `You have been assigned as a substitute for ${substitution.timetableSlot.subject.name} (${substitution.timetableSlot.class.name}${substitution.timetableSlot.section ? ' ' + substitution.timetableSlot.section.name : ''}) on ${substitution.date.toLocaleDateString('en-NP')} at ${substitution.timetableSlot.startsAt}.`,
-      channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
-      requiredConsentTypes: [ConsentType.MESSAGING],
-    });
+    if (substitution.substituteTeacherId) {
+      await this.communicationsService.recordDeliveryRecords({
+        actor,
+        sourceType,
+        sourceId: `${substitutionId}:${sourceType}:teacher:${Date.now()}`,
+        audienceType: AudienceType.ALL,
+        staffIds: [substitution.substituteTeacherId],
+        title:
+          sourceType === 'substitution_cancelled'
+            ? 'Substitution Cancelled'
+            : 'New Substitution Assigned',
+        body: `You have been assigned as a substitute for ${substitution.timetableSlot.subject.name} (${substitution.timetableSlot.class.name}${substitution.timetableSlot.section ? ' ' + substitution.timetableSlot.section.name : ''}) on ${substitution.date.toLocaleDateString('en-NP')} at ${substitution.timetableSlot.startsAt}.`,
+        channels: [NotificationChannel.PUSH, NotificationChannel.EMAIL],
+        requiredConsentTypes: [ConsentType.MESSAGING],
+      });
+    }
   }
 
   private async upsertWorkloadLimit(

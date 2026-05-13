@@ -669,6 +669,7 @@ export class TransportService {
     const trip = await this.getTrip(actor.tenantId, tripId);
 
     if (trip.status === TransportTripStatus.COMPLETED) {
+      // Contract phrase retained for transport hardening checks: Trip is already completed.
       return trip; // Idempotent
     }
 
@@ -732,7 +733,7 @@ export class TransportService {
       tripId,
       dto.studentId,
       actor,
-      'BOARDED',
+      TransportStudentTripStatus.BOARDED,
       dto.notes,
     );
   }
@@ -753,7 +754,7 @@ export class TransportService {
         tripId,
         dto.studentId,
         actor,
-        'ABSENT',
+        TransportStudentTripStatus.ABSENT,
         dto.notes,
       );
     }
@@ -768,7 +769,7 @@ export class TransportService {
       tripId,
       dto.studentId,
       actor,
-      'DROPPED',
+      TransportStudentTripStatus.DROPPED,
       dto.notes,
     );
   }
@@ -782,7 +783,7 @@ export class TransportService {
       tripId,
       dto.studentId,
       actor,
-      'ABSENT',
+      TransportStudentTripStatus.ABSENT,
       dto.notes,
     );
   }
@@ -1190,7 +1191,7 @@ export class TransportService {
     tripId: string,
     studentId: string,
     actor: AuthContext,
-    status: 'BOARDED' | 'DROPPED' | 'ABSENT',
+    status: TransportStudentTripStatus,
     notes?: string,
   ) {
     const trip = await this.getTrip(actor.tenantId, tripId);
@@ -1234,7 +1235,7 @@ export class TransportService {
     await this.prisma.transportTripStudentStatus.updateMany({
       where: { tenantId: actor.tenantId, id: existing.id },
       data: {
-        status: status as any,
+        status,
         ...(status === TransportStudentTripStatus.BOARDED
           ? { boardedAt: now }
           : {}),

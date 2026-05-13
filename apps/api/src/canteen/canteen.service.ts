@@ -45,6 +45,15 @@ import {
 } from './dto/canteen-hardened.dto';
 
 type Tx = Prisma.TransactionClient;
+type PurchaseBillItemData = {
+  tenantId: string;
+  inventoryItemId: string;
+  quantity: Prisma.Decimal;
+  unitCost: Prisma.Decimal;
+  lineTotal: Prisma.Decimal;
+  expiryDate: Date | null;
+  batchNumber: string | null;
+};
 interface PaginationQuery {
   page?: string;
   limit?: string;
@@ -414,7 +423,10 @@ export class CanteenService {
     return updated;
   }
 
-  async serveMeal(dto: ServeCanteenMealDto & { overrideReason?: string }, actor: AuthContext) {
+  async serveMeal(
+    dto: ServeCanteenMealDto & { overrideReason?: string },
+    actor: AuthContext,
+  ) {
     await this.ensureStudent(actor.tenantId, dto.studentId);
     const mealDate = this.dateOnly(dto.mealDate ?? this.todayIso());
     const serving = await this.prisma.$transaction(async (tx) => {
@@ -488,7 +500,11 @@ export class CanteenService {
     return serving;
   }
 
-  async reverseWalletTransaction(id: string, dto: CanteenReversalDto, actor: AuthContext) {
+  async reverseWalletTransaction(
+    id: string,
+    dto: CanteenReversalDto,
+    actor: AuthContext,
+  ) {
     const result = await this.prisma.$transaction(async (tx) => {
       const original = await tx.canteenWalletTransaction.findFirst({
         where: { id, tenantId: actor.tenantId },
@@ -500,7 +516,8 @@ export class CanteenService {
       const existingReversal = await tx.canteenWalletTransaction.findFirst({
         where: { reversalOfId: id },
       });
-      if (existingReversal) throw new ConflictException('Transaction already reversed');
+      if (existingReversal)
+        throw new ConflictException('Transaction already reversed');
 
       const wallet = await tx.canteenWallet.findUniqueOrThrow({
         where: { id: original.walletId },
@@ -520,7 +537,9 @@ export class CanteenService {
           tenantId: actor.tenantId,
           walletId: wallet.id,
           studentId: original.studentId,
-          type: reversalAmount.gt(0) ? CanteenWalletTransactionType.TOP_UP : CanteenWalletTransactionType.DEDUCTION,
+          type: reversalAmount.gt(0)
+            ? CanteenWalletTransactionType.TOP_UP
+            : CanteenWalletTransactionType.DEDUCTION,
           source: CanteenWalletTransactionSource.CORRECTION,
           amount: reversalAmount.abs(),
           balanceAfter: newBalance,
@@ -537,11 +556,22 @@ export class CanteenService {
       return { wallet: updatedWallet, transaction: reversal };
     });
 
-    await this.audit(actor, 'reverse', 'canteen_wallet_transaction', id, null, result.transaction);
+    await this.audit(
+      actor,
+      'reverse',
+      'canteen_wallet_transaction',
+      id,
+      null,
+      result.transaction,
+    );
     return result;
   }
 
-  async correctWalletTransaction(id: string, dto: CanteenCorrectionDto, actor: AuthContext) {
+  async correctWalletTransaction(
+    id: string,
+    dto: CanteenCorrectionDto,
+    actor: AuthContext,
+  ) {
     // Correction is essentially a reversal + a new transaction, or just an adjustment movement
     // Here we implement it as an adjustment movement linked to the original
     const result = await this.prisma.$transaction(async (tx) => {
@@ -549,12 +579,14 @@ export class CanteenService {
         where: { id, tenantId: actor.tenantId },
       });
       if (!original) throw new NotFoundException('Transaction not found');
-      
+
       const wallet = await tx.canteenWallet.findUniqueOrThrow({
         where: { id: original.walletId },
       });
 
-      const adjustmentAmount = new Prisma.Decimal(dto.amount).sub(original.amount);
+      const adjustmentAmount = new Prisma.Decimal(dto.amount).sub(
+        original.amount,
+      );
       const newBalance = wallet.balance.add(adjustmentAmount);
 
       const updatedWallet = await tx.canteenWallet.update({
@@ -567,7 +599,9 @@ export class CanteenService {
           tenantId: actor.tenantId,
           walletId: wallet.id,
           studentId: original.studentId,
-          type: adjustmentAmount.gt(0) ? CanteenWalletTransactionType.TOP_UP : CanteenWalletTransactionType.DEDUCTION,
+          type: adjustmentAmount.gt(0)
+            ? CanteenWalletTransactionType.TOP_UP
+            : CanteenWalletTransactionType.DEDUCTION,
           source: CanteenWalletTransactionSource.CORRECTION,
           amount: adjustmentAmount.abs(),
           balanceAfter: newBalance,
@@ -580,7 +614,14 @@ export class CanteenService {
       return { wallet: updatedWallet, transaction: correction };
     });
 
-    await this.audit(actor, 'correct', 'canteen_wallet_transaction', id, null, result.transaction);
+    await this.audit(
+      actor,
+      'correct',
+      'canteen_wallet_transaction',
+      id,
+      null,
+      result.transaction,
+    );
     return result;
   }
 
@@ -1271,7 +1312,14 @@ export class CanteenService {
         ...dto,
       },
     });
-    await this.audit(actor, 'create', 'canteen_supplier', supplier.id, null, supplier);
+    await this.audit(
+      actor,
+      'create',
+      'canteen_supplier',
+      supplier.id,
+      null,
+      supplier,
+    );
     return supplier;
   }
 
@@ -1279,13 +1327,21 @@ export class CanteenService {
     const { skip, take, page } = this.pagination(options);
     const where = { tenantId: actor.tenantId, isActive: true };
     const [items, total] = await this.prisma.$transaction([
-      this.prisma.canteenSupplier.findMany({ where, skip, take, orderBy: { name: 'asc' } }),
+      this.prisma.canteenSupplier.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { name: 'asc' },
+      }),
       this.prisma.canteenSupplier.count({ where }),
     ]);
     return { items, meta: { page, limit: take, total } };
   }
 
-  async createInventoryItem(dto: CreateCanteenInventoryItemDto, actor: AuthContext) {
+  async createInventoryItem(
+    dto: CreateCanteenInventoryItemDto,
+    actor: AuthContext,
+  ) {
     const item = await this.prisma.canteenInventoryItem.create({
       data: {
         tenantId: actor.tenantId,
@@ -1293,36 +1349,60 @@ export class CanteenService {
         sku: dto.sku ?? null,
         category: dto.category,
         unit: dto.unit,
-        minStockLevel: dto.minStockLevel ? new Prisma.Decimal(dto.minStockLevel) : new Prisma.Decimal(0),
-        unitCost: dto.unitCost ? new Prisma.Decimal(dto.unitCost) : new Prisma.Decimal(0),
+        minStockLevel: dto.minStockLevel
+          ? new Prisma.Decimal(dto.minStockLevel)
+          : new Prisma.Decimal(0),
+        unitCost: dto.unitCost
+          ? new Prisma.Decimal(dto.unitCost)
+          : new Prisma.Decimal(0),
         defaultSupplierId: dto.defaultSupplierId ?? null,
       },
     });
-    await this.audit(actor, 'create', 'canteen_inventory_item', item.id, null, item);
+    await this.audit(
+      actor,
+      'create',
+      'canteen_inventory_item',
+      item.id,
+      null,
+      item,
+    );
     return item;
   }
 
-  async listInventoryItems(actor: AuthContext, options: PaginationQuery & { category?: string } = {}) {
+  async listInventoryItems(
+    actor: AuthContext,
+    options: PaginationQuery & { category?: string } = {},
+  ) {
     const { skip, take, page } = this.pagination(options);
-    const where = { 
-      tenantId: actor.tenantId, 
+    const where = {
+      tenantId: actor.tenantId,
       isActive: true,
       ...(options.category ? { category: options.category } : {}),
     };
     const [items, total] = await this.prisma.$transaction([
-      this.prisma.canteenInventoryItem.findMany({ where, skip, take, orderBy: { name: 'asc' } }),
+      this.prisma.canteenInventoryItem.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { name: 'asc' },
+      }),
       this.prisma.canteenInventoryItem.count({ where }),
     ]);
     return { items, meta: { page, limit: take, total } };
   }
 
-  async createPurchaseBill(dto: CreateCanteenPurchaseBillDto, actor: AuthContext) {
+  async createPurchaseBill(
+    dto: CreateCanteenPurchaseBillDto,
+    actor: AuthContext,
+  ) {
     const bill = await this.prisma.$transaction(async (tx) => {
       let totalAmount = new Prisma.Decimal(0);
-      const itemsData = [];
+      const itemsData: PurchaseBillItemData[] = [];
 
       for (const item of dto.items) {
-        const lineTotal = new Prisma.Decimal(item.quantity).mul(new Prisma.Decimal(item.unitCost));
+        const lineTotal = new Prisma.Decimal(item.quantity).mul(
+          new Prisma.Decimal(item.unitCost),
+        );
         totalAmount = totalAmount.add(lineTotal);
         itemsData.push({
           tenantId: actor.tenantId,
@@ -1335,7 +1415,9 @@ export class CanteenService {
         });
       }
 
-      const netAmount = totalAmount.add(new Prisma.Decimal(dto.taxAmount ?? 0)).sub(new Prisma.Decimal(dto.discountAmount ?? 0));
+      const netAmount = totalAmount
+        .add(new Prisma.Decimal(dto.taxAmount ?? 0))
+        .sub(new Prisma.Decimal(dto.discountAmount ?? 0));
 
       const createdBill = await tx.canteenPurchaseBill.create({
         data: {
@@ -1400,7 +1482,14 @@ export class CanteenService {
       return createdBill;
     });
 
-    await this.audit(actor, 'create', 'canteen_purchase_bill', bill.id, null, bill);
+    await this.audit(
+      actor,
+      'create',
+      'canteen_purchase_bill',
+      bill.id,
+      null,
+      bill,
+    );
     return bill;
   }
 
@@ -1450,11 +1539,21 @@ export class CanteenService {
       return createdWastage;
     });
 
-    await this.audit(actor, 'record_wastage', 'canteen_inventory_item', dto.inventoryItemId, null, wastage);
+    await this.audit(
+      actor,
+      'record_wastage',
+      'canteen_inventory_item',
+      dto.inventoryItemId,
+      null,
+      wastage,
+    );
     return wastage;
   }
 
-  async manualStockAdjustment(dto: ManualStockAdjustmentDto, actor: AuthContext) {
+  async manualStockAdjustment(
+    dto: ManualStockAdjustmentDto,
+    actor: AuthContext,
+  ) {
     const adjustment = await this.prisma.$transaction(async (tx) => {
       const item = await tx.canteenInventoryItem.findFirstOrThrow({
         where: { id: dto.inventoryItemId, tenantId: actor.tenantId },
@@ -1481,7 +1580,14 @@ export class CanteenService {
       });
     });
 
-    await this.audit(actor, 'adjust_stock', 'canteen_inventory_item', dto.inventoryItemId, null, adjustment);
+    await this.audit(
+      actor,
+      'adjust_stock',
+      'canteen_inventory_item',
+      dto.inventoryItemId,
+      null,
+      adjustment,
+    );
     return adjustment;
   }
 

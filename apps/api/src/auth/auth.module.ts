@@ -20,7 +20,18 @@ import { PlansModule } from '../plans/plans.module';
     PlansModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard],
-  exports: [AuthService, JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard, JwtModule],
+  providers: [
+    AuthService,
+    JwtAuthGuard,
+    RolesPermissionsGuard,
+    EntitlementGuard,
+  ],
+  exports: [
+    AuthService,
+    JwtAuthGuard,
+    RolesPermissionsGuard,
+    EntitlementGuard,
+    JwtModule,
+  ],
 })
 export class AuthModule {}

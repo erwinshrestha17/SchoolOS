@@ -216,12 +216,12 @@ export class StudentQrService {
     // Security check: Teacher cannot resolve unassigned student unless permission allows
     if (
       auth.roles.includes('teacher') &&
-      !auth.permissions.includes('student:qr:resolve:all')
+      !auth.permissions.includes('students:qr:resolve_all')
     ) {
       const isAssigned = await this.prisma.subjectTeacherAssignment.findFirst({
         where: {
           tenantId,
-          teacherId: auth.userId,
+          staff: { userId: auth.userId },
           classId: student.classId,
           OR: [
             { sectionId: student.sectionId },
@@ -236,7 +236,11 @@ export class StudentQrService {
           resource: 'student_qr',
           tenantId,
           userId: auth.userId,
-          after: { studentId: student.id, purpose, reason: 'unassigned_teacher' },
+          after: {
+            studentId: student.id,
+            purpose,
+            reason: 'unassigned_teacher',
+          },
         });
         throw new ForbiddenException('Teacher not assigned to this student');
       }

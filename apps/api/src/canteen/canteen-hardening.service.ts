@@ -35,7 +35,11 @@ export class CanteenHardeningService {
     );
   }
 
-  async resumeEnrollment(id: string, dto: CanteenReasonDto, actor: AuthContext) {
+  async resumeEnrollment(
+    id: string,
+    dto: CanteenReasonDto,
+    actor: AuthContext,
+  ) {
     return this.transitionEnrollment(
       id,
       CanteenEnrollmentStatus.ACTIVE,

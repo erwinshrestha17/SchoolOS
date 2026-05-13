@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { StaffStatus } from '@prisma/client';
@@ -19,7 +20,11 @@ import { UpdateStaffDto } from './dto/update-staff.dto';
 import { StaffService } from './staff.service';
 import { StaffDocumentService } from './staff-document.service';
 import { StaffLifecycleService } from './staff-lifecycle.service';
-import { AddStaffDocumentDto, TerminateStaffDto, VerifyStaffDocumentDto } from './dto/staff-actions.dto';
+import {
+  AddStaffDocumentDto,
+  TerminateStaffDto,
+  VerifyStaffDocumentDto,
+} from './dto/staff-actions.dto';
 
 @Controller('hr/staff')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard)
@@ -103,8 +108,10 @@ export class HrStaffController {
   listDocuments(
     @Param('staffId') staffId: string,
     @CurrentAuth() auth: AuthContext,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return this.documentService.listDocuments(staffId, auth);
+    return this.documentService.listDocuments(staffId, auth, { page, limit });
   }
 
   @Post(':staffId/documents')
@@ -124,7 +131,11 @@ export class HrStaffController {
     @Body() dto: VerifyStaffDocumentDto,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.documentService.verifyDocument(documentId, dto.notes || '', auth);
+    return this.documentService.verifyDocument(
+      documentId,
+      dto.notes || '',
+      auth,
+    );
   }
 
   @Get(':staffId/history')

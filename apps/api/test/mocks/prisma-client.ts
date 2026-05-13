@@ -336,14 +336,30 @@ export const StudentDocumentKind = {
 } as const;
 
 export const StaffDocumentKind = {
+  ID_CARD: 'ID_CARD',
   CITIZENSHIP: 'CITIZENSHIP',
-  PASSPORT: 'PASSPORT',
-  ACADEMIC_CERTIFICATE: 'ACADEMIC_CERTIFICATE',
-  EXPERIENCE_LETTER: 'EXPERIENCE_LETTER',
   CONTRACT: 'CONTRACT',
-  PHOTO: 'PHOTO',
+  ACADEMIC_CERTIFICATE: 'ACADEMIC_CERTIFICATE',
   PAN_CARD: 'PAN_CARD',
+  OFFER_LETTER: 'OFFER_LETTER',
   OTHER: 'OTHER',
+} as const;
+
+export const StaffLifecycleEventType = {
+  HIRED: 'HIRED',
+  PROMOTED: 'PROMOTED',
+  TRANSFERRED: 'TRANSFERRED',
+  ON_LEAVE: 'ON_LEAVE',
+  RETURNED: 'RETURNED',
+  TERMINATED: 'TERMINATED',
+  RESIGNED: 'RESIGNED',
+  STATUS_CHANGE: 'STATUS_CHANGE',
+  CONTRACT_RENEWAL: 'CONTRACT_RENEWAL',
+} as const;
+
+export const StudentQrStatus = {
+  ACTIVE: 'ACTIVE',
+  REVOKED: 'REVOKED',
 } as const;
 
 export const NoticePriority = {

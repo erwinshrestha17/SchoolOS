@@ -22,11 +22,7 @@ import { CanteenAlertsProcessor } from './canteen-alerts.processor';
     }),
   ],
   controllers: [CanteenController],
-  providers: [
-    CanteenService,
-    CanteenHardeningService,
-    CanteenAlertsProcessor,
-  ],
+  providers: [CanteenService, CanteenHardeningService, CanteenAlertsProcessor],
   exports: [CanteenService, CanteenHardeningService],
 })
 export class CanteenModule {}

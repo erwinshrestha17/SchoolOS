@@ -2,10 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthContext } from '../auth/auth.types';
 import { StaffLifecycleEventType, Prisma } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class StaffLifecycleService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   async recordEvent(
     staffId: string,
@@ -18,7 +22,7 @@ export class StaffLifecycleService {
       eventDate?: Date;
     } = {},
   ) {
-    return this.prisma.staffLifecycleEvent.create({
+    const event = await this.prisma.staffLifecycleEvent.create({
       data: {
         tenantId: actor.tenantId,
         staffId,
@@ -30,6 +34,17 @@ export class StaffLifecycleService {
         createdById: actor.userId,
       },
     });
+
+    await this.auditService.record({
+      action: 'record',
+      resource: 'staff_lifecycle_event',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: event.id,
+      after: { staffId, eventType, reason: options.reason },
+    });
+
+    return event;
   }
 
   async getStaffHistory(staffId: string, actor: AuthContext) {

@@ -635,12 +635,16 @@ export class PayrollService {
     const lines = payrollSources.map((source) => {
       const presentDays = attendanceByStaff.get(source.staffId) ?? 0;
       const approvedPaidLeaveDays = paidLeaveByStaff.get(source.staffId) ?? 0;
-      const approvedUnpaidLeaveDays = unpaidLeaveByStaff.get(source.staffId) ?? 0;
-      
+      const approvedUnpaidLeaveDays =
+        unpaidLeaveByStaff.get(source.staffId) ?? 0;
+
       const totalEffectiveDays = presentDays + approvedPaidLeaveDays;
       const unpaidLeaveDays = Math.max(0, workingDays - totalEffectiveDays);
       // Ensure we count explicit unpaid leave if it exceeds the working day gap
-      const finalUnpaidDays = Math.max(unpaidLeaveDays, approvedUnpaidLeaveDays);
+      const finalUnpaidDays = Math.max(
+        unpaidLeaveDays,
+        approvedUnpaidLeaveDays,
+      );
 
       const baseSalary = new Prisma.Decimal(source.baseSalary);
       const allowances = new Prisma.Decimal(source.allowances);
@@ -979,7 +983,7 @@ export class PayrollService {
 
     return paid;
   }
- 
+
   async reversePayrollRun(
     id: string,
     dto: PayrollActionDto,
@@ -988,9 +992,9 @@ export class PayrollService {
     if (!dto.reason) {
       throw new ConflictException('Reversal reason is required');
     }
- 
+
     const run = await this.getPayrollRunOrThrow(id, actor);
- 
+
     if (
       run.status !== PayrollRunStatus.POSTED &&
       run.status !== PayrollRunStatus.PAID
@@ -999,7 +1003,7 @@ export class PayrollService {
         'Only posted or paid payroll runs can be reversed',
       );
     }
- 
+
     const reversed = await this.prisma.$transaction(async (tx) => {
       // 1. Reverse Disbursement if paid
       if (run.disbursementJournalEntryId) {
@@ -1030,7 +1034,7 @@ export class PayrollService {
           );
         }
       }
- 
+
       // 2. Reverse Accrual
       if (run.journalEntryId) {
         const originalEntry = await tx.journalEntry.findUnique({
@@ -1060,7 +1064,7 @@ export class PayrollService {
           );
         }
       }
- 
+
       // 3. Update Payroll Run Status
       return tx.payrollRun.update({
         where: { id: run.id },
@@ -1072,7 +1076,7 @@ export class PayrollService {
         },
       });
     });
- 
+
     await this.auditService.record({
       action: 'reverse',
       resource: 'payroll_run',
@@ -1084,7 +1088,7 @@ export class PayrollService {
         reason: dto.reason,
       },
     });
- 
+
     return reversed;
   }
 

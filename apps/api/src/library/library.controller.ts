@@ -22,7 +22,10 @@ import { MarkLibraryCopyStatusDto } from './dto/mark-library-copy-status.dto';
 import { ReturnLibraryCopyDto } from './dto/return-library-copy.dto';
 import { UpdateLibraryBookDto } from './dto/update-library-book.dto';
 import { UpdateLibraryCopyDto } from './dto/update-library-copy.dto';
-import { CreateLibraryFineDto, UpdateLibraryFineDto } from './dto/library-fine.dto';
+import {
+  CreateLibraryFineDto,
+  UpdateLibraryFineDto,
+} from './dto/library-fine.dto';
 import { UpdateLibrarySettingDto } from './dto/update-library-setting.dto';
 import { LibraryHardeningService } from './library-hardening.service';
 import { LibraryService } from './library.service';

@@ -127,6 +127,11 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Resolve scanned QR tokens for identity verification',
   },
   {
+    resource: 'students:qr',
+    action: 'resolve_all',
+    description: 'Resolve scanned QR tokens beyond assigned-student scope',
+  },
+  {
     resource: 'tenants',
     action: 'manage',
     description: 'Deactivate or manage tenants (platform admins only)',
@@ -358,6 +363,7 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     ['hr:staff', 'create', 'Create HR staff profiles'],
     ['hr:staff', 'update', 'Update HR staff profiles'],
     ['hr:staff', 'lifecycle', 'Manage staff lifecycle transitions'],
+    ['hr:staff', 'terminate', 'Terminate staff employment'],
     ['hr:staff', 'archive', 'Archive staff profiles'],
     ['hr:attendance', 'read', 'Read staff attendance'],
     ['hr:attendance', 'write', 'Mark staff attendance'],
@@ -390,6 +396,7 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     ['payroll:run', 'approve', 'Approve payroll runs'],
     ['payroll:run', 'post', 'Post payroll to accounting'],
     ['payroll:run', 'pay', 'Mark payroll paid'],
+    ['payroll:run', 'reverse', 'Reverse posted payroll runs'],
     ['payroll:payslip', 'read', 'Read payslips'],
     ['payroll:reports', 'read', 'Read payroll reports'],
     ['payroll:exports', 'create', 'Create payroll exports'],
@@ -830,6 +837,16 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     resource: 'canteen:pos',
     action: 'update',
     description: 'Update canteen POS sales',
+  },
+  {
+    resource: 'canteen:inventory',
+    action: 'read',
+    description: 'Read canteen suppliers, inventory, purchases, and wastage',
+  },
+  {
+    resource: 'canteen:inventory',
+    action: 'update',
+    description: 'Manage canteen suppliers, inventory, purchases, and wastage',
   },
   {
     resource: 'canteen:controls',

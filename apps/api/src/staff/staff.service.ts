@@ -369,11 +369,16 @@ export class StaffService {
       before: { status: staff.status },
       after: { status: updated.status, reason: dto.reason ?? null },
     });
- 
-    await this.lifecycleService.recordEvent(staff.id, StaffLifecycleEventType.STATUS_CHANGE, actor, {
-      reason: dto.reason,
-      metadata: { from: staff.status, to: updated.status },
-    });
+
+    await this.lifecycleService.recordEvent(
+      staff.id,
+      StaffLifecycleEventType.STATUS_CHANGE,
+      actor,
+      {
+        reason: dto.reason,
+        metadata: { from: staff.status, to: updated.status },
+      },
+    );
 
     return updated;
   }
@@ -415,36 +420,41 @@ export class StaffService {
 
     return `${normalizeSlug(actor.tenantSlug)}-EMP-${String(count + 1).padStart(4, '0')}`;
   }
- 
+
   async terminateStaff(staffId: string, reason: string, actor: AuthContext) {
     const staff = await this.prisma.staff.findFirst({
       where: { id: staffId, tenantId: actor.tenantId },
       include: { user: true },
     });
- 
+
     if (!staff) {
       throw new NotFoundException('Staff member not found');
     }
- 
+
     const updated = await this.prisma.$transaction(async (tx) => {
       // Deactivate user
       await tx.user.update({
         where: { id: staff.userId },
         data: { status: 'SUSPENDED' },
       });
- 
+
       // Update staff status
       return tx.staff.update({
         where: { id: staff.id },
         data: { status: StaffStatus.TERMINATED },
       });
     });
- 
-    await this.lifecycleService.recordEvent(staff.id, StaffLifecycleEventType.TERMINATED, actor, {
-      reason,
-      eventDate: new Date(),
-    });
- 
+
+    await this.lifecycleService.recordEvent(
+      staff.id,
+      StaffLifecycleEventType.TERMINATED,
+      actor,
+      {
+        reason,
+        eventDate: new Date(),
+      },
+    );
+
     await this.auditService.record({
       action: 'terminate',
       resource: 'staff',
@@ -453,7 +463,7 @@ export class StaffService {
       resourceId: staff.id,
       after: { status: StaffStatus.TERMINATED, reason },
     });
- 
+
     return updated;
   }
 }
@@ -543,14 +553,14 @@ function mapStaffDetail(
     actor?.permissions?.includes('hr.admin') ||
     actor?.permissions?.includes('payroll.admin') ||
     (staff.userId && actor?.userId === staff.userId);
- 
+
   const mask = (val: string | null | undefined) => {
     if (!val) return val;
     if (canSeeSensitive) return val;
     if (val.length <= 4) return '****';
     return val.substring(0, 2) + '****' + val.substring(val.length - 2);
   };
- 
+
   return {
     ...staff,
     citizenshipNo: mask(staff.citizenshipNo),

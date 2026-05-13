@@ -36,6 +36,15 @@ Multi-school production-ready: Not yet
 Full SchoolOS product complete: No
 ```
 
+Latest stabilization result on 2026-05-13:
+
+```text
+Repo stabilization sprint completed for current M0, M1, M6, M7, M8A, M8B, and M8C drift.
+Prisma generate/validate, OpenAPI verification, lint, typecheck, unit tests, E2E tests, build, and verify:production pass locally.
+Prisma migrate status can reach the configured database only with elevated local access and reports unapplied local migrations, including the stabilization migration.
+smoke:phase1 was not run because API, web, Postgres, and Redis were not running in the local workspace.
+```
+
 CTO verdict:
 
 ```text

@@ -20,7 +20,7 @@ describe('StudentQrService', () => {
     email: 'admin@test.com',
     authMethod: 'PASSWORD',
     roles: ['admin'],
-    permissions: ['student:qr:manage', 'student:qr:resolve'],
+    permissions: ['students:qr:generate', 'students:qr:resolve'],
   };
 
   const mockPrisma = {
@@ -133,7 +133,9 @@ describe('StudentQrService', () => {
     };
 
     it('should resolve active QR for admin', async () => {
-      mockPrisma.studentQrCredential.findUnique.mockResolvedValue(mockCredential);
+      mockPrisma.studentQrCredential.findUnique.mockResolvedValue(
+        mockCredential,
+      );
       mockPrisma.studentQrCredential.update.mockResolvedValue({});
 
       const result = await service.resolveQr(
@@ -152,7 +154,9 @@ describe('StudentQrService', () => {
 
     it('should allow parent to resolve their child', async () => {
       const parentAuth = { ...mockAuth, userId: 'p1', roles: ['parent'] };
-      mockPrisma.studentQrCredential.findUnique.mockResolvedValue(mockCredential);
+      mockPrisma.studentQrCredential.findUnique.mockResolvedValue(
+        mockCredential,
+      );
 
       const result = await service.resolveQr(
         't1',
@@ -166,7 +170,9 @@ describe('StudentQrService', () => {
 
     it('should fail for unrelated parent', async () => {
       const otherParentAuth = { ...mockAuth, userId: 'p2', roles: ['parent'] };
-      mockPrisma.studentQrCredential.findUnique.mockResolvedValue(mockCredential);
+      mockPrisma.studentQrCredential.findUnique.mockResolvedValue(
+        mockCredential,
+      );
 
       await expect(
         service.resolveQr(
@@ -179,8 +185,15 @@ describe('StudentQrService', () => {
     });
 
     it('should fail for unassigned teacher', async () => {
-      const teacherAuth = { ...mockAuth, userId: 't1', roles: ['teacher'], permissions: [] };
-      mockPrisma.studentQrCredential.findUnique.mockResolvedValue(mockCredential);
+      const teacherAuth = {
+        ...mockAuth,
+        userId: 't1',
+        roles: ['teacher'],
+        permissions: [],
+      };
+      mockPrisma.studentQrCredential.findUnique.mockResolvedValue(
+        mockCredential,
+      );
       mockPrisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
 
       await expect(
@@ -194,9 +207,18 @@ describe('StudentQrService', () => {
     });
 
     it('should allow assigned teacher to resolve', async () => {
-      const teacherAuth = { ...mockAuth, userId: 't1', roles: ['teacher'], permissions: [] };
-      mockPrisma.studentQrCredential.findUnique.mockResolvedValue(mockCredential);
-      mockPrisma.subjectTeacherAssignment.findFirst.mockResolvedValue({ id: 'asgn1' });
+      const teacherAuth = {
+        ...mockAuth,
+        userId: 't1',
+        roles: ['teacher'],
+        permissions: [],
+      };
+      mockPrisma.studentQrCredential.findUnique.mockResolvedValue(
+        mockCredential,
+      );
+      mockPrisma.subjectTeacherAssignment.findFirst.mockResolvedValue({
+        id: 'asgn1',
+      });
 
       const result = await service.resolveQr(
         't1',
@@ -209,24 +231,28 @@ describe('StudentQrService', () => {
     });
 
     it('should shape response for CANTEEN with allergies', async () => {
-      mockPrisma.studentQrCredential.findUnique.mockResolvedValue(mockCredential);
+      mockPrisma.studentQrCredential.findUnique.mockResolvedValue(
+        mockCredential,
+      );
       mockPrisma.canteenWallet.findUnique.mockResolvedValue({
         balance: new Prisma.Decimal(100),
       });
 
-      const result = await service.resolveQr(
+      const result = (await service.resolveQr(
         't1',
         validToken,
         StudentQrResolvePurpose.CANTEEN,
         mockAuth,
-      );
+      )) as { walletBalance: string; allergyWarnings: string[] };
 
       expect(result.walletBalance).toBe('100');
       expect(result.allergyWarnings).toContain('Peanuts');
     });
 
     it('should not include wallet balance in GENERAL_STUDENT_LOOKUP', async () => {
-      mockPrisma.studentQrCredential.findUnique.mockResolvedValue(mockCredential);
+      mockPrisma.studentQrCredential.findUnique.mockResolvedValue(
+        mockCredential,
+      );
 
       const result = await service.resolveQr(
         't1',
@@ -239,4 +265,3 @@ describe('StudentQrService', () => {
     });
   });
 });
-

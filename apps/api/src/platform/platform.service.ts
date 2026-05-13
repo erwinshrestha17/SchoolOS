@@ -556,7 +556,10 @@ export class PlatformService {
       };
     }
 
-    const isAllowed = await this.plansService.checkFeatureEnabled(tenantId, featureKey);
+    const isAllowed = await this.plansService.checkFeatureEnabled(
+      tenantId,
+      featureKey,
+    );
     const subscription = await this.getRawActiveSubscription(tenantId);
 
     return {
@@ -940,7 +943,9 @@ export class PlatformService {
 
     const job = await queue.getJob(dto.jobId);
     if (!job) {
-      throw new NotFoundException(`Job ${dto.jobId} not found in queue ${dto.queueName}`);
+      throw new NotFoundException(
+        `Job ${dto.jobId} not found in queue ${dto.queueName}`,
+      );
     }
 
     const isFailed = await job.isFailed();

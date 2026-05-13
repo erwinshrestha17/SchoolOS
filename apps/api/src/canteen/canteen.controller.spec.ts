@@ -52,14 +52,19 @@ function createController() {
     exportDailyMealCountCsv: jest.fn(),
     exportItemWiseSalesCsv: jest.fn(),
   };
+  const studentQrService = {
+    resolveQr: jest.fn(),
+  };
 
   return {
     controller: new CanteenController(
       canteenService as never,
       canteenHardeningService as never,
+      studentQrService as never,
     ),
     canteenService,
     canteenHardeningService,
+    studentQrService,
   };
 }
 

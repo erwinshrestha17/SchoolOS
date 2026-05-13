@@ -37,21 +37,17 @@ export class StudentQrController {
   constructor(private readonly studentQrService: StudentQrService) {}
 
   @Post(':studentId/qr')
-  @Permissions('student:qr:manage')
+  @Permissions('students:qr:generate')
   @ApiOperation({ summary: 'Generate a new QR credential for a student' })
   async generateQr(
     @Param('studentId') studentId: string,
     @CurrentAuth() auth: AuthContext,
   ) {
-    return this.studentQrService.generateQr(
-      auth.tenantId,
-      studentId,
-      auth,
-    );
+    return this.studentQrService.generateQr(auth.tenantId, studentId, auth);
   }
 
   @Post(':studentId/qr/rotate')
-  @Permissions('student:qr:manage')
+  @Permissions('students:qr:rotate')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Rotate a student QR credential' })
   async rotateQr(
@@ -68,7 +64,7 @@ export class StudentQrController {
   }
 
   @Post(':studentId/qr/revoke')
-  @Permissions('student:qr:manage')
+  @Permissions('students:qr:revoke')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Revoke a student QR credential' })
   async revokeQr(
@@ -85,7 +81,7 @@ export class StudentQrController {
   }
 
   @Post('qr/resolve')
-  @Permissions('student:qr:resolve')
+  @Permissions('students:qr:resolve')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Resolve a scanned QR token for a declared purpose',
@@ -103,7 +99,7 @@ export class StudentQrController {
   }
 
   @Get(':studentId/qr-image')
-  @Permissions('student:qr:manage')
+  @Permissions('students:qr:read')
   @ApiOperation({ summary: 'Return QR SVG for ID card/profile' })
   async getQrImage(
     @Param('studentId') studentId: string,

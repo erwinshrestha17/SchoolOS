@@ -96,14 +96,34 @@ export const permissionCatalog = [
       'Transfer, exit, archive, and manage student lifecycle transitions',
   },
   {
-    resource: 'student:qr',
-    action: 'manage',
-    description: 'Manage student QR credentials (generate, rotate, revoke)',
+    resource: 'students:qr',
+    action: 'generate',
+    description: 'Generate new QR credentials for students',
   },
   {
-    resource: 'student:qr',
+    resource: 'students:qr',
+    action: 'read',
+    description: 'Read student QR credentials and images',
+  },
+  {
+    resource: 'students:qr',
+    action: 'rotate',
+    description: 'Rotate existing student QR credentials',
+  },
+  {
+    resource: 'students:qr',
+    action: 'revoke',
+    description: 'Revoke student QR credentials',
+  },
+  {
+    resource: 'students:qr',
     action: 'resolve',
     description: 'Resolve scanned QR tokens for identity verification',
+  },
+  {
+    resource: 'students:qr',
+    action: 'resolve_all',
+    description: 'Resolve scanned QR tokens beyond assigned-student scope',
   },
   {
     resource: 'tenants',
@@ -337,6 +357,7 @@ export const permissionCatalog = [
     ['hr:staff', 'create', 'Create HR staff profiles'],
     ['hr:staff', 'update', 'Update HR staff profiles'],
     ['hr:staff', 'lifecycle', 'Manage staff lifecycle transitions'],
+    ['hr:staff', 'terminate', 'Terminate staff employment'],
     ['hr:staff', 'archive', 'Archive staff profiles'],
     ['hr:attendance', 'read', 'Read staff attendance'],
     ['hr:attendance', 'write', 'Mark staff attendance'],
@@ -369,6 +390,7 @@ export const permissionCatalog = [
     ['payroll:run', 'approve', 'Approve payroll runs'],
     ['payroll:run', 'post', 'Post payroll to accounting'],
     ['payroll:run', 'pay', 'Mark payroll paid'],
+    ['payroll:run', 'reverse', 'Reverse posted payroll runs'],
     ['payroll:payslip', 'read', 'Read payslips'],
     ['payroll:reports', 'read', 'Read payroll reports'],
     ['payroll:exports', 'create', 'Create payroll exports'],
@@ -793,6 +815,16 @@ export const permissionCatalog = [
     resource: 'canteen:pos',
     action: 'update',
     description: 'Update canteen POS sales',
+  },
+  {
+    resource: 'canteen:inventory',
+    action: 'read',
+    description: 'Read canteen suppliers, inventory, purchases, and wastage',
+  },
+  {
+    resource: 'canteen:inventory',
+    action: 'update',
+    description: 'Manage canteen suppliers, inventory, purchases, and wastage',
   },
   {
     resource: 'canteen:controls',
