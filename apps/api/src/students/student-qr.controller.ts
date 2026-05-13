@@ -1,33 +1,25 @@
 import {
-  Controller,
-  Post,
-  Get,
-  Param,
-  Query,
   Body,
-  UseGuards,
+  Controller,
+  Get,
   HttpCode,
   HttpStatus,
-  Res,
+  Param,
+  Post,
+  UseGuards,
 } from '@nestjs/common';
 import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
   ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
 } from '@nestjs/swagger';
-import { StudentQrService } from './student-qr.service';
-import {
-  ResolveStudentQrDto,
-  RotateStudentQrDto,
-  RevokeStudentQrDto,
-} from './dto/student-qr.dto';
+import { AuthContext } from '../auth/auth.types';
+import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
+import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
-import { Permissions } from '../auth/decorators/permissions.decorator';
-import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
-import { AuthContext } from '../auth/auth.types';
-import { Response } from 'express';
+import { ResolveStudentQrDto, RotateStudentQrDto, RevokeStudentQrDto } from './dto/student-qr.dto';
+import { StudentQrService } from './student-qr.service';
 
 @ApiTags('Student QR')
 @ApiBearerAuth()
@@ -38,7 +30,10 @@ export class StudentQrController {
 
   @Post(':studentId/qr')
   @Permissions('students:qr:generate')
-  @ApiOperation({ summary: 'Generate a new QR credential for a student' })
+  @ApiOperation({
+    summary:
+      'Generate a student QR credential. Returns a printable QR image only when a new credential is issued.',
+  })
   async generateQr(
     @Param('studentId') studentId: string,
     @CurrentAuth() auth: AuthContext,
@@ -49,7 +44,10 @@ export class StudentQrController {
   @Post(':studentId/qr/rotate')
   @Permissions('students:qr:rotate')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Rotate a student QR credential' })
+  @ApiOperation({
+    summary:
+      'Rotate a student QR credential and return a new printable QR image',
+  })
   async rotateQr(
     @Param('studentId') studentId: string,
     @Body() dto: RotateStudentQrDto,
@@ -100,22 +98,15 @@ export class StudentQrController {
 
   @Get(':studentId/qr-image')
   @Permissions('students:qr:read')
-  @ApiOperation({ summary: 'Return QR SVG for ID card/profile' })
-  async getQrImage(
-    @Param('studentId') studentId: string,
-    @Query('token') token: string,
-    @Res() res: Response,
-    @CurrentAuth() auth: AuthContext,
-  ) {
-    if (!token) {
-      return res.status(HttpStatus.BAD_REQUEST).json({
-        message:
-          'Raw token is required to generate the QR image as it is not stored server-side.',
-      });
-    }
-
-    const svg = await this.studentQrService.getQrImage(token);
-    res.setHeader('Content-Type', 'image/svg+xml');
-    res.send(svg);
+  @ApiOperation({
+    summary: 'Explain why QR images are one-time printable and not re-readable',
+  })
+  async getQrImageMetadata(@Param('studentId') studentId: string) {
+    return {
+      studentId,
+      qrImageAvailable: false,
+      message:
+        'Student QR raw tokens are never stored. Generate or rotate the credential to receive a one-time printable QR image.',
+    };
   }
 }

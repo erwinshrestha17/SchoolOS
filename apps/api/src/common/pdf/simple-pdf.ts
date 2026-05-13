@@ -1,3 +1,5 @@
+import QRCode from 'qrcode';
+
 export function buildSimplePdf(lines: string[]) {
   const content = [
     'BT',
@@ -356,9 +358,8 @@ export function buildIdCardPdf(input: {
 
   if (input.qrToken) {
     contentParts.push(
-      `${left + width - 64} ${bottom + 116} 44 44 re S`,
-      text('QR', left + width - 48, bottom + 136, 8, 'F2'),
-      text(input.qrToken.slice(0, 8), left + width - 60, bottom + 110, 6, 'F1'),
+      renderQrTokenAsPdfBlocks(input.qrToken, left + width - 72, bottom + 96, 56),
+      text('SCAN ID', left + width - 68, bottom + 86, 6, 'F2'),
     );
   }
 
@@ -675,4 +676,44 @@ function wrapPdfLine(
   }
 
   return lines.map((line, index) => text(line, x, y - index * 14, size, 'F1'));
+}
+
+type QrCodeMatrix = {
+  modules: {
+    size: number;
+    data: boolean[];
+  };
+};
+
+function renderQrTokenAsPdfBlocks(
+  token: string,
+  x: number,
+  y: number,
+  size: number,
+) {
+  const qr = QRCode.create(token, {
+    errorCorrectionLevel: 'M',
+    margin: 1,
+  }) as QrCodeMatrix;
+  const matrixSize = qr.modules.size;
+  const cell = size / matrixSize;
+  const parts = [
+    '0 g',
+    `${x} ${y} ${size} ${size} re S`,
+    '0 0 0 rg',
+  ];
+
+  for (let row = 0; row < matrixSize; row++) {
+    for (let col = 0; col < matrixSize; col++) {
+      if (!qr.modules.data[row * matrixSize + col]) {
+        continue;
+      }
+
+      const px = x + col * cell;
+      const py = y + size - (row + 1) * cell;
+      parts.push(`${px.toFixed(2)} ${py.toFixed(2)} ${cell.toFixed(2)} ${cell.toFixed(2)} re f`);
+    }
+  }
+
+  return parts.join('\n');
 }
