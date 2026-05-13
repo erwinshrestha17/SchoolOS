@@ -16,9 +16,9 @@ test.describe('SchoolOS UX Polish: Keyboard Navigation', () => {
     await page.goto('/dashboard/academics/marks');
     
     // Select context to load data (using data from seed)
-    await page.locator('[data-testid="filter-exam-term"]').selectOption({ label: /First Term/i });
-    await page.locator('[data-testid="filter-class"]').selectOption({ label: /Class 1/i });
-    await page.locator('[data-testid="filter-subject"]').selectOption({ label: /English/i });
+    await page.locator('[data-testid="filter-exam-term"]').selectOption({ label: 'First Term' });
+    await page.locator('[data-testid="filter-class"]').selectOption({ label: 'Class 1' });
+    await page.locator('[data-testid="filter-subject"]').selectOption({ label: 'English' });
     await page.locator('[data-testid="filter-component"]').selectOption({ index: 1 });
 
     // Wait for table to load
