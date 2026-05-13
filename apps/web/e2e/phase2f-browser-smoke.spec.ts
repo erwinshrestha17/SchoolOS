@@ -70,15 +70,24 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
     }
   });
 
-  test('student directory filters and profile link are safe with seeded or empty data', async ({
+  test('student directory filters and profile link are safe with seeded data', async ({
     page,
   }) => {
     await page.goto('/dashboard/students');
     await expect(page.getByText(/Directory Filters/i)).toBeVisible();
+
+    // Test search with real seeded data
+    await page
+      .getByLabel(/Search students by name, student code, guardian name, or phone/i)
+      .fill('STU001');
+    await expect(page.getByText(/Aryan Sharma/i)).toBeVisible({ timeout: 10_000 });
+
+    // Test search with no results
     await page
       .getByLabel(/Search students by name, student code, guardian name, or phone/i)
       .fill('NoSuchStudentForSmoke');
     await expect(page.getByText(/No students found/i)).toBeVisible();
+
     await page.getByRole('button', { name: /Reset All/i }).click();
 
     const firstStudent = page.locator('a[href^="/dashboard/students/"]').first();
@@ -154,16 +163,33 @@ async function login(
   await page.getByLabel(/Email/i).fill(credentials.email ?? '');
   await page.getByLabel(/Password/i).fill(credentials.password ?? '');
   await page.getByRole('button', { name: /Sign in/i }).click();
-  await page.waitForURL(/\/(?:dashboard|platform)(?:$|[/?#])/, {
-    timeout: 20_000,
-  });
+
+  // Wait for either the dashboard/platform or an error message
+  await Promise.race([
+    page.waitForURL(/\/(?:dashboard|platform)(?:$|[/?#])/, { timeout: 20_000 }),
+    expect(page.getByText(/Invalid credentials|Account suspended|not authorized/i).first()).toBeVisible({ timeout: 20_000 }),
+  ]);
+
+  if (!page.url().includes('/dashboard') && !page.url().includes('/platform')) {
+    throw new Error(`Login failed for ${credentials.email}. Still at ${page.url()}`);
+  }
 }
 
 async function expectNoFatalPage(page: Page, route: string) {
-  await expect(
-    page.getByText(
-      /Application error|Unhandled Runtime Error|This page could not be found|Internal Server Error/i,
-    ),
-    `${route} rendered a fatal page`,
-  ).toHaveCount(0);
+  const fatalMessages = [
+    /Application error/i,
+    /Unhandled Runtime Error/i,
+    /This page could not be found/i,
+    /Internal Server Error/i,
+    /Next.js-specific error/i,
+    /500 - Internal Server Error/i,
+    /404 - Page Not Found/i,
+  ];
+
+  for (const msg of fatalMessages) {
+    await expect(
+      page.getByText(msg),
+      `${route} rendered a fatal page matching ${msg}`,
+    ).toHaveCount(0);
+  }
 }

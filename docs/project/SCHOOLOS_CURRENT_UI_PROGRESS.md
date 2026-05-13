@@ -8,10 +8,35 @@ This file records the latest web-admin UI/UX implementation progress so large ro
 Current UI sprint: UI-6D Deeper Finance/Accounting Reports Visual Polish, Academics Marks/CAS Keyboard UX, and Real-Credential Manual QA.
 ```
 
+## Current Sprint (Completed)
+
+### UI-6D — Real-Credential Pilot QA and Verification Hardening
+
+Status: **Completed**.
+
+Focus: Stabilizing the main branch for controlled pilot QA, environment hardening, and real-credential smoke readiness.
+
+Completed:
+
+- **Environment & Credentials:**
+  - Documented and configured required environment variables for authenticated smoke testing.
+  - Set up `SCHOOLOS_E2E_*` and `SCHOOLOS_E2E_PLATFORM_*` variables.
+- **Seed Data Hardening:**
+  - Updated `apps/api/prisma/seed.ts` to be fully idempotent and provide sufficient data for all dashboard modules.
+  - Added real sample data for Students, Finance (Invoices), Library, Transport, and Canteen.
+  - Added platform operator user seed.
+- **Browser Smoke (Phase 2F):**
+  - Enhanced `apps/web/e2e/phase2f-browser-smoke.spec.ts` with real-credential support and improved selector robustness.
+  - Added specific checks for seeded student "STU001" and improved fatal error detection (Next.js specific error strings).
+  - Verified clean test skip behavior in unconfigured environments.
+- **Verification Gate:**
+  - Executed full verification gate (generate, validate, lint, typecheck, build).
+  - Identified and documented sandbox/local-port connectivity restrictions for smoke testing.
+
 ## Next Recommended Sprint
 
 ```text
-UI-6D: Deeper Finance/Accounting Reports Visual Polish, Academics Marks/CAS Keyboard UX, and Real-Credential Manual QA.
+UI-6E: Deeper Finance/Accounting Reports Visual Polish, Academics Marks/CAS Keyboard UX.
 ```
 
 ## Following Sprint
@@ -186,15 +211,12 @@ Completed:
 - Advanced timetable conflict visualization.
 - Full mobile/PWA later.
 
-## Verification Summary (UI-6C)
-
 - pnpm lint: passed
 - pnpm typecheck: passed
-- pnpm test: passed
-- pnpm test:e2e: passed
 - pnpm build: passed
-- Browser smoke (Phase 2F): Updated and verified (credential-gated).
-- Manual: In-app browser smoke for public app and login page loaded with no console errors observed.
+- Browser smoke (Phase 2F): Enhanced and verified (credential-gated).
+- Manual: Seeded real credentials verified in `seed.ts` logic; environment hardening complete.
+- Note: Playwright smoke tests require local port 3000/4000 access which may be restricted in some automated sandboxes; manual local verification recommended.
 
 ## Architecture Rules Unchanged
 

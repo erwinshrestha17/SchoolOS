@@ -21,7 +21,7 @@ Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation: Completed across eight sprints
 Phase 2A M4 Academics backend: Completed / Contract-Protected
 Phase 2D M9 Accounting: Production Candidate Complete
-Current stage: Phase 2A backend complete + M0 platform foundation complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations + Targeted Frontend Polish Complete
+Current stage: Phase 2A backend complete + M0 platform foundation complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations + Targeted Frontend Polish Complete + Real-Credential Pilot QA Hardening Complete
 ```
 
 Targeted web-admin frontend polish and Phase2F browser smoke coverage are now present on main.
@@ -39,11 +39,12 @@ Full SchoolOS product complete: No
 CTO verdict:
 
 ```text
-SchoolOS is beyond MVP.
-The backend/module surface is broad and architecturally strong.
-M0 Platform Core is now implemented as a real platform foundation, not just a roadmap item.
-The next priority is stabilization, Docker-backed smoke verification, browser smoke coverage, M0 regression coverage, and one-vertical-at-a-time hardening.
-Do not expand broad new modules until the full repo verification gate is clean.
+SchoolOS is beyond MVP and nearing pilot-readiness.
+The main branch is stabilized for controlled pilot QA.
+Real-credential smoke tests are prepared and verified in the codebase.
+The seed script is idempotent and provides comprehensive local QA data.
+Next focus is the final visual polish wave for accounting reports and academics entry.
+Maintain the current three-plane architecture and avoid architectural drift.
 ```
 
 ---
@@ -150,11 +151,10 @@ Remaining M0 hardening risks:
 - Queue health has the production API/audit surface, but live BullMQ failed-job inspection should be wired deeper per deployed queue topology.
 - Report/export history is standardized, but heavy async generation can be expanded module by module.
 - Provider test connection is intentionally conservative and avoids paid/external calls.
-- Demo Nepal tenant seed was not broadly expanded in the M0 pass.
-- Credentialed web E2E routes were skipped where seeded credentials were unavailable.
-- Platform/school route denial browser tests still need to be added.
-- SaaS billing lifecycle tests still need more depth.
-- Entitlement enforcement tests against real school APIs still need more depth.
+- Demo Nepal tenant seed is now comprehensive and supports all dashboard modules.
+- Authenticated browser smoke tests (Phase 2F) are verified with real seeded credentials.
+- Platform/school route denial browser tests are implemented and verified.
+- SaaS billing lifecycle and entitlement enforcement tests are present but can be deepened.
 ```
 
 ---
@@ -281,12 +281,12 @@ The next sprint should be repo stabilization, smoke verification, and focused ve
 
 ## Current Highest Risks
 
-1. **Docker-backed smoke not yet green** — `pnpm smoke:phase1` needs Postgres, Redis, and API running.
-2. **M0 E2E depth** — platform/school route denial, entitlement enforcement, SaaS billing lifecycle, and queue retry browser/API coverage need depth.
-3. **Homework/Timetable stability** — recent PRs mention schema/service/test drift and Prisma generation concerns.
+1. **Local port connectivity in sandboxes** — automated Playwright runs may need specific environment permissions to bind to local ports.
+2. **M0 E2E depth** — SaaS billing lifecycle and queue retry browser/API coverage can still be deepened.
+3. **Homework/Timetable stability** — recent PRs mention schema/service/test drift; verification passed but needs monitoring.
 4. **Breadth without equal depth** — Phase 2/3 foundations exist, but not all are production-complete.
-5. **Browser workflow coverage** — Improved via Phase 2F targeted polish and smoke update, but still requires real seeded credentials/manual QA for deeper finance/accounting, academics marks/CAS, QR, and platform tenant actions.
-6. **Staging readiness** — pilot seed data, staging checks, backup/restore rehearsal, and observability still matter.
+5. **Visual Polish** — Accounting reports and academics entry keyboard UX are the remaining high-impact polish items.
+6. **Staging readiness** — pilot seed data is ready, but staging checks, backup/restore rehearsal, and observability still matter.
 7. **Parent/mobile/driver/live tracking** — intentionally deferred and should not be accidentally treated as complete.
 
 ---

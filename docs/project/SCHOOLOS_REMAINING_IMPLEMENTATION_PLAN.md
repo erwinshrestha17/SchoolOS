@@ -1,7 +1,7 @@
 # SchoolOS Remaining Implementation Plan
 
 **Status source:** `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md`  
-**Current stage:** Phase 2A backend complete + Phase 2 implemented foundations + Phase 3 operations admin foundations + Targeted Frontend Polish Complete
+**Current stage:** Phase 2A backend complete + Phase 2 implemented foundations + Phase 3 operations admin foundations + Targeted Frontend Polish Complete + Real-Credential Pilot QA Hardening Complete
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard  
 **Last updated:** 2026-05-12
 
@@ -94,16 +94,14 @@ Biometric workflows
 Do first:
 
 ```text
-1. Run full verification gate.
-2. Fix any Prisma/schema/typecheck/test blockers.
+1. Execute final visual polish for Finance/Accounting Reports.
+2. Implement keyboard-friendly marks/CAS entry for Academics.
 3. Stabilize Homework/Timetable service/schema/test alignment.
-4. Build Phase 2A Academics admin UI against completed backend APIs.
-5. Add authenticated Playwright Phase 2A and Accounting workflow smoke tests.
-6. Review production migrations and default Chart of Accounts/report mapping seeds.
-7. Harden one existing vertical at a time: HR/Payroll, Library, Transport, Canteen.
-8. Add request/correlation ID logging if not fully wired.
-9. Add queue failure visibility for notifications/reports/payroll/PDF work.
-10. Harden File Registry/object storage before uploads expand.
+4. Perform final staging/pilot environment verification.
+5. Harden one existing vertical at a time: HR/Payroll, Library, Transport, Canteen.
+6. Add request/correlation ID logging if not fully wired.
+7. Add queue failure visibility for notifications/reports/payroll/PDF work.
+8. Harden File Registry/object storage before uploads expand.
 ```
 
 Avoid now:
@@ -639,13 +637,14 @@ Full UI/UX roadmap: 60–70%
 
 ```text
 Phase 1: Completed; only hardening remains.
-Phase 2A backend: Completed / contract-protected; frontend/admin UI next.
-Student Identity QR: Approved M1 cross-module foundation; implement before deeper Library/Canteen/Transport QR workflows.
+Phase 2A backend: Completed / contract-protected.
+Student Identity QR: Approved M1 cross-module foundation.
 Phase 2B/2C/2E: Foundations implemented; needs vertical hardening.
 Phase 2D M9: Production Candidate Complete.
 Phase 3: Admin foundations implemented; parent/mobile/driver/live tracking/inventory remain.
 Phase 4: Not started.
 M0 Platform Core: Partially implemented; SaaS/platform depth remains.
+Stabilization: Real-credential pilot QA hardening complete.
 ```
 
-SchoolOS should now prioritize production hardening and Phase 2A frontend/admin UI over broad feature expansion.
+SchoolOS should now prioritize final visual polish and keyboard UX over broad feature expansion.
