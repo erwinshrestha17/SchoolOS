@@ -53,7 +53,6 @@ describe('Transport Security Boundaries', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
     );
     hardeningService = new TransportHardeningService(
       prisma as any,
