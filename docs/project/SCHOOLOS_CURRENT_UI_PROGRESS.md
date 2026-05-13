@@ -5,10 +5,35 @@ This file records the latest web-admin UI/UX implementation progress so large ro
 ## Current UI Sprint
 
 ```text
-Current UI sprint: UI-6D Deeper Finance/Accounting Reports Visual Polish, Academics Marks/CAS Keyboard UX, and Real-Credential Manual QA.
+Current UI sprint: UI-7A Operations UX Foundation — Library, Transport, Canteen.
 ```
 
 ## Current Sprint (Completed)
+
+### UI-6E — Deeper Finance/Accounting Reports Visual Polish, Academics Marks/CAS Keyboard UX
+
+Status: **Completed**.
+
+Focus: Enhancing daily operator usability for high-frequency workflows (Finance/Accounting and Academics).
+
+Completed:
+
+- **Accounting Reports Polish:**
+  - Implemented `ReportFilters` with fiscal year status indicators and better date range layout.
+  - Revamped `ReportTable` with sticky headers, better numeric alignment, and prominent footer rows.
+  - Updated `AccountingReportsView` with a cleaner report selection UI, `PageHeader` integration, and enhanced loading/error states.
+  - Standardized money display and status colors across financial statements.
+- **Academics Keyboard UX:**
+  - Integrated grid-style keyboard navigation (Arrow keys, Enter, Shift+Enter) into the marks entry workspace.
+  - Implemented similar keyboard navigation in the CAS batch roster.
+  - Updated `DataTable` to support row-indexed cell rendering for focus management.
+  - Added visual focus rings and improved input styling for rapid data entry.
+- **Design System & Global CSS:**
+  - Added `premium-input` and typography utility classes (`font-black`, `tracking-tight`) to `globals.css`.
+  - Polished `SectionCard` with sharper typography and better spacing.
+- **Verification & Testing:**
+  - Created `apps/web/e2e/ux-polish-keyboard.spec.ts` to verify keyboard navigation workflows.
+  - Updated `apps/web/e2e/accounting-smoke.spec.ts` for the new filter layout.
 
 ### UI-6D — Real-Credential Pilot QA and Verification Hardening
 
@@ -36,13 +61,13 @@ Completed:
 ## Next Recommended Sprint
 
 ```text
-UI-6E: Deeper Finance/Accounting Reports Visual Polish, Academics Marks/CAS Keyboard UX.
+UI-7A: Operations UX Foundation — Library, Transport, Canteen.
 ```
 
 ## Following Sprint
 
 ```text
-UI-7A: Operations UX Foundation — Library, Transport, Canteen.
+UI-7B: Advanced Operations & Audit Logging.
 ```
 
 ## Completed / Foundation-Complete UI Work

@@ -283,11 +283,41 @@ async function seedStudentsAndGuardians(
       create: { tenantId, studentId: safeStudent.id, guardianId: guardian.id, relation: 'Guardian', isPrimary: true, appLoginLinked: linkParent },
     });
 
-    await prisma.enrollment.upsert({
-      where: { tenantId_studentId_academicYearId: { tenantId, studentId: safeStudent.id, academicYearId } },
-      update: { classId: classroom.id, sectionId: section.id, rollNumber, admissionNumber: studentSystemId.replace('SCH', 'ADM'), admissionDate: date('2026-04-10'), mediumOfInstruction: 'English' },
-      create: { tenantId, studentId: safeStudent.id, academicYearId, classId: classroom.id, sectionId: section.id, rollNumber, admissionNumber: studentSystemId.replace('SCH', 'ADM'), admissionDate: date('2026-04-10'), mediumOfInstruction: 'English' },
+    const existingEnrollment = await prisma.enrollment.findFirst({
+      where: {
+        tenantId,
+        academicYearId,
+        studentId: safeStudent.id,
+      },
     });
+
+    if (existingEnrollment) {
+      await prisma.enrollment.update({
+        where: { id: existingEnrollment.id },
+        data: {
+          classId: classroom.id,
+          sectionId: section.id,
+          rollNumber,
+          admissionNumber: studentSystemId.replace('SCH', 'ADM'),
+          admissionDate: date('2026-04-10'),
+          mediumOfInstruction: 'English',
+        },
+      });
+    } else {
+      await prisma.enrollment.create({
+        data: {
+          tenantId,
+          academicYearId,
+          studentId: safeStudent.id,
+          classId: classroom.id,
+          sectionId: section.id,
+          rollNumber,
+          admissionNumber: studentSystemId.replace('SCH', 'ADM'),
+          admissionDate: date('2026-04-10'),
+          mediumOfInstruction: 'English',
+        },
+      });
+    }
 
     seeded.push({ student: safeStudent, guardian, className });
   }

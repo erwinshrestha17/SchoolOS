@@ -270,6 +270,41 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
 
   const records = casRecordsQuery.data ?? [];
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>, row: number, col: number) => {
+    const { key, shiftKey } = e;
+    
+    let nextRow = row;
+    let nextCol = col;
+
+    if (key === 'ArrowDown' || (key === 'Enter' && !shiftKey)) {
+      nextRow++;
+      e.preventDefault();
+    } else if (key === 'ArrowUp' || (key === 'Enter' && shiftKey)) {
+      nextRow--;
+      e.preventDefault();
+    } else if (key === 'ArrowRight' && (e.currentTarget as any).selectionEnd === (e.currentTarget as any).value?.length) {
+      nextCol++;
+    } else if (key === 'ArrowLeft' && (e.currentTarget as any).selectionStart === 0) {
+      nextCol--;
+    } else if (key === 'Escape') {
+      (e.currentTarget as HTMLElement).blur();
+      return;
+    } else {
+      return;
+    }
+
+    const nextTarget = document.querySelector(
+      `[data-cas-row="${nextRow}"][data-cas-col="${nextCol}"]`
+    ) as HTMLElement;
+
+    if (nextTarget) {
+      nextTarget.focus();
+      if (nextTarget instanceof HTMLInputElement) {
+        nextTarget.select();
+      }
+    }
+  };
+
   return (
     <div className="space-y-10 animate-fade-in">
       {/* Search & Feedback */}
@@ -440,7 +475,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
                               <p className="text-[10px] font-black uppercase tracking-widest">Select class to load batch roster</p>
                            </td>
                          </tr>
-                       ) : formStudentsForClass.map((student) => (
+                       ) : formStudentsForClass.map((student, rowIndex) => (
                          <tr key={student.id} className="group hover:bg-slate-50/50 transition-colors">
                            <td className="py-4 px-8">
                               <div className="flex flex-col">
@@ -456,7 +491,10 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
                                 value={batchDraft[student.id] ?? ''} 
                                 placeholder="0.0"
                                 onChange={(e) => setBatchDraft(c => ({ ...c, [student.id]: e.target.value }))}
-                                className="w-full h-12 rounded-xl border border-slate-100 bg-slate-50 text-center font-black tracking-tighter focus:bg-white focus:border-primary-400 transition-all"
+                                onKeyDown={(e) => handleKeyDown(e, rowIndex, 0)}
+                                data-cas-row={rowIndex}
+                                data-cas-col={0}
+                                className="w-full h-12 rounded-xl border border-slate-100 bg-slate-50 text-center font-black tracking-tighter focus:bg-white focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 transition-all outline-none"
                               />
                            </td>
                            <td className="py-4 px-6">
@@ -465,7 +503,10 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
                                 value={batchNotes[student.id] ?? ''} 
                                 placeholder="Add remark..."
                                 onChange={(e) => setBatchNotes(c => ({ ...c, [student.id]: e.target.value }))}
-                                className="w-full h-12 rounded-xl border border-slate-100 bg-slate-50 px-4 text-xs font-medium focus:bg-white focus:border-primary-400 transition-all"
+                                onKeyDown={(e) => handleKeyDown(e, rowIndex, 1)}
+                                data-cas-row={rowIndex}
+                                data-cas-col={1}
+                                className="w-full h-12 rounded-xl border border-slate-100 bg-slate-50 px-4 text-xs font-medium focus:bg-white focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 transition-all outline-none"
                               />
                            </td>
                          </tr>

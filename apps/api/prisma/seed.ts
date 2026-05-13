@@ -786,27 +786,37 @@ async function seedStudentAndEnrollment(
     },
   });
 
-  await prisma.enrollment.upsert({
+  const existingEnrollment = await prisma.enrollment.findFirst({
     where: {
-      tenantId_academicYearId_studentId: {
-        tenantId,
-        academicYearId,
-        studentId: student.id,
-      },
-    },
-    update: {
-      status: EnrollmentStatus.ACTIVE,
-    },
-    create: {
       tenantId,
       academicYearId,
       studentId: student.id,
-      classId: class1.id,
-      sectionId: sectionA.id,
-      status: EnrollmentStatus.ACTIVE,
-      enrolledAt: new Date(),
     },
   });
+
+  if (existingEnrollment) {
+    await prisma.enrollment.update({
+      where: { id: existingEnrollment.id },
+      data: {
+        classId: class1.id,
+        sectionId: sectionA.id,
+        status: EnrollmentStatus.ACTIVE,
+      },
+    });
+  } else {
+    await prisma.enrollment.create({
+      data: {
+        tenantId,
+        academicYearId,
+        studentId: student.id,
+        classId: class1.id,
+        sectionId: sectionA.id,
+        status: EnrollmentStatus.ACTIVE,
+        admissionDate: new Date(),
+        mediumOfInstruction: 'English',
+      },
+    });
+  }
 
   return student;
 }

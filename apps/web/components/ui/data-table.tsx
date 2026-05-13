@@ -9,7 +9,7 @@ import { PageState } from './page-state';
 interface Column<T> {
   header: string;
   accessorKey?: keyof T | string;
-  cell?: (item: T) => React.ReactNode;
+  cell?: (item: T, index: number) => React.ReactNode;
   className?: string;
 }
 
@@ -98,7 +98,7 @@ export function DataTable<T>({
                     key={colIndex}
                     className={cn('px-6 py-4 text-slate-700', column.className)}
                   >
-                    {column.cell ? column.cell(item) : String(value ?? '')}
+                    {column.cell ? column.cell(item, rowIndex) : String(value ?? '')}
                   </td>
                 );
               })}

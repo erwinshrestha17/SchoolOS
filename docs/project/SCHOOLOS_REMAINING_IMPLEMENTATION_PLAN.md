@@ -1,9 +1,9 @@
 # SchoolOS Remaining Implementation Plan
 
 **Status source:** `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md`  
-**Current stage:** Phase 2A backend complete + Phase 2 implemented foundations + Phase 3 operations admin foundations + Targeted Frontend Polish Complete + Real-Credential Pilot QA Hardening Complete
+**Current stage:** Phase 2A backend complete + Phase 2 foundations + Phase 3 operations admin foundations + Finance & Academics UX Polish Pass Complete + Real-Credential Pilot QA Hardening Complete
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard  
-**Last updated:** 2026-05-12
+**Last updated:** 2026-05-13
 
 ---
 
@@ -94,14 +94,21 @@ Biometric workflows
 Do first:
 
 ```text
-1. Execute final visual polish for Finance/Accounting Reports.
-2. Implement keyboard-friendly marks/CAS entry for Academics.
-3. Stabilize Homework/Timetable service/schema/test alignment.
-4. Perform final staging/pilot environment verification.
-5. Harden one existing vertical at a time: HR/Payroll, Library, Transport, Canteen.
-6. Add request/correlation ID logging if not fully wired.
-7. Add queue failure visibility for notifications/reports/payroll/PDF work.
-8. Harden File Registry/object storage before uploads expand.
+1. Harden Operations UX Foundation — Library, Transport, Canteen.
+2. Stabilize Homework/Timetable service/schema/test alignment.
+3. Perform final staging/pilot environment verification.
+4. Add request/correlation ID logging if not fully wired.
+5. Add queue failure visibility for notifications/reports/payroll/PDF work.
+6. Harden File Registry/object storage before uploads expand.
+```
+
+Completed in recent UX Polish Sprint:
+
+```text
+- Final visual polish for Finance/Accounting Reports.
+- Keyboard-friendly marks/CAS entry for Academics.
+- DataTable grid keyboard navigation support.
+- Standardized premium design system tokens.
 ```
 
 Avoid now:

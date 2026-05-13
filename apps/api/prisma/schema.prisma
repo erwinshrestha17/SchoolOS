@@ -1583,7 +1583,7 @@ model Enrollment {
   section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   invoices     Invoice[]
 
-  @@unique([tenantId, studentId, academicYearId])
+  @@unique([tenantId, academicYearId, studentId])
 }
 
 model Staff {
