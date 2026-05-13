@@ -11,6 +11,8 @@ import {
   Post,
 } from '@nestjs/common';
 import { PlatformService } from './platform.service';
+import { PlatformQueuesService } from './platform-queues.service';
+import { PlatformReportExportsService } from './platform-report-exports.service';
 import { PlatformGuard } from '../auth/guards/platform.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/auth-request.interface';
@@ -44,7 +46,11 @@ import {
 @Controller('platform')
 @UseGuards(JwtAuthGuard, PlatformGuard)
 export class PlatformController {
-  constructor(private readonly platformService: PlatformService) {}
+  constructor(
+    private readonly platformService: PlatformService,
+    private readonly platformQueuesService: PlatformQueuesService,
+    private readonly platformReportExportsService: PlatformReportExportsService,
+  ) {}
 
   @Get('dashboard')
   @Permissions('platform:dashboard:read')
@@ -286,13 +292,13 @@ export class PlatformController {
   @Get('queues')
   @Permissions('platform:queues:read')
   async getQueueHealth() {
-    return this.platformService.getQueueHealth();
+    return this.platformQueuesService.getQueueHealth();
   }
 
   @Get('queues/failed-jobs')
   @Permissions('platform:queues:read')
   async listFailedJobs() {
-    return this.platformService.listFailedJobs();
+    return this.platformQueuesService.listFailedJobs();
   }
 
   @Post('queues/retry')
@@ -301,7 +307,7 @@ export class PlatformController {
     @Body() body: RetryFailedJobDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    return this.platformService.retryFailedJob(body, this.requireUser(req));
+    return this.platformQueuesService.retryFailedJob(body, this.requireUser(req));
   }
 
   @Get('health')
@@ -312,8 +318,16 @@ export class PlatformController {
 
   @Get('report-exports')
   @Permissions('platform:reports:read')
-  async listReportExports(@Query('tenantId') tenantId?: string) {
-    return this.platformService.listReportExports(tenantId);
+  async listReportExports(
+    @Query('tenantId') tenantId?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.platformReportExportsService.listReportExportsPage({
+      tenantId,
+      page,
+      limit,
+    });
   }
 
   @Get('tenants/:tenantId/onboarding')
