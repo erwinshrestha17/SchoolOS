@@ -11,6 +11,7 @@ import {
   StudentQrStatus,
 } from '@prisma/client';
 import { randomBytes } from 'crypto';
+import QRCode from 'qrcode';
 import { StudentQrResolvePurpose } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
@@ -396,29 +397,12 @@ export class StudentQrService {
   }
 
   async getQrImage(token: string) {
-    const size = 128;
-    const digest = hashToken(token);
-    const cells = Array.from(digest)
-      .map((char, index) => {
-        const value = Number.parseInt(char, 16);
-        const x = 46 + (index % 12) * 6;
-        const y = 46 + Math.floor(index / 12) * 6;
-        return value % 2 === 0
-          ? `<rect x="${x}" y="${y}" width="4" height="4"/>`
-          : '';
-      })
-      .join('');
-
-    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Student QR credential">
-  <rect width="${size}" height="${size}" fill="white"/>
-  <rect x="10" y="10" width="30" height="30" fill="none" stroke="black" stroke-width="4"/>
-  <rect x="18" y="18" width="14" height="14" fill="black"/>
-  <rect x="10" y="88" width="30" height="30" fill="none" stroke="black" stroke-width="4"/>
-  <rect x="18" y="96" width="14" height="14" fill="black"/>
-  <rect x="88" y="10" width="30" height="30" fill="none" stroke="black" stroke-width="4"/>
-  <rect x="96" y="18" width="14" height="14" fill="black"/>
-  <g fill="black">${cells}</g>
-</svg>`;
+    return QRCode.toString(token, {
+      type: 'svg',
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      width: 128,
+    });
   }
 
   private async assertActiveStudent(tenantId: string, studentId: string) {
