@@ -127,7 +127,7 @@ export const dashboardNavGroups: NavGroup[] = [
         href: '/dashboard/hr',
         label: 'HR / Staff',
         icon: UserCog,
-        permissions: ['hr:read'],
+        permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
       },
       {
         href: '/dashboard/payroll',
