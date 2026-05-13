@@ -311,9 +311,9 @@ export class RetryFailedJobDto {
   @IsNotEmpty()
   jobId!: string;
 
-  @IsOptional()
   @IsString()
-  reason?: string;
+  @MinLength(5)
+  reason!: string;
 }
 
 export class OnboardingOverrideDto {
