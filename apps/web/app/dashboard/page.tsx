@@ -21,6 +21,7 @@ import type {
 import { api } from '../../lib/api';
 import { StatCard } from '../../components/ui/stat-card';
 import { SectionCard } from '../../components/ui/section-card';
+import { TeacherDashboard } from '../../components/academics/teacher-dashboard';
 import { EmptyState } from '../../components/ui/empty-state';
 import { LoadingState } from '../../components/ui/loading-state';
 import { Badge } from '../../components/ui/badge';
@@ -253,6 +254,16 @@ export default function DashboardPage() {
         <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-primary-600/20 blur-3xl" />
         <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-indigo-600/20 blur-3xl" />
       </header>
+
+      {session?.user.roles.includes('teacher') && (
+        <section className="space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="h-1 w-8 bg-indigo-500 rounded-full" />
+            <h2 className="text-xl font-black uppercase italic tracking-tight text-slate-900">Teacher Insights</h2>
+          </div>
+          <TeacherDashboard />
+        </section>
+      )}
 
       <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard

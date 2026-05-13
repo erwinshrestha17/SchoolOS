@@ -26,6 +26,28 @@ export class StaffLeaveAccrualService {
       `Processing monthly accruals for tenant ${tenantId}, period ${year}-${month}`,
     );
 
+    // Idempotency lock using TenantSetting
+    const settingKey = `hr:accrual:lock:${year}:${month}`;
+    const existingLock = await this.prisma.tenantSetting.findUnique({
+      where: {
+        tenantId_key: {
+          tenantId,
+          key: settingKey,
+        },
+      },
+    });
+
+    if (existingLock) {
+      this.logger.warn(
+        `Accruals for ${year}-${month} already processed for tenant ${tenantId}. Skipping.`,
+      );
+      return {
+        processedCount: 0,
+        accrualsGenerated: 0,
+        skipped: true,
+      };
+    }
+
     const activeStaff = await this.prisma.staff.findMany({
       where: {
         tenantId,
@@ -71,6 +93,19 @@ export class StaffLeaveAccrualService {
         results.push(balance);
       }
     }
+
+    await this.prisma.tenantSetting.create({
+      data: {
+        tenantId,
+        key: settingKey,
+        value: {
+          processedAt: new Date(),
+          processedBy: actorUserId,
+          staffCount: activeStaff.length,
+          accrualsCount: results.length,
+        },
+      },
+    });
 
     await this.auditService.record({
       action: 'process_accruals',

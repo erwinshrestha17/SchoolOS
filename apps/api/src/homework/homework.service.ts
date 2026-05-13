@@ -17,6 +17,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from '../communications/communications.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import {
   HomeworkReminderQueryDto,
   HomeworkReminderType,
@@ -50,6 +51,7 @@ export class HomeworkService {
     private readonly prisma: PrismaService,
     private readonly communicationsService: CommunicationsService,
     private readonly auditService: AuditService,
+    private readonly fileRegistry: FileRegistryService,
     @InjectQueue('homework') private readonly homeworkQueue: Queue,
   ) {}
 
@@ -245,7 +247,7 @@ export class HomeworkService {
 
       if (dto.attachmentFileIds?.length) {
         await this.linkAttachments(
-          actor.tenantId,
+          actor,
           assignment.id,
           null,
           dto.attachmentFileIds,
@@ -312,7 +314,7 @@ export class HomeworkService {
         });
         if (dto.attachmentFileIds.length > 0) {
           await this.linkAttachments(
-            actor.tenantId,
+            actor,
             assignment.id,
             null,
             dto.attachmentFileIds,
@@ -518,7 +520,7 @@ export class HomeworkService {
 
       if (dto.attachmentFileIds?.length) {
         await this.linkAttachments(
-          actor.tenantId,
+          actor,
           assignmentId,
           submission.id,
           dto.attachmentFileIds,
@@ -568,7 +570,7 @@ export class HomeworkService {
         });
         if (dto.attachmentFileIds.length > 0) {
           await this.linkAttachments(
-            actor.tenantId,
+            actor,
             submission.homeworkId,
             submission.id,
             dto.attachmentFileIds,
@@ -833,15 +835,17 @@ export class HomeworkService {
   }
 
   private async linkAttachments(
-    tenantId: string,
+    actor: AuthContext,
     assignmentId: string,
     submissionId: string | null,
     fileAssetIds: string[],
     tx?: Prisma.TransactionClient,
   ) {
     const prisma = tx || this.prisma;
+    
+    // 1. Validate files belong to tenant
     const fileAssets = await prisma.fileAsset.findMany({
-      where: { id: { in: fileAssetIds }, tenantId },
+      where: { id: { in: fileAssetIds }, tenantId: actor.tenantId },
       select: { id: true },
     });
 
@@ -851,9 +855,10 @@ export class HomeworkService {
       );
     }
 
+    // 2. Create join records
     await prisma.homeworkAttachment.createMany({
       data: fileAssetIds.map((fileAssetId) => ({
-        tenantId,
+        tenantId: actor.tenantId,
         assignmentId,
         submissionId,
         fileAssetId,
@@ -861,14 +866,16 @@ export class HomeworkService {
       skipDuplicates: true,
     });
 
-    // Update FileAsset entity reference
-    await prisma.fileAsset.updateMany({
-      where: { id: { in: fileAssetIds }, tenantId },
-      data: {
-        module: 'homework',
-        entityId: submissionId ?? assignmentId,
-      },
-    });
+    // 3. Update FileAsset entity reference via Registry for consistency/auditing
+    for (const assetId of fileAssetIds) {
+      await this.fileRegistry.linkToEntity(
+        actor.tenantId,
+        assetId,
+        'homework',
+        submissionId ?? assignmentId,
+        actor.userId,
+      );
+    }
   }
 
   async sendHomeworkReminder(
@@ -888,6 +895,7 @@ export class HomeworkService {
       where: {
         tenantId: actor.tenantId,
         idempotencyKey,
+        status: 'COMPLETED',
       },
     });
 
@@ -1166,9 +1174,9 @@ export class HomeworkService {
   ) {
     const date = new Date().toISOString().split('T')[0];
     if (reminderType === HomeworkReminderType.HOMEWORK_PUBLISHED) {
-      return `${tenantId}:${homeworkId}:PUBLISHED`;
+      return `hw_rem:${tenantId}:${homeworkId}:${reminderType}`;
     }
-    return `${tenantId}:${homeworkId}:${reminderType}:${date}`;
+    return `hw_rem:${tenantId}:${homeworkId}:${reminderType}:${date}`;
   }
 
   private async createOrReuseReminderBatch(

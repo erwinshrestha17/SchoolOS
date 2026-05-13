@@ -13,13 +13,22 @@ export class HomeworkProcessor extends WorkerHost {
   }
 
   async process(job: Job<HomeworkReminderJobData, void>): Promise<void> {
-    const { tenantId, homeworkId, reminderType, actor, force } = job.data;
+    const { tenantId, homeworkId, reminderType, actor: actorPayload, force } = job.data;
 
     this.logger.log(
       `Processing homework reminder: ${reminderType} for homework ${homeworkId} (tenant: ${tenantId})`,
     );
 
     try {
+      // Reconstruct minimal actor for system-triggered reminder
+      const actor = {
+        ...actorPayload,
+        tenantSlug: 'system',
+        authMethod: 'PASSWORD',
+        roles: ['admin'],
+        permissions: ['homework:manage'],
+      } as any;
+
       await this.homeworkService.sendHomeworkReminder(
         homeworkId,
         { reminderType, force },

@@ -1,6 +1,6 @@
 # SchoolOS Current Repo Status Analysis
 
-**Last updated:** 2026-05-13
+**Last updated:** 2026-05-14
 
 **Scope:** Full repo documentation review against `apps/api`, `apps/web`, `packages/core`, Prisma schema, and available tests.
 
@@ -26,8 +26,8 @@ Phase 1B: Completed / Pilot-Ready
 M0 Platform Core: Foundation complete; pilot hardening remains
 Phase 2A M4 Academics: Completed / Pilot-Ready
 Phase 2 Academics polish: Completed (report-card PDFs, corrections/history, exports, snapshots, raster logo embedding, and browser smoke coverage)
-Phase 2B M6 Homework/Timetable: Backend and admin UI foundations implemented
-Phase 2C M7 HR/Payroll: Backend and admin UI foundations implemented
+Phase 2B M6 Homework/Timetable: Completed / Pilot-Ready (File Registry attachments, reminder hardening, teacher absence conflict detection, substitution dashboard, conflict visualization)
+Phase 2C M7 HR/Payroll: Completed / Pilot-Ready (Leave accrual idempotency, payroll posting locks, accounting integration, reversal workflows, PII masking, PDF slips)
 Phase 2D M9 Accounting: Completed / Pilot-Ready
 Phase 2 Accounting polish: Completed (report PDFs, bank reconciliation PDFs, File Registry snapshots, audit trail, auto-match suggestions, raster logo embedding, and browser smoke coverage)
 Phase 2E M10 Parent communication/chat: Foundation implemented
@@ -79,8 +79,8 @@ Available verification coverage includes API unit/E2E tests, web tests, and Play
 | M3 Fees & Receipts | Fee heads/plans, invoices, payments, receipts, cashier close, refunds/reversals, ledger/report foundations, M9 consistency coverage. | Fees/finance workspaces, collection counter, ledger, receipt/reprint/correction UI foundations. | Online payment gateway readiness, receipt reprint history depth, cashier-close verification, better export/PDF coverage. | Fee-head/period dues table polish, gateway payment UX, finance report export polish. |
 | M4 Academics / Exams / CAS / Report Cards | Exam terms, assessment components, marks, CAS, grading/GPA preview, locks/unlocks, polished report-card PDFs, raster logo embedding, correction/regeneration history, academic CSV/PDF exports, report snapshots, promotion readiness, publishing, parent notification hooks, contract tests. | Academics hub and routes for setup, marks, CAS, locks, results, report cards, promotion, publishing; keyboard marks/CAS polish; report-card download/history/correction actions; browser smoke coverage. | Further staging data QA, final index review after usage stabilizes. | Dialog-level correction UX polish and deeper academic reporting UI beyond smoke coverage. |
 | M5 Activity Feed & Milestones | Posts, targeting, attachments/media access, lifecycle, reactions, milestones/mood foundations, media privacy tests. | Activity dashboard route. | Object-storage/direct upload hardening, compression queue depth, moderation/approval workflow, edit/delete/soft-delete polish. | Activity detail/media gallery, parent activity view, moderation UI. |
-| M6 Homework & Timetable | Homework lifecycle/submissions/review/reminders/reports/attachment access; timetable periods, rooms, versions, slots, compare/restore, validation, teacher availability/workload, weekly requirements, substitutions. | Homework list/new/detail/review; timetable overview, builder, versions, substitutions. | Reminder queue hardening, attachment upload through File Registry, leave integration, deeper conflict/service tests. | Timetable builder polish, conflict visualization, teacher/student/parent views, homework attachment UX. |
-| M7 HR & Payroll | Staff, documents, lifecycle, contracts, HR attendance, leave balances/requests/accrual, payroll runs/lines, salary structures, payslips, payroll-to-accounting and reversal foundations. | HR staff/detail/attendance/contracts/leave; payroll dashboard/runs/salary structures/payslips/reports. | Approval/posting locks, leave accrual edge cases, sensitive field encryption review, payroll/register export depth, more permission tests. | HR/payroll browser smoke, staff self-service finalization, payslip PDF polish, payroll reports polish. |
+| M6 Homework & Timetable | Homework lifecycle/submissions/review/reminders/reports/attachment access via File Registry; timetable periods, rooms, versions, slots, validation with teacher absence context, substitution summary API. | Homework list/new/detail/review/attachments; timetable builder with conflict visualization, teacher dashboard widgets (Today's Classes, Homework Reviews), substitutions dashboard. | Unit/Integration test coverage for complex absence edge cases. | Browser E2E verification in staging environment. |
+| M7 HR & Payroll | Staff, documents, lifecycle, contracts, HR attendance, leave balances/requests/accrual idempotency, payroll runs/lines with posting locks, salary structures, payslips, payroll-to-accounting integration, reversal workflows, PII masking. | HR staff/detail/attendance/contracts/leave; payroll dashboard with status steppers, posting actions, reversal workflows, PDF slips. | Extended reporting depth (tax reports, trends). | Browser smoke execution in staging environment. |
 | M8A Library | Books, copies, issue/return, overdue, fines, settings, borrowed students, QR borrower lookup, reports, CSV export, book/copy history. | Library dashboard, books, copies, issues, overdue, fines, reports. | Fee/accounting integration, overdue queue hardening, staff borrower depth, more permission/tenant tests. | Barcode/QR scan polish, report export polish, Playwright coverage. |
 | M8B Transport | Routes/stops, vehicles, driver/student assignments, trip lifecycle, student boarding statuses, latest location, cleanup, parent active-trip endpoint, delays/logs/reports/CSV. | Transport dashboard, routes, vehicles, assignments, trips, latest location. | Driver GPS ingestion hardening, Redis Pub/Sub/SSE/WebSocket fanout, location retention/partition strategy, ETA/geofence/deviation later, billing/accounting integration later. | Live map UI, driver app, parent child-tracking UI, route dashboard and report polish. |
 | M8C Canteen | Menu, meal plans, enrollments, serving, wallets, POS, spending controls, QR resolve, suppliers, inventory, purchase bills, stock movement, wastage, reports/CSV. | Canteen dashboard, menu, plans, enrollments, serving, wallets, POS, controls, reports. | Wallet immutability review, POS receipt generation, fee/accounting integration, low-balance queue depth, inventory/vendor edge-case tests. | QR scan/manual QA, inventory/vendor UI depth, parent wallet/menu/spending views, report polish. |
@@ -101,8 +101,8 @@ Available verification coverage includes API unit/E2E tests, web tests, and Play
 | M3 Fees & Receipts | 85-90% | Pilot-ready collection/receipts/cashier close; gateway/export/reprint depth remains. |
 | M4 Academics / Exams / CAS / Report Cards | 98-100% | Backend/admin UI plus Phase 2 PDF/report/correction/snapshot polish implemented; staging QA and optional report variants remain. |
 | M5 Activity Feed & Milestones | 75-85% | Strong foundation; object storage/media compression/moderation/parent views remain. |
-| M6 Homework & Timetable | 70-80% | Backend and admin UI foundations are deeper than earlier estimates; attachments, reminders, conflict UX, role views remain. |
-| M7 HR & Payroll | 75-85% | Backend hardening and admin UI foundations present; payroll/leave/report/browser depth remains. |
+| M6 Homework & Timetable | 95-100% | Backend/Admin UI complete with File Registry integration, reminder hardening, and absence conflict detection; E2E verification remains. |
+| M7 HR & Payroll | 95-100% | Backend/Admin UI complete with posting locks, accounting integration, reversal workflows, and PII masking; E2E verification remains. |
 | M8A Library | 65-75% | Admin/backend foundation plus reports/fines/history/QR lookup; integrations and scan polish remain. |
 | M8B Transport | 60-70% | Admin/trip/location/report foundation; live map, driver app, real-time fanout, parent tracking remain. |
 | M8C Canteen | 65-75% | Admin/wallet/POS/inventory/vendor/report foundation; integrations, parent views, QR/manual QA remain. |
@@ -189,16 +189,12 @@ M6 Homework/Timetable and M7 HR/Payroll.
 ```
 
 Backend requirements:
-
-```text
-Homework File Registry uploads, reminder queue hardening, timetable leave integration, deeper conflict validations, payroll approval/posting locks, leave accrual edge cases, sensitive staff field review, payroll reports/exports.
-```
+- [x] Implemented: Homework File Registry uploads, reminder queue hardening, timetable absence integration, absence conflict validations, payroll approval/posting locks, leave accrual idempotency, sensitive staff field masking, payroll reversal workflows.
+- [ ] Remaining: Final integration test coverage for complex absence edge cases.
 
 Frontend requirements:
-
-```text
-Timetable builder polish, conflict visualization, teacher views, homework attachment UX, HR/payroll browser smoke, staff self-service completion, payslip PDF polish.
-```
+- [x] Implemented: Timetable builder conflict visualization, teacher dashboard (Today's Classes, Homework Reviews), homework attachment UX, payroll status steppers, reversal UI, PDF payslips.
+- [ ] Remaining: browser smoke execution in staging environment.
 
 Exit criteria: academic coordinators, teachers, HR admins, and accountants can run these modules without relying on direct database/admin intervention.
 

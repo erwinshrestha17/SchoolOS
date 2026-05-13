@@ -527,25 +527,56 @@ export function TimetableBuilderTab({
                           <p className="text-xs font-black uppercase tracking-widest text-slate-400">{day.label}</p>
                         </div>
                         <div className="flex flex-1 flex-wrap gap-3">
-                          {daySlots.map((s) => (
-                            <div key={s.id} className="w-48 flex-shrink-0 space-y-2 rounded-2xl border border-indigo-100 bg-indigo-50/30 p-4 transition-colors hover:bg-indigo-50">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="text-xs font-black uppercase leading-tight tracking-tight text-indigo-900">{s.subject?.code ?? 'SUB'}</p>
-                                <Badge variant="outline" className="border-indigo-200 px-1 py-0 text-[8px] font-black uppercase text-indigo-400">
-                                  {s.startsAt}
-                                </Badge>
-                              </div>
-                              <p className="truncate text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                {s.staff?.firstName} {s.staff?.lastName}
-                              </p>
-                              {(s.section?.name || s.room) && (
-                                <div className="flex gap-2 text-[9px] font-black uppercase tracking-widest text-indigo-300">
-                                  {s.section?.name && <span>Sec {s.section.name}</span>}
-                                  {s.room && <span>• {s.room}</span>}
+                          {daySlots.map((s) => {
+                            const hasConflict = validationResult?.errors.some(e => e.conflictingSlotId === s.id || e.affectedPeriodIds.includes(s.id));
+                            return (
+                              <div 
+                                key={s.id} 
+                                className={cn(
+                                  "w-48 flex-shrink-0 space-y-2 rounded-2xl border p-4 transition-colors",
+                                  hasConflict 
+                                    ? "border-red-200 bg-red-50 hover:bg-red-100/50" 
+                                    : "border-indigo-100 bg-indigo-50/30 hover:bg-indigo-50"
+                                )}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-center gap-1.5">
+                                    <p className={cn(
+                                      "text-xs font-black uppercase leading-tight tracking-tight",
+                                      hasConflict ? "text-red-900" : "text-indigo-900"
+                                    )}>
+                                      {s.subject?.code ?? 'SUB'}
+                                    </p>
+                                    {hasConflict && <AlertCircle className="h-3 w-3 text-red-500" />}
+                                  </div>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={cn(
+                                      "px-1 py-0 text-[8px] font-black uppercase",
+                                      hasConflict ? "border-red-200 text-red-400" : "border-indigo-200 text-indigo-400"
+                                    )}
+                                  >
+                                    {s.startsAt}
+                                  </Badge>
                                 </div>
-                              )}
-                            </div>
-                          ))}
+                                <p className={cn(
+                                  "truncate text-[10px] font-bold uppercase tracking-widest",
+                                  hasConflict ? "text-red-700" : "text-slate-500"
+                                )}>
+                                  {s.staff?.firstName} {s.staff?.lastName}
+                                </p>
+                                {(s.section?.name || s.room) && (
+                                  <div className={cn(
+                                    "flex gap-2 text-[9px] font-black uppercase tracking-widest",
+                                    hasConflict ? "text-red-300" : "text-indigo-300"
+                                  )}>
+                                    {s.section?.name && <span>Sec {s.section.name}</span>}
+                                    {s.room && <span>• {s.room}</span>}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     );

@@ -429,6 +429,15 @@ export class TimetableController {
 
   // --- Substitutions ---
 
+  @Get('substitutions/summary')
+  @Permissions('timetable:read')
+  getDailySubstitutionSummary(
+    @Query('date') date: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.substitutionService.getDailySubstitutionSummary(date, auth);
+  }
+
   @Get('substitutions')
   @Permissions('timetable:read')
   listSubstitutions(

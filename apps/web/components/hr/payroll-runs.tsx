@@ -13,6 +13,7 @@ import {
   Loader2,
   Plus,
   ShieldCheck,
+  RotateCcw,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useSession } from '../session-provider';
@@ -208,6 +209,15 @@ export function PayrollRuns() {
       const paidRun = normalizeRun(run);
       void queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
       setSelectedRunId(paidRun.id);
+    },
+  });
+
+  const reverseMutation = useMutation({
+    mutationFn: (id: string) =>
+      api.reversePayrollRun(id, { reason: 'Administrative correction' }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
+      setSelectedRunId(null);
     },
   });
 
@@ -530,6 +540,37 @@ export function PayrollRuns() {
                 </div>
               </div>
 
+              {/* Status Stepper */}
+              <div className="flex items-center justify-between px-2 py-4">
+                {[
+                  { label: 'Draft', active: true },
+                  { label: 'Approved', active: ['APPROVED', 'POSTED', 'PAID'].includes(selectedRun.status) },
+                  { label: 'Posted', active: ['POSTED', 'PAID'].includes(selectedRun.status) },
+                  { label: 'Paid', active: selectedRun.status === 'PAID' },
+                ].map((step, idx, arr) => (
+                  <div key={step.label} className="flex items-center flex-1 last:flex-none">
+                    <div className="flex flex-col items-center gap-1">
+                      <div className={cn(
+                        "h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-black",
+                        step.active ? "bg-primary-600 text-white" : "bg-slate-100 text-slate-400"
+                      )}>
+                        {step.active ? <CheckCircle2 size={12} /> : idx + 1}
+                      </div>
+                      <span className={cn(
+                        "text-[9px] font-black uppercase tracking-widest",
+                        step.active ? "text-slate-900" : "text-slate-400"
+                      )}>{step.label}</span>
+                    </div>
+                    {idx < arr.length - 1 && (
+                      <div className={cn(
+                        "h-[2px] flex-1 mx-2 mb-4",
+                        arr[idx+1].active ? "bg-primary-600" : "bg-slate-100"
+                      )} />
+                    )}
+                  </div>
+                ))}
+              </div>
+
               <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs leading-relaxed text-amber-800">
                 <strong>Posting note:</strong> Approved payroll can be posted once to M9 Accounting. Posting creates the payroll accrual journal through the backend accounting boundary and changes the run to POSTED. It does not disburse salaries, create reversal entries, or enable editing posted runs.
               </div>
@@ -567,6 +608,22 @@ export function PayrollRuns() {
                 >
                   {markPaidMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Landmark size={16} />}
                   Mark Paid and Post Disbursement
+                </button>
+              )}
+
+              {['POSTED', 'PAID'].includes(selectedRun.status) && (
+                <button
+                  type="button"
+                  disabled={!canManagePayroll || reverseMutation.isPending}
+                  onClick={() => {
+                    if (confirm('Are you sure you want to reverse this payroll run? This will create reversal journal entries and void the run.')) {
+                      reverseMutation.mutate(selectedRun.id);
+                    }
+                  }}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-danger-200 bg-white px-4 py-2.5 text-sm font-bold text-danger-700 transition-colors hover:bg-danger-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {reverseMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+                  Reverse and Void Run
                 </button>
               )}
 

@@ -6,6 +6,7 @@ import { api } from '../../lib/api';
 import { useSession } from '../session-provider';
 import { TimetableBuilderTab } from './tabs/timetable-builder-tab';
 import { TeacherWorkloadTab } from './tabs/teacher-workload-tab';
+import { SubstitutionsTab } from './tabs/substitutions-tab';
 import { HomeworkTab } from './tabs/homework-tab';
 import { StudentHomeworkTab } from './tabs/student-homework-tab';
 import { StudentTimetableTab } from './tabs/student-timetable-tab';
@@ -27,6 +28,7 @@ import {
 const adminSections = [
   'Timetable Builder',
   'Teacher Workload',
+  'Substitutions',
   'Homework',
 ] as const;
 
@@ -68,6 +70,11 @@ const sectionMeta: Record<Section, { title: string; description: string; icon: a
     title: 'My Weekly Schedule',
     description: 'View your personalized weekly class schedule, subjects, and teachers.',
     icon: Clock,
+  },
+  Substitutions: {
+    title: 'Faculty Coverage',
+    description: 'Track teacher absences and manage class substitutions to ensure academic continuity.',
+    icon: Users,
   },
 };
 
@@ -178,6 +185,10 @@ export function TimetableWorkspace({ initialSection }: TimetableWorkspaceProps =
             workload={workloadQuery.data ?? []}
             isLoading={workloadQuery.isLoading}
           />
+        </TabsContent>
+
+        <TabsContent value="Substitutions">
+          <SubstitutionsTab />
         </TabsContent>
 
         <TabsContent value="Homework">

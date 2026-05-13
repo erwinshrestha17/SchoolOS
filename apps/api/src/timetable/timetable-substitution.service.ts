@@ -68,6 +68,79 @@ export class TimetableSubstitutionService {
     });
   }
 
+  async getDailySubstitutionSummary(dateStr: string, actor: AuthContext) {
+    const date = stripTime(parseDate(dateStr, 'date'));
+    const dayOfWeek = date.getDay();
+
+    // 1. Fetch all slots for this day of week from PUBLISHED/LOCKED versions
+    const slots = await this.prisma.timetableSlot.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        dayOfWeek,
+        version: {
+          status: {
+            in: [
+              TimetableVersionStatus.PUBLISHED,
+              TimetableVersionStatus.LOCKED,
+            ],
+          },
+        },
+      },
+      include: timetableSlotInclude(),
+    });
+
+    // 2. Fetch existing substitutions for this date
+    const existingSubstitutions =
+      await this.prisma.timetableSubstitution.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          date,
+          status: { not: TimetableSubstitutionStatus.CANCELLED },
+        },
+      });
+
+    const substitutionBySlotId = new Map(
+      existingSubstitutions.map((s) => [s.timetableSlotId, s]),
+    );
+
+    // 3. For each slot, check if teacher is absent
+    const results = await Promise.all(
+      slots.map(async (slot) => {
+        const absenceContext = await this.getTeacherAbsenceContext(
+          actor,
+          slot.staffId,
+          date,
+        );
+        const existing = substitutionBySlotId.get(slot.id);
+
+        return {
+          slotId: slot.id,
+          startsAt: slot.startsAt,
+          endsAt: slot.endsAt,
+          subjectName: slot.subject.name,
+          className: slot.class.name,
+          sectionName: slot.section?.name ?? null,
+          originalTeacherId: slot.staffId,
+          originalTeacherName: `${slot.staff?.firstName} ${slot.staff?.lastName}`,
+          isTeacherAbsent: absenceContext.isAbsent,
+          absenceReason: absenceContext.leaveType ?? absenceContext.attendanceStatus ?? null,
+          hasSubstitution: !!existing,
+          substitutionStatus: existing?.status ?? null,
+          substituteTeacherId: existing?.substituteTeacherId ?? null,
+          needsAction: absenceContext.isAbsent && !existing,
+        };
+      }),
+    );
+
+    return {
+      date: date.toISOString(),
+      totalSlots: results.length,
+      absentSlots: results.filter((r) => r.isTeacherAbsent).length,
+      needsSubstitution: results.filter((r) => r.needsAction).length,
+      slots: results,
+    };
+  }
+
   async createSubstitution(dto: CreateSubstitutionDto, actor: AuthContext) {
     const date = stripTime(parseDate(dto.date, 'date'));
     const slot = await this.findSlotOrThrow(dto.timetableSlotId, actor);

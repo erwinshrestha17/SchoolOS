@@ -370,6 +370,9 @@ export class PayrollService {
     return updated;
   }
 
+    return updated;
+  }
+
   async listPayrollRuns(actor: AuthContext) {
     return this.prisma.payrollRun.findMany({
       where: { tenantId: actor.tenantId },
@@ -909,6 +912,71 @@ export class PayrollService {
     });
 
     return posted;
+  }
+
+  async reverseAndCorrectPayrollRun(
+    id: string,
+    dto: PayrollActionDto,
+    actor: AuthContext,
+  ) {
+    const run = await this.getPayrollRunOrThrow(id, actor);
+    const actions = getPayrollRunActions(run.status);
+
+    if (!actions.canReverse) {
+      throw new ConflictException(
+        `Payroll run in ${run.status} status cannot be reversed`,
+      );
+    }
+
+    if (!run.journalEntryId) {
+      throw new ConflictException('No journal entry found to reverse');
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 1. Reverse in accounting
+      const reversalEntry = await this.accountingPostingService.postCorrection(
+        {
+          tenantId: actor.tenantId,
+          originalEntryId: run.journalEntryId!,
+          reason: dto.reason || 'Payroll correction',
+        },
+        actor,
+        tx,
+      );
+
+      // 2. Void current run
+      const updated = await tx.payrollRun.update({
+        where: { id: run.id },
+        data: {
+          status: PayrollRunStatus.VOID,
+          voidedAt: new Date(),
+          voidedById: actor.userId,
+        },
+      });
+
+      // 3. Void payslips
+      await tx.payslip.updateMany({
+        where: { tenantId: actor.tenantId, payrollRunId: run.id },
+        data: { status: 'VOID' },
+      });
+
+      return { updated, reversalEntry };
+    });
+
+    await this.auditService.record({
+      action: 'reverse',
+      resource: 'payroll_run',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: run.id,
+      after: {
+        status: PayrollRunStatus.VOID,
+        reversalEntryId: result.reversalEntry.id,
+      },
+    });
+
+    return result;
+  }
   }
 
   async rejectPayrollRun(

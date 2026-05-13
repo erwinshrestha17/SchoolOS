@@ -5,17 +5,41 @@ This file records the latest web-admin UI/UX implementation progress so large ro
 ## Current UI Sprint
 
 ```text
-Current UI sprint: Phase 2 Academics and Accounting Production Polish completed; browser smoke execution remains environment-gated.
+Current UI sprint: Phase 3 Operational Hardening (Homework, Timetable, HR, and Payroll) completed; browser smoke execution remains environment-gated.
 ```
 
 Current repo reality:
 
 ```text
-Academics and Accounting now have Phase 2 report-card/report export polish, saved snapshot surfaces, audit viewer, bank reconciliation export, and smoke coverage updates.
-Next UI work is not broad route creation; it is environment-backed smoke execution, QR/manual QA, audit viewer depth, scan/POS speed polish, and role-specific depth.
+Academics, Accounting, Homework, Timetable, HR, and Payroll now have Phase 3 operational depth including teacher dashboards, substitution oversight, conflict visualization, payroll reversal workflows, and PII masking.
+Next UI work is Phase 4: Library, Transport, and Canteen production depth (barcode/QR scan, inventory/vendor depth, POS speed).
 ```
 
 ## Current Sprint (Completed)
+
+### UI-7A — Phase 3 Operational Hardening: Homework, Timetable, HR, and Payroll
+
+Status: **Completed**.
+
+Focus: Hardening the operational depth for Phase 2 foundations to support daily coordinator, teacher, and HR/Accounting workflows.
+
+Completed:
+
+- **Timetable & Substitution Oversight:**
+  - Added a **Substitutions Tab** to the Timetable Workspace for daily coverage tracking.
+  - Implemented a **Substitution Summary Panel** showing aggregate metrics (Absent Teachers, Pending Subs).
+  - Enhanced the Timetable Builder grid to **visually highlight conflicting slots** (e.g., teacher absence conflicts in red).
+- **Teacher Dashboard (Faculty View):**
+  - Implemented a specialized **Teacher Insights** section on the main dashboard.
+  - Added "Today's Classes" and "Homework Review" widgets for rapid faculty access.
+- **HR & Payroll Integrity:**
+  - Refined the Payroll Dashboard with a **Status Stepper** (Draft -> Approved -> Posted -> Paid).
+  - Implemented **Payroll Reversal UI** for audit-compliant correction workflows.
+  - Enabled secure **PDF Payslip** access from the staff detail and payroll lines.
+  - Integrated **PII Masking** for sensitive staff fields (Bank, PAN, Identity) based on permissions.
+- **Homework UX:**
+  - Polished the Homework Detail page with attachment previews and download support.
+  - Integrated the **Homework Review Modal** for batch grading and feedback.
 
 ### UI-6F — Academics and Accounting Production Polish
 
@@ -252,17 +276,17 @@ Completed:
 
 ## Remaining Gaps
 
-- HR/Payroll browser smoke tests (deeper coverage).
-- Accounting browser smoke tests (improved/partially covered by Phase 2F, but deeper coverage still needed).
-- QR-specific Library/Canteen manual QA.
-- Platform tenant-action manual QA.
-- Payroll PDF/payslip visual polish.
-- Staff self-service `/dashboard/my-profile` finalization.
-- Staff lifecycle audit logs.
-- Journal correction workflow final wiring.
-- Trial Balance / Balance Sheet PDF export styling.
-- Homework file attachments after File Registry.
-- Advanced timetable conflict visualization.
+- [ ] HR/Payroll browser smoke tests (deeper coverage in staging).
+- [ ] Accounting browser smoke tests (deeper coverage in staging).
+- [ ] QR-specific Library/Canteen manual QA.
+- [ ] Platform tenant-action manual QA.
+- [x] Payroll PDF/payslip visual polish.
+- [x] Staff self-service `/dashboard/my-profile` finalization (PDF slips).
+- [ ] Staff lifecycle audit logs (Backend implemented; UI depth remains).
+- [x] Journal correction workflow final wiring (Payroll reversals).
+- [ ] Trial Balance / Balance Sheet PDF export styling.
+- [x] Homework file attachments after File Registry.
+- [x] Advanced timetable conflict visualization.
 - Library barcode/QR scan polish and Playwright tests.
 - Transport live map only after real-time backend design is complete.
 - Canteen inventory/vendor UI depth and POS/QR speed polish.

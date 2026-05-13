@@ -81,14 +81,11 @@ export class HomeworkCron {
 
     if (!adminUser) return;
 
-    const actor: AuthContext = {
+    // We pass a simplified actor to BullMQ
+    const actorPayload = {
       userId: adminUser.id,
       tenantId: homework.tenantId,
-      tenantSlug: 'system',
       email: adminUser.email,
-      authMethod: AuthMethod.PASSWORD,
-      roles: ['admin'],
-      permissions: ['homework:manage'],
     };
 
     await this.homeworkQueue.add(
@@ -97,7 +94,7 @@ export class HomeworkCron {
         tenantId: homework.tenantId,
         homeworkId: homework.id,
         reminderType,
-        actor,
+        actor: actorPayload,
         force: false,
       },
       {

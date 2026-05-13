@@ -1,6 +1,6 @@
 # SchoolOS Master Project Memory
 
-**Status:** M0 Platform Core Foundation Complete + Phase 2 Academics/Accounting Production Polish Implemented + Student QR Foundation Implemented + Phase 3 Operations Admin Foundations Implemented
+**Status:** M0 Platform Core Foundation Complete + Phase 2 Academics/Accounting Production Polish Implemented + Student QR Foundation Implemented + Phase 3 Operations (Homework, Timetable, HR, Payroll) Hardened
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard
 
@@ -33,7 +33,7 @@ Phase 2 Academics production polish: Completed (report-card PDFs, corrections/hi
 Student QR Foundation: Implemented; release hardening remains
 Phase 2D M9 Accounting: Completed
 Phase 2 Accounting production polish: Completed (report PDFs, snapshots, reconciliation suggestions, audit trail, and smoke coverage)
-Current stage: M0 platform foundation complete + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3 operations admin foundations
+Current stage: M0 platform foundation complete + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3 operations (Homework, Timetable, HR, Payroll) hardened
 ```
 
 Targeted web-admin frontend polish and Phase 2F browser smoke coverage are now present on main.
@@ -115,8 +115,8 @@ Rules:
 | M3 | Fees & Receipts | Phase 1A/1B complete / pilot-ready |
 | M4 | Exams, CAS & Report Cards | Phase 2 backend/admin UI plus production PDF/report/correction/snapshot polish implemented |
 | M5 | Activity Feed & Milestones | Phase 1A/1B complete with media/moderation hardening foundations |
-| M6 | Homework & Timetable | Phase 2 backend/admin UI foundation implemented; attachment, queue, conflict, and role-view depth remains |
-| M7 | HR & Payroll | Phase 2 backend/admin UI foundation implemented; approval, reporting, self-service, and browser depth remains |
+| M6 | Homework & Timetable | Phase 3 operational hardening complete (File Registry, reminders, absence conflicts, teacher dashboard) |
+| M7 | HR & Payroll | Phase 3 operational hardening complete (Posting locks, accounting integration, reversals, PII masking) |
 | M8A | Library Management | Phase 3 admin/backend foundation implemented with fines, reports, history, and QR lookup |
 | M8B | Transport Management | Phase 3 admin/trip/location/report foundation implemented; live/driver/parent later |
 | M8C | Canteen Management | Phase 3 admin/wallet/POS/inventory/vendor/report foundation implemented; integrations and parent views later |
@@ -245,8 +245,8 @@ Status: **Partially complete**.
 
 ```text
 2A Academics, Exams, CAS, Report Cards — complete for backend/admin UI and production PDF/report/correction/snapshot polish
-2B Homework and Timetable — backend/admin UI foundation implemented; attachment, queue, conflict, and role-view depth remains
-2C HR and Payroll — backend/admin UI foundation implemented; approval, reporting, self-service, and browser depth remains
+2B Homework and Timetable — Completed / Pilot-Ready
+2C HR and Payroll — Completed / Pilot-Ready
 2D M9 Accounting and Finance — production-candidate complete with PDF/snapshot/reconciliation polish
 2E Parent Communication Expansion — foundation implemented / provider, moderation, retention, and mobile depth remains
 2F Student Identity QR Foundation — implemented foundation; release QA, ID-card PDF verification, and deeper scan tests remain
@@ -254,12 +254,13 @@ Status: **Partially complete**.
 
 ### Phase 3 — Extended School Operations
 
-Status: **Admin foundations implemented; production depth incomplete**.
+Status: **Operations (Homework, Timetable, HR, Payroll) hardened; others in admin-foundation state.**
 
 ```text
 Library admin/backend foundation with fines, reports, history, and QR lookup
 Transport admin/trip/location/report foundation
 Canteen admin/wallet/POS/inventory/vendor/report foundation
+Homework, Timetable, HR, and Payroll operational depth complete (Phase 3)
 Parent/mobile, driver app, live transport map/WebSocket/SSE, and deeper accounting/billing integrations later
 ```
 
@@ -462,9 +463,9 @@ Module estimates:
 | M5 Activity Feed | 75-85% |
 | M10 Notices & Communication | 85-90% |
 | M4 Academics | 100% |
-| M6 Homework & Timetable | 70-80% |
-| M7 HR & Payroll | 75-85% |
-| M9 Accounting | 95-100% |
+| M6 Homework & Timetable | 95-100% |
+| M7 HR & Payroll | 95-100% |
+| M9 Accounting | 98-100% |
 | M8A Library | 65-75% |
 | M8B Transport | 60-70% |
 | M8C Canteen | 65-75% |

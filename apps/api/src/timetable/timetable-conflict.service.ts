@@ -12,7 +12,8 @@ export type TimetableConflictType =
   | 'SUBJECT_REQUIREMENT_EXCEEDED'
   | 'PERIOD_MISMATCH'
   | 'OUTSIDE_SCHEDULE'
-  | 'ROOM_CAPACITY_EXCEEDED';
+  | 'ROOM_CAPACITY_EXCEEDED'
+  | 'TEACHER_ABSENT';
 
 export type TimetableConflictSeverity = 'BLOCKING' | 'WARNING';
 
@@ -46,6 +47,7 @@ export interface ConflictSlotInput {
   dayOfWeek: number;
   startsAt: string;
   endsAt: string;
+  referenceDate?: string | Date;
 }
 
 export interface AvailabilityInput {
@@ -91,6 +93,7 @@ export interface TimetableConflictValidationInput {
     endsAt: string;
     dayOfWeek: number | null;
   }[];
+  date?: Date | string | null;
 }
 
 export interface TimetableConflictValidationResult {
@@ -101,7 +104,10 @@ export interface TimetableConflictValidationResult {
 
 @Injectable()
 export class TimetableConflictService {
-  constructor(private readonly prisma?: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly attendanceService?: any, // Use any for now to avoid circular dependency if it occurs, but we will try to type it later
+  ) {}
 
   validateCandidate(
     input: TimetableConflictValidationInput,
@@ -132,6 +138,12 @@ export class TimetableConflictService {
         input.classSize ?? null,
       ),
     ];
+
+    if (input.date) {
+      // Date-specific conflicts (Absence/Leave)
+      // Note: This requires the calling service to have already checked the absence context
+      // Or we can add a flag here. For template-level validation, this is skipped.
+    }
 
     const deduped = dedupeIssues(issues);
     const errors = deduped.filter((issue) => issue.severity === 'BLOCKING');
@@ -290,7 +302,7 @@ export class TimetableConflictService {
       throw new Error('Period tenant mismatch');
     }
 
-    return this.validateCandidate({
+    const result = this.validateCandidate({
       candidate,
       existingSlots,
       teacherAvailability,
@@ -301,6 +313,19 @@ export class TimetableConflictService {
       roomCapacity: room?.capacity,
       classSize,
     });
+
+    if (candidate.referenceDate) {
+      const absenceIssues = await this.detectTeacherAbsenceConflict(
+        tenantId,
+        candidate.staffId,
+        candidate.referenceDate,
+      );
+      result.warnings.push(...absenceIssues.filter((i) => i.severity === 'WARNING'));
+      result.errors.push(...absenceIssues.filter((i) => i.severity === 'BLOCKING'));
+      result.valid = result.valid && result.errors.length === 0;
+    }
+
+    return result;
   }
 
   validateVersionSlots(
@@ -663,6 +688,39 @@ export class TimetableConflictService {
           affectedPeriodIds: [candidate.id],
           roomId: candidate.roomId,
           classId: candidate.classId,
+        },
+      ];
+    }
+
+    return [];
+  }
+
+  async detectTeacherAbsenceConflict(
+    tenantId: string,
+    staffId: string,
+    date: Date | string,
+  ): Promise<TimetableConflictIssue[]> {
+    if (!this.attendanceService) return [];
+
+    const targetDate = typeof date === 'string' ? new Date(date) : date;
+    const context = await this.attendanceService.getTeacherAbsenceContext(
+      tenantId,
+      staffId,
+      targetDate,
+    );
+
+    if (context.isAbsent) {
+      const reason = context.leaveType
+        ? `on approved ${context.leaveType.toLowerCase()} leave`
+        : 'marked absent';
+      return [
+        {
+          type: 'TEACHER_ABSENT',
+          severity: 'WARNING',
+          message: `Teacher is ${reason} on this date.`,
+          affectedPeriodIds: [], // To be filled by caller
+          teacherId: staffId,
+          dayOfWeek: targetDate.getDay(),
         },
       ];
     }

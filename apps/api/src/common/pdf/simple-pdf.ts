@@ -553,6 +553,24 @@ export function buildTableReportPdf(input: {
   return buildPdfFromContent(contentParts.filter(Boolean).join('\n'), input.logo);
 }
 
+export function buildRosterPdf(input: {
+  schoolName: string;
+  className?: string | null;
+  sectionName?: string | null;
+  academicYear?: string | null;
+  headers: string[];
+  rows: Array<Record<string, unknown>>;
+  logo?: PdfImage | null;
+}) {
+  return buildTableReportPdf({
+    schoolName: input.schoolName,
+    title: 'STUDENT ROSTER',
+    subtitle: `${input.className ?? ''} ${input.sectionName ? '(' + input.sectionName + ')' : ''} ${input.academicYear ? '- ' + input.academicYear : ''}`.trim(),
+    rows: input.rows,
+    logo: input.logo,
+  });
+}
+
 function escapePdfText(text: string | number | null | undefined) {
   const safeText = String(text ?? 'N/A');
   return safeText

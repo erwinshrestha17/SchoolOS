@@ -1013,6 +1013,8 @@ export const api = {
     page?: number;
     limit?: number;
   }) => request<TimetableSubstitutionSummary[]>(withQuery('/timetable/substitutions', params ?? {})),
+  getSubstitutionSummary: (params?: { date?: string }) =>
+    request<any>(withQuery('/timetable/substitutions/summary', params ?? {})),
   createSubstitution: (body: JsonBody) =>
     request<TimetableSubstitutionSummary>('/timetable/substitutions', {
       method: 'POST',
@@ -1130,6 +1132,11 @@ export const api = {
     request<PayrollRunSummary>(`/payroll/runs/${id}/post`, {
       method: 'POST',
       json: {},
+    }),
+  reversePayrollRun: (id: string, body: { reason: string }) =>
+    request<any>(`/payroll/runs/${id}/reverse`, {
+      method: 'POST',
+      json: body,
     }),
   submitPayrollRunReview: (id: string) =>
     request<PayrollRunSummary>(`/payroll/runs/${id}/submit-review`, {

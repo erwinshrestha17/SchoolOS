@@ -191,7 +191,7 @@ export class ReportCardPdfService {
       academicYear: reportCard.academicYear.name,
       student: {
         id: reportCard.student.studentSystemId,
-        name: studentName,
+        name: `${reportCard.student.firstNameEn} ${reportCard.student.lastNameEn}`.trim(),
         className: reportCard.class.name,
         sectionName: reportCard.section?.name,
         rollNumber: reportCard.student.rollNumber,

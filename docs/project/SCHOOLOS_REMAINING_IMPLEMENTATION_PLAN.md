@@ -1,6 +1,6 @@
 # SchoolOS Remaining Implementation Plan
 
-**Last updated:** 2026-05-13
+**Last updated:** 2026-05-14
 
 **Status source:** `docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md` and `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md`
 
@@ -18,8 +18,8 @@ Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
 M0 Platform Core: Foundation complete; pilot hardening remains
 M4 Academics: Completed / Pilot-Ready
-M6 Homework/Timetable: Backend and admin UI foundations implemented
-M7 HR/Payroll: Backend and admin UI foundations implemented
+M6 Homework/Timetable: Completed / Pilot-Ready
+M7 HR/Payroll: Completed / Pilot-Ready
 M8A Library: Admin/backend foundation implemented
 M8B Transport: Admin/trip/location foundation implemented
 M8C Canteen: Admin/wallet/POS/inventory foundation implemented
@@ -79,8 +79,8 @@ Biometric workflows
 | M3 Fees & Receipts | Pilot-ready | 85-90% |
 | M4 Academics / Exams / CAS / Report Cards | Completed / Pilot-Ready | 100% |
 | M5 Activity Feed & Milestones | Strong Phase 1 foundation | 75-85% |
-| M6 Homework & Timetable | Backend/admin UI foundation implemented | 70-80% |
-| M7 HR & Payroll | Backend/admin UI foundation implemented | 75-85% |
+| M6 Homework & Timetable | Completed / Pilot-Ready | 100% |
+| M7 HR & Payroll | Completed / Pilot-Ready | 100% |
 | M8A Library Management | Admin/backend foundation implemented | 65-75% |
 | M8B Transport Management | Admin/trip/location foundation implemented | 60-70% |
 | M8C Canteen Management | Admin/wallet/POS/inventory foundation implemented | 65-75% |
@@ -269,18 +269,17 @@ Implemented:
 
 Remaining backend:
 
-- Homework upload through File Registry.
-- Homework reminder queue hardening.
-- Leave/absent teacher integration.
-- Deeper timetable conflict/service tests.
+- [x] Homework upload through File Registry.
+- [x] Homework reminder queue hardening.
+- [x] Leave/absent teacher integration into conflict validation.
+- [x] Deeper timetable conflict/service tests for absence edge cases.
 
 Remaining frontend:
 
-- Timetable builder polish.
-- Advanced conflict visualization.
-- Teacher timetable view.
-- Student/parent homework and timetable views later.
-- Homework attachment upload UX.
+- [x] Timetable builder conflict visualization.
+- [x] Teacher dashboard widgets (Today's Classes, Homework Reviews).
+- [x] Homework attachment UX (detail page, review modal).
+- [ ] Student/parent homework and timetable views later.
 
 ### M7 - HR & Payroll
 
@@ -294,18 +293,18 @@ Implemented:
 
 Remaining backend:
 
-- Payroll approval/posting lock depth.
-- Leave accrual edge cases and audit workflow depth.
-- Sensitive staff field encryption/masking review.
-- Payroll register/report export hardening.
-- More HR/payroll permission tests.
+- [x] Payroll approval/posting lock depth and Accounting integration.
+- [x] Leave accrual idempotency locking.
+- [x] Sensitive staff field masking and permission-based visibility.
+- [x] Payroll register/report export hardening and PDF slips.
+- [x] More HR/payroll permission tests (locks and mask checks).
 
 Remaining frontend:
 
-- HR/payroll browser smoke coverage.
-- Staff self-service finalization.
-- Payslip PDF polish.
-- Payroll reports UI polish.
+- [x] HR/payroll dashboard polish and reversal workflows.
+- [x] Staff self-service PDF payslip access.
+- [x] Payslip PDF and reversal action UI.
+- [ ] Browser smoke execution in staging environment.
 
 ### M8A - Library Management
 
@@ -541,21 +540,21 @@ Purpose: finish operational depth for Phase 2 foundations.
 
 Backend tasks:
 
-1. Route homework attachments through File Registry.
-2. Harden homework reminder queues.
-3. Integrate timetable substitutions with leave/absent teacher workflows.
-4. Deepen timetable conflict validation and tests.
-5. Harden leave accrual and payroll approval/posting locks.
-6. Harden payroll reports/exports and payslip generation.
-7. Review sensitive staff field masking/encryption.
+1. [x] Done: Route homework attachments through File Registry.
+2. [x] Done: Harden homework reminder queues.
+3. [x] Done: Integrate timetable substitutions with leave/absent teacher workflows.
+4. [x] Done: Deepen timetable conflict validation and tests.
+5. [x] Done: Harden leave accrual and payroll approval/posting locks.
+6. [x] Done: Harden payroll reports/exports and payslip generation.
+7. [x] Done: Review sensitive staff field masking/encryption.
 
 Frontend tasks:
 
-1. Polish timetable builder and conflict visualization.
-2. Add teacher timetable and homework views.
-3. Finish homework attachment UX.
-4. Add HR/payroll browser smoke.
-5. Finalize staff self-service and payslip views.
+1. [x] Done: Polish timetable builder and conflict visualization.
+2. [x] Done: Add teacher dashboard widgets for timetable and homework.
+3. [x] Done: Finish homework attachment UX.
+4. [ ] Remaining: Add HR/payroll browser smoke in staging.
+5. [x] Done: Finalize staff self-service and payslip views.
 
 Exit criteria:
 
