@@ -4,24 +4,33 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 type DynamicRecord = Record<string, unknown>;
+type DynamicWhere = Record<string, unknown>;
 type DynamicDelegate = {
   findMany(args?: unknown): Promise<DynamicRecord[]>;
   count(args?: unknown): Promise<number>;
+};
+
+export type ListReportExportsQuery = {
+  tenantId?: string;
+  module?: string;
+  reportType?: string;
+  status?: string;
+  requestedBy?: string;
+  page?: number;
+  limit?: number;
 };
 
 @Injectable()
 export class PlatformReportExportsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listReportExportsPage(query: {
-    tenantId?: string;
-    page?: number;
-    limit?: number;
-  }): Promise<PaginatedResponse<DynamicRecord>> {
+  async listReportExportsPage(
+    query: ListReportExportsQuery,
+  ): Promise<PaginatedResponse<DynamicRecord>> {
     const page = Math.max(Number(query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(query.limit) || 25, 1), 100);
     const skip = (page - 1) * limit;
-    const where = query.tenantId ? { tenantId: query.tenantId } : undefined;
+    const where = this.buildWhere(query);
     const delegate = this.delegate('reportExport');
 
     if (!delegate) {
@@ -89,6 +98,32 @@ export class PlatformReportExportsService {
         completedAt: new Date(),
       },
     });
+  }
+
+  private buildWhere(query: ListReportExportsQuery): DynamicWhere | undefined {
+    const where: DynamicWhere = {};
+
+    if (query.tenantId?.trim()) {
+      where.tenantId = query.tenantId.trim();
+    }
+
+    if (query.module?.trim()) {
+      where.scope = query.module.trim();
+    }
+
+    if (query.reportType?.trim()) {
+      where.reportKey = query.reportType.trim();
+    }
+
+    if (query.status?.trim()) {
+      where.status = query.status.trim();
+    }
+
+    if (query.requestedBy?.trim()) {
+      where.requestedBy = query.requestedBy.trim();
+    }
+
+    return Object.keys(where).length > 0 ? where : undefined;
   }
 
   private delegate(name: string): DynamicDelegate | null {

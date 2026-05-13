@@ -48,6 +48,20 @@ const platformRoutes = [
   '/platform/audit',
 ] as const;
 
+const platformApiPathsByRoute: Record<(typeof platformRoutes)[number], RegExp> = {
+  '/platform/dashboard': /\/platform\/dashboard(?:$|[?#])?/,
+  '/platform/schools': /\/platform\/tenants(?:$|[/?#])?/,
+  '/platform/audit': /\/platform\/audit-logs(?:$|[/?#])?/,
+};
+
+const tenantApiPathsByRoute = {
+  '/dashboard': /\/auth\/me(?:$|[?#])?|\/academic-years(?:$|[/?#])?/,
+  '/dashboard/students': /\/students(?:$|[/?#])?/,
+  '/dashboard/attendance': /\/attendance(?:$|[/?#])?/,
+  '/dashboard/fees': /\/fees(?:$|[/?#])?/,
+  '/dashboard/settings': /\/settings(?:$|[/?#])?|\/tenant-settings(?:$|[/?#])?/,
+} as const;
+
 test.describe('Dashboard route audit smoke', () => {
   test.beforeEach(() => {
     test.skip(
@@ -106,6 +120,37 @@ test.describe('Platform route audit smoke', () => {
   });
 });
 
+test.describe('Browser-level platform and school route denial', () => {
+  test.beforeEach(() => {
+    test.skip(
+      !schoolCredentials.tenantSlug ||
+        !schoolCredentials.email ||
+        !schoolCredentials.password ||
+        !platformCredentials.tenantSlug ||
+        !platformCredentials.email ||
+        !platformCredentials.password,
+      'Set both school and platform E2E credentials to run route-denial audit.',
+    );
+  });
+
+  test('denies school users from platform control-plane routes', async ({ page }) => {
+    await login(page, schoolCredentials);
+
+    for (const route of platformRoutes) {
+      await expectRouteDenied(page, route, platformApiPathsByRoute[route]);
+      await expect(page.getByRole('heading', { name: /Platform Dashboard/i })).toHaveCount(0);
+    }
+  });
+
+  test('denies platform users from tenant school operation routes', async ({ page }) => {
+    await login(page, platformCredentials);
+
+    for (const [route, apiPattern] of Object.entries(tenantApiPathsByRoute)) {
+      await expectRouteDenied(page, route, apiPattern);
+    }
+  });
+});
+
 async function login(
   page: Page,
   credentials: {
@@ -134,4 +179,35 @@ async function expectUsableRoute(page: Page, route: string) {
     ),
     `${route} rendered a framework or fatal error page`,
   ).toHaveCount(0);
+}
+
+async function expectRouteDenied(
+  page: Page,
+  route: string,
+  apiPattern: RegExp,
+) {
+  const deniedResponsePromise = page
+    .waitForResponse(
+      (response) =>
+        apiPattern.test(response.url()) && [401, 403].includes(response.status()),
+      { timeout: 15_000 },
+    )
+    .catch(() => null);
+
+  await page.goto(route);
+  await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => undefined);
+
+  const deniedResponse = await deniedResponsePromise;
+
+  if (deniedResponse) {
+    expect([401, 403]).toContain(deniedResponse.status());
+    return;
+  }
+
+  await expect(
+    page.getByText(
+      /Access restricted|Insufficient platform permissions|Access denied|Forbidden|not authorized|Authentication required|Request failed with status 401|Request failed with status 403/i,
+    ),
+    `${route} should render an authorization denial when no denied API response is observable`,
+  ).toBeVisible({ timeout: 10_000 });
 }
