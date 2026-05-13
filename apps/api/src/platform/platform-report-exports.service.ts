@@ -71,9 +71,11 @@ export class PlatformReportExportsService {
     requestedBy?: string | null;
     status?: string;
   }) {
-    const delegate = this.delegate('reportExport') as (DynamicDelegate & {
-      create(args?: unknown): Promise<DynamicRecord>;
-    }) | null;
+    const delegate = this.delegate('reportExport') as
+      | (DynamicDelegate & {
+          create(args?: unknown): Promise<DynamicRecord>;
+        })
+      | null;
     if (!delegate) return null;
     return delegate.create({
       data: {

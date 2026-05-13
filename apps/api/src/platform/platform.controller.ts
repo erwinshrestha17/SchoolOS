@@ -307,7 +307,10 @@ export class PlatformController {
     @Body() body: RetryFailedJobDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    return this.platformQueuesService.retryFailedJob(body, this.requireUser(req));
+    return this.platformQueuesService.retryFailedJob(
+      body,
+      this.requireUser(req),
+    );
   }
 
   @Get('health')
