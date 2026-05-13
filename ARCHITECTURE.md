@@ -204,6 +204,17 @@ Provider failures must not crash core business transactions.
 
 ---
 
+## M8B Transport GPS Strategy
+
+Transport live-tracking is built for high-concurrency GPS ingestion without compromising database stability.
+
+1. **Latest-Value Cache**: Every GPS ping is stored in Redis for real-time tracking (6-hour expiry). This serves the real-time "Latest coordinate" API without touching PostgreSQL.
+2. **Throttled Persistence**: GPS pings are persisted to PostgreSQL only if the previous ping for that specific trip was more than 30 seconds ago. This prevents write-pressure on the primary database during active tracking.
+3. **Retention Policy**: Location history is for operational auditing, not permanent storage. A 90-day retention policy is enforced; older coordinates are cleaned up to keep the `TransportLocationPing` table performant.
+4. **Tenant Isolation**: All location data is strictly scoped by `tenantId` and `tripId`. Drivers can only ping their assigned trips; parents can only view their assigned child's trip location.
+
+---
+
 ## M9 Accounting Architecture
 
 M9 Accounting is production-candidate complete and remains inside the modular monolith.

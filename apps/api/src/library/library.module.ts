@@ -7,6 +7,7 @@ import { StudentsModule } from '../students/students.module';
 import { LibraryController } from './library.controller';
 import { LibraryHardeningService } from './library-hardening.service';
 import { LibraryService } from './library.service';
+import { LibraryCron } from './library.cron';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { LibraryService } from './library.service';
     StudentsModule,
   ],
   controllers: [LibraryController],
-  providers: [LibraryService, LibraryHardeningService],
+  providers: [LibraryService, LibraryHardeningService, LibraryCron],
   exports: [LibraryService, LibraryHardeningService],
 })
 export class LibraryModule {}

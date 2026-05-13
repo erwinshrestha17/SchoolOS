@@ -45,6 +45,7 @@ type PrintableQrResult = {
   qrImageSvg?: string;
   qrImageAvailable: boolean;
   qrImageMessage?: string;
+  rawToken?: string;
 };
 
 const PURPOSE_PERMISSIONS: Record<StudentQrResolvePurpose, string[]> = {
@@ -136,6 +137,7 @@ export class StudentQrService {
       credential: this.sanitizeCredential(issued.credential),
       qrImageSvg: await this.getQrImage(issued.rawToken),
       qrImageAvailable: true,
+      rawToken: issued.rawToken,
     };
   }
 
@@ -181,6 +183,7 @@ export class StudentQrService {
       credential: this.sanitizeCredential(issued.credential),
       qrImageSvg: await this.getQrImage(issued.rawToken),
       qrImageAvailable: true,
+      rawToken: issued.rawToken,
     };
   }
 
@@ -375,17 +378,36 @@ export class StudentQrService {
         };
       }
       case StudentQrResolvePurpose.CANTEEN: {
-        const wallet = await this.prisma.canteenWallet.findUnique({
-          where: { tenantId_studentId: { tenantId, studentId: student.id } },
-        });
+        const [wallet, control] = await Promise.all([
+          this.prisma.canteenWallet.findUnique({
+            where: { tenantId_studentId: { tenantId, studentId: student.id } },
+          }),
+          this.prisma.canteenSpendingControl.findUnique({
+            where: {
+              tenantId_studentId: { tenantId, studentId: student.id },
+              isActive: true,
+            },
+          }),
+        ]);
+
+        const balance = wallet?.balance ?? new Prisma.Decimal(0);
+        const threshold = wallet?.lowBalanceThreshold ?? new Prisma.Decimal(100);
 
         return {
           ...baseResponse,
-          walletBalance: wallet?.balance?.toString() ?? '0.00',
+          walletBalance: balance.toString(),
+          walletStatus: balance.lte(0)
+            ? 'INSUFFICIENT_FUNDS'
+            : balance.lte(threshold)
+              ? 'LOW_BALANCE'
+              : 'ACTIVE',
           allergyWarnings: student.severeAllergies
             ? student.severeAllergies.split(',').map((item) => item.trim())
             : [],
-          canPurchase: (wallet?.balance ?? new Prisma.Decimal(0)).gt(0),
+          spendingWarnings: control?.blockedCategories?.length
+            ? `Blocked: ${control.blockedCategories.join(', ')}`
+            : null,
+          canPurchase: balance.gt(0),
         };
       }
       case StudentQrResolvePurpose.TRANSPORT:

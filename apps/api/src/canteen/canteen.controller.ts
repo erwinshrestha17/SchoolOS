@@ -414,6 +414,8 @@ export class CanteenController {
     return this.canteenService.topUpWallet(studentId, dto, auth);
   }
 
+
+
   @Get('wallets/student/:studentId/transactions')
   @Permissions('canteen:wallets:read')
   transactionHistory(
@@ -568,6 +570,21 @@ export class CanteenController {
   ) {
     return this.canteenService.studentSpendingSummary(auth, {
       studentId,
+      from,
+      to,
+    });
+  }
+
+  @Get('reports/stock-ledger')
+  @Permissions('canteen:reports:read')
+  getStockLedger(
+    @CurrentAuth() auth: AuthContext,
+    @Query('inventoryItemId') inventoryItemId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.canteenService.getStockLedger(auth, {
+      inventoryItemId,
       from,
       to,
     });

@@ -260,6 +260,25 @@ export class TransportController {
     return this.transportService.markStudentAbsent(tripId, dto, auth);
   }
 
+  @Get('trips/:id')
+  @Permissions('transport:trips:read')
+  getTripDetails(
+    @Param('id') tripId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportService.getTripDetails(tripId, auth);
+  }
+
+  @Patch('trips/:id/delay')
+  @Permissions('transport:trips:update', 'transport:operate')
+  markTripDelay(
+    @Param('id') tripId: string,
+    @Body() dto: { isDelayed: boolean; delayReason?: string; delayMinutes?: number },
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportService.markTripDelay(tripId, dto, auth);
+  }
+
   @Get('trips/active')
   @Permissions('transport:trips:read')
   listActiveTrips(@CurrentAuth() auth: AuthContext) {

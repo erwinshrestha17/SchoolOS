@@ -3,6 +3,8 @@ import {
   Body,
   Controller,
   Post,
+  Get,
+  Param,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
@@ -85,6 +87,26 @@ export class FileRegistryController {
         auth.tenantId,
         asset.id,
       ),
+    };
+  }
+
+  @Get(':id/view')
+  async getFileView(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') id: string,
+  ) {
+    const asset = await this.fileRegistryService.getFileMetadata(
+      auth.tenantId,
+      id,
+    );
+    const url = await this.fileRegistryService.getSignedUrl(auth.tenantId, id);
+
+    return {
+      id: asset.id,
+      fileName: asset.originalFilename,
+      mimeType: asset.mimeType,
+      sizeBytes: asset.sizeBytes,
+      url,
     };
   }
 

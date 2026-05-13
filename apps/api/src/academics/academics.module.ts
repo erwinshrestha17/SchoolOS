@@ -4,6 +4,7 @@ import { AuthModule } from '../auth/auth.module';
 import { CommunicationsModule } from '../communications/communications.module';
 import { FinanceModule } from '../finance/finance.module';
 import { SettingsModule } from '../settings/settings.module';
+import { UsageModule } from '../usage/usage.module';
 import { AcademicsController } from './academics.controller';
 import { AcademicsFoundationService } from './academics-foundation.service';
 import { AcademicsService } from './academics.service';
@@ -29,6 +30,7 @@ import {
     AuditModule,
     FinanceModule,
     SettingsModule,
+    UsageModule,
   ],
   controllers: [
     SubjectsController,

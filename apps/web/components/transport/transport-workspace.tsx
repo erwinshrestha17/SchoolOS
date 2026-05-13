@@ -72,6 +72,11 @@ const emptyVehicleForm: TransportVehiclePayload = {
   registrationNumber: '',
   model: '',
   capacity: 1,
+  fitnessCertificateExp: '',
+  insuranceExpiry: '',
+  registrationExpiry: '',
+  pollutionExpiry: '',
+  documentExpiry: '',
 };
 
 const emptyDriverForm: TransportDriverAssignmentPayload = {
@@ -116,6 +121,12 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
     action: 'complete' | 'cancel';
     tripId: string;
   } | null>(null);
+  const [delayingTrip, setDelayingTrip] = useState<{
+    tripId: string;
+    isDelayed: boolean;
+    delayReason?: string;
+  } | null>(null);
+  const [viewingTripId, setViewingTripId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
   const routesQuery = useQuery({ queryKey: ['transport-routes'], queryFn: () => transportApi.listRoutes() });
@@ -277,6 +288,19 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
       invalidateTransport();
     },
   });
+  const markDelayMutation = useMutation({
+    mutationFn: ({ tripId, body }: { tripId: string; body: { isDelayed: boolean; delayReason?: string; delayMinutes?: number } }) =>
+      transportApi.markTripDelay(tripId, body),
+    onSuccess: () => {
+      setNotice('Trip delay status updated.');
+      invalidateTransport();
+    },
+  });
+  const tripDetailsQuery = useQuery({
+    queryKey: ['transport-trip-details', viewingTripId],
+    queryFn: () => transportApi.getTripDetails(viewingTripId!),
+    enabled: Boolean(viewingTripId),
+  });
 
   const routes = routesQuery.data ?? [];
   const stops = stopsQuery.data ?? [];
@@ -307,7 +331,16 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
     studentsNotBoarded,
     vehiclesActive: vehicles.filter((vehicle) => vehicle.status === 'ACTIVE').length,
     driversOnline,
-    vehicleAlerts: (reportsQuery.data?.vehicleFitnessAlerts as any[])?.length ?? 0,
+    vehicleAlerts: vehicles.filter(v => {
+      const dates = [
+        v.fitnessCertificateExp,
+        v.insuranceExpiry,
+        v.registrationExpiry,
+        v.pollutionExpiry,
+        v.documentExpiry
+      ].filter(Boolean) as string[];
+      return dates.some(d => new Date(d) < addDays(new Date(), 30));
+    }).length,
     driverAlerts: (reportsQuery.data?.driverLicenseAlerts as any[])?.length ?? 0,
   };
 
@@ -380,7 +413,13 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
                 </section>
               )}
 
-              <TripList trips={activeTrips} emptyTitle="No active trips" onSelect={(id) => { setSelectedTripId(id); setActiveTab('trips'); }} />
+              <TripList 
+                trips={activeTrips} 
+                emptyTitle="No active trips" 
+                onSelect={setViewingTripId} 
+                onDelay={(tripId, isDelayed) => setDelayingTrip({ tripId, isDelayed })}
+                onComplete={(tripId) => setConfirmingTripAction({ action: 'complete', tripId })}
+              />
               
               <InfoCard title="Privacy and safety rules" lines={['Parents will only see their own child’s assigned vehicle/trip in the future parent view.', 'Driver app will only expose trips assigned to that driver later.', 'Never expose a full bus passenger list to parents.', 'Live map/WebSocket tracking is intentionally deferred; this admin slice shows latest coordinates only.']} />
             </div>
@@ -486,6 +525,20 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
                           Docs expire: {new Date(vehicle.documentExpiry).toLocaleDateString()}
                         </p>
                       )}
+                      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-slate-400">
+                        {vehicle.fitnessCertificateExp && (
+                          <p>Fitness: {new Date(vehicle.fitnessCertificateExp).toLocaleDateString()}</p>
+                        )}
+                        {vehicle.insuranceExpiry && (
+                          <p>Insurance: {new Date(vehicle.insuranceExpiry).toLocaleDateString()}</p>
+                        )}
+                        {vehicle.registrationExpiry && (
+                          <p>Reg: {new Date(vehicle.registrationExpiry).toLocaleDateString()}</p>
+                        )}
+                        {vehicle.pollutionExpiry && (
+                          <p>Pollution: {new Date(vehicle.pollutionExpiry).toLocaleDateString()}</p>
+                        )}
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => updateVehicleMutation.mutate({ id: vehicle.id, body: { status: vehicle.status === 'ACTIVE' ? 'MAINTENANCE' : 'ACTIVE' } })} className="text-xs font-bold text-blue-600 hover:underline">
@@ -503,7 +556,13 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
               <TextInput label="Registration number" value={vehicleForm.registrationNumber} onChange={(registrationNumber) => setVehicleForm({ ...vehicleForm, registrationNumber })} required />
               <TextInput label="Model" value={vehicleForm.model ?? ''} onChange={(model) => setVehicleForm({ ...vehicleForm, model })} />
               <TextInput label="Capacity" type="number" value={String(vehicleForm.capacity)} onChange={(value) => setVehicleForm({ ...vehicleForm, capacity: Number(value) || 1 })} required />
-              <TextInput label="Document expiry" type="date" value={vehicleForm.documentExpiry ?? ''} onChange={(documentExpiry) => setVehicleForm({ ...vehicleForm, documentExpiry })} />
+              <div className="grid grid-cols-2 gap-3">
+                <TextInput label="Fitness Exp" type="date" value={vehicleForm.fitnessCertificateExp ?? ''} onChange={(fitnessCertificateExp) => setVehicleForm({ ...vehicleForm, fitnessCertificateExp })} />
+                <TextInput label="Insurance Exp" type="date" value={vehicleForm.insuranceExpiry ?? ''} onChange={(insuranceExpiry) => setVehicleForm({ ...vehicleForm, insuranceExpiry })} />
+                <TextInput label="Registration Exp" type="date" value={vehicleForm.registrationExpiry ?? ''} onChange={(registrationExpiry) => setVehicleForm({ ...vehicleForm, registrationExpiry })} />
+                <TextInput label="Pollution Exp" type="date" value={vehicleForm.pollutionExpiry ?? ''} onChange={(pollutionExpiry) => setVehicleForm({ ...vehicleForm, pollutionExpiry })} />
+              </div>
+              <TextInput label="Other Doc Exp" type="date" value={vehicleForm.documentExpiry ?? ''} onChange={(documentExpiry) => setVehicleForm({ ...vehicleForm, documentExpiry })} />
               <button type="submit" className="btn-primary" disabled={createVehicleMutation.isPending}>{createVehicleMutation.isPending ? 'Saving...' : 'Create vehicle'}</button>
             </form>
           </Panel>
@@ -570,7 +629,8 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
               emptyTitle="No active trips"
               onComplete={(tripId) => setConfirmingTripAction({ action: 'complete', tripId })}
               onCancel={(tripId) => setConfirmingTripAction({ action: 'cancel', tripId })}
-              onSelect={setSelectedTripId}
+              onSelect={setViewingTripId}
+              onDelay={(tripId, isDelayed) => setDelayingTrip({ tripId, isDelayed })}
               showLocationWarning
             />
           </Panel>
@@ -726,6 +786,108 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
         variant={confirmingTripAction?.action === 'cancel' ? 'destructive' : 'default'}
         isConfirming={completeTripMutation.isPending || cancelTripMutation.isPending}
       />
+
+      <ConfirmDialog
+        isOpen={Boolean(delayingTrip)}
+        onClose={() => setDelayingTrip(null)}
+        onConfirm={() => {
+          if (delayingTrip) {
+            markDelayMutation.mutate({
+              tripId: delayingTrip.tripId,
+              body: {
+                isDelayed: delayingTrip.isDelayed,
+                delayReason: delayingTrip.delayReason,
+              },
+            });
+          }
+          setDelayingTrip(null);
+        }}
+        title={delayingTrip?.isDelayed ? 'Mark trip as delayed?' : 'Remove delay status?'}
+        description={
+          delayingTrip?.isDelayed
+            ? 'This will flag the trip as delayed for administrators and optionally notify parents if broadcasting is enabled.'
+            : 'This will remove the delay flag from the trip.'
+        }
+        confirmLabel={delayingTrip?.isDelayed ? 'Mark Delayed' : 'Remove Delay'}
+        variant="default"
+        isConfirming={markDelayMutation.isPending}
+      >
+        {delayingTrip?.isDelayed && (
+          <div className="mt-4">
+            <TextInput
+              label="Delay Reason"
+              placeholder="Traffic, weather, vehicle issue..."
+              value={delayingTrip.delayReason ?? ''}
+              onChange={(delayReason) => setDelayingTrip({ ...delayingTrip, delayReason })}
+            />
+          </div>
+        )}
+      </ConfirmDialog>
+
+      {viewingTripId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-auto rounded-[2rem] bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-900">Trip Details</h2>
+              <button type="button" onClick={() => setViewingTripId(null)} className="text-sm font-bold text-slate-400 hover:text-slate-900">Close</button>
+            </div>
+
+            {tripDetailsQuery.isLoading ? <LoadingState label="Loading details..." /> : null}
+            {tripDetailsQuery.data && (
+              <div className="mt-6 space-y-6">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Route</p>
+                    <p className="mt-1 font-bold text-slate-900">{tripDetailsQuery.data.route?.name}</p>
+                    <p className="text-sm text-slate-500">{tripDetailsQuery.data.route?.code}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Vehicle</p>
+                    <p className="mt-1 font-bold text-slate-900">{tripDetailsQuery.data.vehicle?.registrationNumber}</p>
+                    <p className="text-sm text-slate-500">{tripDetailsQuery.data.vehicle?.model}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-bold text-slate-900 mb-3">Stop Timeline</h3>
+                  <div className="space-y-4">
+                    {tripDetailsQuery.data.route?.stops?.map((stop: any, idx: number) => {
+                      const studentStatus = tripDetailsQuery.data.studentStatuses?.find((s: any) => s.stopId === stop.id);
+                      return (
+                        <div key={stop.id} className="relative flex gap-4 pl-6">
+                          {idx < (tripDetailsQuery.data.route?.stops?.length ?? 0) - 1 && (
+                            <div className="absolute left-[7px] top-4 h-full w-0.5 bg-slate-200" />
+                          )}
+                          <div className="absolute left-0 top-1 h-4 w-4 rounded-full border-2 border-white bg-slate-400 shadow-sm" />
+                          <div className="flex-1">
+                            <p className="font-bold text-sm text-slate-900">{stop.name}</p>
+                            <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
+                              <span>Pickup: {stop.estimatedPickup ?? '--'}</span>
+                              <span>Drop: {stop.estimatedDrop ?? '--'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-bold text-slate-900 mb-3">Onboard Students ({tripDetailsQuery.data.studentStatuses?.filter((s: any) => s.status === 'BOARDED').length})</h3>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {tripDetailsQuery.data.studentStatuses?.map((status: any) => (
+                      <div key={status.id} className="flex items-center justify-between rounded-xl border border-slate-100 p-3 text-sm">
+                        <span className="font-semibold text-slate-700">{status.student?.firstNameEn} {status.student?.lastNameEn}</span>
+                        <TransportStatusBadge status={status.status} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -764,7 +926,7 @@ function InfoCard({ title, lines }: { title: string; lines: string[] }) {
   );
 }
 
-function TripList({ trips, emptyTitle, onComplete, onCancel, onSelect, compact, showLocationWarning }: { trips: TransportTrip[]; emptyTitle: string; onComplete?: (tripId: string) => void; onCancel?: (tripId: string) => void; onSelect?: (tripId: string) => void; compact?: boolean; showLocationWarning?: boolean }) {
+function TripList({ trips, emptyTitle, onComplete, onCancel, onSelect, onDelay, compact, showLocationWarning }: { trips: TransportTrip[]; emptyTitle: string; onComplete?: (tripId: string) => void; onCancel?: (tripId: string) => void; onSelect?: (tripId: string) => void; onDelay?: (tripId: string, isDelayed: boolean) => void; compact?: boolean; showLocationWarning?: boolean }) {
   if (trips.length === 0) return <EmptyState title={emptyTitle} description="Trip records will appear here." />;
 
   return (
@@ -773,7 +935,14 @@ function TripList({ trips, emptyTitle, onComplete, onCancel, onSelect, compact, 
         <div key={trip.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="font-bold text-slate-900">{trip.route?.name ?? trip.routeId}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-slate-900">{trip.route?.name ?? trip.routeId}</h3>
+                {trip.isDelayed && (
+                  <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
+                    <AlertTriangle size={10} className="mr-1" /> DELAYED
+                  </span>
+                )}
+              </div>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <p className="text-sm text-slate-500">{trip.vehicle?.registrationNumber ?? trip.vehicleId} • {trip.direction}</p>
                 <TransportStatusBadge status={trip.status} />
@@ -786,6 +955,9 @@ function TripList({ trips, emptyTitle, onComplete, onCancel, onSelect, compact, 
                   )}
                 </div>
               )}
+              {trip.isDelayed && trip.delayReason && (
+                <p className="mt-2 text-xs font-bold text-red-600">Reason: {trip.delayReason}</p>
+              )}
               {showLocationWarning ? (
                 <p className="mt-2 text-xs font-semibold text-amber-600">
                   Open Details or Location to verify the latest backend coordinate before parent updates.
@@ -793,6 +965,15 @@ function TripList({ trips, emptyTitle, onComplete, onCancel, onSelect, compact, 
               ) : null}
             </div>
             <div className="flex gap-2">
+              {onDelay && trip.status === 'ACTIVE' && (
+                <button 
+                  type="button" 
+                  className={cn("text-xs font-bold", trip.isDelayed ? "text-slate-400" : "text-orange-600 hover:text-orange-700")}
+                  onClick={() => onDelay(trip.id, !trip.isDelayed)}
+                >
+                  {trip.isDelayed ? 'Clear Delay' : 'Mark Delay'}
+                </button>
+              )}
               {onSelect ? <button type="button" className="btn-secondary" onClick={() => onSelect(trip.id)}>Details</button> : null}
               {onComplete && trip.status === 'ACTIVE' ? <button type="button" className="btn-primary" onClick={() => onComplete(trip.id)}>Complete</button> : null}
               {onCancel && trip.status === 'ACTIVE' ? <button type="button" className="text-xs font-bold text-red-500 hover:text-red-700 ml-2" onClick={() => onCancel(trip.id)}>Cancel</button> : null}
@@ -851,11 +1032,11 @@ function formatStatus(status: string) {
   return status.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function TextInput({ label, value, onChange, type = 'text', required }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean }) {
+function TextInput({ label, value, onChange, placeholder, type = 'text', required }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; type?: string; required?: boolean }) {
   return (
     <label className="block text-sm font-semibold text-slate-700">
       {label}
-      <input required={required} type={type} value={value} onChange={(event) => onChange(event.target.value)} className="input-control mt-1" />
+      <input required={required} type={type} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} className="input-control mt-1" />
     </label>
   );
 }

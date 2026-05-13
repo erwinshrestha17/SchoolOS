@@ -1205,6 +1205,18 @@ export class PayrollService {
       'December',
     ];
 
+    const canSeeSensitive =
+      actor.permissions.includes('hr:manage') ||
+      actor.permissions.includes('payroll:manage') ||
+      actor.userId === payslip.staff.userId;
+
+    const mask = (val: string | null | undefined) => {
+      if (!val) return val;
+      if (canSeeSensitive) return val;
+      if (val.length <= 4) return '****';
+      return val.substring(0, 2) + '****' + val.substring(val.length - 2);
+    };
+
     return buildSalarySlipPdf({
       schoolName: payslip.payrollRun.tenant.name,
       payslipNumber: payslip.payslipNumber,
@@ -1212,8 +1224,8 @@ export class PayrollService {
       staff: {
         name: `${payslip.staff.firstName} ${payslip.staff.lastName}`,
         id: payslip.staff.employeeId,
-        bankAccount: payslip.staff.bankAccount,
-        panNumber: payslip.staff.panNumber,
+        bankAccount: mask(payslip.staff.bankAccount),
+        panNumber: mask(payslip.staff.panNumber),
       },
       earnings: [
         {

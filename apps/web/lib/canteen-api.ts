@@ -134,6 +134,7 @@ export type CanteenWalletTransaction = {
   referenceType?: string | null;
   referenceId?: string | null;
   note?: string | null;
+  reversalOfId?: string | null;
   transactionDate: string;
 };
 
@@ -464,6 +465,19 @@ export const canteenApi = {
     request<CanteenWalletTransaction[]>(
       `/canteen/wallets/student/${encodeURIComponent(studentId)}/transactions`,
     ),
+  reverseWalletTransaction: (transactionId: string, body: { reason: string }) =>
+    request<CanteenWalletTransaction>(
+      `/canteen/wallets/transactions/${encodeURIComponent(transactionId)}/reverse`,
+      { method: 'POST', json: body },
+    ),
+  correctWalletTransaction: (
+    transactionId: string,
+    body: { amount: number; reason: string; note?: string },
+  ) =>
+    request<CanteenWalletTransaction>(
+      `/canteen/wallets/transactions/${encodeURIComponent(transactionId)}/correct`,
+      { method: 'POST', json: body },
+    ),
   createPosSale: (body: CanteenPosSalePayload) =>
     request<CanteenPosSale>('/canteen/pos-sales', {
       method: 'POST',
@@ -517,4 +531,10 @@ export const canteenApi = {
     request<StudentSpendingSummary[]>(
       withQuery('/canteen/reports/student-spending-summary', params ?? {}),
     ),
+  getStockLedger: (params?: {
+    inventoryItemId?: string | null;
+    from?: string | null;
+    to?: string | null;
+  }) =>
+    request<any[]>(withQuery('/canteen/reports/stock-ledger', params ?? {})),
 };

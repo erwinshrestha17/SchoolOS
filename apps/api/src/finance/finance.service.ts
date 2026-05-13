@@ -25,6 +25,7 @@ import {
   ReconciliationExportFormat,
   ReconciliationQueryDto,
 } from '../accounting/dto/reconciliation-query.dto';
+import { UsageService } from '../usage/usage.service';
 import { buildSimplePdf, buildReceiptPdf } from '../common/pdf/simple-pdf';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -137,6 +138,7 @@ export class FinanceService {
     private readonly communicationsService: CommunicationsService,
     private readonly accountingPostingService: AccountingPostingService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly usageService: UsageService,
   ) {}
 
   async reprintReceipt(
@@ -2557,6 +2559,12 @@ export class FinanceService {
       }
     }
 
+    await this.usageService.verifyLimit(
+      actor.tenantId,
+      'receipts.generated',
+      1,
+    );
+
     const fiscalYear = resolveFiscalYear(new Date());
     const tenant = await this.prisma.tenant.findUniqueOrThrow({
       where: { id: actor.tenantId },
@@ -2610,6 +2618,12 @@ export class FinanceService {
           receipt: true,
         },
       });
+
+      await this.usageService.incrementUsage(
+        actor.tenantId,
+        'receipts.generated',
+        1,
+      );
 
       const totalPaid = paidSoFar.add(paymentAmount);
 

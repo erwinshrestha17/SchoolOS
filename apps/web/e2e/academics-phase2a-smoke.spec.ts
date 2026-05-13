@@ -51,14 +51,14 @@ test.describe.serial('SchoolOS Phase 2A Academics Admin Flow Smoke Tests', () =>
 
   test('Exam Terms Setup: Navigation and workspace', async ({ page }) => {
     await page.goto('/dashboard/academics/exam-terms');
-    await expect(page.getByRole('heading', { name: /Exam Terms/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Create Exam Term/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Exam Terms/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Initialize Exam Term/i })).toBeVisible();
   });
 
   test('Assessment Components: Setup workspace', async ({ page }) => {
     await page.goto('/dashboard/academics/assessment-components');
     await expect(page.getByRole('heading', { name: /Assessment Components/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Add Component/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Add Assessment Map/i })).toBeVisible();
   });
 
   test('Marks Entry: Filter integration', async ({ page }) => {
@@ -75,8 +75,7 @@ test.describe.serial('SchoolOS Phase 2A Academics Admin Flow Smoke Tests', () =>
   test('CAS Records: Management workspace', async ({ page }) => {
     await page.goto('/dashboard/academics/cas');
     await expect(page.getByRole('heading', { name: /CAS Records/i })).toBeVisible();
-    // Verify tabs or list
-    await expect(page.getByText(/CAS management/i)).toBeVisible();
+    await expect(page.getByText(/CAS Entry/i)).toBeVisible();
   });
 
   test('Marks Lock & Review: Request list', async ({ page }) => {
@@ -88,7 +87,7 @@ test.describe.serial('SchoolOS Phase 2A Academics Admin Flow Smoke Tests', () =>
   test('Report Cards: Batch generation', async ({ page }) => {
     await page.goto('/dashboard/academics/report-cards');
     await expect(page.getByRole('heading', { name: /Report Cards/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Generate Batch/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Batch Generate/i })).toBeVisible();
   });
 
   test('Promotion Readiness: Eligibility check', async ({ page }) => {
@@ -100,7 +99,7 @@ test.describe.serial('SchoolOS Phase 2A Academics Admin Flow Smoke Tests', () =>
   test('Result Publishing: Notifications and visibility', async ({ page }) => {
     await page.goto('/dashboard/academics/publishing');
     await expect(page.getByRole('heading', { name: /Result Publishing/i })).toBeVisible();
-    await expect(page.getByText(/Select exam term to view readiness/i)).toBeVisible();
+    await expect(page.getByText(/Select an exam term to control result visibility/i)).toBeVisible();
   });
 });
 

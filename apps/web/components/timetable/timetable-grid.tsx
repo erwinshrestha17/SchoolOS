@@ -7,6 +7,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Clock, MapPin, User, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
+import { TimetableSubstitutionModal } from '@/components/timetable/substitution-modal';
 
 const daysOfWeek = [
   { value: 1, label: 'Monday' },
@@ -19,6 +21,8 @@ const daysOfWeek = [
 ];
 
 export function TimetableGrid({ filters, activeVersionId }: { filters: any, activeVersionId?: string }) {
+  const [selectedSlot, setSelectedSlot] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const timetableQuery = useQuery({
     queryKey: ['timetable', filters.classId, filters.academicYearId, activeVersionId],
     queryFn: () => api.listTimetable({ 
@@ -108,7 +112,13 @@ export function TimetableGrid({ filters, activeVersionId }: { filters: any, acti
                 return (
                   <td key={`${day.value}-${period.id}`} className="border-b border-slate-200 p-3">
                     {slot ? (
-                      <div className="h-full min-h-[100px] rounded-2xl p-4 transition-all hover:shadow-md border bg-primary-50/30 border-primary-100">
+                      <div 
+                        className="h-full min-h-[100px] rounded-2xl p-4 transition-all hover:shadow-md border bg-primary-50/30 border-primary-100 cursor-pointer hover:bg-primary-50"
+                        onClick={() => {
+                          setSelectedSlot(slot);
+                          setIsModalOpen(true);
+                        }}
+                      >
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <span className="text-xs font-black uppercase tracking-tight text-primary-900">
                             {slot.subject?.name}
@@ -146,6 +156,16 @@ export function TimetableGrid({ filters, activeVersionId }: { filters: any, acti
           ))}
         </tbody>
       </table>
+
+      <TimetableSubstitutionModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedSlot(null);
+        }}
+        slot={selectedSlot}
+        mode="create"
+      />
     </div>
   );
 }

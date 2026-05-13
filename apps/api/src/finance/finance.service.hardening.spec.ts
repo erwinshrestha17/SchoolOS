@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { UsageService } from '../usage/usage.service';
 import { FinanceService } from './finance.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -55,6 +56,13 @@ describe('FinanceService - Hardening', () => {
           },
         },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        {
+          provide: UsageService,
+          useValue: {
+            verifyLimit: jest.fn().mockResolvedValue(undefined),
+            incrementUsage: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 

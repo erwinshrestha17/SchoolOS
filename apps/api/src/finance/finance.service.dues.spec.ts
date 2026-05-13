@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { FinanceService } from './finance.service';
+import { UsageService } from '../usage/usage.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CommunicationsService } from '../communications/communications.service';
@@ -41,6 +42,13 @@ describe('FinanceService - Dues & Reprints', () => {
         { provide: CommunicationsService, useValue: {} },
         { provide: AccountingPostingService, useValue: {} },
         { provide: EventEmitter2, useValue: {} },
+        {
+          provide: UsageService,
+          useValue: {
+            verifyLimit: jest.fn().mockResolvedValue(undefined),
+            incrementUsage: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 

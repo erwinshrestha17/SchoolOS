@@ -24,5 +24,17 @@ export class CreateTransportVehicleDto {
 
   @IsOptional()
   @IsDateString()
+  insuranceExpiry?: string;
+
+  @IsOptional()
+  @IsDateString()
+  registrationExpiry?: string;
+
+  @IsOptional()
+  @IsDateString()
+  pollutionExpiry?: string;
+
+  @IsOptional()
+  @IsDateString()
   documentExpiry?: string;
 }

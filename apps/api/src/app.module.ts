@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -46,6 +46,7 @@ import { FileRegistryModule } from './file-registry/file-registry.module';
 import { ReportsModule } from './reports/reports.module';
 import { UsageModule } from './usage/usage.module';
 import { PlansModule } from './plans/plans.module';
+import { UsageInterceptor } from './usage/usage.interceptor';
 
 @Module({
   imports: [
@@ -114,6 +115,10 @@ import { PlansModule } from './plans/plans.module';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: UsageInterceptor,
     },
   ],
 })

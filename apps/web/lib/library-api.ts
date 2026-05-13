@@ -101,6 +101,21 @@ export type LibraryIssue = {
   } | null;
 };
 
+export type LibraryFine = {
+  id: string;
+  tenantId: string;
+  issueId: string;
+  amount: string | number;
+  waivedAmount: string | number;
+  status: 'PENDING' | 'WAIVED' | 'PAID';
+  waiverReason?: string | null;
+  correctionReason?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  issue?: LibraryIssue;
+};
+
 export type LibraryBookPayload = {
   title: string;
   author: string;
@@ -126,6 +141,20 @@ export type LibraryIssuePayload = {
   borrowerStudentId?: string;
   borrowerStaffId?: string;
   dueAt: string;
+  notes?: string;
+};
+
+export type LibraryFinePayload = {
+  issueId: string;
+  amount: number;
+  notes?: string;
+};
+
+export type UpdateLibraryFinePayload = {
+  status?: 'PENDING' | 'WAIVED' | 'PAID';
+  waivedAmount?: number;
+  waiverReason?: string;
+  correctionReason?: string;
   notes?: string;
 };
 
@@ -285,6 +314,29 @@ export const libraryApi = {
       json: body,
     }),
   listOverdue: () => request<LibraryIssue[]>('/library/overdue'),
+  listFines: (params?: { page?: string; limit?: string }) =>
+    request<LibraryPaginatedResult<LibraryFine>>(
+      withQuery('/library/fines', params ?? {}),
+    ),
+  updateFine: (fineId: string, body: UpdateLibraryFinePayload) =>
+    request<LibraryFine>(`/library/fines/${encodeURIComponent(fineId)}`, {
+      method: 'PATCH',
+      json: body,
+    }),
+  getPopularBooks: (params?: { page?: string; limit?: string }) =>
+    request<LibraryPaginatedResult<{ book: LibraryBook; issueCount: number }>>(
+      withQuery('/library/reports/popular', params ?? {}),
+    ),
+  getLostDamagedReport: () =>
+    request<LibraryPaginatedResult<LibraryCopy>>('/library/reports/lost-damaged'),
+  getBookHistory: (bookId: string) =>
+    request<{ book: LibraryBook; history: LibraryIssue[] }>(
+      `/library/books/${encodeURIComponent(bookId)}/history`,
+    ),
+  getCopyHistory: (copyId: string) =>
+    request<{ copy: LibraryCopy; history: LibraryIssue[] }>(
+      `/library/copies/${encodeURIComponent(copyId)}/history`,
+    ),
   sendOverdueReminders: () =>
     request<{ overdue: number; deliveryCount: number }>(
       '/library/overdue/reminders',

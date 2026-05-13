@@ -123,6 +123,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Exam Term</label>
             <select 
+              data-testid="filter-exam-term"
               value={filters.examTermId} 
               onChange={(e) => setFilters(c => ({ ...c, examTermId: e.target.value, assessmentComponentId: '' }))}
               className="premium-input bg-white"
@@ -134,6 +135,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Class</label>
             <select 
+              data-testid="filter-class"
               value={filters.classId} 
               onChange={(e) => setFilters(c => ({ ...c, classId: e.target.value, sectionId: '' }))}
               className="premium-input bg-white"
@@ -145,6 +147,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Subject</label>
             <select 
+              data-testid="filter-subject"
               value={filters.subjectId} 
               onChange={(e) => setFilters(c => ({ ...c, subjectId: e.target.value, assessmentComponentId: '' }))}
               className="premium-input bg-white"
@@ -156,6 +159,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Component</label>
             <select 
+              data-testid="filter-component"
               value={filters.assessmentComponentId} 
               onChange={(e) => setFilters(c => ({ ...c, assessmentComponentId: e.target.value }))}
               className="premium-input bg-white"
@@ -386,7 +390,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
           </div>
           <h3 className="text-2xl font-black text-slate-900 italic uppercase tracking-tight">Roster Ready</h3>
           <p className="mt-2 text-sm font-bold text-slate-400 max-w-sm mx-auto leading-relaxed">
-            Select an exam term, class, and assessment component above to load the mark entry grid.
+            Select context to begin. Choose an exam term, class, and assessment component above to load the mark entry grid.
           </p>
           <div className="mt-8 flex items-center justify-center gap-3">
              <div className="px-4 py-2 rounded-2xl bg-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-500">Fast Entry</div>

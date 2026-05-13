@@ -20,7 +20,7 @@ const formatDate = (date: string | Date) => {
   }).format(new Date(date));
 };
 
-export function OverviewTab({ profile }: { profile: StudentProfileDetail }) {
+export function OverviewTab({ profile, onOpenPdf }: { profile: StudentProfileDetail; onOpenPdf: (kind: string, token?: string) => void }) {
   const primaryGuardian = profile.guardians.find((g) => g.isPrimary) ?? profile.guardians[0];
   const outstanding = profile.invoices.reduce((sum, invoice) => sum + invoice.outstandingAmount, 0);
   const presentCount = profile.attendanceRecords.filter((r) => r.status === 'PRESENT').length;
@@ -50,7 +50,9 @@ export function OverviewTab({ profile }: { profile: StudentProfileDetail }) {
           <StudentQrCard 
             studentId={profile.student.id} 
             studentSystemId={profile.student.studentSystemId}
-            initialStatus={profile.student.activeIdentity ? 'ACTIVE' : 'NOT_GENERATED'}
+            // @ts-ignore
+            qrCredential={profile.student.qrCredential ?? null}
+            onOpenIdCard={(token) => onOpenPdf('id-card', token)}
           />
 
           <SectionCard title="Primary Guardian">

@@ -259,6 +259,11 @@ export class StudentsService {
           take: 30,
         },
         identities: true,
+        qrCredentials: {
+          where: { status: 'ACTIVE' },
+          select: { id: true, status: true, createdAt: true, rotatedAt: true, lastScannedAt: true },
+          take: 1,
+        },
       },
     });
 
@@ -381,6 +386,15 @@ export class StudentsService {
         doctorPhone: student.doctorPhone,
         studentIdentityCode: student.studentIdentityCode ?? null,
         activeIdentity: identities[0]?.identityCode ?? null,
+        qrCredential: (student.qrCredentials ?? [])[0]
+          ? {
+              id: student.qrCredentials[0].id,
+              status: student.qrCredentials[0].status,
+              createdAt: student.qrCredentials[0].createdAt.toISOString(),
+              rotatedAt: student.qrCredentials[0].rotatedAt?.toISOString() ?? null,
+              lastScannedAt: student.qrCredentials[0].lastScannedAt?.toISOString() ?? null,
+            }
+          : null,
       },
       guardians,
       enrollments: (student.enrollments || []).map((enrollment) => ({

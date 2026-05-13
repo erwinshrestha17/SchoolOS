@@ -110,6 +110,13 @@ export type StudentProfile = {
     id: string;
     status: string;
   } | null;
+  qrCredential?: {
+    id: string;
+    status: string;
+    createdAt: string;
+    rotatedAt: string | null;
+    lastScannedAt: string | null;
+  } | null;
 };
 
 export enum StudentQrResolvePurpose {

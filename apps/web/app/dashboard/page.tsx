@@ -233,9 +233,6 @@ export default function DashboardPage() {
               <Badge variant="neutral" className="border-white/10 bg-white/10 text-white">
                 {todayLabel}
               </Badge>
-              <Badge variant="neutral" className="border-white/10 bg-white/10 text-white capitalize">
-                {session?.user.roles[0]?.replace(/_/g, ' ') ?? 'User'}
-              </Badge>
             </div>
           </div>
 
@@ -257,58 +254,19 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {showOnboarding && (
-          <div className="relative z-10 mt-10 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl shadow-2xl">
-             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="neutral" className="bg-amber-500/20 text-amber-400 border-amber-500/30 font-bold text-[10px]">PILOT ONBOARDING</Badge>
-                    <span className="text-xs font-bold text-white">{onboardingProgress}% Complete</span>
-                  </div>
-                  <h2 className="text-xl font-bold text-white">Setup Checklist</h2>
-                  <p className="text-sm text-slate-400 mt-1">Complete these steps to ensure your school is production-ready.</p>
-                </div>
-                <div className="h-2 w-full max-w-xs bg-white/10 rounded-full overflow-hidden">
-                  <div className="h-full bg-amber-500 transition-all duration-1000" style={{ width: `${onboardingProgress}%` }} />
-                </div>
-             </div>
-
-             <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {onboardingSteps.map((step) => (
-                  <Link 
-                    key={step.id}
-                    href={step.href}
-                    className={cn(
-                      "flex items-center gap-3 rounded-2xl border p-3 transition-all",
-                      step.isComplete 
-                        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" 
-                        : "border-white/5 bg-white/5 text-slate-400 hover:bg-white/10 hover:border-white/20"
-                    )}
-                  >
-                    <div className={cn(
-                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2",
-                      step.isComplete ? "border-emerald-400 bg-emerald-400 text-slate-900" : "border-slate-600"
-                    )}>
-                      {step.isComplete && <CheckCircle2 size={12} strokeWidth={3} />}
-                    </div>
-                    <span className="text-xs font-bold truncate">{step.label}</span>
-                  </Link>
-                ))}
-             </div>
-          </div>
-        )}
-
         {/* Decorative elements */}
         <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-primary-600/20 blur-3xl" />
         <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-indigo-600/20 blur-3xl" />
       </header>
 
+      {/* Today KPI Cards */}
       <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Students"
           value={totalStudents}
           icon={<Users size={20} />}
           loading={studentsQuery.isLoading}
+          href="/dashboard/students"
         />
         <StatCard
           title="Today's Attendance"
@@ -320,98 +278,27 @@ export default function DashboardPage() {
             label: "Presence rate",
             isUp: attendancePercent >= 80
           }}
+          href="/dashboard/attendance"
         />
         <StatCard
           title="Monthly Collection"
           value={formatMoney(collectedThisMonth)}
           icon={<Wallet size={20} />}
           loading={receiptsQuery.isLoading}
+          href="/dashboard/fees"
         />
         <StatCard
           title="Outstanding Fees"
           value={formatMoney(outstandingFees)}
           icon={<Calculator size={20} />}
           loading={defaultersQuery.isLoading}
+          href="/dashboard/fees"
         />
       </section>
 
       <div className="grid gap-8 lg:grid-cols-3">
-        <SectionCard
-          title="Setup needs attention"
-          description="Issues requiring immediate attention"
-          className="lg:col-span-2"
-        >
-          {operationalAlerts.length > 0 ? (
-            <div className="space-y-4">
-              {operationalAlerts.map((alert, idx) => (
-                <div
-                  key={idx}
-                  className={cn(
-                    "flex flex-col gap-4 rounded-2xl border p-5 sm:flex-row sm:items-center sm:justify-between",
-                    alert.tone === 'danger' 
-                      ? 'border-danger-100 bg-danger-50/50' 
-                      : 'border-warning-100 bg-warning-50/50'
-                  )}
-                >
-                  <div className="flex gap-4">
-                    <div className={cn(
-                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-                      alert.tone === 'danger' ? 'bg-danger-500 text-white' : 'bg-warning-500 text-white'
-                    )}>
-                      <AlertTriangle size={20} />
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-900">{alert.title}</p>
-                      <p className="mt-0.5 text-sm text-slate-500">{alert.body}</p>
-                    </div>
-                  </div>
-                  <Link
-                    href={alert.href}
-                    className="inline-flex items-center gap-2 text-sm font-bold text-primary-600 hover:text-primary-700"
-                  >
-                    {alert.cta}
-                    <ArrowRight size={16} />
-                  </Link>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              title="No alerts available yet"
-              description="No critical alerts at this time. Your school operations are running smoothly."
-              icon={<TrendingUp size={32} />}
-            />
-          )}
-        </SectionCard>
-
-        <SectionCard title="Quick Actions">
-          <div className="grid gap-3">
-            {[
-              { label: 'New Admission', href: '/dashboard/admissions', icon: UserPlus },
-              { label: 'Collect Fee', href: '/dashboard/fees', icon: Wallet },
-              { label: 'Mark Attendance', href: '/dashboard/attendance', icon: CalendarCheck },
-              { label: 'Post Update', href: '/dashboard/activity', icon: Images },
-              { label: 'Send Notice', href: '/dashboard/notices', icon: Megaphone },
-              { label: 'Accounting', href: '/dashboard/accounting', icon: Calculator },
-            ].map((action) => (
-              <Link
-                key={action.label}
-                href={action.href}
-                className="group flex items-center gap-4 rounded-xl border border-slate-100 bg-slate-50/30 p-4 transition hover:border-primary-200 hover:bg-primary-50"
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition group-hover:bg-primary-500 group-hover:text-white">
-                  <action.icon size={20} />
-                </div>
-                <span className="font-bold text-slate-700 group-hover:text-primary-700">
-                  {action.label}
-                </span>
-                <ArrowRight size={16} className="ml-auto opacity-0 transition group-hover:opacity-100 group-hover:translate-x-1 text-primary-500" />
-              </Link>
-            ))}
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Attendance Mix" description="Today's presence summary">
+        {/* Attendance Snapshot */}
+        <SectionCard title="Attendance Snapshot" description="Today's presence summary">
           <div className="space-y-6">
             <div className="flex items-end gap-2">
               <span className="text-4xl font-extrabold text-slate-900">{attendancePercent}%</span>
@@ -437,26 +324,25 @@ export default function DashboardPage() {
                 total={totalMarkedToday} 
                 color="bg-warning-500" 
               />
-              <AttendanceRow 
-                label="Leave" 
-                count={todayTotals?.leave ?? 0} 
-                total={totalMarkedToday} 
-                color="bg-primary-500" 
-              />
             </div>
+            <Link href="/dashboard/attendance" className="mt-4 block text-center text-sm font-bold text-primary-600 hover:text-primary-700">
+              View Detailed Reports
+            </Link>
           </div>
         </SectionCard>
 
-        <SectionCard title="Fee Collection" description="Monthly target tracking">
+        {/* Fee Snapshot */}
+        <SectionCard title="Fee Snapshot" description="Monthly target tracking">
           <div className="space-y-6">
             <div className="flex items-end gap-2">
               <span className="text-2xl font-extrabold text-slate-900">{formatMoney(collectedThisMonth)}</span>
+              <span className="mb-0.5 text-sm font-bold text-slate-400">Collected</span>
             </div>
             
             <div className="space-y-4">
               <div>
                 <div className="mb-2 flex items-center justify-between text-sm">
-                  <span className="font-bold text-slate-500 uppercase tracking-wider text-[0.65rem]">Collection vs Due</span>
+                  <span className="font-bold text-slate-500 uppercase tracking-wider text-[0.65rem]">Collection Target</span>
                   <span className="font-bold text-slate-900">{Math.round((collectedThisMonth / (collectedThisMonth + outstandingFees)) * 100) || 0}%</span>
                 </div>
                 <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
@@ -478,41 +364,94 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+            <Link href="/dashboard/fees" className="mt-4 block text-center text-sm font-bold text-primary-600 hover:text-primary-700">
+              Manage Collections
+            </Link>
           </div>
         </SectionCard>
 
-        <SectionCard title="Notification Health" description="Message delivery status">
-          <div className="space-y-6">
-            <div className="flex items-end gap-2">
-              <span className="text-2xl font-extrabold text-slate-900">{sentDeliveries}</span>
-              <span className="mb-0.5 text-sm font-bold text-slate-400">Sent Today</span>
-            </div>
-            
-            <div className="space-y-4">
-              <HealthRow label="Sent Successfully" count={sentDeliveries} total={sentDeliveries + queuedDeliveries + failedDeliveries} color="bg-success-500" />
-              <HealthRow label="Queued/Pending" count={queuedDeliveries} total={sentDeliveries + queuedDeliveries + failedDeliveries} color="bg-warning-500" />
-              <HealthRow label="Failed" count={failedDeliveries} total={sentDeliveries + queuedDeliveries + failedDeliveries} color="bg-danger-500" />
-            </div>
+        {/* Quick Actions */}
+        <SectionCard title="Quick Actions">
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: 'Admission', href: '/dashboard/admissions', icon: UserPlus },
+              { label: 'Fee Collection', href: '/dashboard/fees', icon: Wallet },
+              { label: 'Attendance', href: '/dashboard/attendance', icon: CalendarCheck },
+              { label: 'Activity Feed', href: '/dashboard/activity', icon: Images },
+              { label: 'Send Notice', href: '/dashboard/notices', icon: Megaphone },
+              { label: 'Accounting', href: '/dashboard/accounting', icon: Calculator },
+            ].map((action) => (
+              <Link
+                key={action.label}
+                href={action.href}
+                className="group flex flex-col items-center justify-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/30 p-4 transition hover:border-primary-200 hover:bg-primary-50"
+              >
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm transition group-hover:bg-primary-500 group-hover:text-white group-hover:rotate-3">
+                  <action.icon size={24} />
+                </div>
+                <span className="text-center text-xs font-bold text-slate-700 group-hover:text-primary-700">
+                  {action.label}
+                </span>
+              </Link>
+            ))}
           </div>
+        </SectionCard>
+
+        {/* Notices Card */}
+        <SectionCard 
+          title="Notices & Announcements" 
+          className="lg:col-span-2"
+          headerAction={
+            <Link href="/dashboard/notices" className="text-sm font-bold text-primary-600 hover:text-primary-700">
+              Go to Communications
+            </Link>
+          }
+        >
+          {noticesQuery.data && noticesQuery.data.length > 0 ? (
+            <div className="divide-y divide-slate-50">
+              {noticesQuery.data.slice(0, 4).map((notice) => (
+                <div key={notice.id} className="flex items-center gap-4 py-4 first:pt-0 last:pb-0">
+                   <div className={cn(
+                     "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+                     notice.priority.toUpperCase() === 'HIGH' ? 'bg-danger-50 text-danger-500' : 'bg-primary-50 text-primary-500'
+                   )}>
+                     <Megaphone size={20} />
+                   </div>
+                   <div className="flex-1 min-w-0">
+                     <p className="text-sm font-bold text-slate-900 truncate">{notice.title}</p>
+                     <p className="text-xs text-slate-500 mt-0.5">
+                       {notice.audienceType} • {formatSchoolDate(notice.publishedAt || notice.createdAt, 'BOTH')}
+                     </p>
+                   </div>
+                   <Badge variant={notice.priority.toUpperCase() === 'HIGH' ? 'destructive' : 'neutral'}>
+                     {notice.priority}
+                   </Badge>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title="No active notices"
+              description="Important school announcements will appear here."
+              icon={<Megaphone size={32} />}
+            />
+          )}
+        </SectionCard>
+
+        {/* Recent Activity */}
+        <SectionCard
+          title="Recent Activity"
+          description="Latest operations across modules"
+          className="lg:col-span-1"
+        >
+          <RecentActivityList 
+            admissions={admissionsQuery.data ?? []}
+            receipts={receiptsQuery.data ?? []}
+            activityPosts={activityPostsQuery.data ?? []}
+            notices={noticesQuery.data ?? []}
+          />
         </SectionCard>
       </div>
-
-      <SectionCard
-        title="Recent School Activity"
-        description="Latest updates from across all modules"
-        headerAction={
-          <Link href="/dashboard/activity" className="text-sm font-bold text-primary-600 hover:text-primary-700">
-            View All Activity
-          </Link>
-        }
-      >
-        <RecentActivityList 
-          admissions={admissionsQuery.data ?? []}
-          receipts={receiptsQuery.data ?? []}
-          activityPosts={activityPostsQuery.data ?? []}
-          notices={noticesQuery.data ?? []}
-        />
-      </SectionCard>
     </div>
   );
 }

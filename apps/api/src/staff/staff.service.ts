@@ -610,8 +610,8 @@ function mapStaffDetail(
   actor?: AuthContext,
 ) {
   const canSeeSensitive =
-    actor?.permissions?.includes('hr.admin') ||
-    actor?.permissions?.includes('payroll.admin') ||
+    actor?.permissions?.includes('hr:manage') ||
+    actor?.permissions?.includes('payroll:manage') ||
     (staff.userId && actor?.userId === staff.userId);
 
   const mask = (val: string | null | undefined) => {

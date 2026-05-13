@@ -15,6 +15,7 @@ import { FinanceProcessor } from './finance.processor';
 import { FinanceCron } from './finance.cron';
 
 import { AccountingPostingModule } from '../accounting/accounting-posting.module';
+import { UsageModule } from '../usage/usage.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AccountingPostingModule } from '../accounting/accounting-posting.module
     BullModule.registerQueue({
       name: 'finance',
     }),
+    UsageModule,
   ],
   controllers: [
     FeesController,

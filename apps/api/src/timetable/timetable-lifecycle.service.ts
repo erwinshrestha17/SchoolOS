@@ -107,9 +107,19 @@ export class TimetableLifecycleService {
     const subjectIds = Array.from(
       new Set(version.slots.map((s) => s.subjectId)),
     );
+    const roomIds = Array.from(
+      new Set(version.slots.filter((s) => s.roomId).map((s) => s.roomId!)),
+    );
+    const classIds = Array.from(new Set(version.slots.map((s) => s.classId)));
 
-    const [availability, workloadLimits, requirements, allPeriods] =
-      await Promise.all([
+    const [
+      availability,
+      workloadLimits,
+      requirements,
+      allPeriods,
+      rooms,
+      classes,
+    ] = await Promise.all([
         this.prisma.teacherAvailability.findMany({
           where: {
             tenantId: actor.tenantId,
@@ -147,7 +157,30 @@ export class TimetableLifecycleService {
           },
           select: { id: true, startsAt: true, endsAt: true, dayOfWeek: true },
         }),
+        this.prisma.room.findMany({
+          where: { tenantId: actor.tenantId, id: { in: roomIds } },
+          select: { id: true, capacity: true },
+        }),
+        this.prisma.class.findMany({
+          where: { tenantId: actor.tenantId, id: { in: classIds } },
+          select: {
+            id: true,
+            students: {
+              where: { lifecycleStatus: 'ACTIVE' },
+              select: { id: true },
+            },
+          },
+        }),
       ]);
+
+    const roomCapacities = rooms.reduce(
+      (acc, r) => ({ ...acc, [r.id]: r.capacity }),
+      {},
+    );
+    const classSizes = classes.reduce(
+      (acc, c) => ({ ...acc, [c.id]: c.students.length }),
+      {},
+    );
 
     return this.conflictService.validateVersionSlots(
       version.slots.map((slot) => ({
@@ -169,6 +202,8 @@ export class TimetableLifecycleService {
       workloadLimits,
       availability,
       allPeriods,
+      roomCapacities,
+      classSizes,
     );
   }
 

@@ -6,6 +6,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { getQueueToken } from '@nestjs/bullmq';
+import { UsageService } from '../src/usage/usage.service';
 import { PrismaMock, createPrismaMock, createQueueMock } from './test-helpers';
 
 describe('SchoolOS File Registry (E2E)', () => {
@@ -33,6 +34,11 @@ describe('SchoolOS File Registry (E2E)', () => {
       .useValue(createQueueMock())
       .overrideProvider(NotificationsService)
       .useValue({ sendAuthCodeEmail: jest.fn(), sendEmail: jest.fn() })
+      .overrideProvider(UsageService)
+      .useValue({
+        verifyLimit: jest.fn().mockResolvedValue(undefined),
+        incrementUsage: jest.fn().mockResolvedValue(undefined),
+      })
       .compile();
 
     fileRegistryService = moduleRef.get(FileRegistryService);

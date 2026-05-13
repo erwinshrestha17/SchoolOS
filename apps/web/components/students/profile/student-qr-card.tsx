@@ -5,17 +5,27 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { QrCode, RefreshCw, XCircle, Download, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
+import { QrCode, RefreshCw, XCircle, FileText, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+type QrCredentialInfo = {
+  id: string;
+  status: string;
+  createdAt: string;
+  rotatedAt: string | null;
+  lastScannedAt: string | null;
+};
 
 type StudentQrCardProps = {
   studentId: string;
   studentSystemId: string;
-  initialStatus?: string;
+  qrCredential?: QrCredentialInfo | null;
+  onOpenIdCard: (token?: string) => void;
 };
 
-export function StudentQrCard({ studentId, studentSystemId, initialStatus }: StudentQrCardProps) {
+export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpenIdCard }: StudentQrCardProps) {
   const queryClient = useQueryClient();
+  const [qrSvg, setQrSvg] = useState<string | null>(null);
   const [rawToken, setRawToken] = useState<string | null>(null);
   const [showConfirmRotate, setShowConfirmRotate] = useState(false);
   const [showConfirmRevoke, setShowConfirmRevoke] = useState(false);
@@ -24,16 +34,26 @@ export function StudentQrCard({ studentId, studentSystemId, initialStatus }: Stu
 
   const generateMutation = useMutation({
     mutationFn: () => api.generateStudentQr(studentId),
-    onSuccess: (data) => {
-      setRawToken(data.rawToken);
+    onSuccess: (data: any) => {
+      if (data.qrImageSvg) {
+        setQrSvg(data.qrImageSvg);
+      }
+      if (data.rawToken) {
+        setRawToken(data.rawToken);
+      }
       void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
     },
   });
 
   const rotateMutation = useMutation({
     mutationFn: () => api.rotateStudentQr(studentId, { reason: rotateReason }),
-    onSuccess: (data) => {
-      setRawToken(data.rawToken);
+    onSuccess: (data: any) => {
+      if (data.qrImageSvg) {
+        setQrSvg(data.qrImageSvg);
+      }
+      if (data.rawToken) {
+        setRawToken(data.rawToken);
+      }
       setShowConfirmRotate(false);
       setRotateReason('');
       void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
@@ -43,6 +63,7 @@ export function StudentQrCard({ studentId, studentSystemId, initialStatus }: Stu
   const revokeMutation = useMutation({
     mutationFn: () => api.revokeStudentQr(studentId, { reason: revokeReason }),
     onSuccess: () => {
+      setQrSvg(null);
       setRawToken(null);
       setShowConfirmRevoke(false);
       setRevokeReason('');
@@ -50,7 +71,7 @@ export function StudentQrCard({ studentId, studentSystemId, initialStatus }: Stu
     },
   });
 
-  const status = initialStatus || 'NOT_GENERATED';
+  const status = qrCredential?.status || 'NOT_GENERATED';
   const isActive = status === 'ACTIVE';
 
   return (
@@ -89,31 +110,32 @@ export function StudentQrCard({ studentId, studentSystemId, initialStatus }: Stu
           )}
         </div>
 
-        {rawToken && (
+        {qrSvg && (
           <div className="rounded-[2rem] border-2 border-primary-100 bg-primary-50/30 p-6 text-center animate-in zoom-in-95 duration-300">
             <div className="mx-auto mb-4 flex h-48 w-48 items-center justify-center rounded-3xl bg-white p-4 shadow-xl ring-8 ring-primary-50">
-              {/* eslint-disable-next-line @next/next/no-img-element -- Data URL generated for QR code does not benefit from next/image optimization */}
-              <img 
-                src={api.getStudentQrImageUrl(studentId, rawToken)} 
-                alt="Student QR Code"
-                className="h-full w-full object-contain"
+              <div
+                className="h-full w-full [&>svg]:h-full [&>svg]:w-full"
+                dangerouslySetInnerHTML={{ __html: qrSvg }}
               />
             </div>
             <p className="text-sm font-bold text-slate-900">New QR Identity Generated</p>
             <p className="mt-1 text-xs text-slate-500 max-w-[240px] mx-auto">
-              This token is not stored server-side. Please print or save the ID card now.
+              Token is not stored server-side. Generate the ID card now to include this code.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
                <button 
                 className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
-                onClick={() => window.print()}
+                onClick={() => onOpenIdCard(rawToken ?? undefined)}
                >
-                 <Download size={14} />
-                 Print Code
+                 <FileText size={14} className="text-primary-500" />
+                 Print ID Card
                </button>
                <button 
                 className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-slate-800"
-                onClick={() => setRawToken(null)}
+                onClick={() => {
+                  setQrSvg(null);
+                  setRawToken(null);
+                }}
                >
                  Done
                </button>
@@ -121,22 +143,30 @@ export function StudentQrCard({ studentId, studentSystemId, initialStatus }: Stu
           </div>
         )}
 
-        {isActive && !rawToken && (
-          <div className="grid grid-cols-2 gap-3">
-             <button
-              onClick={() => setShowConfirmRotate(true)}
-              className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
-            >
-              <RefreshCw size={16} className="text-primary-500" />
-              Rotate (Lost Card)
-            </button>
-            <button
-              onClick={() => setShowConfirmRevoke(true)}
-              className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
-            >
-              <XCircle size={16} className="text-danger-500" />
-              Revoke Access
-            </button>
+        {isActive && !qrSvg && (
+          <div className="space-y-3">
+            {qrCredential?.lastScannedAt && (
+              <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/30 px-4 py-2.5 text-xs text-slate-500">
+                <ShieldCheck size={14} className="text-success-500" />
+                <span>Last scanned {new Date(qrCredential.lastScannedAt).toLocaleDateString('en-NP', { dateStyle: 'medium' })}</span>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+               <button
+                onClick={() => setShowConfirmRotate(true)}
+                className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+              >
+                <RefreshCw size={16} className="text-primary-500" />
+                Rotate (Lost Card)
+              </button>
+              <button
+                onClick={() => setShowConfirmRevoke(true)}
+                className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+              >
+                <XCircle size={16} className="text-danger-500" />
+                Revoke Access
+              </button>
+            </div>
           </div>
         )}
 
@@ -203,6 +233,12 @@ export function StudentQrCard({ studentId, studentSystemId, initialStatus }: Stu
                 Cancel
               </button>
             </div>
+          </div>
+        )}
+
+        {(generateMutation.error || rotateMutation.error || revokeMutation.error) && (
+          <div className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-xs font-bold text-danger-600 animate-in fade-in">
+            {(generateMutation.error || rotateMutation.error || revokeMutation.error)?.message || 'An error occurred'}
           </div>
         )}
 

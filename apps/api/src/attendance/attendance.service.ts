@@ -1799,6 +1799,12 @@ export class AttendanceService {
       );
     }
 
+    if (dto.status === 'REJECTED' && !dto.reviewNote) {
+      throw new ConflictException(
+        'A review note is required when rejecting a leave request',
+      );
+    }
+
     const updated = await this.prisma.$transaction(async (tx) => {
       const reviewed = await tx.staffLeaveRequest.update({
         where: { id: leave.id },

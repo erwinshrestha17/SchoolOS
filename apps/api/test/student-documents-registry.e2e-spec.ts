@@ -6,6 +6,7 @@ import { FileRegistryService } from '../src/file-registry/file-registry.service'
 import { PrismaService } from '../src/prisma/prisma.service';
 import { StorageService } from '../src/storage/storage.service';
 import { StudentRecordsService } from '../src/student-records/student-records.service';
+import { UsageService } from '../src/usage/usage.service';
 import {
   PrismaMock,
   createAuthContextMock,
@@ -46,6 +47,10 @@ describe('Student Documents Registry Integration (E2E)', () => {
       auditService as unknown as AuditService,
       { port: 4000 } as ConfigService,
       { checkReadiness: jest.fn() } as unknown as StorageService,
+      {
+        verifyLimit: jest.fn().mockResolvedValue(undefined),
+        incrementUsage: jest.fn().mockResolvedValue(undefined),
+      } as any,
     );
     studentRecordsService = new StudentRecordsService(
       prisma as unknown as PrismaService,

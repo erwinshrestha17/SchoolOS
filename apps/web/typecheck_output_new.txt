@@ -1,0 +1,5 @@
+
+> @schoolos/web@0.1.0 typecheck
+> tsc --noEmit --project tsconfig.json
+
+tests/transport-polish.spec.ts(53,1): error TS1005: '}' expected.

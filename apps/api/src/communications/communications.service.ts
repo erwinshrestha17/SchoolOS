@@ -17,6 +17,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { CreateNoticeDto } from './dto/create-notice.dto';
 import { CaptureConsentDto } from './dto/capture-consent.dto';
+import { UsageService } from '../usage/usage.service';
 
 @Injectable()
 export class CommunicationsService {
@@ -26,6 +27,7 @@ export class CommunicationsService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly auditService: AuditService,
+    private readonly usageService: UsageService,
   ) {}
 
   async listNotices(actor: AuthContext) {
@@ -377,6 +379,26 @@ export class CommunicationsService {
       return { count: 0 };
     }
 
+    const totalToSent = allowedRecipients.length * input.channels.length;
+    const smsToSent = input.channels.includes(NotificationChannel.SMS)
+      ? allowedRecipients.length
+      : 0;
+
+    if (totalToSent > 0) {
+      await this.usageService.verifyLimit(
+        input.actor.tenantId,
+        'notifications.sent',
+        totalToSent,
+      );
+    }
+    if (smsToSent > 0) {
+      await this.usageService.verifyLimit(
+        input.actor.tenantId,
+        'sms.sent',
+        smsToSent,
+      );
+    }
+
     const queuedDeliveries = await this.createDeliveryRows(
       input,
       allowedRecipients,
@@ -391,6 +413,21 @@ export class CommunicationsService {
 
     for (const delivery of queuedDeliveries) {
       await this.dispatchDelivery(delivery);
+    }
+
+    if (totalToSent > 0) {
+      await this.usageService.incrementUsage(
+        input.actor.tenantId,
+        'notifications.sent',
+        totalToSent,
+      );
+    }
+    if (smsToSent > 0) {
+      await this.usageService.incrementUsage(
+        input.actor.tenantId,
+        'sms.sent',
+        smsToSent,
+      );
     }
 
     await this.auditService.record({

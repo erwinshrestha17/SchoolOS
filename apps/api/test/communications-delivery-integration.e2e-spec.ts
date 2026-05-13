@@ -13,6 +13,7 @@ import { DeliveryRetryService } from '../src/communications/delivery-retry.servi
 import { M10HardeningService } from '../src/communications/m10-hardening.service';
 import { NotificationsService } from '../src/notifications/notifications.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { UsageService } from '../src/usage/usage.service';
 
 interface CommunicationState {
   notices: Record<string, unknown>[];
@@ -77,6 +78,10 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
       prisma as unknown as PrismaService,
       notificationsService as unknown as NotificationsService,
       auditService as unknown as AuditService,
+      {
+        verifyLimit: jest.fn().mockResolvedValue(undefined),
+        incrementUsage: jest.fn().mockResolvedValue(undefined),
+      } as any,
     );
     m10HardeningService = new M10HardeningService(
       prisma as unknown as PrismaService,

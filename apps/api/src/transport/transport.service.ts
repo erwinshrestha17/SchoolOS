@@ -329,6 +329,15 @@ export class TransportService {
         fitnessCertificateExp: dto.fitnessCertificateExp
           ? new Date(dto.fitnessCertificateExp)
           : null,
+        insuranceExpiry: dto.insuranceExpiry
+          ? new Date(dto.insuranceExpiry)
+          : null,
+        registrationExpiry: dto.registrationExpiry
+          ? new Date(dto.registrationExpiry)
+          : null,
+        pollutionExpiry: dto.pollutionExpiry
+          ? new Date(dto.pollutionExpiry)
+          : null,
         documentExpiry: dto.documentExpiry
           ? new Date(dto.documentExpiry)
           : null,
@@ -369,6 +378,27 @@ export class TransportService {
           ? {
               fitnessCertificateExp: dto.fitnessCertificateExp
                 ? new Date(dto.fitnessCertificateExp)
+                : null,
+            }
+          : {}),
+        ...(dto.insuranceExpiry !== undefined
+          ? {
+              insuranceExpiry: dto.insuranceExpiry
+                ? new Date(dto.insuranceExpiry)
+                : null,
+            }
+          : {}),
+        ...(dto.registrationExpiry !== undefined
+          ? {
+              registrationExpiry: dto.registrationExpiry
+                ? new Date(dto.registrationExpiry)
+                : null,
+            }
+          : {}),
+        ...(dto.pollutionExpiry !== undefined
+          ? {
+              pollutionExpiry: dto.pollutionExpiry
+                ? new Date(dto.pollutionExpiry)
                 : null,
             }
           : {}),
@@ -1047,13 +1077,33 @@ export class TransportService {
       requiredConsentTypes: [ConsentType.MESSAGING],
     });
 
+    // Mark current active trips on this route as delayed if not already
+    await this.prisma.transportTrip.updateMany({
+      where: {
+        tenantId: actor.tenantId,
+        routeId: route.id,
+        status: TransportTripStatus.ACTIVE,
+      },
+      data: {
+        isDelayed: true,
+        delayReason: dto.message,
+        notes: dto.estimatedDelay
+          ? `Estimated delay: ${dto.estimatedDelay}`
+          : undefined,
+      },
+    });
+
     await this.auditService.record({
       action: 'broadcast_delay',
       resource: 'transport_route',
       tenantId: actor.tenantId,
       userId: actor.userId,
       resourceId: route.id,
-      after: { routeId: route.id, studentCount: studentIds.length },
+      after: {
+        routeId: route.id,
+        studentCount: studentIds.length,
+        message: dto.message,
+      },
     });
 
     return {
@@ -1061,6 +1111,70 @@ export class TransportService {
       studentCount: studentIds.length,
       deliveryCount: delivery.count,
     };
+  }
+
+  async markTripDelay(
+    tripId: string,
+    dto: { isDelayed: boolean; delayReason?: string; delayMinutes?: number },
+    actor: AuthContext,
+  ) {
+    const trip = await this.getTrip(actor.tenantId, tripId);
+
+    const updated = await this.prisma.transportTrip.update({
+      where: { id: trip.id },
+      data: {
+        isDelayed: dto.isDelayed,
+        delayReason: dto.delayReason ?? null,
+        delayMinutes: dto.delayMinutes ?? null,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'mark_delay',
+      resource: 'transport_trip',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: trip.id,
+      after: {
+        isDelayed: updated.isDelayed,
+        delayReason: updated.delayReason,
+        delayMinutes: updated.delayMinutes,
+      },
+    });
+
+    return updated;
+  }
+
+  async getTripDetails(tripId: string, actor: AuthContext) {
+    const trip = await this.prisma.transportTrip.findFirst({
+      where: { id: tripId, tenantId: actor.tenantId },
+      include: {
+        route: { include: { stops: { orderBy: { sequence: 'asc' } } } },
+        vehicle: true,
+        driverAssignment: { include: { staff: true } },
+        studentStatuses: {
+          include: {
+            student: {
+              select: {
+                id: true,
+                firstNameEn: true,
+                lastNameEn: true,
+                photoUrl: true,
+                emergencyName: true,
+                emergencyPhone: true,
+              },
+            },
+            stop: true,
+          },
+        },
+      },
+    });
+
+    if (!trip) {
+      throw new NotFoundException('Trip not found');
+    }
+
+    return trip;
   }
 
   async getReports(actor: AuthContext) {
@@ -1094,6 +1208,24 @@ export class TransportService {
           OR: [
             {
               fitnessCertificateExp: {
+                lte: addDays(new Date(), 30),
+                gte: new Date(),
+              },
+            },
+            {
+              insuranceExpiry: {
+                lte: addDays(new Date(), 30),
+                gte: new Date(),
+              },
+            },
+            {
+              registrationExpiry: {
+                lte: addDays(new Date(), 30),
+                gte: new Date(),
+              },
+            },
+            {
+              pollutionExpiry: {
                 lte: addDays(new Date(), 30),
                 gte: new Date(),
               },

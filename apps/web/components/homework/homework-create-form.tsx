@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { FileUploader } from '@/components/ui/file-uploader';
 
 export function HomeworkCreateForm() {
   const router = useRouter();
@@ -27,6 +28,7 @@ export function HomeworkCreateForm() {
     dueAt: '',
     maxScore: 10,
     isSubmissionRequired: true,
+    attachmentFileIds: [] as string[],
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -141,14 +143,23 @@ export function HomeworkCreateForm() {
         </SectionCard>
 
         <SectionCard
-          title="Attachments"
           description="Upload resources or worksheets for students."
         >
-          <div className="p-8 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center text-slate-500">
-            <FileText className="h-12 w-12 mb-4 opacity-20" />
-            <p className="text-sm font-medium">Attachment upload will be enabled after file registry integration.</p>
-            <p className="text-xs opacity-60 mt-1">Expected in Phase 2C.</p>
-          </div>
+          <FileUploader
+            module="homework"
+            onUploadComplete={(id) => {
+              setFormData(prev => ({
+                ...prev,
+                attachmentFileIds: [...prev.attachmentFileIds, id]
+              }));
+            }}
+            onRemove={(id) => {
+              setFormData(prev => ({
+                ...prev,
+                attachmentFileIds: prev.attachmentFileIds.filter(fid => fid !== id)
+              }));
+            }}
+          />
         </SectionCard>
       </div>
 

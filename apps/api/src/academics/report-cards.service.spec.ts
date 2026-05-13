@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { GradeCalculatorService } from './grade-calculator.service';
 import { ReportCardsService } from './report-cards.service';
+import { UsageService } from '../usage/usage.service';
 
 describe('ReportCardsService', () => {
   let service: ReportCardsService;
@@ -62,6 +63,13 @@ describe('ReportCardsService', () => {
         { provide: AuditService, useValue: auditService },
         { provide: FinanceService, useValue: financeService },
         { provide: SettingsService, useValue: {} },
+        {
+          provide: UsageService,
+          useValue: {
+            verifyLimit: jest.fn().mockResolvedValue(undefined),
+            incrementUsage: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 

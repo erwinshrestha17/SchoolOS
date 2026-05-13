@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma, LibraryCopyStatus, LibraryIssueStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -172,7 +172,8 @@ export class LibraryHardeningService {
 }
 
 function csvEscape(value: unknown) {
-  const text = String(value ?? '');
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string
+  const text = value === null || value === undefined ? '' : String(value);
   if (/[",\n]/.test(text)) {
     return `"${text.replace(/"/g, '""')}"`;
   }

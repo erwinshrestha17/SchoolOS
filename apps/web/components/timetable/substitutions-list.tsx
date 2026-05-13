@@ -1,7 +1,9 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { TimetableSubstitutionModal } from '@/components/timetable/substitution-modal';
 import { DataTable } from '@/components/ui/data-table';
 import { LoadingState } from '@/components/ui/loading-state';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -11,9 +13,23 @@ import { Plus, Users, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export function SubstitutionsList({ filters }: { filters: any }) {
+  const queryClient = useQueryClient();
+  const [selectedSub, setSelectedSub] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   const substitutionsQuery = useQuery({
     queryKey: ['timetable-substitutions', filters],
     queryFn: () => api.listSubstitutions(filters),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => api.cancelSubstitution(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['timetable-substitutions'] }),
+  });
+
+  const completeMutation = useMutation({
+    mutationFn: (id: string) => api.completeSubstitution(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['timetable-substitutions'] }),
   });
 
   if (substitutionsQuery.isLoading) return <LoadingState />;
@@ -67,19 +83,26 @@ export function SubstitutionsList({ filters }: { filters: any }) {
             {
               label: 'Assign Substitute',
               icon: <Users className="h-4 w-4" />,
-              onClick: () => {},
-              disabled: row.status !== 'PENDING',
+              onClick: () => {
+                setSelectedSub(row);
+                setIsModalOpen(true);
+              },
+              disabled: row.status === 'CANCELLED' || row.status === 'COMPLETED',
             },
             {
               label: 'Complete',
               icon: <CheckCircle2 className="h-4 w-4" />,
-              onClick: () => {},
+              onClick: () => completeMutation.mutate(row.id),
               disabled: row.status !== 'ASSIGNED',
             },
             {
               label: 'Cancel',
               icon: <XCircle className="h-4 w-4" />,
-              onClick: () => {},
+              onClick: () => {
+                if (confirm('Are you sure you want to cancel this substitution?')) {
+                  cancelMutation.mutate(row.id);
+                }
+              },
               disabled: row.status === 'CANCELLED' || row.status === 'COMPLETED',
             },
           ]}
@@ -110,6 +133,16 @@ export function SubstitutionsList({ filters }: { filters: any }) {
       ) : (
         <DataTable columns={columns} data={substitutionsQuery.data || []} />
       )}
+
+      <TimetableSubstitutionModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedSub(null);
+        }}
+        substitution={selectedSub}
+        mode="assign"
+      />
     </div>
   );
 }

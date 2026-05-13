@@ -79,6 +79,9 @@ export type TransportVehicle = {
   capacity: number;
   status: TransportVehicleStatus;
   fitnessCertificateExp?: string | null;
+  insuranceExpiry?: string | null;
+  registrationExpiry?: string | null;
+  pollutionExpiry?: string | null;
   model?: string | null;
   documentExpiry?: string | null;
   createdAt?: string;
@@ -145,6 +148,9 @@ export type TransportTrip = {
   status: TransportTripStatus;
   startedAt: string;
   completedAt?: string | null;
+  isDelayed: boolean;
+  delayMinutes?: number | null;
+  delayReason?: string | null;
   notes?: string | null;
   createdAt?: string;
   updatedAt?: string;
@@ -216,6 +222,9 @@ export type TransportVehiclePayload = {
   model?: string;
   capacity: number;
   fitnessCertificateExp?: string;
+  insuranceExpiry?: string;
+  registrationExpiry?: string;
+  pollutionExpiry?: string;
   documentExpiry?: string;
   status?: string;
 };
@@ -467,4 +476,14 @@ export const transportApi = {
     request<{ items: any[]; meta: { total: number } }>(
       withQuery('/transport/reports/boarding', params ?? {}),
     ),
+  getTripDetails: (tripId: string) =>
+    request<TransportTrip>(`/transport/trips/${encodeURIComponent(tripId)}`),
+  markTripDelay: (
+    tripId: string,
+    body: { isDelayed: boolean; delayReason?: string; delayMinutes?: number },
+  ) =>
+    request<TransportTrip>(`/transport/trips/${encodeURIComponent(tripId)}/delay`, {
+      method: 'PATCH',
+      json: body,
+    }),
 };

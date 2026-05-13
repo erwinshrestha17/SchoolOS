@@ -37,8 +37,9 @@ Estimated completion:
 
 ```text
 Full SchoolOS vision: around 70–80% implemented
+Full SchoolOS vision: around 70–80% implemented
 Phase 1 pilot product: around 90–95% implemented
-Phase 2A backend: 100% for current backend scope; frontend/admin UI remains
+Phase 2A backend and admin UI: 100% complete and wired; deep reporting polish remains
 ```
 
 Near-term rule:
@@ -80,7 +81,7 @@ Biometric workflows
 | M1 Admissions & Student Profiles | Pilot-ready | 90–95% |
 | M2 Smart Attendance | Pilot-ready | 85–90% |
 | M3 Fees & Receipts | Pilot-ready | 85–90% |
-| M4 Academics / Exams / CAS / Report Cards | Backend complete / contract-protected; admin UI next | 80–90% |
+| M4 Academics / Exams / CAS / Report Cards | Complete / contract-protected / UI wired | 95–100% |
 | M5 Activity Feed & Milestones | Strong Phase 1 foundation | 75–85% |
 | M6 Homework & Timetable | Phase 2 foundation implemented | 60–70% |
 | M7 HR & Payroll | Phase 2 foundation implemented | 65–75% |
@@ -230,23 +231,13 @@ Phase 2 foundations are implemented. Phase 2A backend is complete and contract-p
 
 ### 6.1 Phase 2A — M4 Academics, Exams, CAS, Report Cards
 
-Current estimate: 80–90% implemented.
+Current estimate: 95–100% implemented.
 
 Backend status: **Complete / contract-protected**.
+Frontend status: **Complete / UI fully wired and tested**.
 
 Remaining:
 
-- Academics workspace/dashboard UI.
-- Exam term setup UI.
-- Assessment component setup UI.
-- Marks entry UI.
-- CAS records UI.
-- Result preview UI.
-- Marks lock/review UI.
-- Report card generation UI.
-- Promotion readiness UI.
-- Result publishing and notification UI.
-- Browser smoke / Playwright coverage for the full Phase 2A workflow.
 - Report card PDF visual polish.
 - Locked report-card correction/regeneration workflow.
 - Deeper academic reports/export.

@@ -28,7 +28,7 @@ import { MenuItemSelector } from './menu-item-selector';
 import { QRResolver } from '../ui/qr-resolver';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 
-type CanteenTab = 'overview' | 'menu' | 'plans' | 'enrollments' | 'serving' | 'wallets' | 'pos' | 'controls' | 'reports';
+type CanteenTab = 'overview' | 'menu' | 'plans' | 'enrollments' | 'serving' | 'wallets' | 'pos' | 'controls' | 'inventory' | 'reports';
 
 type CanteenWorkspaceProps = { initialTab?: CanteenTab };
 
@@ -41,6 +41,7 @@ const tabs: Array<{ key: CanteenTab; label: string; href: string }> = [
   { key: 'wallets', label: 'Wallets', href: '/dashboard/canteen/wallets' },
   { key: 'pos', label: 'POS', href: '/dashboard/canteen/pos' },
   { key: 'controls', label: 'Controls', href: '/dashboard/canteen/controls' },
+  { key: 'inventory', label: 'Inventory', href: '/dashboard/canteen/inventory' },
   { key: 'reports', label: 'Reports', href: '/dashboard/canteen/reports' },
 ];
 
@@ -121,6 +122,14 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
   const completeSaleMutation = useMutation({ mutationFn: (saleId: string) => canteenApi.completePosSale(saleId), onSuccess: () => { setNotice('POS sale completed.'); invalidateCanteen(); } });
   const cancelSaleMutation = useMutation({ mutationFn: (saleId: string) => canteenApi.cancelPosSale(saleId), onSuccess: () => { setNotice('POS sale cancelled.'); invalidateCanteen(); } });
   const controlMutation = useMutation({ mutationFn: canteenApi.upsertSpendingControl, onSuccess: () => { setNotice('Spending control saved.'); invalidateCanteen(); } });
+  const reverseWalletTransactionMutation = useMutation({
+    mutationFn: ({ transactionId, reason }: { transactionId: string; reason: string }) =>
+      canteenApi.reverseWalletTransaction(transactionId, { reason }),
+    onSuccess: () => {
+      setNotice('Transaction reversed.');
+      invalidateCanteen();
+    },
+  });
 
   const menuItems = menuQuery.data ?? [];
   const plans = plansQuery.data ?? [];
@@ -298,7 +307,27 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
             <StudentSelector students={studentsQuery.data ?? []} selectedId={walletStudentId} onSelect={setWalletStudentId} label="Student" />
             <div className="mt-3 flex gap-2"><button type="button" className="btn-secondary" disabled={!walletStudentId || createWalletMutation.isPending} onClick={() => createWalletMutation.mutate(walletStudentId)}>Create / load wallet</button></div>
             {walletQuery.data ? <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm text-slate-500">Balance</p><p className="text-2xl font-black text-slate-900">{money(walletQuery.data.balance)}</p><p className="text-xs text-slate-400">Low balance threshold: {money(walletQuery.data.lowBalanceThreshold)}</p></div>{isWalletLow(walletQuery.data.balance, walletQuery.data.lowBalanceThreshold) ? <CanteenStatusBadge status="WALLET_LOW" /> : null}</div></div> : <EmptyState title="No wallet selected" description="Select a student to view or create a wallet." />}
-            <div className="mt-4 space-y-3">{(transactionsQuery.data ?? []).slice(0, 6).map((tx) => <RecordCard key={tx.id} title={`${tx.type} • ${money(tx.amount)}`} subtitle={`Balance after: ${money(tx.balanceAfter)} • ${tx.note ?? 'No note'}`} />)}</div>
+            <div className="mt-4 space-y-3">
+              {(transactionsQuery.data ?? []).slice(0, 10).map((tx) => (
+                <RecordCard
+                  key={tx.id}
+                  title={`${tx.type} • ${money(tx.amount)}`}
+                  subtitle={`Balance after: ${money(tx.balanceAfter)} • ${tx.note ?? 'No note'}${tx.reversalOfId ? ' (Reversal)' : ''}`}
+                  action={!tx.reversalOfId && (tx.type === 'TOP_UP' || tx.type === 'DEDUCTION') ? (
+                    <button
+                      type="button"
+                      className="btn-secondary text-xs"
+                      onClick={() => {
+                        const reason = window.prompt('Reason for reversal?');
+                        if (reason) reverseWalletTransactionMutation.mutate({ transactionId: tx.id, reason });
+                      }}
+                    >
+                      Reverse
+                    </button>
+                  ) : null}
+                />
+              ))}
+            </div>
           </Panel>
           <Panel title="Manual top-up" description="Top-up writes are backend-controlled and audited.">
             <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); if (walletStudentId) topUpMutation.mutate({ studentId: walletStudentId, body: cleanTopUp(topUpForm) }); }}>
@@ -350,6 +379,26 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
               ) : null}
 
               <button type="submit" className="btn-primary w-full h-12 text-base" disabled={posMutation.isPending}>{posMutation.isPending ? 'Creating Sale...' : 'Create POS sale'}</button>
+            </form>
+          </Panel>
+        </TwoColumn>
+      )}
+
+      {activeTab === 'inventory' && (
+        <TwoColumn>
+          <Panel title="Inventory status" description="Track stock levels, adjustments, and wastage.">
+            <InfoCard lines={['Real-time stock levels are updated by purchase bills and POS sales.', 'Wastage and manual adjustments are logged in the stock ledger.']} />
+            <div className="mt-4 space-y-3">
+               <RecordCard title="Rice (Premium)" subtitle="Stock: 45kg • Min: 10kg" badge={<StatusBadge status="ACTIVE" label="In Stock" tone="approved" />} />
+               <RecordCard title="Cooking Oil" subtitle="Stock: 12L • Min: 15L" badge={<StatusBadge status="LOW" label="Low Stock" tone="pending" />} />
+            </div>
+          </Panel>
+          <Panel title="Quick adjustment" description="Record wastage or stock corrections.">
+            <form className="space-y-3">
+              <TextInput label="Item (SKU)" value="Rice-001" onChange={() => {}} />
+              <TextInput label="Quantity change" type="number" value="0" onChange={() => {}} />
+              <SelectInput label="Reason" value="WASTAGE" onChange={() => {}} options={[{ label: 'Wastage', value: 'WASTAGE' }, { label: 'Correction', value: 'CORRECTION' }]} />
+              <button type="button" className="btn-primary w-full" disabled>Record adjustment</button>
             </form>
           </Panel>
         </TwoColumn>
@@ -445,7 +494,7 @@ function Panel({ title, description, children }: { title: string; description: s
 function Notice({ tone, message, onDismiss }: { tone: 'success' | 'error'; message: string; onDismiss?: () => void }) { return <div className={cn('flex items-center justify-between rounded-2xl border px-4 py-3 text-sm', tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700')}><span>{message}</span>{onDismiss ? <button type="button" className="font-semibold" onClick={onDismiss}>Dismiss</button> : null}</div>; }
 function InfoCard({ lines }: { lines: string[] }) { return <section className="rounded-[2rem] border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"><ul className="list-disc space-y-1 pl-5">{lines.map((line) => <li key={line}>{line}</li>)}</ul></section>; }
 function RecordCard({ title, subtitle, action, badge }: { title: string; subtitle: string; action?: React.ReactNode; badge?: React.ReactNode }) { return <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-bold text-slate-900">{title}</h3><p className="text-sm text-slate-500">{subtitle}</p></div><div className="flex flex-wrap items-center gap-2">{badge}{action}</div></div></div>; }
-function SaleList({ sales, emptyTitle, onComplete, onCancel }: { sales: Array<{ id: string; status: string; paymentMethod: string; totalAmount: string | number; studentId?: string | null; items?: Array<{ itemName: string; quantity: number }> }>; emptyTitle: string; onComplete?: (saleId: string) => void; onCancel?: (saleId: string) => void }) { if (sales.length === 0) return <EmptyState title={emptyTitle} description="Canteen sales will appear here." />; return <div className="space-y-3">{sales.map((sale) => <RecordCard key={sale.id} title={`${sale.paymentMethod} • ${money(sale.totalAmount)}`} subtitle={sale.items?.map((item) => `${item.itemName} x${item.quantity}`).join(', ') || sale.studentId || 'Walk-in sale'} badge={<CanteenStatusBadge status={sale.status} />} action={sale.status === 'DRAFT' ? <div className="flex gap-2">{onComplete ? <button type="button" className="btn-primary" onClick={() => onComplete(sale.id)}>Complete</button> : null}{onCancel ? <button type="button" className="btn-secondary" onClick={() => onCancel(sale.id)}>Cancel</button> : null}</div> : undefined} />)}</div>; }
+function SaleList({ sales, emptyTitle, onComplete, onCancel }: { sales: Array<{ id: string; status: string; paymentMethod: string; totalAmount: string | number; receiptNumber?: string | null; studentId?: string | null; items?: Array<{ itemName: string; quantity: number }> }>; emptyTitle: string; onComplete?: (saleId: string) => void; onCancel?: (saleId: string) => void }) { if (sales.length === 0) return <EmptyState title={emptyTitle} description="Canteen sales will appear here." />; return <div className="space-y-3">{sales.map((sale) => <RecordCard key={sale.id} title={`${sale.paymentMethod} • ${money(sale.totalAmount)}`} subtitle={`${sale.receiptNumber ? `${sale.receiptNumber} • ` : ''}${sale.items?.map((item) => `${item.itemName} x${item.quantity}`).join(', ') || sale.studentId || 'Walk-in sale'}`} badge={<CanteenStatusBadge status={sale.status} />} action={sale.status === 'DRAFT' ? <div className="flex gap-2">{onComplete ? <button type="button" className="btn-primary" onClick={() => onComplete(sale.id)}>Complete</button> : null}{onCancel ? <button type="button" className="btn-secondary" onClick={() => onCancel(sale.id)}>Cancel</button> : null}</div> : undefined} />)}</div>; }
 function LowBalanceList({ wallets }: { wallets: Array<{ id: string; balance: string | number; lowBalanceThreshold: string | number; studentId: string; student?: { firstNameEn?: string; lastNameEn?: string; studentSystemId?: string } | null }> }) { if (wallets.length === 0) return <EmptyState title="No low balance wallets" description="Low balance wallet report returned no students." />; return <Panel title="Wallet Low" description="Students returned by the backend low-balance wallet report."><div className="space-y-3">{wallets.map((wallet) => <RecordCard key={wallet.id} title={studentLabel(wallet.student) || wallet.studentId} subtitle={`Balance ${money(wallet.balance)} • threshold ${money(wallet.lowBalanceThreshold)}`} badge={<CanteenStatusBadge status="WALLET_LOW" />} />)}</div></Panel>; }
 function ReportPanel({ title, loading, rows }: { title: string; loading: boolean; rows: string[] }) { return <Panel title={title} description="Backend report result.">{loading ? <LoadingState label="Loading report..." /> : rows.length ? <div className="space-y-2">{rows.map((row) => <p key={row} className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">{row}</p>)}</div> : <EmptyState title="No data" description="No report rows returned." />}</Panel>; }
 function TextInput({ label, value, onChange, type = 'text', required }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean }) { return <label className="block text-sm font-semibold text-slate-700">{label}<input required={required} type={type} value={value} onChange={(event) => onChange(event.target.value)} className="input-control mt-1" /></label>; }

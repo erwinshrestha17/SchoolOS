@@ -13,6 +13,7 @@ import { NotificationsProcessor } from '../src/notifications/notifications.proce
 import { PayrollProcessor } from '../src/payroll/payroll.processor';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { StudentsService } from '../src/students/students.service';
+import { UsageService } from '../src/usage/usage.service';
 import {
   createAuthContextMock,
   createPrismaMock,
@@ -70,6 +71,11 @@ describe('Student Lifecycle Integration Depth (E2E)', () => {
       .useValue({ process: jest.fn() })
       .overrideProvider(PayrollProcessor)
       .useValue({ process: jest.fn() })
+      .overrideProvider(UsageService)
+      .useValue({
+        verifyLimit: jest.fn().mockResolvedValue(undefined),
+        incrementUsage: jest.fn().mockResolvedValue(undefined),
+      })
       .compile();
 
     app = moduleFixture.createNestApplication();

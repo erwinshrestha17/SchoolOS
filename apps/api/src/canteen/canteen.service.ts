@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -473,6 +474,16 @@ export class CanteenService {
         });
       }
 
+      if (
+        dietaryWarning &&
+        dto.overrideReason &&
+        !actor.permissions.includes('canteen:serving:override')
+      ) {
+        throw new ForbiddenException(
+          'You do not have permission to override dietary warnings',
+        );
+      }
+
       return tx.canteenMealServing.create({
         data: {
           tenantId: actor.tenantId,
@@ -885,6 +896,7 @@ export class CanteenService {
         data: {
           status: CanteenPosSaleStatus.COMPLETED,
           completedAt: new Date(),
+          receiptNumber: await this.generateReceiptNumber(tx, actor.tenantId),
         },
         include: { items: true },
       });
@@ -917,6 +929,8 @@ export class CanteenService {
     );
     return updated;
   }
+
+
 
   async listPosSales(actor: AuthContext, options: ListPosSalesQuery = {}) {
     const { skip, take, page } = this.pagination(options);
@@ -1073,6 +1087,27 @@ export class CanteenService {
       saleCount: summary._count._all,
       totalSpent: summary._sum.totalAmount ?? new Prisma.Decimal(0),
     }));
+  }
+
+  async getStockLedger(
+    actor: AuthContext,
+    options: { inventoryItemId?: string; from?: string; to?: string } = {},
+  ) {
+    const { from, to } = this.dateRange({
+      from: options.from,
+      to: options.to,
+    });
+    return this.prisma.canteenStockMovement.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        ...(options.inventoryItemId
+          ? { inventoryItemId: options.inventoryItemId }
+          : {}),
+        movementDate: { gte: from, lte: to },
+      },
+      include: { inventoryItem: true, createdBy: true },
+      orderBy: [{ movementDate: 'desc' }, { createdAt: 'desc' }],
+    });
   }
 
   private async resolveSaleItems(
@@ -1287,6 +1322,21 @@ export class CanteenService {
       before: before ?? undefined,
       after: after ?? undefined,
     });
+  }
+
+  private async generateReceiptNumber(tx: Tx, tenantId: string) {
+    const year = new Date().getUTCFullYear();
+    const count = await tx.canteenPosSale.count({
+      where: {
+        tenantId,
+        status: CanteenPosSaleStatus.COMPLETED,
+        completedAt: {
+          gte: new Date(`${year}-01-01`),
+          lte: new Date(`${year}-12-31`),
+        },
+      },
+    });
+    return `POS-${year}-${String(count + 1).padStart(6, '0')}`;
   }
 
   private parseMenuItemStatus(status: string) {

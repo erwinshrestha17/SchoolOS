@@ -8,6 +8,7 @@ import {
 } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from './communications.service';
+import { UsageService } from '../usage/usage.service';
 
 describe('CommunicationsService', () => {
   let prisma: any;
@@ -83,6 +84,10 @@ describe('CommunicationsService', () => {
       prisma,
       notificationsService,
       auditService,
+      {
+        verifyLimit: jest.fn().mockResolvedValue(undefined),
+        incrementUsage: jest.fn().mockResolvedValue(undefined),
+      } as any,
     );
   });
 

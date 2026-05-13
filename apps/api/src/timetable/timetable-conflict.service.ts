@@ -11,7 +11,8 @@ export type TimetableConflictType =
   | 'SUBJECT_REQUIREMENT_MISSING'
   | 'SUBJECT_REQUIREMENT_EXCEEDED'
   | 'PERIOD_MISMATCH'
-  | 'OUTSIDE_SCHEDULE';
+  | 'OUTSIDE_SCHEDULE'
+  | 'ROOM_CAPACITY_EXCEEDED';
 
 export type TimetableConflictSeverity = 'BLOCKING' | 'WARNING';
 
@@ -82,6 +83,8 @@ export interface TimetableConflictValidationInput {
     endsAt: string;
     dayOfWeek: number | null;
   } | null;
+  roomCapacity?: number | null;
+  classSize?: number | null;
   allPeriods?: {
     id: string;
     startsAt: string;
@@ -123,6 +126,11 @@ export class TimetableConflictService {
       ),
       ...this.detectPeriodMismatch(input.candidate, input.periodConfig ?? null),
       ...this.detectOutsideSchedule(input.candidate, input.allPeriods ?? []),
+      ...this.detectRoomCapacityConflict(
+        input.candidate,
+        input.roomCapacity ?? null,
+        input.classSize ?? null,
+      ),
     ];
 
     const deduped = dedupeIssues(issues);
@@ -163,6 +171,8 @@ export class TimetableConflictService {
       subjectWeeklyRequirement,
       periodConfig,
       allPeriods,
+      room,
+      classRecord,
     ] = await Promise.all([
       this.prisma.timetableSlot.findMany({
         where: {
@@ -258,7 +268,23 @@ export class TimetableConflictService {
         },
         select: { id: true, startsAt: true, endsAt: true, dayOfWeek: true },
       }),
+      candidate.roomId
+        ? this.prisma.room.findUnique({
+            where: { id: candidate.roomId },
+            select: { capacity: true },
+          })
+        : Promise.resolve(null),
+      this.prisma.class.findUnique({
+        where: { id: candidate.classId },
+        select: {
+          students: {
+            where: { lifecycleStatus: 'ACTIVE' },
+          },
+        },
+      }),
     ]);
+
+    const classSize = classRecord?.students.length ?? 0;
 
     if (periodConfig && periodConfig.tenantId !== tenantId) {
       throw new Error('Period tenant mismatch');
@@ -272,6 +298,8 @@ export class TimetableConflictService {
       subjectWeeklyRequirement,
       periodConfig,
       allPeriods,
+      roomCapacity: room?.capacity,
+      classSize,
     });
   }
 
@@ -286,6 +314,8 @@ export class TimetableConflictService {
       endsAt: string;
       dayOfWeek: number | null;
     }[] = [],
+    roomCapacities: Record<string, number> = {},
+    classSizes: Record<string, number> = {},
   ): TimetableConflictValidationResult {
     const issues: TimetableConflictIssue[] = [];
 
@@ -303,6 +333,8 @@ export class TimetableConflictService {
           ? (allPeriods.find((p) => p.id === slot.periodId) ?? null)
           : null,
         allPeriods,
+        roomCapacity: slot.roomId ? roomCapacities[slot.roomId] : null,
+        classSize: classSizes[slot.classId] || null,
         // We handle requirements separately to avoid duplicates
         subjectWeeklyRequirement: null,
       });
@@ -606,6 +638,31 @@ export class TimetableConflictService {
           message:
             'Slot times do not align with any configured timetable periods.',
           affectedPeriodIds: [candidate.id],
+        },
+      ];
+    }
+
+    return [];
+  }
+
+  private detectRoomCapacityConflict(
+    candidate: ConflictSlotInput,
+    roomCapacity: number | null,
+    classSize: number | null,
+  ): TimetableConflictIssue[] {
+    if (!candidate.roomId || roomCapacity === null || classSize === null) {
+      return [];
+    }
+
+    if (classSize > roomCapacity) {
+      return [
+        {
+          type: 'ROOM_CAPACITY_EXCEEDED',
+          severity: 'WARNING',
+          message: `Class size (${classSize}) exceeds room capacity (${roomCapacity}).`,
+          affectedPeriodIds: [candidate.id],
+          roomId: candidate.roomId,
+          classId: candidate.classId,
         },
       ];
     }

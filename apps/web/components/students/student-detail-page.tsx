@@ -106,12 +106,12 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     },
   });
 
-  async function openStudentPdf(kind: string) {
+  async function openStudentPdf(kind: string, token?: string) {
     setPdfError('');
     try {
-      await api.openStudentDocumentPdf(studentId, kind);
-    } catch (error) {
-      setPdfError(error instanceof Error ? error.message : 'Could not open PDF.');
+      await api.openStudentDocumentPdf(studentId, kind, token);
+    } catch (err: any) {
+      setPdfError(err.message || 'Failed to generate document');
     }
   }
 
@@ -173,7 +173,7 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
 
         <div className="min-h-[400px]">
           <TabsContent value="Overview" className="mt-0">
-            <ProfileTabs.OverviewTab profile={profile} />
+            <ProfileTabs.OverviewTab profile={profile} onOpenPdf={openStudentPdf} />
           </TabsContent>
           <TabsContent value="Guardians" className="mt-0">
             <ProfileTabs.GuardiansTab 

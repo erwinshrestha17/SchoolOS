@@ -3442,6 +3442,7 @@ model TimetableSlot {
   @@index([tenantId, staffId, dayOfWeek])
   @@index([tenantId, roomId, dayOfWeek])
   @@index([tenantId, classId, sectionId])
+  @@index([tenantId, versionId, dayOfWeek, startsAt])
   @@index([tenantId, versionId])
 }
 
@@ -3530,6 +3531,7 @@ model TimetableSubstitution {
   @@index([tenantId, date, status])
   @@index([tenantId, absentTeacherId, date])
   @@index([tenantId, substituteTeacherId, date])
+  @@index([tenantId, timetableSlotId, date])
 }
 
 model HomeworkReminderBatch {
@@ -4215,6 +4217,9 @@ model TransportVehicle {
   capacity              Int
   status                TransportVehicleStatus @default(ACTIVE)
   fitnessCertificateExp DateTime?
+  insuranceExpiry       DateTime?
+  registrationExpiry    DateTime?
+  pollutionExpiry       DateTime?
   model                 String?
   documentExpiry        DateTime?
   createdAt             DateTime               @default(now())
@@ -4230,6 +4235,8 @@ model TransportVehicle {
   @@unique([tenantId, registrationNumber])
   @@index([tenantId, status])
   @@index([tenantId, registrationNumber])
+  @@index([tenantId, insuranceExpiry])
+  @@index([tenantId, fitnessCertificateExp])
 }
 
 model TransportDriverAssignment {
@@ -4343,6 +4350,9 @@ model TransportTrip {
   status             TransportTripStatus    @default(ACTIVE)
   startedAt          DateTime               @default(now())
   completedAt        DateTime?
+  isDelayed          Boolean                @default(false)
+  delayMinutes       Int?
+  delayReason        String?
   notes              String?
   createdById        String?
   completedById      String?
@@ -4359,8 +4369,9 @@ model TransportTrip {
   locationPings    TransportLocationPing[]
 
   @@index([tenantId, status])
-  @@index([tenantId, routeId])
-  @@index([tenantId, vehicleId])
+  @@index([tenantId, routeId, createdAt])
+  @@index([tenantId, vehicleId, createdAt])
+  @@index([tenantId, driverAssignmentId, createdAt])
   @@index([tenantId, startedAt])
 }
 
@@ -4566,6 +4577,7 @@ model CanteenPosSale {
   subtotal        Decimal              @default(0) @db.Decimal(12, 2)
   discountAmount  Decimal              @default(0) @db.Decimal(12, 2)
   totalAmount     Decimal              @default(0) @db.Decimal(12, 2)
+  receiptNumber   String?              @unique
   completedAt     DateTime?
   cancelledAt     DateTime?
   createdByUserId String?

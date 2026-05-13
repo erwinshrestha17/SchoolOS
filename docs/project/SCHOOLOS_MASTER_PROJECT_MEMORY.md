@@ -111,7 +111,7 @@ Rules:
 | M1 | Admissions & Student Profiles | Phase 1A/1B complete / pilot-ready |
 | M2 | Smart Attendance | Phase 1A/1B complete / pilot-ready |
 | M3 | Fees & Receipts | Phase 1A/1B complete / pilot-ready |
-| M4 | Exams, CAS & Report Cards | Phase 2A backend complete / admin UI next |
+| M4 | Exams, CAS & Report Cards | Phase 2A backend and admin UI complete |
 | M5 | Activity Feed & Milestones | Phase 1A/1B complete with media/moderation hardening foundations |
 | M6 | Homework & Timetable | Phase 2 foundation implemented; stabilization priority |
 | M7 | HR & Payroll | Phase 2 foundation implemented; deeper tests and UI polish needed |
@@ -242,7 +242,7 @@ Includes Auth/RBAC/tenant isolation, admissions, student profiles, attendance, f
 Status: **Partially complete**.
 
 ```text
-2A Academics, Exams, CAS, Report Cards — backend complete / contract-protected
+2A Academics, Exams, CAS, Report Cards — complete (backend and admin UI)
 2B Homework and Timetable — foundation implemented; stabilization priority
 2C HR and Payroll — foundation implemented; deeper lifecycle/accounting tests needed
 2D M9 Accounting and Finance — production-candidate complete
@@ -288,7 +288,6 @@ Step 9 — Backend Final Hardening + Phase 2A Flow Contract
 Next Phase 2A work:
 
 ```text
-- Phase 2A frontend/admin UI wired to real APIs.
 - Browser smoke/Playwright contracts for the full Phase 2A workflow.
 - Report card PDF visual polish.
 - Future locked report-card correction/regeneration workflow.
@@ -449,7 +448,7 @@ Module estimates:
 | M3 Fees & Receipts | 85-90% |
 | M5 Activity Feed | 75-85% |
 | M10 Notices & Communication | 85-90% |
-| M4 Academics | 80-90% |
+| M4 Academics | 100% |
 | M6 Homework & Timetable | 60-70% |
 | M7 HR & Payroll | 65-75% |
 | M9 Accounting | 95-100% |
@@ -463,7 +462,8 @@ Biggest risks:
 ```text
 - Docker-backed smoke is pending because Postgres, Redis, and API must be running.
 - M0 platform/school route denial, SaaS billing lifecycle, entitlement enforcement, and queue retry coverage need deeper E2E/regression tests.
-- Phase 2A backend is complete but still needs admin UI wiring and browser smoke tests.
+- 2. Current Action Priority  
+The immediate objective is to shift focus to deeper report card PDF generation, advanced accounting polish, and overall staging pilot verification, as the M4 Academics admin UI has been successfully completed and wired.
 - Existing Phase 2/3 breadth without enough depth outside M4 and M9.
 - Homework/Timetable schema/service/test stability after recent verification follow-ups.
 - Pilot operations exposing real-world data-entry, fee, attendance, guardian-contact, PDF, and slow-network issues.

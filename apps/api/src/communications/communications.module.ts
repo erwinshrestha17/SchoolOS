@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { UsageModule } from '../usage/usage.module';
 import { CommunicationsService } from './communications.service';
 import { ConsentsController } from './consents.controller';
 import { DeliveriesController } from './deliveries.controller';
@@ -19,7 +20,7 @@ import { NotificationDeliveriesAliasController } from './notification-deliveries
 import { NoticesController } from './notices.controller';
 
 @Module({
-  imports: [AuthModule, NotificationsModule, AuditModule],
+  imports: [AuthModule, NotificationsModule, AuditModule, UsageModule],
   controllers: [
     NoticesController,
     NoticeDetailController,

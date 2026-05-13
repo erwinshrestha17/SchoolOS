@@ -433,12 +433,12 @@ export const api = {
       },
     ),
   generateStudentQr: (studentId: string) =>
-    request<{ credential: any; rawToken: string }>(
+    request<{ credential: any; qrImageSvg?: string; qrImageAvailable: boolean; qrImageMessage?: string; rawToken?: string }>(
       `/students/${encodeURIComponent(studentId)}/qr`,
       { method: 'POST' },
     ),
   rotateStudentQr: (studentId: string, body: { reason: string }) =>
-    request<{ credential: any; rawToken: string }>(
+    request<{ credential: any; qrImageSvg?: string; qrImageAvailable: boolean; rawToken?: string }>(
       `/students/${encodeURIComponent(studentId)}/qr/rotate`,
       {
         method: 'POST',
@@ -612,6 +612,14 @@ export const api = {
       },
     );
   },
+  getFileView: (id: string) =>
+    request<{
+      id: string;
+      fileName: string;
+      mimeType: string;
+      sizeBytes: number;
+      url: string;
+    }>(`/files/${encodeURIComponent(id)}/view`),
 
   uploadStudentDocument: (body: UploadStudentDocumentPayload) =>
     request('/student-documents', {
@@ -624,13 +632,15 @@ export const api = {
     request<{ url: string }>(`/student-documents/${id}/download`),
   deleteStudentDocument: (id: string) =>
     request(`/student-documents/${id}`, { method: 'DELETE' }),
-  openStudentDocumentPdf: async (studentId: string, kind: string) => {
-    const response = await fetch(
-      `${API_BASE_URL}/students/${encodeURIComponent(studentId)}/documents/${encodeURIComponent(kind)}.pdf`,
-      {
-        credentials: 'include',
-      },
-    );
+  openStudentDocumentPdf: async (studentId: string, kind: string, token?: string) => {
+    const url = new URL(`${API_BASE_URL}/students/${encodeURIComponent(studentId)}/documents/${encodeURIComponent(kind)}.pdf`);
+    if (token) {
+      url.searchParams.set('token', token);
+    }
+    
+    const response = await fetch(url.toString(), {
+      credentials: 'include',
+    });
 
     await openPdfBlob(response);
   },

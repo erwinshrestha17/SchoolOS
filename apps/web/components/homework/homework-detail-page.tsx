@@ -14,7 +14,9 @@ import {
   MoreVertical,
   Trash2,
   CheckCircle2,
-  MessageSquare
+  MessageSquare,
+  FileText,
+  Download
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -29,6 +31,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { DataTable } from '@/components/ui/data-table';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { HomeworkReviewModal } from '@/components/homework/homework-review-modal';
 
 export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
   const router = useRouter();
@@ -37,6 +40,8 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
   const activeTab = searchParams.get('tab') || 'submissions';
   
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
   const homeworkQuery = useQuery({
     queryKey: ['homework-detail', homeworkId],
@@ -86,7 +91,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
     );
   }
 
-  const homework = homeworkQuery.data;
+  const homework = homeworkQuery.data as any;
 
   const submissionColumns = [
     {
@@ -126,7 +131,10 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
             {
               label: 'Review',
               icon: <FileCheck2 className="h-4 w-4" />,
-              onClick: () => { /* Open review modal */ },
+              onClick: () => { 
+                setSelectedSubmission(row);
+                setIsReviewModalOpen(true);
+              },
             },
             {
               label: 'Message Student',
@@ -207,6 +215,52 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                   {homework.instructions}
                 </div>
               </div>
+
+              {homework.attachments && homework.attachments.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-primary-500" />
+                    Attachments
+                  </h3>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {homework.attachments.map((attachment: any) => (
+                      <div 
+                        key={attachment.id}
+                        className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 bg-white shadow-sm hover:border-primary-200 transition-colors group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center text-primary-500">
+                            <FileText className="h-5 w-5" />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-slate-900 truncate max-w-[150px]">
+                              {attachment.fileAsset?.originalFilename}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-medium">
+                              {Math.round((attachment.fileAsset?.sizeBytes || 0) / 1024)} KB
+                            </span>
+                          </div>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-9 w-9 rounded-xl text-slate-400 hover:text-primary-600 hover:bg-primary-50"
+                          onClick={async () => {
+                            try {
+                              const view = await api.getFileView(attachment.fileAssetId);
+                              window.open(view.url, '_blank');
+                            } catch (err) {
+                              alert('Failed to open file');
+                            }
+                          }}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </SectionCard>
 
@@ -353,6 +407,16 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
         description="Are you sure you want to cancel this assignment? This action cannot be undone and students will no longer be able to submit."
         confirmLabel="Cancel Assignment"
         variant="destructive"
+      />
+
+      <HomeworkReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={() => {
+          setIsReviewModalOpen(false);
+          setSelectedSubmission(null);
+        }}
+        submission={selectedSubmission}
+        homework={homework}
       />
     </div>
   );

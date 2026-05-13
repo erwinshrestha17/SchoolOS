@@ -83,7 +83,7 @@ export function ProfileHeader({ profile, onEdit, onOpenIdCard, pdfError }: Profi
             Documents
           </Link>
           <Link
-            href={`/dashboard/students/${encodeURIComponent(student.id)}?tab=Documents`}
+            href={`/dashboard/students/${encodeURIComponent(student.id)}?tab=Overview`}
             className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-white/20"
           >
             <QrCode size={18} />

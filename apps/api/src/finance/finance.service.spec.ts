@@ -12,6 +12,7 @@ import {
   FinanceService,
   resolveInvoiceStatusAfterAdjustment,
 } from './finance.service';
+import { UsageService } from '../usage/usage.service';
 import { InvoiceAdjustmentDirection } from './dto/create-invoice-adjustment.dto';
 
 const actor = {
@@ -1488,6 +1489,10 @@ function buildService(options: {
       communicationsService as never,
       accountingPostingService as never,
       eventEmitter as never,
+      {
+        verifyLimit: jest.fn().mockResolvedValue(undefined),
+        incrementUsage: jest.fn().mockResolvedValue(undefined),
+      } as any,
     ),
     prisma,
     auditService,

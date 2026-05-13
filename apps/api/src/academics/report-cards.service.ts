@@ -16,6 +16,7 @@ import {
   type ComponentScoreInput,
   type SubjectGradeResult,
 } from './grade-calculator.service';
+import { UsageService } from '../usage/usage.service';
 
 type MarkWithComponent = Prisma.MarkEntryGetPayload<{
   include: {
@@ -40,6 +41,7 @@ export class ReportCardsService {
     private readonly gradeCalculator: GradeCalculatorService,
     private readonly financeService: FinanceService,
     private readonly settingsService: SettingsService,
+    private readonly usageService: UsageService,
   ) {}
 
   async generateReportCard(dto: GenerateReportCardDto, actor: AuthContext) {
@@ -110,6 +112,12 @@ export class ReportCardsService {
         );
       }
     }
+
+    await this.usageService.verifyLimit(
+      actor.tenantId,
+      'report_cards.generated',
+      1,
+    );
 
     const [components, marks] = await Promise.all([
       this.prisma.assessmentComponent.findMany({
@@ -215,6 +223,12 @@ export class ReportCardsService {
         section: true,
       },
     });
+
+    await this.usageService.incrementUsage(
+      actor.tenantId,
+      'report_cards.generated',
+      1,
+    );
 
     await this.auditService.record({
       action: 'ACADEMICS_REPORT_CARD_GENERATED',

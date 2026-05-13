@@ -1,6 +1,7 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { FileStatus } from '@prisma/client';
 import { FileRegistryService } from './file-registry.service';
+import { UsageService } from '../usage/usage.service';
 
 describe('FileRegistryService tenant scoping', () => {
   let service: FileRegistryService;
@@ -43,6 +44,10 @@ describe('FileRegistryService tenant scoping', () => {
       auditService as any,
       { port: 4000 } as any,
       storageService as any,
+      {
+        verifyLimit: jest.fn().mockResolvedValue(undefined),
+        incrementUsage: jest.fn().mockResolvedValue(undefined),
+      } as any,
     );
   });
 

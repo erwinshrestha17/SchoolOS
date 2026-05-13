@@ -26,6 +26,18 @@ export class UpdateTransportVehicleDto {
 
   @IsOptional()
   @IsDateString()
+  insuranceExpiry?: string;
+
+  @IsOptional()
+  @IsDateString()
+  registrationExpiry?: string;
+
+  @IsOptional()
+  @IsDateString()
+  pollutionExpiry?: string;
+
+  @IsOptional()
+  @IsDateString()
   documentExpiry?: string;
 
   @IsOptional()

@@ -39,4 +39,16 @@ test.describe('Transport Admin Polish Smoke Tests', () => {
        await expect(page.getByText('Trip cancelled.')).toBeVisible();
     }
   });
+
+  test('should allow marking trip as delayed', async ({ page }) => {
+    await page.getByRole('link', { name: 'Trips' }).click();
+    const delayBtn = page.getByRole('button', { name: 'Mark Delay' }).first();
+    if (await delayBtn.isVisible()) {
+       await delayBtn.click();
+       await page.getByLabel('Delay Reason').fill('Heavy Rain');
+       await page.getByRole('button', { name: 'Mark Delayed' }).click();
+       await expect(page.getByText('Trip delay status updated.')).toBeVisible();
+       await expect(page.getByText('DELAYED')).toBeVisible();
+    }
+  });
 });

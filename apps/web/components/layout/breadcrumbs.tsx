@@ -9,18 +9,25 @@ import { ChevronRight, Home } from 'lucide-react';
  */
 const segmentLabels: Record<string, string> = {
   dashboard: 'Dashboard',
-  admissions: 'Students',
+  students: 'Students',
+  admissions: 'Admissions',
   attendance: 'Attendance',
-  finance: 'Fee Collection',
+  fees: 'Fees',
   academics: 'Academics',
-  payroll: 'Staff & HR',
+  hr: 'HR & Payroll',
+  payroll: 'Payroll',
   accounting: 'Accounting',
-  timetable: 'Timetable & Homework',
+  homework: 'Homework & Timetable',
+  timetable: 'Timetable',
   activity: 'Activity Feed',
-  notices: 'Notices',
+  notices: 'Communications',
   messaging: 'Messaging',
   messages: 'Messages',
   settings: 'Settings',
+  library: 'Library',
+  transport: 'Transport',
+  canteen: 'Canteen',
+  reports: 'Reports',
 };
 
 export function Breadcrumbs() {

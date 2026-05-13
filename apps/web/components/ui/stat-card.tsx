@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
+import Link from 'next/link';
 import { cn } from '../../lib/utils';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
@@ -15,6 +16,7 @@ interface StatCardProps {
   };
   className?: string;
   loading?: boolean;
+  href?: string;
 }
 
 export function StatCard({
@@ -24,22 +26,10 @@ export function StatCard({
   trend,
   className,
   loading = false,
+  href,
 }: StatCardProps) {
-  if (loading) {
-    return (
-      <div className={cn('shell-card p-6 animate-pulse', className)}>
-        <div className="flex items-center justify-between">
-          <div className="h-4 w-24 rounded bg-gray-200" />
-          <div className="h-10 w-10 rounded-xl bg-gray-100" />
-        </div>
-        <div className="mt-4 h-8 w-16 rounded bg-gray-200" />
-        <div className="mt-2 h-4 w-32 rounded bg-gray-100" />
-      </div>
-    );
-  }
-
-  return (
-    <div className={cn('shell-card p-6', className)}>
+  const content = (
+    <>
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">
           {title}
@@ -74,6 +64,33 @@ export function StatCard({
           </div>
         )}
       </div>
+    </>
+  );
+
+  if (loading) {
+    return (
+      <div className={cn('shell-card p-6 animate-pulse', className)}>
+        <div className="flex items-center justify-between">
+          <div className="h-4 w-24 rounded bg-gray-200" />
+          <div className="h-10 w-10 rounded-xl bg-gray-100" />
+        </div>
+        <div className="mt-4 h-8 w-16 rounded bg-gray-200" />
+        <div className="mt-2 h-4 w-32 rounded bg-gray-100" />
+      </div>
+    );
+  }
+
+  if (href) {
+    return (
+      <Link href={href} className={cn('shell-card p-6 block transition-transform hover:scale-[1.02] active:scale-[0.98]', className)}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <div className={cn('shell-card p-6', className)}>
+      {content}
     </div>
   );
 }

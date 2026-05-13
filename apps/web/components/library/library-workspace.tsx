@@ -45,6 +45,8 @@ const tabs = [
   { key: 'copies', label: 'Copies', href: '/dashboard/library/copies' },
   { key: 'issues', label: 'Issues', href: '/dashboard/library/issues' },
   { key: 'overdue', label: 'Overdue', href: '/dashboard/library/overdue' },
+  { key: 'fines', label: 'Fines', href: '/dashboard/library/fines' },
+  { key: 'reports', label: 'Reports', href: '/dashboard/library/reports' },
 ] as const;
 
 type LibraryTab = (typeof tabs)[number]['key'];
@@ -103,6 +105,7 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
   const [returnDrafts, setReturnDrafts] = useState<Record<string, ReturnLibraryIssuePayload>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [isConfirmingReturn, setIsConfirmingReturn] = useState<string | null>(null);
+  const [viewingHistory, setViewingHistory] = useState<{ type: 'book' | 'copy'; id: string } | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -138,6 +141,49 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
   const staffQuery = useQuery({
     queryKey: ['staff-for-library'],
     queryFn: api.listStaff,
+  });
+
+  const finesQuery = useQuery({
+    queryKey: ['library-fines'],
+    queryFn: () => libraryApi.listFines({ limit: '100' }),
+    enabled: activeTab === 'fines' || activeTab === 'overview',
+  });
+
+  const popularBooksQuery = useQuery({
+    queryKey: ['library-popular-books'],
+    queryFn: () => libraryApi.getPopularBooks({ limit: '10' }),
+    enabled: activeTab === 'reports',
+  });
+
+  const lostDamagedQuery = useQuery({
+    queryKey: ['library-lost-damaged'],
+    queryFn: () => libraryApi.getLostDamagedReport(),
+    enabled: activeTab === 'reports',
+  });
+
+  const historyQuery = useQuery<{ history: LibraryIssue[] }, Error>({
+    queryKey: ['library-history', viewingHistory],
+    queryFn: async () => {
+      if (viewingHistory?.type === 'book') {
+        const res = await libraryApi.getBookHistory(viewingHistory.id);
+        return { history: res.history };
+      }
+      if (viewingHistory?.type === 'copy') {
+        const res = await libraryApi.getCopyHistory(viewingHistory.id);
+        return { history: res.history };
+      }
+      return { history: [] };
+    },
+    enabled: Boolean(viewingHistory),
+  });
+
+  const updateFineMutation = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: any }) =>
+      libraryApi.updateFine(id, body),
+    onSuccess: () => {
+      setNotice('Fine updated successfully.');
+      void queryClient.invalidateQueries({ queryKey: ['library-fines'] });
+    },
   });
 
   const invalidateLibrary = () => {
@@ -385,6 +431,7 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
           setEditingBookId={setEditingBookId}
           onSubmit={handleBookSubmit}
           onEdit={editBook}
+          onViewHistory={(type, id) => setViewingHistory({ type, id })}
           isLoading={booksQuery.isLoading}
           isSaving={createBookMutation.isPending || updateBookMutation.isPending}
           error={createBookMutation.error || updateBookMutation.error}
@@ -405,6 +452,7 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
           setEditingCopyId={setEditingCopyId}
           onSubmit={handleCopySubmit}
           onEdit={editCopy}
+          onViewHistory={(type, id) => setViewingHistory({ type, id })}
           onStatusChange={(copy, status) =>
             copyStatusMutation.mutate({ id: copy.id, status })
           }
@@ -417,6 +465,33 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
           }
         />
       )}
+
+      <ConfirmDialog
+        isOpen={Boolean(viewingHistory)}
+        onClose={() => setViewingHistory(null)}
+        title={`${viewingHistory?.type === 'book' ? 'Book' : 'Copy'} Circulation History`}
+        description="Review all historical issue and return events for this item."
+        confirmLabel="Close"
+        onConfirm={() => setViewingHistory(null)}
+      >
+        <div className="mt-4 max-h-[60vh] overflow-y-auto space-y-4">
+          {historyQuery.isLoading && <LoadingState label="Loading history..." />}
+          {historyQuery.data?.history.map((issue: any) => (
+            <div key={issue.id} className="p-3 rounded-xl border border-slate-100 bg-slate-50 text-sm">
+              <div className="flex justify-between font-bold">
+                <span>{borrowerName(issue)}</span>
+                <LibraryStatusBadge status={issue.status} />
+              </div>
+              <div className="mt-1 text-slate-500">
+                <p>Issued: {formatDate(issue.issuedAt)}</p>
+                <p>Returned: {formatDate(issue.returnedAt)}</p>
+                {issue.fineAmount > 0 && <p className="text-red-600 font-bold">Fine: {money(issue.fineAmount)}</p>}
+              </div>
+            </div>
+          ))}
+          {historyQuery.data?.history.length === 0 && <EmptyState title="No history" description="This item has never been issued." />}
+        </div>
+      </ConfirmDialog>
 
       {activeTab === 'issues' && (
         <IssuesPanel
@@ -445,6 +520,23 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
           isSending={remindersMutation.isPending}
           onSendReminders={() => remindersMutation.mutate()}
           error={remindersMutation.error}
+        />
+      )}
+      
+      {activeTab === 'fines' && (
+        <FinesPanel
+          fines={finesQuery.data?.items ?? []}
+          isLoading={finesQuery.isLoading}
+          onUpdateFine={(id, body) => updateFineMutation.mutate({ id, body })}
+          isUpdating={updateFineMutation.isPending}
+        />
+      )}
+
+      {activeTab === 'reports' && (
+        <ReportsPanel
+          popularBooks={popularBooksQuery.data?.items ?? []}
+          lostDamaged={lostDamagedQuery.data?.items ?? []}
+          isLoading={popularBooksQuery.isLoading || lostDamagedQuery.isLoading}
         />
       )}
     </div>
@@ -501,13 +593,22 @@ function OverviewPanel({
 
       <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
         <PanelHeader
-          title="Future library foundations"
-          description="Planned Library UX sections are visible without calling endpoints that do not exist yet."
+          title="Library operations"
+          description="Access detailed borrower history, fine records, and health reports."
         />
         <div className="mt-5 grid gap-4 lg:grid-cols-3">
-          <PendingLibraryCard title="Students with borrowed books" />
-          <PendingLibraryCard title="Fine records" />
-          <PendingLibraryCard title="Library reports" />
+          <Link href="/dashboard/library/reports" className="group rounded-2xl border border-slate-100 bg-slate-50/50 p-5 transition hover:border-primary-100 hover:bg-primary-50/20">
+            <h3 className="font-bold text-slate-900 group-hover:text-primary-700">Detailed reports</h3>
+            <p className="mt-1 text-sm text-slate-500">Popular books, damaged inventory, and CSV exports.</p>
+          </Link>
+          <Link href="/dashboard/library/fines" className="group rounded-2xl border border-slate-100 bg-slate-50/50 p-5 transition hover:border-primary-100 hover:bg-primary-50/20">
+            <h3 className="font-bold text-slate-900 group-hover:text-primary-700">Fine management</h3>
+            <p className="mt-1 text-sm text-slate-500">Track pending fines and apply audit-logged waivers.</p>
+          </Link>
+          <Link href="/dashboard/library/issues" className="group rounded-2xl border border-slate-100 bg-slate-50/50 p-5 transition hover:border-primary-100 hover:bg-primary-50/20">
+            <h3 className="font-bold text-slate-900 group-hover:text-primary-700">Borrower lookup</h3>
+            <p className="mt-1 text-sm text-slate-500">Search student history and check active issue limits.</p>
+          </Link>
         </div>
       </section>
     </div>
@@ -525,6 +626,7 @@ function BooksPanel(props: {
   setEditingBookId: (value: string | null) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onEdit: (book: LibraryBook) => void;
+  onViewHistory: (type: 'book' | 'copy', id: string) => void;
   isLoading: boolean;
   isSaving: boolean;
   error: Error | null;
@@ -589,9 +691,10 @@ function BooksPanel(props: {
                     ) : (
                       <StatusBadge status="DRAFT" label="No copies" tone="draft" />
                     )}
-                    <button type="button" onClick={() => props.onEdit(book)} className="btn-secondary">Edit</button>
-                    <Link href={`/dashboard/library/copies?bookId=${encodeURIComponent(book.id)}`} className="btn-secondary">Copies</Link>
-                  </div>
+                      <button type="button" onClick={() => props.onEdit(book)} className="btn-secondary">Edit</button>
+                      <button type="button" onClick={() => props.onViewHistory('book', book.id)} className="btn-secondary">History</button>
+                      <Link href={`/dashboard/library/copies?bookId=${encodeURIComponent(book.id)}`} className="btn-secondary">Copies</Link>
+                    </div>
                 </div>
               </div>
             );
@@ -641,6 +744,7 @@ function CopiesPanel(props: {
   setEditingCopyId: (value: string | null) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onEdit: (copy: LibraryCopy) => void;
+  onViewHistory: (type: 'book' | 'copy', id: string) => void;
   onStatusChange: (copy: LibraryCopy, status: LibraryCopyStatus) => void;
   isLoading: boolean;
   isSaving: boolean;
@@ -678,6 +782,7 @@ function CopiesPanel(props: {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button type="button" onClick={() => props.onEdit(copy)} className="btn-secondary">Edit</button>
+                  <button type="button" onClick={() => props.onViewHistory('copy', copy.id)} className="btn-secondary">History</button>
                   {copy.status !== 'ISSUED' && copyStatuses.filter((status) => status !== copy.status).map((status) => (
                     <button
                       key={status}
@@ -1095,4 +1200,159 @@ function studentName(student: { firstNameEn?: string; lastNameEn?: string; stude
 
 function staffName(staff: { firstName?: string; lastName?: string; employeeId?: string }) {
   return `${staff.firstName ?? ''} ${staff.lastName ?? ''}`.trim() || staff.employeeId || 'Staff';
+}
+
+function FinesPanel({
+  fines,
+  isLoading,
+  onUpdateFine,
+  isUpdating,
+}: {
+  fines: any[];
+  isLoading: boolean;
+  onUpdateFine: (id: string, body: any) => void;
+  isUpdating: boolean;
+}) {
+  const [waivingId, setWaivingId] = useState<string | null>(null);
+  const [waiveReason, setWaiveReason] = useState('');
+  const [waiveAmount, setWaiveAmount] = useState<number>(0);
+
+  return (
+    <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+      <PanelHeader title="Fine Management" description="Track and waive library fines with mandatory audit logging." />
+      <div className="mt-5 space-y-3">
+        {isLoading && <LoadingState label="Loading fines..." />}
+        {!isLoading && fines.length === 0 && <EmptyState title="No fines found" description="Library circulation is currently clear of outstanding fines." />}
+        {fines.map((fine) => (
+          <div key={fine.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-bold text-slate-900">{fine.issue?.copy?.book?.title ?? 'Unknown book'}</h3>
+                  <StatusBadge status={fine.status} label={fine.status} tone={fine.status === 'PENDING' ? 'overdue' : 'approved'} />
+                </div>
+                <p className="mt-1 text-sm text-slate-500">
+                  Borrower: {fine.issue ? borrowerName(fine.issue) : 'Unknown'} • Amount: {money(fine.amount)}
+                </p>
+                {fine.waivedAmount > 0 && (
+                  <p className="mt-1 text-xs text-emerald-600 font-semibold">Waived: {money(fine.waivedAmount)} (Reason: {fine.waiverReason})</p>
+                )}
+              </div>
+              {fine.status === 'PENDING' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWaivingId(fine.id);
+                    setWaiveAmount(Number(fine.amount));
+                  }}
+                  className="btn-secondary"
+                >
+                  Waive / Correct
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <ConfirmDialog
+        isOpen={Boolean(waivingId)}
+        onClose={() => {
+          setWaivingId(null);
+          setWaiveReason('');
+        }}
+        onConfirm={() => {
+          if (waivingId) {
+            onUpdateFine(waivingId, {
+              status: waiveAmount >= Number(fines.find(f => f.id === waivingId)?.amount) ? 'WAIVED' : 'PENDING',
+              waivedAmount: waiveAmount,
+              waiverReason: waiveReason,
+            });
+          }
+          setWaivingId(null);
+          setWaiveReason('');
+        }}
+        title="Waive Library Fine"
+        description="Provide a reason for waiving this fine. This action is audit-logged and visible to school administrators."
+        confirmLabel="Confirm Waiver"
+      >
+        <div className="mt-4 space-y-4">
+          <TextInput
+            label="Waiver Amount (NPR)"
+            type="number"
+            value={waiveAmount.toString()}
+            onChange={(val) => setWaiveAmount(Number(val))}
+          />
+          <TextInput
+            label="Reason for Waiver"
+            placeholder="e.g. Special permission, Technical error"
+            value={waiveReason}
+            required
+            onChange={setWaiveReason}
+          />
+        </div>
+      </ConfirmDialog>
+    </section>
+  );
+}
+
+function ReportsPanel({
+  popularBooks,
+  lostDamaged,
+  isLoading,
+}: {
+  popularBooks: any[];
+  lostDamaged: any[];
+  isLoading: boolean;
+}) {
+  return (
+    <div className="grid gap-6 xl:grid-cols-2">
+      <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <PanelHeader title="Popular Books" description="Most frequently issued books in the library." />
+          <a
+            href={`${process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1'}/library/reports/issued.csv`}
+            className="btn-secondary flex items-center gap-2"
+            target="_blank"
+            rel="noreferrer"
+          >
+             Export CSV
+          </a>
+        </div>
+        <div className="mt-5 space-y-3">
+          {isLoading && <LoadingState label="Loading popularity report..." />}
+          {popularBooks.map((item, idx) => (
+            <div key={idx} className="flex items-center justify-between p-3 border-b border-slate-50 last:border-0">
+              <div className="min-w-0">
+                <p className="font-bold text-slate-900 truncate">{item.book?.title}</p>
+                <p className="text-xs text-slate-500">{item.book?.author}</p>
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+                {item.issueCount} issues
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+        <PanelHeader title="Lost / Damaged Copies" description="Current inventory items marked as unusable." />
+        <div className="mt-5 space-y-3">
+          {isLoading && <LoadingState label="Loading loss report..." />}
+          {lostDamaged.map((copy) => (
+            <div key={copy.id} className="flex items-center justify-between p-3 border-b border-slate-50 last:border-0">
+              <div>
+                <p className="font-bold text-slate-900">{copy.book?.title}</p>
+                <p className="text-xs text-slate-500">Barcode: {copy.barcode} • Status: {copy.status}</p>
+              </div>
+              <LibraryStatusBadge status={copy.status} />
+            </div>
+          ))}
+          {lostDamaged.length === 0 && !isLoading && (
+            <EmptyState title="No lost/damaged books" description="Inventory health is currently perfect." />
+          )}
+        </div>
+      </section>
+    </div>
+  );
 }

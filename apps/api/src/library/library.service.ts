@@ -979,10 +979,8 @@ export class LibraryService {
 
   async getPopularBooksReport(
     actor: AuthContext,
-    options: PaginationQuery = {},
+    _options: PaginationQuery = {},
   ) {
-    const { skip, take } = this.pagination(options);
-
     // Aggregation for popular books
     const popular = await this.prisma.libraryIssue.groupBy({
       by: ['copyId'],
