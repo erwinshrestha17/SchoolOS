@@ -45,6 +45,20 @@ for (const file of files) {
       violations++;
     }
   }
+
+  // Check for ESM extensionless relative imports/exports
+  // Catches: from './permissions', import './something', etc.
+  const esmRelativeImportPattern = /(?:from|import)\s+['"](\.\.?\/[^'"]*?)['"]/g;
+  let match;
+  while ((match = esmRelativeImportPattern.exec(content)) !== null) {
+    const importPath = match[1];
+    // Allow valid extensions. Node ESM requires these for relative paths.
+    const hasValidExtension = /\.(js|json|mjs|css|svg)$/.test(importPath);
+    if (!hasValidExtension) {
+      console.error(`Extensionless relative import detected in ${relativeFile}: found "${importPath}"`);
+      violations++;
+    }
+  }
 }
 
 if (violations > 0) {

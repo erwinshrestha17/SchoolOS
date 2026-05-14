@@ -49,7 +49,8 @@ describe('ConfigService production validation', () => {
     process.env.JWT_SECRET = 'x'.repeat(40);
     process.env.JWT_CHALLENGE_SECRET = 'y'.repeat(40);
     process.env.MEDICAL_ENCRYPTION_KEY = 'z'.repeat(40);
-    process.env.FRONTEND_ORIGIN = 'https://schoolos.example.com';
+    process.env.FRONTEND_ORIGIN =
+      'https://app.schoolos.local,https://platform.schoolos.local,https://admin.schoolos.local';
     process.env.EMAIL_DELIVERY_MODE = 'log';
     process.env.STORAGE_PROVIDER = 'local';
 
@@ -84,6 +85,32 @@ describe('ConfigService production validation', () => {
     process.env.JWT_CHALLENGE_SECRET = 'y'.repeat(40);
     process.env.MEDICAL_ENCRYPTION_KEY = 'z'.repeat(40);
     process.env.FRONTEND_ORIGIN = 'http://schoolos.example.com';
+
+    expect(() => {
+      new ConfigService().validateForRuntime();
+    }).toThrow(/must use https in production/);
+  });
+
+  it('allows local HTTP origins outside production', () => {
+    process.env.NODE_ENV = 'development';
+    process.env.FRONTEND_ORIGINS =
+      'http://localhost:3000,http://127.0.0.1:3101';
+
+    expect(() => {
+      new ConfigService().validateForRuntime();
+    }).not.toThrow();
+  });
+
+  it('explicitly rejects local HTTP origins in production', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.ALLOW_PROD_BOOT = 'true';
+    process.env.DATABASE_URL =
+      'postgresql://schoolos:schoolos@db:5432/schoolos';
+    process.env.REDIS_HOST = 'redis';
+    process.env.JWT_SECRET = 'x'.repeat(40);
+    process.env.JWT_CHALLENGE_SECRET = 'y'.repeat(40);
+    process.env.MEDICAL_ENCRYPTION_KEY = 'z'.repeat(40);
+    process.env.FRONTEND_ORIGIN = 'http://localhost:3000';
 
     expect(() => {
       new ConfigService().validateForRuntime();

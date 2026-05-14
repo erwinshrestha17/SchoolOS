@@ -83,26 +83,24 @@ export class ConfigService {
       .map((origin) => origin?.trim())
       .filter((origin): origin is string => Boolean(origin));
 
-    if (rawOrigins.length > 0) {
-      return Array.from(new Set(rawOrigins));
-    }
-
     const devOrigins = this.isProduction
       ? []
       : ['http://localhost:3101', 'http://127.0.0.1:3101'];
 
-    return Array.from(
-      new Set([
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://localhost:5173',
-        'http://localhost:4000',
-        'http://127.0.0.1:3000',
-        'http://127.0.0.1:5173',
-        'http://127.0.0.1:4000',
-        ...devOrigins,
-      ]),
-    );
+    const baseOrigins = this.isProduction
+      ? []
+      : [
+          'http://localhost:3000',
+          'http://localhost:3001',
+          'http://localhost:5173',
+          'http://localhost:4000',
+          'http://127.0.0.1:3000',
+          'http://127.0.0.1:5173',
+          'http://127.0.0.1:4000',
+          ...devOrigins,
+        ];
+
+    return Array.from(new Set([...rawOrigins, ...baseOrigins]));
   }
 
   get otpTtlMinutes() {
