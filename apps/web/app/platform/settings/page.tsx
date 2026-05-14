@@ -127,7 +127,7 @@ export default function PlatformSettings() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [auditFilters.action, auditFilters.tenantId]);
 
   const retryQueue = async (queueName: string) => {
     setRetrying(queueName);
@@ -677,23 +677,19 @@ export default function PlatformSettings() {
             <div className="space-y-2">
                <Label className="font-bold">JSON Configuration</Label>
                <Textarea 
-                 className="rounded-xl border-slate-200 min-h-[150px] font-mono text-xs"
+                 className="rounded-xl border-slate-200 min-h-[180px] font-mono text-xs"
                  value={providerForm.config}
                  onChange={(e) => setProviderForm({...providerForm, config: e.target.value})}
                />
-               <p className="text-[11px] text-slate-400">Values for keys containing &apos;token&apos;, &apos;secret&apos;, or &apos;key&apos; will be masked.</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" className="rounded-xl font-bold" onClick={() => setProviderDialogOpen(false)}>
               Cancel
             </Button>
-            <Button 
-              className="rounded-xl font-bold bg-slate-900 text-white"
-              onClick={saveProvider}
-              disabled={savingProvider}
-            >
-              {savingProvider ? 'Saving...' : 'Save Configuration'}
+            <Button className="rounded-xl font-bold bg-slate-900 text-white" onClick={saveProvider} disabled={savingProvider}>
+              {savingProvider ? <RefreshCw size={16} className="animate-spin mr-2" /> : null}
+              Save Provider
             </Button>
           </DialogFooter>
         </DialogContent>
