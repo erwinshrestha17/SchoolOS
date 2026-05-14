@@ -19,6 +19,7 @@ describe('JwtAuthGuard', () => {
   let prisma: {
     tenant: { findUnique: jest.Mock };
     user: { findUnique: jest.Mock };
+    supportOverride: { findFirst: jest.Mock };
   };
   let cls: { set: jest.Mock; isActive: jest.Mock<boolean, []> };
 
@@ -170,7 +171,7 @@ describe('JwtAuthGuard', () => {
       id: 'tenant-2',
       isActive: true,
     });
-    (prisma.supportOverride.findFirst as jest.Mock).mockResolvedValueOnce({
+    prisma.supportOverride.findFirst.mockResolvedValueOnce({
       id: 'override-1',
       isActive: true,
     });
