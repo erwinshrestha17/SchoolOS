@@ -105,7 +105,12 @@ export default function PlatformDashboard() {
       </section>
 
       <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-        <h2 className="text-xl font-bold text-slate-900">Infrastructure Health</h2>
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-xl font-bold text-slate-900">Infrastructure Health</h2>
+          <Link href="/platform/settings?tab=health" className="text-sm font-bold text-indigo-600 hover:text-indigo-700">
+            Health details
+          </Link>
+        </div>
         <div className="mt-4 flex items-center justify-between rounded-2xl bg-slate-50 p-4">
           <span className="font-bold text-slate-700">Queue Health</span>
           <Badge variant={s.failedJobsCount > 0 ? 'destructive' : 'neutral'}>{s.failedJobsCount || 0} Failed</Badge>

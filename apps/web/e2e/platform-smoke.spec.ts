@@ -111,6 +111,73 @@ test.describe('Platform Control Plane Smoke Tests', () => {
     await expect(page.locator('text=NPR 50,000')).toBeVisible();
   });
 
+  test('Tenant Change Plan workflow renders with guarded submit', async ({ page }) => {
+    await page.goto(`${BASE_URL}/platform/schools`);
+    await page.click('text=Trial Academy');
+
+    await expect(page.getByRole('button', { name: 'Change Plan' })).toBeVisible();
+    await page.getByRole('button', { name: 'Change Plan' }).click();
+
+    await expect(page).toHaveURL(/.*platform\/schools\/.*\/change-plan/);
+    await expect(page.locator('h1')).toContainText('Change Subscription Plan');
+    await expect(page.getByLabel('New subscription plan')).toBeVisible();
+    await expect(page.getByText('Audit reason')).toBeVisible();
+    await expect(page.getByText(/SchoolOS subscription billing only/i)).toBeVisible();
+
+    const submit = page.getByRole('button', { name: 'Change Plan' });
+    await expect(submit).toBeDisabled();
+    await page.getByPlaceholder(/School upgraded/i).fill('Pilot upgrade approved');
+    await expect(submit).toBeEnabled();
+  });
+
+  test('Tenant detail operator dialogs render for support, billing, invoices, and onboarding', async ({ page }) => {
+    await page.goto(`${BASE_URL}/platform/schools`);
+    await page.click('text=Trial Academy');
+
+    await page.getByTestId('support-mode-button').click();
+    await expect(page.getByText('Enter Support Mode')).toBeVisible();
+    const supportSubmit = page.getByRole('button', { name: 'Enter Support Mode' });
+    await expect(supportSubmit).toBeDisabled();
+    await page.getByPlaceholder(/support case/i).fill('Support ticket verification');
+    await expect(supportSubmit).toBeEnabled();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    await page.click('button:has-text("SaaS Billing")');
+    await page.getByTestId('new-saas-invoice-button').click();
+    await expect(page.getByText('Create SchoolOS Subscription Invoice')).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    await page.getByTestId('billing-profile-edit-button').click();
+    await expect(page.getByText('Edit Billing Profile')).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    await page.click('button:has-text("Overview")');
+    await page.getByTestId('onboarding-checklist-button').click();
+    await expect(page.getByText('Onboarding Checklist')).toBeVisible();
+  });
+
+  test('Platform settings deep links and operator dialogs render', async ({ page }) => {
+    await page.goto(`${BASE_URL}/platform/settings?tab=providers`);
+    await expect(page.getByRole('tab', { name: 'Providers' })).toHaveAttribute('data-state', 'active');
+    await page.getByTestId('provider-edit-button').first().click();
+    await expect(page.getByText('Edit Provider')).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    await page.goto(`${BASE_URL}/platform/settings?tab=queues`);
+    await expect(page.getByRole('tab', { name: 'Queues' })).toHaveAttribute('data-state', 'active');
+    const retryAll = page.getByRole('button', { name: /Retry All/i }).first();
+    if (await retryAll.isEnabled()) {
+      await retryAll.click();
+      await expect(page.getByText('Retry Failed Job')).toBeVisible();
+      await page.getByRole('button', { name: 'Cancel' }).click();
+    }
+
+    await page.goto(`${BASE_URL}/platform/settings?tab=audit`);
+    await expect(page.getByRole('tab', { name: 'Global Audit' })).toHaveAttribute('data-state', 'active');
+    await expect(page.getByText('Resource ID')).toBeVisible();
+    await expect(page.getByText('Export current page CSV')).toBeVisible();
+  });
+
   test('Feature Override Workflow', async ({ page }) => {
     await page.goto(`${BASE_URL}/platform/schools`);
     await page.click('text=Trial Academy');

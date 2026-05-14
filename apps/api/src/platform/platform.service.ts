@@ -172,6 +172,7 @@ type DynamicDelegate = {
   findFirst(args?: unknown): Promise<DynamicRecord | null>;
   create(args?: unknown): Promise<DynamicRecord>;
   update(args?: unknown): Promise<DynamicRecord>;
+  updateMany(args?: unknown): Promise<DynamicRecord>;
   upsert(args?: unknown): Promise<DynamicRecord>;
   count(args?: unknown): Promise<number>;
 };
@@ -515,12 +516,39 @@ export class PlatformService {
       where: { tenantId },
       orderBy: { createdAt: 'desc' },
     });
+    const startsAt = dto.startsAt ? new Date(dto.startsAt) : new Date();
+    const previousActiveSubscriptions = ACTIVE_SUBSCRIPTION_STATUSES.has(
+      dto.status,
+    )
+      ? await delegate.findMany({
+          where: {
+            tenantId,
+            status: { in: Array.from(ACTIVE_SUBSCRIPTION_STATUSES) },
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+      : [];
+
+    for (const previous of previousActiveSubscriptions) {
+      await delegate.update({
+        where: { id: String(previous.id) },
+        data: {
+          status: 'EXPIRED',
+          endsAt: startsAt,
+          notes: appendSubscriptionNote(
+            previous.notes,
+            `Superseded by platform subscription assignment to plan ${dto.planId}.`,
+          ),
+        },
+      });
+    }
+
     const subscription = await delegate.create({
       data: {
         tenantId,
         planId: dto.planId,
         status: dto.status,
-        startsAt: dto.startsAt ? new Date(dto.startsAt) : new Date(),
+        startsAt,
         endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
         renewsAt: dto.renewsAt ? new Date(dto.renewsAt) : null,
         trialEndsAt: dto.trialEndsAt ? new Date(dto.trialEndsAt) : null,
@@ -533,8 +561,18 @@ export class PlatformService {
       'tenant_subscription_assigned',
       'subscriptions',
       String(subscription.id),
-      before,
-      { tenantId, planId: dto.planId, status: dto.status },
+      {
+        latestSubscriptionBefore: before,
+        activeSubscriptionsBefore: previousActiveSubscriptions,
+      },
+      {
+        tenantId,
+        planId: dto.planId,
+        status: dto.status,
+        closedPreviousSubscriptionIds: previousActiveSubscriptions.map((item) =>
+          String(item.id),
+        ),
+      },
       tenantId,
     );
     return this.toSubscriptionSummary(subscription);
@@ -935,8 +973,6 @@ export class PlatformService {
   async upsertProvider(dto: UpsertProviderConfigDto, actorUserId: string) {
     const delegate = this.requireDelegate('providerConfig');
     this.validateProvider(dto);
-    const secretKeys = dto.secretKeys ?? this.detectSecretKeys(dto.config);
-    const configEncrypted = this.encryptProviderConfig(dto.config, secretKeys);
     const before = await delegate.findUnique({
       where: {
         type_name_environment: {
@@ -946,6 +982,13 @@ export class PlatformService {
         },
       },
     });
+    const secretKeys = dto.secretKeys ?? this.detectSecretKeys(dto.config);
+    const configEncrypted = preserveMaskedProviderSecrets(
+      this.encryptProviderConfig(dto.config, secretKeys),
+      dto.config,
+      before?.configEncrypted,
+      secretKeys,
+    );
     const provider = await delegate.upsert({
       where: {
         type_name_environment: {
@@ -978,6 +1021,42 @@ export class PlatformService {
       before ? this.toProviderSummary(before) : null,
       this.toProviderSummary(provider),
     );
+    return this.toProviderSummary(provider);
+  }
+
+  async updateProviderStatus(
+    providerId: string,
+    enabled: boolean,
+    actorUserId: string,
+    reason?: string,
+  ) {
+    const delegate = this.requireDelegate('providerConfig');
+    const before = await delegate.findUnique({ where: { id: providerId } });
+    if (!before) throw new NotFoundException('Provider not found');
+    if (!enabled && (!reason?.trim() || reason.trim().length < 5)) {
+      throw new BadRequestException('Provider disable requires a reason');
+    }
+
+    const provider = await delegate.update({
+      where: { id: providerId },
+      data: {
+        enabled,
+        updatedBy: actorUserId,
+      },
+    });
+
+    await this.platformAudit(
+      actorUserId,
+      enabled ? 'provider_config_enabled' : 'provider_config_disabled',
+      'provider_config',
+      providerId,
+      this.toProviderSummary(before),
+      {
+        ...this.toProviderSummary(provider),
+        reason: reason?.trim() || null,
+      },
+    );
+
     return this.toProviderSummary(provider);
   }
 
@@ -1800,6 +1879,34 @@ function nullableString(value: unknown): string | null {
 
 function toDate(value: unknown): Date {
   return value instanceof Date ? value : new Date(String(value));
+}
+
+function appendSubscriptionNote(current: unknown, note: string) {
+  const existing = typeof current === 'string' ? current.trim() : '';
+  return existing ? `${existing}\n${note}` : note;
+}
+
+function preserveMaskedProviderSecrets(
+  encryptedConfig: Record<string, unknown>,
+  rawConfig: Record<string, unknown>,
+  previousConfig: unknown,
+  secretKeys: string[],
+) {
+  const previous = asRecord(previousConfig);
+  const merged: Record<string, unknown> = { ...encryptedConfig };
+
+  for (const key of secretKeys) {
+    const value = rawConfig[key];
+    if (
+      typeof value === 'string' &&
+      ['********', '••••••••'].includes(value.trim()) &&
+      typeof previous[key] !== 'undefined'
+    ) {
+      merged[key] = previous[key];
+    }
+  }
+
+  return merged;
 }
 
 function decimalValue(value: unknown): Prisma.Decimal {

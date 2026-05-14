@@ -318,6 +318,21 @@ export class PlatformController {
     );
   }
 
+  @Patch('providers/:id/status')
+  @Permissions('platform:providers:manage')
+  async updateProviderStatus(
+    @Param('id') id: string,
+    @Body() body: { enabled: boolean; reason?: string },
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformService.updateProviderStatus(
+      id,
+      body.enabled,
+      this.requireUser(req),
+      body.reason,
+    );
+  }
+
   @Get('queues')
   @Permissions('platform:queues:read')
   async getQueueHealth() {

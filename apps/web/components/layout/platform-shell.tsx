@@ -55,14 +55,14 @@ const platformNavItems: PlatformNavItem[] = [
     disabled: true,
   },
   {
-    href: '/platform/settings',
+    href: '/platform/settings?tab=plans',
     label: 'Plans & Billing',
     description: 'Subscriptions, invoices and limits',
     icon: CreditCard,
     permissions: ['platform:manage'],
   },
   {
-    href: '/platform/settings',
+    href: '/platform/settings?tab=health',
     label: 'System Health',
     description: 'Infrastructure, jobs and provider status',
     icon: MonitorCheck,

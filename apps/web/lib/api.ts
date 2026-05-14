@@ -64,6 +64,8 @@ import type {
   PlatformHealthSummary,
   PlatformOnboardingChecklist,
   PlatformSaaSInvoiceSummary,
+  PlatformFailedJobSummary,
+  PlatformTenantSubscriptionSummary,
   TenantSettingSummary,
   PayslipSummary,
   PromotionReadiness,
@@ -148,6 +150,34 @@ type RequestOptions = RequestInit & {
   auth?: boolean;
   json?: JsonBody;
   retryOnUnauthorized?: boolean;
+};
+
+export type AssignPlatformTenantSubscriptionPayload = Record<string, unknown> & {
+  planId: string;
+  status: 'TRIAL' | 'ACTIVE' | 'GRACE' | 'SUSPENDED' | 'EXPIRED' | 'CANCELLED';
+  startsAt?: string;
+  endsAt?: string;
+  renewsAt?: string;
+  trialEndsAt?: string;
+  notes?: string;
+};
+
+export type PlatformSupportOverridePayload = Record<string, unknown> & {
+  tenantId: string;
+  reason: string;
+  durationMinutes?: number;
+};
+
+export type PlatformAuditLogFilters = {
+  page?: number;
+  limit?: number;
+  tenantId?: string;
+  action?: string;
+  resource?: string;
+  resourceId?: string;
+  userId?: string;
+  startDate?: string;
+  endDate?: string;
 };
 
 async function request<T>(path: string, init?: RequestOptions) {
@@ -1639,13 +1669,7 @@ export const api = {
         json: { isActive, reason },
       },
     ),
-  listPlatformAuditLogs: (params?: {
-    page?: number;
-    limit?: number;
-    tenantId?: string;
-    action?: string;
-    userId?: string;
-  }) =>
+  listPlatformAuditLogs: (params?: PlatformAuditLogFilters) =>
     request<PaginatedResult<PlatformAuditLog>>(
       withQuery('/platform/audit-logs', {
         ...params,
@@ -1653,6 +1677,15 @@ export const api = {
         limit: params?.limit?.toString(),
       }),
     ),
+  enterPlatformSupportOverride: (body: PlatformSupportOverridePayload) =>
+    request<{ success: true; overrideId: string; expiresAt: string }>(
+      '/platform/support/override/enter',
+      { method: 'POST', json: body },
+    ),
+  exitPlatformSupportOverride: () =>
+    request<{ success: true }>('/platform/support/override/exit', {
+      method: 'POST',
+    }),
   getPlatformDashboard: () =>
     request<PlatformDashboardSummary>('/platform/dashboard'),
   listPlatformPlans: () => request<PlatformPlanSummary[]>('/platform/plans'),
@@ -1663,8 +1696,19 @@ export const api = {
       method: 'PATCH',
       json: body,
     }),
-  assignPlatformSubscription: (tenantId: string, body: JsonBody) =>
-    request(
+  assignPlatformTenantSubscription: (
+    tenantId: string,
+    body: AssignPlatformTenantSubscriptionPayload,
+  ) =>
+    request<PlatformTenantSubscriptionSummary>(
+      `/platform/tenants/${encodeURIComponent(tenantId)}/subscriptions`,
+      { method: 'POST', json: body },
+    ),
+  assignPlatformSubscription: (
+    tenantId: string,
+    body: AssignPlatformTenantSubscriptionPayload,
+  ) =>
+    request<PlatformTenantSubscriptionSummary>(
       `/platform/tenants/${encodeURIComponent(tenantId)}/subscriptions`,
       { method: 'POST', json: body },
     ),
@@ -1696,6 +1740,11 @@ export const api = {
       `/platform/tenants/${encodeURIComponent(tenantId)}/saas-invoices/${encodeURIComponent(invoiceId)}/payments`,
       { method: 'POST', json: body },
     ),
+  cancelPlatformSaaSInvoice: (tenantId: string, invoiceId: string, body: JsonBody) =>
+    request<PlatformSaaSInvoiceSummary>(
+      `/platform/tenants/${encodeURIComponent(tenantId)}/saas-invoices/${encodeURIComponent(invoiceId)}/cancel`,
+      { method: 'POST', json: body },
+    ),
   listPlatformProviders: () =>
     request<PlatformProviderConfigSummary[]>('/platform/providers'),
   upsertPlatformProvider: (body: JsonBody) =>
@@ -1707,16 +1756,24 @@ export const api = {
     request<{ success: boolean; message: string }>(`/platform/providers/${encodeURIComponent(id)}/test`, {
       method: 'POST',
     }),
+  updatePlatformProviderStatus: (id: string, body: JsonBody) =>
+    request<PlatformProviderConfigSummary>(
+      `/platform/providers/${encodeURIComponent(id)}/status`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
   getPlatformQueueHealth: () =>
     request<PlatformQueueSummary[]>('/platform/queues'),
   listPlatformFailedJobs: (params?: { queueName?: string; page?: number; limit?: number }) =>
-    request<PaginatedResult<any>>(withQuery('/platform/queues/failed-jobs', {
+    request<PaginatedResult<PlatformFailedJobSummary>>(withQuery('/platform/queues/failed-jobs', {
       ...params,
       page: params?.page?.toString(),
       limit: params?.limit?.toString(),
     })),
   getPlatformJobDetail: (queueName: string, jobId: string) =>
-    request<any>(`/platform/queues/${encodeURIComponent(queueName)}/jobs/${encodeURIComponent(jobId)}`),
+    request<PlatformFailedJobSummary>(`/platform/queues/${encodeURIComponent(queueName)}/jobs/${encodeURIComponent(jobId)}`),
   removePlatformJob: (queueName: string, jobId: string) =>
     request<{ success: true }>(`/platform/queues/${encodeURIComponent(queueName)}/jobs/${encodeURIComponent(jobId)}`, {
       method: 'DELETE',

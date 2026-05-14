@@ -15,6 +15,31 @@ Academics, Accounting, Homework, Timetable, HR, Payroll, Library, Transport, and
 Next UI work is seeded staging QA and deeper Library/Canteen/Transport operator ergonomics after product rules for remaining financial and live-map workflows are approved.
 ```
 
+### M0 Platform Subscription Plan Change Workflow
+
+Status: **Completed**.
+
+Completed:
+
+- Wired the Platform School Detail **Change Plan** action to `/platform/schools/[tenantId]/change-plan`.
+- Updated the change-plan page to use shared API helpers for tenant detail, platform plans, and tenant subscription assignment.
+- Added current-plan versus new-plan preview, effective/renewal date visibility, readable success/error states, and guarded submit behavior requiring an audit reason.
+- Kept the billing boundary explicit: this is SchoolOS SaaS subscription billing only and does not create student fee invoices or post to tenant M9 Accounting.
+- Added web contract coverage and a platform smoke assertion for the change-plan workflow.
+
+### M0 Platform Operator Workflow Completion
+
+Status: **Completed**.
+
+Completed:
+
+- Tenant detail support override now opens a reasoned, time-bound **Enter Support Mode** dialog backed by the platform support override API.
+- Tenant SaaS billing now supports invoice creation, invoice detail viewing, payment recording, invoice cancellation, and billing profile editing through real platform APIs.
+- Tenant onboarding now has a full checklist dialog and audited item override workflow.
+- Tenant and global audit views now expose richer filters and clearly labelled **Export current page CSV** behavior.
+- Platform settings now supports provider edit, provider disable through a status-only audited endpoint, inline provider test results, queue retry reason dialogs, and queue discard confirmation.
+- Platform settings sidebar deep-links now select the intended tab, and fake infrastructure telemetry has been replaced with a not-configured state.
+
 ## Current Sprint (Completed)
 
 ### UI-7A — Phase 3 Operational Hardening: Homework, Timetable, HR, and Payroll

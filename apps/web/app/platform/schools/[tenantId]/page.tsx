@@ -42,8 +42,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from "@/components/ui/progress";
+
+type InvoiceDialogMode = 'view' | 'payment' | 'cancel';
 
 export default function PlatformSchoolDetail() {
   const { tenantId } = useParams<{ tenantId: string }>();
@@ -54,15 +58,42 @@ export default function PlatformSchoolDetail() {
   const [updating, setUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Status Change Dialog State
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [statusReason, setStatusReason] = useState('');
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [supportDialogOpen, setSupportDialogOpen] = useState(false);
+  const [supportReason, setSupportReason] = useState('');
+  const [supportDuration, setSupportDuration] = useState('30');
+  const [supportSaving, setSupportSaving] = useState(false);
   
   // Feature Override State
   const [overrideTarget, setOverrideTarget] = useState<{ key: string; enabled: boolean } | null>(null);
   const [overrideReason, setOverrideReason] = useState('');
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  const [invoiceAction, setInvoiceAction] = useState<{ mode: InvoiceDialogMode; invoice: PlatformSaaSInvoiceSummary } | null>(null);
+  const [invoiceSaving, setInvoiceSaving] = useState(false);
+  const [invoiceForm, setInvoiceForm] = useState(() => makeDefaultInvoiceForm());
+  const [paymentForm, setPaymentForm] = useState(() => makeDefaultPaymentForm());
+  const [cancelReason, setCancelReason] = useState('');
+  const [billingDialogOpen, setBillingDialogOpen] = useState(false);
+  const [billingForm, setBillingForm] = useState(() => makeDefaultBillingForm());
+  const [onboardingDialogOpen, setOnboardingDialogOpen] = useState(false);
+  const [onboardingOverride, setOnboardingOverride] = useState<{ key: string; completed: boolean; label: string } | null>(null);
+  const [onboardingReason, setOnboardingReason] = useState('');
+  const [tenantAuditLogs, setTenantAuditLogs] = useState<PlatformAuditLog[]>([]);
+  const [auditDialogOpen, setAuditDialogOpen] = useState(false);
+  const [auditFilters, setAuditFilters] = useState({
+    action: '',
+    resource: '',
+    resourceId: '',
+    userId: '',
+    startDate: '',
+    endDate: '',
+  });
 
   const handleFeatureToggle = async () => {
     if (!overrideTarget || !overrideReason.trim()) return;
@@ -93,6 +124,7 @@ export default function PlatformSchoolDetail() {
       ]);
       setTenant(data);
       setInvoices(invData);
+      setTenantAuditLogs(data.recentAudit ?? []);
     } catch (err) {
       console.error('Failed to load tenant', err);
     } finally {
@@ -122,6 +154,182 @@ export default function PlatformSchoolDetail() {
       setStatusReason('');
     } catch (error: any) {
       setStatusError(error.message || 'Failed to update status');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleEnterSupportMode = async () => {
+    if (!tenant || supportReason.trim().length < 5) return;
+    setSupportSaving(true);
+    setActionError(null);
+    try {
+      await api.enterPlatformSupportOverride({
+        tenantId: tenant.id,
+        reason: supportReason.trim(),
+        durationMinutes: Number(supportDuration) || 30,
+      });
+      setMessage('Support override is active. Redirecting to the school workspace.');
+      setSupportDialogOpen(false);
+      router.push(`/dashboard?tenantOverride=${encodeURIComponent(tenant.id)}`);
+    } catch (error: any) {
+      setActionError(error.message || 'Failed to enter support mode');
+    } finally {
+      setSupportSaving(false);
+    }
+  };
+
+  const openBillingDialog = () => {
+    if (!tenant) return;
+    setBillingForm({
+      billingContactName: tenant.billingProfile?.billingContactName ?? '',
+      billingEmail: tenant.billingProfile?.billingEmail ?? '',
+      billingPhone: tenant.billingProfile?.billingPhone ?? '',
+      billingAddress: tenant.billingProfile?.billingAddress ?? '',
+      panVatNumber: tenant.billingProfile?.panVatNumber ?? tenant.panNumber ?? '',
+      preferredBillingCycle: tenant.billingProfile?.preferredBillingCycle ?? 'MONTHLY',
+      notes: tenant.billingProfile?.notes ?? '',
+    });
+    setBillingDialogOpen(true);
+  };
+
+  const saveBillingProfile = async () => {
+    if (!tenant) return;
+    if (billingForm.billingEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(billingForm.billingEmail)) {
+      setActionError('Enter a valid billing email address.');
+      return;
+    }
+    setUpdating(true);
+    setActionError(null);
+    try {
+      await api.updatePlatformBillingProfile(tenant.id, cleanPayload(billingForm));
+      setMessage('Billing profile updated.');
+      setBillingDialogOpen(false);
+      await loadTenantData();
+    } catch (error: any) {
+      setActionError(error.message || 'Failed to update billing profile');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const createInvoice = async () => {
+    if (!tenant || !invoiceForm.description.trim()) return;
+    if (invoiceForm.dueDate < invoiceForm.issueDate) {
+      setActionError('Due date cannot be before issue date.');
+      return;
+    }
+    setInvoiceSaving(true);
+    setActionError(null);
+    try {
+      await api.createPlatformSaaSInvoice(tenant.id, {
+        issueDate: toIsoDate(invoiceForm.issueDate),
+        dueDate: toIsoDate(invoiceForm.dueDate),
+        notes: invoiceForm.notes,
+        planId: tenant.subscription?.planId,
+        subscriptionId: tenant.subscription?.id,
+        lines: [
+          {
+            lineType: invoiceForm.lineType,
+            description: invoiceForm.description.trim(),
+            quantity: Number(invoiceForm.quantity),
+            unitAmount: invoiceForm.unitAmount,
+          },
+        ],
+      });
+      setMessage('SchoolOS subscription invoice created.');
+      setInvoiceDialogOpen(false);
+      setInvoiceForm(makeDefaultInvoiceForm());
+      await loadTenantData();
+    } catch (error: any) {
+      setActionError(error.message || 'Failed to create invoice');
+    } finally {
+      setInvoiceSaving(false);
+    }
+  };
+
+  const recordPayment = async () => {
+    if (!tenant || !invoiceAction) return;
+    setInvoiceSaving(true);
+    setActionError(null);
+    try {
+      await api.recordPlatformSaaSPayment(tenant.id, invoiceAction.invoice.id, {
+        amount: paymentForm.amount,
+        paymentDate: toIsoDate(paymentForm.paymentDate),
+        method: paymentForm.method,
+        reference: paymentForm.reference,
+        notes: paymentForm.notes,
+      });
+      setMessage('SaaS payment recorded.');
+      setInvoiceAction(null);
+      setPaymentForm(makeDefaultPaymentForm());
+      await loadTenantData();
+    } catch (error: any) {
+      setActionError(error.message || 'Failed to record payment');
+    } finally {
+      setInvoiceSaving(false);
+    }
+  };
+
+  const cancelInvoice = async () => {
+    if (!tenant || !invoiceAction || cancelReason.trim().length < 5) return;
+    setInvoiceSaving(true);
+    setActionError(null);
+    try {
+      await api.cancelPlatformSaaSInvoice(tenant.id, invoiceAction.invoice.id, {
+        reason: cancelReason.trim(),
+      });
+      setMessage('SaaS invoice cancelled.');
+      setInvoiceAction(null);
+      setCancelReason('');
+      await loadTenantData();
+    } catch (error: any) {
+      setActionError(error.message || 'Failed to cancel invoice');
+    } finally {
+      setInvoiceSaving(false);
+    }
+  };
+
+  const applyTenantAuditFilters = async () => {
+    if (!tenant) return;
+    setLoadingInvoices(true);
+    setActionError(null);
+    try {
+      const result = await api.listPlatformAuditLogs({
+        tenantId: tenant.id,
+        limit: 50,
+        action: auditFilters.action || undefined,
+        resource: auditFilters.resource || undefined,
+        resourceId: auditFilters.resourceId || undefined,
+        userId: auditFilters.userId || undefined,
+        startDate: auditFilters.startDate || undefined,
+        endDate: auditFilters.endDate || undefined,
+      });
+      setTenantAuditLogs(result.items);
+      setAuditDialogOpen(false);
+    } catch (error: any) {
+      setActionError(error.message || 'Failed to load audit logs');
+    } finally {
+      setLoadingInvoices(false);
+    }
+  };
+
+  const saveOnboardingOverride = async () => {
+    if (!tenant || !onboardingOverride || onboardingReason.trim().length < 5) return;
+    setUpdating(true);
+    setActionError(null);
+    try {
+      await api.setTenantOnboardingOverride(tenant.id, {
+        itemKey: onboardingOverride.key,
+        completed: onboardingOverride.completed,
+        reason: onboardingReason.trim(),
+      });
+      setMessage('Onboarding checklist override saved.');
+      setOnboardingOverride(null);
+      setOnboardingReason('');
+      await loadTenantData();
+    } catch (error: any) {
+      setActionError(error.message || 'Failed to save onboarding override');
     } finally {
       setUpdating(false);
     }
@@ -206,12 +414,27 @@ export default function PlatformSchoolDetail() {
             {tenant.isActive ? <ShieldOff size={18} className="mr-2" /> : <Shield size={18} className="mr-2" />}
             {tenant.isActive ? 'Suspend School' : 'Restore Access'}
           </Button>
-          <Button variant="outline" className="rounded-2xl px-6 font-bold border-slate-200">
+          <Button
+            variant="outline"
+            className="rounded-2xl px-6 font-bold border-slate-200"
+            onClick={() => setSupportDialogOpen(true)}
+            data-testid="support-mode-button"
+          >
             <ExternalLink size={18} className="mr-2" />
-            Impersonate
+            Enter Support Mode
           </Button>
         </div>
       </div>
+
+      {(message || actionError) && (
+        <div className={`rounded-2xl border p-4 text-sm font-bold ${
+          actionError
+            ? 'border-rose-100 bg-rose-50 text-rose-700'
+            : 'border-emerald-100 bg-emerald-50 text-emerald-700'
+        }`}>
+          {actionError || message}
+        </div>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
         <TabsList className="bg-slate-100/50 p-1 rounded-2xl border border-slate-100">
@@ -258,7 +481,11 @@ export default function PlatformSchoolDetail() {
                          </p>
                        </div>
                      </div>
-                     <Button variant="outline" className="rounded-xl font-bold border-slate-200 bg-white">
+                     <Button
+                       variant="outline"
+                       className="rounded-xl font-bold border-slate-200 bg-white"
+                       onClick={() => router.push(`/platform/schools/${tenant.id}/change-plan`)}
+                     >
                         Change Plan
                      </Button>
                    </div>
@@ -280,14 +507,14 @@ export default function PlatformSchoolDetail() {
                 <CardHeader>
                   <CardTitle className="text-xl font-bold flex items-center gap-2">
                     <Activity className="text-slate-400" size={22} />
-                    Usage Limits
+                    Current Platform Usage
                   </CardTitle>
-                  <CardDescription>Consumption metrics for the current billing cycle.</CardDescription>
+                  <CardDescription>Backend-reported tenant usage. Plan limits are enforced server-side.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                   <UsageLimitRow label="Students" current={tenant.studentCount} limit={500} unit="students" />
-                   <UsageLimitRow label="Storage" current={tenant.usage.storageSizeBytes ?? 0} limit={10 * 1024 * 1024 * 1024} unit="bytes" />
-                   <UsageLimitRow label="SMS (Monthly)" current={1240} limit={5000} unit="credits" />
+                <CardContent className="grid gap-4 sm:grid-cols-3">
+                   <UsageValue label="Students" value={tenant.studentCount.toLocaleString()} />
+                   <UsageValue label="Staff" value={tenant.staffCount.toLocaleString()} />
+                   <UsageValue label="Storage" value={formatBytes(tenant.usage.storageSizeBytes ?? 0)} />
                 </CardContent>
               </Card>
             </div>
@@ -322,7 +549,12 @@ export default function PlatformSchoolDetail() {
                         </div>
                       ))}
                     </div>
-                    <Button variant="ghost" className="w-full mt-6 text-xs font-bold text-slate-500 hover:text-slate-900">
+                    <Button
+                      variant="ghost"
+                      className="w-full mt-6 text-xs font-bold text-slate-500 hover:text-slate-900"
+                      onClick={() => setOnboardingDialogOpen(true)}
+                      data-testid="onboarding-checklist-button"
+                    >
                       View Checklist <ChevronRight size={14} />
                     </Button>
                  </CardContent>
@@ -357,7 +589,12 @@ export default function PlatformSchoolDetail() {
                       <CardTitle className="text-xl font-bold">SaaS Invoices</CardTitle>
                       <CardDescription>Historical platform fee records.</CardDescription>
                     </div>
-                    <Button variant="outline" className="rounded-xl font-bold gap-2">
+                    <Button
+                      variant="outline"
+                      className="rounded-xl font-bold gap-2"
+                      onClick={() => setInvoiceDialogOpen(true)}
+                      data-testid="new-saas-invoice-button"
+                    >
                        <Plus size={16} /> New Invoice
                     </Button>
                   </CardHeader>
@@ -395,10 +632,33 @@ export default function PlatformSchoolDetail() {
                                        {inv.status}
                                      </Badge>
                                    </td>
-                                   <td className="px-6 py-4 text-right">
-                                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-400 hover:text-slate-900">
-                                       <MoreVertical size={16} />
-                                     </Button>
+                                   <td className="px-6 py-4">
+                                     <div className="flex justify-end gap-2">
+                                       <Button variant="ghost" size="sm" className="rounded-lg font-bold" onClick={() => setInvoiceAction({ mode: 'view', invoice: inv })}>
+                                         View
+                                       </Button>
+                                       <Button
+                                         variant="outline"
+                                         size="sm"
+                                         className="rounded-lg font-bold border-slate-200"
+                                         disabled={inv.status === 'PAID' || inv.status === 'CANCELLED'}
+                                         onClick={() => {
+                                           setPaymentForm({ ...makeDefaultPaymentForm(), amount: inv.balanceAmount });
+                                           setInvoiceAction({ mode: 'payment', invoice: inv });
+                                         }}
+                                       >
+                                         Payment
+                                       </Button>
+                                       <Button
+                                         variant="ghost"
+                                         size="sm"
+                                         className="rounded-lg font-bold text-rose-600"
+                                         disabled={inv.status === 'PAID' || inv.status === 'CANCELLED'}
+                                         onClick={() => setInvoiceAction({ mode: 'cancel', invoice: inv })}
+                                       >
+                                         Cancel
+                                       </Button>
+                                     </div>
                                    </td>
                                  </tr>
                                ))
@@ -425,10 +685,15 @@ export default function PlatformSchoolDetail() {
                       <p className="text-sm font-bold text-slate-900 leading-relaxed">{tenant.billingProfile?.billingAddress ?? 'Not provided'}</p>
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Payment Terms</Label>
-                      <p className="text-sm font-bold text-slate-900">Net 15 (Standard)</p>
+                      <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Billing Cycle</Label>
+                      <p className="text-sm font-bold text-slate-900">{tenant.billingProfile?.preferredBillingCycle ?? 'Not configured'}</p>
                     </div>
-                    <Button variant="outline" className="w-full rounded-xl font-bold border-slate-200">
+                    <Button
+                      variant="outline"
+                      className="w-full rounded-xl font-bold border-slate-200"
+                      onClick={openBillingDialog}
+                      data-testid="billing-profile-edit-button"
+                    >
                       Update Profile
                     </Button>
                   </CardContent>
@@ -557,23 +822,34 @@ export default function PlatformSchoolDetail() {
                  <CardDescription>Complete history of operator actions on this tenant.</CardDescription>
                </div>
                <div className="flex items-center gap-2">
-                 <Button variant="outline" size="sm" className="rounded-lg font-bold border-slate-200">
+                 <Button
+                   variant="outline"
+                   size="sm"
+                   className="rounded-lg font-bold border-slate-200"
+                   onClick={() => setAuditDialogOpen(true)}
+                   data-testid="tenant-audit-filter-button"
+                 >
                     Filter
                  </Button>
-                 <Button variant="outline" size="sm" className="rounded-lg font-bold border-slate-200">
-                    Export
+                 <Button
+                   variant="outline"
+                   size="sm"
+                   className="rounded-lg font-bold border-slate-200"
+                   onClick={() => exportAuditCsv(tenantAuditLogs, `${tenant.slug}-audit-current-page.csv`)}
+                 >
+                    Export current page CSV
                  </Button>
                </div>
              </CardHeader>
              <CardContent className="p-0">
                 <div className="divide-y divide-slate-50 border-t border-slate-50">
-                   {(tenant.recentAudit ?? []).length === 0 ? (
+                   {tenantAuditLogs.length === 0 ? (
                      <div className="flex flex-col items-center justify-center p-20 text-center">
                         <History size={48} className="text-slate-100 mb-4" />
                         <p className="text-sm font-bold text-slate-400">No audit logs found.</p>
                      </div>
                    ) : (
-                      (tenant.recentAudit || []).map((log: any) => (
+                      tenantAuditLogs.map((log) => (
                        <div key={log.id} className="group flex items-center justify-between p-6 hover:bg-slate-50/50 transition-colors">
                           <div className="flex items-start gap-4">
                              <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 group-hover:bg-slate-900 group-hover:text-white transition-colors">
@@ -600,6 +876,235 @@ export default function PlatformSchoolDetail() {
            </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={supportDialogOpen} onOpenChange={setSupportDialogOpen}>
+        <DialogContent className="rounded-3xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Enter Support Mode</DialogTitle>
+            <DialogDescription>
+              Start a time-bound support override for <strong>{tenant.name}</strong>. This is audited and does not expose tenant data until the backend creates the override.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="font-bold text-slate-700">Duration</Label>
+              <Select value={supportDuration} onChange={(e) => setSupportDuration(e.target.value)}>
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="60">60 minutes</option>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="font-bold text-slate-700">Audit Reason</Label>
+              <Textarea value={supportReason} onChange={(e) => setSupportReason(e.target.value)} className="rounded-2xl border-slate-200" placeholder="Explain the support case or operator action." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl font-bold" onClick={() => setSupportDialogOpen(false)}>Cancel</Button>
+            <Button className="rounded-xl font-bold bg-slate-900 text-white" disabled={supportReason.trim().length < 5 || supportSaving} onClick={handleEnterSupportMode}>
+              {supportSaving ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Enter Support Mode
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={invoiceDialogOpen} onOpenChange={setInvoiceDialogOpen}>
+        <DialogContent className="rounded-3xl sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Create SchoolOS Subscription Invoice</DialogTitle>
+            <DialogDescription>This creates a platform SaaS invoice only. It is not a student fee invoice.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Issue Date</Label>
+              <Input type="date" value={invoiceForm.issueDate} onChange={(e) => setInvoiceForm({ ...invoiceForm, issueDate: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Due Date</Label>
+              <Input type="date" value={invoiceForm.dueDate} onChange={(e) => setInvoiceForm({ ...invoiceForm, dueDate: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Line Type</Label>
+              <Select value={invoiceForm.lineType} onChange={(e) => setInvoiceForm({ ...invoiceForm, lineType: e.target.value })}>
+                <option value="SUBSCRIPTION">Subscription</option>
+                <option value="SETUP_FEE">Setup fee</option>
+                <option value="TRAINING_FEE">Training fee</option>
+                <option value="SMS_BUNDLE">SMS bundle</option>
+                <option value="STORAGE_ADDON">Storage add-on</option>
+                <option value="CUSTOM_SUPPORT">Custom support</option>
+                <option value="OTHER">Other</option>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Unit Amount</Label>
+              <Input inputMode="decimal" value={invoiceForm.unitAmount} onChange={(e) => setInvoiceForm({ ...invoiceForm, unitAmount: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Quantity</Label>
+              <Input type="number" min={1} value={invoiceForm.quantity} onChange={(e) => setInvoiceForm({ ...invoiceForm, quantity: e.target.value })} />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Description</Label>
+              <Input value={invoiceForm.description} onChange={(e) => setInvoiceForm({ ...invoiceForm, description: e.target.value })} />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Notes</Label>
+              <Textarea className="rounded-2xl border-slate-200" value={invoiceForm.notes} onChange={(e) => setInvoiceForm({ ...invoiceForm, notes: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl font-bold" onClick={() => setInvoiceDialogOpen(false)}>Cancel</Button>
+            <Button className="rounded-xl font-bold bg-slate-900 text-white" disabled={invoiceSaving || !invoiceForm.description.trim() || Number(invoiceForm.quantity) < 1 || !invoiceForm.unitAmount} onClick={createInvoice}>
+              {invoiceSaving ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Create Invoice
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!invoiceAction} onOpenChange={(open: boolean) => !open && setInvoiceAction(null)}>
+        <DialogContent className="rounded-3xl sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">
+              {invoiceAction?.mode === 'payment' ? 'Record SaaS Payment' : invoiceAction?.mode === 'cancel' ? 'Cancel SaaS Invoice' : 'SaaS Invoice Detail'}
+            </DialogTitle>
+            <DialogDescription>{invoiceAction?.invoice.invoiceNumber}</DialogDescription>
+          </DialogHeader>
+          {invoiceAction?.mode === 'payment' ? (
+            <div className="grid gap-4 py-4 sm:grid-cols-2">
+              <InputWithLabel label="Amount" value={paymentForm.amount} onChange={(value) => setPaymentForm({ ...paymentForm, amount: value })} />
+              <InputWithLabel label="Payment Date" type="date" value={paymentForm.paymentDate} onChange={(value) => setPaymentForm({ ...paymentForm, paymentDate: value })} />
+              <div className="space-y-2">
+                <Label>Method</Label>
+                <Select value={paymentForm.method} onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}>
+                  <option value="BANK_TRANSFER">Bank transfer</option>
+                  <option value="CASH">Cash</option>
+                  <option value="ESEWA">eSewa</option>
+                  <option value="KHALTI">Khalti</option>
+                  <option value="CHEQUE">Cheque</option>
+                  <option value="OTHER">Other</option>
+                </Select>
+              </div>
+              <InputWithLabel label="Reference" value={paymentForm.reference} onChange={(value) => setPaymentForm({ ...paymentForm, reference: value })} />
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Notes</Label>
+                <Textarea className="rounded-2xl border-slate-200" value={paymentForm.notes} onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })} />
+              </div>
+            </div>
+          ) : invoiceAction?.mode === 'cancel' ? (
+            <div className="space-y-4 py-4">
+              <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">Cancelling this SchoolOS SaaS invoice is audited and cannot be used for student fee corrections.</div>
+              <Textarea className="rounded-2xl border-slate-200" placeholder="Reason for cancelling this invoice" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
+            </div>
+          ) : invoiceAction ? (
+            <InvoiceDetail invoice={invoiceAction.invoice} />
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl font-bold" onClick={() => setInvoiceAction(null)}>Close</Button>
+            {invoiceAction?.mode === 'payment' && (
+              <Button className="rounded-xl font-bold bg-slate-900 text-white" disabled={invoiceSaving || !paymentForm.amount} onClick={recordPayment}>Record Payment</Button>
+            )}
+            {invoiceAction?.mode === 'cancel' && (
+              <Button variant="destructive" className="rounded-xl font-bold" disabled={invoiceSaving || cancelReason.trim().length < 5} onClick={cancelInvoice}>Cancel Invoice</Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={billingDialogOpen} onOpenChange={setBillingDialogOpen}>
+        <DialogContent className="rounded-3xl sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Edit Billing Profile</DialogTitle>
+            <DialogDescription>Platform SaaS billing contact details for {tenant.name}.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 sm:grid-cols-2">
+            <InputWithLabel label="Billing Contact" value={billingForm.billingContactName} onChange={(value) => setBillingForm({ ...billingForm, billingContactName: value })} />
+            <InputWithLabel label="Billing Email" type="email" value={billingForm.billingEmail} onChange={(value) => setBillingForm({ ...billingForm, billingEmail: value })} />
+            <InputWithLabel label="Billing Phone" value={billingForm.billingPhone} onChange={(value) => setBillingForm({ ...billingForm, billingPhone: value })} />
+            <InputWithLabel label="PAN/VAT Number" value={billingForm.panVatNumber} onChange={(value) => setBillingForm({ ...billingForm, panVatNumber: value })} />
+            <div className="space-y-2">
+              <Label>Preferred Billing Cycle</Label>
+              <Select value={billingForm.preferredBillingCycle} onChange={(e) => setBillingForm({ ...billingForm, preferredBillingCycle: e.target.value })}>
+                <option value="MONTHLY">Monthly</option>
+                <option value="QUARTERLY">Quarterly</option>
+                <option value="ANNUAL">Annual</option>
+              </Select>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Billing Address</Label>
+              <Textarea className="rounded-2xl border-slate-200" value={billingForm.billingAddress} onChange={(e) => setBillingForm({ ...billingForm, billingAddress: e.target.value })} />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Notes</Label>
+              <Textarea className="rounded-2xl border-slate-200" value={billingForm.notes} onChange={(e) => setBillingForm({ ...billingForm, notes: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl font-bold" onClick={() => setBillingDialogOpen(false)}>Cancel</Button>
+            <Button className="rounded-xl font-bold bg-slate-900 text-white" disabled={updating} onClick={saveBillingProfile}>Save Billing Profile</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={onboardingDialogOpen} onOpenChange={setOnboardingDialogOpen}>
+        <DialogContent className="rounded-3xl sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Onboarding Checklist</DialogTitle>
+            <DialogDescription>Required and optional platform onboarding checks for {tenant.name}.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[55vh] space-y-3 overflow-y-auto py-4">
+            {(tenant.onboarding?.items ?? []).map((item) => (
+              <div key={item.key} className="flex items-center justify-between rounded-2xl border border-slate-100 p-4">
+                <div>
+                  <p className="text-sm font-bold text-slate-900">{item.label}</p>
+                  <p className="mt-1 text-xs font-semibold text-slate-400">{item.required ? 'Required' : 'Optional'} · {item.source}</p>
+                  {item.href ? <p className="mt-1 text-xs font-bold text-indigo-600">{item.href}</p> : null}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant={item.completed ? 'success' : 'neutral'}>{item.completed ? 'Complete' : 'Open'}</Badge>
+                  <Button size="sm" variant="outline" className="rounded-lg font-bold" onClick={() => setOnboardingOverride({ key: item.key, label: item.label, completed: !item.completed })}>
+                    Override
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!onboardingOverride} onOpenChange={(open: boolean) => !open && setOnboardingOverride(null)}>
+        <DialogContent className="rounded-3xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Override Checklist Item</DialogTitle>
+            <DialogDescription>{onboardingOverride?.label}</DialogDescription>
+          </DialogHeader>
+          <Textarea className="my-4 rounded-2xl border-slate-200" placeholder="Audit reason" value={onboardingReason} onChange={(e) => setOnboardingReason(e.target.value)} />
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl font-bold" onClick={() => setOnboardingOverride(null)}>Cancel</Button>
+            <Button className="rounded-xl font-bold bg-slate-900 text-white" disabled={onboardingReason.trim().length < 5 || updating} onClick={saveOnboardingOverride}>Save Override</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={auditDialogOpen} onOpenChange={setAuditDialogOpen}>
+        <DialogContent className="rounded-3xl sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Filter Tenant Audit</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 sm:grid-cols-2">
+            {(['action', 'resource', 'resourceId', 'userId'] as const).map((key) => (
+              <InputWithLabel key={key} label={key} value={auditFilters[key]} onChange={(value) => setAuditFilters({ ...auditFilters, [key]: value })} />
+            ))}
+            <InputWithLabel label="Start Date" type="date" value={auditFilters.startDate} onChange={(value) => setAuditFilters({ ...auditFilters, startDate: value })} />
+            <InputWithLabel label="End Date" type="date" value={auditFilters.endDate} onChange={(value) => setAuditFilters({ ...auditFilters, endDate: value })} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl font-bold" onClick={() => setAuditFilters({ action: '', resource: '', resourceId: '', userId: '', startDate: '', endDate: '' })}>Clear</Button>
+            <Button className="rounded-xl font-bold bg-slate-900 text-white" disabled={loadingInvoices} onClick={applyTenantAuditFilters}>Apply Filters</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Status Change Dialog */}
       <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
@@ -656,6 +1161,62 @@ function MetricCard({ label, value, icon: Icon, color, bg }: { label: string, va
       </div>
       <p className="text-xs font-black uppercase tracking-widest text-slate-400">{label}</p>
       <p className="mt-1 text-3xl font-black text-slate-900 tracking-tight">{value.toLocaleString()}</p>
+    </div>
+  );
+}
+
+function UsageValue({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+      <p className="mt-1 text-lg font-black text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function InputWithLabel({
+  label,
+  value,
+  onChange,
+  type = 'text',
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+    </div>
+  );
+}
+
+function InvoiceDetail({ invoice }: { invoice: PlatformSaaSInvoiceSummary }) {
+  return (
+    <div className="space-y-4 py-4">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <UsageValue label="Status" value={invoice.status} />
+        <UsageValue label="Issued" value={new Date(invoice.issueDate).toLocaleDateString()} />
+        <UsageValue label="Due" value={new Date(invoice.dueDate).toLocaleDateString()} />
+      </div>
+      <div className="rounded-2xl border border-slate-100">
+        {invoice.lines.map((line) => (
+          <div key={line.id} className="flex items-center justify-between border-b border-slate-50 p-4 last:border-b-0">
+            <div>
+              <p className="text-sm font-bold text-slate-900">{line.description}</p>
+              <p className="text-xs font-semibold text-slate-400">{line.lineType} · Qty {line.quantity}</p>
+            </div>
+            <p className="font-black text-slate-900">{invoice.currency} {Number(line.totalAmount).toLocaleString()}</p>
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <UsageValue label="Total" value={`${invoice.currency} ${Number(invoice.amount).toLocaleString()}`} />
+        <UsageValue label="Paid" value={`${invoice.currency} ${Number(invoice.paidAmount).toLocaleString()}`} />
+        <UsageValue label="Balance" value={`${invoice.currency} ${Number(invoice.balanceAmount).toLocaleString()}`} />
+      </div>
     </div>
   );
 }
@@ -717,6 +1278,71 @@ function InvoicePlaceholderRow() {
       </td>
     </tr>
   );
+}
+
+function makeDefaultInvoiceForm() {
+  const today = new Date().toISOString().slice(0, 10);
+  const due = new Date();
+  due.setDate(due.getDate() + 15);
+  return {
+    issueDate: today,
+    dueDate: due.toISOString().slice(0, 10),
+    lineType: 'SUBSCRIPTION',
+    description: 'SchoolOS subscription billing',
+    quantity: '1',
+    unitAmount: '',
+    notes: '',
+  };
+}
+
+function makeDefaultPaymentForm() {
+  return {
+    amount: '',
+    paymentDate: new Date().toISOString().slice(0, 10),
+    method: 'BANK_TRANSFER',
+    reference: '',
+    notes: '',
+  };
+}
+
+function makeDefaultBillingForm() {
+  return {
+    billingContactName: '',
+    billingEmail: '',
+    billingPhone: '',
+    billingAddress: '',
+    panVatNumber: '',
+    preferredBillingCycle: 'MONTHLY',
+    notes: '',
+  };
+}
+
+function toIsoDate(value: string) {
+  return new Date(`${value}T00:00:00.000Z`).toISOString();
+}
+
+function cleanPayload(values: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(values).filter(([, value]) => value.trim() !== ''),
+  );
+}
+
+function exportAuditCsv(logs: PlatformAuditLog[], fileName: string) {
+  const headers = ['createdAt', 'action', 'resource', 'resourceId', 'tenantId', 'userId'];
+  const rows = logs.map((log) =>
+    headers
+      .map((key) => `"${String(log[key as keyof PlatformAuditLog] ?? '').replace(/"/g, '""')}"`)
+      .join(','),
+  );
+  const blob = new Blob([[headers.join(','), ...rows].join('\n')], {
+    type: 'text/csv;charset=utf-8',
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 function formatBytes(value: number) {

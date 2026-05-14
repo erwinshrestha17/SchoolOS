@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   AlertTriangle, 
   CheckCircle2, 
@@ -29,6 +30,7 @@ import type {
   PlatformProviderConfigSummary,
   PlatformQueueSummary,
   PlatformAuditLog,
+  PlatformFailedJobSummary,
 } from '@schoolos/core';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -48,24 +50,30 @@ import {
 import { Select } from "@/components/ui/select";
 
 export default function PlatformSettings() {
-  const [activeTab, setActiveTab] = useState('health');
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState(() => getInitialSettingsTab());
   const [providers, setProviders] = useState<PlatformProviderConfigSummary[]>([]);
   const [queues, setQueues] = useState<PlatformQueueSummary[]>([]);
   const [health, setHealth] = useState<PlatformHealthSummary | null>(null);
   const [plans, setPlans] = useState<PlatformPlanSummary[]>([]);
   const [auditLogs, setAuditLogs] = useState<PlatformAuditLog[]>([]);
-  const [failedJobs, setFailedJobs] = useState<any[]>([]);
+  const [failedJobs, setFailedJobs] = useState<PlatformFailedJobSummary[]>([]);
   
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [retrying, setRetrying] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   // Audit Filters
   const [auditFilters, setAuditFilters] = useState({
     action: '',
     tenantId: '',
     resource: '',
+    resourceId: '',
+    userId: '',
+    startDate: '',
+    endDate: '',
   });
 
   // Job Inspection State
@@ -75,14 +83,23 @@ export default function PlatformSettings() {
   const [providerDialogOpen, setProviderDialogOpen] = useState(false);
   const [savingProvider, setSavingProvider] = useState(false);
   const [testingProviderId, setTestingProviderId] = useState<string | null>(null);
+  const [providerError, setProviderError] = useState<string | null>(null);
+  const [providerResult, setProviderResult] = useState<string | null>(null);
+  const [editingProvider, setEditingProvider] = useState<PlatformProviderConfigSummary | null>(null);
+  const [disableProvider, setDisableProvider] = useState<PlatformProviderConfigSummary | null>(null);
+  const [disableReason, setDisableReason] = useState('');
+  const [retryDialog, setRetryDialog] = useState<{ queueName: string; jobId?: string } | null>(null);
+  const [retryReason, setRetryReason] = useState('');
+  const [discardDialog, setDiscardDialog] = useState<PlatformFailedJobSummary | null>(null);
+  const [discardConfirm, setDiscardConfirm] = useState('');
 
   const testProvider = async (providerId: string) => {
     setTestingProviderId(providerId);
     try {
       const result = await api.testPlatformProviderConnection(providerId);
-      alert(result.message);
+      setProviderResult(result.message ?? 'Provider connection test completed.');
     } catch (err: any) {
-      alert(err.message ?? 'Connection test failed');
+      setProviderError(err.message ?? 'Connection test failed');
     } finally {
       setTestingProviderId(null);
     }
@@ -111,6 +128,11 @@ export default function PlatformSettings() {
           limit: 20,
           action: auditFilters.action || undefined,
           tenantId: auditFilters.tenantId || undefined,
+          resource: auditFilters.resource || undefined,
+          resourceId: auditFilters.resourceId || undefined,
+          userId: auditFilters.userId || undefined,
+          startDate: auditFilters.startDate || undefined,
+          endDate: auditFilters.endDate || undefined,
         }),
         api.listPlatformFailedJobs({ limit: 50 })
       ]);
@@ -127,26 +149,34 @@ export default function PlatformSettings() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [auditFilters.action, auditFilters.tenantId]);
+  }, [auditFilters]);
 
   const retryQueue = async (queueName: string) => {
-    setRetrying(queueName);
+    setRetryDialog({ queueName });
+    setRetryReason('');
+  };
+
+  const submitRetry = async () => {
+    if (!retryDialog || retryReason.trim().length < 5) return;
+    setRetrying(retryDialog.queueName);
     try {
-      // For simplicity, we just retry the first few if any, or a general retry if supported
-      const failedInQueue = failedJobs.filter(j => j.queueName === queueName);
+      const failedInQueue = retryDialog.jobId
+        ? failedJobs.filter((job) => job.queueName === retryDialog.queueName && job.id === retryDialog.jobId)
+        : failedJobs.filter((job) => job.queueName === retryDialog.queueName);
       if (failedInQueue.length === 0) {
-        alert('No failed jobs found in this queue.');
+        setActionMessage('No failed jobs found in this queue.');
         return;
       }
 
       await Promise.all(failedInQueue.map(job => 
-        api.retryPlatformFailedJob({ queueName, jobId: job.id, reason: 'Operator bulk retry' })
+        api.retryPlatformFailedJob({ queueName: job.queueName, jobId: job.id, reason: retryReason.trim() })
       ));
       
-      alert(`Retried ${failedInQueue.length} jobs.`);
+      setActionMessage(`Retry requested for ${failedInQueue.length} failed job(s).`);
+      setRetryDialog(null);
       await load(true);
     } catch (err: any) {
-      alert(err.message ?? 'Retry failed');
+      setError(err.message ?? 'Retry failed');
     } finally {
       setRetrying(null);
     }
@@ -156,19 +186,76 @@ export default function PlatformSettings() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    const nextTab = getInitialSettingsTab();
+    if (nextTab !== activeTab) {
+      setActiveTab(nextTab);
+    }
+    // The page reads the URL once on navigation; tab changes update the URL below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const saveProvider = async () => {
     setSavingProvider(true);
+    setProviderError(null);
     try {
       await api.upsertPlatformProvider({
         ...providerForm,
         config: JSON.parse(providerForm.config),
       });
+      setProviderResult(editingProvider ? 'Provider updated.' : 'Provider created.');
       setProviderDialogOpen(false);
+      setEditingProvider(null);
       await load(true);
     } catch (err: any) {
-      alert(err.message ?? 'Failed to save provider');
+      setProviderError(err.message ?? 'Failed to save provider');
     } finally {
       setSavingProvider(false);
+    }
+  };
+
+  const openProviderEditor = (provider: PlatformProviderConfigSummary) => {
+    setEditingProvider(provider);
+    setProviderForm({
+      type: provider.type,
+      name: provider.name,
+      environment: provider.environment,
+      enabled: provider.enabled,
+      config: JSON.stringify(provider.config, null, 2),
+    });
+    setProviderDialogOpen(true);
+  };
+
+  const updateProviderStatus = async () => {
+    if (!disableProvider || disableReason.trim().length < 5) return;
+    setSavingProvider(true);
+    setProviderError(null);
+    try {
+      await api.updatePlatformProviderStatus(disableProvider.id, {
+        enabled: false,
+        reason: disableReason.trim(),
+      });
+      setProviderResult('Provider disabled.');
+      setDisableProvider(null);
+      setDisableReason('');
+      await load(true);
+    } catch (err: any) {
+      setProviderError(err.message ?? 'Failed to disable provider');
+    } finally {
+      setSavingProvider(false);
+    }
+  };
+
+  const discardJob = async () => {
+    if (!discardDialog || discardConfirm !== discardDialog.id) return;
+    try {
+      await api.removePlatformJob(discardDialog.queueName, discardDialog.id);
+      setActionMessage('Failed job discarded.');
+      setDiscardDialog(null);
+      setDiscardConfirm('');
+      await load(true);
+    } catch (err: any) {
+      setError(err.message ?? 'Failed to discard job');
     }
   };
 
@@ -214,6 +301,8 @@ export default function PlatformSettings() {
           <Button 
             className="rounded-2xl h-12 px-6 font-bold bg-slate-900 shadow-xl shadow-slate-200 hover:bg-slate-800 gap-2 text-white"
             onClick={() => {
+              setEditingProvider(null);
+              setProviderError(null);
               setProviderForm({ type: 'SMS', name: '', environment: 'PRODUCTION', enabled: true, config: '{}' });
               setProviderDialogOpen(true);
             }}
@@ -231,7 +320,24 @@ export default function PlatformSettings() {
         </div>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
+      {(actionMessage || providerResult || providerError) && (
+        <div className={`rounded-2xl border p-4 text-sm font-bold ${
+          providerError
+            ? 'border-rose-100 bg-rose-50 text-rose-700'
+            : 'border-emerald-100 bg-emerald-50 text-emerald-700'
+        }`}>
+          {providerError || providerResult || actionMessage}
+        </div>
+      )}
+
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          setActiveTab(value);
+          router.replace(`/platform/settings?tab=${value}`);
+        }}
+        className="space-y-8"
+      >
         <TabsList className="bg-slate-100/50 p-1 rounded-2xl border border-slate-100 w-fit">
           <TabsTrigger value="health" className="rounded-xl px-6 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
             System Health
@@ -280,37 +386,12 @@ export default function PlatformSettings() {
           <Card className="rounded-[2.5rem] border-slate-100 shadow-sm overflow-hidden">
             <CardHeader className="bg-slate-50/50 p-8">
               <CardTitle className="text-2xl font-black">Environmental Metrics</CardTitle>
-              <CardDescription>Real-time telemetry from the production cluster.</CardDescription>
+              <CardDescription>Cluster telemetry is shown only when backed by platform health APIs.</CardDescription>
             </CardHeader>
             <CardContent className="p-8">
-               <div className="grid gap-12 md:grid-cols-3">
-                 <div className="space-y-3">
-                   <div className="flex items-center justify-between">
-                     <span className="text-sm font-bold text-slate-700">CPU Usage</span>
-                     <span className="text-sm font-black text-slate-900">12%</span>
-                   </div>
-                   <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                     <div className="h-full bg-indigo-500 w-[12%]" />
-                   </div>
-                 </div>
-                 <div className="space-y-3">
-                   <div className="flex items-center justify-between">
-                     <span className="text-sm font-bold text-slate-700">Memory Load</span>
-                     <span className="text-sm font-black text-slate-900">4.2 GB / 16 GB</span>
-                   </div>
-                   <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                     <div className="h-full bg-sky-500 w-[26%]" />
-                   </div>
-                 </div>
-                 <div className="space-y-3">
-                   <div className="flex items-center justify-between">
-                     <span className="text-sm font-bold text-slate-700">API Latency (p99)</span>
-                     <span className="text-sm font-black text-slate-900">124ms</span>
-                   </div>
-                   <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                     <div className="h-full bg-emerald-500 w-[45%]" />
-                   </div>
-                 </div>
+               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6">
+                 <p className="text-sm font-bold text-slate-700">CPU, memory, DB pool, and API latency telemetry are not configured in the current backend response.</p>
+                 <p className="mt-2 text-xs font-semibold text-slate-500">No fake production metrics are displayed. Connect observability data to the platform health API to populate this section.</p>
                </div>
             </CardContent>
           </Card>
@@ -355,13 +436,25 @@ export default function PlatformSettings() {
                        disabled={testingProviderId === provider.id}
                      >
                         {testingProviderId === provider.id ? <RefreshCw size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
-                        Test Connection
+                       Test Connection
                      </Button>
                      <div className="flex items-center gap-2">
-                       <Button variant="ghost" size="sm" className="w-full rounded-xl font-bold text-slate-600 hover:bg-slate-100">
+                       <Button
+                         variant="ghost"
+                         size="sm"
+                         className="w-full rounded-xl font-bold text-slate-600 hover:bg-slate-100"
+                         onClick={() => openProviderEditor(provider)}
+                         data-testid="provider-edit-button"
+                       >
                           Edit
                        </Button>
-                       <Button variant="ghost" size="sm" className="rounded-xl font-bold text-rose-500 hover:bg-rose-50 hover:text-rose-600">
+                       <Button
+                         variant="ghost"
+                         size="sm"
+                         className="rounded-xl font-bold text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+                         onClick={() => setDisableProvider(provider)}
+                         disabled={!provider.enabled}
+                       >
                           <Trash2 size={16} />
                        </Button>
                      </div>
@@ -467,12 +560,7 @@ export default function PlatformSettings() {
                                   variant="ghost" 
                                   size="sm" 
                                   className="rounded-lg font-bold text-rose-500"
-                                  onClick={async () => {
-                                    if (confirm('Permanently remove this job?')) {
-                                      await api.removePlatformJob(job.queueName, job.id);
-                                      await load(true);
-                                    }
-                                  }}
+                                  onClick={() => setDiscardDialog(job)}
                                 >
                                   Discard
                                 </Button>
@@ -480,9 +568,9 @@ export default function PlatformSettings() {
                                   variant="outline" 
                                   size="sm" 
                                   className="rounded-lg font-bold border-slate-200"
-                                  onClick={async () => {
-                                    await api.retryPlatformFailedJob({ queueName: job.queueName, jobId: job.id, reason: 'Operator manual retry' });
-                                    await load(true);
+                                  onClick={() => {
+                                    setRetryDialog({ queueName: job.queueName, jobId: job.id });
+                                    setRetryReason('');
                                   }}
                                 >
                                   Retry
@@ -543,7 +631,7 @@ export default function PlatformSettings() {
 
         <TabsContent value="audit" className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
            <div className="flex flex-col gap-4 md:flex-row md:items-end justify-between bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 flex-1">
                  <div className="space-y-2">
                     <Label className="text-xs font-black text-slate-500 uppercase tracking-widest">Action Filter</Label>
                     <Input 
@@ -562,14 +650,26 @@ export default function PlatformSettings() {
                       onChange={(e) => setAuditFilters(prev => ({ ...prev, tenantId: e.target.value }))}
                     />
                  </div>
+                 <FilterInput label="Resource" value={auditFilters.resource} onChange={(value) => setAuditFilters(prev => ({ ...prev, resource: value }))} />
+                 <FilterInput label="Resource ID" value={auditFilters.resourceId} onChange={(value) => setAuditFilters(prev => ({ ...prev, resourceId: value }))} />
+                 <FilterInput label="User ID" value={auditFilters.userId} onChange={(value) => setAuditFilters(prev => ({ ...prev, userId: value }))} />
+                 <FilterInput label="Start Date" type="date" value={auditFilters.startDate} onChange={(value) => setAuditFilters(prev => ({ ...prev, startDate: value }))} />
+                 <FilterInput label="End Date" type="date" value={auditFilters.endDate} onChange={(value) => setAuditFilters(prev => ({ ...prev, endDate: value }))} />
               </div>
               <div className="flex items-center gap-2">
                  <Button 
                    variant="outline" 
                    className="rounded-xl font-bold gap-2"
-                   onClick={() => setAuditFilters({ action: '', tenantId: '', resource: '' })}
+                   onClick={() => setAuditFilters({ action: '', tenantId: '', resource: '', resourceId: '', userId: '', startDate: '', endDate: '' })}
                  >
                     Clear
+                 </Button>
+                 <Button
+                   variant="outline"
+                   className="rounded-xl font-bold gap-2"
+                   onClick={() => exportSettingsAuditCsv(auditLogs)}
+                 >
+                    Export current page CSV
                  </Button>
                  <Button 
                    className="rounded-xl font-bold bg-slate-900 text-white gap-2"
@@ -637,20 +737,71 @@ export default function PlatformSettings() {
         </TabsContent>
       </Tabs>
 
+      <Dialog open={!!retryDialog} onOpenChange={(open: boolean) => !open && setRetryDialog(null)}>
+        <DialogContent className="rounded-3xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Retry Failed Job</DialogTitle>
+            <DialogDescription>
+              {retryDialog?.jobId ? `Job ${retryDialog.jobId}` : 'Bulk retry'} in queue {retryDialog?.queueName}. Retry is audited and requires an operator reason.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea className="my-4 rounded-2xl border-slate-200" placeholder="Reason for retrying this failed job" value={retryReason} onChange={(e) => setRetryReason(e.target.value)} />
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl font-bold" onClick={() => setRetryDialog(null)}>Cancel</Button>
+            <Button className="rounded-xl font-bold bg-slate-900 text-white" disabled={retryReason.trim().length < 5 || !!retrying} onClick={submitRetry}>Retry</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!discardDialog} onOpenChange={(open: boolean) => !open && setDiscardDialog(null)}>
+        <DialogContent className="rounded-3xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-rose-700">Discard Failed Job</DialogTitle>
+            <DialogDescription>
+              Type the job id to confirm removal. The backend audit records the queue and job id; sensitive payload data remains masked.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-4">
+            <Label>Confirmation: {discardDialog?.id}</Label>
+            <Input value={discardConfirm} onChange={(e) => setDiscardConfirm(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl font-bold" onClick={() => setDiscardDialog(null)}>Cancel</Button>
+            <Button variant="destructive" className="rounded-xl font-bold" disabled={!discardDialog || discardConfirm !== discardDialog.id} onClick={discardJob}>Discard Job</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!disableProvider} onOpenChange={(open: boolean) => !open && setDisableProvider(null)}>
+        <DialogContent className="rounded-3xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Disable Provider</DialogTitle>
+            <DialogDescription>
+              Disable {disableProvider?.name}. This status-only action does not expose or rewrite provider secrets.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea className="my-4 rounded-2xl border-slate-200" placeholder="Reason for disabling this provider" value={disableReason} onChange={(e) => setDisableReason(e.target.value)} />
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl font-bold" onClick={() => setDisableProvider(null)}>Cancel</Button>
+            <Button variant="destructive" className="rounded-xl font-bold" disabled={disableReason.trim().length < 5 || savingProvider} onClick={updateProviderStatus}>Disable Provider</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Provider Dialog */}
       <Dialog open={providerDialogOpen} onOpenChange={setProviderDialogOpen}>
         <DialogContent className="rounded-3xl sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black">Provider Configuration</DialogTitle>
+            <DialogTitle className="text-2xl font-black">{editingProvider ? 'Edit Provider' : 'Provider Configuration'}</DialogTitle>
             <DialogDescription>
-              Sensitive values will be encrypted on the server. Only root operators can manage these.
+              Sensitive values are masked in the UI. Replacing a secret value will rotate the stored encrypted secret.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-6 py-6">
             <div className="grid grid-cols-2 gap-4">
                <div className="space-y-2">
                  <Label className="font-bold">Type</Label>
-                 <Select value={providerForm.type} onChange={(e) => setProviderForm({...providerForm, type: e.target.value})}>
+                 <Select value={providerForm.type} disabled={!!editingProvider} onChange={(e) => setProviderForm({...providerForm, type: e.target.value})}>
                    <option value="SMS">SMS</option>
                    <option value="EMAIL">Email</option>
                    <option value="FCM">FCM</option>
@@ -659,18 +810,24 @@ export default function PlatformSettings() {
                </div>
                <div className="space-y-2">
                  <Label className="font-bold">Environment</Label>
-                 <Select value={providerForm.environment} onChange={(e) => setProviderForm({...providerForm, environment: e.target.value})}>
+                 <Select value={providerForm.environment} disabled={!!editingProvider} onChange={(e) => setProviderForm({...providerForm, environment: e.target.value})}>
                    <option value="TEST">Test</option>
                    <option value="PRODUCTION">Production</option>
                  </Select>
                </div>
             </div>
+            {editingProvider && (
+              <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+                Type, name, and environment identify the provider record. Masked secret values are preserved by the backend unless replaced.
+              </div>
+            )}
             <div className="space-y-2">
                <Label className="font-bold">Provider Name</Label>
                <Input 
                  placeholder="e.g. sparrow, sendgrid, r2" 
                  className="rounded-xl border-slate-200"
                  value={providerForm.name}
+                 disabled={!!editingProvider}
                  onChange={(e) => setProviderForm({...providerForm, name: e.target.value})}
                />
             </div>
@@ -696,4 +853,54 @@ export default function PlatformSettings() {
       </Dialog>
     </div>
   );
+}
+
+function FilterInput({
+  label,
+  value,
+  onChange,
+  type = 'text',
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs font-black text-slate-500 uppercase tracking-widest">{label}</Label>
+      <Input
+        type={type}
+        className="rounded-xl border-slate-200"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
+  );
+}
+
+function exportSettingsAuditCsv(logs: PlatformAuditLog[]) {
+  const headers = ['createdAt', 'action', 'resource', 'resourceId', 'tenantId', 'userId'];
+  const rows = logs.map((log) =>
+    headers
+      .map((key) => `"${String(log[key as keyof PlatformAuditLog] ?? '').replace(/"/g, '""')}"`)
+      .join(','),
+  );
+  const blob = new Blob([[headers.join(','), ...rows].join('\n')], {
+    type: 'text/csv;charset=utf-8',
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = 'platform-audit-current-page.csv';
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function getInitialSettingsTab() {
+  if (typeof window === 'undefined') return 'health';
+  const tab = new URLSearchParams(window.location.search).get('tab');
+  return ['health', 'providers', 'queues', 'plans', 'audit'].includes(tab ?? '')
+    ? tab!
+    : 'health';
 }

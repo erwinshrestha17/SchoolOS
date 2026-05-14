@@ -33,6 +33,7 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
         create: jest.fn(),
       },
       tenantSubscription: {
+        findMany: jest.fn(),
         findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
@@ -382,6 +383,93 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'tenant_subscription_status_updated',
+        resource: 'subscriptions',
+        tenantId: 'tenant-1',
+        userId: 'platform-user-1',
+      }),
+    );
+  });
+
+  it('expires previous active-like subscriptions before assigning a new active subscription', async () => {
+    const previous = {
+      id: 'sub-old',
+      tenantId: 'tenant-1',
+      planId: 'plan-basic',
+      status: 'ACTIVE',
+      startsAt: new Date('2026-01-01'),
+      notes: 'Initial pilot plan',
+    };
+    const created = {
+      id: 'sub-new',
+      tenantId: 'tenant-1',
+      planId: 'plan-premium',
+      status: 'ACTIVE',
+      startsAt: new Date('2026-05-15'),
+      endsAt: null,
+      renewsAt: new Date('2027-05-15'),
+      trialEndsAt: null,
+      plan: { key: 'premium', name: 'Premium' },
+    };
+
+    prisma.tenantSubscription.findFirst.mockResolvedValue(previous);
+    prisma.tenantSubscription.findMany.mockResolvedValue([previous]);
+    prisma.tenantSubscription.update.mockResolvedValue({
+      ...previous,
+      status: 'EXPIRED',
+      endsAt: new Date('2026-05-15'),
+    });
+    prisma.tenantSubscription.create.mockResolvedValue(created);
+    jest.spyOn(service as any, 'toSubscriptionSummary').mockReturnValue({
+      id: 'sub-new',
+      tenantId: 'tenant-1',
+      planId: 'plan-premium',
+      status: 'ACTIVE',
+    });
+
+    await service.assignSubscription(
+      'tenant-1',
+      {
+        planId: 'plan-premium',
+        status: 'ACTIVE',
+        startsAt: '2026-05-15T00:00:00.000Z',
+        renewsAt: '2027-05-15T00:00:00.000Z',
+        notes: 'Plan changed after pilot approval',
+      },
+      'platform-user-1',
+    );
+
+    expect(prisma.tenantSubscription.findMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'tenant-1',
+        status: { in: ['TRIAL', 'ACTIVE', 'GRACE'] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(prisma.tenantSubscription.update).toHaveBeenCalledWith({
+      where: { id: 'sub-old' },
+      data: expect.objectContaining({
+        status: 'EXPIRED',
+        endsAt: new Date('2026-05-15T00:00:00.000Z'),
+        notes: expect.stringContaining(
+          'Superseded by platform subscription assignment',
+        ),
+      }),
+    });
+    expect(prisma.tenantSubscription.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tenantId: 'tenant-1',
+          planId: 'plan-premium',
+          status: 'ACTIVE',
+        }),
+      }),
+    );
+    expect((prisma as any).invoice).toBeUndefined();
+    expect((prisma as any).payment).toBeUndefined();
+    expect((prisma as any).journalEntry).toBeUndefined();
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'tenant_subscription_assigned',
         resource: 'subscriptions',
         tenantId: 'tenant-1',
         userId: 'platform-user-1',

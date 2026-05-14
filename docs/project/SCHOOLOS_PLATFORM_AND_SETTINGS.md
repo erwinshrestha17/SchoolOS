@@ -57,13 +57,18 @@ Implemented M0 foundation areas:
 ```text
 Platform tenant list/detail/dashboard/status flows
 Reason-required tenant suspend/activate actions
+Platform tenant subscription plan-change workflow with audit reason and current-vs-new preview
+Reasoned, time-bound support override entry from tenant detail
+Tenant SaaS invoice create/payment/cancel actions and billing profile edit workflow
+Tenant onboarding checklist detail and audited override workflow
 Audited support override reason
 Plan, feature, subscription, override, and usage-counter foundations
 Explainable entitlement checks and usage-limit surfaces
 Manual tenant billing profile
 SaaS invoices, line items, and payments
 Provider config masking and secret-safe response shape
-Queue health and audited retry endpoint
+Provider edit/disable workflow without exposing or rewriting masked secrets
+Queue health plus audited retry/discard operator workflows
 File upload validation and dangerous extension blocking
 Private/protected file URL response shape
 Report export history and audited export persistence
@@ -164,6 +169,24 @@ School subscription, plan, SMS quota, AI credits, module entitlement -> M0 platf
 ```
 
 M0 SaaS billing records must not post directly into school tenant fee ledgers. Any future internal SchoolOS company accounting must be modeled separately from a tenant school's M3/M9 accounting domain.
+
+Current platform subscription plan changes follow this boundary:
+
+```text
+Platform operator changes a tenant's SchoolOS plan/status/dates
+→ POST /platform/tenants/:tenantId/subscriptions
+→ previous TRIAL/ACTIVE/GRACE subscription rows are expired for history safety
+→ no M3 fee invoice, payment, or M9 journal entry is created
+```
+
+Current platform tenant billing actions follow the same boundary:
+
+```text
+SchoolOS subscription invoice/payment/cancel actions
+→ /platform/tenants/:tenantId/saas-invoices/*
+→ platform SaaS billing records only
+→ no M3 student fee invoice, no tenant cashier receipt, no M9 school journal entry
+```
 
 ---
 

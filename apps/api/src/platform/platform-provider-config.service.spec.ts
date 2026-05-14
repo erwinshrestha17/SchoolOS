@@ -20,6 +20,7 @@ describe('PlatformService provider config hardening', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         upsert: jest.fn(),
+        update: jest.fn(),
       },
     };
     auditService = { record: jest.fn().mockResolvedValue({}) };
@@ -275,6 +276,114 @@ describe('PlatformService provider config hardening', () => {
       expect.objectContaining({
         create: expect.objectContaining({ secretKeys: ['password'] }),
         update: expect.objectContaining({ secretKeys: ['password'] }),
+      }),
+    );
+  });
+
+  it('preserves existing encrypted secret values when edited form posts masked secrets', async () => {
+    const before = {
+      id: 'provider-1',
+      type: 'SMS',
+      name: 'sparrow',
+      enabled: true,
+      environment: 'TEST',
+      configEncrypted: {
+        apiKey: 'encrypted-original-secret',
+        senderId: 'SchoolOS',
+      },
+      secretKeys: ['apiKey'],
+    };
+    const persisted = {
+      ...before,
+      configEncrypted: {
+        apiKey: 'encrypted-original-secret',
+        senderId: 'SchoolOS Nepal',
+      },
+    };
+
+    prisma.providerConfig.findUnique.mockResolvedValue(before);
+    prisma.providerConfig.upsert.mockResolvedValue(persisted);
+    jest
+      .spyOn(service as any, 'validateProvider')
+      .mockImplementation(() => undefined);
+    jest.spyOn(service as any, 'encryptProviderConfig').mockReturnValue({
+      apiKey: 'encrypted-masked-value',
+      senderId: 'SchoolOS Nepal',
+    });
+    jest.spyOn(service as any, 'toProviderSummary').mockReturnValue({
+      id: 'provider-1',
+      config: { apiKey: '********', senderId: 'SchoolOS Nepal' },
+      secretKeys: ['apiKey'],
+    });
+
+    await service.upsertProvider(
+      {
+        type: 'SMS',
+        name: 'sparrow',
+        enabled: true,
+        environment: 'TEST',
+        config: { apiKey: '********', senderId: 'SchoolOS Nepal' },
+        secretKeys: ['apiKey'],
+      },
+      'platform-user-1',
+    );
+
+    expect(prisma.providerConfig.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          configEncrypted: {
+            apiKey: 'encrypted-original-secret',
+            senderId: 'SchoolOS Nepal',
+          },
+        }),
+      }),
+    );
+  });
+
+  it('updates provider enabled status without rewriting provider config secrets', async () => {
+    const before = {
+      id: 'provider-1',
+      type: 'SMS',
+      name: 'sparrow',
+      enabled: true,
+      environment: 'TEST',
+      configEncrypted: { apiKey: 'encrypted-original-secret' },
+      secretKeys: ['apiKey'],
+    };
+    prisma.providerConfig.findUnique.mockResolvedValue(before);
+    prisma.providerConfig.update.mockResolvedValue({
+      ...before,
+      enabled: false,
+    });
+    jest
+      .spyOn(service as any, 'toProviderSummary')
+      .mockImplementation((provider: any) => ({
+        id: provider.id,
+        enabled: provider.enabled,
+        config: { apiKey: '********' },
+        secretKeys: ['apiKey'],
+      }));
+
+    await service.updateProviderStatus(
+      'provider-1',
+      false,
+      'platform-user-1',
+      'Rotating provider credentials',
+    );
+
+    expect(prisma.providerConfig.update).toHaveBeenCalledWith({
+      where: { id: 'provider-1' },
+      data: {
+        enabled: false,
+        updatedBy: 'platform-user-1',
+      },
+    });
+    expect(prisma.providerConfig.upsert).not.toHaveBeenCalled();
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'provider_config_disabled',
+        resource: 'provider_config',
+        resourceId: 'provider-1',
       }),
     );
   });
