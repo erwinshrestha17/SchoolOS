@@ -80,6 +80,7 @@ describe('Communications Delivery Reliability Integration (E2E)', () => {
       auditService as unknown as AuditService,
       {
         verifyLimit: jest.fn().mockResolvedValue(undefined),
+        checkLimit: jest.fn().mockResolvedValue(undefined),
         incrementUsage: jest.fn().mockResolvedValue(undefined),
       } as any,
     );

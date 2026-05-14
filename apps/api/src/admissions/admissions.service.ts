@@ -18,6 +18,7 @@ import { StorageService } from '../storage/storage.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { StudentRecordsService } from '../student-records/student-records.service';
 import { StudentsService } from '../students/students.service';
+import { UsageService } from '../usage/usage.service';
 import { UsersService } from '../users/users.service';
 import {
   buildAdmissionDtoFromCsvRow,
@@ -52,6 +53,7 @@ export class AdmissionsService {
     private readonly studentsService: StudentsService,
     private readonly storageService: StorageService,
     private readonly fileRegistryService: FileRegistryService,
+    private readonly usageService: UsageService,
   ) {}
 
   async listAdmissions(actor: AuthContext) {
@@ -462,6 +464,8 @@ export class AdmissionsService {
       actor,
     });
 
+    await this.usageService.incrementUsage(actor.tenantId, 'students.count');
+
     return {
       student: {
         id: core.student.id,
@@ -626,6 +630,8 @@ export class AdmissionsService {
   ): Promise<AdmissionReferenceContext> {
     this.assertGuardianPhoneRequirement(dto.guardians);
 
+    await this.usageService.checkLimit(actor.tenantId, 'students.count', 1);
+
     const [academicYear, classroom, section] = await Promise.all([
       this.prisma.academicYear.findFirst({
         where: { id: dto.academicYearId, tenantId: actor.tenantId },
@@ -713,9 +719,12 @@ export class AdmissionsService {
   }
 
   private assertGuardianPhoneRequirement(guardians: AdmissionGuardianInput[]) {
-    const hasValidPrimaryPhone = guardians.some((guardian) =>
-      isValidGuardianPhone(guardian.primaryPhone),
-    );
+    const hasValidPrimaryPhone = guardians.some((guardian) => {
+      const phone = guardian.primaryPhone;
+      if (!phone) return false;
+      const clean = phone.trim().replace(/[\s-()]/g, '');
+      return /^(9\d{9}|\+?\d{10,15})$/.test(clean);
+    });
 
     if (!hasValidPrimaryPhone) {
       throw new BadRequestException(
@@ -884,14 +893,6 @@ function buildBulkImportErrorCsv(
 
 function normalizeGuardianPhone(phone: string) {
   return phone.trim().replace(/\s+/g, ' ');
-}
-
-function isValidGuardianPhone(phone: string | undefined) {
-  if (!phone) {
-    return false;
-  }
-
-  return /^\+?[0-9][0-9\s-]{6,19}$/.test(normalizeGuardianPhone(phone));
 }
 
 function formatImportError(error: unknown) {

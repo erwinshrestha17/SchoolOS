@@ -76,25 +76,50 @@ export class JwtAuthGuard implements CanActivate {
     const overrideTenantId = resolveHeader(
       request.headers['x-schoolos-tenant-id'],
     );
-    const overrideReason = resolveHeader(
-      request.headers['x-schoolos-tenant-override-reason'],
-    );
-    const canOverrideTenant = roles.includes('platform_super_admin');
+    const isPlatformUser = roles.includes('platform_super_admin');
 
-    if (overrideTenantId && !canOverrideTenant) {
-      throw new ForbiddenException(
-        'Tenant override requires platform super admin',
-      );
-    }
-    if (overrideTenantId && (!overrideReason || overrideReason.length < 5)) {
-      throw new ForbiddenException(
-        'Tenant override requires an explicit reason',
-      );
-    }
+    let effectiveTenantId = payload.tenantId;
 
-    const effectiveTenantId = overrideTenantId
-      ? await this.resolveOverrideTenantId(overrideTenantId)
-      : payload.tenantId;
+    if (overrideTenantId) {
+      if (!isPlatformUser) {
+        throw new ForbiddenException(
+          'Tenant override requires platform super admin',
+        );
+      }
+
+      const activeOverride = await this.prisma.supportOverride.findFirst({
+        where: {
+          platformUserId: user.id,
+          tenantId: overrideTenantId,
+          isActive: true,
+          expiresAt: { gt: new Date() },
+        },
+      });
+
+      if (!activeOverride) {
+        throw new ForbiddenException(
+          'No active support override session found or session expired',
+        );
+      }
+
+      const reason = resolveHeader(
+        request.headers['x-schoolos-tenant-override-reason'],
+      );
+
+      await this.auditService.record({
+        action: 'tenant_override',
+        resource: 'auth',
+        tenantId: payload.tenantId,
+        userId: user.id,
+        after: {
+          originalTenantId: payload.tenantId,
+          effectiveTenantId: overrideTenantId,
+          reason: reason || 'Not specified',
+        },
+      });
+
+      effectiveTenantId = await this.resolveOverrideTenantId(overrideTenantId);
+    }
 
     request.auth = {
       userId: user.id,
@@ -110,20 +135,6 @@ export class JwtAuthGuard implements CanActivate {
 
     if (hasActiveCls) {
       this.cls.set(TENANT_ID_KEY, effectiveTenantId);
-    }
-
-    if (overrideTenantId) {
-      await this.auditService.record({
-        action: 'tenant_override',
-        resource: 'auth',
-        tenantId: payload.tenantId,
-        userId: payload.sub,
-        after: {
-          originalTenantId: payload.tenantId,
-          effectiveTenantId,
-          reason: overrideReason,
-        },
-      });
     }
 
     return true;

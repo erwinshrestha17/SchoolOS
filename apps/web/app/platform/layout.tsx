@@ -4,7 +4,7 @@ import { useSession } from '../../components/session-provider';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { PlatformShell } from '../../components/layout/platform-shell';
-import { PermissionDenied } from '../../components/ui/permission-denied';
+import { PermissionDenied } from '../../components/platform/PermissionDenied';
 
 const PLATFORM_ROLES = [
   'platform_super_admin',

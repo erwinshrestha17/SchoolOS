@@ -31,7 +31,7 @@ export class FileRegistryService {
     entityId?: string;
     metadata?: Prisma.InputJsonValue;
   }) {
-    await this.usageService.verifyLimit(
+    await this.usageService.checkLimit(
       input.tenantId,
       'storage.bytes',
       input.sizeBytes,

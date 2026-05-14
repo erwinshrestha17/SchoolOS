@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PlatformTenantUsage } from '@schoolos/core';
+import { PlansService } from '../plans/plans.service';
 
 @Injectable()
 export class UsageService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly plansService: PlansService,
+  ) {}
 
   async getTenantUsageSummary(tenantId: string): Promise<PlatformTenantUsage> {
     const tenant = await this.prisma.tenant.findUnique({
@@ -76,39 +80,54 @@ export class UsageService {
   }
 
   async verifyLimit(tenantId: string, usageKey: string, currentCount: number) {
-    const subscription = await this.prisma.tenantSubscription.findFirst({
-      where: {
-        tenantId,
-        status: { in: ['ACTIVE', 'TRIAL', 'GRACE'] },
-      },
-      include: {
-        plan: {
-          include: {
-            usageLimits: {
-              where: { usageKey },
+    return this.plansService.validateLimit(tenantId, usageKey, currentCount);
+  }
+
+  async getCurrentUsageCount(
+    tenantId: string,
+    usageKey: string,
+  ): Promise<number> {
+    const now = new Date();
+    const periodStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+    );
+
+    switch (usageKey) {
+      case 'students.count':
+        return this.prisma.student.count({ where: { tenantId } });
+      case 'staff.count':
+        return this.prisma.staff.count({
+          where: { tenantId, status: 'ACTIVE' },
+        });
+      case 'storage.bytes':
+        const storage = await this.prisma.fileAsset.aggregate({
+          where: { tenantId, softDeletedAt: null },
+          _sum: { sizeBytes: true },
+        });
+        return Number(storage._sum.sizeBytes || 0);
+      default:
+        // Periodic counters from UsageCounter table
+        const counter = await this.prisma.usageCounter.findUnique({
+          where: {
+            tenantId_usageKey_period_periodStart: {
+              tenantId,
+              usageKey,
+              period: 'MONTHLY',
+              periodStart,
             },
           },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (!subscription) {
-      // If no active subscription, default to a very low limit or block
-      if (currentCount >= 10) {
-        throw new NotFoundException(
-          'No active subscription found. Free limit of 10 reached.',
-        );
-      }
-      return;
+        });
+        return counter?.value || 0;
     }
+  }
 
-    const limit = subscription.plan?.usageLimits?.[0];
-    if (limit && currentCount >= limit.limit) {
-      throw new NotFoundException(
-        `Plan limit reached for ${usageKey}. Limit: ${limit.limit}. Please upgrade your plan.`,
-      );
-    }
+  async checkLimit(tenantId: string, usageKey: string, incrementBy = 0) {
+    const current = await this.getCurrentUsageCount(tenantId, usageKey);
+    await this.plansService.validateLimit(
+      tenantId,
+      usageKey,
+      current + incrementBy,
+    );
   }
 
   async incrementUsage(tenantId: string, usageKey: string, amount = 1) {

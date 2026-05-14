@@ -45,7 +45,10 @@ describe('StudentsService (iEMIS Export)', () => {
         { provide: AuditService, useValue: { record: jest.fn() } },
         { provide: UsersService, useValue: {} },
         { provide: CommunicationsService, useValue: {} },
-        { provide: UsageService, useValue: { verifyLimit: jest.fn() } },
+        {
+          provide: UsageService,
+          useValue: { verifyLimit: jest.fn(), checkLimit: jest.fn() },
+        },
         { provide: StorageService, useValue: {} },
         { provide: FileRegistryService, useValue: {} },
       ],

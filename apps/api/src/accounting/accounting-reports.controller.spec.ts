@@ -5,6 +5,8 @@ import { AccountingReportExportsService } from './accounting-report-exports.serv
 import { AuditService } from '../audit/audit.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { Reflector } from '@nestjs/core';
+import { PlansService } from '../plans/plans.service';
 import { Response } from 'express';
 
 describe('AccountingReportsController', () => {
@@ -48,6 +50,13 @@ describe('AccountingReportsController', () => {
           useValue: mockExportsService,
         },
         { provide: AuditService, useValue: mockAuditService },
+        {
+          provide: PlansService,
+          useValue: {
+            checkFeatureEnabled: jest.fn().mockResolvedValue({ allowed: true }),
+          },
+        },
+        Reflector,
       ],
     })
       .overrideGuard(JwtAuthGuard)

@@ -30,7 +30,7 @@ describe('M0 Entitlement enforcement contracts', () => {
       expect(guard).toContain('EntitlementGuard');
       expect(guard).toContain('CanActivate');
       expect(guard).toContain('ForbiddenException');
-      expect(guard).toContain('is not enabled for your current plan');
+      expect(guard).toContain('is not enabled for your tenant');
     });
 
     it('EntitlementGuard reads featureKey from decorator metadata', () => {
@@ -85,7 +85,7 @@ describe('M0 Entitlement enforcement contracts', () => {
       const plansService = read('src/plans/plans.service.ts');
 
       expect(plansService).toContain('!tenant.isActive');
-      expect(plansService).toContain('return false');
+      expect(plansService).toContain('allowed: false');
     });
 
     it('validates usage limits throw ForbiddenException on excess', () => {

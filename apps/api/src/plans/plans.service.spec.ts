@@ -34,7 +34,9 @@ describe('PlansService entitlement and usage enforcement', () => {
 
     await expect(
       service.checkFeatureEnabled('tenant-1', 'module.attendance'),
-    ).resolves.toBe(false);
+    ).resolves.toEqual(
+      expect.objectContaining({ allowed: false, reason: 'tenant_inactive' }),
+    );
 
     expect(prisma.tenantFeatureOverride.findUnique).not.toHaveBeenCalled();
     expect(prisma.tenantSubscription.findFirst).not.toHaveBeenCalled();
@@ -48,7 +50,9 @@ describe('PlansService entitlement and usage enforcement', () => {
 
     await expect(
       service.checkFeatureEnabled('tenant-1', 'module.fees'),
-    ).resolves.toBe(false);
+    ).resolves.toEqual(
+      expect.objectContaining({ allowed: false, reason: 'feature_locked' }),
+    );
 
     expect(prisma.tenantFeatureOverride.findUnique).toHaveBeenCalledWith({
       where: {
@@ -73,7 +77,7 @@ describe('PlansService entitlement and usage enforcement', () => {
 
     await expect(
       service.checkFeatureEnabled('tenant-1', 'module.students'),
-    ).resolves.toBe(true);
+    ).resolves.toEqual(expect.objectContaining({ allowed: true }));
 
     expect(prisma.tenantSubscription.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -97,14 +101,16 @@ describe('PlansService entitlement and usage enforcement', () => {
 
     await expect(
       service.checkFeatureEnabled('tenant-1', 'module.library'),
-    ).resolves.toBe(false);
+    ).resolves.toEqual(
+      expect.objectContaining({ allowed: false, reason: 'feature_locked' }),
+    );
   });
 
   it('rejects usage when there is no active subscription', async () => {
     prisma.tenantSubscription.findFirst.mockResolvedValue(null);
 
     await expect(
-      service.validateLimit('tenant-1', 'students.count', 1),
+      service.validateLimit('tenant-1', 'students.count', 10),
     ).rejects.toThrow(ForbiddenException);
   });
 

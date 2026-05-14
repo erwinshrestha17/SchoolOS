@@ -12,14 +12,31 @@ export enum PlanKey {
   PREMIUM = 'premium',
 }
 
+export interface EntitlementCheckResult {
+  allowed: boolean;
+  reason?:
+    | 'tenant_inactive'
+    | 'subscription_missing'
+    | 'feature_locked'
+    | 'usage_limit_exceeded';
+  message?: string;
+}
+
 @Injectable()
 export class PlansService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getTenantStatus(tenantId: string) {
+    return this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true, isActive: true },
+    });
+  }
+
   async checkFeatureEnabled(
     tenantId: string,
     featureKey: string,
-  ): Promise<boolean> {
+  ): Promise<EntitlementCheckResult> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { isActive: true },
@@ -30,7 +47,12 @@ export class PlansService {
     }
 
     if (!tenant.isActive) {
-      return false;
+      return {
+        allowed: false,
+        reason: 'tenant_inactive',
+        message:
+          'Your school account is currently suspended. Please contact platform support.',
+      };
     }
 
     // 1. Check for manual overrides
@@ -39,7 +61,13 @@ export class PlansService {
     });
 
     if (override) {
-      return override.enabled;
+      return {
+        allowed: override.enabled,
+        reason: override.enabled ? undefined : 'feature_locked',
+        message: override.enabled
+          ? undefined
+          : `The feature '${featureKey}' has been manually disabled for your tenant.`,
+      };
     }
 
     // 2. Check active subscription
@@ -61,19 +89,35 @@ export class PlansService {
     });
 
     if (!subscription) {
-      return false;
+      return {
+        allowed: false,
+        reason: 'subscription_missing',
+        message: 'No active subscription found for your tenant.',
+      };
     }
 
     // 3. Check plan features
     const feature = subscription.plan?.features?.[0];
-    return feature?.enabled ?? false;
+    const allowed = feature?.enabled ?? false;
+
+    return {
+      allowed,
+      reason: allowed ? undefined : 'feature_locked',
+      message: allowed
+        ? undefined
+        : `The feature '${featureKey}' is not included in your current '${subscription.plan?.name}' plan.`,
+    };
   }
 
   async checkModuleEnabled(
     tenantId: string,
     moduleName: string,
   ): Promise<boolean> {
-    return this.checkFeatureEnabled(tenantId, `module.${moduleName}`);
+    const result = await this.checkFeatureEnabled(
+      tenantId,
+      `module.${moduleName}`,
+    );
+    return result.allowed;
   }
 
   async validateLimit(
@@ -99,7 +143,16 @@ export class PlansService {
     });
 
     if (!subscription) {
-      throw new ForbiddenException('No active subscription found');
+      // Default free limits if no subscription
+      if (
+        currentCount >= 10 &&
+        (usageKey === 'students.count' || usageKey === 'staff.count')
+      ) {
+        throw new ForbiddenException(
+          'No active subscription found. Free limit of 10 reached.',
+        );
+      }
+      return;
     }
 
     const limit = subscription.plan?.usageLimits?.[0];

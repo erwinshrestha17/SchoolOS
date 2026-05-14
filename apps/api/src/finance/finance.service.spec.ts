@@ -1491,6 +1491,7 @@ function buildService(options: {
       eventEmitter as never,
       {
         verifyLimit: jest.fn().mockResolvedValue(undefined),
+        checkLimit: jest.fn().mockResolvedValue(undefined),
         incrementUsage: jest.fn().mockResolvedValue(undefined),
       } as any,
     ),

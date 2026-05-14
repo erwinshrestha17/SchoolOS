@@ -35,14 +35,7 @@ export class StaffService {
       throw new ConflictException('Employee ID already exists');
     }
 
-    const currentCount = await this.prisma.staff.count({
-      where: { tenantId: actor.tenantId, status: 'ACTIVE' },
-    });
-    await this.usageService.verifyLimit(
-      actor.tenantId,
-      'staff.count',
-      currentCount,
-    );
+    await this.usageService.checkLimit(actor.tenantId, 'staff.count', 1);
 
     const managedUser = await this.usersService.createManagedUser({
       tenantId: actor.tenantId,

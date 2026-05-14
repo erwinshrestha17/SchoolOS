@@ -1703,8 +1703,24 @@ export const api = {
       method: 'POST',
       json: body,
     }),
+  testPlatformProviderConnection: (id: string) =>
+    request<{ success: boolean; message: string }>(`/platform/providers/${encodeURIComponent(id)}/test`, {
+      method: 'POST',
+    }),
   getPlatformQueueHealth: () =>
     request<PlatformQueueSummary[]>('/platform/queues'),
+  listPlatformFailedJobs: (params?: { queueName?: string; page?: number; limit?: number }) =>
+    request<PaginatedResult<any>>(withQuery('/platform/queues/failed-jobs', {
+      ...params,
+      page: params?.page?.toString(),
+      limit: params?.limit?.toString(),
+    })),
+  getPlatformJobDetail: (queueName: string, jobId: string) =>
+    request<any>(`/platform/queues/${encodeURIComponent(queueName)}/jobs/${encodeURIComponent(jobId)}`),
+  removePlatformJob: (queueName: string, jobId: string) =>
+    request<{ success: true }>(`/platform/queues/${encodeURIComponent(queueName)}/jobs/${encodeURIComponent(jobId)}`, {
+      method: 'DELETE',
+    }),
   retryPlatformFailedJob: (body: JsonBody) =>
     request('/platform/queues/retry', { method: 'POST', json: body }),
   getPlatformHealth: () => request<PlatformHealthSummary>('/platform/health'),

@@ -7,6 +7,14 @@ import {
   Prisma,
   PrismaClient,
   UserStatus,
+  EnrollmentStatus,
+  TenantSubscriptionStatus,
+  UsagePeriod,
+  PlatformPlanStatus,
+  ProviderType,
+  ProviderEnvironment,
+  SaaSInvoiceStatus,
+  SaaSInvoiceLineType,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
@@ -125,6 +133,7 @@ async function main() {
   await seedLibraryData(tenant.id);
   await seedTransportData(tenant.id);
   await seedCanteenData(tenant.id);
+  await seedPlatformInfrastructure();
 
   console.log('');
   console.log('✅ SchoolOS seed completed successfully.');
@@ -961,7 +970,227 @@ async function seedCanteenData(tenantId: string) {
   });
 }
 
-import { EnrollmentStatus } from '@prisma/client';
+async function seedPlatformInfrastructure() {
+  console.log('Seeding platform infrastructure...');
+
+  // 1. Create a few more tenants
+  const trialTenant = await prisma.tenant.upsert({
+    where: { slug: 'trial-school' },
+    update: {
+      name: 'Trial Academy',
+      plan: 'free',
+      isActive: true,
+    },
+    create: {
+      name: 'Trial Academy',
+      slug: 'trial-school',
+      plan: 'free',
+      isActive: true,
+    },
+  });
+
+  const suspendedTenant = await prisma.tenant.upsert({
+    where: { slug: 'suspended-school' },
+    update: {
+      name: 'Suspended Academy',
+      plan: 'standard',
+      isActive: false,
+    },
+    create: {
+      name: 'Suspended Academy',
+      slug: 'suspended-school',
+      plan: 'standard',
+      isActive: false,
+    },
+  });
+
+  // 2. Create Platform Plans
+  const plans = [
+    { key: 'free', name: 'Free Tier', priceNpr: 0, billingCycle: 'ANNUAL' },
+    { key: 'standard', name: 'Standard Tier', priceNpr: 50000, billingCycle: 'ANNUAL' },
+    { key: 'premium', name: 'Premium Tier', priceNpr: 150000, billingCycle: 'ANNUAL' },
+  ];
+
+  const createdPlans: any[] = [];
+  for (const planData of plans) {
+    const plan = await prisma.platformPlan.upsert({
+      where: { key: planData.key },
+      update: {
+        name: planData.name,
+        priceNpr: new Prisma.Decimal(planData.priceNpr),
+        billingCycle: planData.billingCycle,
+        status: PlatformPlanStatus.ACTIVE,
+      },
+      create: {
+        key: planData.key,
+        name: planData.name,
+        priceNpr: new Prisma.Decimal(planData.priceNpr),
+        billingCycle: planData.billingCycle,
+        status: PlatformPlanStatus.ACTIVE,
+      },
+    });
+    createdPlans.push(plan);
+
+    // Seed features for each plan
+    const features = ['academics', 'finance', 'hr', 'communications', 'library', 'transport', 'canteen'];
+    for (const featureKey of features) {
+      await prisma.platformPlanFeature.upsert({
+        where: { planId_featureKey: { planId: plan.id, featureKey } },
+        update: { enabled: planData.key !== 'free' || featureKey === 'academics' },
+        create: { planId: plan.id, featureKey, enabled: planData.key !== 'free' || featureKey === 'academics' },
+      });
+    }
+
+    // Seed limits
+    const limits = [
+      { usageKey: 'students', limit: planData.key === 'free' ? 50 : planData.key === 'standard' ? 500 : 5000 },
+      { usageKey: 'storage', limit: planData.key === 'free' ? 1 : planData.key === 'standard' ? 10 : 100 },
+    ];
+    for (const limitData of limits) {
+      await prisma.usageLimit.upsert({
+        where: { planId_usageKey_period: { planId: plan.id, usageKey: limitData.usageKey, period: UsagePeriod.MONTHLY } },
+        update: { limit: limitData.limit },
+        create: { planId: plan.id, usageKey: limitData.usageKey, limit: limitData.limit, period: UsagePeriod.MONTHLY },
+      });
+    }
+  }
+
+  // 3. Assign Subscriptions
+  const defaultTenant = await prisma.tenant.findUnique({ where: { slug: 'default-school' } });
+  if (defaultTenant) {
+    const standardPlan = createdPlans.find(p => p.key === 'standard');
+    if (standardPlan) {
+      const subId = `sub-${defaultTenant.slug}`;
+      await prisma.tenantSubscription.upsert({
+        where: { id: subId },
+        update: { planId: standardPlan.id, status: TenantSubscriptionStatus.ACTIVE },
+        create: { id: subId, tenantId: defaultTenant.id, planId: standardPlan.id, status: TenantSubscriptionStatus.ACTIVE },
+      });
+
+      // Seed some usage counters
+      await prisma.usageCounter.upsert({
+        where: {
+          tenantId_usageKey_period_periodStart: {
+            tenantId: defaultTenant.id,
+            usageKey: 'students',
+            period: UsagePeriod.MONTHLY,
+            periodStart: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+          },
+        },
+        update: { value: 120 },
+        create: {
+          tenantId: defaultTenant.id,
+          usageKey: 'students',
+          period: UsagePeriod.MONTHLY,
+          periodStart: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+          value: 120,
+        },
+      });
+    }
+  }
+
+  // 4. Seed Provider Configs
+  const providers = [
+    { type: ProviderType.SMS, name: 'sparrow', environment: ProviderEnvironment.PRODUCTION, enabled: true },
+    { type: ProviderType.EMAIL, name: 'sendgrid', environment: ProviderEnvironment.PRODUCTION, enabled: true },
+    { type: ProviderType.OBJECT_STORAGE, name: 'r2', environment: ProviderEnvironment.PRODUCTION, enabled: true },
+  ];
+
+  for (const p of providers) {
+    await prisma.providerConfig.upsert({
+      where: { type_name_environment: { type: p.type, name: p.name, environment: p.environment } },
+      update: { enabled: p.enabled },
+      create: {
+        type: p.type,
+        name: p.name,
+        enabled: p.enabled,
+        environment: p.environment,
+        configEncrypted: { apiToken: '••••••••', secret: '••••••••' },
+        secretKeys: ['apiToken', 'secret'],
+      },
+    });
+  }
+
+  if (defaultTenant) {
+    // 5. Seed SaaS Invoices
+    const invoiceId = `inv-${defaultTenant.slug}-001`;
+    await prisma.saaSInvoice.upsert({
+      where: { id: invoiceId },
+      update: { status: SaaSInvoiceStatus.PAID },
+      create: {
+        id: invoiceId,
+        tenantId: defaultTenant.id,
+        invoiceNumber: 'SO-2024-00001',
+        amount: new Prisma.Decimal(50000),
+        currency: 'NPR',
+        issueDate: new Date('2024-01-01'),
+        dueDate: new Date('2024-01-15'),
+        status: SaaSInvoiceStatus.PAID,
+        lines: {
+          create: [
+            {
+              lineType: SaaSInvoiceLineType.SUBSCRIPTION,
+              description: 'Standard Tier Annual Subscription',
+              quantity: 1,
+              unitAmount: new Prisma.Decimal(50000),
+              totalAmount: new Prisma.Decimal(50000),
+            }
+          ]
+        }
+      },
+    });
+
+    const overdueInvoiceId = `inv-${defaultTenant.slug}-002`;
+    await prisma.saaSInvoice.upsert({
+      where: { id: overdueInvoiceId },
+      update: { status: SaaSInvoiceStatus.ISSUED },
+      create: {
+        id: overdueInvoiceId,
+        tenantId: defaultTenant.id,
+        invoiceNumber: 'SO-2024-00002',
+        amount: new Prisma.Decimal(12000),
+        currency: 'NPR',
+        issueDate: new Date('2024-04-01'),
+        dueDate: new Date('2024-04-15'), // Overdue
+        status: SaaSInvoiceStatus.ISSUED,
+        lines: {
+          create: [
+            {
+              lineType: SaaSInvoiceLineType.SMS_BUNDLE,
+              description: 'SMS Bundle Add-on (10k)',
+              quantity: 1,
+              unitAmount: new Prisma.Decimal(12000),
+              totalAmount: new Prisma.Decimal(12000),
+            }
+          ]
+        }
+      },
+    });
+
+    // 6. Seed Audit Logs
+    const auditActions = [
+      { action: 'TENANT_STATUS_CHANGE', resource: 'tenant', resourceId: trialTenant.id, reason: 'Trial period review' },
+      { action: 'SUBSCRIPTION_ASSIGN', resource: 'subscription', resourceId: defaultTenant.id, reason: 'Migration to Standard' },
+      { action: 'PROVIDER_UPDATE', resource: 'provider', resourceId: 'sms-sparrow', reason: 'Update production tokens' },
+      { action: 'FEATURE_OVERRIDE', resource: 'tenant', resourceId: defaultTenant.id, reason: 'Enabling Transport for pilot' },
+      { action: 'QUEUE_RETRY', resource: 'queue', resourceId: 'communications', reason: 'Retrying failed SMS batch' },
+      { action: 'SUPPORT_OVERRIDE_START', resource: 'tenant', resourceId: defaultTenant.id, reason: 'Debugging billing issue' },
+    ];
+
+    for (const a of auditActions) {
+      await prisma.auditLog.create({
+        data: {
+          tenantId: defaultTenant.id,
+          action: a.action,
+          resource: a.resource,
+          resourceId: a.resourceId,
+          after: { reason: a.reason },
+        },
+      });
+    }
+  }
+}
+
 
 main()
   .catch((error) => {

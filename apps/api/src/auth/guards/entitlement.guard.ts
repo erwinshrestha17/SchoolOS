@@ -38,14 +38,15 @@ export class EntitlementGuard implements CanActivate {
       return true;
     }
 
-    const isAllowed = await this.plansService.checkFeatureEnabled(
+    const result = await this.plansService.checkFeatureEnabled(
       tenantId,
       featureKey,
     );
 
-    if (!isAllowed) {
+    if (!result.allowed) {
       throw new ForbiddenException(
-        `Feature '${featureKey}' is not enabled for your current plan. Please contact your administrator.`,
+        result.message ||
+          `Feature '${featureKey}' is not enabled for your tenant.`,
       );
     }
 

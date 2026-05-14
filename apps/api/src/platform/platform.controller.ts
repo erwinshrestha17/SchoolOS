@@ -9,6 +9,7 @@ import {
   UnauthorizedException,
   Query,
   Post,
+  Delete,
 } from '@nestjs/common';
 import { PlatformService } from './platform.service';
 import { PlatformQueuesService } from './platform-queues.service';
@@ -305,6 +306,18 @@ export class PlatformController {
     return this.platformService.upsertProvider(body, this.requireUser(req));
   }
 
+  @Post('providers/:id/test')
+  @Permissions('platform:providers:manage')
+  async testProvider(
+    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformService.testProviderConnection(
+      id,
+      this.requireUser(req),
+    );
+  }
+
   @Get('queues')
   @Permissions('platform:queues:read')
   async getQueueHealth() {
@@ -315,6 +328,29 @@ export class PlatformController {
   @Permissions('platform:queues:read')
   async listFailedJobs() {
     return this.platformQueuesService.listFailedJobs();
+  }
+
+  @Get('queues/:queueName/jobs/:jobId')
+  @Permissions('platform:queues:read')
+  async getJobDetail(
+    @Param('queueName') queueName: string,
+    @Param('jobId') jobId: string,
+  ) {
+    return this.platformQueuesService.getJobDetail(queueName, jobId);
+  }
+
+  @Delete('queues/:queueName/jobs/:jobId')
+  @Permissions('platform:queues:manage')
+  async removeJob(
+    @Param('queueName') queueName: string,
+    @Param('jobId') jobId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformQueuesService.removeJob(
+      queueName,
+      jobId,
+      this.requireUser(req),
+    );
   }
 
   @Post('queues/retry')
@@ -379,6 +415,27 @@ export class PlatformController {
     );
   }
 
+  @Post('support/override/enter')
+  @Permissions('platform:support:override')
+  async enterSupportOverride(
+    @Body()
+    body: { tenantId: string; reason: string; durationMinutes?: number },
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformService.enterSupportOverride(
+      body.tenantId,
+      this.requireUser(req),
+      body.reason,
+      body.durationMinutes,
+    );
+  }
+
+  @Post('support/override/exit')
+  @Permissions('platform:support:override')
+  async exitSupportOverride(@Req() req: AuthenticatedRequest) {
+    return this.platformService.exitSupportOverride(this.requireUser(req));
+  }
+
   @Get('audit-logs')
   @Permissions('platform:audit:read')
   async listAuditLogs(
@@ -387,6 +444,10 @@ export class PlatformController {
     @Query('tenantId') tenantId?: string,
     @Query('action') action?: string,
     @Query('userId') userId?: string,
+    @Query('resource') resource?: string,
+    @Query('resourceId') resourceId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ): Promise<PaginatedResponse<PlatformAuditLog>> {
     return this.platformService.listAuditLogs({
       page,
@@ -394,6 +455,10 @@ export class PlatformController {
       tenantId,
       action,
       userId,
+      resource,
+      resourceId,
+      startDate,
+      endDate,
     });
   }
 

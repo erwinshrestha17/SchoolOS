@@ -46,8 +46,9 @@ describe('FinanceService - Dues & Reprints', () => {
           provide: UsageService,
           useValue: {
             verifyLimit: jest.fn().mockResolvedValue(undefined),
+            checkLimit: jest.fn().mockResolvedValue(undefined),
             incrementUsage: jest.fn().mockResolvedValue(undefined),
-          },
+          } as any,
         },
       ],
     }).compile();

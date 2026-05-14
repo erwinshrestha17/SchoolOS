@@ -10,6 +10,7 @@ import { StudentsModule } from '../students/students.module';
 import { UsersModule } from '../users/users.module';
 import { AdmissionsController } from './admissions.controller';
 import { AdmissionsService } from './admissions.service';
+import { UsageModule } from '../usage/usage.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AdmissionsService } from './admissions.service';
     AuditModule,
     StorageModule,
     FileRegistryModule,
+    UsageModule,
   ],
   controllers: [AdmissionsController],
   providers: [AdmissionsService],

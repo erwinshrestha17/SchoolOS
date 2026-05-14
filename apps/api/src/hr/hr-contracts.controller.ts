@@ -4,11 +4,14 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { PayrollService } from '../payroll/payroll.service';
 import { CreateStaffContractDto } from './dto/create-staff-contract.dto';
 
 @Controller('hr/contracts')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.hr')
 export class HrContractsController {
   constructor(private readonly payrollService: PayrollService) {}
 

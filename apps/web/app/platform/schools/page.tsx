@@ -15,7 +15,13 @@ import {
   Activity,
   Settings,
   AlertTriangle,
-  ChevronRight
+  ChevronRight,
+  ArrowRight,
+  Users,
+  LayoutGrid,
+  List,
+  Eye,
+  RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,11 +29,14 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ActionMenu } from '@/components/ui/action-menu';
+import { Select } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { useRouter } from 'next/navigation';
 
 export default function PlatformSchools() {
+  const router = useRouter();
   const [data, setData] = useState<PaginatedResult<PlatformTenantSummary>>({ 
     items: [], 
     total: 0,
@@ -85,27 +94,30 @@ export default function PlatformSchools() {
     }
   };
 
-  const PLANS = ['free', 'basic', 'standard', 'premium'];
-
   return (
-    <div className="space-y-8 p-8 max-w-7xl mx-auto">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <header className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Global Tenants</h1>
-          <p className="text-slate-500 mt-1">Manage and monitor school instances across the platform.</p>
+          <Badge variant="neutral" className="bg-slate-100 text-slate-600 hover:bg-slate-200 mb-3">
+            Tenant Directory
+          </Badge>
+          <h1 className="text-4xl font-black tracking-tight text-slate-900">Global Schools</h1>
+          <p className="mt-2 text-lg text-slate-500">
+            Manage and monitor <span className="font-bold text-slate-900">{data.total}</span> school instances across the platform.
+          </p>
         </div>
-        <Button className="rounded-xl shadow-lg shadow-primary-500/20 gap-2 px-6 py-6 font-bold bg-primary-600 hover:bg-primary-700 transition-all">
+        <Button className="rounded-2xl h-12 px-8 font-bold bg-slate-900 shadow-xl shadow-slate-200 hover:bg-slate-800 gap-2">
           <Plus size={20} />
           Onboard New School
         </Button>
-      </div>
+      </header>
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <Input 
-            placeholder="Search by school name or slug..."
-            className="pl-10"
+            placeholder="Search school name or slug..."
+            className="pl-12 h-12 rounded-2xl border-slate-100 bg-white shadow-sm focus:ring-slate-900"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -114,11 +126,11 @@ export default function PlatformSchools() {
           />
         </div>
         
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-3">
           <Select 
             value={status} 
             onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-            className="w-[140px]"
+            className="w-[140px] h-12 rounded-2xl border-slate-100 bg-white shadow-sm"
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
@@ -128,125 +140,138 @@ export default function PlatformSchools() {
           <Select 
             value={plan} 
             onChange={(e) => { setPlan(e.target.value); setPage(1); }}
-            className="w-[140px]"
+            className="w-[140px] h-12 rounded-2xl border-slate-100 bg-white shadow-sm"
           >
             <option value="all">All Plans</option>
-            {PLANS.map(p => (
-              <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
-            ))}
+            <option value="free">Free</option>
+            <option value="standard">Standard</option>
+            <option value="premium">Premium</option>
           </Select>
+
+          <div className="h-10 w-px bg-slate-100 mx-2" />
+          
+          <div className="flex p-1 bg-slate-100 rounded-xl">
+            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-lg bg-white shadow-sm text-slate-900">
+              <List size={18} />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-lg text-slate-400">
+              <LayoutGrid size={18} />
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+      <div className="rounded-[2.5rem] border border-slate-100 bg-white overflow-hidden shadow-xl shadow-slate-100/50">
         <Table>
-          <TableHeader className="bg-slate-50/50">
-            <TableRow className="hover:bg-transparent border-b border-slate-100">
-              <TableHead className="w-[350px] font-bold text-slate-500 text-[10px] uppercase tracking-wider">Identity & Location</TableHead>
-              <TableHead className="font-bold text-slate-500 text-[10px] uppercase tracking-wider">Access Status</TableHead>
-              <TableHead className="font-bold text-slate-500 text-[10px] uppercase tracking-wider">Service Tier</TableHead>
-              <TableHead className="font-bold text-slate-500 text-[10px] uppercase tracking-wider">User Base</TableHead>
-              <TableHead className="text-right font-bold text-slate-500 text-[10px] uppercase tracking-wider">Operations</TableHead>
+          <TableHeader className="bg-slate-50/50 border-b border-slate-50">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-[400px] px-8 py-5 font-black text-slate-400 text-[10px] uppercase tracking-[0.15em]">Identity & Origin</TableHead>
+              <TableHead className="font-black text-slate-400 text-[10px] uppercase tracking-[0.15em]">Access</TableHead>
+              <TableHead className="font-black text-slate-400 text-[10px] uppercase tracking-[0.15em]">Tier</TableHead>
+              <TableHead className="font-black text-slate-400 text-[10px] uppercase tracking-[0.15em]">Metrics</TableHead>
+              <TableHead className="text-right px-8 font-black text-slate-400 text-[10px] uppercase tracking-[0.15em]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={6}>
-                    <div className="h-16 animate-pulse bg-slate-50 rounded-lg w-full" />
+                  <TableCell colSpan={6} className="px-8 py-8">
+                    <div className="h-12 animate-pulse bg-slate-50 rounded-2xl w-full" />
                   </TableCell>
                 </TableRow>
               ))
             ) : data.items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-64 text-center">
-                  <div className="flex flex-col items-center justify-center text-slate-400 gap-2">
-                    <Search size={40} className="text-slate-200" />
-                    <p>No schools found matching your criteria.</p>
+                <TableCell colSpan={6} className="h-96 text-center">
+                  <div className="flex flex-col items-center justify-center text-slate-400 gap-4">
+                    <div className="h-20 w-20 flex items-center justify-center rounded-3xl bg-slate-50 text-slate-200">
+                      <Search size={40} />
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-slate-900">No results found</p>
+                      <p className="text-sm">Try adjusting your filters or search terms.</p>
+                    </div>
                   </div>
                 </TableCell>
               </TableRow>
             ) : (
               data.items.map((tenant) => (
-                <TableRow key={tenant.id} className="group hover:bg-slate-50/50 transition-colors">
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <span className="font-extrabold text-slate-900 group-hover:text-primary-600 transition-colors">
+                <TableRow key={tenant.id} className="group hover:bg-slate-50/50 transition-all border-b border-slate-50">
+                  <TableCell className="px-8 py-6">
+                    <div className="flex flex-col gap-1.5">
+                      <Link href={`/platform/schools/${tenant.id}`} className="font-bold text-lg text-slate-900 hover:text-indigo-600 transition-colors">
                         {tenant.name}
-                      </span>
+                      </Link>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 uppercase tracking-tighter">
+                        <Badge variant="neutral" className="text-[10px] font-mono bg-slate-100 text-slate-500 uppercase px-2 py-0">
                           {tenant.slug}
-                        </span>
+                        </Badge>
                         <span className="text-[10px] font-mono text-slate-300">
-                          {tenant.id}
+                          ID: {tenant.id.slice(0, 8)}...
                         </span>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
                     {tenant.isActive ? (
-                      <Badge variant="success" className="gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border-emerald-100 font-bold text-[10px]">
-                        <Shield size={12} fill="currentColor" className="opacity-20" />
+                      <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 font-bold text-[10px] px-2.5 py-0.5 rounded-lg">
                         ACTIVE
                       </Badge>
                     ) : (
-                      <Badge variant="destructive" className="gap-1.5 px-3 py-1 bg-rose-50 text-rose-700 border-rose-100 font-bold text-[10px]">
-                        <ShieldOff size={12} fill="currentColor" className="opacity-20" />
+                      <Badge variant="destructive" className="bg-rose-50 text-rose-700 border-rose-100 font-bold text-[10px] px-2.5 py-0.5 rounded-lg">
                         SUSPENDED
                       </Badge>
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="neutral" className="uppercase font-extrabold text-[10px] tracking-widest bg-slate-100 text-slate-600 border-slate-200">
+                    <Badge variant="neutral" className="uppercase font-black text-[10px] tracking-widest bg-slate-900 text-white border-transparent px-3 py-1 rounded-lg shadow-lg shadow-slate-900/10">
                       {tenant.plan}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-6">
                       <div className="flex flex-col">
-                        <span className="text-sm font-bold text-slate-700">{tenant.studentCount.toLocaleString()}</span>
+                        <span className="text-base font-black text-slate-900">{tenant.studentCount.toLocaleString()}</span>
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Students</span>
                       </div>
-                      <div className="h-8 w-px bg-slate-100" />
                       <div className="flex flex-col">
-                        <span className="text-sm font-bold text-slate-700">Healthy</span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Health</span>
+                        <span className="text-base font-black text-slate-900">{tenant.staffCount.toLocaleString()}</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Staff</span>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
+                  <TableCell className="text-right px-8">
+                    <div className="flex items-center justify-end gap-2">
                       <Link href={`/platform/schools/${tenant.id}`}>
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="rounded-xl hover:bg-white hover:text-primary-600 hover:shadow-sm transition-all"
+                          className="h-10 w-10 rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm hover:shadow-lg"
                         >
-                          <ExternalLink size={18} />
+                          <Eye size={18} />
                         </Button>
                       </Link>
                       
                       <ActionMenu
                         trigger={
-                          <Button variant="ghost" size="icon" className="rounded-xl">
+                          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl text-slate-400">
                             <MoreVertical size={18} />
                           </Button>
                         }
                         items={[
                           {
-                            label: 'Usage Dashboard',
-                            icon: <Activity size={16} />,
-                            onClick: () => window.location.href = `/platform/schools/${tenant.id}#usage`
+                            label: 'Details',
+                            icon: <ArrowRight size={16} />,
+                            onClick: () => router.push(`/platform/schools/${tenant.id}`)
                           },
                           {
-                            label: 'Platform Settings',
-                            icon: <Settings size={16} />,
-                            onClick: () => {}
+                            label: 'Billing',
+                            icon: <Activity size={16} />, // Re-using Activity for billing in simple mode
+                            onClick: () => router.push(`/platform/schools/${tenant.id}?tab=billing`)
                           },
                           {
-                            label: tenant.isActive ? 'Suspend Access' : 'Restore Access',
+                            label: tenant.isActive ? 'Suspend' : 'Restore',
                             icon: tenant.isActive ? <ShieldOff size={16} /> : <Shield size={16} />,
                             variant: tenant.isActive ? 'danger' : 'success',
                             onClick: () => setStatusChange({
@@ -265,45 +290,55 @@ export default function PlatformSchools() {
           </TableBody>
         </Table>
         
-        <TablePagination 
-          page={page}
-          pageSize={pageSize}
-          total={data.total}
-          onPageChange={setPage}
-        />
+        <div className="px-8 py-6 bg-slate-50/50 border-t border-slate-50">
+          <TablePagination 
+            page={page}
+            pageSize={pageSize}
+            total={data.total}
+            onPageChange={setPage}
+          />
+        </div>
       </div>
 
       {/* Status Change Dialog */}
       <Dialog open={!!statusChange} onOpenChange={(open: boolean) => !open && setStatusChange(null)}>
-        <DialogContent className="sm:max-w-[425px] rounded-2xl">
+        <DialogContent className="rounded-3xl sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className={statusChange?.isActive ? "text-rose-500" : "text-emerald-500"} />
-              {statusChange?.isActive ? 'Suspend School Access' : 'Restore School Access'}
+            <DialogTitle className="flex items-center gap-3 text-xl font-bold">
+              {statusChange?.isActive ? (
+                <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+                  <ShieldOff size={24} />
+                </div>
+              ) : (
+                <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                  <Shield size={24} />
+                </div>
+              )}
+              {statusChange?.isActive ? 'Suspend Access' : 'Restore Access'}
             </DialogTitle>
-            <DialogDescription>
-              Are you sure you want to {statusChange?.isActive ? 'suspend' : 'restore'} access for <strong>{statusChange?.name}</strong>?
+            <DialogDescription className="pt-2">
+              You are about to change the access status for <strong>{statusChange?.name}</strong>.
             </DialogDescription>
           </DialogHeader>
           
           <div className="py-4 space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">Reason for change</label>
+              <Label className="font-bold text-slate-700">Audit Reason</Label>
               <Textarea 
-                placeholder="Provide a mandatory reason for this platform action..."
+                placeholder="Why are you taking this action?"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                className="resize-none"
+                className="rounded-2xl border-slate-200 min-h-[100px]"
               />
-              <p className="text-[11px] text-slate-500 italic">This reason will be recorded in the platform audit logs.</p>
+              <p className="text-[11px] text-slate-400 italic">This will be permanently recorded in the platform audit logs.</p>
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="gap-3">
             <Button 
               variant="outline" 
               onClick={() => setStatusChange(null)}
-              className="rounded-xl"
+              className="rounded-xl font-bold border-slate-200 px-6"
               disabled={submitting}
             >
               Cancel
@@ -312,9 +347,9 @@ export default function PlatformSchools() {
               onClick={handleStatusChange}
               disabled={!reason.trim() || submitting}
               variant={statusChange?.isActive ? 'destructive' : 'default'}
-              className="rounded-xl min-w-[100px]"
+              className="rounded-xl font-bold px-8 shadow-lg shadow-slate-200"
             >
-              {submitting ? 'Processing...' : (statusChange?.isActive ? 'Suspend' : 'Restore')}
+              {submitting ? 'Processing...' : 'Confirm Action'}
             </Button>
           </DialogFooter>
         </DialogContent>

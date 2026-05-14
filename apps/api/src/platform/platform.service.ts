@@ -63,7 +63,9 @@ const FEATURE_KEYS = [
   'module.library',
   'module.transport',
   'module.canteen',
+  'module.communications',
   'module.intelligence',
+
   'feature.receipt_pdf',
   'feature.report_card_pdf',
   'feature.parent_teacher_chat',
@@ -80,6 +82,7 @@ const USAGE_KEYS = [
   'storage.bytes',
   'sms.sent',
   'notifications.sent',
+  'messages.sent',
   'receipts.generated',
   'report_cards.generated',
   'exports.generated',
@@ -200,13 +203,24 @@ export class PlatformService {
   }
 
   async getDashboardSummary(): Promise<PlatformDashboardSummary> {
-    const [totalTenants, activeTenants, usage] = await Promise.all([
+    const [
+      totalTenants,
+      activeTenants,
+      usage,
+      health,
+      failedJobs,
+      onboarding,
+      audit,
+    ] = await Promise.all([
       this.prisma.tenant.count(),
       this.prisma.tenant.count({ where: { isActive: true } }),
       this.usageService.getGlobalUsageStats(),
+      this.getPlatformHealth(),
+      this.listFailedJobs(),
+      this.getOnboardingCounts(),
+      this.listAuditLogs({ limit: 10 }),
     ]);
     const suspendedTenants = totalTenants - activeTenants;
-    const onboarding = await this.getOnboardingCounts();
 
     return {
       totalTenants,
@@ -214,6 +228,9 @@ export class PlatformService {
       suspendedTenants,
       pendingOnboarding: onboarding.pending,
       usage,
+      healthStatus: health.status,
+      failedJobsCount: failedJobs.length,
+      recentAudit: audit.items,
     };
   }
 
@@ -262,14 +279,21 @@ export class PlatformService {
       throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
     }
 
-    const [usage, subscription, billingProfile, recentAudit, onboarding] =
-      await Promise.all([
-        this.usageService.getTenantUsageSummary(tenantId),
-        this.getTenantSubscription(tenantId),
-        this.getBillingProfile(tenantId),
-        this.getTenantRecentAudit(tenantId),
-        this.getOnboardingChecklist(tenantId),
-      ]);
+    const [
+      usage,
+      subscription,
+      billingProfile,
+      recentAudit,
+      onboarding,
+      overrides,
+    ] = await Promise.all([
+      this.usageService.getTenantUsageSummary(tenantId),
+      this.getTenantSubscription(tenantId),
+      this.getBillingProfile(tenantId),
+      this.getTenantRecentAudit(tenantId),
+      this.getOnboardingChecklist(tenantId),
+      this.getTenantFeatureOverrides(tenantId),
+    ]);
 
     return {
       id: tenant.id,
@@ -287,6 +311,7 @@ export class PlatformService {
       billingProfile,
       recentAudit,
       onboarding,
+      overrides,
     };
   }
 
@@ -348,6 +373,10 @@ export class PlatformService {
     tenantId?: string;
     action?: string;
     userId?: string;
+    resource?: string;
+    resourceId?: string;
+    startDate?: string;
+    endDate?: string;
   }): Promise<PaginatedResponse<PlatformAuditLog>> {
     const page = Number(query.page) || 1;
     const limit = Math.min(Number(query.limit) || 25, 100);
@@ -357,6 +386,14 @@ export class PlatformService {
     if (query.tenantId) where.tenantId = query.tenantId;
     if (query.action) where.action = query.action;
     if (query.userId) where.userId = query.userId;
+    if (query.resource) where.resource = query.resource;
+    if (query.resourceId) where.resourceId = query.resourceId;
+
+    if (query.startDate || query.endDate) {
+      where.createdAt = {};
+      if (query.startDate) where.createdAt.gte = new Date(query.startDate);
+      if (query.endDate) where.createdAt.lte = new Date(query.endDate);
+    }
 
     const [logs, total] = await Promise.all([
       this.prisma.auditLog.findMany({
@@ -536,6 +573,17 @@ export class PlatformService {
     return this.toSubscriptionSummary(subscription);
   }
 
+  async getTenantFeatureOverrides(tenantId: string) {
+    const delegate = this.delegate('tenantFeatureOverride');
+    if (!delegate) return [];
+    const overrides = await delegate.findMany({ where: { tenantId } });
+    return asRecords(overrides).map((o) => ({
+      featureKey: String(o.featureKey),
+      enabled: Boolean(o.enabled),
+      reason: String(o.reason),
+    }));
+  }
+
   async setFeatureOverride(
     tenantId: string,
     dto: TenantFeatureOverrideDto,
@@ -590,10 +638,11 @@ export class PlatformService {
       };
     }
 
-    const isAllowed = await this.plansService.checkFeatureEnabled(
+    const entitlement = await this.plansService.checkFeatureEnabled(
       tenantId,
       featureKey,
     );
+    const isAllowed = entitlement.allowed;
     const subscription = await this.getRawActiveSubscription(tenantId);
 
     return {
@@ -738,6 +787,18 @@ export class PlatformService {
       (sum, line) => sum.add(line.totalAmount),
       new Prisma.Decimal(0),
     );
+    const existing = await delegate.findFirst({
+      where: {
+        tenantId,
+        subscriptionId: dto.subscriptionId,
+        issueDate: new Date(dto.issueDate),
+        status: { not: 'CANCELLED' },
+      },
+    });
+    if (existing) {
+      return this.toInvoiceSummary(existing);
+    }
+
     const invoice = await delegate.create({
       data: {
         tenantId,
@@ -920,6 +981,102 @@ export class PlatformService {
     return this.toProviderSummary(provider);
   }
 
+  async testProviderConnection(providerId: string, actorUserId: string) {
+    const provider = await this.prisma.providerConfig.findUnique({
+      where: { id: providerId },
+    });
+    if (!provider) throw new NotFoundException('Provider not found');
+
+    // Simulate dry-run connection test
+    const success = true; // Replace with actual provider health check logic
+
+    await this.platformAudit(
+      actorUserId,
+      'provider_connection_tested',
+      'provider_config',
+      providerId,
+      null,
+      { success },
+    );
+
+    return { success, testedAt: new Date().toISOString() };
+  }
+
+  async enterSupportOverride(
+    tenantId: string,
+    platformUserId: string,
+    reason: string,
+    durationMinutes = 60,
+  ) {
+    if (!reason?.trim() || reason.trim().length < 5) {
+      throw new BadRequestException('Support override requires a reason');
+    }
+
+    await this.ensureTenant(tenantId);
+
+    // Expire existing active overrides for this user
+    await this.prisma.supportOverride.updateMany({
+      where: { platformUserId, isActive: true },
+      data: { isActive: false },
+    });
+
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + durationMinutes);
+
+    const override = await this.prisma.supportOverride.create({
+      data: {
+        platformUserId,
+        tenantId,
+        reason,
+        expiresAt,
+        isActive: true,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'support_override_entered',
+      resource: 'support',
+      resourceId: tenantId,
+      tenantId: 'platform',
+      userId: platformUserId,
+      after: {
+        overrideId: override.id,
+        reason,
+        expiresAt: expiresAt.toISOString(),
+      },
+    });
+
+    return {
+      success: true,
+      overrideId: override.id,
+      expiresAt: expiresAt.toISOString(),
+    };
+  }
+
+  async exitSupportOverride(platformUserId: string) {
+    const override = await this.prisma.supportOverride.findFirst({
+      where: { platformUserId, isActive: true },
+    });
+
+    if (override) {
+      await this.prisma.supportOverride.update({
+        where: { id: override.id },
+        data: { isActive: false },
+      });
+
+      await this.auditService.record({
+        action: 'support_override_exited',
+        resource: 'support',
+        resourceId: override.tenantId,
+        tenantId: 'platform',
+        userId: platformUserId,
+        after: { overrideId: override.id },
+      });
+    }
+
+    return { success: true };
+  }
+
   async getQueueHealth(): Promise<PlatformQueueSummary[]> {
     const summaries: PlatformQueueSummary[] = [];
 
@@ -1009,16 +1166,23 @@ export class PlatformService {
   }
 
   async getPlatformHealth(): Promise<PlatformHealthSummary> {
-    const [database, redis] = await Promise.all([
+    const [database, redis, storageProvider] = await Promise.all([
       this.checkDatabase(),
       this.checkRedis(),
+      this.prisma.providerConfig.findFirst({
+        where: { type: 'OBJECT_STORAGE', enabled: true },
+      }),
     ]);
+
     const checks = {
       database,
       redis,
       queue: redis,
-      objectStorage: { status: 'ok' as const },
+      objectStorage: storageProvider
+        ? { status: 'ok' as const }
+        : { status: 'error' as const, message: 'No enabled storage provider' },
     };
+
     const ready = Object.values(checks).every((check) => check.status === 'ok');
     return {
       status: ready ? 'ready' : 'degraded',

@@ -117,7 +117,7 @@ export class ReportCardsService {
       }
     }
 
-    await this.usageService.verifyLimit(
+    await this.usageService.checkLimit(
       actor.tenantId,
       'report_cards.generated',
       1,

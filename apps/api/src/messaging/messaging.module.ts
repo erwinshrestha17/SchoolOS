@@ -8,9 +8,10 @@ import { MessagingHardeningService } from './messaging-hardening.service';
 import { MessagingService } from './messaging.service';
 import { ParentTeacherChatController } from './parent-teacher-chat.controller';
 import { ParentTeacherChatService } from './parent-teacher-chat.service';
+import { UsageModule } from '../usage/usage.module';
 
 @Module({
-  imports: [AuthModule, CommunicationsModule, AuditModule],
+  imports: [AuthModule, CommunicationsModule, AuditModule, UsageModule],
   controllers: [
     MessagingController,
     ParentTeacherChatController,

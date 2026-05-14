@@ -10,6 +10,13 @@ export function normalizeAdmissionName(value: string) {
   return value.trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
+export function isValidGuardianPhone(phone: string | undefined): boolean {
+  if (!phone) return false;
+  // Basic validation for Nepal (10 digits starting with 9) or generic
+  const clean = phone.trim().replace(/[\s-()]/g, '');
+  return /^(9\d{9}|\+?\d{10,15})$/.test(clean);
+}
+
 export function parseAdmissionCsv(csvContent: string): ParsedAdmissionRow[] {
   const lines = csvContent
     .split(/\r?\n/)

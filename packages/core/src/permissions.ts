@@ -966,6 +966,16 @@ export const permissionCatalog = [
     description: "Retry failed platform jobs",
   },
   {
+    resource: "platform:queues",
+    action: "manage",
+    description: "Manage platform queues and jobs (delete, pause)",
+  },
+  {
+    resource: "platform:support",
+    action: "override",
+    description: "Enter or exit support override mode for a tenant",
+  },
+  {
     resource: "platform:audit",
     action: "read",
     description: "Read platform audit logs",
@@ -1080,6 +1090,8 @@ const PLATFORM_PERMISSION_KEYS = [
   "platform:providers:manage",
   "platform:queues:read",
   "platform:queues:retry",
+  "platform:queues:manage",
+  "platform:support:override",
   "platform:audit:read",
   "platform:health:read",
   "platform:reports:read",

@@ -14,6 +14,8 @@ import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { HomeworkQueryDto } from './dto/homework-query.dto';
 import { HomeworkSubmissionQueryDto } from './dto/homework-submission-query.dto';
@@ -37,7 +39,8 @@ import { HomeworkAttachmentAccessService } from './homework-attachment-access.se
 import { HomeworkService } from './homework.service';
 
 @Controller('homework')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.homework')
 export class HomeworkController {
   constructor(
     private readonly homeworkService: HomeworkService,

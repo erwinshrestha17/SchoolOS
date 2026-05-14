@@ -11,6 +11,8 @@ import { UsageModule } from '../usage/usage.module';
 import { ConfigModule } from '../config/config.module';
 import { RedisModule } from '../redis/redis.module';
 
+import { PlatformBillingLifecycleService } from './platform-billing-lifecycle.service';
+
 @Module({
   imports: [
     PrismaModule,
@@ -32,6 +34,7 @@ import { RedisModule } from '../redis/redis.module';
     PlatformService,
     PlatformQueuesService,
     PlatformReportExportsService,
+    PlatformBillingLifecycleService,
   ],
   exports: [
     PlatformService,

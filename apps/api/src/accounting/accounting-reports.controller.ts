@@ -17,6 +17,8 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import type { AuthContext } from '../auth/auth.types';
@@ -34,7 +36,8 @@ import { UpdateAccountingReportMappingsDto } from './dto/report-account-mapping.
 @ApiTags('Accounting Reports')
 @ApiBearerAuth()
 @ApiCookieAuth()
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.accounting')
 @Controller('accounting/reports')
 export class AccountingReportsController {
   constructor(

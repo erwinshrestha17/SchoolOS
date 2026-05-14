@@ -30,6 +30,7 @@ export type PlatformTenantDetail = PlatformTenantSummary & {
   billingProfile?: PlatformBillingProfile | null;
   recentAudit?: PlatformAuditLog[];
   onboarding?: PlatformOnboardingChecklist;
+  overrides?: Array<{ featureKey: string; enabled: boolean; reason: string }>;
 };
 
 export type PlatformDashboardSummary = {
@@ -43,6 +44,9 @@ export type PlatformDashboardSummary = {
     totalUsers: number;
     totalStorageBytes: number;
   };
+  healthStatus: 'ready' | 'degraded';
+  failedJobsCount: number;
+  recentAudit: PlatformAuditLog[];
 };
 
 export type PlatformPlanSummary = {

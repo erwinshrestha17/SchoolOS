@@ -37,6 +37,7 @@ describe('SchoolOS File Registry (E2E)', () => {
       .overrideProvider(UsageService)
       .useValue({
         verifyLimit: jest.fn().mockResolvedValue(undefined),
+        checkLimit: jest.fn().mockResolvedValue(undefined),
         incrementUsage: jest.fn().mockResolvedValue(undefined),
       })
       .compile();

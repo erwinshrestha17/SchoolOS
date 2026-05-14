@@ -385,14 +385,14 @@ export class CommunicationsService {
       : 0;
 
     if (totalToSent > 0) {
-      await this.usageService.verifyLimit(
+      await this.usageService.checkLimit(
         input.actor.tenantId,
         'notifications.sent',
         totalToSent,
       );
     }
     if (smsToSent > 0) {
-      await this.usageService.verifyLimit(
+      await this.usageService.checkLimit(
         input.actor.tenantId,
         'sms.sent',
         smsToSent,

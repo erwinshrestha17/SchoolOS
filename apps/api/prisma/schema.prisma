@@ -890,6 +890,7 @@ model Tenant {
   studentQrCredentials          StudentQrCredential[]
   staffDocuments                StaffDocument[]
   staffLifecycleEvents          StaffLifecycleEvent[]
+  supportOverrides              SupportOverride[]
 }
 
 model User {
@@ -960,6 +961,7 @@ model User {
   verifiedStaffDocuments         StaffDocument[]                  @relation("VerifiedStaffDocuments")
   createdStaffLifecycleEvents    StaffLifecycleEvent[]            @relation("CreatedStaffLifecycleEvents")
   attendanceDrafts               AttendanceDraft[]
+  supportOverrides               SupportOverride[]                @relation("UserSupportOverrides")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
@@ -1053,6 +1055,11 @@ model AuditLog {
   createdAt  DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, action, createdAt])
+  @@index([tenantId, action, createdAt])
+  @@index([resource, resourceId])
+  @@index([createdAt])
 }
 
 model TenantSetting {
@@ -1234,8 +1241,9 @@ model SaaSInvoice {
   lines        SaaSInvoiceLine[]
   payments     SaaSPayment[]
 
-  @@index([tenantId, status])
-  @@index([dueDate])
+  @@index([tenantId, status, issueDate])
+  @@index([dueDate, status])
+  @@index([invoiceNumber])
 }
 
 model SaaSInvoiceLine {
@@ -1308,6 +1316,25 @@ model ReportExport {
   @@index([tenantId, reportKey, createdAt])
   @@index([tenantId, requestedBy, createdAt])
   @@index([tenantId, fileAssetId])
+}
+
+model SupportOverride {
+  id             String    @id @default(uuid())
+  platformUserId String
+  tenantId       String
+  reason         String
+  startsAt       DateTime  @default(now())
+  expiresAt      DateTime
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  platformUser User   @relation("UserSupportOverrides", fields: [platformUserId], references: [id])
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([platformUserId, isActive])
+  @@index([tenantId, isActive])
+  @@index([expiresAt])
 }
 
 model TenantOnboardingChecklistOverride {

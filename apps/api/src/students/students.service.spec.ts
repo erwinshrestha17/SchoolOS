@@ -1348,6 +1348,7 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
   };
   const usageService = {
     verifyLimit: jest.fn(),
+    checkLimit: jest.fn(),
   };
 
   return {

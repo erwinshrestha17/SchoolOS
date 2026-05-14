@@ -13,6 +13,8 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { AdjustLeaveBalanceDto } from './dto/adjust-leave-balance.dto';
 import { CorrectStaffAttendanceDto } from './dto/correct-staff-attendance.dto';
 import { CreateStaffLeaveRequestDto } from './dto/create-staff-leave-request.dto';
@@ -22,7 +24,8 @@ import { SubmitStaffAttendanceDto } from './dto/submit-staff-attendance.dto';
 import { AttendanceService } from './attendance.service';
 
 @Controller('hr')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.hr')
 export class HrAttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 

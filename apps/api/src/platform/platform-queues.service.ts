@@ -145,6 +145,49 @@ export class PlatformQueuesService {
     return failedJobs.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
   }
 
+  async getJobDetail(
+    queueName: string,
+    jobId: string,
+  ): Promise<PlatformFailedJobSummary> {
+    const queue = this.queues.get(queueName);
+    if (!queue) throw new NotFoundException(`Queue ${queueName} not found`);
+
+    const job = await queue.getJob(jobId);
+    if (!job) throw new NotFoundException(`Job ${jobId} not found`);
+
+    return {
+      id: String(job.id),
+      queueName,
+      name: job.name,
+      failedReason: job.failedReason,
+      attemptsMade: job.attemptsMade,
+      timestamp: job.timestamp,
+      data: sanitizeJobData(job.data, 0, true), // Enhanced masking for detail view
+    };
+  }
+
+  async removeJob(queueName: string, jobId: string, actorUserId: string) {
+    const queue = this.queues.get(queueName);
+    if (!queue) throw new NotFoundException(`Queue ${queueName} not found`);
+
+    const job = await queue.getJob(jobId);
+    if (!job) throw new NotFoundException(`Job ${jobId} not found`);
+
+    await job.remove();
+
+    await this.auditService.record({
+      action: 'queue_job_removed',
+      resource: 'queues',
+      resourceId: `${queueName}:${jobId}`,
+      tenantId: 'platform',
+      userId: actorUserId,
+      before: { queueName, jobId, name: job.name },
+      after: { removed: true },
+    });
+
+    return { success: true };
+  }
+
   async retryFailedJob(dto: RetryFailedJobDto, actorUserId: string) {
     const queue = this.queues.get(dto.queueName);
     if (!queue) {
@@ -203,7 +246,7 @@ export class PlatformQueuesService {
   }
 }
 
-function sanitizeJobData(value: unknown, depth = 0): unknown {
+function sanitizeJobData(value: unknown, depth = 0, strict = false): unknown {
   if (depth > 4) {
     return '[Truncated]';
   }
@@ -213,6 +256,9 @@ function sanitizeJobData(value: unknown, depth = 0): unknown {
   }
 
   if (typeof value === 'string') {
+    if (strict && SECRET_KEY_PATTERN.test(value)) {
+      return '********';
+    }
     return value.length > MAX_STRING_LENGTH
       ? `${value.slice(0, MAX_STRING_LENGTH)}…`
       : value;
@@ -225,7 +271,7 @@ function sanitizeJobData(value: unknown, depth = 0): unknown {
   if (Array.isArray(value)) {
     return value
       .slice(0, MAX_ARRAY_LENGTH)
-      .map((item) => sanitizeJobData(item, depth + 1));
+      .map((item) => sanitizeJobData(item, depth + 1, strict));
   }
 
   if (typeof value === 'object') {
@@ -236,9 +282,11 @@ function sanitizeJobData(value: unknown, depth = 0): unknown {
     );
 
     for (const [key, nestedValue] of entries) {
-      output[key] = SECRET_KEY_PATTERN.test(key)
-        ? '********'
-        : sanitizeJobData(nestedValue, depth + 1);
+      if (SECRET_KEY_PATTERN.test(key)) {
+        output[key] = '********';
+      } else {
+        output[key] = sanitizeJobData(nestedValue, depth + 1, strict);
+      }
     }
 
     return output;

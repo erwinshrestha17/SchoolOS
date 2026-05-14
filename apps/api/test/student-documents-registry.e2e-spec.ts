@@ -49,6 +49,7 @@ describe('Student Documents Registry Integration (E2E)', () => {
       { checkReadiness: jest.fn() } as unknown as StorageService,
       {
         verifyLimit: jest.fn().mockResolvedValue(undefined),
+        checkLimit: jest.fn().mockResolvedValue(undefined),
         incrementUsage: jest.fn().mockResolvedValue(undefined),
       } as any,
     );

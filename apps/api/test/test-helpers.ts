@@ -2258,7 +2258,6 @@ export function createPrismaMock() {
         findFirst: jest.fn((q: any) => {
           const items = (state as any)[actualStateKey] || [];
           let found = items.find((item: any) => matchesWhere(item, q?.where));
-
           if (found && q.include) {
             found = { ...found };
             if (model === 'tenantSubscription' && q.include.plan) {

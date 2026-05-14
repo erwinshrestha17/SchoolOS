@@ -14,6 +14,8 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { CreateTimetableSlotDto } from './dto/create-timetable-slot.dto';
 import {
   AssignSubstitutionDto,
@@ -44,7 +46,8 @@ import { TimetableService } from './timetable.service';
 import { TimetableSubstitutionService } from './timetable-substitution.service';
 
 @Controller('timetable')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.timetable')
 export class TimetableController {
   constructor(
     private readonly timetableService: TimetableService,

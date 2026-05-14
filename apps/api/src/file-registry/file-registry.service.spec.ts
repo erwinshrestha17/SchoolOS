@@ -46,6 +46,7 @@ describe('FileRegistryService tenant scoping', () => {
       storageService as any,
       {
         verifyLimit: jest.fn().mockResolvedValue(undefined),
+        checkLimit: jest.fn().mockResolvedValue(undefined),
         incrementUsage: jest.fn().mockResolvedValue(undefined),
       } as any,
     );

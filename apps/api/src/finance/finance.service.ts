@@ -2559,11 +2559,7 @@ export class FinanceService {
       }
     }
 
-    await this.usageService.verifyLimit(
-      actor.tenantId,
-      'receipts.generated',
-      1,
-    );
+    await this.usageService.checkLimit(actor.tenantId, 'receipts.generated', 1);
 
     const fiscalYear = resolveFiscalYear(new Date());
     const tenant = await this.prisma.tenant.findUniqueOrThrow({

@@ -64,6 +64,9 @@ describe('JwtAuthGuard', () => {
       user: {
         findUnique: jest.fn().mockResolvedValue(mockUser),
       },
+      supportOverride: {
+        findFirst: jest.fn(),
+      },
     };
     cls = {
       set: jest.fn(),
@@ -165,6 +168,10 @@ describe('JwtAuthGuard', () => {
     });
     prisma.tenant.findUnique.mockResolvedValueOnce({
       id: 'tenant-2',
+      isActive: true,
+    });
+    (prisma.supportOverride.findFirst as jest.Mock).mockResolvedValueOnce({
+      id: 'override-1',
       isActive: true,
     });
     const { context, request } = createContext({

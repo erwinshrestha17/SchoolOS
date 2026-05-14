@@ -17,6 +17,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { ReadMessageDto } from './dto/read-message.dto';
+import { UsageService } from '../usage/usage.service';
 
 @Injectable()
 export class MessagingService {
@@ -25,6 +26,7 @@ export class MessagingService {
     private readonly communicationsService: CommunicationsService,
     private readonly auditService: AuditService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly usageService: UsageService,
   ) {}
 
   async listConversations(actor: AuthContext) {
@@ -173,6 +175,10 @@ export class MessagingService {
       where: { tenantId: actor.tenantId, userId: actor.userId },
     });
 
+    // Check usage limit (monthly messages)
+    const now = new Date();
+    await this.usageService.checkLimit(actor.tenantId, 'messages.sent', 1);
+
     const message = await this.prisma.message.create({
       data: {
         tenantId: actor.tenantId,
@@ -187,6 +193,8 @@ export class MessagingService {
         senderStaff: true,
       },
     });
+
+    await this.usageService.incrementUsage(actor.tenantId, 'messages.sent');
 
     await this.recordMessageDeliveries(actor, conversation, message);
 

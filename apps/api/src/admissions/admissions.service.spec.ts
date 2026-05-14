@@ -15,6 +15,7 @@ import { StorageService } from '../storage/storage.service';
 import { StudentRecordsService } from '../student-records/student-records.service';
 import { StudentsService } from '../students/students.service';
 import { UsersService } from '../users/users.service';
+import { UsageService } from '../usage/usage.service';
 import { AdmissionsService } from './admissions.service';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
 
@@ -371,6 +372,11 @@ function buildService(prisma = buildPrisma()) {
     getSignedUrl: jest.fn(),
   };
 
+  const usageService = {
+    checkLimit: jest.fn().mockResolvedValue(undefined),
+    incrementUsage: jest.fn().mockResolvedValue(undefined),
+  };
+
   const service = new AdmissionsService(
     prisma as unknown as PrismaService,
     usersService as unknown as UsersService,
@@ -383,6 +389,7 @@ function buildService(prisma = buildPrisma()) {
     studentsService as unknown as StudentsService,
     storageService as unknown as StorageService,
     fileRegistryService as unknown as FileRegistryService,
+    usageService as unknown as UsageService,
   );
 
   return {

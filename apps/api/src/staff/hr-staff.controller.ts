@@ -14,6 +14,8 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
+import { EntitlementGuard } from '../auth/guards/entitlement.guard';
+import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { StaffLifecycleDto } from './dto/staff-lifecycle.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
@@ -28,7 +30,8 @@ import {
 } from './dto/staff-actions.dto';
 
 @Controller('hr/staff')
-@UseGuards(JwtAuthGuard, RolesPermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
+@Entitlement('module.hr')
 export class HrStaffController {
   constructor(
     private readonly staffService: StaffService,
