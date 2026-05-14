@@ -256,8 +256,12 @@ export function buildSalarySlipPdf(input: {
   let y = 560;
   const maxRows = Math.max(input.earnings.length, input.deductions.length);
   for (let i = 0; i < maxRows && y >= 318; i++) {
-    const earning = input.earnings[i];
-    const deduction = input.deductions[i];
+    const earning = input.earnings[i] as
+      | (typeof input.earnings)[number]
+      | undefined;
+    const deduction = input.deductions[i] as
+      | (typeof input.deductions)[number]
+      | undefined;
 
     if (earning) {
       contentParts.push(
@@ -592,8 +596,8 @@ export function buildRosterPdf(input: {
   });
 }
 
-function escapePdfText(text: string | number | null | undefined) {
-  const safeText = String(text ?? 'N/A');
+function escapePdfText(input: string | number | null | undefined) {
+  const safeText = String(input ?? 'N/A');
   return safeText
     .replace(/\\/g, '\\\\')
     .replace(/\(/g, '\\(')
@@ -601,7 +605,7 @@ function escapePdfText(text: string | number | null | undefined) {
 }
 
 function buildPdfFromContent(content: string, logo?: PdfImage | null) {
-  const objects: (string | Buffer)[] = [
+  const objects: Array<string | Buffer> = [
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
     `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> ${
@@ -623,7 +627,7 @@ function buildPdfFromContent(content: string, logo?: PdfImage | null) {
   return buildPdfObjects(objects);
 }
 
-function buildPdfObjects(objects: (string | Buffer)[]) {
+function buildPdfObjects(objects: Array<string | Buffer>) {
   const chunks: Buffer[] = [Buffer.from('%PDF-1.4\n')];
   const offsets: number[] = [0];
   let currentOffset = chunks[0].length;
@@ -732,14 +736,50 @@ function formatDateTime(value: Date) {
   return value.toISOString().replace('T', ' ').slice(0, 19);
 }
 
-function formatPdfCell(value: unknown) {
+function formatPdfCell(value: unknown): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
   if (value instanceof Date) {
     return formatIsoDate(value);
   }
-  if (typeof value === 'object' && value !== null && 'toString' in value) {
+
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint'
+  ) {
     return String(value);
   }
-  return String(value ?? '');
+
+  if (typeof value === 'object') {
+    // Handle Prisma Decimal-like objects
+    const obj = value as Record<string, unknown>;
+    if (typeof obj.toNumber === 'function') {
+      const val: unknown = (obj as { toNumber: () => unknown }).toNumber();
+      if (typeof val === 'number' || typeof val === 'string') {
+        return String(val);
+      }
+    }
+    if (
+      typeof obj.toString === 'function' &&
+      obj.toString !== Object.prototype.toString
+    ) {
+      const val: unknown = (obj as { toString: () => unknown }).toString();
+      if (typeof val === 'string') {
+        return val;
+      }
+    }
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '[Object]';
+    }
+  }
+
+  return 'N/A';
 }
 
 function fitText(value: string, maxLength: number) {
@@ -779,12 +819,12 @@ function wrapPdfLine(
   return lines.map((line, index) => text(line, x, y - index * 14, size, 'F1'));
 }
 
-type QrCodeMatrix = {
+interface QrCodeMatrix {
   modules: {
     size: number;
     data: ArrayLike<boolean | number>;
   };
-};
+}
 
 function renderQrTokenAsPdfBlocks(
   token: string,
