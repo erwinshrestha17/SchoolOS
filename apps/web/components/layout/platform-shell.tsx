@@ -146,7 +146,7 @@ export function PlatformShell({ children }: { children: ReactNode }) {
           <div className="space-y-1">
             {visibleItems.map((item) => (
               <PlatformNavEntry
-                key={item.href}
+                key={`${item.href}:${item.label}`}
                 item={item}
                 pathname={pathname}
                 onClick={() => setMobileOpen(false)}
