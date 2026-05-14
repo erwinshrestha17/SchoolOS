@@ -332,7 +332,9 @@ describe('ReportsService', () => {
       'Student ID,Student,Subject,Category,Observed On,Score,Max Score,Percentage,Note',
     );
     expect(csvString).toContain('"SCH-001","Erwin Shrestha","ENG - English"');
-    expect(csvString).toContain('"PROJECT","2024-05-01","8","10","80.00","Good"');
+    expect(csvString).toContain(
+      '"PROJECT","2024-05-01","8","10","80.00","Good"',
+    );
   });
 
   it('exports academic-promotion-readiness in CSV format', async () => {

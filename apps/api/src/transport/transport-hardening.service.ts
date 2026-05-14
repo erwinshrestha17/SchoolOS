@@ -276,6 +276,22 @@ export class TransportHardeningService {
     return rows.map((row) => row.map(csvEscape).join(',')).join('\n');
   }
 
+  /**
+   * Phase 4 guard: transport billing is intentionally not wired to M3/M9 yet.
+   * Route assignment, trip status, GPS, and latest-location operations must not
+   * create invoices or accounting journals until product pricing rules are
+   * explicitly approved and implemented through the finance/accounting boundary.
+   */
+  getBillingIntegrationReadiness(actor: AuthContext) {
+    return {
+      tenantId: actor.tenantId,
+      approved: false,
+      status: 'DEFERRED_PRICING_RULES_NOT_APPROVED',
+      allowedEffects: ['none'],
+      prohibitedEffects: ['invoice_create', 'journal_post'],
+    };
+  }
+
   private async transitionStudentAssignment(
     assignmentId: string,
     status: TransportEnrollmentStatus,

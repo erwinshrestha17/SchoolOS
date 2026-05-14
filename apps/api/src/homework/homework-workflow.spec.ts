@@ -13,6 +13,7 @@ import { HomeworkService } from './homework.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CommunicationsService } from '../communications/communications.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { AuthContext } from '../auth/auth.types';
 import { getQueueToken } from '@nestjs/bullmq';
 
@@ -133,6 +134,10 @@ describe('Homework Workflow', () => {
           },
         },
         {
+          provide: FileRegistryService,
+          useValue: { linkToEntity: jest.fn().mockResolvedValue(undefined) },
+        },
+        {
           provide: getQueueToken('homework'),
           useValue: { add: jest.fn() },
         },
@@ -172,10 +177,6 @@ describe('Homework Workflow', () => {
 
       expect(result.id).toBe('new-hw');
       expect(prisma.homeworkAttachment.createMany).toHaveBeenCalled();
-      expect(prisma.fileAsset.updateMany).toHaveBeenCalledWith({
-        where: { id: { in: ['file-1'] }, tenantId: mockActor.tenantId },
-        data: { module: 'homework', entityId: 'new-hw' },
-      });
     });
 
     it('should reject attachment from another tenant', async () => {

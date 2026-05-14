@@ -882,6 +882,13 @@ export const api = {
   listLedgerEntries: () => request<JournalEntryView[]>('/ledger/entries'),
   listTimetable: (params?: { classId?: string | null }) =>
     request<TimetableSlotSummary[]>(withQuery('/timetable', params ?? {})),
+  getTeacherTimetable: (
+    teacherId: string,
+    params?: { dayOfWeek?: number; academicYearId?: string },
+  ) =>
+    request<TimetableSlotSummary[]>(
+      withQuery(`/timetable/reports/teacher/${encodeURIComponent(teacherId)}`, params ?? {}),
+    ),
   listTeacherWorkload: () =>
     request<TeacherWorkloadSummary[]>('/timetable/workload'),
   createTimetableSlot: (body: JsonBody) =>
@@ -1133,11 +1140,6 @@ export const api = {
       method: 'POST',
       json: {},
     }),
-  reversePayrollRun: (id: string, body: { reason: string }) =>
-    request<any>(`/payroll/runs/${id}/reverse`, {
-      method: 'POST',
-      json: body,
-    }),
   submitPayrollRunReview: (id: string) =>
     request<PayrollRunSummary>(`/payroll/runs/${id}/submit-review`, {
       method: 'POST',
@@ -1145,11 +1147,6 @@ export const api = {
     }),
   rejectPayrollRun: (id: string, body: JsonBody) =>
     request<PayrollRunSummary>(`/payroll/runs/${id}/reject`, {
-      method: 'POST',
-      json: body,
-    }),
-  markPayrollRunPaid: (id: string, body: JsonBody) =>
-    request<PayrollRunSummary>(`/payroll/runs/${id}/mark-paid`, {
       method: 'POST',
       json: body,
     }),

@@ -1752,6 +1752,7 @@ export type TimetableValidationIssue = {
   staffId?: string | null;
   roomId?: string | null;
   versionId?: string | null;
+  affectedPeriodIds?: string[];
   dayOfWeek?: number;
   startsAt?: string;
   endsAt?: string;

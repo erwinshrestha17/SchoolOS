@@ -10,6 +10,7 @@ import { HomeworkService } from './homework.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CommunicationsService } from '../communications/communications.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { AuthContext } from '../auth/auth.types';
 import { HomeworkReminderType } from './dto/reminder.dto';
 import { getQueueToken } from '@nestjs/bullmq';
@@ -78,6 +79,10 @@ describe('Homework Reminders', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: AuditService, useValue: { record: jest.fn() } },
         { provide: CommunicationsService, useValue: communicationsService },
+        {
+          provide: FileRegistryService,
+          useValue: { linkToEntity: jest.fn().mockResolvedValue(undefined) },
+        },
         {
           provide: getQueueToken('homework'),
           useValue: { add: jest.fn() },

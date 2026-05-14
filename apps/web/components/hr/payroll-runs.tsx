@@ -13,12 +13,12 @@ import {
   Loader2,
   Plus,
   ShieldCheck,
-  RotateCcw,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useSession } from '../session-provider';
 import { api } from '../../lib/api';
 import { JournalEntryDialog } from '../accounting/journal-entry-dialog';
+import { cn } from '@/lib/utils';
 
 type PayrollLineView = {
   id?: string;
@@ -199,25 +199,6 @@ export function PayrollRuns() {
       const postedRun = normalizeRun(run);
       void queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
       setSelectedRunId(postedRun.id);
-    },
-  });
-
-  const markPaidMutation = useMutation({
-    mutationFn: (id: string) =>
-      api.markPayrollRunPaid(id, { reason: 'Salary disbursement confirmed' }),
-    onSuccess: (run) => {
-      const paidRun = normalizeRun(run);
-      void queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
-      setSelectedRunId(paidRun.id);
-    },
-  });
-
-  const reverseMutation = useMutation({
-    mutationFn: (id: string) =>
-      api.reversePayrollRun(id, { reason: 'Administrative correction' }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
-      setSelectedRunId(null);
     },
   });
 
@@ -544,9 +525,8 @@ export function PayrollRuns() {
               <div className="flex items-center justify-between px-2 py-4">
                 {[
                   { label: 'Draft', active: true },
-                  { label: 'Approved', active: ['APPROVED', 'POSTED', 'PAID'].includes(selectedRun.status) },
-                  { label: 'Posted', active: ['POSTED', 'PAID'].includes(selectedRun.status) },
-                  { label: 'Paid', active: selectedRun.status === 'PAID' },
+                  { label: 'Approved', active: ['APPROVED', 'POSTED'].includes(selectedRun.status) },
+                  { label: 'Posted', active: selectedRun.status === 'POSTED' },
                 ].map((step, idx, arr) => (
                   <div key={step.label} className="flex items-center flex-1 last:flex-none">
                     <div className="flex flex-col items-center gap-1">
@@ -596,34 +576,6 @@ export function PayrollRuns() {
                 >
                   {postMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Landmark size={16} />}
                   Post to M9 Accounting
-                </button>
-              )}
-
-              {selectedRun.status === 'POSTED' && (
-                <button
-                  type="button"
-                  disabled={!canManagePayroll || markPaidMutation.isPending}
-                  onClick={() => markPaidMutation.mutate(selectedRun.id)}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {markPaidMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Landmark size={16} />}
-                  Mark Paid and Post Disbursement
-                </button>
-              )}
-
-              {['POSTED', 'PAID'].includes(selectedRun.status) && (
-                <button
-                  type="button"
-                  disabled={!canManagePayroll || reverseMutation.isPending}
-                  onClick={() => {
-                    if (confirm('Are you sure you want to reverse this payroll run? This will create reversal journal entries and void the run.')) {
-                      reverseMutation.mutate(selectedRun.id);
-                    }
-                  }}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-danger-200 bg-white px-4 py-2.5 text-sm font-bold text-danger-700 transition-colors hover:bg-danger-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {reverseMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
-                  Reverse and Void Run
                 </button>
               )}
 

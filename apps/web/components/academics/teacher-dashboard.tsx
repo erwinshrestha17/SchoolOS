@@ -7,11 +7,10 @@ import { Card } from '@/components/ui/card';
 import { LoadingState } from '@/components/ui/loading-state';
 import { BookOpen, Clock, AlertCircle, CheckCircle2, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
-import { format } from 'date-fns';
 
 export function TeacherDashboard() {
   const { session } = useSession();
-  const staffId = session?.user.staffId;
+  const staffId = (session?.user as { staffId?: string } | undefined)?.staffId;
 
   const timetableQuery = useQuery({
     queryKey: ['teacher-timetable-today', staffId],
@@ -33,7 +32,10 @@ export function TeacherDashboard() {
   }
 
   const todayClasses = timetableQuery.data ?? [];
-  const activeHomework = homeworkQuery.data?.items ?? [];
+  const activeHomework = homeworkQuery.data ?? [];
+  const weekday = new Intl.DateTimeFormat('en', { weekday: 'long' }).format(
+    new Date(),
+  );
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -45,10 +47,10 @@ export function TeacherDashboard() {
               <div className="bg-indigo-500 p-2 rounded-xl">
                 <Clock className="h-5 w-5 text-white" />
               </div>
-              <h3 className="text-lg font-black uppercase italic tracking-tight text-slate-900">Today's Classes</h3>
+              <h3 className="text-lg font-black uppercase italic tracking-tight text-slate-900">Today&apos;s Classes</h3>
             </div>
             <span className="text-xs font-bold uppercase tracking-widest text-slate-400 bg-white px-3 py-1 rounded-full border border-slate-200">
-              {format(new Date(), 'EEEE')}
+              {weekday}
             </span>
           </div>
           
@@ -125,7 +127,7 @@ export function TeacherDashboard() {
                     <div className="flex-1 min-w-0">
                       <p className="font-black text-slate-900 uppercase italic leading-none truncate">{hw.title}</p>
                       <p className="text-xs font-bold text-slate-500 mt-1 uppercase tracking-tight">
-                        {hw.class?.name} • Due {format(new Date(hw.dueDate), 'MMM d')}
+                        {hw.class?.name} • Due {formatShortDate(hw.dueDate)}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -171,4 +173,11 @@ export function TeacherDashboard() {
       </div>
     </div>
   );
+}
+
+function formatShortDate(value: string | Date) {
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(value));
 }

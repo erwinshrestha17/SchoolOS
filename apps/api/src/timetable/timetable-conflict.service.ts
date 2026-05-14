@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { TeacherAvailabilityType, Prisma } from '@prisma/client';
+import { AttendanceService } from '../attendance/attendance.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type TimetableConflictType =
@@ -106,7 +107,7 @@ export interface TimetableConflictValidationResult {
 export class TimetableConflictService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly attendanceService?: any, // Use any for now to avoid circular dependency if it occurs, but we will try to type it later
+    @Optional() private readonly attendanceService?: AttendanceService,
   ) {}
 
   validateCandidate(
@@ -320,8 +321,12 @@ export class TimetableConflictService {
         candidate.staffId,
         candidate.referenceDate,
       );
-      result.warnings.push(...absenceIssues.filter((i) => i.severity === 'WARNING'));
-      result.errors.push(...absenceIssues.filter((i) => i.severity === 'BLOCKING'));
+      result.warnings.push(
+        ...absenceIssues.filter((i) => i.severity === 'WARNING'),
+      );
+      result.errors.push(
+        ...absenceIssues.filter((i) => i.severity === 'BLOCKING'),
+      );
       result.valid = result.valid && result.errors.length === 0;
     }
 

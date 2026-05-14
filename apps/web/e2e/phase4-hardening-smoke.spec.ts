@@ -6,14 +6,50 @@ const API_BASE_URL =
   'http://localhost:4000/api/v1';
 
 const schoolAdminCredentials = {
-  tenantSlug: process.env.SCHOOLOS_E2E_TENANT_SLUG ?? 'default-school',
-  email: process.env.SCHOOLOS_E2E_EMAIL ?? 'admin@schoolos.com',
-  password: process.env.SCHOOLOS_E2E_PASSWORD ?? 'admin123',
+  tenantSlug: process.env.SCHOOLOS_E2E_TENANT_SLUG,
+  email: process.env.SCHOOLOS_E2E_EMAIL,
+  password: process.env.SCHOOLOS_E2E_PASSWORD,
 };
 
-test.describe.serial('SchoolOS Phase 4 Hardening Smoke Tests', () => {
+const libraryRoutes = [
+  '/dashboard/library',
+  '/dashboard/library/books',
+  '/dashboard/library/copies',
+  '/dashboard/library/issues',
+  '/dashboard/library/fines',
+  '/dashboard/library/reports',
+];
+
+const canteenRoutes = [
+  '/dashboard/canteen',
+  '/dashboard/canteen/menu',
+  '/dashboard/canteen/plans',
+  '/dashboard/canteen/enrollments',
+  '/dashboard/canteen/serving',
+  '/dashboard/canteen/wallets',
+  '/dashboard/canteen/pos',
+  '/dashboard/canteen/controls',
+  '/dashboard/canteen/reports',
+];
+
+const transportRoutes = [
+  '/dashboard/transport',
+  '/dashboard/transport/routes',
+  '/dashboard/transport/vehicles',
+  '/dashboard/transport/assignments',
+  '/dashboard/transport/trips',
+  '/dashboard/transport/location',
+];
+
+test.describe.serial('SchoolOS Phase 4 operations smoke', () => {
   test.beforeEach(async ({ context, page }) => {
-    // Check if API is available
+    test.skip(
+      !schoolAdminCredentials.tenantSlug ||
+        !schoolAdminCredentials.email ||
+        !schoolAdminCredentials.password,
+      'Set SchoolOS E2E credentials to run Phase 4 operations smoke tests.',
+    );
+
     try {
       const response = await page.request.get(`${API_BASE_URL}/health`);
       if (!response.ok()) {
@@ -27,55 +63,54 @@ test.describe.serial('SchoolOS Phase 4 Hardening Smoke Tests', () => {
     await login(page, schoolAdminCredentials);
   });
 
-  test('Library: Dashboard and Reports', async ({ page }) => {
+  test('Library admin routes and scan/report surfaces load without fatal errors', async ({ page }) => {
+    await assertRoutesLoad(page, libraryRoutes);
     await page.goto('/dashboard/library');
-    await expect(page).toHaveURL(/\/dashboard\/library/);
-    await expect(page.getByRole('heading', { name: /Library/i })).toBeVisible();
-
-    // Verify sub-modules or tabs if any (based on folder structure we saw library/ doesn't have subfolders, so it's likely tab-based or single page)
-    await expect(page.getByText(/Books/i)).toBeVisible();
-    await expect(page.getByText(/Issues/i)).toBeVisible();
+    await expect(page.locator('body')).toContainText(/scan|barcode|QR/i);
+    await page.goto('/dashboard/library/reports');
+    await expect(page.locator('body')).toContainText(/export|report/i);
   });
 
-  test('Canteen: Operations and POS', async ({ page }) => {
-    await page.goto('/dashboard/canteen');
-    await expect(page.getByRole('heading', { name: /Canteen/i })).toBeVisible();
-
-    // Check POS link
+  test('Canteen POS, wallet, inventory, and reports load without fatal errors', async ({ page }) => {
+    await assertRoutesLoad(page, canteenRoutes);
     await page.goto('/dashboard/canteen/pos');
-    await expect(page).toHaveURL(/\/dashboard\/canteen\/pos/);
-    await expect(page.getByText(/Terminal/i).or(page.getByText(/Sale/i))).toBeVisible();
-
-    // Check Inventory (Menu items)
+    await expect(page.locator('body')).toContainText(/QR|manual|search|student/i);
+    await expect(page.locator('button[type="submit"], button')).toBeVisible();
     await page.goto('/dashboard/canteen/menu');
-    await expect(page.getByRole('heading', { name: /Menu/i })).toBeVisible();
+    await expect(page.locator('body')).toContainText(/stock|inventory|menu/i);
   });
 
-  test('Transport: Tracking and Routes', async ({ page }) => {
-    await page.goto('/dashboard/transport');
-    await expect(page.getByRole('heading', { name: /Transport/i })).toBeVisible();
-
-    // Check Location/Tracking
+  test('Transport admin routes and latest-location surface load without parent tracking UI', async ({ page }) => {
+    await assertRoutesLoad(page, transportRoutes);
     await page.goto('/dashboard/transport/location');
-    await expect(page).toHaveURL(/\/dashboard\/transport\/location/);
-    await expect(page.getByText(/Live/i).or(page.getByText(/Tracking/i))).toBeVisible();
-
-    // Check Routes
-    await page.goto('/dashboard/transport/routes');
-    await expect(page.getByRole('heading', { name: /Routes/i })).toBeVisible();
+    await expect(page.locator('body')).toContainText(/latest|location|tracking|status/i);
+    await expect(page.locator('body')).not.toContainText(/parent portal|driver app/i);
   });
 });
 
+async function assertRoutesLoad(page: Page, routes: string[]) {
+  const runtimeErrors: string[] = [];
+  page.on('pageerror', (error) => runtimeErrors.push(error.message));
+
+  for (const route of routes) {
+    await page.goto(route);
+    await expect(page).toHaveURL(new RegExp(`${route.replaceAll('/', '\\/')}`));
+    await expect(page.locator('main, body')).toBeVisible();
+  }
+
+  expect(runtimeErrors).toEqual([]);
+}
+
 async function login(
   page: Page,
-  credentials: { tenantSlug: string; email: string; password: string },
+  credentials: { tenantSlug?: string; email?: string; password?: string },
 ) {
   await page.goto('/login');
   await expect(page.getByLabel(/School Code/i)).toBeVisible();
 
-  await page.getByLabel(/School Code/i).fill(credentials.tenantSlug);
-  await page.getByLabel(/Email/i).fill(credentials.email);
-  await page.getByLabel(/Password/i).fill(credentials.password);
+  await page.getByLabel(/School Code/i).fill(credentials.tenantSlug ?? '');
+  await page.getByLabel(/Email/i).fill(credentials.email ?? '');
+  await page.getByLabel(/Password/i).fill(credentials.password ?? '');
 
   await Promise.all([
     page.waitForURL(/\/dashboard(?:$|[/?#])/, { timeout: 20_000 }),

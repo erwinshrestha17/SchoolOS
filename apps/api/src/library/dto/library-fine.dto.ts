@@ -43,3 +43,8 @@ export class UpdateLibraryFineDto {
   @IsString()
   notes?: string;
 }
+
+export class PostLibraryFineToFeesDto {
+  @IsString()
+  reason!: string;
+}

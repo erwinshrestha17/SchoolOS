@@ -617,18 +617,6 @@ export class LibraryService {
     const fineAmount = new Prisma.Decimal(dto.fineAmount ?? calculatedFine);
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const invoiceId =
-        issue.borrowerStudentId && fineAmount.gt(0)
-          ? await this.createLibraryFineInvoice(tx, {
-              actor,
-              studentId: issue.borrowerStudentId,
-              amount: fineAmount,
-              description: dto.markLost
-                ? `Lost book charge: ${issue.copy.book.title}`
-                : `Library fine: ${issue.copy.book.title}`,
-            })
-          : null;
-
       if (fineAmount.gt(0)) {
         await tx.libraryFine.create({
           data: {
@@ -652,7 +640,6 @@ export class LibraryService {
           returnedAt: new Date(),
           returnCondition: dto.returnCondition ?? null,
           fineAmount,
-          invoiceId,
           notes: dto.notes ?? issue.notes,
         },
       });
@@ -913,11 +900,27 @@ export class LibraryService {
       throw new NotFoundException('Library issue not found');
     }
 
+    const amount = new Prisma.Decimal(dto.amount);
+    const existing = await this.prisma.libraryFine.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        issueId: dto.issueId,
+        amount,
+        status: {
+          in: ['PENDING', 'POSTED_TO_FEES'],
+        },
+      },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
     const fine = await this.prisma.libraryFine.create({
       data: {
         tenantId: actor.tenantId,
         issueId: dto.issueId,
-        amount: new Prisma.Decimal(dto.amount),
+        amount,
         status: 'PENDING',
         notes: dto.notes ?? null,
       },
@@ -935,6 +938,118 @@ export class LibraryService {
     return fine;
   }
 
+  async postFineToFees(actor: AuthContext, fineId: string, reason: string) {
+    if (!reason.trim()) {
+      throw new BadRequestException('Reason is required to post fine to fees');
+    }
+
+    const fine = await this.prisma.libraryFine.findFirst({
+      where: { id: fineId, tenantId: actor.tenantId },
+      include: {
+        issue: {
+          include: {
+            copy: { include: { book: true } },
+            borrowerStudent: true,
+          },
+        },
+      },
+    });
+
+    if (!fine) {
+      throw new NotFoundException('Library fine not found');
+    }
+
+    if (!fine.issue.borrowerStudentId) {
+      throw new ConflictException(
+        'Only student library fines can post to fees',
+      );
+    }
+
+    if (fine.feeInvoiceId || fine.issue.invoiceId) {
+      return {
+        ...fine,
+        feeInvoiceId: fine.feeInvoiceId ?? fine.issue.invoiceId,
+        alreadyPosted: true,
+      };
+    }
+
+    if (fine.status === 'WAIVED') {
+      throw new ConflictException('Waived library fines cannot post to fees');
+    }
+
+    const posted = await this.prisma.$transaction(async (tx) => {
+      const locked = await tx.libraryFine.findFirst({
+        where: {
+          id: fine.id,
+          tenantId: actor.tenantId,
+          feeInvoiceId: null,
+          status: 'PENDING',
+        },
+        include: {
+          issue: {
+            include: {
+              copy: { include: { book: true } },
+            },
+          },
+        },
+      });
+
+      if (!locked?.issue.borrowerStudentId) {
+        throw new ConflictException('Library fine is already posted or closed');
+      }
+
+      const invoiceId = await this.createLibraryFineInvoice(tx, {
+        actor,
+        studentId: locked.issue.borrowerStudentId,
+        amount: locked.amount,
+        description: `Library fine: ${locked.issue.copy.book.title}`,
+      });
+
+      await tx.libraryIssue.update({
+        where: { id: locked.issueId },
+        data: { invoiceId },
+      });
+
+      return tx.libraryFine.update({
+        where: { id: locked.id },
+        data: {
+          status: 'POSTED_TO_FEES',
+          feeInvoiceId: invoiceId,
+          feePostedAt: new Date(),
+          notes: locked.notes
+            ? `${locked.notes}\nPosted to fees: ${reason.trim()}`
+            : `Posted to fees: ${reason.trim()}`,
+        },
+        include: {
+          issue: {
+            include: {
+              copy: { include: { book: true } },
+              borrowerStudent: true,
+              borrowerStaff: true,
+              invoice: true,
+            },
+          },
+        },
+      });
+    });
+
+    await this.auditService.record({
+      action: 'post_to_fees',
+      resource: 'library_fine',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: posted.id,
+      after: {
+        fineId: posted.id,
+        issueId: posted.issueId,
+        feeInvoiceId: posted.feeInvoiceId,
+        reason: reason.trim(),
+      },
+    });
+
+    return posted;
+  }
+
   async updateFine(
     actor: AuthContext,
     fineId: string,
@@ -946,6 +1061,17 @@ export class LibraryService {
 
     if (!existing) {
       throw new NotFoundException('Library fine not found');
+    }
+
+    if (
+      (dto.status === 'WAIVED' || dto.waivedAmount !== undefined) &&
+      !dto.waiverReason?.trim()
+    ) {
+      throw new BadRequestException('Reason is required to waive a fine');
+    }
+
+    if (dto.correctionReason !== undefined && !dto.correctionReason.trim()) {
+      throw new BadRequestException('Reason is required to correct a fine');
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -967,12 +1093,17 @@ export class LibraryService {
         include: { issue: true },
       });
 
-      if (u.status === 'WAIVED' && u.waivedAmount.gt(0) && u.issue.invoiceId && u.issue.borrowerStudentId) {
+      if (
+        u.status === 'WAIVED' &&
+        u.waivedAmount.gt(0) &&
+        (u.feeInvoiceId || u.issue.invoiceId) &&
+        u.issue.borrowerStudentId
+      ) {
         const waiver = await tx.feeWaiver.create({
           data: {
             tenantId: actor.tenantId,
             studentId: u.issue.borrowerStudentId,
-            invoiceId: u.issue.invoiceId,
+            invoiceId: u.feeInvoiceId ?? u.issue.invoiceId,
             amount: u.waivedAmount,
             reason: u.waiverReason ?? 'Library fine waiver',
             approvedById: actor.userId,

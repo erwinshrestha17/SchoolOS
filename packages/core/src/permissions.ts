@@ -651,6 +651,21 @@ export const permissionCatalog = [
     description: "Return issued library copies",
   },
   {
+    resource: "library:fines",
+    action: "create",
+    description: "Create controlled library fine records",
+  },
+  {
+    resource: "library:fines",
+    action: "update",
+    description: "Waive, reverse, or correct library fine records with reason",
+  },
+  {
+    resource: "library:fines",
+    action: "post",
+    description: "Post approved library fines to student fee dues",
+  },
+  {
     resource: "library:reports",
     action: "read",
     description: "Read library overdue and circulation reports",

@@ -90,6 +90,7 @@ export class ServeCanteenMealDto {
 export class TopUpCanteenWalletDto {
   @IsNumber() @Min(1) amount!: number;
   @IsOptional() @IsString() note?: string;
+  @IsOptional() @IsString() idempotencyKey?: string;
   @IsOptional() @IsNumber() @Min(0) lowBalanceThreshold?: number;
 }
 

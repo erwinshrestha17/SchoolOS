@@ -22,6 +22,7 @@ export enum PostingAction {
 export interface CanteenTopUpPostingInput {
   tenantId: string;
   walletId: string;
+  transactionId?: string;
   studentId: string;
   amount: Prisma.Decimal;
   paymentMethod: string;
@@ -1276,7 +1277,7 @@ export class AccountingPostingService {
       input.tenantId,
       'CANTEEN',
       JournalSourceType.ADJUSTMENT,
-      input.walletId,
+      input.transactionId ?? input.walletId,
       'TOPUP',
     );
 
@@ -1330,7 +1331,7 @@ export class AccountingPostingService {
         narration: input.note ?? `Canteen top-up for ${input.studentId}`,
         sourceModule: 'CANTEEN',
         sourceType: JournalSourceType.ADJUSTMENT,
-        sourceId: input.walletId,
+        sourceId: input.transactionId ?? input.walletId,
         postingType: 'TOPUP',
         createdById: actor.userId,
         postedAt: new Date(),

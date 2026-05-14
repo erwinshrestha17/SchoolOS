@@ -164,4 +164,20 @@ describe('Transport Security Boundaries', () => {
       ).rejects.toThrow(ForbiddenException);
     });
   });
+
+  describe('Billing Boundary', () => {
+    it('keeps transport billing deferred until pricing rules are approved', () => {
+      const readiness =
+        hardeningService.getBillingIntegrationReadiness(adminActor);
+
+      expect(readiness).toMatchObject({
+        tenantId,
+        approved: false,
+        status: 'DEFERRED_PRICING_RULES_NOT_APPROVED',
+      });
+      expect(readiness.prohibitedEffects).toEqual(
+        expect.arrayContaining(['invoice_create', 'journal_post']),
+      );
+    });
+  });
 });

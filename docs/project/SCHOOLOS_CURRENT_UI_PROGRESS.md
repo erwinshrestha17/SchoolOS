@@ -5,14 +5,14 @@ This file records the latest web-admin UI/UX implementation progress so large ro
 ## Current UI Sprint
 
 ```text
-Current UI sprint: Phase 3 Operational Hardening (Homework, Timetable, HR, and Payroll) completed; browser smoke execution remains environment-gated.
+Current UI sprint: Phase 4 Library, Transport, and Canteen production-depth hardening is implemented for backend/admin boundaries; seeded browser smoke execution remains environment-gated.
 ```
 
 Current repo reality:
 
 ```text
-Academics, Accounting, Homework, Timetable, HR, and Payroll now have Phase 3 operational depth including teacher dashboards, substitution oversight, conflict visualization, payroll reversal workflows, and PII masking.
-Next UI work is Phase 4: Library, Transport, and Canteen production depth (barcode/QR scan, inventory/vendor depth, POS speed).
+Academics, Accounting, Homework, Timetable, HR, Payroll, Library, Transport, and Canteen now have admin production-depth coverage for the current modular-monolith scope.
+Next UI work is seeded staging QA and deeper Library/Canteen/Transport operator ergonomics after product rules for remaining financial and live-map workflows are approved.
 ```
 
 ## Current Sprint (Completed)
@@ -283,13 +283,14 @@ Completed:
 - [x] Payroll PDF/payslip visual polish.
 - [x] Staff self-service `/dashboard/my-profile` finalization (PDF slips).
 - [ ] Staff lifecycle audit logs (Backend implemented; UI depth remains).
-- [x] Journal correction workflow final wiring (Payroll reversals).
+- [x] Payroll posting boundary final wiring (payment/reversal actions remain outside the Phase 2 UI).
 - [ ] Trial Balance / Balance Sheet PDF export styling.
 - [x] Homework file attachments after File Registry.
 - [x] Advanced timetable conflict visualization.
-- Library barcode/QR scan polish and Playwright tests.
-- Transport live map only after real-time backend design is complete.
-- Canteen inventory/vendor UI depth and POS/QR speed polish.
+- [x] Credential-gated Phase 4 Library/Canteen/Transport Playwright smoke coverage.
+- [ ] Library barcode/QR scan polish beyond current admin scan/report surfaces.
+- [ ] Transport live map only after admin real-time readiness is product-approved.
+- [ ] Canteen inventory/vendor UI depth and POS/QR speed polish beyond current routes.
 - Full mobile/PWA later.
 
 - pnpm lint: passed

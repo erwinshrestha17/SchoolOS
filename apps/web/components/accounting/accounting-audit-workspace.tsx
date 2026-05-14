@@ -187,7 +187,7 @@ export function AccountingAuditWorkspace() {
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                     Before
                   </label>
-                  <div className="rounded-2xl bg-slate-50 p-4 font-mono text-[10px] overflow-auto max-h-60 border border-slate-100">
+                  <div className="rounded-2xl bg-slate-50 p-4 text-[10px] overflow-auto max-h-60 border border-slate-100">
                     <pre>
                       {selectedLog.before
                         ? JSON.stringify(selectedLog.before, null, 2)
@@ -199,7 +199,7 @@ export function AccountingAuditWorkspace() {
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                     After
                   </label>
-                  <div className="rounded-2xl bg-slate-50 p-4 font-mono text-[10px] overflow-auto max-h-60 border border-slate-100">
+                  <div className="rounded-2xl bg-slate-50 p-4 text-[10px] overflow-auto max-h-60 border border-slate-100">
                     <pre>
                       {selectedLog.after
                         ? JSON.stringify(selectedLog.after, null, 2)

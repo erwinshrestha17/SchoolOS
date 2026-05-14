@@ -20,7 +20,7 @@ describe('TimetableConflictService', () => {
   let service: TimetableConflictService;
 
   beforeEach(() => {
-    service = new TimetableConflictService();
+    service = new TimetableConflictService({} as never);
   });
 
   it('detects teacher double booking for overlapping periods', () => {

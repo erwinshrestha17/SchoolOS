@@ -842,7 +842,7 @@ export class HomeworkService {
     tx?: Prisma.TransactionClient,
   ) {
     const prisma = tx || this.prisma;
-    
+
     // 1. Validate files belong to tenant
     const fileAssets = await prisma.fileAsset.findMany({
       where: { id: { in: fileAssetIds }, tenantId: actor.tenantId },

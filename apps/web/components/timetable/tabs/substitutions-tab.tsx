@@ -3,16 +3,12 @@
 import { useState } from 'react';
 import { SubstitutionSummaryPanel } from '../substitution-summary-panel';
 import { SubstitutionsList } from '../substitutions-list';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 export function SubstitutionsTab() {
   const [date, setDate] = useState<Date>(new Date());
-  const dateStr = format(date, 'yyyy-MM-dd');
+  const dateStr = toDateInputValue(date);
 
   const nextDay = () => setDate(new Date(date.getTime() + 24 * 60 * 60 * 1000));
   const prevDay = () => setDate(new Date(date.getTime() - 24 * 60 * 60 * 1000));
@@ -25,7 +21,7 @@ export function SubstitutionsTab() {
             Substitution Oversight
           </h3>
           <p className="text-sm font-medium text-slate-500">
-            Monitoring coverage for {format(date, 'EEEE, MMMM do, yyyy')}
+            Monitoring coverage for {formatDisplayDate(date)}
           </p>
         </div>
 
@@ -34,28 +30,16 @@ export function SubstitutionsTab() {
             <ChevronLeft className="h-5 w-5" />
           </Button>
           
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  'w-[240px] justify-start text-left font-black uppercase tracking-tight rounded-xl border-slate-200 h-10',
-                  !date && 'text-muted-foreground'
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4 text-indigo-500" />
-                {date ? format(date, 'PPP') : <span>Pick a date</span>}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 rounded-[2rem] border-slate-200 shadow-2xl" align="end">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={(d) => d && setDate(d)}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
+          <label className="flex h-10 w-[240px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-left text-xs font-black uppercase tracking-tight text-slate-700">
+            <CalendarIcon className="h-4 w-4 text-indigo-500" />
+            <input
+              aria-label="Substitution date"
+              className="w-full bg-transparent text-xs font-black uppercase outline-none"
+              type="date"
+              value={dateStr}
+              onChange={(event) => setDate(fromDateInputValue(event.target.value))}
+            />
+          </label>
 
           <Button variant="ghost" size="icon" onClick={nextDay} className="rounded-xl h-10 w-10">
             <ChevronRight className="h-5 w-5" />
@@ -70,4 +54,22 @@ export function SubstitutionsTab() {
       </div>
     </div>
   );
+}
+
+function toDateInputValue(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function fromDateInputValue(value: string) {
+  const next = new Date(`${value}T00:00:00`);
+  return Number.isNaN(next.getTime()) ? new Date() : next;
+}
+
+function formatDisplayDate(date: Date) {
+  return new Intl.DateTimeFormat('en', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date);
 }

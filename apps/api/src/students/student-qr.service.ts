@@ -250,7 +250,18 @@ export class StudentQrService {
     purpose: StudentQrResolvePurpose,
     auth: AuthContext,
   ) {
-    this.assertPurposeAccess(purpose, auth);
+    if (!this.canResolvePurpose(purpose, auth)) {
+      await this.recordResolveDenied(
+        tenantId,
+        auth,
+        null,
+        purpose,
+        'unauthorized_purpose',
+      );
+      throw new ForbiddenException(
+        `You do not have permission to resolve QR scans for ${purpose}`,
+      );
+    }
 
     const tokenHash = hashToken(token);
     const credential = await this.prisma.studentQrCredential.findUnique({
@@ -281,8 +292,20 @@ export class StudentQrService {
         resource: 'student_qr',
         tenantId,
         userId: auth.userId,
+        resourceId: credential?.id ?? null,
         after: {
+          scannedBy: auth.userId,
           purpose,
+          studentId: credential?.studentId ?? null,
+          resolvedEntity: credential?.studentId ?? null,
+          success: false,
+          failureCode: !credential
+            ? 'not_found'
+            : credential.tenantId !== tenantId
+              ? 'wrong_tenant'
+              : credential.status !== StudentQrStatus.ACTIVE
+                ? 'revoked'
+                : 'inactive_student',
           reason: !credential
             ? 'not_found'
             : credential.tenantId !== tenantId
@@ -290,6 +313,7 @@ export class StudentQrService {
               : credential.status !== StudentQrStatus.ACTIVE
                 ? 'revoked'
                 : 'inactive_student',
+          timestamp: new Date().toISOString(),
         },
       });
       throw new ForbiddenException('Invalid or revoked QR token');
@@ -349,7 +373,15 @@ export class StudentQrService {
       tenantId,
       userId: auth.userId,
       resourceId: credential.id,
-      after: { studentId: credential.studentId, purpose },
+      after: {
+        scannedBy: auth.userId,
+        studentId: credential.studentId,
+        resolvedEntity: credential.studentId,
+        purpose,
+        success: true,
+        reason: 'resolved',
+        timestamp: new Date().toISOString(),
+      },
     });
 
     const baseResponse = {
@@ -426,17 +458,18 @@ export class StudentQrService {
         };
       }
       case StudentQrResolvePurpose.TRANSPORT: {
-        const assignment = await this.prisma.transportStudentAssignment.findFirst({
-          where: {
-            tenantId,
-            studentId: student.id,
-            status: TransportEnrollmentStatus.ACTIVE,
-          },
-          include: {
-            route: true,
-            stop: true,
-          },
-        });
+        const assignment =
+          await this.prisma.transportStudentAssignment.findFirst({
+            where: {
+              tenantId,
+              studentId: student.id,
+              status: TransportEnrollmentStatus.ACTIVE,
+            },
+            include: {
+              route: true,
+              stop: true,
+            },
+          });
 
         return {
           ...baseResponse,
@@ -543,20 +576,14 @@ export class StudentQrService {
     };
   }
 
-  private assertPurposeAccess(
+  private canResolvePurpose(
     purpose: StudentQrResolvePurpose,
     auth: AuthContext,
   ) {
     const allowedPermissions = PURPOSE_PERMISSIONS[purpose] ?? [];
-    const allowed = allowedPermissions.some((permission) =>
+    return allowedPermissions.some((permission) =>
       this.hasPermission(auth, permission),
     );
-
-    if (!allowed) {
-      throw new ForbiddenException(
-        `You do not have permission to resolve QR scans for ${purpose}`,
-      );
-    }
   }
 
   private hasPermission(auth: AuthContext, permission: string) {
@@ -566,7 +593,7 @@ export class StudentQrService {
   private recordResolveDenied(
     tenantId: string,
     auth: AuthContext,
-    studentId: string,
+    studentId: string | null,
     purpose: StudentQrResolvePurpose,
     reason: string,
   ) {
@@ -575,7 +602,16 @@ export class StudentQrService {
       resource: 'student_qr',
       tenantId,
       userId: auth.userId,
-      after: { studentId, purpose, reason },
+      after: {
+        scannedBy: auth.userId,
+        studentId,
+        resolvedEntity: studentId,
+        purpose,
+        success: false,
+        failureCode: reason,
+        reason,
+        timestamp: new Date().toISOString(),
+      },
     });
   }
 }

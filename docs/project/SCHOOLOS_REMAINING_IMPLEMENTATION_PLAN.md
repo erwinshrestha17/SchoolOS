@@ -81,9 +81,9 @@ Biometric workflows
 | M5 Activity Feed & Milestones | Strong Phase 1 foundation | 75-85% |
 | M6 Homework & Timetable | Completed / Pilot-Ready | 100% |
 | M7 HR & Payroll | Completed / Pilot-Ready | 100% |
-| M8A Library Management | Admin/backend foundation implemented | 65-75% |
-| M8B Transport Management | Admin/trip/location foundation implemented | 60-70% |
-| M8C Canteen Management | Admin/wallet/POS/inventory foundation implemented | 65-75% |
+| M8A Library Management | Admin/backend foundation plus controlled fine-to-fees posting implemented | 75-85% |
+| M8B Transport Management | Admin/trip/location foundation plus billing guard and GPS/cache hardening implemented | 70-80% |
+| M8C Canteen Management | Admin/wallet/POS/inventory foundation plus idempotency, supplier, stock, and accounting-source hardening implemented | 75-85% |
 | M9 Accounting & Finance | Completed / Pilot-Ready | 100% |
 | M10 Notices & Communication | Strong Phase 1 + chat foundation | 85-90% |
 | M11 School Intelligence / AI | Roadmap only | 0% |
@@ -319,17 +319,16 @@ Implemented:
 
 Remaining backend:
 
-- Library fine integration with M3 fees.
-- Library accounting integration with M9 where product-approved.
+- Receipt/payment linkage polish for library fines after M3 collection rules are finalized.
 - Overdue reminder queue hardening.
 - Staff borrower depth.
-- More tenant/permission tests.
+- More tenant/permission tests beyond fine posting, QR, and report coverage.
 
 Remaining frontend:
 
-- Barcode/QR scanner polish.
-- Report/export UI polish.
-- Library Playwright tests.
+- Barcode/QR scanner polish beyond current admin scan surface.
+- Report/export UI polish beyond current CSV/report routes.
+- Browser smoke execution in seeded staging.
 
 ### M8B - Transport Management
 
@@ -339,21 +338,19 @@ Implemented:
 - Driver and student assignments.
 - Trip lifecycle, boarded/dropped/absent statuses.
 - Latest trip location, location cleanup, logs, delays.
+- GPS ingestion validation, Redis latest-location cache, throttled PostgreSQL persistence, tenant/trip-scoped fanout, and retention cleanup.
 - Parent active-trip endpoint.
 - Trip/boarding reports and CSV export.
 - Transport dashboard, routes, vehicles, assignments, trips, location routes.
 
 Remaining backend:
 
-- Driver mobile GPS ingestion hardening.
-- Redis Pub/Sub or SSE/WebSocket fanout for multi-instance real-time tracking.
-- GPS write-pressure protection and retention/partition strategy.
 - ETA/geofence/overspeed/deviation later.
-- Transport billing/accounting integration later.
+- Transport billing/accounting integration remains deferred behind explicit pricing-rule approval.
 
 Remaining frontend:
 
-- Live map UI after real-time backend is ready.
+- Live map UI after real-time backend is product-approved for admin consumption.
 - Driver app.
 - Parent child-specific tracking UI.
 - Route dashboard and trip-history report polish.
@@ -372,20 +369,18 @@ Implemented:
 
 Remaining backend:
 
-- Wallet immutability hardening review.
+- Meal plan fee-dues boundary through M3 Finance once product rules are approved.
 - POS receipt generation.
-- Canteen accounting integration with M9.
-- Meal plan fee integration with M3.
 - Low-balance notification queue depth.
-- Inventory/vendor edge-case tests.
+- Inventory/vendor edge-case tests beyond purchase/wastage/negative-stock/idempotency coverage.
 
 Remaining frontend:
 
-- QR/student ID scan speed polish.
-- Inventory/vendor UI depth.
+- QR/student ID scan speed polish beyond current admin POS/serving surfaces.
+- Inventory/vendor UI depth beyond current menu/inventory/report surfaces.
 - Parent wallet/menu/spending views later.
 - Canteen report/export polish.
-- Canteen Playwright tests.
+- Browser smoke execution in seeded staging.
 
 ### M9 - Accounting & Finance
 
@@ -568,20 +563,20 @@ Purpose: turn Phase 3 admin foundations into reliable operations products.
 
 Backend tasks:
 
-1. Integrate Library fines with M3 fees and M9 accounting where approved.
-2. Integrate Canteen meal plans/wallets/POS with M3/M9 where approved.
-3. Integrate Transport billing/accounting only after pricing rules are approved.
-4. Harden QR scan audit depth and purpose-limited responses.
-5. Harden inventory/vendor, stock, wastage, and canteen wallet immutability.
-6. Harden GPS ingestion, latest-location cache, retention cleanup, and real-time fanout design.
-7. Add vertical-specific permission, tenant, and report tests.
+1. Library fines now post explicitly to M3 fee invoices and M9 via approved posting boundaries; payment collection remains owned by M3.
+2. Canteen wallet top-ups/POS sales use immutable source records, idempotency keys, and M9 posting boundaries; meal-plan dues remain deferred until M3 product rules are approved.
+3. Transport billing/accounting is explicitly guarded because route pricing rules are not approved.
+4. QR scan audit depth and purpose-limited responses are hardened for Library/Canteen usage.
+5. Inventory/vendor, stock, wastage, and canteen wallet immutability are hardened for current admin scope.
+6. GPS ingestion, latest-location cache, retention cleanup, and tenant/trip-scoped fanout design are backend-first; no unrestricted map UI is introduced.
+7. Vertical-specific permission, tenant, and report tests were added or extended for the hardened surfaces.
 
 Frontend tasks:
 
-1. Polish Library barcode/QR scan and report export flows.
-2. Polish Canteen QR/POS speed and inventory/vendor screens.
-3. Build Transport live map only after real-time backend design is complete.
-4. Add Library, Transport, and Canteen Playwright smoke coverage.
+1. Library barcode/QR scan and report export surfaces remain admin-only and are covered by Phase 4 smoke.
+2. Canteen QR/POS and inventory/menu routes remain admin-only and are covered by Phase 4 smoke.
+3. Transport live map remains gated; location route exposes only safe latest/status surfaces for admin operations.
+4. Library, Transport, and Canteen Playwright smoke coverage is credential-gated and skips cleanly without seeded credentials.
 
 Exit criteria:
 

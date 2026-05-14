@@ -26,6 +26,7 @@ import { UpdateLibraryBookDto } from './dto/update-library-book.dto';
 import { UpdateLibraryCopyDto } from './dto/update-library-copy.dto';
 import {
   CreateLibraryFineDto,
+  PostLibraryFineToFeesDto,
   UpdateLibraryFineDto,
 } from './dto/library-fine.dto';
 import { UpdateLibrarySettingDto } from './dto/update-library-setting.dto';
@@ -273,7 +274,7 @@ export class LibraryController {
   }
 
   @Post('fines')
-  @Permissions('library:reports:read')
+  @Permissions('library:fines:create')
   createFine(
     @CurrentAuth() auth: AuthContext,
     @Body() dto: CreateLibraryFineDto,
@@ -282,13 +283,23 @@ export class LibraryController {
   }
 
   @Patch('fines/:id')
-  @Permissions('library:reports:read')
+  @Permissions('library:fines:update')
   updateFine(
     @CurrentAuth() auth: AuthContext,
     @Param('id') fineId: string,
     @Body() dto: UpdateLibraryFineDto,
   ) {
     return this.libraryService.updateFine(auth, fineId, dto);
+  }
+
+  @Post('fines/:id/post-to-fees')
+  @Permissions('library:fines:post')
+  postFineToFees(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') fineId: string,
+    @Body() dto: PostLibraryFineToFeesDto,
+  ) {
+    return this.libraryService.postFineToFees(auth, fineId, dto.reason);
   }
 
   @Get('reports/popular')

@@ -9,6 +9,7 @@ import { HomeworkService } from './homework.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CommunicationsService } from '../communications/communications.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { AuthContext } from '../auth/auth.types';
 import { createPrismaMock, PrismaMock } from '../../test/test-helpers';
 import { getQueueToken } from '@nestjs/bullmq';
@@ -46,6 +47,10 @@ describe('Homework Hardening', () => {
               .fn()
               .mockResolvedValue({ sentCount: 1 }),
           },
+        },
+        {
+          provide: FileRegistryService,
+          useValue: { linkToEntity: jest.fn().mockResolvedValue(undefined) },
         },
         {
           provide: getQueueToken('homework'),

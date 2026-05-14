@@ -528,7 +528,11 @@ export function TimetableBuilderTab({
                         </div>
                         <div className="flex flex-1 flex-wrap gap-3">
                           {daySlots.map((s) => {
-                            const hasConflict = validationResult?.errors.some(e => e.conflictingSlotId === s.id || e.affectedPeriodIds.includes(s.id));
+                            const hasConflict = validationResult?.errors.some(
+                              (e) =>
+                                e.conflictingSlotId === s.id ||
+                                (e.affectedPeriodIds ?? []).includes(s.id),
+                            );
                             return (
                               <div 
                                 key={s.id} 

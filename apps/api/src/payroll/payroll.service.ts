@@ -370,9 +370,6 @@ export class PayrollService {
     return updated;
   }
 
-    return updated;
-  }
-
   async listPayrollRuns(actor: AuthContext) {
     return this.prisma.payrollRun.findMany({
       where: { tenantId: actor.tenantId },
@@ -933,12 +930,32 @@ export class PayrollService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const originalEntry = await tx.journalEntry.findUnique({
+        where: { id: run.journalEntryId! },
+        include: { lines: true },
+      });
+
+      if (!originalEntry) {
+        throw new ConflictException('Payroll journal entry was not found');
+      }
+
       // 1. Reverse in accounting
-      const reversalEntry = await this.accountingPostingService.postCorrection(
+      const reversalEntry = await this.accountingPostingService.postReversal(
         {
           tenantId: actor.tenantId,
-          originalEntryId: run.journalEntryId!,
+          originalEntryId: originalEntry.id,
+          reversalDate: new Date(),
+          narration: `Reversal of payroll run ${run.periodMonth}/${run.periodYear}`,
           reason: dto.reason || 'Payroll correction',
+          lines: originalEntry.lines.map((line) => ({
+            chartAccountId: line.chartAccountId,
+            side:
+              line.side === JournalLineSide.DEBIT
+                ? JournalLineSide.CREDIT
+                : JournalLineSide.DEBIT,
+            amount: line.amount,
+            description: `Reversal of ${line.description}`,
+          })),
         },
         actor,
         tx,
@@ -949,15 +966,10 @@ export class PayrollService {
         where: { id: run.id },
         data: {
           status: PayrollRunStatus.VOID,
-          voidedAt: new Date(),
-          voidedById: actor.userId,
+          reversalAt: new Date(),
+          reversalReason: dto.reason || 'Payroll correction',
+          reversedById: actor.userId,
         },
-      });
-
-      // 3. Void payslips
-      await tx.payslip.updateMany({
-        where: { tenantId: actor.tenantId, payrollRunId: run.id },
-        data: { status: 'VOID' },
       });
 
       return { updated, reversalEntry };
@@ -976,7 +988,6 @@ export class PayrollService {
     });
 
     return result;
-  }
   }
 
   async rejectPayrollRun(

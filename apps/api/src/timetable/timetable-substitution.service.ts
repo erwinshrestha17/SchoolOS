@@ -123,7 +123,8 @@ export class TimetableSubstitutionService {
           originalTeacherId: slot.staffId,
           originalTeacherName: `${slot.staff?.firstName} ${slot.staff?.lastName}`,
           isTeacherAbsent: absenceContext.isAbsent,
-          absenceReason: absenceContext.leaveType ?? absenceContext.attendanceStatus ?? null,
+          absenceReason:
+            absenceContext.leaveType ?? absenceContext.attendanceStatus ?? null,
           hasSubstitution: !!existing,
           substitutionStatus: existing?.status ?? null,
           substituteTeacherId: existing?.substituteTeacherId ?? null,

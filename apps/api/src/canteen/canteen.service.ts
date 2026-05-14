@@ -725,6 +725,28 @@ export class CanteenService {
   ) {
     await this.ensureStudent(actor.tenantId, studentId);
     const result = await this.prisma.$transaction(async (tx) => {
+      if (dto.idempotencyKey) {
+        const existingTransaction =
+          await tx.canteenWalletTransaction.findUnique({
+            where: { idempotencyKey: dto.idempotencyKey },
+            include: { wallet: true },
+          });
+
+        if (existingTransaction) {
+          if (
+            existingTransaction.tenantId !== actor.tenantId ||
+            existingTransaction.studentId !== studentId
+          ) {
+            throw new ConflictException('Duplicate wallet request key');
+          }
+
+          return {
+            wallet: existingTransaction.wallet,
+            transaction: existingTransaction,
+          };
+        }
+      }
+
       const wallet = await this.getOrCreateWalletInTx(
         tx,
         actor.tenantId,
@@ -753,6 +775,8 @@ export class CanteenService {
           amount: new Prisma.Decimal(dto.amount),
           balanceAfter: updated.balance,
           referenceType: 'manual_top_up',
+          referenceId: dto.idempotencyKey ?? null,
+          idempotencyKey: dto.idempotencyKey ?? null,
           note: dto.note ?? null,
           createdByUserId: actor.userId,
         },
@@ -762,6 +786,7 @@ export class CanteenService {
         {
           tenantId: actor.tenantId,
           walletId: wallet.id,
+          transactionId: transaction.id,
           studentId,
           amount: new Prisma.Decimal(dto.amount),
           paymentMethod: 'CASH', // Assuming cash for manual top-up or add to DTO
@@ -810,11 +835,17 @@ export class CanteenService {
     }
 
     if (dto.idempotencyKey) {
-      const existing = await this.prisma.canteenPosSale.findFirst({
-        where: { tenantId: actor.tenantId, idempotencyKey: dto.idempotencyKey },
+      const existing = await this.prisma.canteenPosSale.findUnique({
+        where: { idempotencyKey: dto.idempotencyKey },
         include: { items: true },
       });
-      if (existing) return existing;
+      if (existing) {
+        if (existing.tenantId !== actor.tenantId) {
+          throw new ConflictException('Duplicate POS request key');
+        }
+
+        return existing;
+      }
     }
 
     const paymentMethod = this.parsePaymentMethod(dto.paymentMethod);
@@ -880,6 +911,12 @@ export class CanteenService {
   ) {
     const sale = await this.prisma.$transaction(async (tx) => {
       const existing = await this.requirePosSale(tx, actor.tenantId, id);
+      if (existing.status === CanteenPosSaleStatus.COMPLETED) {
+        return tx.canteenPosSale.findUniqueOrThrow({
+          where: { id },
+          include: { items: true },
+        });
+      }
       if (existing.status !== CanteenPosSaleStatus.DRAFT) {
         throw new ConflictException('Only draft POS sales can be completed');
       }
@@ -1329,6 +1366,18 @@ export class CanteenService {
     return enrollment;
   }
 
+  private async requireSupplier(tenantId: string, id: string) {
+    const supplier = await this.prisma.canteenSupplier.findFirst({
+      where: { tenantId, id, isActive: true },
+    });
+
+    if (!supplier) {
+      throw new NotFoundException('Canteen supplier not found in this tenant');
+    }
+
+    return supplier;
+  }
+
   private async requirePosSale(
     tx: Tx | PrismaService,
     tenantId: string,
@@ -1430,6 +1479,10 @@ export class CanteenService {
     dto: CreateCanteenInventoryItemDto,
     actor: AuthContext,
   ) {
+    if (dto.defaultSupplierId) {
+      await this.requireSupplier(actor.tenantId, dto.defaultSupplierId);
+    }
+
     const item = await this.prisma.canteenInventoryItem.create({
       data: {
         tenantId: actor.tenantId,
@@ -1484,10 +1537,38 @@ export class CanteenService {
     actor: AuthContext,
   ) {
     const bill = await this.prisma.$transaction(async (tx) => {
+      const supplier = await tx.canteenSupplier.findFirst({
+        where: {
+          id: dto.supplierId,
+          tenantId: actor.tenantId,
+          isActive: true,
+        },
+      });
+
+      if (!supplier) {
+        throw new NotFoundException(
+          'Canteen supplier not found in this tenant',
+        );
+      }
+
       let totalAmount = new Prisma.Decimal(0);
       const itemsData: PurchaseBillItemData[] = [];
 
       for (const item of dto.items) {
+        const inventoryItem = await tx.canteenInventoryItem.findFirst({
+          where: {
+            id: item.inventoryItemId,
+            tenantId: actor.tenantId,
+            isActive: true,
+          },
+        });
+
+        if (!inventoryItem) {
+          throw new NotFoundException(
+            'Canteen inventory item not found in this tenant',
+          );
+        }
+
         const lineTotal = new Prisma.Decimal(item.quantity).mul(
           new Prisma.Decimal(item.unitCost),
         );
@@ -1588,6 +1669,10 @@ export class CanteenService {
       });
 
       const quantity = new Prisma.Decimal(dto.quantity);
+      if (item.currentStock.lt(quantity)) {
+        throw new ConflictException('Wastage cannot make stock negative');
+      }
+
       const totalCost = item.unitCost.mul(quantity);
 
       const createdWastage = await tx.canteenWastage.create({
@@ -1604,9 +1689,21 @@ export class CanteenService {
         },
       });
 
-      const updatedItem = await tx.canteenInventoryItem.update({
-        where: { id: item.id },
+      const stockUpdate = await tx.canteenInventoryItem.updateMany({
+        where: {
+          id: item.id,
+          tenantId: actor.tenantId,
+          currentStock: { gte: quantity },
+        },
         data: { currentStock: { decrement: quantity } },
+      });
+
+      if (stockUpdate.count !== 1) {
+        throw new ConflictException('Wastage cannot make stock negative');
+      }
+
+      const updatedItem = await tx.canteenInventoryItem.findUniqueOrThrow({
+        where: { id: item.id },
       });
 
       await tx.canteenStockMovement.create({
@@ -1648,9 +1745,22 @@ export class CanteenService {
       });
 
       const quantity = new Prisma.Decimal(dto.quantity);
+      if (quantity.isZero()) {
+        throw new BadRequestException(
+          'Stock adjustment quantity cannot be zero',
+        );
+      }
+
+      const nextStock = item.currentStock.add(quantity);
+      if (nextStock.lt(0)) {
+        throw new ConflictException(
+          'Stock adjustment cannot make stock negative',
+        );
+      }
+
       const updatedItem = await tx.canteenInventoryItem.update({
         where: { id: item.id },
-        data: { currentStock: { increment: quantity } },
+        data: { currentStock: nextStock },
       });
 
       return tx.canteenStockMovement.create({

@@ -22,7 +22,10 @@ import {
 
 import { FinanceService } from '../finance/finance.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
-import { buildTableReportPdf, getJpegDimensions } from '../common/pdf/simple-pdf';
+import {
+  buildTableReportPdf,
+  getJpegDimensions,
+} from '../common/pdf/simple-pdf';
 
 export interface ReportExecutor {
   definition: ReportDefinition;
@@ -643,7 +646,9 @@ export class ReportsService {
             tenantId: actor.tenantId,
             academicYearId: String(filters.academicYearId),
             ...(filters.classId ? { classId: String(filters.classId) } : {}),
-            ...(filters.sectionId ? { sectionId: String(filters.sectionId) } : {}),
+            ...(filters.sectionId
+              ? { sectionId: String(filters.sectionId) }
+              : {}),
           },
           include: {
             student: true,
@@ -1898,13 +1903,19 @@ export class ReportsService {
           where: { tenantId: actor.tenantId, key: 'school_logo' },
         });
         const logoSetting = settings[0]?.value;
-        if (logoSetting && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(logoSetting))) {
+        if (
+          logoSetting &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            String(logoSetting),
+          )
+        ) {
           try {
-            const { content } = await this.fileRegistryService.getProtectedDownload(
-              actor.tenantId,
-              String(logoSetting),
-              actor.userId,
-            );
+            const { content } =
+              await this.fileRegistryService.getProtectedDownload(
+                actor.tenantId,
+                String(logoSetting),
+                actor.userId,
+              );
             logoBuffer = content;
             logoDimensions = getJpegDimensions(content);
           } catch (e) {
@@ -1920,12 +1931,15 @@ export class ReportsService {
               title: executor.definition.name,
               subtitle: `Module: ${executor.definition.module}`,
               rows: data,
-              logo: logoBuffer && logoDimensions ? {
-                buffer: logoBuffer,
-                width: logoDimensions.width,
-                height: logoDimensions.height,
-                format: 'jpeg',
-              } : null,
+              logo:
+                logoBuffer && logoDimensions
+                  ? {
+                      buffer: logoBuffer,
+                      width: logoDimensions.width,
+                      height: logoDimensions.height,
+                      format: 'jpeg',
+                    }
+                  : null,
             })
           : Buffer.from(this.convertToCsv(data));
       const contentType =

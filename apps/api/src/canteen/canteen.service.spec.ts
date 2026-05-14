@@ -96,12 +96,64 @@ describe('CanteenService Phase 3C hardening', () => {
     });
   });
 
+  it('deduplicates wallet top-up requests by idempotency key', async () => {
+    const { service, tx, accountingPostingService } = buildService({
+      existingWalletTransaction: {
+        id: 'txn-existing',
+        tenantId: actor.tenantId,
+        studentId: 'student-1',
+        wallet: {
+          id: 'wallet-1',
+          tenantId: actor.tenantId,
+          studentId: 'student-1',
+          balance: new Prisma.Decimal(500),
+        },
+      },
+    });
+
+    const result = await service.topUpWallet(
+      'student-1',
+      { amount: 500, idempotencyKey: 'topup-1' },
+      actor,
+    );
+
+    expect(result.transaction).toEqual(
+      expect.objectContaining({ id: 'txn-existing' }),
+    );
+    expect(tx.canteenWallet.update).not.toHaveBeenCalled();
+    expect(accountingPostingService.postCanteenTopUp).not.toHaveBeenCalled();
+  });
+
   it('prevents wallet balance from going negative when completing POS sale', async () => {
     const { service } = buildService({ walletDeductCount: 0 });
 
     await expect(
       service.completePosSale('sale-1', { note: 'complete' }, actor),
     ).rejects.toThrow(ConflictException);
+  });
+
+  it('treats completed POS completion retries as idempotent', async () => {
+    const { service, tx, accountingPostingService } = buildService({
+      posSale: {
+        id: 'sale-1',
+        tenantId: actor.tenantId,
+        studentId: 'student-1',
+        walletId: 'wallet-1',
+        paymentMethod: CanteenPaymentMethod.WALLET,
+        status: CanteenPosSaleStatus.COMPLETED,
+        totalAmount: new Prisma.Decimal(100),
+      },
+    });
+
+    const result = await service.completePosSale(
+      'sale-1',
+      { note: 'retry' },
+      actor,
+    );
+
+    expect(result).toEqual(expect.objectContaining({ id: 'sale-1' }));
+    expect(tx.canteenWallet.updateMany).not.toHaveBeenCalled();
+    expect(accountingPostingService.postCanteenSale).not.toHaveBeenCalled();
   });
 
   it('prevents inactive menu items from being sold', async () => {
@@ -191,6 +243,8 @@ function buildService(
     spendingControl?: unknown;
     duplicateServing?: unknown;
     walletDeductCount?: number;
+    existingWalletTransaction?: unknown;
+    posSale?: unknown;
   } = {},
 ) {
   const student =
@@ -219,7 +273,7 @@ function buildService(
     balance: new Prisma.Decimal(1000),
     lowBalanceThreshold: new Prisma.Decimal(100),
   };
-  const sale = {
+  const sale = options.posSale ?? {
     id: 'sale-1',
     tenantId: actor.tenantId,
     studentId: 'student-1',
@@ -260,6 +314,9 @@ function buildService(
       }),
     },
     canteenWalletTransaction: {
+      findUnique: jest
+        .fn()
+        .mockResolvedValue(options.existingWalletTransaction ?? null),
       create: jest.fn().mockResolvedValue({ id: 'txn-1' }),
     },
     canteenSpendingControl: {
@@ -268,6 +325,10 @@ function buildService(
     canteenPosSale: {
       create: jest.fn().mockResolvedValue({ id: 'sale-1', items: [] }),
       findFirst: jest.fn().mockResolvedValue(sale),
+      findUniqueOrThrow: jest.fn().mockResolvedValue({
+        ...(sale as Record<string, unknown>),
+        items: [],
+      }),
       update: jest.fn().mockResolvedValue({
         ...sale,
         status: CanteenPosSaleStatus.COMPLETED,

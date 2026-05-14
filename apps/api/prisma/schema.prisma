@@ -551,6 +551,7 @@ enum LibraryIssueStatus {
 
 enum LibraryFineStatus {
   PENDING
+  POSTED_TO_FEES
   PAID
   PARTIALLY_PAID
   WAIVED
@@ -4137,6 +4138,8 @@ model LibraryFine {
   amount           Decimal           @db.Decimal(12, 2)
   waivedAmount     Decimal           @default(0) @db.Decimal(12, 2)
   status           LibraryFineStatus @default(PENDING)
+  feeInvoiceId     String?
+  feePostedAt      DateTime?
   waiverReason     String?
   correctionReason String?
   notes            String?
@@ -4148,6 +4151,7 @@ model LibraryFine {
 
   @@index([tenantId, status])
   @@index([tenantId, issueId])
+  @@index([tenantId, feeInvoiceId])
 }
 
 model LibrarySetting {
@@ -4549,6 +4553,7 @@ model CanteenWalletTransaction {
   referenceId     String?
   reversalOfId    String?                        @unique
   correctionOfId  String?                        @unique
+  idempotencyKey  String?                        @unique
   reason          String?
   note            String?
   transactionDate DateTime                       @default(now())

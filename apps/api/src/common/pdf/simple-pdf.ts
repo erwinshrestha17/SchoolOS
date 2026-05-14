@@ -55,7 +55,7 @@ export function buildCertificatePdf(input: {
       'CERTIFICATE',
       input.schoolName,
       input.subtitle ?? 'Official school record',
-      input.logo ? 'Img1' : undefined
+      input.logo ? 'Img1' : undefined,
     ),
     pill(390, 694, 150, 34),
     text('REFERENCE', 402, 716, 7, 'F2'),
@@ -86,7 +86,10 @@ export function buildCertificatePdf(input: {
     ),
   ];
 
-  return buildPdfFromContent(contentParts.filter(Boolean).join('\n'), input.logo);
+  return buildPdfFromContent(
+    contentParts.filter(Boolean).join('\n'),
+    input.logo,
+  );
 }
 
 export function buildReceiptPdf(input: {
@@ -118,7 +121,7 @@ export function buildReceiptPdf(input: {
       'FEE RECEIPT',
       input.schoolName,
       input.panNumber ? `PAN: ${input.panNumber}` : 'Official payment receipt',
-      input.logo ? 'Img1' : undefined
+      input.logo ? 'Img1' : undefined,
     ),
     input.isReprint ? stamp('REPRINT', 456, 688) : '',
     infoBox(48, 628, 228, 54),
@@ -197,7 +200,10 @@ export function buildReceiptPdf(input: {
     ),
   );
 
-  return buildPdfFromContent(contentParts.filter(Boolean).join('\n'), input.logo);
+  return buildPdfFromContent(
+    contentParts.filter(Boolean).join('\n'),
+    input.logo,
+  );
 }
 
 export function buildSalarySlipPdf(input: {
@@ -228,7 +234,7 @@ export function buildSalarySlipPdf(input: {
       'SALARY SLIP',
       input.schoolName,
       input.panNumber ? `PAN: ${input.panNumber}` : input.period,
-      input.logo ? 'Img1' : undefined
+      input.logo ? 'Img1' : undefined,
     ),
     infoBox(48, 622, 492, 62),
     sectionLabel('Employee', 60, 666),
@@ -299,7 +305,10 @@ export function buildSalarySlipPdf(input: {
     ),
   );
 
-  return buildPdfFromContent(contentParts.filter(Boolean).join('\n'), input.logo);
+  return buildPdfFromContent(
+    contentParts.filter(Boolean).join('\n'),
+    input.logo,
+  );
 }
 
 export function buildIdCardPdf(input: {
@@ -324,7 +333,9 @@ export function buildIdCardPdf(input: {
     '0.8 w',
     `${left} ${bottom} ${width} ${height} re S`,
     `${left + 8} ${bottom + 8} ${width - 16} ${height - 16} re S`,
-    input.logo ? `q 40 0 0 40 ${left + 14} ${bottom + height - 54} cm /Img1 Do Q` : '',
+    input.logo
+      ? `q 40 0 0 40 ${left + 14} ${bottom + height - 54} cm /Img1 Do Q`
+      : '',
     text(
       fitText(input.schoolName, 29),
       left + (input.logo ? 58 : 14),
@@ -383,7 +394,10 @@ export function buildIdCardPdf(input: {
     );
   }
 
-  return buildPdfFromContent(contentParts.filter(Boolean).join('\n'), input.logo);
+  return buildPdfFromContent(
+    contentParts.filter(Boolean).join('\n'),
+    input.logo,
+  );
 }
 
 export function buildReportCardPdf(input: {
@@ -422,7 +436,7 @@ export function buildReportCardPdf(input: {
       input.panNumber
         ? `PAN: ${input.panNumber}`
         : `${input.examName} - ${input.academicYear}`,
-      input.logo ? 'Img1' : undefined
+      input.logo ? 'Img1' : undefined,
     ),
     infoBox(48, 626, 492, 58),
     sectionLabel('Student', 60, 666),
@@ -493,7 +507,10 @@ export function buildReportCardPdf(input: {
     text(`Printed on: ${formatIsoDate(new Date())}`, 238, 36, 8, 'F1'),
   );
 
-  return buildPdfFromContent(contentParts.filter(Boolean).join('\n'), input.logo);
+  return buildPdfFromContent(
+    contentParts.filter(Boolean).join('\n'),
+    input.logo,
+  );
 }
 
 export function buildTableReportPdf(input: {
@@ -515,7 +532,7 @@ export function buildTableReportPdf(input: {
       fitText(input.title.toUpperCase(), 24),
       input.schoolName,
       input.subtitle ?? 'Generated report export',
-      input.logo ? 'Img1' : undefined
+      input.logo ? 'Img1' : undefined,
     ),
     text(
       `Generated: ${formatDateTime(input.generatedAt ?? new Date())}`,
@@ -550,7 +567,10 @@ export function buildTableReportPdf(input: {
     text('Protected SchoolOS report snapshot', 360, 54, 8, 'F1'),
   );
 
-  return buildPdfFromContent(contentParts.filter(Boolean).join('\n'), input.logo);
+  return buildPdfFromContent(
+    contentParts.filter(Boolean).join('\n'),
+    input.logo,
+  );
 }
 
 export function buildRosterPdf(input: {
@@ -565,7 +585,8 @@ export function buildRosterPdf(input: {
   return buildTableReportPdf({
     schoolName: input.schoolName,
     title: 'STUDENT ROSTER',
-    subtitle: `${input.className ?? ''} ${input.sectionName ? '(' + input.sectionName + ')' : ''} ${input.academicYear ? '- ' + input.academicYear : ''}`.trim(),
+    subtitle:
+      `${input.className ?? ''} ${input.sectionName ? '(' + input.sectionName + ')' : ''} ${input.academicYear ? '- ' + input.academicYear : ''}`.trim(),
     rows: input.rows,
     logo: input.logo,
   });
@@ -595,7 +616,7 @@ function buildPdfFromContent(content: string, logo?: PdfImage | null) {
     objects.push(
       `<< /Type /XObject /Subtype /Image /Width ${logo.width} /Height ${logo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${logo.buffer.length} >>\nstream\n`,
       logo.buffer,
-      '\nendstream'
+      '\nendstream',
     );
   }
 
@@ -612,7 +633,7 @@ function buildPdfObjects(objects: (string | Buffer)[]) {
     const header = Buffer.from(`${index + 1} 0 obj\n`);
     const body = typeof obj === 'string' ? Buffer.from(obj) : obj;
     const footer = Buffer.from('\nendobj\n');
-    
+
     chunks.push(header, body, footer);
     currentOffset += header.length + body.length + footer.length;
   }
@@ -626,7 +647,9 @@ function buildPdfObjects(objects: (string | Buffer)[]) {
   }
 
   chunks.push(
-    Buffer.from(`trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`)
+    Buffer.from(
+      `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`,
+    ),
   );
 
   return Buffer.concat(chunks);
@@ -642,7 +665,12 @@ function text(
   return `BT /${font} ${size} Tf ${x} ${y} Td (${escapePdfText(value)}) Tj ET`;
 }
 
-function pageFrame(title: string, schoolName: string, subtitle: string, logoKey?: string) {
+function pageFrame(
+  title: string,
+  schoolName: string,
+  subtitle: string,
+  logoKey?: string,
+) {
   const parts = [
     '0.6 w',
     '36 36 540 720 re S',
@@ -794,8 +822,11 @@ function renderQrTokenAsPdfBlocks(
   return parts.join('\n');
 }
 
-export function getJpegDimensions(buffer: Buffer): { width: number; height: number } {
-  if (buffer[0] !== 0xFF || buffer[1] !== 0xD8) {
+export function getJpegDimensions(buffer: Buffer): {
+  width: number;
+  height: number;
+} {
+  if (buffer[0] !== 0xff || buffer[1] !== 0xd8) {
     throw new Error('Invalid JPEG: Missing SOI marker');
   }
 
@@ -804,7 +835,7 @@ export function getJpegDimensions(buffer: Buffer): { width: number; height: numb
     const marker = buffer.readUInt16BE(offset);
     offset += 2;
 
-    if (marker === 0xFFC0 || marker === 0xFFC2) {
+    if (marker === 0xffc0 || marker === 0xffc2) {
       // SOF0 or SOF2
       offset += 3; // Skip length and precision
       const height = buffer.readUInt16BE(offset);

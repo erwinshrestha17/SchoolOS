@@ -9,7 +9,10 @@ import { AuditService } from '../audit/audit.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { GradeCalculatorService } from './grade-calculator.service';
-import { buildReportCardPdf, getJpegDimensions } from '../common/pdf/simple-pdf';
+import {
+  buildReportCardPdf,
+  getJpegDimensions,
+} from '../common/pdf/simple-pdf';
 
 type ReportCardWithRelations = Prisma.ReportCardGetPayload<{
   include: {
@@ -169,7 +172,12 @@ export class ReportCardPdfService {
     let logoDimensions: { width: number; height: number } | null = null;
 
     const logoSetting = settingMap.get('school_logo');
-    if (logoSetting && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(logoSetting))) {
+    if (
+      logoSetting &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        String(logoSetting),
+      )
+    ) {
       try {
         const { content } = await this.fileRegistryService.getProtectedDownload(
           actor.tenantId,
@@ -196,18 +204,30 @@ export class ReportCardPdfService {
         sectionName: reportCard.section?.name,
         rollNumber: reportCard.student.rollNumber,
       },
-      subjects: this.buildSubjectRows(marks).map(s => ({
+      subjects: this.buildSubjectRows(marks).map((s) => ({
         name: s.subject,
-        theory: s.components.find(c => c.type === 'THEORY') ? {
-          max: s.components.filter(c => c.type === 'THEORY').reduce((sum, c) => sum + c.max, 0),
-          obtained: s.components.filter(c => c.type === 'THEORY').reduce((sum, c) => sum + c.obtained, 0),
-          grade: s.grade,
-        } : undefined,
-        practical: s.components.find(c => c.type === 'PRACTICAL') ? {
-          max: s.components.filter(c => c.type === 'PRACTICAL').reduce((sum, c) => sum + c.max, 0),
-          obtained: s.components.filter(c => c.type === 'PRACTICAL').reduce((sum, c) => sum + c.obtained, 0),
-          grade: s.grade,
-        } : undefined,
+        theory: s.components.find((c) => c.type === 'THEORY')
+          ? {
+              max: s.components
+                .filter((c) => c.type === 'THEORY')
+                .reduce((sum, c) => sum + c.max, 0),
+              obtained: s.components
+                .filter((c) => c.type === 'THEORY')
+                .reduce((sum, c) => sum + c.obtained, 0),
+              grade: s.grade,
+            }
+          : undefined,
+        practical: s.components.find((c) => c.type === 'PRACTICAL')
+          ? {
+              max: s.components
+                .filter((c) => c.type === 'PRACTICAL')
+                .reduce((sum, c) => sum + c.max, 0),
+              obtained: s.components
+                .filter((c) => c.type === 'PRACTICAL')
+                .reduce((sum, c) => sum + c.obtained, 0),
+              grade: s.grade,
+            }
+          : undefined,
         totalGrade: s.grade,
         gradePoint: s.grade === 'NG' ? 0 : 4, // Placeholder for actual GPA calc
       })),
@@ -219,12 +239,15 @@ export class ReportCardPdfService {
         finalGpa: Number(reportCard.gpa),
         remarks: reportCard.remarks,
       },
-      logo: logoBuffer && logoDimensions ? {
-        buffer: logoBuffer,
-        width: logoDimensions.width,
-        height: logoDimensions.height,
-        format: 'jpeg',
-      } : null,
+      logo:
+        logoBuffer && logoDimensions
+          ? {
+              buffer: logoBuffer,
+              width: logoDimensions.width,
+              height: logoDimensions.height,
+              format: 'jpeg',
+            }
+          : null,
     });
 
     if (!reportCard.fileId) {
@@ -339,4 +362,3 @@ export class ReportCardPdfService {
     return rows;
   }
 }
-
