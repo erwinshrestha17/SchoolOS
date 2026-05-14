@@ -5,17 +5,33 @@ import path from 'node:path';
 
 const repoRoot = process.cwd();
 const coreDist = path.join(repoRoot, 'packages/core/dist');
+const requiredFiles = [
+  path.join(coreDist, 'index.js'),
+  path.join(coreDist, 'index.d.ts'),
+];
 
 if (!existsSync(coreDist)) {
-  console.log('packages/core/dist does not exist, skipping check.');
-  process.exit(0);
+  console.error('Error: packages/core/dist does not exist. Run `pnpm --filter @schoolos/core build` first.');
+  process.exit(1);
+}
+
+if (!statSync(coreDist).isDirectory()) {
+  console.error('Error: packages/core/dist exists but is not a directory.');
+  process.exit(1);
+}
+
+for (const file of requiredFiles) {
+  if (!existsSync(file)) {
+    console.error(`Error: required @schoolos/core build artifact is missing: ${path.relative(repoRoot, file)}`);
+    process.exit(1);
+  }
 }
 
 const pollutionPatterns = [
-  { pattern: /import\.meta\.webpackHot/g, name: 'import.meta.webpackHot' },
-  { pattern: /webpackHot/g, name: 'webpackHot' },
-  { pattern: /Refresh Boundary/g, name: 'Refresh Boundary' },
-  { pattern: /RefreshBoundary/g, name: 'RefreshBoundary' },
+  { pattern: /import\.meta\.webpackHot/, name: 'import.meta.webpackHot' },
+  { pattern: /Refresh Boundary/, name: 'Refresh Boundary' },
+  { pattern: /RefreshBoundary/, name: 'RefreshBoundary' },
+  { pattern: /webpackHot/, name: 'webpackHot' },
 ];
 
 function walk(dir, files = []) {
@@ -25,7 +41,7 @@ function walk(dir, files = []) {
 
     if (stat.isDirectory()) {
       walk(fullPath, files);
-    } else if (entry.endsWith('.js')) {
+    } else if (entry.endsWith('.js') || entry.endsWith('.d.ts')) {
       files.push(fullPath);
     }
   }
@@ -47,8 +63,9 @@ for (const file of files) {
   }
 
   // Check for ESM extensionless relative imports/exports
-  // Catches: from './permissions', import './something', etc.
-  const esmRelativeImportPattern = /(?:from|import)\s+['"](\.\.?\/[^'"]*?)['"]/g;
+  // Catches: from './permissions', import './something', import('./something'), etc.
+  const esmRelativeImportPattern =
+    /(?:\bfrom\s+|\bimport\s+(?:[^'"]+\s+from\s+)?|\bexport\s+[^'"]+\s+from\s+|\bimport\s*\(\s*)['"](\.\.?\/[^'"]*?)['"]/g;
   let match;
   while ((match = esmRelativeImportPattern.exec(content)) !== null) {
     const importPath = match[1];
@@ -62,8 +79,8 @@ for (const file of files) {
 }
 
 if (violations > 0) {
-  console.error(`\nError: packages/core/dist is polluted with bundler-specific code (HMR/React Refresh).`);
-  console.error(`Ensure @schoolos/core is only built with 'tsc' and not processed by Next.js/Webpack during build.`);
+  console.error(`\nError: packages/core/dist failed validation.`);
+  console.error(`Ensure @schoolos/core is built with 'tsc', emits Node ESM-safe imports, and is not processed by Next.js/Webpack.`);
   process.exit(1);
 }
 

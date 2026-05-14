@@ -18,7 +18,7 @@
   ],
   "scripts": {
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
-    "build": "tsc --project tsconfig.json",
+    "build": "pnpm run clean && tsc --project tsconfig.json",
     "lint": "tsc --noEmit --project tsconfig.json",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "test": "echo \"No tests for @schoolos/core\""
