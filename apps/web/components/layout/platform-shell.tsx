@@ -52,7 +52,6 @@ const platformNavItems: PlatformNavItem[] = [
     description: 'Seats, storage, modules and activity',
     icon: BarChart3,
     permissions: ['platform:read'],
-    disabled: true,
   },
   {
     href: '/platform/settings?tab=plans',
