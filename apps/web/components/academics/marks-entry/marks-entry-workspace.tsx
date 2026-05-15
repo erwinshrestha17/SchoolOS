@@ -38,7 +38,11 @@ export function MarksEntryWorkspace() {
   });
   const studentsQuery = useQuery({
     queryKey: ['students', classId, sectionId],
-    queryFn: () => api.listStudents({ classId: classId || undefined, sectionId: sectionId || undefined }),
+    queryFn: () => api.listStudents({ 
+      classId: classId || undefined, 
+      sectionId: sectionId || undefined,
+      limit: 1000 
+    }),
     enabled: !!classId,
   });
   const existingMarksQuery = useQuery({
@@ -364,7 +368,7 @@ export function MarksEntryWorkspace() {
             
             <DataTable
               columns={columns}
-              data={studentsQuery.data ?? []}
+              data={studentsQuery.data?.items ?? []}
               isLoading={studentsQuery.isLoading || existingMarksQuery.isLoading}
               getRowKey={(s) => s.id}
             />

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -41,6 +42,24 @@ export class StudentRecordsService {
 
     if (!student) {
       throw new NotFoundException('Student not found in this tenant');
+    }
+
+    const ALLOWED_DOCUMENT_MIME_TYPES = new Set([
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ]);
+
+    if (
+      dto.contentType &&
+      !ALLOWED_DOCUMENT_MIME_TYPES.has(dto.contentType.toLowerCase())
+    ) {
+      throw new BadRequestException(
+        `File type ${dto.contentType} is not allowed for student documents. Only PDF, JPEG, PNG, WEBP, and DOC/DOCX are permitted.`,
+      );
     }
 
     const stored = await this.storageService.saveBase64Object({

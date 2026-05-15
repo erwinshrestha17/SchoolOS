@@ -110,7 +110,7 @@ describe('StudentsService (Duplicate Merge)', () => {
       prisma.conversation,
       prisma.conversationParticipant,
       prisma.enrollment,
-    ] as unknown as Array<{ updateMany?: jest.Mock; createMany?: jest.Mock }>;
+    ] as unknown as { updateMany?: jest.Mock; createMany?: jest.Mock }[];
 
     for (const delegate of delegates) {
       delegate.updateMany?.mockResolvedValue({ count: 0 });

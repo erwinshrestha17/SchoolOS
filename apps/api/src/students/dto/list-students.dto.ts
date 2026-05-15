@@ -1,0 +1,34 @@
+import { IsOptional, IsString, IsInt, Min, Max, IsEnum } from 'class-validator';
+import { Type } from 'class-transformer';
+import { StudentLifecycleStatus } from '@prisma/client';
+
+export class ListStudentsDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  page?: number = 1;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  @Type(() => Number)
+  limit?: number = 50;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsString()
+  classId?: string;
+
+  @IsOptional()
+  @IsString()
+  sectionId?: string;
+
+  @IsOptional()
+  @IsEnum(StudentLifecycleStatus)
+  status?: StudentLifecycleStatus;
+}

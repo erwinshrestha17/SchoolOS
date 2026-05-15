@@ -10,9 +10,18 @@ import { useState } from 'react';
 export default function StudentsPage() {
   const [pdfError, setPdfError] = useState('');
 
+  const [filters, setFilters] = useState<{
+    academicYearId?: string;
+    classId?: string;
+    sectionId?: string;
+    status?: string;
+    search?: string;
+    page?: number;
+  }>({ page: 1 });
+
   const admissionsQuery = useQuery({
     queryKey: ['admissions'],
-    queryFn: api.listAdmissions,
+    queryFn: () => api.listAdmissions({ limit: 100 }),
   });
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years'],
@@ -26,7 +35,10 @@ export default function StudentsPage() {
     queryKey: ['sections'],
     queryFn: api.listSections,
   });
-  const studentsQuery = useQuery({ queryKey: ['students'], queryFn: () => api.listStudents() });
+  const studentsQuery = useQuery({ 
+    queryKey: ['students', filters], 
+    queryFn: () => api.listStudents(filters) 
+  });
 
   async function openStudentPdf(studentId: string, kind: string) {
     setPdfError('');
@@ -67,7 +79,7 @@ export default function StudentsPage() {
 
       <StudentDirectory
         academicYears={academicYearsQuery.data ?? []}
-        admissions={admissionsQuery.data ?? []}
+        admissions={admissionsQuery.data?.items ?? []}
         classes={classesQuery.data ?? []}
         isError={
           academicYearsQuery.isError ||
@@ -85,11 +97,12 @@ export default function StudentsPage() {
         }
         pdfError={pdfError}
         sections={sectionsQuery.data ?? []}
-        students={studentsQuery.data ?? []}
+        studentsResponse={studentsQuery.data}
         onOpenPdf={(studentId, kind) => void openStudentPdf(studentId, kind)}
         onExportRoster={(format, filters) =>
           void handleExportRoster(format, filters)
         }
+        onFilterChange={setFilters}
       />
     </div>
   );

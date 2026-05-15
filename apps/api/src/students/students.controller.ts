@@ -18,6 +18,7 @@ import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { ArchiveStudentDto } from './dto/archive-student.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
+import { ListStudentsDto } from './dto/list-students.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
 import { InviteGuardianDto } from './dto/invite-guardian.dto';
 import { MergeDuplicateStudentDto } from './dto/merge-duplicate-student.dto';
@@ -40,8 +41,11 @@ export class StudentsController {
 
   @Get()
   @Permissions('students:read')
-  listStudents(@CurrentAuth() auth: AuthContext) {
-    return this.studentsService.listStudents(auth);
+  listStudents(
+    @Query() query: ListStudentsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.listStudents(query, auth);
   }
 
   @Get(':id')

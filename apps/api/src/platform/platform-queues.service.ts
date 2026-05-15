@@ -13,7 +13,7 @@ type QueueCounts = Partial<
   Record<'waiting' | 'active' | 'completed' | 'failed' | 'delayed', number>
 >;
 
-type PlatformQueueHealth = {
+export interface PlatformQueueHealth {
   name: string;
   waiting: number;
   active: number;
@@ -23,9 +23,9 @@ type PlatformQueueHealth = {
   paused: boolean;
   workerHealth: 'healthy' | 'degraded' | 'unknown';
   error?: string;
-};
+}
 
-type PlatformFailedJobSummary = {
+export interface PlatformFailedJobSummary {
   id: string;
   queueName: string;
   name: string;
@@ -33,7 +33,7 @@ type PlatformFailedJobSummary = {
   attemptsMade: number;
   timestamp?: number;
   data: unknown;
-};
+}
 
 const SECRET_KEY_PATTERN =
   /(api[-_]?key|token|secret|password|credential|authorization|private[-_]?key)/i;

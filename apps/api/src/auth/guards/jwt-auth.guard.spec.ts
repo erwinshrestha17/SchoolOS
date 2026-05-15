@@ -36,6 +36,7 @@ describe('JwtAuthGuard', () => {
     id: 'user-1',
     status: 'ACTIVE',
     email: 'admin@schoolos.com',
+    tenantId: 'tenant-1',
     tenant: { id: 'tenant-1', isActive: true },
     userRoles: [
       {
@@ -228,6 +229,19 @@ describe('JwtAuthGuard', () => {
     await expect(
       guard.canActivate(inactiveTenant.context),
     ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(cls.set).not.toHaveBeenCalled();
+  });
+
+  it('rejects when user tenantId does not match token tenantId (tenant mismatch)', async () => {
+    prisma.user.findUnique.mockResolvedValueOnce({
+      ...mockUser,
+      tenantId: 'tenant-wrong',
+    });
+    const { context } = createContext();
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      new ForbiddenException('Tenant mismatch'),
+    );
     expect(cls.set).not.toHaveBeenCalled();
   });
 });

@@ -47,6 +47,7 @@ import { ReportsModule } from './reports/reports.module';
 import { UsageModule } from './usage/usage.module';
 import { PlansModule } from './plans/plans.module';
 import { UsageInterceptor } from './usage/usage.interceptor';
+import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
 
 @Module({
   imports: [
@@ -119,6 +120,10 @@ import { UsageInterceptor } from './usage/usage.interceptor';
     {
       provide: APP_INTERCEPTOR,
       useClass: UsageInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RequestIdInterceptor,
     },
   ],
 })

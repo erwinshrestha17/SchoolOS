@@ -27,7 +27,7 @@ export function MessagingForm() {
   const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
   const admissionsQuery = useQuery({
     queryKey: ['admissions'],
-    queryFn: api.listAdmissions,
+    queryFn: () => api.listAdmissions(),
   });
   const conversationsQuery = useQuery({
     queryKey: ['conversations'],
@@ -46,7 +46,7 @@ export function MessagingForm() {
     queryFn: api.listNotificationDeliveries,
   });
 
-  const guardianOptions = (admissionsQuery.data ?? []).flatMap((admission) =>
+  const guardianOptions = (admissionsQuery.data?.items ?? []).flatMap((admission) =>
     admission.guardians.map((guardian) => ({
       guardianId: guardian.id,
       studentId: admission.id,

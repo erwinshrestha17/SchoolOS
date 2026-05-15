@@ -297,6 +297,7 @@ export function createPrismaMock() {
     transportDriverAssignments: [] as Record<string, unknown>[],
     transportLocationPings: [] as Record<string, unknown>[],
     guardianConsents: [] as Record<string, unknown>[],
+    supportOverrides: [] as Record<string, unknown>[],
   };
 
   const nextId = (prefix: string) =>
@@ -831,6 +832,25 @@ export function createPrismaMock() {
           (item) => !q.where?.tenantId || item.tenantId === q.where.tenantId,
         );
         return Promise.resolve({ count: before - state.academicYears.length });
+      }),
+    },
+    supportOverride: {
+      findFirst: jest.fn((q: PrismaQuery) =>
+        Promise.resolve(
+          state.supportOverrides.find(
+            (item) =>
+              (!q.where?.platformUserId ||
+                item.platformUserId === q.where.platformUserId) &&
+              (!q.where?.tenantId || item.tenantId === q.where.tenantId) &&
+              (!q.where?.isActive || item.isActive === q.where.isActive),
+          ),
+        ),
+      ),
+      create: jest.fn((q: PrismaQuery) => {
+        const data = q.data ?? {};
+        const item = { id: nextId('override'), ...data, createdAt: new Date() };
+        state.supportOverrides.push(item as Record<string, unknown>);
+        return Promise.resolve(item);
       }),
     },
     chartAccount: {

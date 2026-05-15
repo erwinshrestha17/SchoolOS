@@ -57,12 +57,12 @@ export default function DashboardPage() {
   });
   const studentsQuery = useQuery({
     queryKey: ['dashboard-students'],
-    queryFn: () => api.listStudents(),
+    queryFn: () => api.listStudents({ limit: 1000 }),
     enabled: status === 'authenticated',
   });
   const admissionsQuery = useQuery({
     queryKey: ['dashboard-admissions'],
-    queryFn: api.listAdmissions,
+    queryFn: () => api.listAdmissions({ limit: 10 }),
     enabled: status === 'authenticated',
   });
   const attendanceQuery = useQuery({
@@ -115,7 +115,7 @@ export default function DashboardPage() {
     activeFeePlanCount === 0 ? 'Configure an active fee plan' : null,
   ].filter(Boolean) as string[];
 
-  const totalStudents = studentsQuery.data?.length ?? 0;
+  const totalStudents = studentsQuery.data?.total ?? 0;
   const todayTotals = attendanceQuery.data?.todaySummary.totals;
   const totalMarkedToday = todayTotals?.totalStudents ?? 0;
   const attendancePercent =
@@ -528,7 +528,7 @@ export default function DashboardPage() {
           className="lg:col-span-1"
         >
           <RecentActivityList
-            admissions={admissionsQuery.data ?? []}
+            admissions={admissionsQuery.data?.items ?? []}
             receipts={receiptsQuery.data ?? []}
             activityPosts={activityPostsQuery.data ?? []}
             notices={noticesQuery.data ?? []}

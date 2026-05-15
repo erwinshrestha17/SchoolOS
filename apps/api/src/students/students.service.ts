@@ -35,6 +35,7 @@ import { UsageService } from '../usage/usage.service';
 import { UsersService } from '../users/users.service';
 import { ArchiveStudentDto } from './dto/archive-student.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
+import { ListStudentsDto } from './dto/list-students.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
 import { InviteGuardianDto } from './dto/invite-guardian.dto';
 import { MergeDuplicateStudentDto } from './dto/merge-duplicate-student.dto';
@@ -177,32 +178,61 @@ export class StudentsService {
     };
   }
 
-  async listStudents(actor: AuthContext) {
-    const students = await this.prisma.student.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        class: true,
-        user: true,
-      },
-      orderBy: [{ createdAt: 'desc' }, { firstNameEn: 'asc' }],
-      take: 100,
-    });
+  async listStudents(query: ListStudentsDto, actor: AuthContext) {
+    const { page = 1, limit = 50, search, classId, sectionId, status } = query;
+    const skip = (page - 1) * limit;
 
-    return students.map((student) => ({
-      id: student.id,
-      studentSystemId: student.studentSystemId,
-      firstNameEn: student.firstNameEn,
-      lastNameEn: student.lastNameEn,
-      class: {
-        id: student.class.id,
-        name: student.class.name,
-      },
-      section: student.section,
-      rollNumber: student.rollNumber,
-      email: student.user?.email ?? null,
-      hasLogin: Boolean(student.userId),
-      lifecycleStatus: student.lifecycleStatus,
-    }));
+    const where: Prisma.StudentWhereInput = {
+      tenantId: actor.tenantId,
+      ...(status ? { lifecycleStatus: status } : {}),
+      ...(classId ? { classId } : {}),
+      ...(sectionId ? { sectionId } : {}),
+      ...(search
+        ? {
+            OR: [
+              { firstNameEn: { contains: search, mode: 'insensitive' } },
+              { lastNameEn: { contains: search, mode: 'insensitive' } },
+              { studentSystemId: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const [total, students] = await Promise.all([
+      this.prisma.student.count({ where }),
+      this.prisma.student.findMany({
+        where,
+        include: {
+          class: true,
+          user: true,
+        },
+        orderBy: [{ createdAt: 'desc' }, { firstNameEn: 'asc' }],
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      items: students.map((student) => ({
+        id: student.id,
+        studentSystemId: student.studentSystemId,
+        firstNameEn: student.firstNameEn,
+        lastNameEn: student.lastNameEn,
+        class: {
+          id: student.class.id,
+          name: student.class.name,
+        },
+        section: student.section,
+        rollNumber: student.rollNumber,
+        email: student.user?.email ?? null,
+        hasLogin: Boolean(student.userId),
+        lifecycleStatus: student.lifecycleStatus,
+      })),
+      total,
+      page,
+      limit,
+      hasNextPage: total > skip + students.length,
+    };
   }
 
   async getStudentProfile(studentId: string, actor: AuthContext) {
@@ -1611,6 +1641,13 @@ export class StudentsService {
           data: { studentId: targetStudent.id },
         }),
         tx.conversationParticipant.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          data: { studentId: targetStudent.id },
+        }),
+        tx.attendanceRecord.updateMany({
           where: {
             tenantId: actor.tenantId,
             studentId: sourceStudent.id,
@@ -3299,9 +3336,8 @@ function isProbableDuplicateStudent(
 
   const admissionMatch =
     sourceStudent.admissionNumber &&
-    targetStudent.admissionNumber &&
     sourceStudent.admissionNumber.trim().toLowerCase() ===
-      targetStudent.admissionNumber.trim().toLowerCase();
+      targetStudent.admissionNumber?.trim().toLowerCase();
 
   return nameDobMatch || admissionMatch;
 }

@@ -30,5 +30,4 @@ import { AccountingReportExportsService } from './accounting-report-exports.serv
     AccountingReportsService,
   ],
 })
-// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class AccountingModule {}

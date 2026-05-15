@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ClsService } from 'nestjs-cls';
+import { REQUEST_ID_KEY } from '../common/security/cls-keys';
 
 interface AuditLogInput {
   action: string;
@@ -12,13 +14,19 @@ interface AuditLogInput {
   after?: unknown;
   ipAddress?: string | null;
   userAgent?: string | null;
+  requestId?: string | null;
 }
 
 @Injectable()
 export class AuditService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cls: ClsService,
+  ) {}
 
   async record(input: AuditLogInput) {
+    const requestId = input.requestId ?? this.cls.get(REQUEST_ID_KEY);
+
     await this.prisma.auditLog.create({
       data: {
         action: input.action,
@@ -30,6 +38,7 @@ export class AuditService {
         after: input.after as Prisma.InputJsonValue | undefined,
         ipAddress: input.ipAddress ?? null,
         userAgent: input.userAgent ?? null,
+        requestId: requestId ?? null,
       },
     });
   }

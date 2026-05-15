@@ -84,8 +84,11 @@ export type PlatformEntitlementCheck = {
   allowed: boolean;
   tenantId: string;
   featureKey: string;
-  reason: 'allowed' | 'tenant_inactive' | 'no_subscription' | 'subscription_inactive' | 'feature_disabled';
+  reason: 'allowed' | 'tenant_inactive' | 'no_subscription' | 'subscription_inactive' | 'feature_locked';
+  source?: 'plan' | 'override' | 'none';
   subscriptionStatus?: string | null;
+  limit?: number | null;
+  currentValue?: number | null;
 };
 
 export type PlatformUsageCounterSummary = {
@@ -197,6 +200,7 @@ export type PlatformAuditLog = {
   after?: any;
   ipAddress?: string | null;
   userAgent?: string | null;
+  requestId?: string | null;
   createdAt: string;
   user?: {
     id: string;

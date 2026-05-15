@@ -5,12 +5,12 @@ import { PrismaService } from '../prisma/prisma.service';
 
 type DynamicRecord = Record<string, unknown>;
 type DynamicWhere = Record<string, unknown>;
-type DynamicDelegate = {
+interface DynamicDelegate {
   findMany(args?: unknown): Promise<DynamicRecord[]>;
   count(args?: unknown): Promise<number>;
-};
+}
 
-export type ListReportExportsQuery = {
+export interface ListReportExportsQuery {
   tenantId?: string;
   module?: string;
   reportType?: string;
@@ -18,7 +18,7 @@ export type ListReportExportsQuery = {
   requestedBy?: string;
   page?: number;
   limit?: number;
-};
+}
 
 @Injectable()
 export class PlatformReportExportsService {

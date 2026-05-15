@@ -98,7 +98,7 @@ export class PlatformBillingLifecycleService {
     });
 
     for (const inv of longOverdue) {
-      if (inv.subscription && inv.subscription.status === 'GRACE') {
+      if (inv.subscription?.status === 'GRACE') {
         await this.prisma.tenantSubscription.update({
           where: { id: inv.subscriptionId! },
           data: { status: 'SUSPENDED' },

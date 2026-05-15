@@ -166,7 +166,7 @@ const ONBOARDING_ITEMS = [
 ] as const;
 
 type DynamicRecord = Record<string, unknown>;
-type DynamicDelegate = {
+interface DynamicDelegate {
   findMany(args?: unknown): Promise<DynamicRecord[]>;
   findUnique(args?: unknown): Promise<DynamicRecord | null>;
   findFirst(args?: unknown): Promise<DynamicRecord | null>;
@@ -175,7 +175,7 @@ type DynamicDelegate = {
   updateMany(args?: unknown): Promise<DynamicRecord>;
   upsert(args?: unknown): Promise<DynamicRecord>;
   count(args?: unknown): Promise<number>;
-};
+}
 
 @Injectable()
 export class PlatformService {
@@ -673,6 +673,7 @@ export class PlatformService {
         tenantId,
         featureKey,
         reason: 'tenant_inactive',
+        source: 'none',
       };
     }
 
@@ -680,14 +681,36 @@ export class PlatformService {
       tenantId,
       featureKey,
     );
-    const isAllowed = entitlement.allowed;
+
     const subscription = await this.getRawActiveSubscription(tenantId);
 
+    // Determine source
+    let source: PlatformEntitlementCheck['source'] = 'none';
+    const override = await this.prisma.tenantFeatureOverride.findUnique({
+      where: { tenantId_featureKey: { tenantId, featureKey } },
+    });
+
+    if (override) {
+      source = 'override';
+    } else if (subscription) {
+      source = 'plan';
+    }
+
+    let reason: PlatformEntitlementCheck['reason'] = 'feature_locked';
+    if (entitlement.allowed) {
+      reason = 'allowed';
+    } else if (entitlement.reason === 'tenant_inactive') {
+      reason = 'tenant_inactive';
+    } else if (entitlement.reason === 'subscription_missing') {
+      reason = 'no_subscription';
+    }
+
     return {
-      allowed: isAllowed,
+      allowed: entitlement.allowed,
       tenantId,
       featureKey,
-      reason: isAllowed ? 'allowed' : 'feature_disabled',
+      reason,
+      source,
       subscriptionStatus: subscription?.status as string | null,
     };
   }
@@ -1547,8 +1570,8 @@ export class PlatformService {
       resourceId,
       tenantId,
       userId,
-      before: before as Prisma.InputJsonValue,
-      after: after as Prisma.InputJsonValue,
+      before,
+      after,
     });
   }
 

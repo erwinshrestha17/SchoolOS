@@ -81,9 +81,10 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
       const controller = read('src/platform/platform.controller.ts');
 
       // Class-level guard ensures every method is protected
-      const classGuardMatch = controller.match(
-        /@UseGuards\(JwtAuthGuard,\s*PlatformGuard\)\s*\nexport class PlatformController/,
-      );
+      const classGuardMatch =
+        /@UseGuards\(JwtAuthGuard,\s*PlatformGuard\)\s*\nexport class PlatformController/.exec(
+          controller,
+        );
       expect(
         classGuardMatch ||
           controller.includes(
@@ -127,8 +128,8 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
       const permissions = read('../../packages/core/src/permissions.ts');
 
       // platform_support should have only read/view permissions
-      const supportMatch = permissions.match(
-        /platform_support:\s*\[([\s\S]*?)\]/,
+      const supportMatch = /platform_support:\s*\[([\s\S]*?)\]/.exec(
+        permissions,
       );
       expect(supportMatch).not.toBeNull();
 
@@ -141,8 +142,8 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
     it('platform_billing_admin has billing permissions but no queue/provider mutation', () => {
       const permissions = read('../../packages/core/src/permissions.ts');
 
-      const billingMatch = permissions.match(
-        /platform_billing_admin:\s*\[([\s\S]*?)\]/,
+      const billingMatch = /platform_billing_admin:\s*\[([\s\S]*?)\]/.exec(
+        permissions,
       );
       expect(billingMatch).not.toBeNull();
 

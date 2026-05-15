@@ -65,6 +65,10 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('User or tenant is inactive');
     }
 
+    if (user.tenantId !== payload.tenantId) {
+      throw new ForbiddenException('Tenant mismatch');
+    }
+
     const permissionKeys = user.userRoles.flatMap((ur) =>
       ur.role.rolePermissions.map(
         ({ permission }) => `${permission.resource}:${permission.action}`,
@@ -124,6 +128,8 @@ export class JwtAuthGuard implements CanActivate {
     request.auth = {
       userId: user.id,
       tenantId: effectiveTenantId,
+      originalTenantId: payload.tenantId,
+      isSupportOverride: effectiveTenantId !== payload.tenantId,
       tenantSlug: payload.tenantSlug,
       email: user.email,
       authMethod: payload.authMethod,

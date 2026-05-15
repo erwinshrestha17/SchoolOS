@@ -3,6 +3,8 @@ import { type AuthMethod, type OtpPurpose } from '@prisma/client';
 export interface AuthContext {
   userId: string;
   tenantId: string;
+  originalTenantId?: string;
+  isSupportOverride?: boolean;
   tenantSlug: string;
   email: string | null;
   authMethod: AuthMethod;

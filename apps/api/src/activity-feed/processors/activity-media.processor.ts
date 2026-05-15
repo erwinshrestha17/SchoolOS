@@ -30,7 +30,7 @@ export class ActivityMediaProcessor extends WorkerHost {
       include: { fileAsset: true },
     });
 
-    if (!attachment || !attachment.fileAsset) {
+    if (!attachment?.fileAsset) {
       this.logger.warn(`Attachment ${attachmentId} not found, skipping.`);
       return;
     }

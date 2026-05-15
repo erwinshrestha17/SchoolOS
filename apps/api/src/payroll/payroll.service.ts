@@ -1578,7 +1578,7 @@ export function calculatePayrollLine(input: PayrollLineInput) {
   return {
     earnings: grossSalaryDecimal,
     grossSalary: grossSalaryDecimal,
-    allowances: allowances,
+    allowances,
     leaveDeductions: moneyDecimal(fullPeriodLeaveDeduction),
     pfEmployee,
     pfEmployer,

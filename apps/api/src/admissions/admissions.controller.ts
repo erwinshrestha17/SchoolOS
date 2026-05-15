@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
@@ -15,6 +16,7 @@ import { EntitlementGuard } from '../auth/guards/entitlement.guard';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { AdmissionsService } from './admissions.service';
+import { ListAdmissionsDto } from './dto/list-admissions.dto';
 import { BulkAdmissionImportDto } from './dto/bulk-admission-import.dto';
 import { CheckAdmissionDuplicateDto } from './dto/check-admission-duplicate.dto';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
@@ -28,8 +30,11 @@ export class AdmissionsController {
 
   @Get()
   @Permissions('enrollments:read', 'students:read', 'guardians:read')
-  listAdmissions(@CurrentAuth() auth: AuthContext) {
-    return this.admissionsService.listAdmissions(auth);
+  listAdmissions(
+    @Query() query: ListAdmissionsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.admissionsService.listAdmissions(query, auth);
   }
 
   @Post()

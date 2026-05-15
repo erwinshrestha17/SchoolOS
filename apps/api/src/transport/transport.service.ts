@@ -972,7 +972,7 @@ export class TransportService {
 
       subClient.on('message', (ch, message) => {
         if (ch === channel) {
-          subscriber.next({ data: JSON.parse(message) } as MessageEvent);
+          subscriber.next({ data: JSON.parse(message) });
         }
       });
 

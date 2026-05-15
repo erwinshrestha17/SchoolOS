@@ -50,6 +50,7 @@ import type {
   PaymentRefundPayload,
   PaymentRefundSummary,
   PaginatedResult,
+  PaginatedResponse,
   ParentTeacherMessageSummary,
   ParentTeacherThreadCreateResult,
   ParentTeacherThreadSummary,
@@ -412,8 +413,14 @@ export const api = {
   listSections: () => request<SectionSummary[]>('/sections'),
   createSection: (body: JsonBody) =>
     request<SectionSummary>('/sections', { method: 'POST', json: body }),
-  listStudents: (params?: { classId?: string; sectionId?: string; status?: string }) =>
-    request<StudentProfile[]>(withQuery('/students', params ?? {})),
+  listStudents: (params?: {
+    classId?: string;
+    sectionId?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) => request<PaginatedResponse<StudentProfile>>(withQuery('/students', params ?? {})),
   getStudentProfile: (studentId: string) =>
     request<StudentProfileDetail>(`/students/${encodeURIComponent(studentId)}`),
   updateStudent: (studentId: string, body: UpdateStudentProfilePayload) =>
@@ -643,7 +650,12 @@ export const api = {
       method: 'POST',
       json: body,
     }),
-  listAdmissions: () => request<AdmissionSummary[]>('/admissions'),
+  listAdmissions: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+  }) => request<PaginatedResponse<AdmissionSummary>>(withQuery('/admissions', params ?? {})),
   createAdmission: (body: JsonBody) =>
     request<AdmissionCreationResult>('/admissions', { method: 'POST', json: body }),
   checkAdmissionDuplicates: (body: JsonBody) =>

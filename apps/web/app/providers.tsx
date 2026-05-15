@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PropsWithChildren, useState } from 'react';
 import { SessionProvider } from '../components/session-provider';
+import { SupportOverrideBanner } from '../components/platform/SupportOverrideBanner';
 import { ApiRequestError } from '../lib/api';
 
 export function Providers({ children }: PropsWithChildren) {
@@ -29,6 +30,7 @@ export function Providers({ children }: PropsWithChildren) {
 
   return (
     <SessionProvider>
+      <SupportOverrideBanner />
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </SessionProvider>
   );

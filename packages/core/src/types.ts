@@ -4,6 +4,8 @@ import type { SalaryStructureSummary, PayrollLineSummary } from "./payroll.js";
 export type AuthSessionUser = {
   id: string;
   tenantId: string;
+  originalTenantId?: string;
+  isSupportOverride?: boolean;
   tenantSlug: string;
   email: string | null;
   authMethod: string;

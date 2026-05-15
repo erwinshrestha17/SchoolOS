@@ -41,7 +41,11 @@ export function ReportCardsWorkspace() {
   
   const studentsQuery = useQuery({
     queryKey: ['students', classId, sectionId],
-    queryFn: () => api.listStudents({ classId: classId || undefined, sectionId: sectionId || undefined }),
+    queryFn: () => api.listStudents({ 
+      classId: classId || undefined, 
+      sectionId: sectionId || undefined,
+      limit: 1000 
+    }),
     enabled: !!classId,
   });
 
@@ -96,7 +100,7 @@ export function ReportCardsWorkspace() {
       return;
     }
 
-    const studentIds = (studentsQuery.data as any[])?.map((s: any) => s.id) ?? [];
+    const studentIds = (studentsQuery.data?.items ?? []).map((s: any) => s.id);
     if (studentIds.length === 0) {
       setError('No students found in selected class/section');
       return;
@@ -226,7 +230,7 @@ export function ReportCardsWorkspace() {
               />
               <StatCard
                 title="Total Students"
-                value={studentsQuery.data?.length ?? 0}
+                value={studentsQuery.data?.total ?? 0}
                 icon={<CheckCircle2 size={20} />}
                 className="bg-emerald-50/50 border-emerald-100"
               />

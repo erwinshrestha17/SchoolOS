@@ -201,7 +201,7 @@ export function ActivityFeedForm() {
     queryKey: ['sections'],
     queryFn: api.listSections,
   });
-  const studentsQuery = useQuery({ queryKey: ['students'], queryFn: () => api.listStudents() });
+  const studentsQuery = useQuery({ queryKey: ['students'], queryFn: () => api.listStudents({ limit: 1000 }) });
   const postsQuery = useQuery({
     queryKey: ['activity-posts'],
     queryFn: api.listActivityPosts,
@@ -235,7 +235,7 @@ export function ActivityFeedForm() {
 
   const classes = classesQuery.data ?? [];
   const sections = (sectionsQuery.data ?? []) as SectionSummaryForUi[];
-  const students = studentsQuery.data ?? [];
+  const students = studentsQuery.data?.items ?? [];
   const postSections = filterSectionsForClass(sections, post.classId);
   const moodSections = filterSectionsForClass(sections, moodLog.classId);
   const milestoneSections = filterSectionsForClass(sections, milestone.classId);

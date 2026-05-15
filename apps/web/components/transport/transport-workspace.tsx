@@ -147,9 +147,9 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
     queryFn: () => transportApi.getBoardingReport(),
     enabled: activeTab === 'reports'
   });
-  const schoolStudentsQuery = useQuery<StudentProfile[], Error>({ 
+  const schoolStudentsQuery = useQuery({ 
     queryKey: ['students-for-transport'], 
-    queryFn: () => api.listStudents() 
+    queryFn: () => api.listStudents({ limit: 1000 }) 
   });
   const staffQuery = useQuery({ queryKey: ['staff-for-transport'], queryFn: () => api.listStaff() });
   const locationQuery = useQuery({
@@ -610,7 +610,7 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
             </form>
             <hr className="my-5" />
             <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); assignStudentMutation.mutate(cleanStudentAssignment(studentForm)); }}>
-              <SelectInput label="Student" value={studentForm.studentId} onChange={(studentId) => setStudentForm({ ...studentForm, studentId })} required options={(schoolStudentsQuery.data ?? []).map((student) => ({ label: studentLabel(student) || student.id, value: student.id }))} />
+              <SelectInput label="Student" value={studentForm.studentId} onChange={(studentId) => setStudentForm({ ...studentForm, studentId })} required options={(schoolStudentsQuery.data?.items ?? []).map((student) => ({ label: studentLabel(student) || student.id, value: student.id }))} />
               <SelectInput label="Route" value={studentForm.routeId} onChange={(routeId) => setStudentForm({ ...studentForm, routeId, stopId: '' })} required options={routes.map((route) => ({ label: route.name, value: route.id }))} />
               <SelectInput label="Stop" value={studentForm.stopId} onChange={(stopId) => setStudentForm({ ...studentForm, stopId })} required options={stops.filter((stop) => !studentForm.routeId || stop.routeId === studentForm.routeId).map((stop) => ({ label: `${stop.sequence}. ${stop.name}`, value: stop.id }))} />
               <TextInput label="Fee amount" type="number" value={studentForm.feeAmount?.toString() ?? ''} onChange={(value) => setStudentForm({ ...studentForm, feeAmount: value ? Number(value) : undefined })} />

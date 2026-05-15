@@ -98,6 +98,7 @@ export class AuthService {
         userId: user.id,
         ipAddress: requestMeta?.ipAddress,
         userAgent: requestMeta?.userAgent,
+        requestId: requestMeta?.requestId,
       });
 
       return {
@@ -403,6 +404,7 @@ export class AuthService {
         userId: authContext.userId,
         ipAddress: requestMeta?.ipAddress,
         userAgent: requestMeta?.userAgent,
+        requestId: requestMeta?.requestId,
       });
 
       return this.buildAuthSession(session.accessToken, authContext, tenant);
@@ -454,6 +456,7 @@ export class AuthService {
         userId: session.userId,
         ipAddress: requestMeta?.ipAddress,
         userAgent: requestMeta?.userAgent,
+        requestId: requestMeta?.requestId,
       });
     }
 
@@ -495,6 +498,8 @@ export class AuthService {
 
     return {
       ...currentAuth,
+      originalTenantId: auth.originalTenantId,
+      isSupportOverride: auth.isSupportOverride,
       tenant: {
         id: user.tenant.id,
         name: user.tenant.name,
@@ -554,6 +559,7 @@ export class AuthService {
       after: { email: authContext.email, authMethod: authContext.authMethod },
       ipAddress: requestMeta?.ipAddress,
       userAgent: requestMeta?.userAgent,
+      requestId: requestMeta?.requestId,
     });
 
     return this.buildAuthSession(session.accessToken, authContext, tenant);
@@ -652,6 +658,7 @@ export class AuthService {
       },
       ipAddress: requestMeta?.ipAddress,
       userAgent: requestMeta?.userAgent,
+      requestId: requestMeta?.requestId,
     });
   }
 
@@ -922,6 +929,8 @@ export class AuthService {
       user: {
         id: authContext.userId,
         tenantId: authContext.tenantId,
+        originalTenantId: authContext.originalTenantId,
+        isSupportOverride: authContext.isSupportOverride,
         tenantSlug: authContext.tenantSlug,
         email: authContext.email,
         authMethod: authContext.authMethod,
@@ -1004,6 +1013,7 @@ function resolveAccessTokenMaxAge(ttl: string) {
 interface RequestMeta {
   ipAddress?: string | null;
   userAgent?: string | null;
+  requestId?: string | null;
 }
 
 type UserWithRoles = User & {

@@ -160,7 +160,7 @@ export function CommunicationsForm() {
   });
   const admissionsQuery = useQuery({
     queryKey: ['admissions'],
-    queryFn: api.listAdmissions,
+    queryFn: () => api.listAdmissions(),
   });
   const guardianConsentStatusQuery = useQuery({
     queryKey: ['guardian-consent-status', selectedGuardianId],
@@ -182,7 +182,7 @@ export function CommunicationsForm() {
 
   const guardians = useMemo(
     () =>
-      (admissionsQuery.data ?? []).flatMap((admission) =>
+      (admissionsQuery.data?.items ?? []).flatMap((admission) =>
         admission.guardians.map((guardian) => ({
           ...guardian,
           studentName: admission.fullNameEn,

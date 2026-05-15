@@ -110,6 +110,7 @@ export default function PlatformAudit() {
               <TableHead>Resource</TableHead>
               <TableHead>Tenant</TableHead>
               <TableHead>Performed By</TableHead>
+              <TableHead>Request ID</TableHead>
               <TableHead className="text-right">Details</TableHead>
             </TableRow>
           </TableHeader>
@@ -168,6 +169,11 @@ export default function PlatformAudit() {
                         <span className="text-[9px] text-slate-400 font-mono">{log.userId?.slice(0, 8) || ''}</span>
                       </div>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-[10px] font-mono text-slate-400">
+                      {log.requestId?.slice(0, 8) || 'N/A'}
+                    </span>
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" className="h-8 rounded-lg gap-1.5 text-xs text-slate-500 hover:text-primary-600">

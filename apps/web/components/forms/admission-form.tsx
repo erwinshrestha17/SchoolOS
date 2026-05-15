@@ -63,11 +63,11 @@ export function AdmissionForm() {
   const [disabilityMode, setDisabilityMode] = useState<'' | 'NO_KNOWN_DISABILITY' | 'DISABILITY_PRESENT'>('');
   const [pdfError, setPdfError] = useState('');
 
-  const admissionsQuery = useQuery({ queryKey: ['admissions'], queryFn: api.listAdmissions });
+  const admissionsQuery = useQuery({ queryKey: ['admissions'], queryFn: () => api.listAdmissions() });
   const academicYearsQuery = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
   const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
-  const studentsQuery = useQuery({ queryKey: ['students'], queryFn: () => api.listStudents() });
+  const studentsQuery = useQuery({ queryKey: ['students'], queryFn: () => api.listStudents({ limit: 1000 }) });
 
   const form = useForm<AdmissionFormInput>({
     resolver: zodResolver(admissionFormSchema),
@@ -185,8 +185,8 @@ export function AdmissionForm() {
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard title="Total Admissions" value={admissionsQuery.data?.length ?? 0} icon={<UserPlus size={20} />} />
-        <StatCard title="Active Students" value={studentsQuery.data?.length ?? 0} icon={<Users size={20} />} />
+        <StatCard title="Total Admissions" value={admissionsQuery.data?.total ?? 0} icon={<UserPlus size={20} />} />
+        <StatCard title="Active Students" value={studentsQuery.data?.total ?? 0} icon={<Users size={20} />} />
         <Link href="/dashboard/students" className="group relative overflow-hidden rounded-[2rem] bg-slate-900 p-6 text-white shadow-xl transition hover:-translate-y-1">
           <div className="absolute right-0 top-0 h-24 w-24 rounded-full bg-primary-500/20 blur-2xl" />
           <div className="relative flex items-center justify-between">
@@ -571,11 +571,11 @@ export function AdmissionForm() {
 
       {activeWorkspaceTab === 'recent' && (
         <SectionCard title="Recent Admissions" description="Latest admission records from the backend.">
-          {(admissionsQuery.data ?? []).length === 0 ? (
+          {(admissionsQuery.data?.items ?? []).length === 0 ? (
             <EmptyState title="No recent admissions" description="New student admissions will appear here after enrollment." />
           ) : (
             <div className="divide-y divide-slate-100">
-              {(admissionsQuery.data ?? []).slice(0, 10).map((admission) => (
+              {(admissionsQuery.data?.items ?? []).slice(0, 10).map((admission) => (
                 <div key={admission.id} className="flex flex-wrap items-center justify-between gap-3 py-4">
                   <div>
                     <p className="font-bold text-slate-900">

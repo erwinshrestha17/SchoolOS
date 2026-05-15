@@ -6,6 +6,7 @@ import type {
   ClassSummary,
   SectionSummary,
   StudentProfile,
+  PaginatedResponse,
 } from '@schoolos/core';
 import Link from 'next/link';
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
@@ -43,7 +44,7 @@ type StudentDirectoryProps = {
   onOpenPdf: (studentId: string, kind: string) => void;
   pdfError: string;
   sections: SectionSummary[];
-  students: StudentProfile[];
+  studentsResponse?: PaginatedResponse<StudentProfile>;
   onExportRoster: (
     format: 'csv' | 'json',
     filters: {
@@ -52,6 +53,14 @@ type StudentDirectoryProps = {
       sectionId?: string;
     },
   ) => void;
+  onFilterChange: (filters: {
+    academicYearId?: string;
+    classId?: string;
+    sectionId?: string;
+    status?: string;
+    search?: string;
+    page?: number;
+  }) => void;
 };
 
 export function StudentDirectory({
@@ -63,9 +72,14 @@ export function StudentDirectory({
   onOpenPdf,
   pdfError,
   sections,
-  students,
+  studentsResponse,
   onExportRoster,
+  onFilterChange,
 }: StudentDirectoryProps) {
+  const students = studentsResponse?.items ?? [];
+  const totalStudents = studentsResponse?.total ?? 0;
+  const currentPage = studentsResponse?.page ?? 1;
+  const hasNextPage = studentsResponse?.hasNextPage ?? false;
   const [academicYearId, setAcademicYearId] = useState('');
   const [classId, setClassId] = useState('');
   const [sectionId, setSectionId] = useState('');
@@ -105,55 +119,18 @@ export function StudentDirectory({
     return map;
   }, [admissions]);
 
-  const filteredStudents = useMemo(() => {
-    const normalizedSearch = deferredSearch.trim().toLowerCase();
-    return students
-      .filter((student) => {
-        const admission = admissionBySystemId.get(student.studentSystemId);
-        const studentClassId = student.class?.id;
-        const studentClassName = student.className ?? student.class?.name ?? admission?.className ?? '';
-        const studentSectionName = student.sectionName ?? student.section ?? admission?.sectionName ?? '';
-        const academicYearMatches =
-          !selectedAcademicYear ||
-          !admission?.latestEnrollment ||
-          admission.latestEnrollment.academicYear === selectedAcademicYear.name;
-        const classMatches =
-          !classId ||
-          studentClassId === classId ||
-          studentClassName === classes.find(c => c.id === classId)?.name;
-        const sectionMatches =
-          !selectedSection || studentSectionName === selectedSection.name;
-        const searchable = [
-          getStudentName(student, admission),
-          student.studentSystemId,
-          studentClassName,
-          studentSectionName,
-          primaryGuardianName(student, admission),
-          ...(student.guardians ?? []).map((guardian) => guardian.primaryPhone),
-          ...(admission?.guardians ?? []).map((guardian) => guardian.primaryPhone),
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
+  useEffect(() => {
+    onFilterChange({
+      academicYearId: academicYearId || undefined,
+      classId: classId || undefined,
+      sectionId: sectionId || undefined,
+      status: status || undefined,
+      search: deferredSearch || undefined,
+      page: 1,
+    });
+  }, [academicYearId, classId, sectionId, status, deferredSearch, onFilterChange]);
 
-        const statusMatches = !status || student.lifecycleStatus === status;
-
-        return (
-          academicYearMatches &&
-          classMatches &&
-          sectionMatches &&
-          statusMatches &&
-          (!normalizedSearch || searchable.includes(normalizedSearch))
-        );
-      })
-      .sort((first, second) => {
-        const firstAdmission = admissionBySystemId.get(first.studentSystemId);
-        const secondAdmission = admissionBySystemId.get(second.studentSystemId);
-        const firstRoll = first.rollNumber ?? firstAdmission?.rollNumber ?? 99999;
-        const secondRoll = second.rollNumber ?? secondAdmission?.rollNumber ?? 99999;
-        return firstRoll - secondRoll || getStudentName(first, firstAdmission).localeCompare(getStudentName(second, secondAdmission));
-      });
-  }, [admissionBySystemId, deferredSearch, selectedAcademicYear, classId, classes, selectedSection, students, status]);
+  const filteredStudents = students;
 
   if (isLoading) return <LoadingState label="Loading student directory..." />;
 
@@ -182,9 +159,9 @@ export function StudentDirectory({
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Records" value={students.length} icon={<Users size={20} />} />
+        <StatCard title="Total Records" value={totalStudents} icon={<Users size={20} />} />
         <StatCard title="Active Enrollment" value={students.filter(s => s.lifecycleStatus === 'ACTIVE').length} icon={<UserCheck size={20} />} className="border-success-100 bg-success-50/20" />
-        <StatCard title="Filtered Results" value={filteredStudents.length} icon={<Filter size={20} />} className="border-primary-100 bg-primary-50/20" />
+        <StatCard title="Current Page" value={currentPage} icon={<Filter size={20} />} className="border-primary-100 bg-primary-50/20" />
         <div className="flex items-center justify-end px-2 gap-2">
            <button
             type="button"
@@ -418,6 +395,36 @@ export function StudentDirectory({
                 </div>
               );
             })}
+            {totalStudents > students.length && (
+              <div className="flex items-center justify-between border-t border-slate-100 p-4">
+                <p className="text-xs font-bold text-slate-500">
+                  Showing {students.length} of {totalStudents} records
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => onFilterChange({ 
+                      academicYearId, classId, sectionId, status, search: deferredSearch, 
+                      page: currentPage - 1 
+                    })}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-30"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs font-bold text-slate-900">{currentPage}</span>
+                  <button
+                    disabled={!hasNextPage}
+                    onClick={() => onFilterChange({ 
+                      academicYearId, classId, sectionId, status, search: deferredSearch, 
+                      page: currentPage + 1 
+                    })}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-30"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <EmptyState

@@ -512,9 +512,10 @@ describe('School OS Auth + RBAC integration', () => {
 
     await expect(
       studentsController.listStudents(
+        {},
         secondTenantRequest.auth as unknown as AuthContext,
       ),
-    ).resolves.toHaveLength(0);
+    ).resolves.toMatchObject({ items: [], total: 0 });
 
     await expect(
       usersController.updateStatus(

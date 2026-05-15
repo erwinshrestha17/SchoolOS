@@ -26,6 +26,7 @@ import {
   parseAdmissionCsv,
 } from './admissions.utils';
 import { BulkAdmissionImportDto } from './dto/bulk-admission-import.dto';
+import { ListAdmissionsDto } from './dto/list-admissions.dto';
 import { CheckAdmissionDuplicateDto } from './dto/check-admission-duplicate.dto';
 import { CreateAdmissionDto } from './dto/create-admission.dto';
 import { TransferStudentDto } from './dto/transfer-student.dto';
@@ -56,73 +57,114 @@ export class AdmissionsService {
     private readonly usageService: UsageService,
   ) {}
 
-  async listAdmissions(actor: AuthContext) {
-    const students = await this.prisma.student.findMany({
-      where: { tenantId: actor.tenantId },
-      include: {
-        class: true,
-        sectionRef: true,
-        guardianLinks: {
-          include: {
-            guardian: true,
-          },
-        },
-        enrollments: {
-          include: {
-            academicYear: true,
-            section: true,
-          },
-          orderBy: { createdAt: 'desc' },
-        },
-        invoices: {
-          orderBy: { issuedAt: 'desc' },
-          take: 1,
-        },
-        _count: {
-          select: {
-            documents: true,
-          },
+  async listAdmissions(query: ListAdmissionsDto, actor: AuthContext) {
+    const {
+      page = 1,
+      limit = 50,
+      search,
+      academicYearId,
+      classId,
+      status,
+    } = query;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.StudentWhereInput = {
+      tenantId: actor.tenantId,
+      ...(classId ? { classId } : {}),
+      enrollments: {
+        some: {
+          tenantId: actor.tenantId,
+          ...(academicYearId ? { academicYearId } : {}),
+          ...(status ? { status } : {}),
         },
       },
-      orderBy: [{ createdAt: 'desc' }],
-      take: 100,
-    });
+      ...(search
+        ? {
+            OR: [
+              { firstNameEn: { contains: search, mode: 'insensitive' } },
+              { lastNameEn: { contains: search, mode: 'insensitive' } },
+              { studentSystemId: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
 
-    return students.map((student) => ({
-      id: student.id,
-      studentSystemId: student.studentSystemId,
-      fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
-      fullNameNp:
-        student.firstNameNp || student.lastNameNp
-          ? `${student.firstNameNp ?? ''} ${student.lastNameNp ?? ''}`.trim()
+    const [total, students] = await Promise.all([
+      this.prisma.student.count({ where }),
+      this.prisma.student.findMany({
+        where,
+        include: {
+          class: true,
+          sectionRef: true,
+          guardianLinks: {
+            include: {
+              guardian: true,
+            },
+          },
+          enrollments: {
+            include: {
+              academicYear: true,
+              section: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+          invoices: {
+            orderBy: { issuedAt: 'desc' },
+            take: 1,
+          },
+          _count: {
+            select: {
+              documents: true,
+            },
+          },
+        },
+        orderBy: [{ createdAt: 'desc' }],
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      items: students.map((student) => ({
+        id: student.id,
+        studentSystemId: student.studentSystemId,
+        fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+        fullNameNp:
+          student.firstNameNp || student.lastNameNp
+            ? `${student.firstNameNp ?? ''} ${student.lastNameNp ?? ''}`.trim()
+            : null,
+        className: student.class.name,
+        sectionName: student.sectionRef?.name ?? student.section ?? null,
+        rollNumber: student.rollNumber,
+        documentCount: student._count.documents,
+        guardians: student.guardianLinks.map((link) => ({
+          id: link.guardian.id,
+          fullName: link.guardian.fullName,
+          relation: link.relation,
+          primaryPhone: link.guardian.primaryPhone,
+          isPrimary: link.isPrimary,
+        })),
+        latestEnrollment: student.enrollments[0]
+          ? {
+              id: student.enrollments[0].id,
+              academicYear: student.enrollments[0].academicYear.name,
+              status: student.enrollments[0].status,
+            }
           : null,
-      className: student.class.name,
-      sectionName: student.sectionRef?.name ?? student.section ?? null,
-      rollNumber: student.rollNumber,
-      documentCount: student._count.documents,
-      guardians: student.guardianLinks.map((link) => ({
-        id: link.guardian.id,
-        fullName: link.guardian.fullName,
-        relation: link.relation,
-        primaryPhone: link.guardian.primaryPhone,
-        isPrimary: link.isPrimary,
+        latestInvoice: student.invoices[0]
+          ? {
+              id: student.invoices[0].id,
+              invoiceNumber: student.invoices[0].invoiceNumber,
+              status: student.invoices[0].status,
+              totalAmount: Number(student.invoices[0].totalAmount),
+            }
+          : null,
       })),
-      latestEnrollment: student.enrollments[0]
-        ? {
-            id: student.enrollments[0].id,
-            academicYear: student.enrollments[0].academicYear.name,
-            status: student.enrollments[0].status,
-          }
-        : null,
-      latestInvoice: student.invoices[0]
-        ? {
-            id: student.invoices[0].id,
-            invoiceNumber: student.invoices[0].invoiceNumber,
-            status: student.invoices[0].status,
-            totalAmount: Number(student.invoices[0].totalAmount),
-          }
-        : null,
-    }));
+      total,
+      page,
+      limit,
+      hasNextPage: total > skip + students.length,
+    };
   }
 
   async createAdmission(dto: CreateAdmissionDto, actor: AuthContext) {
@@ -146,8 +188,8 @@ export class AdmissionsService {
 
       const managedUser = await this.usersService.createManagedUser({
         tenantId: actor.tenantId,
-        email: dto.email as string,
-        password: dto.password as string,
+        email: dto.email!,
+        password: dto.password!,
         phone: dto.phone,
         roleIds: [studentRole.id],
         assignedById: actor.userId,

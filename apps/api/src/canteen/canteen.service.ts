@@ -47,7 +47,7 @@ import {
 } from './dto/canteen-hardened.dto';
 
 type Tx = Prisma.TransactionClient;
-type PurchaseBillItemData = {
+interface PurchaseBillItemData {
   tenantId: string;
   inventoryItemId: string;
   quantity: Prisma.Decimal;
@@ -55,7 +55,7 @@ type PurchaseBillItemData = {
   lineTotal: Prisma.Decimal;
   expiryDate: Date | null;
   batchNumber: string | null;
-};
+}
 interface PaginationQuery {
   page?: string;
   limit?: string;

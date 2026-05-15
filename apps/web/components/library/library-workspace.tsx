@@ -134,9 +134,9 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
     queryKey: ['library-overdue'],
     queryFn: libraryApi.listOverdue,
   });
-  const schoolStudentsQuery = useQuery<StudentProfile[], Error>({ 
+  const schoolStudentsQuery = useQuery({ 
     queryKey: ['students-for-library'], 
-    queryFn: () => api.listStudents() 
+    queryFn: () => api.listStudents({ limit: 1000 }) 
   });
   const staffQuery = useQuery({
     queryKey: ['staff-for-library'],
@@ -497,7 +497,7 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
         <IssuesPanel
           copies={copies}
           issues={issues}
-          students={schoolStudentsQuery.data ?? []}
+          students={schoolStudentsQuery.data?.items ?? []}
           staff={staffQuery.data ?? []}
           status={issueStatus}
           setStatus={setIssueStatus}

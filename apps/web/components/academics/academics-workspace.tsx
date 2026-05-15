@@ -74,7 +74,7 @@ export function AcademicsWorkspace({ initialSection }: AcademicsWorkspaceProps) 
   const academicYearsQuery = useQuery({ queryKey: ['academic-years'], queryFn: api.listAcademicYears });
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
   const sectionsQuery = useQuery({ queryKey: ['sections'], queryFn: api.listSections });
-  const studentsQuery = useQuery({ queryKey: ['students'], queryFn: () => api.listStudents() });
+  const studentsQuery = useQuery({ queryKey: ['students'], queryFn: () => api.listStudents({ limit: 1000 }) });
   const staffQuery = useQuery({ queryKey: ['staff'], queryFn: api.listStaff });
   const subjectsQuery = useQuery({ queryKey: ['subjects'], queryFn: () => api.listSubjects() });
   const assignmentsQuery = useQuery({ queryKey: ['teacher-assignments'], queryFn: api.listTeacherAssignments });
@@ -188,7 +188,7 @@ export function AcademicsWorkspace({ initialSection }: AcademicsWorkspaceProps) 
                 academicYears={academicYearsQuery.data ?? []}
                 classes={classesQuery.data ?? []}
                 allSections={sectionsQuery.data ?? []}
-                students={studentsQuery.data ?? []}
+                students={studentsQuery.data?.items ?? []}
                 exams={examsQuery.data ?? []}
               />
               <div className="h-px bg-slate-100" />
@@ -196,7 +196,7 @@ export function AcademicsWorkspace({ initialSection }: AcademicsWorkspaceProps) 
                 academicYears={academicYearsQuery.data ?? []}
                 classes={classesQuery.data ?? []}
                 allSections={sectionsQuery.data ?? []}
-                students={studentsQuery.data ?? []}
+                students={studentsQuery.data?.items ?? []}
                 subjects={subjectsQuery.data ?? []}
               />
             </div>
@@ -211,7 +211,7 @@ export function AcademicsWorkspace({ initialSection }: AcademicsWorkspaceProps) 
               academicYears={academicYearsQuery.data ?? []}
               classes={classesQuery.data ?? []}
               allSections={sectionsQuery.data ?? []}
-              students={studentsQuery.data ?? []}
+              students={studentsQuery.data?.items ?? []}
               exams={examsQuery.data ?? []}
               reports={reportsQuery.data ?? []}
             />

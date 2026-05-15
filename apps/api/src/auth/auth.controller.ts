@@ -43,6 +43,7 @@ export class AuthController {
     return this.authService.login(dto, response, {
       ipAddress: request.ip,
       userAgent: request.headers['user-agent'],
+      requestId: request.requestId,
     });
   }
 
@@ -113,6 +114,7 @@ export class AuthController {
     return this.authService.refresh(dto, response, cookieHeader, {
       ipAddress: request?.ip,
       userAgent: request?.headers['user-agent'],
+      requestId: request?.requestId,
     });
   }
 
@@ -126,6 +128,7 @@ export class AuthController {
     return this.authService.logout(dto, response, cookieHeader, {
       ipAddress: request?.ip,
       userAgent: request?.headers['user-agent'],
+      requestId: request?.requestId,
     });
   }
 

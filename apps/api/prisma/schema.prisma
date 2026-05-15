@@ -1052,6 +1052,7 @@ model AuditLog {
   after      Json?
   ipAddress  String?
   userAgent  String?
+  requestId  String?
   createdAt  DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -1060,6 +1061,7 @@ model AuditLog {
   @@index([tenantId, action, createdAt])
   @@index([resource, resourceId])
   @@index([createdAt])
+  @@index([requestId])
 }
 
 model TenantSetting {
@@ -1590,6 +1592,8 @@ model Student {
 
   @@unique([tenantId, studentSystemId])
   @@index([tenantId, classId, sectionId])
+  @@index([tenantId, admissionNumber])
+  @@index([tenantId, lifecycleStatus])
 }
 
 model Guardian {
@@ -1622,6 +1626,7 @@ model Guardian {
   identityVerifications    GuardianIdentityVerification[]
 
   @@unique([tenantId, primaryPhone])
+  @@index([tenantId, email])
 }
 
 model GuardianIdentityVerification {
@@ -1687,6 +1692,7 @@ model Enrollment {
   invoices     Invoice[]
 
   @@unique([tenantId, academicYearId, studentId])
+  @@index([tenantId, admissionNumber])
 }
 
 model Staff {

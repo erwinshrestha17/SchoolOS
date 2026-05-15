@@ -1881,7 +1881,7 @@ export class ReportsService {
           tenantId: actor.tenantId,
           reportKey,
           format: request.format,
-          filters: request.filters as Prisma.InputJsonValue,
+          filters: request.filters,
           requestedBy: actor.userId,
         });
 
@@ -1950,7 +1950,7 @@ export class ReportsService {
         tenantId: actor.tenantId,
         reportKey,
         format: request.format,
-        filters: request.filters as Prisma.InputJsonValue,
+        filters: request.filters,
         requestedBy: actor.userId,
         content,
         contentType,
@@ -1973,7 +1973,7 @@ export class ReportsService {
         tenantId: actor.tenantId,
         reportKey,
         format: request.format,
-        filters: request.filters as Prisma.InputJsonValue,
+        filters: request.filters,
         status: 'QUEUED',
         requestedBy: actor.userId,
       },

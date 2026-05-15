@@ -19,7 +19,7 @@ import { AuthContext } from '../auth/auth.types';
 import { hashToken } from '../auth/auth.utils';
 import { PrismaService } from '../prisma/prisma.service';
 
-type QrCredentialRecord = {
+interface QrCredentialRecord {
   id: string;
   tenantId: string;
   studentId: string;
@@ -29,9 +29,9 @@ type QrCredentialRecord = {
   rotatedAt: Date | null;
   revokedAt: Date | null;
   lastScannedAt: Date | null;
-};
+}
 
-type SafeQrCredential = {
+export interface SafeQrCredential {
   id: string;
   studentId: string;
   status: StudentQrStatus;
@@ -39,15 +39,15 @@ type SafeQrCredential = {
   rotatedAt: string | null;
   revokedAt: string | null;
   lastScannedAt: string | null;
-};
+}
 
-type PrintableQrResult = {
+export interface PrintableQrResult {
   credential: SafeQrCredential;
   qrImageSvg?: string;
   qrImageAvailable: boolean;
   qrImageMessage?: string;
   rawToken?: string;
-};
+}
 
 const PURPOSE_PERMISSIONS: Record<StudentQrResolvePurpose, string[]> = {
   [StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP]: [
@@ -105,7 +105,7 @@ export class StudentQrService {
       where: { tenantId_studentId: { tenantId, studentId } },
     });
 
-    if (existing && existing.status === StudentQrStatus.ACTIVE) {
+    if (existing?.status === StudentQrStatus.ACTIVE) {
       await this.auditService.record({
         action: 'QR_GENERATE_SKIPPED_EXISTING_ACTIVE',
         resource: 'student_qr',
@@ -215,7 +215,7 @@ export class StudentQrService {
       where: { tenantId_studentId: { tenantId, studentId } },
     });
 
-    if (!existing || existing.tenantId !== tenantId) {
+    if (existing?.tenantId !== tenantId) {
       throw new NotFoundException('QR credential not found');
     }
 
@@ -282,8 +282,7 @@ export class StudentQrService {
     });
 
     if (
-      !credential ||
-      credential.tenantId !== tenantId ||
+      credential?.tenantId !== tenantId ||
       credential.status !== StudentQrStatus.ACTIVE ||
       credential.student.lifecycleStatus !== StudentLifecycleStatus.ACTIVE
     ) {

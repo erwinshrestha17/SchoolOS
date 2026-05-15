@@ -107,9 +107,9 @@ export function AcademicsForm() {
     queryFn: api.listSections,
     enabled: status === 'authenticated',
   });
-  const studentsQuery = useQuery<StudentProfile[], Error>({
+  const studentsQuery = useQuery({
     queryKey: ['students'],
-    queryFn: () => api.listStudents(),
+    queryFn: () => api.listStudents({ limit: 1000 }),
     enabled: status === 'authenticated',
   });
   const staffQuery = useQuery({
@@ -265,7 +265,7 @@ export function AcademicsForm() {
   }, [examsQuery.data]);
 
   useEffect(() => {
-    const firstStudent = studentsQuery.data?.[0];
+    const firstStudent = studentsQuery.data?.items?.[0];
 
     if (firstStudent) {
       setMark((current) => (current.studentId ? current : { ...current, studentId: firstStudent.id }));
@@ -599,7 +599,7 @@ export function AcademicsForm() {
             </select>
             <select value={mark.studentId} onChange={(event) => setMark((current) => ({ ...current, studentId: event.target.value }))}>
               <option value="">Student</option>
-              {(studentsQuery.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.studentSystemId} / {item.fullNameEn ?? `${item.firstNameEn} ${item.lastNameEn}`}</option>)}
+              {(studentsQuery.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.studentSystemId} / {item.fullNameEn ?? `${item.firstNameEn} ${item.lastNameEn}`}</option>)}
             </select>
             <input type="number" value={mark.marksObtained} onChange={(event) => setMark((current) => ({ ...current, marksObtained: Number(event.target.value) }))} />
             <button type="button" className="rounded-2xl bg-[var(--teal)] px-5 py-3 font-semibold text-white disabled:opacity-50" disabled={!mark.assessmentComponentId || !mark.studentId || markMutation.isPending} onClick={() => markMutation.mutate(mark)}>
@@ -613,7 +613,7 @@ export function AcademicsForm() {
           <div className="grid gap-3">
             <select value={cas.studentId} onChange={(event) => setCas((current) => ({ ...current, studentId: event.target.value }))}>
               <option value="">Student</option>
-              {(studentsQuery.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.studentSystemId} / {item.fullNameEn ?? `${item.firstNameEn} ${item.lastNameEn}`}</option>)}
+              {(studentsQuery.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.studentSystemId} / {item.fullNameEn ?? `${item.firstNameEn} ${item.lastNameEn}`}</option>)}
             </select>
             <input value={cas.category} onChange={(event) => setCas((current) => ({ ...current, category: event.target.value }))} placeholder="CAS category" />
             <div className="grid gap-3 md:grid-cols-2">
@@ -632,7 +632,7 @@ export function AcademicsForm() {
           <div className="grid gap-3">
             <select value={report.studentId} onChange={(event) => setReport((current) => ({ ...current, studentId: event.target.value }))}>
               <option value="">Student</option>
-              {(studentsQuery.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.studentSystemId}</option>)}
+              {(studentsQuery.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.studentSystemId}</option>)}
             </select>
             <textarea rows={3} value={report.remarks} onChange={(event) => setReport((current) => ({ ...current, remarks: event.target.value }))} />
             <label className="flex items-center gap-2 text-sm text-[var(--muted)]">
@@ -650,7 +650,7 @@ export function AcademicsForm() {
           <div className="grid gap-3">
             <select value={promotion.studentId} onChange={(event) => setPromotion((current) => ({ ...current, studentId: event.target.value }))}>
               <option value="">Student</option>
-              {(studentsQuery.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.studentSystemId}</option>)}
+              {(studentsQuery.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.studentSystemId}</option>)}
             </select>
             <div className="grid gap-3 md:grid-cols-2">
               <select value={promotion.academicYearId} onChange={(event) => setPromotion((current) => ({ ...current, academicYearId: event.target.value }))}>

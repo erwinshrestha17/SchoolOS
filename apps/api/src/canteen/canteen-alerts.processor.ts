@@ -26,8 +26,7 @@ export class CanteenAlertsProcessor extends WorkerHost {
   async process(
     job: Job<
       LowBalanceNotificationJob,
-      { skipped: true; reason: string } | { sent: true } | undefined,
-      string
+      { skipped: true; reason: string } | { sent: true } | undefined
     >,
   ) {
     if (job.name === 'low-balance-notification') {
