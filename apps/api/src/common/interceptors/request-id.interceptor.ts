@@ -14,7 +14,9 @@ export class RequestIdInterceptor implements NestInterceptor {
   constructor(private readonly cls: ClsService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest<Request & { requestId: string }>();
+    const request = context
+      .switchToHttp()
+      .getRequest<Request & { requestId: string }>();
     const requestId = request.requestId;
 
     if (requestId) {

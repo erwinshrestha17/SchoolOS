@@ -1,4 +1,8 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { AttendanceStatus, EnrollmentStatus } from '@prisma/client';
 import { AttendanceService } from './attendance.service';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -23,7 +27,11 @@ describe('Attendance Hardening', () => {
   const mockAdminActor: AuthContext = {
     userId: 'admin-1',
     tenantId: 'tenant-1',
-    permissions: ['attendance:mark', 'attendance:read', 'attendance:override_lock'],
+    permissions: [
+      'attendance:mark',
+      'attendance:read',
+      'attendance:override_lock',
+    ],
     role: 'admin',
   };
 
@@ -38,12 +46,24 @@ describe('Attendance Hardening', () => {
             class: { findFirst: jest.fn() },
             section: { findFirst: jest.fn() },
             staff: { findUnique: jest.fn(), findFirst: jest.fn() },
-            student: { findMany: jest.fn(), findUnique: jest.fn(), findFirst: jest.fn() },
-            attendanceSession: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn(), findUniqueOrThrow: jest.fn() },
+            student: {
+              findMany: jest.fn(),
+              findUnique: jest.fn(),
+              findFirst: jest.fn(),
+            },
+            attendanceSession: {
+              findFirst: jest.fn(),
+              create: jest.fn(),
+              update: jest.fn(),
+              findUniqueOrThrow: jest.fn(),
+            },
             attendanceRecord: { deleteMany: jest.fn(), createMany: jest.fn() },
             schoolCalendarDay: { findFirst: jest.fn() },
             subjectTeacherAssignment: { findFirst: jest.fn() },
-            attendanceCorrectionRequest: { findFirst: jest.fn(), create: jest.fn() },
+            attendanceCorrectionRequest: {
+              findFirst: jest.fn(),
+              create: jest.fn(),
+            },
             attendanceConflict: { create: jest.fn() },
             $transaction: jest.fn((cb) => cb(prisma)),
           },
@@ -69,7 +89,8 @@ describe('Attendance Hardening', () => {
 
     service = module.get<AttendanceService>(AttendanceService);
     prisma = module.get<PrismaService>(PrismaService);
-    (service as any).settingsService = module.get<SettingsService>(SettingsService);
+    (service as any).settingsService =
+      module.get<SettingsService>(SettingsService);
   });
 
   describe('Future Date Prevention', () => {
@@ -94,15 +115,24 @@ describe('Attendance Hardening', () => {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
 
-      (prisma.academicYear.findFirst as jest.Mock).mockResolvedValue({ id: 'year-1' });
-      (prisma.class.findFirst as jest.Mock).mockResolvedValue({ id: 'class-1' });
-      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({ id: 'staff-1' });
-      (prisma.section.findFirst as jest.Mock).mockResolvedValue({ id: 'section-1', classTeacherId: 'staff-1' });
-      (prisma.schoolCalendarDay.findFirst as jest.Mock).mockResolvedValue({ 
-        calendarDate: yesterday,
-        isWorkingDay: true 
+      (prisma.academicYear.findFirst as jest.Mock).mockResolvedValue({
+        id: 'year-1',
       });
-      
+      (prisma.class.findFirst as jest.Mock).mockResolvedValue({
+        id: 'class-1',
+      });
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
+        id: 'staff-1',
+      });
+      (prisma.section.findFirst as jest.Mock).mockResolvedValue({
+        id: 'section-1',
+        classTeacherId: 'staff-1',
+      });
+      (prisma.schoolCalendarDay.findFirst as jest.Mock).mockResolvedValue({
+        calendarDate: yesterday,
+        isWorkingDay: true,
+      });
+
       (prisma.attendanceSession.findFirst as jest.Mock).mockResolvedValue({
         id: 'session-1',
         lockAt: yesterday, // Locked
@@ -124,23 +154,38 @@ describe('Attendance Hardening', () => {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
 
-      (prisma.academicYear.findFirst as jest.Mock).mockResolvedValue({ id: 'year-1' });
-      (prisma.class.findFirst as jest.Mock).mockResolvedValue({ id: 'class-1' });
-      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({ id: 'staff-1' });
-      (prisma.section.findFirst as jest.Mock).mockResolvedValue({ id: 'section-1', classTeacherId: 'staff-1' });
-      (prisma.schoolCalendarDay.findFirst as jest.Mock).mockResolvedValue({ 
-        calendarDate: yesterday,
-        isWorkingDay: true 
+      (prisma.academicYear.findFirst as jest.Mock).mockResolvedValue({
+        id: 'year-1',
       });
-      (prisma.student.findMany as jest.Mock).mockResolvedValue([{ id: 'student-1' }]);
+      (prisma.class.findFirst as jest.Mock).mockResolvedValue({
+        id: 'class-1',
+      });
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
+        id: 'staff-1',
+      });
+      (prisma.section.findFirst as jest.Mock).mockResolvedValue({
+        id: 'section-1',
+        classTeacherId: 'staff-1',
+      });
+      (prisma.schoolCalendarDay.findFirst as jest.Mock).mockResolvedValue({
+        calendarDate: yesterday,
+        isWorkingDay: true,
+      });
+      (prisma.student.findMany as jest.Mock).mockResolvedValue([
+        { id: 'student-1' },
+      ]);
       (prisma.attendanceSession.findFirst as jest.Mock).mockResolvedValue({
         id: 'session-1',
         lockAt: yesterday,
         submittedAt: new Date(),
         records: [],
       });
-      (prisma.attendanceSession.update as jest.Mock).mockResolvedValue({ id: 'session-1' });
-      (prisma.attendanceSession.findUniqueOrThrow as jest.Mock).mockResolvedValue({
+      (prisma.attendanceSession.update as jest.Mock).mockResolvedValue({
+        id: 'session-1',
+      });
+      (
+        prisma.attendanceSession.findUniqueOrThrow as jest.Mock
+      ).mockResolvedValue({
         id: 'session-1',
         attendanceDate: yesterday,
         class: { name: 'Class 1' },
@@ -160,9 +205,13 @@ describe('Attendance Hardening', () => {
 
   describe('Correction Request Scoping', () => {
     it('should throw ForbiddenException if teacher is not assigned to the student class', async () => {
-      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({ id: 'staff-1' });
-      (prisma.settingsService as any) = { getSetting: jest.fn().mockResolvedValue(24) }; // Mock setting service property if it was direct, but it is injected
-      
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
+        id: 'staff-1',
+      });
+      (prisma.settingsService as any) = {
+        getSetting: jest.fn().mockResolvedValue(24),
+      }; // Mock setting service property if it was direct, but it is injected
+
       (prisma.student.findUnique as jest.Mock).mockResolvedValue({
         id: 'student-1',
         classId: 'class-1',
@@ -171,7 +220,9 @@ describe('Attendance Hardening', () => {
 
       // Teacher is NOT assigned
       (prisma.section.findFirst as jest.Mock).mockResolvedValue(null);
-      (prisma.subjectTeacherAssignment.findFirst as jest.Mock).mockResolvedValue(null);
+      (
+        prisma.subjectTeacherAssignment.findFirst as jest.Mock
+      ).mockResolvedValue(null);
 
       const dto = {
         studentId: 'student-1',
@@ -180,9 +231,9 @@ describe('Attendance Hardening', () => {
         reason: 'Mistake',
       };
 
-      await expect(service.createCorrectionRequest(dto, mockActor)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.createCorrectionRequest(dto, mockActor),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

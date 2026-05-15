@@ -64,7 +64,10 @@ export class AttendanceService {
     const studentScope = await buildStudentScopeFilter(this.prisma, actor);
 
     // Teacher filtering
-    const teacherSectionIds = await this.getTeacherSectionIds(actor, studentScope);
+    const teacherSectionIds = await this.getTeacherSectionIds(
+      actor,
+      studentScope,
+    );
 
     const sessions = await this.prisma.attendanceSession.findMany({
       where: {
@@ -2193,7 +2196,10 @@ export class AttendanceService {
 
   async getAnalytics(actor: AuthContext) {
     const studentScope = await buildStudentScopeFilter(this.prisma, actor);
-    const teacherSectionIds = await this.getTeacherSectionIds(actor, studentScope);
+    const teacherSectionIds = await this.getTeacherSectionIds(
+      actor,
+      studentScope,
+    );
 
     const sessions = await this.prisma.attendanceSession.findMany({
       where: {
@@ -2204,7 +2210,8 @@ export class AttendanceService {
         class: true,
         section: true,
         records: {
-          where: Object.keys(studentScope).length > 0 ? studentScope : undefined,
+          where:
+            Object.keys(studentScope).length > 0 ? studentScope : undefined,
           include: {
             student: true,
           },
