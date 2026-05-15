@@ -23,4 +23,4 @@ import { UsageModule } from '../usage/usage.module';
     MessagingHardeningService,
   ],
 })
-export class MessagingModule {}
+export class MessagingModule { }
