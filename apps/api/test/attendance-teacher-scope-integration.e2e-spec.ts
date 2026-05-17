@@ -117,6 +117,11 @@ function makePrisma() {
       findUnique: jest.fn(async ({ where }) =>
         where.userId === 'teacher-user' ? { id: 'staff-1' } : null,
       ),
+      findFirst: jest.fn(async ({ where }) =>
+        where.userId === 'teacher-user' && where.tenantId === tenantId
+          ? { id: 'staff-1' }
+          : null,
+      ),
     },
     subjectTeacherAssignment: {
       findMany: jest.fn(async ({ where }) =>

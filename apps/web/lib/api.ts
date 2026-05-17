@@ -61,6 +61,7 @@ import type {
   PlatformDashboardSummary,
   PlatformPlanSummary,
   PlatformProviderConfigSummary,
+  PlatformProviderReadinessDetail,
   PlatformQueueSummary,
   PlatformHealthSummary,
   PlatformOnboardingChecklist,
@@ -153,7 +154,10 @@ type RequestOptions = RequestInit & {
   retryOnUnauthorized?: boolean;
 };
 
-export type AssignPlatformTenantSubscriptionPayload = Record<string, unknown> & {
+export type AssignPlatformTenantSubscriptionPayload = Record<
+  string,
+  unknown
+> & {
   planId: string;
   status: 'TRIAL' | 'ACTIVE' | 'GRACE' | 'SUSPENDED' | 'EXPIRED' | 'CANCELLED';
   startsAt?: string;
@@ -255,7 +259,10 @@ function parseApiErrorMessage(text: string) {
 async function openPdfBlob(response: Response) {
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(parseApiErrorMessage(text) || `Request failed with status ${response.status}`);
+    throw new Error(
+      parseApiErrorMessage(text) ||
+        `Request failed with status ${response.status}`,
+    );
   }
 
   const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
@@ -406,7 +413,10 @@ export const api = {
     request('/tenants/register', { method: 'POST', json: body, auth: false }),
   listAcademicYears: () => request<AcademicYearSummary[]>('/academic-years'),
   createAcademicYear: (body: JsonBody) =>
-    request<AcademicYearSummary>('/academic-years', { method: 'POST', json: body }),
+    request<AcademicYearSummary>('/academic-years', {
+      method: 'POST',
+      json: body,
+    }),
   listClasses: () => request<ClassSummary[]>('/classes'),
   createClass: (body: JsonBody) =>
     request<ClassSummary>('/classes', { method: 'POST', json: body }),
@@ -420,14 +430,20 @@ export const api = {
     page?: number;
     limit?: number;
     search?: string;
-  }) => request<PaginatedResponse<StudentProfile>>(withQuery('/students', params ?? {})),
+  }) =>
+    request<PaginatedResponse<StudentProfile>>(
+      withQuery('/students', params ?? {}),
+    ),
   getStudentProfile: (studentId: string) =>
     request<StudentProfileDetail>(`/students/${encodeURIComponent(studentId)}`),
   updateStudent: (studentId: string, body: UpdateStudentProfilePayload) =>
-    request<StudentProfileDetail>(`/students/${encodeURIComponent(studentId)}`, {
-      method: 'PATCH',
-      json: body as JsonBody,
-    }),
+    request<StudentProfileDetail>(
+      `/students/${encodeURIComponent(studentId)}`,
+      {
+        method: 'PATCH',
+        json: body as JsonBody,
+      },
+    ),
   updateStudentGuardian: (
     studentId: string,
     guardianId: string,
@@ -499,18 +515,23 @@ export const api = {
       },
     ),
   generateStudentQr: (studentId: string) =>
-    request<{ credential: any; qrImageSvg?: string; qrImageAvailable: boolean; qrImageMessage?: string; rawToken?: string }>(
-      `/students/${encodeURIComponent(studentId)}/qr`,
-      { method: 'POST' },
-    ),
+    request<{
+      credential: any;
+      qrImageSvg?: string;
+      qrImageAvailable: boolean;
+      qrImageMessage?: string;
+      rawToken?: string;
+    }>(`/students/${encodeURIComponent(studentId)}/qr`, { method: 'POST' }),
   rotateStudentQr: (studentId: string, body: { reason: string }) =>
-    request<{ credential: any; qrImageSvg?: string; qrImageAvailable: boolean; rawToken?: string }>(
-      `/students/${encodeURIComponent(studentId)}/qr/rotate`,
-      {
-        method: 'POST',
-        json: body,
-      },
-    ),
+    request<{
+      credential: any;
+      qrImageSvg?: string;
+      qrImageAvailable: boolean;
+      rawToken?: string;
+    }>(`/students/${encodeURIComponent(studentId)}/qr/rotate`, {
+      method: 'POST',
+      json: body,
+    }),
   revokeStudentQr: (studentId: string, body: { reason: string }) =>
     request<any>(`/students/${encodeURIComponent(studentId)}/qr/revoke`, {
       method: 'POST',
@@ -552,16 +573,22 @@ export const api = {
     }),
   listExamTerms: () => request<ExamTermSummary[]>('/academics/exams'),
   createExamTerm: (body: JsonBody) =>
-    request<ExamTermSummary>('/academics/exams', { method: 'POST', json: body }),
+    request<ExamTermSummary>('/academics/exams', {
+      method: 'POST',
+      json: body,
+    }),
   updateExamTerm: (id: string, body: JsonBody) =>
     request<ExamTermSummary>(`/academics/exams/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       json: body,
     }),
   deleteExamTerm: (id: string) =>
-    request<{ deleted: true; examTermId: string }>(`/academics/exams/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-    }),
+    request<{ deleted: true; examTermId: string }>(
+      `/academics/exams/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+      },
+    ),
   createAssessmentComponent: (body: JsonBody) =>
     request<AssessmentComponentSummary>('/academics/exams/components', {
       method: 'POST',
@@ -573,17 +600,30 @@ export const api = {
     classId?: string | null;
     sectionId?: string | null;
     subjectId?: string | null;
-  }) => request<MarkEntrySummary[]>(withQuery('/academics/marks', params ?? {})),
+  }) =>
+    request<MarkEntrySummary[]>(withQuery('/academics/marks', params ?? {})),
   enterMark: (body: JsonBody) =>
-    request<MarkEntrySummary>('/academics/marks', { method: 'POST', json: body }),
-  batchEnterMarks: (body: JsonBody) =>
-    request<{ saved: number; entries: MarkEntrySummary[] }>('/academics/marks/batch', {
+    request<MarkEntrySummary>('/academics/marks', {
       method: 'POST',
       json: body,
     }),
-  listComponentsByExamTerm: (examTermId: string, params?: { subjectId?: string | null }) =>
+  batchEnterMarks: (body: JsonBody) =>
+    request<{ saved: number; entries: MarkEntrySummary[] }>(
+      '/academics/marks/batch',
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
+  listComponentsByExamTerm: (
+    examTermId: string,
+    params?: { subjectId?: string | null },
+  ) =>
     request<AssessmentComponentSummary[]>(
-      withQuery(`/academics/exams/${encodeURIComponent(examTermId)}/components`, params ?? {}),
+      withQuery(
+        `/academics/exams/${encodeURIComponent(examTermId)}/components`,
+        params ?? {},
+      ),
     ),
   createCasRecord: (body: JsonBody) =>
     request<CasRecordSummary>('/academics/cas', { method: 'POST', json: body }),
@@ -592,21 +632,36 @@ export const api = {
     examTermId?: string;
     classId?: string;
     sectionId?: string;
-  }) => request<ReportCardSummary[]>(withQuery('/academics/report-cards', params ?? {})),
+  }) =>
+    request<ReportCardSummary[]>(
+      withQuery('/academics/report-cards', params ?? {}),
+    ),
   generateReportCard: (body: JsonBody) =>
-    request<ReportCardSummary>('/academics/report-cards', { method: 'POST', json: body }),
+    request<ReportCardSummary>('/academics/report-cards', {
+      method: 'POST',
+      json: body,
+    }),
   batchGenerateReportCards: (body: JsonBody) =>
-    request<ReportCardSummary[]>('/academics/report-cards/batch', { method: 'POST', json: body }),
+    request<ReportCardSummary[]>('/academics/report-cards/batch', {
+      method: 'POST',
+      json: body,
+    }),
   requestReportCardCorrection: (id: string, body: JsonBody) =>
-    request<any>(`/academics/report-cards/${encodeURIComponent(id)}/corrections`, {
-      method: 'POST',
-      json: body,
-    }),
+    request<any>(
+      `/academics/report-cards/${encodeURIComponent(id)}/corrections`,
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
   regenerateReportCard: (id: string, body: JsonBody) =>
-    request<ReportCardSummary>(`/academics/report-cards/${encodeURIComponent(id)}/regenerate`, {
-      method: 'POST',
-      json: body,
-    }),
+    request<ReportCardSummary>(
+      `/academics/report-cards/${encodeURIComponent(id)}/regenerate`,
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
   listReportCardHistory: (id: string) =>
     request<any>(`/academics/report-cards/${encodeURIComponent(id)}/history`),
   listPromotionReadiness: (params: {
@@ -614,7 +669,8 @@ export const api = {
     classId?: string | null;
     sectionId?: string | null;
     status?: string | null;
-  }) => request<PromotionReadiness[]>(withQuery('/academics/promotions', params)),
+  }) =>
+    request<PromotionReadiness[]>(withQuery('/academics/promotions', params)),
   promoteStudent: (body: JsonBody) =>
     request<any>('/academics/promotions', {
       method: 'POST',
@@ -655,9 +711,15 @@ export const api = {
     limit?: number;
     search?: string;
     status?: string;
-  }) => request<PaginatedResponse<AdmissionSummary>>(withQuery('/admissions', params ?? {})),
+  }) =>
+    request<PaginatedResponse<AdmissionSummary>>(
+      withQuery('/admissions', params ?? {}),
+    ),
   createAdmission: (body: JsonBody) =>
-    request<AdmissionCreationResult>('/admissions', { method: 'POST', json: body }),
+    request<AdmissionCreationResult>('/admissions', {
+      method: 'POST',
+      json: body,
+    }),
   checkAdmissionDuplicates: (body: JsonBody) =>
     request<AdmissionDuplicateCheckResult>('/admissions/duplicates', {
       method: 'POST',
@@ -715,12 +777,18 @@ export const api = {
     request<{ url: string }>(`/student-documents/${id}/download`),
   deleteStudentDocument: (id: string) =>
     request(`/student-documents/${id}`, { method: 'DELETE' }),
-  openStudentDocumentPdf: async (studentId: string, kind: string, token?: string) => {
-    const url = new URL(`${API_BASE_URL}/students/${encodeURIComponent(studentId)}/documents/${encodeURIComponent(kind)}.pdf`);
+  openStudentDocumentPdf: async (
+    studentId: string,
+    kind: string,
+    token?: string,
+  ) => {
+    const url = new URL(
+      `${API_BASE_URL}/students/${encodeURIComponent(studentId)}/documents/${encodeURIComponent(kind)}.pdf`,
+    );
     if (token) {
       url.searchParams.set('token', token);
     }
-    
+
     const response = await fetch(url.toString(), {
       credentials: 'include',
     });
@@ -757,11 +825,14 @@ export const api = {
     sectionId?: string | null;
     month?: number;
     year?: number;
-  }) => request<any>(withQuery('/attendance/register', {
-    ...params,
-    month: params.month ? String(params.month) : undefined,
-    year: params.year ? String(params.year) : undefined,
-  })),
+  }) =>
+    request<any>(
+      withQuery('/attendance/register', {
+        ...params,
+        month: params.month ? String(params.month) : undefined,
+        year: params.year ? String(params.year) : undefined,
+      }),
+    ),
   exportRoster: async (params?: {
     academicYearId?: string;
     classId?: string;
@@ -816,7 +887,10 @@ export const api = {
   listBillingRuns: () => request<FeeBillingRun[]>('/fees/billing-runs'),
   generateBillingRun: (body: JsonBody) =>
     request('/fees/billing-runs', { method: 'POST', json: body }),
-  listDefaulters: (params?: { classId?: string | null; feeHeadId?: string | null }) =>
+  listDefaulters: (params?: {
+    classId?: string | null;
+    feeHeadId?: string | null;
+  }) =>
     request<DefaulterSummary[]>(withQuery('/fees/defaulters', params ?? {})),
   sendDefaulterReminders: (body: JsonBody) =>
     request<DefaulterReminderResult>('/fees/defaulters/reminders', {
@@ -866,7 +940,10 @@ export const api = {
     closedAt: string;
     collectorUserId?: string | null;
     paymentMethod?: string | null;
-  }) => request<CashierClosePreview>(withQuery('/payments/cashier-close/preview', params)),
+  }) =>
+    request<CashierClosePreview>(
+      withQuery('/payments/cashier-close/preview', params),
+    ),
   listCashierCloses: (params?: {
     openedFrom?: string | null;
     closedTo?: string | null;
@@ -891,10 +968,13 @@ export const api = {
       json: body as JsonBody,
     }),
   reversePayment: (paymentId: string, body: { reason: string }) =>
-    request<{ success: true }>(`/payments/${encodeURIComponent(paymentId)}/reverse`, {
-      method: 'POST',
-      json: body as JsonBody,
-    }),
+    request<{ success: true }>(
+      `/payments/${encodeURIComponent(paymentId)}/reverse`,
+      {
+        method: 'POST',
+        json: body as JsonBody,
+      },
+    ),
   listReceipts: () => request<ReceiptView[]>('/receipts'),
   openReceiptPdf: async (receiptNumber: string) => {
     const response = await fetch(
@@ -929,25 +1009,39 @@ export const api = {
     params?: { dayOfWeek?: number; academicYearId?: string },
   ) =>
     request<TimetableSlotSummary[]>(
-      withQuery(`/timetable/reports/teacher/${encodeURIComponent(teacherId)}`, params ?? {}),
+      withQuery(
+        `/timetable/reports/teacher/${encodeURIComponent(teacherId)}`,
+        params ?? {},
+      ),
     ),
   listTeacherWorkload: () =>
     request<TeacherWorkloadSummary[]>('/timetable/workload'),
   createTimetableSlot: (body: JsonBody) =>
     request<TimetableSlotSummary>('/timetable', { method: 'POST', json: body }),
   listTimetablePeriods: (params?: { academicYearId?: string }) =>
-    request<TimetablePeriodSummary[]>(withQuery('/timetable/periods', params ?? {})),
+    request<TimetablePeriodSummary[]>(
+      withQuery('/timetable/periods', params ?? {}),
+    ),
   createTimetablePeriod: (body: JsonBody) =>
-    request<TimetablePeriodSummary>('/timetable/periods', { method: 'POST', json: body }),
-  updateTimetablePeriod: (id: string, body: JsonBody) =>
-    request<TimetablePeriodSummary>(`/timetable/periods/${encodeURIComponent(id)}`, {
-      method: 'PATCH',
+    request<TimetablePeriodSummary>('/timetable/periods', {
+      method: 'POST',
       json: body,
     }),
+  updateTimetablePeriod: (id: string, body: JsonBody) =>
+    request<TimetablePeriodSummary>(
+      `/timetable/periods/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
   deleteTimetablePeriod: (id: string) =>
-    request<{ deleted: boolean; id: string }>(`/timetable/periods/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-    }),
+    request<{ deleted: boolean; id: string }>(
+      `/timetable/periods/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+      },
+    ),
   listRooms: () => request<RoomSummary[]>('/timetable/rooms'),
   createRoom: (body: JsonBody) =>
     request<RoomSummary>('/timetable/rooms', { method: 'POST', json: body }),
@@ -957,9 +1051,12 @@ export const api = {
       json: body,
     }),
   deleteRoom: (id: string) =>
-    request<{ deleted: boolean; id: string }>(`/timetable/rooms/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-    }),
+    request<{ deleted: boolean; id: string }>(
+      `/timetable/rooms/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+      },
+    ),
   listTimetableVersions: (params?: {
     academicYearId?: string;
     classId?: string;
@@ -967,25 +1064,39 @@ export const api = {
     status?: string;
     page?: number;
     limit?: number;
-  }) => request<TimetableVersionSummary[]>(withQuery('/timetable/versions', params ?? {})),
+  }) =>
+    request<TimetableVersionSummary[]>(
+      withQuery('/timetable/versions', params ?? {}),
+    ),
   createTimetableVersion: (body: JsonBody) =>
-    request<TimetableVersionSummary>('/timetable/versions', { method: 'POST', json: body }),
+    request<TimetableVersionSummary>('/timetable/versions', {
+      method: 'POST',
+      json: body,
+    }),
   getTimetableVersion: (id: string) =>
-    request<TimetableVersionSummary>(`/timetable/versions/${encodeURIComponent(id)}`),
+    request<TimetableVersionSummary>(
+      `/timetable/versions/${encodeURIComponent(id)}`,
+    ),
   createTimetableVersionSlot: (versionId: string, body: JsonBody) =>
     request<TimetableSlotSummary>(
       `/timetable/versions/${encodeURIComponent(versionId)}/slots`,
       { method: 'POST', json: body },
     ),
   updateTimetableSlot: (id: string, body: JsonBody) =>
-    request<TimetableSlotSummary>(`/timetable/slots/${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      json: body,
-    }),
+    request<TimetableSlotSummary>(
+      `/timetable/slots/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
   deleteTimetableSlot: (id: string) =>
-    request<{ deleted: boolean; id: string }>(`/timetable/slots/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-    }),
+    request<{ deleted: boolean; id: string }>(
+      `/timetable/slots/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+      },
+    ),
   validateTimetableVersion: (versionId: string) =>
     request<TimetableValidationResult>(
       `/timetable/versions/${encodeURIComponent(versionId)}/validate`,
@@ -1049,9 +1160,15 @@ export const api = {
       `/timetable/teachers/${encodeURIComponent(teacherId)}/availability`,
       { method: 'POST', json: body },
     ),
-  getTeacherWorkload: (teacherId: string, params?: { academicYearId?: string; versionId?: string }) =>
+  getTeacherWorkload: (
+    teacherId: string,
+    params?: { academicYearId?: string; versionId?: string },
+  ) =>
     request<unknown>(
-      withQuery(`/timetable/teachers/${encodeURIComponent(teacherId)}/workload`, params ?? {}),
+      withQuery(
+        `/timetable/teachers/${encodeURIComponent(teacherId)}/workload`,
+        params ?? {},
+      ),
     ),
   listSubstitutions: (params?: {
     date?: string;
@@ -1061,7 +1178,10 @@ export const api = {
     status?: string;
     page?: number;
     limit?: number;
-  }) => request<TimetableSubstitutionSummary[]>(withQuery('/timetable/substitutions', params ?? {})),
+  }) =>
+    request<TimetableSubstitutionSummary[]>(
+      withQuery('/timetable/substitutions', params ?? {}),
+    ),
   getSubstitutionSummary: (params?: { date?: string }) =>
     request<any>(withQuery('/timetable/substitutions/summary', params ?? {})),
   createSubstitution: (body: JsonBody) =>
@@ -1107,20 +1227,29 @@ export const api = {
       json: body,
     }),
   assignHomework: (id: string) =>
-    request<HomeworkAssignmentSummary>(`/homework/${encodeURIComponent(id)}/assign`, {
-      method: 'PATCH',
-      json: {},
-    }),
+    request<HomeworkAssignmentSummary>(
+      `/homework/${encodeURIComponent(id)}/assign`,
+      {
+        method: 'PATCH',
+        json: {},
+      },
+    ),
   closeHomework: (id: string) =>
-    request<HomeworkAssignmentSummary>(`/homework/${encodeURIComponent(id)}/close`, {
-      method: 'PATCH',
-      json: {},
-    }),
+    request<HomeworkAssignmentSummary>(
+      `/homework/${encodeURIComponent(id)}/close`,
+      {
+        method: 'PATCH',
+        json: {},
+      },
+    ),
   cancelHomework: (id: string) =>
-    request<HomeworkAssignmentSummary>(`/homework/${encodeURIComponent(id)}/cancel`, {
-      method: 'PATCH',
-      json: {},
-    }),
+    request<HomeworkAssignmentSummary>(
+      `/homework/${encodeURIComponent(id)}/cancel`,
+      {
+        method: 'PATCH',
+        json: {},
+      },
+    ),
   previewHomeworkReminders: (id: string) =>
     request<unknown>(`/homework/${encodeURIComponent(id)}/reminders/preview`),
   sendHomeworkReminders: (id: string) =>
@@ -1156,7 +1285,10 @@ export const api = {
     }),
   listStaffContracts: () => request<StaffContractSummary[]>('/hr/contracts'),
   createStaffContract: (body: JsonBody) =>
-    request<StaffContractSummary>('/hr/contracts', { method: 'POST', json: body }),
+    request<StaffContractSummary>('/hr/contracts', {
+      method: 'POST',
+      json: body,
+    }),
   listPayrollRuns: () => request<PayrollRunSummary[]>('/payroll/runs'),
   getPayrollRun: (id: string) =>
     request<PayrollRunSummary>(`/payroll/runs/${encodeURIComponent(id)}`),
@@ -1212,9 +1344,12 @@ export const api = {
   getPayrollRegister: () => request<unknown[]>('/payroll/reports/register'),
   getPayrollReportSummary: () => request<unknown>('/payroll/reports/summary'),
   exportPayrollRegisterCsv: async () => {
-    const response = await fetch(`${API_BASE_URL}/payroll/reports/register.csv`, {
-      credentials: 'include',
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/payroll/reports/register.csv`,
+      {
+        credentials: 'include',
+      },
+    );
 
     if (!response.ok) {
       const text = await response.text();
@@ -1257,17 +1392,25 @@ export const api = {
       json: body,
     }),
   approveLeaveRequest: (id: string, body: JsonBody) =>
-    request<StaffLeaveReviewResult>(`/hr/leaves/${encodeURIComponent(id)}/approve`, {
-      method: 'POST',
-      json: body,
-    }),
+    request<StaffLeaveReviewResult>(
+      `/hr/leaves/${encodeURIComponent(id)}/approve`,
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
   rejectLeaveRequest: (id: string, body: JsonBody) =>
-    request<StaffLeaveReviewResult>(`/hr/leaves/${encodeURIComponent(id)}/reject`, {
-      method: 'POST',
-      json: body,
-    }),
+    request<StaffLeaveReviewResult>(
+      `/hr/leaves/${encodeURIComponent(id)}/reject`,
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
   listStaffLeaveBalances: (staffId: string) =>
-    request<StaffLeaveBalanceSummary[]>(`/hr/staff/${encodeURIComponent(staffId)}/leave-balances`),
+    request<StaffLeaveBalanceSummary[]>(
+      `/hr/staff/${encodeURIComponent(staffId)}/leave-balances`,
+    ),
   listAllLeaveBalances: () =>
     request<StaffLeaveBalanceSummary[]>('/hr/leave-balances'),
   getPayrollPreview: (params: {
@@ -1279,7 +1422,9 @@ export const api = {
       withQuery('/payroll/preview', {
         year: String(params.year),
         month: String(params.month),
-        workingDays: params.workingDays ? String(params.workingDays) : undefined,
+        workingDays: params.workingDays
+          ? String(params.workingDays)
+          : undefined,
       }),
     ),
   listAccountingPeriods: () =>
@@ -1341,7 +1486,9 @@ export const api = {
       withQuery('/accounting/reports/trial-balance', params ?? {}),
     ),
   listGeneralLedger: (params?: JsonBody) =>
-    request<unknown[]>(withQuery('/accounting/reports/general-ledger', params ?? {})),
+    request<unknown[]>(
+      withQuery('/accounting/reports/general-ledger', params ?? {}),
+    ),
   listIncomeStatement: (params?: JsonBody) =>
     request<AccountingReport['incomeStatement']>(
       withQuery('/accounting/reports/income-statement', params ?? {}),
@@ -1402,11 +1549,20 @@ export const api = {
   getOpeningBalance: (fiscalYearId: string) =>
     request<any>(`/accounting/opening-balance/${fiscalYearId}`),
   createExpenseVoucher: (body: JsonBody) =>
-    request<any>('/accounting/vouchers/expense', { method: 'POST', json: body }),
+    request<any>('/accounting/vouchers/expense', {
+      method: 'POST',
+      json: body,
+    }),
   createPaymentVoucher: (body: JsonBody) =>
-    request<any>('/accounting/vouchers/payment', { method: 'POST', json: body }),
+    request<any>('/accounting/vouchers/payment', {
+      method: 'POST',
+      json: body,
+    }),
   createReceiptVoucher: (body: JsonBody) =>
-    request<any>('/accounting/vouchers/receipt', { method: 'POST', json: body }),
+    request<any>('/accounting/vouchers/receipt', {
+      method: 'POST',
+      json: body,
+    }),
   createContraVoucher: (body: JsonBody) =>
     request<any>('/accounting/vouchers/contra', { method: 'POST', json: body }),
   closeFiscalYear: (id: string) =>
@@ -1439,24 +1595,36 @@ export const api = {
       json: body,
     }),
   submitJournal: (id: string, body: JsonBody) =>
-    request<JournalEntryView>(`/accounting/journals/${encodeURIComponent(id)}/submit`, {
-      method: 'POST',
-      json: body,
-    }),
+    request<JournalEntryView>(
+      `/accounting/journals/${encodeURIComponent(id)}/submit`,
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
   postJournal: (id: string) =>
-    request<JournalEntryView>(`/accounting/journals/${encodeURIComponent(id)}/post`, {
-      method: 'POST',
-    }),
+    request<JournalEntryView>(
+      `/accounting/journals/${encodeURIComponent(id)}/post`,
+      {
+        method: 'POST',
+      },
+    ),
   reverseJournal: (id: string, body: JsonBody) =>
-    request<JournalEntryView>(`/accounting/journals/${encodeURIComponent(id)}/reverse`, {
-      method: 'POST',
-      json: body,
-    }),
+    request<JournalEntryView>(
+      `/accounting/journals/${encodeURIComponent(id)}/reverse`,
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
   correctJournal: (id: string, body: JsonBody) =>
-    request<JournalEntryView>(`/accounting/journals/${encodeURIComponent(id)}/correct`, {
-      method: 'POST',
-      json: body,
-    }),
+    request<JournalEntryView>(
+      `/accounting/journals/${encodeURIComponent(id)}/correct`,
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
   getAccountingAuditTrail: (params?: {
     resource?: string;
     action?: string;
@@ -1481,7 +1649,10 @@ export const api = {
     }),
   listMessages: () => request<MessageSummary[]>('/messaging/messages'),
   createMessage: (body: JsonBody) =>
-    request<MessageSummary>('/messaging/messages', { method: 'POST', json: body }),
+    request<MessageSummary>('/messaging/messages', {
+      method: 'POST',
+      json: body,
+    }),
   listMessageReadReceipts: () =>
     request<MessageReadReceiptSummary[]>('/messaging/read-receipts'),
   markMessageRead: (body: JsonBody) =>
@@ -1506,10 +1677,13 @@ export const api = {
       `/messaging/parent-teacher/threads/${encodeURIComponent(threadId)}`,
     ),
   createParentTeacherThread: (body: JsonBody) =>
-    request<ParentTeacherThreadCreateResult>('/messaging/parent-teacher/threads', {
-      method: 'POST',
-      json: body,
-    }),
+    request<ParentTeacherThreadCreateResult>(
+      '/messaging/parent-teacher/threads',
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
   closeParentTeacherThread: (threadId: string, body: JsonBody) =>
     request<ParentTeacherThreadSummary>(
       `/messaging/parent-teacher/threads/${encodeURIComponent(threadId)}/close`,
@@ -1520,7 +1694,10 @@ export const api = {
       `/messaging/parent-teacher/threads/${encodeURIComponent(threadId)}/escalate`,
       { method: 'PATCH', json: body },
     ),
-  listParentTeacherMessages: (threadId: string, params?: { page?: string; limit?: string }) =>
+  listParentTeacherMessages: (
+    threadId: string,
+    params?: { page?: string; limit?: string },
+  ) =>
     request<PaginatedResult<ParentTeacherMessageSummary>>(
       withQuery(
         `/messaging/parent-teacher/threads/${encodeURIComponent(threadId)}/messages`,
@@ -1533,35 +1710,49 @@ export const api = {
       { method: 'POST', json: body },
     ),
   markParentTeacherThreadRead: (threadId: string) =>
-    request(`/messaging/parent-teacher/threads/${encodeURIComponent(threadId)}/read`, {
-      method: 'PATCH',
-      json: {},
-    }),
+    request(
+      `/messaging/parent-teacher/threads/${encodeURIComponent(threadId)}/read`,
+      {
+        method: 'PATCH',
+        json: {},
+      },
+    ),
   markParentTeacherMessageRead: (messageId: string) =>
     request<ParentTeacherMessageSummary>(
       `/messaging/parent-teacher/messages/${encodeURIComponent(messageId)}/read`,
       { method: 'PATCH', json: {} },
     ),
   listChatAvailability: () =>
-    request<ChatAvailabilityRuleSummary[]>('/messaging/parent-teacher/availability'),
+    request<ChatAvailabilityRuleSummary[]>(
+      '/messaging/parent-teacher/availability',
+    ),
   updateChatAvailability: (body: JsonBody) =>
-    request<ChatAvailabilityRuleSummary[]>('/messaging/parent-teacher/availability', {
-      method: 'PUT',
-      json: body,
-    }),
+    request<ChatAvailabilityRuleSummary[]>(
+      '/messaging/parent-teacher/availability',
+      {
+        method: 'PUT',
+        json: body,
+      },
+    ),
   getChatAvailabilityStatus: () =>
-    request<ChatAvailabilityStatus>('/messaging/parent-teacher/availability/status'),
+    request<ChatAvailabilityStatus>(
+      '/messaging/parent-teacher/availability/status',
+    ),
   createChatAbuseReport: (threadId: string, body: JsonBody) =>
     request(
       `/messaging/parent-teacher/threads/${encodeURIComponent(threadId)}/abuse-report`,
       { method: 'POST', json: body },
     ),
-  listChatAbuseReports: () => request('/messaging/parent-teacher/abuse-reports'),
+  listChatAbuseReports: () =>
+    request('/messaging/parent-teacher/abuse-reports'),
   reviewChatAbuseReport: (reportId: string, body: JsonBody) =>
-    request(`/messaging/parent-teacher/abuse-reports/${encodeURIComponent(reportId)}/review`, {
-      method: 'PATCH',
-      json: body,
-    }),
+    request(
+      `/messaging/parent-teacher/abuse-reports/${encodeURIComponent(reportId)}/review`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
   resolveChatEscalation: (escalationId: string, body: JsonBody) =>
     request(
       `/messaging/parent-teacher/escalations/${encodeURIComponent(escalationId)}/resolve`,
@@ -1571,18 +1762,24 @@ export const api = {
   previewActivityAttachment: async (attachmentId: string) => {
     const response = await fetch(
       `${API_BASE_URL}/activity-feed/attachments/${encodeURIComponent(attachmentId)}/preview`,
-      { credentials: 'include' }
+      { credentials: 'include' },
     );
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(parseApiErrorMessage(text) || `Preview failed with status ${response.status}`);
+      throw new Error(
+        parseApiErrorMessage(text) ||
+          `Preview failed with status ${response.status}`,
+      );
     }
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank', 'noopener,noreferrer');
     setTimeout(() => URL.revokeObjectURL(url), 60000); // Cleanup after a minute
   },
-  downloadActivityAttachment: async (attachmentId: string, fileName: string) => {
+  downloadActivityAttachment: async (
+    attachmentId: string,
+    fileName: string,
+  ) => {
     const response = await fetch(
       `${API_BASE_URL}/activity-feed/attachments/${encodeURIComponent(attachmentId)}/download`,
       { credentials: 'include' },
@@ -1598,7 +1795,7 @@ export const api = {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    
+
     a.download = fileName;
     document.body.appendChild(a);
     a.click();
@@ -1650,7 +1847,8 @@ export const api = {
       `/consents/guardians/${encodeURIComponent(guardianId)}/revoke`,
       { method: 'POST', json: body },
     ),
-  listPlatformTenants: () => request<PlatformTenantSummary[]>('/platform/tenants'),
+  listPlatformTenants: () =>
+    request<PlatformTenantSummary[]>('/platform/tenants'),
   listPlatformTenantsPage: (params?: {
     page?: number;
     limit?: number;
@@ -1702,12 +1900,18 @@ export const api = {
     request<PlatformDashboardSummary>('/platform/dashboard'),
   listPlatformPlans: () => request<PlatformPlanSummary[]>('/platform/plans'),
   createPlatformPlan: (body: JsonBody) =>
-    request<PlatformPlanSummary>('/platform/plans', { method: 'POST', json: body }),
-  updatePlatformPlan: (planId: string, body: JsonBody) =>
-    request<PlatformPlanSummary>(`/platform/plans/${encodeURIComponent(planId)}`, {
-      method: 'PATCH',
+    request<PlatformPlanSummary>('/platform/plans', {
+      method: 'POST',
       json: body,
     }),
+  updatePlatformPlan: (planId: string, body: JsonBody) =>
+    request<PlatformPlanSummary>(
+      `/platform/plans/${encodeURIComponent(planId)}`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
   assignPlatformTenantSubscription: (
     tenantId: string,
     body: AssignPlatformTenantSubscriptionPayload,
@@ -1732,12 +1936,17 @@ export const api = {
   listPlatformUsageCounters: (tenantId: string) =>
     request(`/platform/tenants/${encodeURIComponent(tenantId)}/usage-counters`),
   getPlatformBillingProfile: (tenantId: string) =>
-    request(`/platform/tenants/${encodeURIComponent(tenantId)}/billing-profile`),
+    request(
+      `/platform/tenants/${encodeURIComponent(tenantId)}/billing-profile`,
+    ),
   updatePlatformBillingProfile: (tenantId: string, body: JsonBody) =>
-    request(`/platform/tenants/${encodeURIComponent(tenantId)}/billing-profile`, {
-      method: 'PATCH',
-      json: body,
-    }),
+    request(
+      `/platform/tenants/${encodeURIComponent(tenantId)}/billing-profile`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
   listPlatformSaaSInvoices: (tenantId: string) =>
     request<PlatformSaaSInvoiceSummary[]>(
       `/platform/tenants/${encodeURIComponent(tenantId)}/saas-invoices`,
@@ -1747,12 +1956,20 @@ export const api = {
       `/platform/tenants/${encodeURIComponent(tenantId)}/saas-invoices`,
       { method: 'POST', json: body },
     ),
-  recordPlatformSaaSPayment: (tenantId: string, invoiceId: string, body: JsonBody) =>
+  recordPlatformSaaSPayment: (
+    tenantId: string,
+    invoiceId: string,
+    body: JsonBody,
+  ) =>
     request<PlatformSaaSInvoiceSummary>(
       `/platform/tenants/${encodeURIComponent(tenantId)}/saas-invoices/${encodeURIComponent(invoiceId)}/payments`,
       { method: 'POST', json: body },
     ),
-  cancelPlatformSaaSInvoice: (tenantId: string, invoiceId: string, body: JsonBody) =>
+  cancelPlatformSaaSInvoice: (
+    tenantId: string,
+    invoiceId: string,
+    body: JsonBody,
+  ) =>
     request<PlatformSaaSInvoiceSummary>(
       `/platform/tenants/${encodeURIComponent(tenantId)}/saas-invoices/${encodeURIComponent(invoiceId)}/cancel`,
       { method: 'POST', json: body },
@@ -1765,9 +1982,16 @@ export const api = {
       json: body,
     }),
   testPlatformProviderConnection: (id: string) =>
-    request<{ success: boolean; message: string }>(`/platform/providers/${encodeURIComponent(id)}/test`, {
-      method: 'POST',
-    }),
+    request<PlatformProviderReadinessDetail>(
+      `/platform/providers/${encodeURIComponent(id)}/test`,
+      {
+        method: 'POST',
+      },
+    ),
+  getPlatformProviderReadiness: (id: string) =>
+    request<PlatformProviderReadinessDetail>(
+      `/platform/providers/${encodeURIComponent(id)}/readiness`,
+    ),
   updatePlatformProviderStatus: (id: string, body: JsonBody) =>
     request<PlatformProviderConfigSummary>(
       `/platform/providers/${encodeURIComponent(id)}/status`,
@@ -1778,18 +2002,29 @@ export const api = {
     ),
   getPlatformQueueHealth: () =>
     request<PlatformQueueSummary[]>('/platform/queues'),
-  listPlatformFailedJobs: (params?: { queueName?: string; page?: number; limit?: number }) =>
-    request<PaginatedResult<PlatformFailedJobSummary>>(withQuery('/platform/queues/failed-jobs', {
-      ...params,
-      page: params?.page?.toString(),
-      limit: params?.limit?.toString(),
-    })),
+  listPlatformFailedJobs: (params?: {
+    queueName?: string;
+    page?: number;
+    limit?: number;
+  }) =>
+    request<PaginatedResult<PlatformFailedJobSummary>>(
+      withQuery('/platform/queues/failed-jobs', {
+        ...params,
+        page: params?.page?.toString(),
+        limit: params?.limit?.toString(),
+      }),
+    ),
   getPlatformJobDetail: (queueName: string, jobId: string) =>
-    request<PlatformFailedJobSummary>(`/platform/queues/${encodeURIComponent(queueName)}/jobs/${encodeURIComponent(jobId)}`),
+    request<PlatformFailedJobSummary>(
+      `/platform/queues/${encodeURIComponent(queueName)}/jobs/${encodeURIComponent(jobId)}`,
+    ),
   removePlatformJob: (queueName: string, jobId: string) =>
-    request<{ success: true }>(`/platform/queues/${encodeURIComponent(queueName)}/jobs/${encodeURIComponent(jobId)}`, {
-      method: 'DELETE',
-    }),
+    request<{ success: true }>(
+      `/platform/queues/${encodeURIComponent(queueName)}/jobs/${encodeURIComponent(jobId)}`,
+      {
+        method: 'DELETE',
+      },
+    ),
   retryPlatformFailedJob: (body: JsonBody) =>
     request('/platform/queues/retry', { method: 'POST', json: body }),
   getPlatformHealth: () => request<PlatformHealthSummary>('/platform/health'),
@@ -1805,7 +2040,8 @@ export const api = {
       { method: 'POST', json: body },
     ),
   getTenantSettings: () => request<TenantSettingSummary[]>('/settings'),
-  getPublicTenantSettings: () => request<TenantSettingSummary[]>('/settings/public'),
+  getPublicTenantSettings: () =>
+    request<TenantSettingSummary[]>('/settings/public'),
   getSchoolOnboardingChecklist: () =>
     request<PlatformOnboardingChecklist>('/settings/onboarding'),
   updateTenantSetting: (key: string, value: any) =>
@@ -1950,9 +2186,12 @@ export const api = {
 
   // Communications - Deliveries
   retryNotificationDelivery: (deliveryId: string) =>
-    request<any>(`/communications/deliveries/${encodeURIComponent(deliveryId)}/retry`, {
-      method: 'POST',
-    }),
+    request<any>(
+      `/communications/deliveries/${encodeURIComponent(deliveryId)}/retry`,
+      {
+        method: 'POST',
+      },
+    ),
   retryFailedNotificationDeliveries: () =>
     request<any>('/communications/deliveries/retry-failed', { method: 'POST' }),
 

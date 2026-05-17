@@ -1,6 +1,6 @@
 # SchoolOS Current Repo Status Analysis
 
-**Last updated:** 2026-05-14
+**Last updated:** 2026-05-17
 
 **Scope:** Full repo documentation review against `apps/api`, `apps/web`, `packages/core`, Prisma schema, and available tests.
 
@@ -23,7 +23,7 @@ Do not treat older Phase 1B / Phase 2-transition notes as current unless they ar
 Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
-M0 Platform Core: Foundation complete; pilot hardening remains
+M0 Platform Core: Foundation complete; provider/queue pilot hardening implemented; broader pilot hardening remains
 Phase 2A M4 Academics: Completed / Pilot-Ready
 Phase 2 Academics polish: Completed (report-card PDFs, corrections/history, exports, snapshots, raster logo embedding, and browser smoke coverage)
 Phase 2B M6 Homework/Timetable: Completed / Pilot-Ready (File Registry attachments, reminder hardening, teacher absence conflict detection, substitution dashboard, conflict visualization)
@@ -49,7 +49,8 @@ Full SchoolOS product complete: No
 Latest practical caveat:
 
 ```text
-The Phase 2 Academics and Accounting polish pass has fully completed and ran the core verification gate successfully through build.
+Phase Gate 0 verification was green before M0 depth work started.
+The current M0 provider/queue hardening pass ran targeted tests plus repo tests through build.
 `pnpm verify:production` reached the browser E2E stage but the sandbox could not bind `127.0.0.1:3101`.
 `pnpm smoke:phase1` still requires local Postgres, Redis, API, and web services to be running.
 ```
@@ -73,7 +74,7 @@ Available verification coverage includes API unit/E2E tests, web tests, and Play
 | Module | Backend Implemented | Frontend Implemented | Remaining Backend | Remaining Frontend |
 |---|---|---|---|---|
 | Auth / Security / Tenant | Cookie-first auth, bearer support, RBAC, tenant context, platform/tenant separation, super-admin override audit, throttling. | Login/register/session-aware dashboard shell. | Deeper request/correlation logging, more denial/override regression tests, production secret/session review. | Permission-denied polish across every route and slow-session recovery. |
-| M0 Platform Core | Tenant management, plans/features, entitlements/usage, SaaS billing records, providers, queue health/retry, file registry, reports/exports, health, onboarding. | `/platform/dashboard`, `/platform/schools`, tenant detail, platform settings, audit surfaces. | Deeper BullMQ failed-job inspection by deployed queue topology, SaaS lifecycle automation, entitlement enforcement tests against school APIs, staging object-storage checks. | More platform tenant-action QA, richer queue/provider failure surfaces, browser coverage for critical platform mutations. |
+| M0 Platform Core | Tenant management, plans/features, entitlements/usage, SaaS billing records, provider masking/readiness detail, queue health/retry/detail/history, file registry, reports/exports, health, onboarding. | `/platform/dashboard`, `/platform/schools`, tenant detail, platform settings, audit surfaces, provider readiness dialog, queue failed-job detail dialog. | SaaS lifecycle automation, entitlement enforcement tests against school APIs, explicit staging object-storage checks, broader browser coverage. | More platform tenant-action QA and browser coverage for critical platform mutations. |
 | M1 Admissions & Students | Admissions, profiles, guardians, documents, lifecycle, search, photo/document access, duplicate/merge foundations, StudentIdentity, StudentQrCredential model/service/API. | Admissions workspace, student directory/detail/profile tabs, document/profile actions, QR card management. | iEMIS final mapping, duplicate merge polish, storage-backed photo/document hardening, QR release verification, more tenant-isolation tests. | QR manual QA, photo/logo upload UX polish, student document audit visibility, parent-safe student views later. |
 | M2 Attendance | Attendance sessions/records, corrections, sync submissions/conflicts, drafts, monthly/history analytics, exports, teacher-scope tests. | Attendance daily workflow and register routes. | Offline sync persistence hardening, attendance export/report stabilization, parent summary API later. | Parent attendance view later, slow-network/offline UX, correction workflow polish. |
 | M3 Fees & Receipts | Fee heads/plans, invoices, payments, receipts, cashier close, refunds/reversals, ledger/report foundations, M9 consistency coverage. | Fees/finance workspaces, collection counter, ledger, receipt/reprint/correction UI foundations. | Online payment gateway readiness, receipt reprint history depth, cashier-close verification, better export/PDF coverage. | Fee-head/period dues table polish, gateway payment UX, finance report export polish. |
@@ -95,7 +96,7 @@ Available verification coverage includes API unit/E2E tests, web tests, and Play
 | Module | Estimated Completion | Current Implementation State |
 |---|---:|---|
 | Auth / RBAC / Tenant Isolation | 90-95% | Strong backend and browser-session foundation; production security/denial coverage remains. |
-| M0 Platform Core | 80-90% | Foundation complete; harden queue topology, entitlement enforcement, SaaS lifecycle, staging checks. |
+| M0 Platform Core | 85-90% | Foundation complete with provider readiness and queue failed-job detail; entitlement enforcement depth, SaaS lifecycle automation, staging checks, and browser coverage remain. |
 | M1 Admissions & Student Profiles | 90-95% | Pilot-ready plus Student QR foundation; storage, iEMIS, duplicate merge, QR QA remain. |
 | M2 Smart Attendance | 85-90% | Pilot-ready attendance and reports; offline/parent/report depth remains. |
 | M3 Fees & Receipts | 85-90% | Pilot-ready collection/receipts/cashier close; gateway/export/reprint depth remains. |

@@ -318,6 +318,12 @@ export class PlatformController {
     );
   }
 
+  @Get('providers/:id/readiness')
+  @Permissions('platform:providers:read')
+  async getProviderReadiness(@Param('id') id: string) {
+    return this.platformService.getProviderReadinessDetail(id);
+  }
+
   @Patch('providers/:id/status')
   @Permissions('platform:providers:manage')
   async updateProviderStatus(

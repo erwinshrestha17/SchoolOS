@@ -35,13 +35,13 @@ Current delivery stage:
 Phase 0 completed
 Phase 1A completed / pilot-ready
 Phase 1B completed / pilot-ready
-M0 Platform Core Foundation Depth completed
+M0 Platform Core Foundation Depth completed with provider/queue pilot hardening
 Phase 2A M4 Academics backend/admin UI completed
 Phase 2 Academics production polish completed
 Student QR Foundation implemented / release hardening remains
 Phase 2D M9 Accounting completed
 Phase 2 Accounting production polish completed
-Current stage: M0 platform foundation complete + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3 operations admin foundations
+Current stage: M0 platform foundation complete with provider readiness and queue failed-job detail hardening + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3 operations admin foundations
 ```
 
 Targeted web-admin polish and Phase2F smoke coverage have been completed; next focus is the strict phase-gate plan in `docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`.
@@ -54,8 +54,8 @@ Recommended near-term direction:
 
 ```text
 Strict Phase Gate 0
-→ stabilize verification, migrations, seed data, smoke tests, and stale docs
-→ then harden controlled pilot reliability across M0 and Phase 1 core
+→ keep verification, migrations, seed data, smoke tests, and stale docs stable
+→ continue controlled pilot reliability across M0 and Phase 1 core
 → then deepen Homework/Timetable, HR/Payroll, Library, Transport, and Canteen one vertical at a time
 ```
 
@@ -93,7 +93,7 @@ Do not rename `tenantId` to `schoolId`.
 Implemented or registered backend foundations now include:
 
 - Auth/RBAC/Tenant Isolation
-- M0 Platform Core: platform tenant control, tenant settings, file registry, reports, usage service, plan service foundations
+- M0 Platform Core: platform tenant control, tenant settings, file registry, reports, usage service, plan service foundations, provider readiness detail, queue failed-job detail, and retry audit history
 - M1 Admissions & Student Profiles
 - M2 Smart Attendance
 - M3 Fees & Receipts
@@ -135,7 +135,7 @@ Approximate module status:
 
 ```text
 Auth/Security/Tenant: 90-95%
-M0 Platform Core: 80-90%
+M0 Platform Core: 85-90%
 M1 Students: 90-95%
 M2 Attendance: 85-90%
 M3 Fees: 85-90%

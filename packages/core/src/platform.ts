@@ -1,4 +1,4 @@
-import type { PaginatedResponse, TenantSummary } from "./types.js";
+import type { PaginatedResponse, TenantSummary } from './types.js';
 
 export type PlatformTenantSummary = {
   id: string;
@@ -67,13 +67,7 @@ export type PlatformTenantSubscriptionSummary = {
   planId: string;
   planKey: string;
   planName: string;
-  status:
-    | 'TRIAL'
-    | 'ACTIVE'
-    | 'GRACE'
-    | 'SUSPENDED'
-    | 'EXPIRED'
-    | 'CANCELLED';
+  status: 'TRIAL' | 'ACTIVE' | 'GRACE' | 'SUSPENDED' | 'EXPIRED' | 'CANCELLED';
   startsAt: string;
   endsAt?: string | null;
   renewsAt?: string | null;
@@ -84,7 +78,12 @@ export type PlatformEntitlementCheck = {
   allowed: boolean;
   tenantId: string;
   featureKey: string;
-  reason: 'allowed' | 'tenant_inactive' | 'no_subscription' | 'subscription_inactive' | 'feature_locked';
+  reason:
+    | 'allowed'
+    | 'tenant_inactive'
+    | 'no_subscription'
+    | 'subscription_inactive'
+    | 'feature_locked';
   source?: 'plan' | 'override' | 'none';
   subscriptionStatus?: string | null;
   limit?: number | null;
@@ -146,6 +145,24 @@ export type PlatformProviderConfigSummary = {
   updatedAt: string;
 };
 
+export type PlatformProviderReadinessDetail = {
+  provider: PlatformProviderConfigSummary;
+  status: 'ok' | 'warning' | 'error';
+  mode: 'disabled' | 'dry_run';
+  message: string;
+  missingKeys: string[];
+  paidExternalCallSkipped: boolean;
+  secretKeysMasked: string[];
+  checkedAt: string;
+  recentAudit: Array<{
+    id: string;
+    action: string;
+    createdAt: string;
+    status?: string | null;
+    message?: string | null;
+  }>;
+};
+
 export type PlatformQueueSummary = {
   name: string;
   waiting: number;
@@ -166,6 +183,16 @@ export type PlatformFailedJobSummary = {
   attemptsMade: number;
   timestamp?: number;
   data: Record<string, unknown>;
+  processedOn?: number | null;
+  finishedOn?: number | null;
+  stacktrace?: string[];
+  retryHistory?: Array<{
+    id: string;
+    userId?: string | null;
+    reason?: string | null;
+    attemptsMade?: number | null;
+    createdAt: string;
+  }>;
 };
 
 export type PlatformHealthSummary = {

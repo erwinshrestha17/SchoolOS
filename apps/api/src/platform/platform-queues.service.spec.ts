@@ -3,6 +3,7 @@ import { PlatformQueuesService } from './platform-queues.service';
 
 describe('PlatformQueuesService', () => {
   let auditService: { record: jest.Mock };
+  let prisma: { auditLog: { findMany: jest.Mock } };
 
   const makeQueue = (overrides: Record<string, unknown> = {}) => ({
     getJobCounts: jest.fn().mockResolvedValue({
@@ -21,6 +22,7 @@ describe('PlatformQueuesService', () => {
 
   const buildService = (queueOverrides: Record<string, unknown> = {}) => {
     auditService = { record: jest.fn().mockResolvedValue({}) };
+    prisma = { auditLog: { findMany: jest.fn().mockResolvedValue([]) } };
 
     const notificationsQueue = makeQueue(queueOverrides.notifications as any);
     const financeQueue = makeQueue(queueOverrides.finance as any);
@@ -32,6 +34,7 @@ describe('PlatformQueuesService', () => {
 
     const service = new PlatformQueuesService(
       auditService as any,
+      prisma as any,
       notificationsQueue as any,
       financeQueue as any,
       payrollQueue as any,
@@ -183,6 +186,76 @@ describe('PlatformQueuesService', () => {
           retryRequested: true,
           reason: 'Retry after provider outage',
         }),
+      }),
+    );
+  });
+
+  it('returns failed job detail with sanitized payload, stacktrace, timings, and retry audit history', async () => {
+    const job = {
+      id: 'job-1',
+      name: 'send-provider-message',
+      failedReason: 'Provider rejected request',
+      attemptsMade: 4,
+      timestamp: 100,
+      processedOn: 110,
+      finishedOn: 120,
+      stacktrace: ['Error: rejected'],
+      data: {
+        tenantId: 'tenant-1',
+        apiToken: 'raw-token',
+        nested: { password: 'raw-password', body: 'Hello' },
+      },
+    };
+
+    const { service } = buildService({
+      notifications: {
+        getJob: jest.fn().mockResolvedValue(job),
+      },
+    });
+    prisma.auditLog.findMany.mockResolvedValue([
+      {
+        id: 'audit-1',
+        userId: 'platform-user-1',
+        before: { attemptsMade: 4 },
+        after: { reason: 'Retry after provider outage' },
+        createdAt: new Date('2026-05-17T00:00:00.000Z'),
+      },
+    ]);
+
+    await expect(
+      service.getJobDetail('notifications', 'job-1'),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: 'job-1',
+        queueName: 'notifications',
+        processedOn: 110,
+        finishedOn: 120,
+        stacktrace: ['Error: rejected'],
+        data: {
+          tenantId: 'tenant-1',
+          apiToken: '********',
+          nested: { password: '********', body: 'Hello' },
+        },
+        retryHistory: [
+          {
+            id: 'audit-1',
+            userId: 'platform-user-1',
+            reason: 'Retry after provider outage',
+            attemptsMade: 4,
+            createdAt: '2026-05-17T00:00:00.000Z',
+          },
+        ],
+      }),
+    );
+    expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'platform',
+          resource: 'queues',
+          resourceId: 'notifications:job-1',
+          action: 'queue_failed_job_retry_requested',
+        }),
+        take: 10,
       }),
     );
   });

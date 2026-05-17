@@ -3,7 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { AttendanceStatus, EnrollmentStatus } from '@prisma/client';
+import { AttendanceStatus, AuthMethod } from '@prisma/client';
 import { AttendanceService } from './attendance.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,23 +16,30 @@ import { AuthContext } from '../auth/auth.types';
 describe('Attendance Hardening', () => {
   let service: AttendanceService;
   let prisma: PrismaService;
+  let settingsService: { getSetting: jest.Mock };
 
   const mockActor: AuthContext = {
     userId: 'user-1',
     tenantId: 'tenant-1',
+    tenantSlug: 'school-1',
+    email: 'teacher@school.test',
+    authMethod: AuthMethod.PASSWORD,
+    roles: ['teacher'],
     permissions: ['attendance:mark', 'attendance:read'],
-    role: 'teacher',
   };
 
   const mockAdminActor: AuthContext = {
     userId: 'admin-1',
     tenantId: 'tenant-1',
+    tenantSlug: 'school-1',
+    email: 'admin@school.test',
+    authMethod: AuthMethod.PASSWORD,
+    roles: ['admin'],
     permissions: [
       'attendance:mark',
       'attendance:read',
       'attendance:override_lock',
     ],
-    role: 'admin',
   };
 
   beforeEach(async () => {
@@ -89,8 +96,10 @@ describe('Attendance Hardening', () => {
 
     service = module.get<AttendanceService>(AttendanceService);
     prisma = module.get<PrismaService>(PrismaService);
-    (service as any).settingsService =
-      module.get<SettingsService>(SettingsService);
+    settingsService = module.get(SettingsService) as unknown as {
+      getSetting: jest.Mock;
+    };
+    settingsService.getSetting.mockResolvedValue(24);
   });
 
   describe('Future Date Prevention', () => {
@@ -101,8 +110,24 @@ describe('Attendance Hardening', () => {
       const dto = {
         academicYearId: 'year-1',
         classId: 'class-1',
+        sectionId: 'section-1',
         attendanceDate: futureDate.toISOString(),
       };
+
+      (prisma.academicYear.findFirst as jest.Mock).mockResolvedValue({
+        id: 'year-1',
+      });
+      (prisma.class.findFirst as jest.Mock).mockResolvedValue({
+        id: 'class-1',
+      });
+      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
+        id: 'staff-1',
+      });
+      (prisma.section.findFirst as jest.Mock).mockResolvedValue({
+        id: 'section-1',
+        classId: 'class-1',
+        classTeacherId: 'staff-1',
+      });
 
       await expect(service.submitAttendance(dto, mockActor)).rejects.toThrow(
         ForbiddenException,
@@ -126,6 +151,7 @@ describe('Attendance Hardening', () => {
       });
       (prisma.section.findFirst as jest.Mock).mockResolvedValue({
         id: 'section-1',
+        classId: 'class-1',
         classTeacherId: 'staff-1',
       });
       (prisma.schoolCalendarDay.findFirst as jest.Mock).mockResolvedValue({
@@ -142,6 +168,7 @@ describe('Attendance Hardening', () => {
       const dto = {
         academicYearId: 'year-1',
         classId: 'class-1',
+        sectionId: 'section-1',
         attendanceDate: yesterday.toISOString(),
       };
 
@@ -165,6 +192,7 @@ describe('Attendance Hardening', () => {
       });
       (prisma.section.findFirst as jest.Mock).mockResolvedValue({
         id: 'section-1',
+        classId: 'class-1',
         classTeacherId: 'staff-1',
       });
       (prisma.schoolCalendarDay.findFirst as jest.Mock).mockResolvedValue({
@@ -195,6 +223,7 @@ describe('Attendance Hardening', () => {
       const dto = {
         academicYearId: 'year-1',
         classId: 'class-1',
+        sectionId: 'section-1',
         attendanceDate: yesterday.toISOString(),
       };
 
@@ -205,12 +234,12 @@ describe('Attendance Hardening', () => {
 
   describe('Correction Request Scoping', () => {
     it('should throw ForbiddenException if teacher is not assigned to the student class', async () => {
-      (prisma.staff.findFirst as jest.Mock).mockResolvedValue({
+      (prisma.staff.findUnique as jest.Mock).mockResolvedValue({
         id: 'staff-1',
       });
-      (prisma.settingsService as any) = {
-        getSetting: jest.fn().mockResolvedValue(24),
-      }; // Mock setting service property if it was direct, but it is injected
+      settingsService.getSetting.mockImplementation(async (_tenantId, key) =>
+        key === 'allow_teacher_correction_request' ? true : 24,
+      );
 
       (prisma.student.findUnique as jest.Mock).mockResolvedValue({
         id: 'student-1',

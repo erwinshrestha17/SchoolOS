@@ -7,6 +7,7 @@ import {
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { AuditService } from '../audit/audit.service';
+import { PrismaService } from '../prisma/prisma.service';
 import type { RetryFailedJobDto } from './dto/platform-core.dto';
 
 type QueueCounts = Partial<
@@ -33,6 +34,16 @@ export interface PlatformFailedJobSummary {
   attemptsMade: number;
   timestamp?: number;
   data: unknown;
+  processedOn?: number | null;
+  finishedOn?: number | null;
+  stacktrace?: string[];
+  retryHistory?: Array<{
+    id: string;
+    userId?: string | null;
+    reason?: string | null;
+    attemptsMade?: number | null;
+    createdAt: string;
+  }>;
 }
 
 const SECRET_KEY_PATTERN =
@@ -48,6 +59,7 @@ export class PlatformQueuesService {
 
   constructor(
     private readonly auditService: AuditService,
+    private readonly prisma: PrismaService,
     @InjectQueue('notifications') private readonly notificationsQueue: Queue,
     @InjectQueue('finance') private readonly financeQueue: Queue,
     @InjectQueue('payroll') private readonly payrollQueue: Queue,
@@ -162,7 +174,11 @@ export class PlatformQueuesService {
       failedReason: job.failedReason,
       attemptsMade: job.attemptsMade,
       timestamp: job.timestamp,
-      data: sanitizeJobData(job.data, 0, true), // Enhanced masking for detail view
+      data: sanitizeJobData(job.data, 0, true),
+      processedOn: job.processedOn ?? null,
+      finishedOn: job.finishedOn ?? null,
+      stacktrace: Array.isArray(job.stacktrace) ? job.stacktrace : [],
+      retryHistory: await this.listRetryHistory(queueName, jobId),
     };
   }
 
@@ -244,6 +260,46 @@ export class PlatformQueuesService {
       return null;
     }
   }
+
+  private async listRetryHistory(queueName: string, jobId: string) {
+    const resourceId = `${queueName}:${jobId}`;
+    const rows = await this.prisma.auditLog.findMany({
+      where: {
+        tenantId: 'platform',
+        resource: 'queues',
+        resourceId,
+        action: 'queue_failed_job_retry_requested',
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: {
+        id: true,
+        userId: true,
+        after: true,
+        before: true,
+        createdAt: true,
+      },
+    });
+
+    return rows.map((row) => {
+      const after = asRecord(row.after);
+      const before = asRecord(row.before);
+      return {
+        id: row.id,
+        userId: row.userId,
+        reason: typeof after.reason === 'string' ? after.reason : null,
+        attemptsMade:
+          typeof before.attemptsMade === 'number' ? before.attemptsMade : null,
+        createdAt: row.createdAt.toISOString(),
+      };
+    });
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object'
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 function sanitizeJobData(value: unknown, depth = 0, strict = false): unknown {

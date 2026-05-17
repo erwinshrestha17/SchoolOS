@@ -1,6 +1,6 @@
 # SchoolOS Master Project Memory
 
-**Status:** M0 Platform Core Foundation Complete + Phase 2 Academics/Accounting Production Polish Implemented + Student QR Foundation Implemented + Phase 3 Operations (Homework, Timetable, HR, Payroll) Hardened
+**Status:** M0 Platform Core Foundation Complete with Provider/Queue Pilot Hardening + Phase 2 Academics/Accounting Production Polish Implemented + Student QR Foundation Implemented + Phase 3 Operations (Homework, Timetable, HR, Payroll) Hardened
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard
 
@@ -27,13 +27,13 @@ Do not recreate separate phase structure, scalability, student QR, M9, M11, pric
 Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
-M0 Platform Core Foundation: Completed across eight sprints; pilot hardening remains
+M0 Platform Core Foundation: Completed across eight sprints; provider/queue pilot hardening implemented; broader pilot hardening remains
 Phase 2A M4 Academics backend/admin UI: Completed
 Phase 2 Academics production polish: Completed (report-card PDFs, corrections/history, exports, snapshots, and smoke coverage)
 Student QR Foundation: Implemented; release hardening remains
 Phase 2D M9 Accounting: Completed
 Phase 2 Accounting production polish: Completed (report PDFs, snapshots, reconciliation suggestions, audit trail, and smoke coverage)
-Current stage: M0 platform foundation complete + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3 operations (Homework, Timetable, HR, Payroll) hardened
+Current stage: M0 platform foundation complete with provider/queue hardening + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3 operations (Homework, Timetable, HR, Payroll) hardened
 ```
 
 Targeted web-admin frontend polish and Phase 2F browser smoke coverage are now present on main.
@@ -52,8 +52,8 @@ Recommended near-term direction:
 
 ```text
 Strict Phase Gate 0 from docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md
-→ stabilize verification, migrations, seed data, smoke tests, and stale docs
-→ then harden controlled pilot reliability across M0 and Phase 1 core
+→ keep verification, migrations, seed data, smoke tests, and stale docs stable
+→ continue controlled pilot reliability across M0 and Phase 1 core
 → then deepen Homework/Timetable, HR/Payroll, Library, Transport, and Canteen one vertical at a time
 ```
 
@@ -109,7 +109,7 @@ Rules:
 
 | Module | Name | Current Status |
 |---|---|---|
-| M0 | Platform Core / SaaS Starter | Foundation completed across eight sprints; M0 pilot hardening next |
+| M0 | Platform Core / SaaS Starter | Foundation completed across eight sprints; provider/queue pilot hardening implemented; entitlement/SaaS/staging depth remains |
 | M1 | Admissions & Student Profiles | Phase 1A/1B complete / pilot-ready |
 | M2 | Smart Attendance | Phase 1A/1B complete / pilot-ready |
 | M3 | Fees & Receipts | Phase 1A/1B complete / pilot-ready |
@@ -128,7 +128,7 @@ Rules:
 
 ## 5. M0 Platform Core Foundation Completion
 
-Status: **Completed across eight sprints; pilot hardening next.**
+Status: **Completed across eight sprints; provider/queue pilot hardening implemented; broader pilot hardening remains.**
 
 Completed sprint sequence:
 
@@ -154,7 +154,8 @@ Implemented M0 capabilities:
 - Manual tenant billing profile.
 - SaaS invoices, invoice lines, payments, and cancellation rules.
 - Provider config masking and secret-safe response shape.
-- Queue health and audited retry endpoint.
+- Provider readiness detail API with dry-run validation, disabled-mode warnings, masked secret reporting, and S3-compatible object-storage readiness checks without paid external calls by default.
+- Queue health, failed-job detail inspection, sanitized payload visibility, stack/timing detail, retry audit history, and audited retry endpoint.
 - Upload validation and dangerous extension blocking.
 - Private/protected file URL response shape.
 - Report export history and audited export persistence where available.
@@ -214,18 +215,36 @@ Notes:
 - Focused platform/auth/report/settings tests passed.
 ```
 
+Current M0 pilot-hardening snapshot:
+
+```text
+Implemented:
+- Provider readiness detail and dry-run validation.
+- Object-storage readiness checks for S3/MinIO/R2-style provider configuration without unsafe external calls by default.
+- Queue failed-job detail with sanitized payload, failure metadata, stack trace, and retry audit history.
+- Platform settings provider readiness and queue job detail surfaces.
+
+Verified:
+- Targeted platform API tests passed.
+- Web contract tests passed.
+- pnpm typecheck, pnpm test, pnpm test:e2e, and pnpm build passed.
+
+Blocked:
+- pnpm verify:production reached Playwright webServer startup and failed to bind 127.0.0.1:3101 in the sandbox.
+- pnpm smoke:phase1 still requires local Postgres, Redis, API, and web services.
+```
+
 Remaining M0 hardening work:
 
 ```text
-- Deeper BullMQ failed-job inspection per deployed queue topology.
 - Async report/export generation expansion module by module.
-- Provider test connection limitations remain intentionally conservative/no paid external calls.
+- Provider test connection must remain conservative/no paid external calls unless explicitly configured.
 - Demo Nepal tenant seed expansion.
 - Credentialed web E2E coverage where seeded credentials are available.
 - Platform/school route denial browser tests.
 - SaaS billing lifecycle tests: invoice -> payment -> overdue/cancel/suspend.
 - Entitlement enforcement tests against real school APIs.
-- Object storage readiness verification against staging provider.
+- Object storage readiness verification against explicit staging provider.
 - Docker-backed smoke once Postgres, Redis, and API are running.
 ```
 
@@ -445,7 +464,7 @@ Feature -> tenant isolation -> indexes -> pagination -> queue slow work -> audit
 ```text
 Full SchoolOS vision: around 70-80% implemented
 Phase 1 pilot product: around 90-95% implemented
-M0 Platform Core: 80-90% foundation complete / pilot hardening next
+M0 Platform Core: 85-90% foundation complete with provider/queue pilot hardening; entitlement/SaaS/staging depth remains
 Phase 2A M4 Academics: backend/admin UI plus PDF/report/correction/snapshot polish implemented
 Student QR Foundation: implemented / release hardening remains
 M9 Accounting: production-candidate complete plus PDF/snapshot/reconciliation polish implemented
@@ -456,7 +475,7 @@ Module estimates:
 | Module | Estimated Completion |
 |---|---:|
 | Auth/Security/Tenant | 90-95% |
-| M0 Platform Core | 80-90% |
+| M0 Platform Core | 85-90% |
 | M1 Admissions & Student Profiles | 90-95% |
 | M2 Attendance | 85-90% |
 | M3 Fees & Receipts | 85-90% |

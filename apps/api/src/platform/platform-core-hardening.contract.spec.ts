@@ -54,7 +54,7 @@ describe('M0 Platform Core hardening contracts', () => {
     expect(service).toContain('USAGE_KEYS');
     expect(service).toContain('checkEntitlement');
     expect(service).toContain('tenantFeatureOverride');
-    expect(service).toContain('feature_disabled');
+    expect(service).toContain('feature_locked');
     expect(plansService).toContain('checkFeatureEnabled');
     expect(plansService).toContain('feature');
     expect(plansService).toContain('No active subscription found');
@@ -92,6 +92,8 @@ describe('M0 Platform Core hardening contracts', () => {
     expect(service).toContain('secretKeys');
     expect(service).toContain("'********'");
     expect(service).toContain('provider_config_updated');
+    expect(service).toContain('getProviderReadinessDetail');
+    expect(service).toContain('paidExternalCallSkipped');
     expect(service).toContain('encryptProviderConfig');
   });
 
@@ -102,6 +104,7 @@ describe('M0 Platform Core hardening contracts', () => {
 
     expect(controller).toContain("@Get('queues')");
     expect(controller).toContain("@Get('queues/failed-jobs')");
+    expect(controller).toContain("@Get('queues/:queueName/jobs/:jobId')");
     expect(controller).toContain("@Post('queues/retry')");
     expect(controller).toContain("@Permissions('platform:queues:read')");
     expect(controller).toContain("@Permissions('platform:queues:retry')");
@@ -115,6 +118,7 @@ describe('M0 Platform Core hardening contracts', () => {
     expect(queuesService).toContain('getJobCounts');
     expect(queuesService).toContain('getFailed(0, 50)');
     expect(queuesService).toContain('queue.getJob(dto.jobId)');
+    expect(queuesService).toContain('listRetryHistory');
     expect(queuesService).toContain('job.isFailed()');
     expect(queuesService).toContain('job.retry()');
     expect(queuesService).toContain('queue_failed_job_retry_requested');

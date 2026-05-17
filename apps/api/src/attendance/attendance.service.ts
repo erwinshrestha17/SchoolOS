@@ -3227,7 +3227,7 @@ export class AttendanceService {
 
   private async getTeacherSectionIds(
     actor: AuthContext,
-    studentScope: Record<string, any>,
+    studentScope: Record<string, unknown>,
   ): Promise<string[] | undefined> {
     if (
       actor.permissions.includes('attendance:read_all') ||

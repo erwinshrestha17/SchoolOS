@@ -22,6 +22,9 @@ describe('PlatformService provider config hardening', () => {
         upsert: jest.fn(),
         update: jest.fn(),
       },
+      auditLog: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
     auditService = { record: jest.fn().mockResolvedValue({}) };
 
@@ -409,5 +412,150 @@ describe('PlatformService provider config hardening', () => {
     expect(prisma.providerConfig.findUnique).not.toHaveBeenCalled();
     expect(prisma.providerConfig.upsert).not.toHaveBeenCalled();
     expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('dry-runs object storage readiness without paid or unsafe external calls', async () => {
+    const provider = {
+      id: 'storage-provider-1',
+      type: 'OBJECT_STORAGE',
+      name: 'r2',
+      enabled: true,
+      environment: 'PRODUCTION',
+      configEncrypted: {
+        bucket: 'schoolos-private',
+        region: 'auto',
+        endpoint: 'https://account.r2.cloudflarestorage.com',
+        accessKeyId: 'encrypted-access-key',
+        secretAccessKey: 'encrypted-secret-key',
+      },
+      secretKeys: ['accessKeyId', 'secretAccessKey'],
+      updatedAt: new Date('2026-05-17T00:00:00.000Z'),
+      lastValidatedAt: null,
+      validationStatus: null,
+    };
+    prisma.providerConfig.findUnique.mockResolvedValue(provider);
+    prisma.providerConfig.update.mockResolvedValue({
+      ...provider,
+      validationStatus: 'OK',
+      lastValidatedAt: new Date('2026-05-17T00:00:00.000Z'),
+    });
+
+    await expect(
+      service.testProviderConnection('storage-provider-1', 'platform-user-1'),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        status: 'ok',
+        mode: 'dry_run',
+        missingKeys: [],
+        paidExternalCallSkipped: true,
+        secretKeysMasked: ['accessKeyId', 'secretAccessKey'],
+        message: expect.stringContaining('No external bucket call was made'),
+        provider: expect.objectContaining({
+          config: expect.objectContaining({
+            accessKeyId: '********',
+            secretAccessKey: '********',
+          }),
+        }),
+      }),
+    );
+
+    expect(prisma.providerConfig.update).toHaveBeenCalledWith({
+      where: { id: 'storage-provider-1' },
+      data: expect.objectContaining({ validationStatus: 'OK' }),
+    });
+    const auditPayload = JSON.stringify(auditService.record.mock.calls[0][0]);
+    expect(auditPayload).not.toContain('encrypted-access-key');
+    expect(auditPayload).not.toContain('encrypted-secret-key');
+  });
+
+  it('returns provider readiness failure details without exposing secrets', async () => {
+    const provider = {
+      id: 'sms-provider-1',
+      type: 'SMS',
+      name: 'sparrow',
+      enabled: true,
+      environment: 'PRODUCTION',
+      configEncrypted: {
+        senderId: 'SchoolOS',
+        apiToken: '',
+      },
+      secretKeys: ['apiToken'],
+      updatedAt: new Date('2026-05-17T00:00:00.000Z'),
+      lastValidatedAt: new Date('2026-05-17T01:00:00.000Z'),
+      validationStatus: 'ERROR',
+    };
+    prisma.providerConfig.findUnique.mockResolvedValue(provider);
+    prisma.auditLog.findMany.mockResolvedValue([
+      {
+        id: 'audit-1',
+        action: 'provider_connection_tested',
+        after: {
+          status: 'error',
+          message: 'Provider configuration is missing required keys: apiToken.',
+          secretValue: 'raw-secret-should-not-be-projected',
+        },
+        createdAt: new Date('2026-05-17T01:00:00.000Z'),
+      },
+    ]);
+
+    const detail = await service.getProviderReadinessDetail('sms-provider-1');
+
+    expect(detail).toEqual(
+      expect.objectContaining({
+        status: 'error',
+        missingKeys: ['apiToken'],
+        provider: expect.objectContaining({
+          config: { senderId: 'SchoolOS', apiToken: '********' },
+        }),
+        recentAudit: [
+          {
+            id: 'audit-1',
+            action: 'provider_connection_tested',
+            createdAt: '2026-05-17T01:00:00.000Z',
+            status: 'error',
+            message:
+              'Provider configuration is missing required keys: apiToken.',
+          },
+        ],
+      }),
+    );
+    expect(JSON.stringify(detail)).not.toContain(
+      'raw-secret-should-not-be-projected',
+    );
+  });
+
+  it('marks disabled providers as blocked without requiring external validation', async () => {
+    const provider = {
+      id: 'email-provider-1',
+      type: 'EMAIL',
+      name: 'smtp',
+      enabled: false,
+      environment: 'PRODUCTION',
+      configEncrypted: {
+        apiToken: 'encrypted-token',
+        fromEmail: 'noreply@schoolos.test',
+      },
+      secretKeys: ['apiToken'],
+      updatedAt: new Date('2026-05-17T00:00:00.000Z'),
+      lastValidatedAt: null,
+      validationStatus: null,
+    };
+    prisma.providerConfig.findUnique.mockResolvedValue(provider);
+    prisma.providerConfig.update.mockResolvedValue(provider);
+
+    await expect(
+      service.testProviderConnection('email-provider-1', 'platform-user-1'),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        status: 'warning',
+        mode: 'disabled',
+        paidExternalCallSkipped: true,
+        message: expect.stringContaining('Provider is disabled'),
+      }),
+    );
+    expect(prisma.providerConfig.update).toHaveBeenCalledWith({
+      where: { id: 'email-provider-1' },
+      data: expect.objectContaining({ validationStatus: 'WARNING' }),
+    });
   });
 });

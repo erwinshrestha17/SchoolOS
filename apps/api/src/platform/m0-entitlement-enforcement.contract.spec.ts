@@ -209,9 +209,8 @@ describe('M0 Entitlement enforcement contracts', () => {
 
       expect(service).toContain('PlatformEntitlementCheck');
       expect(service).toContain("reason: 'tenant_inactive'");
-      expect(service).toContain(
-        "reason: isAllowed ? 'allowed' : 'feature_disabled'",
-      );
+      expect(service).toContain("reason = 'allowed'");
+      expect(service).toContain("= 'feature_locked'");
     });
 
     it('entitlement check includes subscription status for context', () => {

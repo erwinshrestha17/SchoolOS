@@ -16,6 +16,7 @@ import {
   PlatformHealthSummary,
   PlatformOnboardingChecklist,
   PlatformProviderConfigSummary,
+  PlatformProviderReadinessDetail,
   PlatformQueueSummary,
   PlatformSaaSInvoiceSummary,
   PlatformTenantDetail,
@@ -993,6 +994,32 @@ export class PlatformService {
     return providers.map((provider) => this.toProviderSummary(provider));
   }
 
+  async getProviderReadinessDetail(
+    providerId: string,
+  ): Promise<PlatformProviderReadinessDetail> {
+    const provider = await this.prisma.providerConfig.findUnique({
+      where: { id: providerId },
+    });
+    if (!provider) throw new NotFoundException('Provider not found');
+
+    const recentAudit = await this.prisma.auditLog.findMany({
+      where: {
+        tenantId: 'platform',
+        resource: 'provider_config',
+        resourceId: providerId,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: { id: true, action: true, after: true, createdAt: true },
+    });
+
+    return this.buildProviderReadinessDetail(
+      provider,
+      provider.lastValidatedAt ? toDate(provider.lastValidatedAt) : new Date(),
+      recentAudit,
+    );
+  }
+
   async upsertProvider(dto: UpsertProviderConfigDto, actorUserId: string) {
     const delegate = this.requireDelegate('providerConfig');
     this.validateProvider(dto);
@@ -1089,8 +1116,21 @@ export class PlatformService {
     });
     if (!provider) throw new NotFoundException('Provider not found');
 
-    // Simulate dry-run connection test
-    const success = true; // Replace with actual provider health check logic
+    const checkedAt = new Date();
+    const readiness = this.buildProviderReadinessDetail(
+      provider,
+      checkedAt,
+      [],
+    );
+    const validationStatus = readiness.status.toUpperCase();
+
+    await this.prisma.providerConfig.update({
+      where: { id: providerId },
+      data: {
+        validationStatus,
+        lastValidatedAt: checkedAt,
+      },
+    });
 
     await this.platformAudit(
       actorUserId,
@@ -1098,10 +1138,24 @@ export class PlatformService {
       'provider_config',
       providerId,
       null,
-      { success },
+      {
+        status: readiness.status,
+        mode: readiness.mode,
+        message: readiness.message,
+        missingKeys: readiness.missingKeys,
+        paidExternalCallSkipped: readiness.paidExternalCallSkipped,
+        secretKeysMasked: readiness.secretKeysMasked,
+      },
     );
 
-    return { success, testedAt: new Date().toISOString() };
+    return {
+      ...readiness,
+      provider: {
+        ...readiness.provider,
+        validationStatus,
+        lastValidatedAt: checkedAt.toISOString(),
+      },
+    };
   }
 
   async enterSupportOverride(
@@ -1772,6 +1826,14 @@ export class PlatformService {
   }
 
   private validateProvider(dto: UpsertProviderConfigDto) {
+    for (const key of this.getProviderRequiredKeys(dto.type)) {
+      if (!dto.config[key]) {
+        throw new BadRequestException(`${key} is required for ${dto.type}`);
+      }
+    }
+  }
+
+  private getProviderRequiredKeys(type: string) {
     const required: Record<string, string[]> = {
       SMS: ['apiToken', 'senderId'],
       EMAIL: ['apiToken', 'fromEmail'],
@@ -1780,11 +1842,7 @@ export class PlatformService {
       PAYMENT_GATEWAY: ['merchantId'],
       AI_PROVIDER: ['apiKey'],
     };
-    for (const key of required[dto.type] ?? []) {
-      if (!dto.config[key]) {
-        throw new BadRequestException(`${key} is required for ${dto.type}`);
-      }
-    }
+    return required[type] ?? [];
   }
 
   private detectSecretKeys(config: Record<string, unknown>) {
@@ -1829,6 +1887,58 @@ export class PlatformService {
         ? toDate(provider.lastValidatedAt).toISOString()
         : null,
       updatedAt: toDate(provider.updatedAt).toISOString(),
+    };
+  }
+
+  private buildProviderReadinessDetail(
+    provider: DynamicRecord,
+    checkedAt: Date,
+    recentAuditRows: DynamicRecord[],
+  ): PlatformProviderReadinessDetail {
+    const providerType = String(provider.type);
+    const requiredKeys = this.getProviderRequiredKeys(providerType);
+    const config = asRecord(provider.configEncrypted);
+    const missingKeys = requiredKeys.filter((key) => {
+      const value = config[key];
+      return (
+        value === null ||
+        typeof value === 'undefined' ||
+        (typeof value === 'string' && value.trim().length === 0)
+      );
+    });
+    const enabled = Boolean(provider.enabled);
+    const status = !enabled
+      ? 'warning'
+      : missingKeys.length > 0
+        ? 'error'
+        : 'ok';
+    const message = !enabled
+      ? 'Provider is disabled; delivery remains blocked until an operator enables it.'
+      : missingKeys.length > 0
+        ? `Provider configuration is missing required keys: ${missingKeys.join(', ')}.`
+        : providerType === 'OBJECT_STORAGE'
+          ? 'Object storage configuration passed local S3-compatible dry-run validation. No external bucket call was made.'
+          : 'Provider configuration passed local dry-run validation. No paid external call was made.';
+
+    return {
+      provider: this.toProviderSummary(provider),
+      status,
+      mode: enabled ? 'dry_run' : 'disabled',
+      message,
+      missingKeys,
+      paidExternalCallSkipped: true,
+      secretKeysMasked: asStringArray(provider.secretKeys),
+      checkedAt: checkedAt.toISOString(),
+      recentAudit: recentAuditRows.map((row) => {
+        const after = asRecord(row.after);
+        return {
+          id: String(row.id),
+          action: String(row.action),
+          createdAt: toDate(row.createdAt).toISOString(),
+          status: nullableString(after.status),
+          message: nullableString(after.message),
+        };
+      }),
     };
   }
 

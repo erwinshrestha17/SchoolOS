@@ -95,6 +95,8 @@ describe('JwtAuthGuard', () => {
     expect(request.auth).toEqual({
       userId: mockUser.id,
       tenantId: basePayload.tenantId,
+      originalTenantId: basePayload.tenantId,
+      isSupportOverride: false,
       tenantSlug: basePayload.tenantSlug,
       email: mockUser.email,
       authMethod: basePayload.authMethod,
@@ -188,6 +190,8 @@ describe('JwtAuthGuard', () => {
       select: { id: true, isActive: true },
     });
     expect(request.auth?.tenantId).toBe('tenant-2');
+    expect(request.auth?.originalTenantId).toBe('tenant-1');
+    expect(request.auth?.isSupportOverride).toBe(true);
     expect(cls.set).toHaveBeenCalledWith(TENANT_ID_KEY, 'tenant-2');
     expect(auditService.record).toHaveBeenCalledWith({
       action: 'tenant_override',

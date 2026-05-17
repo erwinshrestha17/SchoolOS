@@ -34,7 +34,7 @@ If the setting changes SaaS ownership, billing, infrastructure, provider credent
 
 ```text
 M0 Platform Core Foundation: Completed across eight sprints
-Current work: Phase Gate 0 stabilization, M0 pilot hardening, regression coverage, smoke verification, and one-vertical-at-a-time depth.
+Current work: M0 pilot hardening, M10 provider/attachment depth next, smoke verification, and one-vertical-at-a-time depth.
 ```
 
 M0 is now implemented as a real platform foundation inside the existing NestJS modular monolith. It is not a separate microservice and should not be split unless future scale, team ownership, deployment isolation, or compliance requirements clearly justify that cost.
@@ -68,7 +68,9 @@ Manual tenant billing profile
 SaaS invoices, line items, and payments
 Provider config masking and secret-safe response shape
 Provider edit/disable workflow without exposing or rewriting masked secrets
+Provider readiness detail API with dry-run connection validation, masked secret reporting, disabled-mode warnings, and S3-compatible object-storage readiness checks without paid external calls
 Queue health plus audited retry/discard operator workflows
+Failed-job detail inspection with sanitized payloads, failed reason, timings, stack traces, and retry audit history
 File upload validation and dangerous extension blocking
 Private/protected file URL response shape
 Report export history and audited export persistence
@@ -116,18 +118,41 @@ Notes:
 - Focused platform/auth/report/settings tests passed.
 ```
 
+Current M0 pilot-hardening snapshot:
+
+```text
+Implemented:
+- Platform provider readiness detail endpoint and dry-run validation.
+- Object-storage readiness check for S3/MinIO/R2-style configuration without external paid calls by default.
+- Provider detail UI surfaces masked readiness status, missing non-secret config keys, last validation status, and warnings.
+- Queue failed-job detail UI surfaces sanitized job payload, failure reason, timestamps, stack trace, and retry audit history.
+- Platform contract/unit/web tests cover the new provider readiness and queue detail surfaces.
+
+Verification run:
+- pnpm --filter @schoolos/api test -- --runInBand src/platform/platform-queues.service.spec.ts src/platform/platform-provider-config.service.spec.ts src/platform/platform-core-hardening.contract.spec.ts
+- pnpm --filter @schoolos/web test
+- pnpm typecheck
+- pnpm test
+- pnpm test:e2e
+- pnpm build
+
+Blocked in current sandbox:
+- pnpm verify:production reached Playwright local webServer startup and failed to bind 127.0.0.1:3101 with EPERM.
+- Escalated rerun could not be approved in this session because the local approval/review limit was reached.
+- pnpm smoke:phase1 remains local-stack dependent and requires Postgres, Redis, API, and web to be running.
+```
+
 Remaining M0 hardening work:
 
 ```text
-Deeper BullMQ failed-job inspection per deployed queue topology
 Async report/export generation expansion module by module
-Provider test connection limitations remain intentionally conservative/no paid external calls
+Provider test connection remains intentionally conservative and should stay dry-run by default
 Seed data coverage for every dashboard module route used in smoke tests
 Credentialed web E2E coverage where seeded credentials and local ports are available
 Deeper platform/school route denial browser tests
 SaaS billing lifecycle tests: invoice -> payment -> overdue/cancel/suspend
 Entitlement enforcement tests against real school APIs
-Object storage readiness verification against staging provider
+Object storage readiness verification against a staging provider, explicitly opt-in
 Docker-backed smoke once Postgres, Redis, and API are running
 ```
 

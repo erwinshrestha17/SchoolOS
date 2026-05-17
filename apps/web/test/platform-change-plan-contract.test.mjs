@@ -23,7 +23,9 @@ describe('Platform tenant subscription change workflow contracts', () => {
 
   it('keeps the change-plan route present and helper-backed', () => {
     assert.equal(
-      existsSync(join(webRoot, 'app/platform/schools/[tenantId]/change-plan/page.tsx')),
+      existsSync(
+        join(webRoot, 'app/platform/schools/[tenantId]/change-plan/page.tsx'),
+      ),
       true,
       'Missing platform tenant change-plan route',
     );
@@ -32,7 +34,10 @@ describe('Platform tenant subscription change workflow contracts', () => {
 
     assert.match(page, /api\.getPlatformTenantDetail\(tenantId\)/);
     assert.match(page, /api\.listPlatformPlans\(\)/);
-    assert.match(page, /api\.assignPlatformTenantSubscription\(tenant\.id, compactPayload\(payload\)\)/);
+    assert.match(
+      page,
+      /api\.assignPlatformTenantSubscription\(tenant\.id, compactPayload\(payload\)\)/,
+    );
   });
 
   it('renders the required operator controls and safe billing boundary text', () => {
@@ -56,7 +61,10 @@ describe('Platform tenant subscription change workflow contracts', () => {
   it('guards submit on selected plan, audit reason length, and saving state', () => {
     const page = read('app/platform/schools/[tenantId]/change-plan/page.tsx');
 
-    assert.match(page, /const canSubmit = Boolean\(selectedPlan\) && reason\.trim\(\)\.length >= 5 && !saving/);
+    assert.match(
+      page,
+      /const canSubmit = Boolean\(selectedPlan\) && reason\.trim\(\)\.length >= 5 && !saving/,
+    );
     assert.match(page, /disabled=\{!canSubmit\}/);
     assert.match(page, /No active platform plans are available/);
   });
@@ -88,7 +96,10 @@ describe('Platform tenant subscription change workflow contracts', () => {
       'Export current page CSV',
       'api.listPlatformAuditLogs',
     ]) {
-      assert.match(page, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+      assert.match(
+        page,
+        new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      );
     }
   });
 
@@ -100,14 +111,20 @@ describe('Platform tenant subscription change workflow contracts', () => {
     for (const expected of [
       'Edit Provider',
       'api.updatePlatformProviderStatus',
+      'api.getPlatformProviderReadiness',
+      'Provider Readiness Detail',
       'Retry Failed Job',
+      'Retry audit history',
       'Discard Failed Job',
       'Export current page CSV',
       'resourceId',
       'startDate',
       'router.replace(`/platform/settings?tab=${value}`)',
     ]) {
-      assert.match(settings, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+      assert.match(
+        settings,
+        new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      );
     }
 
     assert.match(shell, /\/platform\/settings\?tab=plans/);
@@ -116,5 +133,7 @@ describe('Platform tenant subscription change workflow contracts', () => {
     assert.match(apiClient, /exitPlatformSupportOverride/);
     assert.match(apiClient, /cancelPlatformSaaSInvoice/);
     assert.match(apiClient, /updatePlatformProviderStatus/);
+    assert.match(apiClient, /getPlatformProviderReadiness/);
+    assert.match(apiClient, /getPlatformJobDetail/);
   });
 });

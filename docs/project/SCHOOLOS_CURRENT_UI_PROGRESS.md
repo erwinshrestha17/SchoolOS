@@ -5,15 +5,34 @@ This file records the latest web-admin UI/UX implementation progress so large ro
 ## Current UI Sprint
 
 ```text
-Current UI sprint: Phase 4 Library, Transport, and Canteen production-depth hardening is implemented for backend/admin boundaries; seeded browser smoke execution remains environment-gated.
+Current UI sprint: M0 Platform provider/queue pilot hardening is implemented; Sprint 2 M10 communication/provider/attachment depth is next after verify:production can run outside the sandbox port-bind restriction.
 ```
 
 Current repo reality:
 
 ```text
 Academics, Accounting, Homework, Timetable, HR, Payroll, Library, Transport, and Canteen now have admin production-depth coverage for the current modular-monolith scope.
-Next UI work is seeded staging QA and deeper Library/Canteen/Transport operator ergonomics after product rules for remaining financial and live-map workflows are approved.
+Platform settings now has provider readiness detail and queue failed-job detail surfaces wired to real APIs.
+Next UI work is M10 delivery failure analytics, retry/resend polish, unread recipient detail, attachment signed-URL workflows, and messaging moderation/escalation depth.
 ```
+
+### M0 Platform Provider and Queue Hardening
+
+Status: **Implemented; final verify:production rerun is environment-blocked in this sandbox.**
+
+Completed:
+
+- Added a provider readiness detail flow on Platform Settings that uses real platform APIs.
+- Surfaced masked provider readiness status, missing non-secret configuration keys, disabled-mode warnings, and object-storage dry-run readiness without triggering paid external calls.
+- Added queue failed-job detail inspection with sanitized job payload, failed reason, timestamps, stack trace, and retry audit history.
+- Kept provider secret values masked and did not expose raw credentials in UI responses.
+- Added web contract coverage for provider readiness and queue job detail affordances.
+
+Verification:
+
+- `pnpm --filter @schoolos/web test` passed.
+- Full repo `pnpm typecheck`, `pnpm test`, `pnpm test:e2e`, and `pnpm build` passed after this M0 UI/API change.
+- `pnpm verify:production` is blocked only when Playwright tries to bind `127.0.0.1:3101` in the current sandbox.
 
 ### M0 Platform Subscription Plan Change Workflow
 

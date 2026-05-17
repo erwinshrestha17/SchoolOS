@@ -1424,6 +1424,9 @@ function buildPrisma(options: {
     notificationDelivery: {
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
+    attendanceRecord: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
     developmentalMilestone: {
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },

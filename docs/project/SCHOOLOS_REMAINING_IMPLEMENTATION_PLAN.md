@@ -1,6 +1,6 @@
 # SchoolOS Remaining Implementation Plan
 
-**Last updated:** 2026-05-14
+**Last updated:** 2026-05-17
 
 **Status source:** `docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md` and `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md`
 
@@ -16,7 +16,7 @@ This is the strict implementation order for SchoolOS from the current repo state
 Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
-M0 Platform Core: Foundation complete; pilot hardening remains
+M0 Platform Core: Foundation complete; provider/queue pilot hardening implemented; broader pilot hardening remains
 M4 Academics: Completed / Pilot-Ready
 M6 Homework/Timetable: Completed / Pilot-Ready
 M7 HR/Payroll: Completed / Pilot-Ready
@@ -33,7 +33,7 @@ Current practical readiness:
 ```text
 Demo-ready: Yes
 Internal QA-ready: Yes
-Controlled pilot-ready: Yes, after staging checks and smoke verification
+Controlled pilot-ready: Yes, after staging checks, `verify:production`, and smoke verification in a local/staging environment that can bind browser-test ports
 Multi-school production-ready: Not yet
 Full SchoolOS product complete: No
 ```
@@ -41,8 +41,9 @@ Full SchoolOS product complete: No
 Important working-tree note:
 
 ```text
-Phase 2 Academics and Accounting production polish has been fully implemented and verified through the core gate.
-`pnpm verify:production` is blocked only at browser E2E local-port binding in the current sandbox.
+Phase Gate 0 verification was green before M0 depth work started.
+M0 provider/queue pilot hardening has now been implemented and verified through build.
+`pnpm verify:production` is currently blocked only at browser E2E local-port binding in the current sandbox.
 `pnpm smoke:phase1` still requires local Postgres, Redis, API, and web services.
 ```
 
@@ -73,7 +74,7 @@ Biometric workflows
 | Module | Current Status | Estimated Completion |
 |---|---|---:|
 | Auth / Security / Tenant Isolation | Strong foundation | 90-95% |
-| M0 Platform Core | Foundation complete; pilot hardening remains | 80-90% |
+| M0 Platform Core | Foundation complete with provider/queue pilot hardening; broader pilot hardening remains | 85-90% |
 | M1 Admissions & Student Profiles | Pilot-ready plus Student QR foundation | 90-95% |
 | M2 Smart Attendance | Pilot-ready | 85-90% |
 | M3 Fees & Receipts | Pilot-ready | 85-90% |
@@ -122,22 +123,22 @@ Implemented:
 - Plans, features, tenant subscriptions, feature overrides, usage limits/counters.
 - SaaS billing records: profiles, invoices, invoice lines, payments.
 - Provider configuration masking.
-- Queue health and audited retry endpoint.
+- Provider readiness detail API with dry-run validation, masked secrets, disabled-mode warnings, and S3-compatible object-storage readiness checks without paid external calls by default.
+- Queue health, failed-job detail inspection, sanitized payload visibility, stack/timing detail, retry audit history, and audited retry endpoint.
 - File Registry, report exports/history, health summary, onboarding checklist.
 - Platform dashboard/schools/settings/audit routes.
 
 Remaining backend:
 
-- Deeper BullMQ failed-job inspection by deployed queue topology.
 - SaaS billing lifecycle automation beyond records.
 - Entitlement enforcement tests against real school APIs.
-- Object-storage readiness checks against staging provider.
-- Provider test connection expansion without leaking secrets or making unsafe paid calls.
+- Object-storage readiness verification against an explicit staging provider.
+- Provider real connection checks only where safe, configured, and non-paid.
 
 Remaining frontend:
 
 - Platform tenant-action manual QA.
-- Queue/provider failure detail surfaces.
+- Broader browser coverage for queue/provider failure detail surfaces.
 - Browser coverage for suspend/activate, overrides, billing, providers, and queue retry.
 
 ### M1 - Admissions & Student Profiles

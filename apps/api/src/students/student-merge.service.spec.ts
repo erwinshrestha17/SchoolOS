@@ -60,6 +60,9 @@ describe('StudentsService (Duplicate Merge)', () => {
             enrollment: {
               updateMany: jest.fn(),
             },
+            attendanceRecord: {
+              updateMany: jest.fn(),
+            },
             studentMergeHistory: {
               create: jest.fn(),
             },
@@ -110,6 +113,7 @@ describe('StudentsService (Duplicate Merge)', () => {
       prisma.conversation,
       prisma.conversationParticipant,
       prisma.enrollment,
+      prisma.attendanceRecord,
     ] as unknown as { updateMany?: jest.Mock; createMany?: jest.Mock }[];
 
     for (const delegate of delegates) {
