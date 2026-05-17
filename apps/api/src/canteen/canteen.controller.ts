@@ -462,6 +462,12 @@ export class CanteenController {
     return this.canteenService.cancelPosSale(id, auth);
   }
 
+  @Get('pos-sales/:id/receipt')
+  @Permissions('canteen:pos:read')
+  getPosReceipt(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
+    return this.canteenService.getPosReceipt(id, auth);
+  }
+
   @Get('pos-sales')
   @Permissions('canteen:pos:read')
   listPosSales(

@@ -156,6 +156,58 @@ describe('CanteenService Phase 3C hardening', () => {
     expect(accountingPostingService.postCanteenSale).not.toHaveBeenCalled();
   });
 
+  it('returns completed POS receipt data from tenant-scoped sale lookup', async () => {
+    const { service, prisma } = buildService({
+      receiptSale: buildReceiptSale(),
+    });
+
+    const receipt = await service.getPosReceipt('sale-1', actor);
+
+    expect(prisma.canteenPosSale.findFirst).toHaveBeenCalledWith({
+      where: { id: 'sale-1', tenantId: actor.tenantId },
+      include: {
+        items: true,
+        student: true,
+        staff: true,
+        wallet: true,
+        createdBy: true,
+      },
+    });
+    expect(receipt).toEqual(
+      expect.objectContaining({
+        receiptNumber: 'POS-2026-000001',
+        saleId: 'sale-1',
+        totalAmount: new Prisma.Decimal(100),
+      }),
+    );
+  });
+
+  it('rejects wallet reversals that would make balance negative', async () => {
+    const { service, tx } = buildService({
+      walletBalance: new Prisma.Decimal(50),
+      walletTransaction: {
+        id: 'txn-1',
+        tenantId: actor.tenantId,
+        walletId: 'wallet-1',
+        studentId: 'student-1',
+        amount: new Prisma.Decimal(100),
+        source: 'MANUAL',
+        reversalOfId: null,
+        correctionOfId: null,
+      },
+    });
+
+    await expect(
+      service.reverseWalletTransaction(
+        'txn-1',
+        { reason: 'Incorrect top-up' },
+        actor,
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    expect(tx.canteenWallet.update).not.toHaveBeenCalled();
+  });
+
   it('prevents inactive menu items from being sold', async () => {
     const { service } = buildService({
       menuItem: {
@@ -244,7 +296,10 @@ function buildService(
     duplicateServing?: unknown;
     walletDeductCount?: number;
     existingWalletTransaction?: unknown;
+    walletTransaction?: unknown;
+    walletBalance?: Prisma.Decimal;
     posSale?: unknown;
+    receiptSale?: unknown;
   } = {},
 ) {
   const student =
@@ -310,13 +365,21 @@ function buildService(
         .mockResolvedValue({ count: options.walletDeductCount ?? 1 }),
       findUniqueOrThrow: jest.fn().mockResolvedValue({
         ...wallet,
-        balance: new Prisma.Decimal(900),
+        balance: options.walletBalance ?? new Prisma.Decimal(900),
       }),
     },
     canteenWalletTransaction: {
       findUnique: jest
         .fn()
         .mockResolvedValue(options.existingWalletTransaction ?? null),
+      findFirst: jest
+        .fn()
+        .mockImplementation(
+          async (query: { where?: { reversalOfId?: string } }) => {
+            if (query.where?.reversalOfId) return null;
+            return options.walletTransaction ?? null;
+          },
+        ),
       create: jest.fn().mockResolvedValue({ id: 'txn-1' }),
     },
     canteenSpendingControl: {
@@ -363,6 +426,9 @@ function buildService(
     canteenStudentEnrollment: {
       create: jest.fn().mockResolvedValue({ id: 'enrollment-1' }),
     },
+    canteenPosSale: {
+      findFirst: jest.fn().mockResolvedValue(options.receiptSale ?? sale),
+    },
     $transaction: jest.fn().mockImplementation(async (input: unknown) => {
       if (Array.isArray(input)) {
         return Promise.all(input);
@@ -396,5 +462,41 @@ function buildService(
     tx,
     accountingPostingService,
     financeService,
+  };
+}
+
+function buildReceiptSale() {
+  return {
+    id: 'sale-1',
+    tenantId: actor.tenantId,
+    receiptNumber: 'POS-2026-000001',
+    saleDate: new Date('2026-05-17T08:00:00.000Z'),
+    completedAt: new Date('2026-05-17T08:01:00.000Z'),
+    paymentMethod: CanteenPaymentMethod.WALLET,
+    status: CanteenPosSaleStatus.COMPLETED,
+    subtotal: new Prisma.Decimal(100),
+    totalAmount: new Prisma.Decimal(100),
+    items: [
+      {
+        itemName: 'Lunch Set',
+        category: 'Lunch',
+        quantity: 1,
+        unitPrice: new Prisma.Decimal(100),
+        lineTotal: new Prisma.Decimal(100),
+      },
+    ],
+    student: {
+      id: 'student-1',
+      admissionNo: 'S-001',
+      firstNameEn: 'Asha',
+      lastNameEn: 'Student',
+    },
+    staff: null,
+    wallet: {
+      balance: new Prisma.Decimal(900),
+    },
+    createdBy: {
+      email: 'canteen@schoolos.test',
+    },
   };
 }

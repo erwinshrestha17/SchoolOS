@@ -133,6 +133,32 @@ describe('LibraryService Phase 3A foundation', () => {
     );
   });
 
+  it('supports staff borrowers while preserving tenant-scoped borrower lookup', async () => {
+    const { service, tx, prisma } = buildService({
+      staff: { id: 'staff-1', tenantId: actor.tenantId },
+    });
+
+    await service.issueCopy(
+      {
+        copyId: 'copy-1',
+        borrowerStaffId: 'staff-1',
+        dueAt: '2026-05-30T00:00:00.000Z',
+      },
+      actor,
+    );
+
+    expect(prisma.staff.findFirst).toHaveBeenCalledWith({
+      where: { id: 'staff-1', tenantId: actor.tenantId },
+    });
+    expect(tx.libraryIssue.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        borrowerStudentId: null,
+        borrowerStaffId: 'staff-1',
+      }),
+    });
+  });
+
   it('returns an active issued copy inside a transaction', async () => {
     const { service, tx } = buildService();
 
@@ -254,6 +280,69 @@ describe('LibraryService Phase 3A foundation', () => {
     );
   });
 
+  it('posts student library fines through fees and accounting boundaries', async () => {
+    const fine = buildLibraryFine();
+    const { service, tx, accountingPostingService, auditService } =
+      buildService({ fine });
+
+    const result = await service.postFineToFees(
+      actor,
+      'fine-1',
+      'Approved by librarian',
+    );
+
+    expect(tx.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tenantId: actor.tenantId,
+          studentId: 'student-1',
+          totalAmount: fine.amount,
+        }),
+      }),
+    );
+    expect(accountingPostingService.postInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: actor.tenantId,
+        invoiceId: 'invoice-1',
+        studentId: 'student-1',
+        totalAmount: fine.amount,
+      }),
+      actor,
+      tx,
+    );
+    expect(tx.libraryFine.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'fine-1' },
+        data: expect.objectContaining({
+          status: 'POSTED_TO_FEES',
+          feeInvoiceId: 'invoice-1',
+        }),
+      }),
+    );
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'post_to_fees',
+        resource: 'library_fine',
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({ feeInvoiceId: 'invoice-1' }),
+    );
+  });
+
+  it('uses purpose-limited Student QR resolution for library borrower lookup', async () => {
+    const { service, studentQrService } = buildService();
+
+    await service.resolveQrBorrower(actor, 'signed-token');
+
+    expect(studentQrService.resolveQr).toHaveBeenCalledWith(
+      actor.tenantId,
+      'signed-token',
+      'LIBRARY',
+      actor,
+    );
+  });
+
   it('uses tenant settings for fine calculation if available', async () => {
     const { service, tx, prisma } = buildService();
     const issue = {
@@ -269,8 +358,16 @@ describe('LibraryService Phase 3A foundation', () => {
       finePerDay: new Prisma.Decimal(10),
     });
 
-    // Wait, the current implementation of returnCopy uses this.configService.libraryFinePerDay
-    // I should update returnCopy to use settings.finePerDay
+    await service.returnCopy('issue-1', { returnCondition: 'Good' }, actor);
+
+    expect(tx.libraryFine.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          amount: new Prisma.Decimal(50),
+          status: 'PENDING',
+        }),
+      }),
+    );
   });
 });
 
@@ -281,6 +378,8 @@ function buildService(
     issue?: unknown;
     activeIssue?: unknown;
     issueUpdateCount?: number;
+    staff?: unknown;
+    fine?: ReturnType<typeof buildLibraryFine>;
   } = {},
 ) {
   const book =
@@ -356,6 +455,12 @@ function buildService(
         dueAt: new Date('2026-05-30T00:00:00.000Z'),
       }),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      update: jest.fn().mockImplementation((args) =>
+        Promise.resolve({
+          ...(issue as Record<string, unknown>),
+          ...args.data,
+        }),
+      ),
       findUniqueOrThrow: jest.fn().mockResolvedValue(returnedIssue),
       groupBy: jest.fn().mockResolvedValue([]),
     },
@@ -379,10 +484,17 @@ function buildService(
         ),
       findMany: jest.fn().mockResolvedValue([]),
       count: jest.fn().mockResolvedValue(0),
-      update: jest
+      update: jest.fn().mockImplementation((args) =>
+        Promise.resolve({
+          id: 'fine-1',
+          issueId: 'issue-1',
+          ...args.data,
+          issue: options.fine?.issue ?? issue,
+        }),
+      ),
+      findFirst: jest
         .fn()
-        .mockImplementation((args) => Promise.resolve(args.data)),
-      findFirst: jest.fn().mockResolvedValue(null),
+        .mockResolvedValue(options.fine ? { ...options.fine } : null),
     },
   };
 
@@ -436,7 +548,9 @@ function buildService(
       update: jest
         .fn()
         .mockImplementation((args) => Promise.resolve(args.data)),
-      findFirst: jest.fn().mockResolvedValue(null),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(options.fine ? { ...options.fine } : null),
     },
     librarySetting: {
       findUnique: jest.fn().mockResolvedValue(null),
@@ -448,7 +562,7 @@ function buildService(
       findFirst: jest.fn().mockResolvedValue({ id: 'student-1' }),
     },
     staff: {
-      findFirst: jest.fn().mockResolvedValue(null),
+      findFirst: jest.fn().mockResolvedValue(options.staff ?? null),
     },
     $transaction: jest.fn().mockImplementation(async (input: unknown) => {
       if (Array.isArray(input)) {
@@ -467,6 +581,14 @@ function buildService(
   };
   const configService = {
     libraryFinePerDay: 5,
+    libraryMaxBooksPerStudent: 3,
+  };
+  const accountingPostingService = {
+    postInvoice: jest.fn().mockResolvedValue({ id: 'journal-1' }),
+    postFeeWaiver: jest.fn().mockResolvedValue({ id: 'waiver-journal-1' }),
+  };
+  const studentQrService = {
+    resolveQr: jest.fn().mockResolvedValue({ studentId: 'student-1' }),
   };
 
   return {
@@ -475,12 +597,38 @@ function buildService(
       auditService as never,
       communicationsService as never,
       configService as never,
-      {} as any,
-      { resolveQr: jest.fn() } as any,
+      accountingPostingService as never,
+      studentQrService as never,
     ),
     prisma,
     tx,
     auditService,
     communicationsService,
+    accountingPostingService,
+    studentQrService,
+  };
+}
+
+function buildLibraryFine() {
+  const amount = new Prisma.Decimal(25);
+  return {
+    id: 'fine-1',
+    tenantId: actor.tenantId,
+    issueId: 'issue-1',
+    amount,
+    status: 'PENDING',
+    feeInvoiceId: null,
+    issue: {
+      id: 'issue-1',
+      tenantId: actor.tenantId,
+      borrowerStudentId: 'student-1',
+      invoiceId: null,
+      copy: {
+        id: 'copy-1',
+        barcode: 'LIB-0001',
+        book: { title: 'Test Book' },
+      },
+      borrowerStudent: { id: 'student-1' },
+    },
   };
 }

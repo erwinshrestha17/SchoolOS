@@ -20,11 +20,11 @@ M0 Platform Core: Foundation complete; provider/queue pilot hardening implemente
 M4 Academics: Completed / Pilot-Ready
 M6 Homework/Timetable: Completed / Pilot-Ready
 M7 HR/Payroll: Completed / Pilot-Ready
-M8A Library: Admin/backend foundation implemented
-M8B Transport: Admin/trip/location foundation implemented
-M8C Canteen: Admin/wallet/POS/inventory foundation implemented
+M8A Library: Admin/backend foundation plus fine/accounting/staff-borrower depth implemented
+M8B Transport: Admin/trip/location foundation plus GPS pressure/cache/retention depth implemented
+M8C Canteen: Admin/wallet/POS/inventory foundation plus receipt/wallet-guard depth implemented
 M9 Accounting: Completed / Pilot-Ready
-M10 Communication/Chat: Foundation implemented
+M10 Communication/Chat: Foundation plus provider/attachment/retry depth implemented
 M11 Intelligence/AI: Not started
 ```
 
@@ -41,9 +41,9 @@ Full SchoolOS product complete: No
 Important working-tree note:
 
 ```text
-Phase Gate 0 verification was green before M0 depth work started.
-M0 provider/queue pilot hardening has now been implemented and verified through build.
-`pnpm verify:production` is currently blocked only at browser E2E local-port binding in the current sandbox.
+Phase Gate 0 verification was green before M0 and feature-depth work started.
+M0 provider/queue pilot hardening and M10/M6/M7/M8A/M8C/M8B feature-depth hardening have now been implemented and verified through build during their sprint gates.
+`pnpm verify:production` must be rerun in local/staging if the current sandbox blocks browser E2E local-port binding.
 `pnpm smoke:phase1` still requires local Postgres, Redis, API, and web services.
 ```
 
@@ -82,11 +82,11 @@ Biometric workflows
 | M5 Activity Feed & Milestones | Strong Phase 1 foundation | 75-85% |
 | M6 Homework & Timetable | Completed / Pilot-Ready | 100% |
 | M7 HR & Payroll | Completed / Pilot-Ready | 100% |
-| M8A Library Management | Admin/backend foundation plus controlled fine-to-fees posting implemented | 75-85% |
-| M8B Transport Management | Admin/trip/location foundation plus billing guard and GPS/cache hardening implemented | 70-80% |
-| M8C Canteen Management | Admin/wallet/POS/inventory foundation plus idempotency, supplier, stock, and accounting-source hardening implemented | 75-85% |
+| M8A Library Management | Admin/backend foundation plus controlled fine-to-fees posting, accounting-boundary tests, staff borrowers, and QR lookup implemented | 80-90% |
+| M8B Transport Management | Admin/trip/location foundation plus billing guard, GPS pressure guard, Redis cache/fanout tests, and cleanup bounds implemented | 75-85% |
+| M8C Canteen Management | Admin/wallet/POS/receipt/inventory foundation plus idempotency, negative-balance guards, supplier, stock, and accounting-source hardening implemented | 80-90% |
 | M9 Accounting & Finance | Completed / Pilot-Ready | 100% |
-| M10 Notices & Communication | Strong Phase 1 + chat foundation | 85-90% |
+| M10 Notices & Communication | Strong Phase 1 + chat foundation with provider modes, attachment access, and failure-dashboard API depth | 90-95% |
 | M11 School Intelligence / AI | Roadmap only | 0% |
 
 ---
@@ -321,9 +321,8 @@ Implemented:
 Remaining backend:
 
 - Receipt/payment linkage polish for library fines after M3 collection rules are finalized.
-- Overdue reminder queue hardening.
-- Staff borrower depth.
-- More tenant/permission tests beyond fine posting, QR, and report coverage.
+- Overdue reminder queue operational depth in staging.
+- More tenant/permission tests beyond fine posting, staff borrowers, QR, and report coverage.
 
 Remaining frontend:
 
@@ -340,6 +339,7 @@ Implemented:
 - Trip lifecycle, boarded/dropped/absent statuses.
 - Latest trip location, location cleanup, logs, delays.
 - GPS ingestion validation, Redis latest-location cache, throttled PostgreSQL persistence, tenant/trip-scoped fanout, and retention cleanup.
+- Redis GPS pressure guard and cleanup retention bounds.
 - Parent active-trip endpoint.
 - Trip/boarding reports and CSV export.
 - Transport dashboard, routes, vehicles, assignments, trips, location routes.
@@ -348,6 +348,7 @@ Remaining backend:
 
 - ETA/geofence/overspeed/deviation later.
 - Transport billing/accounting integration remains deferred behind explicit pricing-rule approval.
+- Production live map remains blocked until the admin real-time design in `docs/project/SCHOOLOS_TRANSPORT_REALTIME_READINESS.md` is accepted.
 
 Remaining frontend:
 
@@ -363,6 +364,7 @@ Implemented:
 - Menu items, meal plans, enrollments, serving.
 - Wallets, top-ups, transaction history, reversals/corrections.
 - POS sales, spending controls, low-balance reports.
+- POS receipt endpoint and wallet reversal/correction guards that prevent negative balances.
 - QR resolve for canteen serving.
 - Suppliers, inventory items, purchase bills, stock movement, wastage, stock ledger.
 - Daily meal count, item-wise sales, low-balance, student spending, stock ledger reports and CSV exports.
@@ -371,8 +373,7 @@ Implemented:
 Remaining backend:
 
 - Meal plan fee-dues boundary through M3 Finance once product rules are approved.
-- POS receipt generation.
-- Low-balance notification queue depth.
+- Low-balance notification queue staging verification.
 - Inventory/vendor edge-case tests beyond purchase/wastage/negative-stock/idempotency coverage.
 
 Remaining frontend:
@@ -413,16 +414,17 @@ Implemented:
 
 - Notices, events, consent templates, guardian consent, communication preferences.
 - Delivery records, retry/read tracking, unread recipients, notification center.
+- Explicit notification provider modes: dev-log, disabled, configured-provider.
+- Delivery failure dashboard API and retry metadata.
+- File Registry notice/chat attachment upload and signed/protected access with guardian ownership tests.
 - Parent-teacher thread/message foundation, chat availability, escalation, abuse report foundations.
 - Notices/detail/messages/messaging routes.
 
 Remaining backend:
 
-- Real SMS/FCM/email provider integration.
-- Delivery retry failure dashboard.
-- Attachment support with signed URLs.
+- Production SMS/FCM/email adapters and signed provider callbacks where provider contracts are approved.
 - Retention and audit policy depth.
-- More guardian ownership tests.
+- More guardian ownership tests across all chat/message routes.
 
 Remaining frontend:
 

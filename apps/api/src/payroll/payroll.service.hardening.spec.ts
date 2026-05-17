@@ -181,6 +181,53 @@ describe('PayrollService hardening boundaries', () => {
       expect.objectContaining({ journalEntryId: 'journal-1' }),
     );
   });
+
+  it('scopes payroll run register reports by tenant and selected payroll run', async () => {
+    const { service, prisma } = buildService({
+      payrollRuns: [
+        buildPayrollRun({
+          lines: [
+            buildPayrollLine({
+              id: 'line-1',
+              pfEmployee: new Prisma.Decimal(1000),
+              pfEmployer: new Prisma.Decimal(1000),
+              tds: new Prisma.Decimal(500),
+            }),
+          ],
+        }),
+      ],
+    });
+
+    const register = await service.getPayrollRegister(actor as never, 'run-1');
+    const pf = await service.getPayrollPfSummary(actor as never, 'run-1');
+    const tds = await service.getPayrollTdsSummary(actor as never, 'run-1');
+    const components = await service.getSalaryComponentSummary(
+      actor as never,
+      'run-1',
+    );
+
+    expect(prisma.payrollRun.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tenantId: actor.tenantId, id: 'run-1' },
+        take: 100,
+      }),
+    );
+    expect(register).toHaveLength(1);
+    expect(pf).toMatchObject({
+      payrollRunId: 'run-1',
+      staffCount: 1,
+      employeeContribution: 1000,
+      employerContribution: 1000,
+      totalContribution: 2000,
+    });
+    expect(tds).toMatchObject({ payrollRunId: 'run-1', totalTds: 500 });
+    expect(components).toMatchObject({
+      payrollRunId: 'run-1',
+      staffCount: 1,
+      grossSalary: 50000,
+      netPayable: 49000,
+    });
+  });
 });
 
 function buildService(options: {
@@ -188,6 +235,7 @@ function buildService(options: {
   salaryStructureFindFirstQueue?: unknown[];
   payrollLineCount?: number;
   payrollRun?: unknown;
+  payrollRuns?: unknown[];
   postedPayrollRun?: unknown;
 }) {
   const salaryStructureFindFirstQueue = [
@@ -239,6 +287,9 @@ function buildService(options: {
         .fn()
         .mockResolvedValue(options.payrollRun ?? buildPayrollRun()),
       findUnique: jest.fn().mockResolvedValue(null),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(options.payrollRuns ?? [buildPayrollRun()]),
       create: jest.fn().mockResolvedValue(buildPayrollRun()),
       update: jest.fn().mockResolvedValue(buildPayrollRun()),
     },
@@ -363,6 +414,25 @@ function buildPayrollRun(overrides: Record<string, unknown> = {}) {
     notes: null,
     lines: [],
     payslips: [],
+    ...overrides,
+  };
+}
+
+function buildPayrollLine(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'line-1',
+    tenantId: actor.tenantId,
+    payrollRunId: 'run-1',
+    staffId: 'staff-1',
+    staff: buildStaff(),
+    grossSalary: new Prisma.Decimal(50000),
+    deductions: new Prisma.Decimal(1000),
+    pfEmployee: new Prisma.Decimal(0),
+    pfEmployer: new Prisma.Decimal(0),
+    tds: new Prisma.Decimal(0),
+    netSalary: new Prisma.Decimal(49000),
+    paidDays: new Prisma.Decimal(26),
+    unpaidDays: new Prisma.Decimal(4),
     ...overrides,
   };
 }

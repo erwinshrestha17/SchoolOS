@@ -5,6 +5,7 @@ import {
   EventType,
   NotificationChannel,
   NotificationStatus,
+  NoticePriority,
 } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import { CommunicationsService } from './communications.service';
@@ -14,6 +15,7 @@ describe('CommunicationsService', () => {
   let prisma: any;
   let notificationsService: any;
   let auditService: any;
+  let fileRegistryService: any;
   let service: CommunicationsService;
   let actor: AuthContext;
 
@@ -70,6 +72,11 @@ describe('CommunicationsService', () => {
     auditService = {
       record: jest.fn(),
     };
+    fileRegistryService = {
+      getFileMetadata: jest.fn(),
+      getSignedUrl: jest.fn(),
+      linkToEntity: jest.fn(),
+    };
     actor = {
       userId: 'admin-1',
       tenantId: 'tenant-1',
@@ -89,6 +96,7 @@ describe('CommunicationsService', () => {
         checkLimit: jest.fn().mockResolvedValue(undefined),
         incrementUsage: jest.fn().mockResolvedValue(undefined),
       } as any,
+      fileRegistryService,
     );
   });
 
@@ -223,6 +231,65 @@ describe('CommunicationsService', () => {
     expect(prisma.student.findMany).not.toHaveBeenCalled();
     expect(prisma.notificationDelivery.create).not.toHaveBeenCalled();
     expect(notificationsService.sendPushNotification).not.toHaveBeenCalled();
+  });
+
+  it('links notice attachments through File Registry and stores protected URLs only', async () => {
+    prisma.notice.create.mockResolvedValue({
+      id: 'notice-1',
+      title: 'Attachment notice',
+      body: 'Read the attached circular.',
+      priority: NoticePriority.NORMAL,
+      audienceType: AudienceType.ALL,
+      classId: null,
+      sectionId: null,
+      attachmentUrl: 'http://localhost:4000/api/v1/files/file-1/preview',
+      publishedAt: new Date('2026-05-17T00:00:00.000Z'),
+    });
+    prisma.notificationDelivery.findMany.mockResolvedValue([]);
+    prisma.student.findMany.mockResolvedValue([]);
+    prisma.guardianConsent.findMany.mockResolvedValue([]);
+    prisma.communicationPreference.findMany.mockResolvedValue([]);
+    fileRegistryService.getFileMetadata.mockResolvedValue({
+      id: 'file-1',
+      tenantId: 'tenant-1',
+      module: 'notices',
+    });
+    fileRegistryService.getSignedUrl.mockResolvedValue(
+      'http://localhost:4000/api/v1/files/file-1/preview',
+    );
+
+    await expect(
+      service.createNotice(
+        {
+          title: 'Attachment notice',
+          body: 'Read the attached circular.',
+          audienceType: AudienceType.ALL,
+          attachmentFileId: 'file-1',
+        },
+        actor,
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        attachmentUrl: 'http://localhost:4000/api/v1/files/file-1/preview',
+      }),
+    );
+
+    expect(fileRegistryService.getFileMetadata).toHaveBeenCalledWith(
+      'tenant-1',
+      'file-1',
+    );
+    expect(fileRegistryService.linkToEntity).toHaveBeenCalledWith(
+      'tenant-1',
+      'file-1',
+      'notices',
+      'notice-1',
+      'admin-1',
+    );
+    expect(prisma.notice.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        attachmentUrl: 'http://localhost:4000/api/v1/files/file-1/preview',
+      }),
+    });
   });
 
   it('converts fee payment domain events into guardian receipt notifications', async () => {

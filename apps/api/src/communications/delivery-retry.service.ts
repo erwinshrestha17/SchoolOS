@@ -34,6 +34,28 @@ export interface BulkDeliveryRetryResult {
   results: DeliveryRetryResult[];
 }
 
+export interface DeliveryFailureDashboardItem {
+  id: string;
+  status: NotificationStatus;
+  channel: NotificationChannel;
+  sourceType: string;
+  sourceId: string;
+  title: string;
+  lastFailureReason: string | null;
+  retryCount: number;
+  retryStatus: 'retryable' | 'pending' | 'not_retryable';
+  lastRetryAt: string | null;
+  failedAt: string | null;
+  createdAt: string;
+  recipientSummary: {
+    audienceType: string;
+    recipientUserId: string | null;
+    guardianId: string | null;
+    studentId: string | null;
+    destinationMasked: string | null;
+  };
+}
+
 @Injectable()
 export class DeliveryRetryService {
   constructor(
@@ -123,6 +145,80 @@ export class DeliveryRetryService {
       requested: deliveries.length,
       retried: results.length,
       results,
+    };
+  }
+
+  async listFailureDashboard(actor: AuthContext): Promise<{
+    items: DeliveryFailureDashboardItem[];
+    total: number;
+  }> {
+    const deliveries = await this.prisma.notificationDelivery.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        status: {
+          in: [
+            NotificationStatus.FAILED,
+            NotificationStatus.RETRY_PENDING,
+            NotificationStatus.SKIPPED,
+          ],
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      take: 100,
+      select: {
+        id: true,
+        status: true,
+        channel: true,
+        sourceType: true,
+        sourceId: true,
+        title: true,
+        errorMessage: true,
+        failureReason: true,
+        failureCode: true,
+        retryCount: true,
+        lastRetryAt: true,
+        failedAt: true,
+        createdAt: true,
+        audienceType: true,
+        recipientUserId: true,
+        guardianId: true,
+        studentId: true,
+        destination: true,
+      },
+    });
+
+    return {
+      total: deliveries.length,
+      items: deliveries.map((delivery) => ({
+        id: delivery.id,
+        status: delivery.status,
+        channel: delivery.channel,
+        sourceType: delivery.sourceType,
+        sourceId: delivery.sourceId,
+        title: delivery.title,
+        lastFailureReason:
+          delivery.failureReason ??
+          delivery.errorMessage ??
+          delivery.failureCode ??
+          null,
+        retryCount: delivery.retryCount,
+        retryStatus:
+          delivery.status === NotificationStatus.RETRY_PENDING
+            ? 'pending'
+            : isRetryable(delivery.status)
+              ? 'retryable'
+              : 'not_retryable',
+        lastRetryAt: delivery.lastRetryAt?.toISOString() ?? null,
+        failedAt: delivery.failedAt?.toISOString() ?? null,
+        createdAt: delivery.createdAt.toISOString(),
+        recipientSummary: {
+          audienceType: delivery.audienceType,
+          recipientUserId: delivery.recipientUserId,
+          guardianId: delivery.guardianId,
+          studentId: delivery.studentId,
+          destinationMasked: maskDestination(delivery.destination),
+        },
+      })),
     };
   }
 
@@ -217,4 +313,14 @@ function isRetryable(status: NotificationStatus) {
     status === NotificationStatus.QUEUED ||
     status === NotificationStatus.RETRY_PENDING
   );
+}
+
+function maskDestination(destination: string | null) {
+  if (!destination) return null;
+  if (destination.includes('@')) {
+    const [name, domain] = destination.split('@');
+    return `${name.slice(0, 2)}***@${domain}`;
+  }
+  if (destination.length <= 4) return '***';
+  return `${destination.slice(0, 3)}***${destination.slice(-2)}`;
 }

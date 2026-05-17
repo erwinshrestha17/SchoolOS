@@ -35,6 +35,15 @@ describe('FileRegistryService tenant scoping', () => {
       activityAttachment: {
         findFirst: jest.fn(),
       },
+      parentTeacherThread: {
+        findFirst: jest.fn(),
+      },
+      guardian: {
+        findFirst: jest.fn(),
+      },
+      staff: {
+        findFirst: jest.fn(),
+      },
     };
     auditService = { record: jest.fn().mockResolvedValue({}) };
     storageService = { checkReadiness: jest.fn().mockResolvedValue(undefined) };
@@ -193,5 +202,62 @@ describe('FileRegistryService tenant scoping', () => {
     await expect(service.getSignedUrl('tenant-1', 'file-1')).resolves.toBe(
       'http://localhost:4000/api/v1/files/file-1/preview',
     );
+  });
+
+  it('allows guardian-owned parent-teacher chat attachment access only for the linked guardian', async () => {
+    const chatAsset = {
+      ...asset,
+      module: 'parent-teacher-chat',
+      entityId: 'thread-1',
+      metadata: {},
+    };
+    prisma.parentTeacherThread.findFirst.mockResolvedValue({
+      guardianId: 'guardian-1',
+      classTeacherId: 'staff-1',
+    });
+    prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
+
+    await expect(
+      service.assertFileAccessForAuth(
+        chatAsset as any,
+        {
+          tenantId: 'tenant-1',
+          userId: 'guardian-user-1',
+          roles: ['parent'],
+          permissions: ['messaging:read'],
+        } as any,
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(prisma.parentTeacherThread.findFirst).toHaveBeenCalledWith({
+      where: { id: 'thread-1', tenantId: 'tenant-1' },
+      select: { guardianId: true, classTeacherId: true },
+    });
+  });
+
+  it('rejects parent-teacher chat attachment access for unrelated guardians', async () => {
+    const chatAsset = {
+      ...asset,
+      module: 'parent-teacher-chat',
+      entityId: 'thread-1',
+      metadata: {},
+    };
+    prisma.parentTeacherThread.findFirst.mockResolvedValue({
+      guardianId: 'guardian-1',
+      classTeacherId: 'staff-1',
+    });
+    prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-2' });
+
+    await expect(
+      service.assertFileAccessForAuth(
+        chatAsset as any,
+        {
+          tenantId: 'tenant-1',
+          userId: 'guardian-user-2',
+          roles: ['parent'],
+          permissions: ['messaging:read'],
+        } as any,
+      ),
+    ).rejects.toThrow(ForbiddenException);
   });
 });

@@ -554,7 +554,7 @@ export class CanteenService {
         throw new ConflictException('Cannot reverse a reversal or correction');
       }
       const existingReversal = await tx.canteenWalletTransaction.findFirst({
-        where: { reversalOfId: id },
+        where: { tenantId: actor.tenantId, reversalOfId: id },
       });
       if (existingReversal)
         throw new ConflictException('Transaction already reversed');
@@ -566,6 +566,11 @@ export class CanteenService {
       // Calculate reversal amount (opposite of original)
       const reversalAmount = original.amount.mul(-1);
       const newBalance = wallet.balance.add(reversalAmount);
+      if (newBalance.lt(0)) {
+        throw new ConflictException(
+          'Wallet reversal cannot make balance negative',
+        );
+      }
 
       const updatedWallet = await tx.canteenWallet.update({
         where: { id: wallet.id },
@@ -639,6 +644,11 @@ export class CanteenService {
         original.amount,
       );
       const newBalance = wallet.balance.add(adjustmentAmount);
+      if (newBalance.lt(0)) {
+        throw new ConflictException(
+          'Wallet correction cannot make balance negative',
+        );
+      }
 
       const updatedWallet = await tx.canteenWallet.update({
         where: { id: wallet.id },
@@ -1005,6 +1015,59 @@ export class CanteenService {
       updated,
     );
     return updated;
+  }
+
+  async getPosReceipt(id: string, actor: AuthContext) {
+    const sale = await this.prisma.canteenPosSale.findFirst({
+      where: { id, tenantId: actor.tenantId },
+      include: {
+        items: true,
+        student: true,
+        staff: true,
+        wallet: true,
+        createdBy: true,
+      },
+    });
+
+    if (!sale) {
+      throw new NotFoundException('Canteen POS sale not found in this tenant');
+    }
+
+    if (sale.status !== CanteenPosSaleStatus.COMPLETED) {
+      throw new ConflictException('Only completed POS sales have receipts');
+    }
+
+    return {
+      receiptNumber: sale.receiptNumber,
+      saleId: sale.id,
+      saleDate: sale.completedAt ?? sale.saleDate,
+      paymentMethod: sale.paymentMethod,
+      cashier: sale.createdBy?.email ?? null,
+      student: sale.student
+        ? {
+            id: sale.student.id,
+            studentSystemId: sale.student.studentSystemId,
+            name: `${sale.student.firstNameEn} ${sale.student.lastNameEn}`,
+          }
+        : null,
+      staff: sale.staff
+        ? {
+            id: sale.staff.id,
+            employeeId: sale.staff.employeeId,
+            name: `${sale.staff.firstName} ${sale.staff.lastName}`,
+          }
+        : null,
+      items: sale.items.map((item) => ({
+        name: item.itemName,
+        category: item.category,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        lineTotal: item.lineTotal,
+      })),
+      subtotal: sale.subtotal,
+      totalAmount: sale.totalAmount,
+      walletBalanceAfter: sale.wallet?.balance ?? null,
+    };
   }
 
   async listPosSales(actor: AuthContext, options: ListPosSalesQuery = {}) {

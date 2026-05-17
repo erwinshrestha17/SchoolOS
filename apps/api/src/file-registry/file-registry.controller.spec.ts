@@ -18,9 +18,13 @@ describe('FileRegistryController upload safety', () => {
     fileRegistryService = {
       registerFile: jest.fn(),
       getSignedUrl: jest.fn(),
+      getFileMetadata: jest.fn(),
+      assertFileAccessForAuth: jest.fn(),
+      auditAccess: jest.fn(),
     };
     storageService = {
       saveBase64Object: jest.fn(),
+      getObjectBuffer: jest.fn(),
     };
     controller = new FileRegistryController(
       fileRegistryService,
@@ -128,6 +132,50 @@ describe('FileRegistryController upload safety', () => {
         mimeType: 'application/pdf',
         sizeBytes: 128,
         module: 'homework',
+        entityId: undefined,
+      }),
+    );
+  });
+
+  it('allows notice and chat attachment upload modules with matching permissions', async () => {
+    const content = Buffer.from('safe-content').toString('base64');
+    storageService.saveBase64Object.mockResolvedValue({
+      objectKey: 'tenant-1/notices/notice.pdf',
+      sizeBytes: 128,
+    });
+    fileRegistryService.registerFile.mockResolvedValue({
+      id: 'file-notice',
+      originalFilename: 'notice.pdf',
+    });
+    fileRegistryService.getSignedUrl.mockResolvedValue(
+      'http://localhost:4000/api/v1/files/file-notice/preview',
+    );
+
+    await expect(
+      controller.uploadFile(
+        {
+          ...auth,
+          permissions: ['notices:create', 'notices:read', 'messaging:create'],
+        } as any,
+        {
+          fileName: 'notice.pdf',
+          contentType: 'application/pdf',
+          base64Content: content,
+          module: 'notices',
+          entityId: 'notice-1',
+        },
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: 'file-notice',
+        publicUrl: null,
+      }),
+    );
+
+    expect(fileRegistryService.registerFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        module: 'notices',
+        entityId: 'notice-1',
       }),
     );
   });

@@ -18,6 +18,7 @@ import { LoadingState } from '../ui/loading-state';
 import { EmptyState } from '../ui/empty-state';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { Badge } from '../ui/badge';
+import { FileUploader } from '../ui/file-uploader';
 import { cn } from '../../lib/utils';
 import { RefreshCcw, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 
@@ -31,8 +32,21 @@ const communicationSections = [
 const noticePriorities = ['NORMAL', 'URGENT', 'EMERGENCY'] as const;
 const audienceTypes = ['ALL', 'CLASS', 'SECTION'] as const;
 const eventTypes = ['GENERAL', 'EXAM', 'MEETING', 'HOLIDAY'] as const;
-const deliveryStatuses = ['QUEUED', 'SENT', 'FAILED', 'SKIPPED', 'PENDING', 'RETRYING'] as const;
-const consentTypes = ['PRIVACY', 'DATA_PROCESSING', 'MEDICAL', 'PHOTO_USAGE', 'MESSAGING'] as const;
+const deliveryStatuses = [
+  'QUEUED',
+  'SENT',
+  'FAILED',
+  'SKIPPED',
+  'PENDING',
+  'RETRYING',
+] as const;
+const consentTypes = [
+  'PRIVACY',
+  'DATA_PROCESSING',
+  'MEDICAL',
+  'PHOTO_USAGE',
+  'MESSAGING',
+] as const;
 
 type CommunicationSection = (typeof communicationSections)[number];
 type AudienceType = (typeof audienceTypes)[number];
@@ -60,6 +74,8 @@ type NoticeState = {
   sectionId: string;
   scheduleMode: 'NOW' | 'LATER';
   scheduledFor: string;
+  attachmentFileId: string;
+  attachmentFileName: string;
 };
 
 type EventState = {
@@ -83,29 +99,34 @@ const sectionMeta: Record<
 > = {
   Notices: {
     title: 'Notice Center',
-    description: 'Publish notices instantly or schedule them for selected classes, sections, or the whole school.',
+    description:
+      'Publish notices instantly or schedule them for selected classes, sections, or the whole school.',
     badge: 'Announcements',
   },
   Events: {
     title: 'Event Publisher',
-    description: 'Create school events, meetings, exams, and holidays with audience-aware delivery.',
+    description:
+      'Create school events, meetings, exams, and holidays with audience-aware delivery.',
     badge: 'Calendar Updates',
   },
   'Delivery Records': {
     title: 'Delivery Records',
-    description: 'Track queued, sent, skipped, failed, and retrying notification records across channels.',
+    description:
+      'Track queued, sent, skipped, failed, and retrying notification records across channels.',
     badge: 'Audit Trail',
   },
   'Consent Management': {
     title: 'Consent Management',
-    description: 'Capture and revoke guardian consent for privacy, messaging, medical, and photo usage workflows.',
+    description:
+      'Capture and revoke guardian consent for privacy, messaging, medical, and photo usage workflows.',
     badge: 'Guardian Controls',
   },
 };
 
 export function CommunicationsForm() {
   const queryClient = useQueryClient();
-  const [activeSection, setActiveSection] = useState<CommunicationSection>('Notices');
+  const [activeSection, setActiveSection] =
+    useState<CommunicationSection>('Notices');
   const [notice, setNotice] = useState<NoticeState>({
     title: '',
     body: '',
@@ -115,6 +136,8 @@ export function CommunicationsForm() {
     sectionId: '',
     scheduleMode: 'NOW',
     scheduledFor: '',
+    attachmentFileId: '',
+    attachmentFileName: '',
   });
   const [noticeError, setNoticeError] = useState<string | null>(null);
   const [noticeSuccess, setNoticeSuccess] = useState<string | null>(null);
@@ -172,8 +195,12 @@ export function CommunicationsForm() {
     const firstClass = classesQuery.data?.[0];
 
     if (firstClass) {
-      setNotice((current) => (current.classId ? current : { ...current, classId: firstClass.id }));
-      setEvent((current) => (current.classId ? current : { ...current, classId: firstClass.id }));
+      setNotice((current) =>
+        current.classId ? current : { ...current, classId: firstClass.id },
+      );
+      setEvent((current) =>
+        current.classId ? current : { ...current, classId: firstClass.id },
+      );
     }
   }, [classesQuery.data]);
 
@@ -205,11 +232,15 @@ export function CommunicationsForm() {
   const filteredDeliveries = (deliveriesQuery.data ?? []).filter((delivery) => {
     return (
       (!deliveryFilters.status || delivery.status === deliveryFilters.status) &&
-      (!deliveryFilters.channel || delivery.channel === deliveryFilters.channel) &&
-      (!deliveryFilters.sourceType || delivery.sourceType === deliveryFilters.sourceType)
+      (!deliveryFilters.channel ||
+        delivery.channel === deliveryFilters.channel) &&
+      (!deliveryFilters.sourceType ||
+        delivery.sourceType === deliveryFilters.sourceType)
     );
   });
-  const deliveryChannels = uniqueValues((deliveriesQuery.data ?? []).map((delivery) => delivery.channel));
+  const deliveryChannels = uniqueValues(
+    (deliveriesQuery.data ?? []).map((delivery) => delivery.channel),
+  );
   const deliverySourceTypes = uniqueValues(
     (deliveriesQuery.data ?? []).map((delivery) => delivery.sourceType),
   );
@@ -231,7 +262,9 @@ export function CommunicationsForm() {
   const noticeMutation = useMutation({
     mutationFn: api.createNotice,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['notification-deliveries'],
+      });
       void queryClient.invalidateQueries({ queryKey: ['notices'] });
       setNoticeSuccess(
         notice.scheduleMode === 'LATER'
@@ -243,7 +276,10 @@ export function CommunicationsForm() {
         ...current,
         title: '',
         body: '',
-        scheduledFor: current.scheduleMode === 'LATER' ? current.scheduledFor : '',
+        scheduledFor:
+          current.scheduleMode === 'LATER' ? current.scheduledFor : '',
+        attachmentFileId: '',
+        attachmentFileName: '',
       }));
     },
     onError: (error) => {
@@ -255,9 +291,13 @@ export function CommunicationsForm() {
   const eventMutation = useMutation({
     mutationFn: api.createEvent,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['notification-deliveries'],
+      });
       void queryClient.invalidateQueries({ queryKey: ['events'] });
-      setEventSuccess('Event created. Delivery records were queued where audience rules apply.');
+      setEventSuccess(
+        'Event created. Delivery records were queued where audience rules apply.',
+      );
       setEventError(null);
       setEvent((current) => ({
         ...current,
@@ -281,9 +321,13 @@ export function CommunicationsForm() {
         },
       }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['guardian-consent-status'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['guardian-consent-status'],
+      });
       void queryClient.invalidateQueries({ queryKey: ['consents'] });
-      void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['notification-deliveries'],
+      });
     },
   });
   const revokeConsentMutation = useMutation({
@@ -296,9 +340,13 @@ export function CommunicationsForm() {
         },
       }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['guardian-consent-status'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['guardian-consent-status'],
+      });
       void queryClient.invalidateQueries({ queryKey: ['consents'] });
-      void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['notification-deliveries'],
+      });
     },
   });
 
@@ -309,7 +357,8 @@ export function CommunicationsForm() {
       audienceType: notice.audienceType,
       classId: notice.classId,
       sectionId: notice.sectionId,
-      scheduledFor: notice.scheduleMode === 'LATER' ? notice.scheduledFor : null,
+      scheduledFor:
+        notice.scheduleMode === 'LATER' ? notice.scheduledFor : null,
     });
 
     if (validationError) {
@@ -324,7 +373,9 @@ export function CommunicationsForm() {
       priority: notice.priority,
       audienceType: notice.audienceType,
       classId: notice.audienceType === 'ALL' ? null : notice.classId || null,
-      sectionId: notice.audienceType === 'SECTION' ? notice.sectionId || null : null,
+      sectionId:
+        notice.audienceType === 'SECTION' ? notice.sectionId || null : null,
+      attachmentFileId: notice.attachmentFileId || null,
       scheduledFor:
         notice.scheduleMode === 'LATER' && notice.scheduledFor
           ? new Date(notice.scheduledFor).toISOString()
@@ -354,7 +405,8 @@ export function CommunicationsForm() {
       eventType: event.eventType,
       audienceType: event.audienceType,
       classId: event.audienceType === 'ALL' ? null : event.classId || null,
-      sectionId: event.audienceType === 'SECTION' ? event.sectionId || null : null,
+      sectionId:
+        event.audienceType === 'SECTION' ? event.sectionId || null : null,
       startsAt: new Date(event.startsAt).toISOString(),
       location: event.location.trim() || null,
     });
@@ -365,7 +417,7 @@ export function CommunicationsForm() {
       <section className="relative overflow-hidden rounded-[2.5rem] border border-slate-200 bg-slate-900 p-8 text-white shadow-xl shadow-slate-900/10">
         <div className="absolute -right-10 -top-10 h-64 w-64 rounded-full bg-primary-500/10 blur-3xl" />
         <div className="absolute -left-10 -bottom-10 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
-        
+
         <div className="relative flex flex-col gap-8 xl:flex-row xl:items-center xl:justify-between">
           <div className="max-w-xl">
             <span className="inline-flex rounded-full bg-white/10 px-4 py-1.5 text-[0.65rem] font-black uppercase tracking-widest text-white/60 border border-white/5 backdrop-blur-sm">
@@ -380,20 +432,40 @@ export function CommunicationsForm() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 xl:min-w-[500px]">
-            <CommunicationMetric label="Notices" value={String(noticesQuery.data?.length ?? 0)} tone="neutral" />
-            <CommunicationMetric label="Events" value={String(eventsQuery.data?.length ?? 0)} tone="info" />
-            <CommunicationMetric label="Sent Successfully" value={String(deliveryStats.sent)} tone="success" />
-            <CommunicationMetric label="Delivery Gaps" value={String(deliveryStats.failed)} tone="danger" />
+            <CommunicationMetric
+              label="Notices"
+              value={String(noticesQuery.data?.length ?? 0)}
+              tone="neutral"
+            />
+            <CommunicationMetric
+              label="Events"
+              value={String(eventsQuery.data?.length ?? 0)}
+              tone="info"
+            />
+            <CommunicationMetric
+              label="Sent Successfully"
+              value={String(deliveryStats.sent)}
+              tone="success"
+            />
+            <CommunicationMetric
+              label="Delivery Gaps"
+              value={String(deliveryStats.failed)}
+              tone="danger"
+            />
           </div>
         </div>
       </section>
 
-      <Tabs value={activeSection} onValueChange={(val) => setActiveSection(val as CommunicationSection)} className="space-y-8">
+      <Tabs
+        value={activeSection}
+        onValueChange={(val) => setActiveSection(val as CommunicationSection)}
+        className="space-y-8"
+      >
         <div className="sticky top-4 z-20 flex justify-center">
           <TabsList className="bg-white/80 backdrop-blur-xl border border-slate-200 p-1.5 rounded-3xl shadow-lg shadow-slate-900/5">
             {communicationSections.map((section) => (
-              <TabsTrigger 
-                key={section} 
+              <TabsTrigger
+                key={section}
                 value={section}
                 className="px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest data-[state=active]:bg-slate-900 data-[state=active]:text-white transition-all"
               >
@@ -407,7 +479,8 @@ export function CommunicationsForm() {
           <div className="bg-primary-50 border border-primary-100 p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-500">
             <div className="h-2 w-2 rounded-full bg-primary-500 animate-pulse" />
             <p className="text-sm font-bold text-primary-900">
-              {deliveryStats.pending} delivery records are currently queued or retrying.
+              {deliveryStats.pending} delivery records are currently queued or
+              retrying.
             </p>
           </div>
         )}
@@ -420,7 +493,9 @@ export function CommunicationsForm() {
             sections={noticeSections}
             notices={noticesQuery.data ?? []}
             noticesLoading={noticesQuery.isLoading}
-            noticesError={noticesQuery.isError ? noticesQuery.error.message : null}
+            noticesError={
+              noticesQuery.isError ? noticesQuery.error.message : null
+            }
             submitNotice={submitNotice}
             isPending={noticeMutation.isPending}
             noticeError={noticeError}
@@ -448,7 +523,9 @@ export function CommunicationsForm() {
           <DeliveryRecordsSection
             deliveries={filteredDeliveries}
             isLoading={deliveriesQuery.isLoading}
-            error={deliveriesQuery.isError ? deliveriesQuery.error.message : null}
+            error={
+              deliveriesQuery.isError ? deliveriesQuery.error.message : null
+            }
             filters={deliveryFilters}
             setFilters={setDeliveryFilters}
             channels={deliveryChannels}
@@ -470,8 +547,16 @@ export function CommunicationsForm() {
             revokeConsent={() => revokeConsentMutation.mutate()}
             capturePending={captureConsentMutation.isPending}
             revokePending={revokeConsentMutation.isPending}
-            captureError={captureConsentMutation.isError ? captureConsentMutation.error.message : null}
-            revokeError={revokeConsentMutation.isError ? revokeConsentMutation.error.message : null}
+            captureError={
+              captureConsentMutation.isError
+                ? captureConsentMutation.error.message
+                : null
+            }
+            revokeError={
+              revokeConsentMutation.isError
+                ? revokeConsentMutation.error.message
+                : null
+            }
           />
         </TabsContent>
       </Tabs>
@@ -516,23 +601,36 @@ function NoticesSection({
         />
 
         <div className="mt-6 space-y-6">
-          <FormField label="Title" description="Give your notice a clear, actionable title.">
+          <FormField
+            label="Title"
+            description="Give your notice a clear, actionable title."
+          >
             <Input
               value={notice.title}
-              onChange={(event) => setNotice((current) => ({ ...current, title: event.target.value }))}
+              onChange={(event) =>
+                setNotice((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))
+              }
               placeholder="Example: Parent-Teacher Association Meeting"
               className="h-12"
             />
           </FormField>
 
-          <FormField 
-            label="Notice Content" 
+          <FormField
+            label="Notice Content"
             description={`${characterCount} characters`}
           >
             <textarea
               rows={6}
               value={notice.body}
-              onChange={(event) => setNotice((current) => ({ ...current, body: event.target.value }))}
+              onChange={(event) =>
+                setNotice((current) => ({
+                  ...current,
+                  body: event.target.value,
+                }))
+              }
               placeholder="Write the notice body for guardians, students, or staff..."
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium transition-all focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-primary-500/10 min-h-[160px] resize-none"
             />
@@ -602,7 +700,10 @@ function NoticesSection({
               <select
                 value={notice.sectionId}
                 onChange={(event) =>
-                  setNotice((current) => ({ ...current, sectionId: event.target.value }))
+                  setNotice((current) => ({
+                    ...current,
+                    sectionId: event.target.value,
+                  }))
                 }
                 className="min-h-11"
               >
@@ -616,6 +717,40 @@ function NoticesSection({
             </label>
           ) : null}
 
+          <FormField
+            label="Attachment"
+            description="Uploads use File Registry and return protected preview/download URLs."
+          >
+            <FileUploader
+              module="notices"
+              maxFiles={1}
+              accept="application/pdf,image/png,image/jpeg,image/webp"
+              onUploadComplete={(fileId, fileName) =>
+                setNotice((current) => ({
+                  ...current,
+                  attachmentFileId: fileId,
+                  attachmentFileName: fileName,
+                }))
+              }
+              onRemove={(fileId) =>
+                setNotice((current) =>
+                  current.attachmentFileId === fileId
+                    ? {
+                        ...current,
+                        attachmentFileId: '',
+                        attachmentFileName: '',
+                      }
+                    : current,
+                )
+              }
+            />
+            {notice.attachmentFileName ? (
+              <p className="mt-2 text-xs font-semibold text-slate-500">
+                Attached through File Registry: {notice.attachmentFileName}
+              </p>
+            ) : null}
+          </FormField>
+
           <fieldset className="rounded-3xl border border-[var(--line)] bg-gray-50/70 p-4">
             <legend className="label px-2">Schedule option</legend>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -625,7 +760,11 @@ function NoticesSection({
                 checked={notice.scheduleMode === 'NOW'}
                 name="notice-schedule-mode"
                 onChange={() =>
-                  setNotice((current) => ({ ...current, scheduleMode: 'NOW', scheduledFor: '' }))
+                  setNotice((current) => ({
+                    ...current,
+                    scheduleMode: 'NOW',
+                    scheduledFor: '',
+                  }))
                 }
               />
               <ScheduleOption
@@ -633,7 +772,12 @@ function NoticesSection({
                 description="Publish at a selected date and time."
                 checked={notice.scheduleMode === 'LATER'}
                 name="notice-schedule-mode"
-                onChange={() => setNotice((current) => ({ ...current, scheduleMode: 'LATER' }))}
+                onChange={() =>
+                  setNotice((current) => ({
+                    ...current,
+                    scheduleMode: 'LATER',
+                  }))
+                }
               />
             </div>
             {notice.scheduleMode === 'LATER' ? (
@@ -657,8 +801,12 @@ function NoticesSection({
               message="Emergency notices may trigger forced delivery channels depending on school settings."
             />
           ) : null}
-          {noticeError ? <InlineMessage tone="error" message={noticeError} /> : null}
-          {noticeSuccess ? <InlineMessage tone="success" message={noticeSuccess} /> : null}
+          {noticeError ? (
+            <InlineMessage tone="error" message={noticeError} />
+          ) : null}
+          {noticeSuccess ? (
+            <InlineMessage tone="success" message={noticeSuccess} />
+          ) : null}
 
           <button
             type="button"
@@ -675,7 +823,11 @@ function NoticesSection({
         </div>
       </div>
 
-      <NoticeList notices={notices} isLoading={noticesLoading} error={noticesError} />
+      <NoticeList
+        notices={notices}
+        isLoading={noticesLoading}
+        error={noticesError}
+      />
     </section>
   );
 }
@@ -712,7 +864,8 @@ function NoticeList({
                 <div>
                   <p className="font-semibold text-gray-950">{item.title}</p>
                   <p className="mt-1 text-sm text-[var(--muted)]">
-                    {formatEnumLabel(item.audienceType)} / {resolveNoticeState(item)}
+                    {formatEnumLabel(item.audienceType)} /{' '}
+                    {resolveNoticeState(item)}
                   </p>
                 </div>
                 <PriorityBadge priority={item.priority} />
@@ -720,7 +873,10 @@ function NoticeList({
             </article>
           ))
         ) : (
-          <EmptyState title="No notices yet" description="Publish your first notice to start building the communication timeline." />
+          <EmptyState
+            title="No notices yet"
+            description="Publish your first notice to start building the communication timeline."
+          />
         )}
       </div>
     </section>
@@ -762,22 +918,34 @@ function EventsSection({
         />
 
         <div className="mt-6 space-y-6">
-          <FormField label="Event Title" description="Keep it short and descriptive.">
+          <FormField
+            label="Event Title"
+            description="Keep it short and descriptive."
+          >
             <Input
               value={event.title}
               onChange={(inputEvent) =>
-                setEvent((current) => ({ ...current, title: inputEvent.target.value }))
+                setEvent((current) => ({
+                  ...current,
+                  title: inputEvent.target.value,
+                }))
               }
               placeholder="Example: First Terminal Examination 2081"
               className="h-12"
             />
           </FormField>
-          <FormField label="Description" description="Provide full details about the event.">
+          <FormField
+            label="Description"
+            description="Provide full details about the event."
+          >
             <textarea
               rows={5}
               value={event.description}
               onChange={(inputEvent) =>
-                setEvent((current) => ({ ...current, description: inputEvent.target.value }))
+                setEvent((current) => ({
+                  ...current,
+                  description: inputEvent.target.value,
+                }))
               }
               placeholder="Event details, instructions, or preparation notes..."
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium transition-all focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-primary-500/10 min-h-[140px] resize-none"
@@ -790,7 +958,10 @@ function EventsSection({
                 type="datetime-local"
                 value={event.startsAt}
                 onChange={(inputEvent) =>
-                  setEvent((current) => ({ ...current, startsAt: inputEvent.target.value }))
+                  setEvent((current) => ({
+                    ...current,
+                    startsAt: inputEvent.target.value,
+                  }))
                 }
                 className="min-h-11"
               />
@@ -800,7 +971,10 @@ function EventsSection({
               <input
                 value={event.location}
                 onChange={(inputEvent) =>
-                  setEvent((current) => ({ ...current, location: inputEvent.target.value }))
+                  setEvent((current) => ({
+                    ...current,
+                    location: inputEvent.target.value,
+                  }))
                 }
                 placeholder="School hall, playground, online, etc."
                 className="min-h-11"
@@ -830,7 +1004,10 @@ function EventsSection({
                 type="datetime-local"
                 value={event.startsAt}
                 onChange={(inputEvent) =>
-                  setEvent((current) => ({ ...current, startsAt: inputEvent.target.value }))
+                  setEvent((current) => ({
+                    ...current,
+                    startsAt: inputEvent.target.value,
+                  }))
                 }
               />
             </FormField>
@@ -879,7 +1056,10 @@ function EventsSection({
               <Select
                 value={event.sectionId}
                 onChange={(inputEvent) =>
-                  setEvent((current) => ({ ...current, sectionId: inputEvent.target.value }))
+                  setEvent((current) => ({
+                    ...current,
+                    sectionId: inputEvent.target.value,
+                  }))
                 }
                 disabled={event.audienceType !== 'SECTION'}
               >
@@ -893,19 +1073,29 @@ function EventsSection({
             </FormField>
           </div>
 
-          <FormField label="Location" description="Physical room or digital link.">
+          <FormField
+            label="Location"
+            description="Physical room or digital link."
+          >
             <Input
               value={event.location}
               onChange={(inputEvent) =>
-                setEvent((current) => ({ ...current, location: inputEvent.target.value }))
+                setEvent((current) => ({
+                  ...current,
+                  location: inputEvent.target.value,
+                }))
               }
               placeholder="Example: School Auditorium or Zoom Link"
               className="h-12"
             />
           </FormField>
 
-          {eventError ? <InlineMessage tone="error" message={eventError} /> : null}
-          {eventSuccess ? <InlineMessage tone="success" message={eventSuccess} /> : null}
+          {eventError ? (
+            <InlineMessage tone="error" message={eventError} />
+          ) : null}
+          {eventSuccess ? (
+            <InlineMessage tone="success" message={eventSuccess} />
+          ) : null}
 
           <button
             type="button"
@@ -918,7 +1108,11 @@ function EventsSection({
         </div>
       </div>
 
-      <EventList events={events} isLoading={eventsLoading} error={eventsError} />
+      <EventList
+        events={events}
+        isLoading={eventsLoading}
+        error={eventsError}
+      />
     </section>
   );
 }
@@ -955,7 +1149,8 @@ function EventList({
                 <div>
                   <p className="font-semibold text-gray-950">{item.title}</p>
                   <p className="mt-1 text-sm text-[var(--muted)]">
-                    {formatEnumLabel(item.eventType)} / {formatEnumLabel(item.audienceType)} /{' '}
+                    {formatEnumLabel(item.eventType)} /{' '}
+                    {formatEnumLabel(item.audienceType)} /{' '}
                     {formatDateTime(item.startsAt)}
                     {item.location ? ` / ${item.location}` : ''}
                   </p>
@@ -965,7 +1160,10 @@ function EventList({
             </article>
           ))
         ) : (
-          <EmptyState title="No events yet" description="Create your first school event and notify the selected audience." />
+          <EmptyState
+            title="No events yet"
+            description="Create your first school event and notify the selected audience."
+          />
         )}
       </div>
     </section>
@@ -986,7 +1184,9 @@ function DeliveryRecordsSection({
   isLoading: boolean;
   error: string | null;
   filters: { status: string; channel: string; sourceType: string };
-  setFilters: Dispatch<SetStateAction<{ status: string; channel: string; sourceType: string }>>;
+  setFilters: Dispatch<
+    SetStateAction<{ status: string; channel: string; sourceType: string }>
+  >;
   channels: string[];
   sourceTypes: string[];
   totalDeliveries: number;
@@ -1008,7 +1208,12 @@ function DeliveryRecordsSection({
       <div className="mt-6 grid gap-3 md:grid-cols-3">
         <select
           value={filters.status}
-          onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
+          onChange={(event) =>
+            setFilters((current) => ({
+              ...current,
+              status: event.target.value,
+            }))
+          }
           className="min-h-11"
         >
           <option value="">All statuses</option>
@@ -1020,7 +1225,12 @@ function DeliveryRecordsSection({
         </select>
         <select
           value={filters.channel}
-          onChange={(event) => setFilters((current) => ({ ...current, channel: event.target.value }))}
+          onChange={(event) =>
+            setFilters((current) => ({
+              ...current,
+              channel: event.target.value,
+            }))
+          }
           className="min-h-11"
         >
           <option value="">All channels</option>
@@ -1033,7 +1243,10 @@ function DeliveryRecordsSection({
         <select
           value={filters.sourceType}
           onChange={(event) =>
-            setFilters((current) => ({ ...current, sourceType: event.target.value }))
+            setFilters((current) => ({
+              ...current,
+              sourceType: event.target.value,
+            }))
           }
           className="min-h-11"
         >
@@ -1063,8 +1276,10 @@ function DeliveryRecordsSection({
               </div>
               <div className="mt-3 grid gap-2 text-sm text-[var(--muted)]">
                 <p>
-                  <span className="font-semibold text-gray-700">{delivery.channel}</span> /{' '}
-                  {delivery.destination ?? 'no destination'}
+                  <span className="font-semibold text-gray-700">
+                    {delivery.channel}
+                  </span>{' '}
+                  / {delivery.destination ?? 'no destination'}
                 </p>
                 <p className="text-xs">
                   {delivery.sourceType} / {delivery.sourceId}
@@ -1073,7 +1288,10 @@ function DeliveryRecordsSection({
             </article>
           ))
         ) : (
-          <EmptyState title="No delivery records found" description="No records match the current filter selection." />
+          <EmptyState
+            title="No delivery records found"
+            description="No records match the current filter selection."
+          />
         )}
       </div>
     </section>
@@ -1120,7 +1338,10 @@ function ConsentManagementSection({
 
         <div className="mt-8 space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
-            <FormField label="Select Guardian" description="Find guardian by student.">
+            <FormField
+              label="Select Guardian"
+              description="Find guardian by student."
+            >
               <Select
                 value={selectedGuardianId}
                 onChange={(event) => setSelectedGuardianId(event.target.value)}
@@ -1167,7 +1388,10 @@ function ConsentManagementSection({
           </div>
 
           {captureError || revokeError ? (
-            <InlineMessage tone="error" message={captureError || revokeError || ''} />
+            <InlineMessage
+              tone="error"
+              message={captureError || revokeError || ''}
+            />
           ) : null}
         </div>
       </div>
@@ -1189,8 +1413,13 @@ function ConsentManagementSection({
                 className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-3 transition-all hover:border-slate-300"
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-black text-slate-900">{formatEnumLabel(status.consentType)}</p>
-                  <Badge variant={status.granted ? 'success' : 'destructive'} className="font-black uppercase tracking-widest text-[10px]">
+                  <p className="text-sm font-black text-slate-900">
+                    {formatEnumLabel(status.consentType)}
+                  </p>
+                  <Badge
+                    variant={status.granted ? 'success' : 'destructive'}
+                    className="font-black uppercase tracking-widest text-[10px]"
+                  >
                     {status.granted ? 'Granted' : 'Revoked'}
                   </Badge>
                 </div>
@@ -1199,15 +1428,23 @@ function ConsentManagementSection({
                     Version {status.version ?? 'N/A'}
                   </p>
                   <p className="text-[10px] font-black text-slate-400">
-                    {status.capturedAt ? formatDateTime(status.capturedAt) : 'Never captured'}
+                    {status.capturedAt
+                      ? formatDateTime(status.capturedAt)
+                      : 'Never captured'}
                   </p>
                 </div>
               </div>
             ))
           ) : (
-            <EmptyState 
-              title={selectedGuardianId ? "No consent records" : "Select a guardian"} 
-              description={selectedGuardianId ? "No consent records have been captured for this guardian yet." : "Choose a guardian to review consent status."} 
+            <EmptyState
+              title={
+                selectedGuardianId ? 'No consent records' : 'Select a guardian'
+              }
+              description={
+                selectedGuardianId
+                  ? 'No consent records have been captured for this guardian yet.'
+                  : 'Choose a guardian to review consent status.'
+              }
             />
           )}
         </div>
@@ -1229,7 +1466,11 @@ function SectionHeader({
     <div>
       <p className="label">{eyebrow}</p>
       <h2 className="mt-2 text-xl font-bold text-gray-950">{title}</h2>
-      {description ? <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{description}</p> : null}
+      {description ? (
+        <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+          {description}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -1252,7 +1493,9 @@ function CommunicationMetric({
 
   return (
     <div className={`rounded-2xl p-4 ring-1 ${toneClass}`}>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-75">{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-75">
+        {label}
+      </p>
       <p className="mt-2 text-2xl font-bold">{value}</p>
     </div>
   );
@@ -1279,10 +1522,20 @@ function ScheduleOption({
           : 'border-[var(--line)] bg-white/70 hover:bg-white'
       }`}
     >
-      <input type="radio" name={name} checked={checked} onChange={onChange} className="mt-1" />
+      <input
+        type="radio"
+        name={name}
+        checked={checked}
+        onChange={onChange}
+        className="mt-1"
+      />
       <span>
-        <span className="block text-sm font-semibold text-gray-950">{title}</span>
-        <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">{description}</span>
+        <span className="block text-sm font-semibold text-gray-950">
+          {title}
+        </span>
+        <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">
+          {description}
+        </span>
       </span>
     </label>
   );
@@ -1297,7 +1550,9 @@ function PriorityBadge({ priority }: { priority: string }) {
         : 'bg-emerald-50 text-emerald-700 ring-emerald-100';
 
   return (
-    <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${className}`}>
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${className}`}
+    >
       {formatEnumLabel(priority)}
     </span>
   );
@@ -1314,7 +1569,9 @@ function EventTypeBadge({ type }: { type: string }) {
           : 'bg-gray-100 text-gray-700 ring-gray-200';
 
   return (
-    <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${className}`}>
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${className}`}
+    >
       {formatEnumLabel(type)}
     </span>
   );
@@ -1333,7 +1590,9 @@ function StatusBadge({ status }: { status: string }) {
             : 'bg-amber-50 text-amber-700 ring-amber-100';
 
   return (
-    <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${className}`}>
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${className}`}
+    >
       {formatEnumLabel(status)}
     </span>
   );
@@ -1352,7 +1611,13 @@ function InlineMessage({
     info: 'border-blue-200 bg-blue-50 text-blue-700',
   }[tone];
 
-  return <p className={`rounded-2xl border px-4 py-3 text-sm font-medium ${className}`}>{message}</p>;
+  return (
+    <p
+      className={`rounded-2xl border px-4 py-3 text-sm font-medium ${className}`}
+    >
+      {message}
+    </p>
+  );
 }
 
 // Removed local EmptyState
@@ -1361,13 +1626,19 @@ function SkeletonList() {
   return (
     <div className="grid gap-3">
       {[0, 1, 2].map((item) => (
-        <div key={item} className="h-24 animate-pulse rounded-3xl bg-gray-100" />
+        <div
+          key={item}
+          className="h-24 animate-pulse rounded-3xl bg-gray-100"
+        />
       ))}
     </div>
   );
 }
 
-function filterSectionsForClass(sections: SectionSummaryForUi[], classId: string) {
+function filterSectionsForClass(
+  sections: SectionSummaryForUi[],
+  classId: string,
+) {
   return sections.filter((section) => {
     const sectionClassId = section.classId ?? section.class?.id;
     return !classId || sectionClassId === classId;
@@ -1394,7 +1665,10 @@ function validateAudienceFields(input: {
     return 'Body is required.';
   }
 
-  if ((input.audienceType === 'CLASS' || input.audienceType === 'SECTION') && !input.classId) {
+  if (
+    (input.audienceType === 'CLASS' || input.audienceType === 'SECTION') &&
+    !input.classId
+  ) {
     return 'Class is required for class or section audiences.';
   }
 

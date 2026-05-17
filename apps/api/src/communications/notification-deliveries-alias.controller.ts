@@ -27,6 +27,12 @@ export class NotificationDeliveriesAliasController {
     return this.communicationsService.getDeliveryAnalytics(auth);
   }
 
+  @Get('failures')
+  @Permissions('communications:read_deliveries')
+  failures(@CurrentAuth() auth: AuthContext) {
+    return this.deliveryRetryService.listFailureDashboard(auth);
+  }
+
   @Post(':deliveryId/retry')
   @Permissions('communications:read_deliveries', 'notices:create')
   retryDelivery(

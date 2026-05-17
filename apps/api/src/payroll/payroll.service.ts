@@ -1363,11 +1363,12 @@ export class PayrollService {
     ];
   }
 
-  async getPayrollRegister(actor: AuthContext) {
+  async getPayrollRegister(actor: AuthContext, payrollRunId?: string) {
     const runs = await this.prisma.payrollRun.findMany({
-      where: { tenantId: actor.tenantId },
+      where: { tenantId: actor.tenantId, id: payrollRunId },
       include: { lines: { include: { staff: true } } },
       orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
+      take: 100,
     });
 
     return runs.flatMap((run) =>
@@ -1395,6 +1396,7 @@ export class PayrollService {
     const runs = await this.prisma.payrollRun.findMany({
       where: { tenantId: actor.tenantId },
       include: { lines: true },
+      take: 100,
     });
 
     return runs.reduce(
@@ -1422,15 +1424,82 @@ export class PayrollService {
     );
   }
 
-  async exportPayrollRegisterCsv(actor: AuthContext) {
-    const rows = await this.getPayrollRegister(actor);
+  async getPayrollPfSummary(actor: AuthContext, payrollRunId?: string) {
+    const rows = await this.getPayrollRegister(actor, payrollRunId);
+    const contributors = rows.filter(
+      (row) => row.pfEmployee > 0 || row.pfEmployer > 0,
+    );
+
+    return {
+      payrollRunId: payrollRunId ?? null,
+      staffCount: contributors.length,
+      employeeContribution: contributors.reduce(
+        (sum, row) => sum + row.pfEmployee,
+        0,
+      ),
+      employerContribution: contributors.reduce(
+        (sum, row) => sum + row.pfEmployer,
+        0,
+      ),
+      totalContribution: contributors.reduce(
+        (sum, row) => sum + row.pfEmployee + row.pfEmployer,
+        0,
+      ),
+      rows: contributors.map((row) => ({
+        payrollRunId: row.payrollRunId,
+        employeeId: row.employeeId,
+        staffName: row.staffName,
+        periodMonth: row.periodMonth,
+        periodYear: row.periodYear,
+        pfEmployee: row.pfEmployee,
+        pfEmployer: row.pfEmployer,
+      })),
+    };
+  }
+
+  async getPayrollTdsSummary(actor: AuthContext, payrollRunId?: string) {
+    const rows = await this.getPayrollRegister(actor, payrollRunId);
+    const contributors = rows.filter((row) => row.tds > 0);
+
+    return {
+      payrollRunId: payrollRunId ?? null,
+      staffCount: contributors.length,
+      totalTds: contributors.reduce((sum, row) => sum + row.tds, 0),
+      rows: contributors.map((row) => ({
+        payrollRunId: row.payrollRunId,
+        employeeId: row.employeeId,
+        staffName: row.staffName,
+        periodMonth: row.periodMonth,
+        periodYear: row.periodYear,
+        tds: row.tds,
+      })),
+    };
+  }
+
+  async getSalaryComponentSummary(actor: AuthContext, payrollRunId?: string) {
+    const rows = await this.getPayrollRegister(actor, payrollRunId);
+
+    return {
+      payrollRunId: payrollRunId ?? null,
+      staffCount: rows.length,
+      grossSalary: rows.reduce((sum, row) => sum + row.grossSalary, 0),
+      deductions: rows.reduce((sum, row) => sum + row.deductions, 0),
+      pfEmployee: rows.reduce((sum, row) => sum + row.pfEmployee, 0),
+      pfEmployer: rows.reduce((sum, row) => sum + row.pfEmployer, 0),
+      tds: rows.reduce((sum, row) => sum + row.tds, 0),
+      netPayable: rows.reduce((sum, row) => sum + row.netPayable, 0),
+    };
+  }
+
+  async exportPayrollRegisterCsv(actor: AuthContext, payrollRunId?: string) {
+    const rows = await this.getPayrollRegister(actor, payrollRunId);
 
     await this.auditService.record({
       action: 'export',
       resource: 'payroll_register',
       tenantId: actor.tenantId,
       userId: actor.userId,
-      after: { rowCount: rows.length },
+      after: { rowCount: rows.length, payrollRunId: payrollRunId ?? null },
     });
 
     return [

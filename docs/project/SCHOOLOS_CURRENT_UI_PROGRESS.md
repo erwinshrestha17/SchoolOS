@@ -5,7 +5,7 @@ This file records the latest web-admin UI/UX implementation progress so large ro
 ## Current UI Sprint
 
 ```text
-Current UI sprint: M0 Platform provider/queue pilot hardening is implemented; Sprint 2 M10 communication/provider/attachment depth is next after verify:production can run outside the sandbox port-bind restriction.
+Current UI sprint: M10 communication/provider/attachment depth and M6/M7/M8A/M8C/M8B backend/admin feature-depth hardening are implemented; next UI work is staging/browser QA plus targeted polish where pilot evidence shows risk.
 ```
 
 Current repo reality:
@@ -13,8 +13,31 @@ Current repo reality:
 ```text
 Academics, Accounting, Homework, Timetable, HR, Payroll, Library, Transport, and Canteen now have admin production-depth coverage for the current modular-monolith scope.
 Platform settings now has provider readiness detail and queue failed-job detail surfaces wired to real APIs.
-Next UI work is M10 delivery failure analytics, retry/resend polish, unread recipient detail, attachment signed-URL workflows, and messaging moderation/escalation depth.
+M10 notice composition now supports File Registry attachments through real upload APIs, and the delivery retry panel consumes the backend failed-delivery dashboard.
+Next UI work is browser/staging QA for delivery failures, retry/resend, QR/POS scan speed, transport stale-location clarity, and permission/error states.
 ```
+
+### M10 and Extended Operations Feature-Depth Pass
+
+Status: **Implemented; final local/staging smoke still required.**
+
+Completed:
+
+- Notice composer now uploads a protected File Registry attachment and passes the attachment file id to the real notice API.
+- Delivery retry UI now reads backend failure dashboard data including retry count, retry status, last failure reason, and recipient summary.
+- M6 homework/timetable backend role depth now fails closed for parent/student homework queries that are not linked to the requested student.
+- M7 payroll backend reports now expose explicit register, PF, TDS, and salary-component summaries instead of thin aliases.
+- M8A Library admin depth now has tests for fine-to-fees/accounting boundary, staff borrowers, and purpose-limited QR lookup.
+- M8C Canteen backend/admin depth now exposes a POS receipt endpoint and prevents wallet reversals/corrections from making balances negative.
+- M8B Transport backend/admin depth now guards GPS ingestion pressure, verifies Redis latest-location/cache fanout, and bounds retention cleanup.
+
+Deferred:
+
+- Full parent/mobile portal.
+- Driver app.
+- Production live transport map.
+- AI/ML/M11.
+- Biometric workflows.
 
 ### M0 Platform Provider and Queue Hardening
 

@@ -9,6 +9,8 @@ import { ConfigService } from '../config/config.service';
 import { StorageService } from '../storage/storage.service';
 import { FileStatus, Prisma } from '@prisma/client';
 import { UsageService } from '../usage/usage.service';
+import type { AuthContext } from '../auth/auth.types';
+import { isParentOnly } from '../common/security/parent-scope';
 
 @Injectable()
 export class FileRegistryService {
@@ -169,6 +171,33 @@ export class FileRegistryService {
     return asset;
   }
 
+  async assertFileAccessForAuth(
+    asset: Awaited<ReturnType<FileRegistryService['getFileMetadata']>>,
+    auth: AuthContext,
+  ) {
+    if (asset.tenantId !== auth.tenantId) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    if (asset.module === 'notices' || asset.module === 'notice-delivery') {
+      if (!auth.permissions.includes('notices:read')) {
+        throw new ForbiddenException('Insufficient notice file access');
+      }
+      return;
+    }
+
+    if (asset.module === 'messages') {
+      if (!auth.permissions.includes('messaging:read')) {
+        throw new ForbiddenException('Insufficient message file access');
+      }
+      return;
+    }
+
+    if (asset.module === 'parent-teacher-chat') {
+      await this.assertParentTeacherChatFileAccess(asset.entityId, auth);
+    }
+  }
+
   async softDeleteFile(tenantId: string, assetId: string, userId: string) {
     const asset = await this.getFileMetadata(tenantId, assetId);
 
@@ -258,6 +287,52 @@ export class FileRegistryService {
       asset,
       content: await this.storageService.getObjectBuffer(asset.objectKey),
     };
+  }
+
+  private async assertParentTeacherChatFileAccess(
+    threadId: string | null,
+    auth: AuthContext,
+  ) {
+    if (!threadId) {
+      throw new ForbiddenException('Chat attachment is not linked to a thread');
+    }
+
+    if (
+      auth.roles.some((role) =>
+        ['platform_super_admin', 'admin', 'principal'].includes(role),
+      )
+    ) {
+      return;
+    }
+
+    const thread = await this.prisma.parentTeacherThread.findFirst({
+      where: { id: threadId, tenantId: auth.tenantId },
+      select: { guardianId: true, classTeacherId: true },
+    });
+
+    if (!thread) {
+      throw new ForbiddenException('Chat attachment thread is unavailable');
+    }
+
+    if (isParentOnly(auth)) {
+      const guardian = await this.prisma.guardian.findFirst({
+        where: { tenantId: auth.tenantId, userId: auth.userId },
+        select: { id: true },
+      });
+      if (guardian?.id === thread.guardianId) return;
+    }
+
+    if (
+      auth.roles.some((role) => ['teacher', 'subject_teacher'].includes(role))
+    ) {
+      const staff = await this.prisma.staff.findFirst({
+        where: { tenantId: auth.tenantId, userId: auth.userId },
+        select: { id: true },
+      });
+      if (staff?.id === thread.classTeacherId) return;
+    }
+
+    throw new ForbiddenException('You cannot access this chat attachment');
   }
 
   private get apiBaseUrl() {

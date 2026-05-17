@@ -1,5 +1,5 @@
-import type { PermissionKey } from "./permissions.js";
-import type { SalaryStructureSummary, PayrollLineSummary } from "./payroll.js";
+import type { PermissionKey } from './permissions.js';
+import type { SalaryStructureSummary, PayrollLineSummary } from './payroll.js';
 
 export type AuthSessionUser = {
   id: string;
@@ -424,7 +424,7 @@ export type InvoiceDetail = {
 export type StudentFeeLedgerRow = {
   id: string;
   date: string;
-  type: "INVOICE" | "PAYMENT" | "WAIVER" | "REFUND";
+  type: 'INVOICE' | 'PAYMENT' | 'WAIVER' | 'REFUND';
   reference: string;
   description: string;
   debit: number;
@@ -595,11 +595,11 @@ export type ReconciliationSummary = {
 };
 
 export type StudentLifecycleStatus =
-  | "ACTIVE"
-  | "TRANSFERRED"
-  | "EXITED"
-  | "ALUMNI"
-  | "DELETED";
+  | 'ACTIVE'
+  | 'TRANSFERRED'
+  | 'EXITED'
+  | 'ALUMNI'
+  | 'DELETED';
 
 export type StudentLifecycleTransition = {
   id: string;
@@ -721,10 +721,10 @@ export type GeneratedStudentDocumentMeta = {
 };
 
 export type GuardianIdentityVerificationStatus =
-  | "PENDING"
-  | "VERIFIED"
-  | "REJECTED"
-  | "REVOKED";
+  | 'PENDING'
+  | 'VERIFIED'
+  | 'REJECTED'
+  | 'REVOKED';
 
 export type GuardianIdentityVerification = {
   id: string;
@@ -778,7 +778,7 @@ export type IemisExportRow = {
 };
 
 export type IemisExportResult = {
-  formatVersion: "SCHOLOS-IEMIS-1.0";
+  formatVersion: 'SCHOLOS-IEMIS-1.0';
   exportedAt: string;
   totalRecords: number;
   validRecords: number;
@@ -806,7 +806,7 @@ export type JournalEntryView = {
   } | null;
   lines: Array<{
     id: string;
-    side: "DEBIT" | "CREDIT";
+    side: 'DEBIT' | 'CREDIT';
     amount: number;
     description: string | null;
     accountName: string;
@@ -981,7 +981,7 @@ export type BulkAdmissionImportResult = {
   failed: number;
   results: Array<{
     rowNumber: number;
-    status: "created" | "validated" | "failed";
+    status: 'created' | 'validated' | 'failed';
     studentId?: string;
     studentSystemId?: string;
     errors?: string[];
@@ -1031,7 +1031,7 @@ export type AttendanceAnalytics = {
   todaySummary: {
     date: string;
     sessionCount: number;
-    totals: AttendanceSummary["totals"];
+    totals: AttendanceSummary['totals'];
   };
   monthlyAttendance: {
     month: number;
@@ -1077,7 +1077,7 @@ export type AttendanceOperationalSummary = {
     classId: string;
     sectionId: string | null;
     submittedAt: string | null;
-    totals: AttendanceSummary["totals"];
+    totals: AttendanceSummary['totals'];
   };
   studentMonthly: {
     studentId: string;
@@ -1174,7 +1174,7 @@ export type AttendanceCalendarDayView = {
   isWorkingDay: boolean;
   label: string | null;
   holidayType: string | null;
-  source: "explicit" | "weekday_fallback";
+  source: 'explicit' | 'weekday_fallback';
 };
 
 export type SchoolCalendarDaySummary = {
@@ -1186,7 +1186,7 @@ export type SchoolCalendarDaySummary = {
 };
 
 export type AttendanceEscalationWarning = {
-  type: "consecutive_absence" | "below_threshold";
+  type: 'consecutive_absence' | 'below_threshold';
   sourceType: string;
   sourceId: string;
   studentId: string;
@@ -1375,7 +1375,7 @@ export type ActivityReaction = {
   activityPostId: string;
   guardianId: string | null;
   studentId: string | null;
-  reaction: "HEART" | "CLAP" | "STAR";
+  reaction: 'HEART' | 'CLAP' | 'STAR';
   createdAt: string;
 };
 
@@ -1396,7 +1396,7 @@ export type DevelopmentalMilestone = {
   studentId: string;
   domain: string;
   milestone: string;
-  status: "EMERGING" | "PROGRESSING" | "ACHIEVED" | "NEEDS_SUPPORT";
+  status: 'EMERGING' | 'PROGRESSING' | 'ACHIEVED' | 'NEEDS_SUPPORT';
   observationNote: string | null;
   photoObjectKey: string | null;
   photoUrl: string | null;
@@ -1432,6 +1432,28 @@ export type NotificationDelivery = {
   body: string;
   sentAt: string | null;
   createdAt: string;
+};
+
+export type NotificationDeliveryFailureSummary = {
+  id: string;
+  status: string;
+  channel: string;
+  sourceType: string;
+  sourceId: string;
+  title: string;
+  lastFailureReason: string | null;
+  retryCount: number;
+  retryStatus: 'retryable' | 'pending' | 'not_retryable';
+  lastRetryAt: string | null;
+  failedAt: string | null;
+  createdAt: string;
+  recipientSummary: {
+    audienceType: string;
+    recipientUserId: string | null;
+    guardianId: string | null;
+    studentId: string | null;
+    destinationMasked: string | null;
+  };
 };
 
 export type ConsentRecord = {
@@ -1543,7 +1565,13 @@ export type MarkEntrySummary = {
   subjectId: string;
   studentId: string;
   marksObtained: number;
-  status: 'PRESENT' | 'ABSENT' | 'EXCUSED' | 'MISSING' | 'WITHHELD' | 'SUBMITTED';
+  status:
+    | 'PRESENT'
+    | 'ABSENT'
+    | 'EXCUSED'
+    | 'MISSING'
+    | 'WITHHELD'
+    | 'SUBMITTED';
   remarks: string | null;
   isLocked: boolean;
   student?: StudentProfile;
@@ -1563,7 +1591,11 @@ export type CasRecordSummary = {
   maxScore: number;
   observedOn: string;
   note: string | null;
-  student?: { firstNameEn: string; lastNameEn: string; studentSystemId: string };
+  student?: {
+    firstNameEn: string;
+    lastNameEn: string;
+    studentSystemId: string;
+  };
   subject?: { code: string; name: string };
   class?: { name: string };
   section?: { name: string | null };
@@ -1598,9 +1630,9 @@ export type PromotionReadiness = {
   percentage: number;
   grade: string;
   gpa: number;
-  status: "READY" | "REVIEW" | "BLOCKED";
+  status: 'READY' | 'REVIEW' | 'BLOCKED';
   reasons: string[];
-  recommendedAction: "PROMOTE" | "REVIEW" | "HOLD";
+  recommendedAction: 'PROMOTE' | 'REVIEW' | 'HOLD';
   lifecycleStatus: string;
   outstandingBalance: number;
 };
@@ -1608,7 +1640,7 @@ export type PromotionReadiness = {
 export type PromotionResult = {
   studentId: string;
   studentName: string;
-  status: "promoted" | "skipped" | "failed";
+  status: 'promoted' | 'skipped' | 'failed';
   reason?: string;
 };
 
@@ -1699,7 +1731,11 @@ export type RoomSummary = {
   isActive: boolean;
 };
 
-export type TimetableVersionStatus = 'DRAFT' | 'PUBLISHED' | 'LOCKED' | 'ARCHIVED';
+export type TimetableVersionStatus =
+  | 'DRAFT'
+  | 'PUBLISHED'
+  | 'LOCKED'
+  | 'ARCHIVED';
 
 export type TimetableVersionSummary = {
   id: string;
@@ -2157,4 +2193,3 @@ export type FileAssetSummary = {
   status: FileStatus;
   createdAt: string;
 };
-

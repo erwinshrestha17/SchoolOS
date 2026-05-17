@@ -1,6 +1,6 @@
 # SchoolOS Master Project Memory
 
-**Status:** M0 Platform Core Foundation Complete with Provider/Queue Pilot Hardening + Phase 2 Academics/Accounting Production Polish Implemented + Student QR Foundation Implemented + Phase 3 Operations (Homework, Timetable, HR, Payroll) Hardened
+**Status:** M0 Platform Core Provider/Queue Hardening + M10 Provider/Attachment Depth + Phase 2 Academics/Accounting Production Polish + Student QR Foundation + Phase 3/4 Operations Depth Hardened
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard
 
@@ -15,6 +15,7 @@ DEVELOPMENT_RULES.md
 docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
 docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md
 docs/project/SCHOOLOS_PLATFORM_AND_SETTINGS.md
+docs/project/SCHOOLOS_TRANSPORT_REALTIME_READINESS.md
 ```
 
 Do not recreate separate phase structure, scalability, student QR, M9, M11, pricing, platform-core, or settings-boundary docs unless the project grows enough to justify splitting them again.
@@ -28,12 +29,13 @@ Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation: Completed across eight sprints; provider/queue pilot hardening implemented; broader pilot hardening remains
+M10 Communication provider/attachment/retry depth: Implemented for admin web scope
 Phase 2A M4 Academics backend/admin UI: Completed
 Phase 2 Academics production polish: Completed (report-card PDFs, corrections/history, exports, snapshots, and smoke coverage)
 Student QR Foundation: Implemented; release hardening remains
 Phase 2D M9 Accounting: Completed
 Phase 2 Accounting production polish: Completed (report PDFs, snapshots, reconciliation suggestions, audit trail, and smoke coverage)
-Current stage: M0 platform foundation complete with provider/queue hardening + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3 operations (Homework, Timetable, HR, Payroll) hardened
+Current stage: M0 platform foundation complete with provider/queue hardening + M10 provider/attachment/retry depth + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3/4 operations feature-depth hardening for M6, M7, M8A, M8C, and M8B
 ```
 
 Targeted web-admin frontend polish and Phase 2F browser smoke coverage are now present on main.
@@ -53,8 +55,9 @@ Recommended near-term direction:
 ```text
 Strict Phase Gate 0 from docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md
 → keep verification, migrations, seed data, smoke tests, and stale docs stable
-→ continue controlled pilot reliability across M0 and Phase 1 core
-→ then deepen Homework/Timetable, HR/Payroll, Library, Transport, and Canteen one vertical at a time
+→ continue controlled pilot reliability across M0, M10, and Phase 1 core
+→ run staging browser/manual QA for Homework/Timetable, HR/Payroll, Library, Canteen, and Transport
+→ then add remaining depth only where pilot evidence shows risk
 ```
 
 Do not expand Phase 2/3 modules broadly at once. Existing Phase 3 admin modules may be polished and hardened, but parent/mobile and driver-facing experiences remain separate future scope.
@@ -115,13 +118,13 @@ Rules:
 | M3 | Fees & Receipts | Phase 1A/1B complete / pilot-ready |
 | M4 | Exams, CAS & Report Cards | Phase 2 backend/admin UI plus production PDF/report/correction/snapshot polish implemented |
 | M5 | Activity Feed & Milestones | Phase 1A/1B complete with media/moderation hardening foundations |
-| M6 | Homework & Timetable | Phase 3 operational hardening complete (File Registry, reminders, absence conflicts, teacher dashboard) |
-| M7 | HR & Payroll | Phase 3 operational hardening complete (Posting locks, accounting integration, reversals, PII masking) |
-| M8A | Library Management | Phase 3 admin/backend foundation implemented with fines, reports, history, and QR lookup |
-| M8B | Transport Management | Phase 3 admin/trip/location/report foundation implemented; live/driver/parent later |
-| M8C | Canteen Management | Phase 3 admin/wallet/POS/inventory/vendor/report foundation implemented; integrations and parent views later |
+| M6 | Homework & Timetable | Phase 3 operational hardening complete plus parent/student homework access fail-closed depth |
+| M7 | HR & Payroll | Phase 3 operational hardening complete plus run-scoped register/PF/TDS/component reporting depth |
+| M8A | Library Management | Phase 3 admin/backend foundation plus fine-to-fees/accounting tests, staff borrower support, bounded history, and QR lookup |
+| M8B | Transport Management | Phase 3 admin/trip/location/report foundation plus GPS pressure guard, Redis cache/fanout tests, and retention cleanup bounds; live/driver/parent later |
+| M8C | Canteen Management | Phase 3 admin/wallet/POS/inventory/vendor/report foundation plus POS receipt endpoint and wallet negative-balance guards; parent views later |
 | M9 | Accounting & Finance | Phase 2D production-candidate complete plus PDF/snapshot/reconciliation polish implemented |
-| M10 | Notices & Communication | Phase 1A/1B + parent-teacher chat foundation |
+| M10 | Notices & Communication | Phase 1A/1B + parent-teacher chat foundation plus provider modes, File Registry attachments, and failure-dashboard depth |
 | M11 | School Intelligence & Analytics | Roadmap only; implementation deferred |
 
 ---

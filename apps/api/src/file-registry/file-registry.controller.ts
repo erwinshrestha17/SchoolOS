@@ -17,7 +17,7 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { FileRegistryService } from './file-registry.service';
 import { StorageService } from '../storage/storage.service';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 class UploadFileDto {
   @IsString()
@@ -35,6 +35,10 @@ class UploadFileDto {
   @IsString()
   @IsNotEmpty()
   module!: string;
+
+  @IsOptional()
+  @IsString()
+  entityId?: string;
 }
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -54,6 +58,10 @@ const MODULE_UPLOAD_PERMISSIONS: Record<string, string[]> = {
   'homework-submission': ['homework:submit'],
   reports: ['reports:export'],
   students: ['student_documents:manage'],
+  notices: ['notices:create'],
+  'notice-delivery': ['notices:create', 'communications:retry_deliveries'],
+  messages: ['messaging:create'],
+  'parent-teacher-chat': ['messaging:create'],
 };
 
 @Controller('files')
@@ -89,6 +97,7 @@ export class FileRegistryController {
       mimeType: dto.contentType,
       sizeBytes: stored.sizeBytes,
       module: dto.module,
+      entityId: dto.entityId,
     });
 
     return {
@@ -108,6 +117,7 @@ export class FileRegistryController {
       auth.tenantId,
       id,
     );
+    await this.fileRegistryService.assertFileAccessForAuth(asset, auth);
     const url = await this.fileRegistryService.getSignedUrl(auth.tenantId, id);
 
     return {
@@ -125,12 +135,19 @@ export class FileRegistryController {
     @Param('id') id: string,
     @Res() res: Response,
   ) {
-    const { asset, content } =
-      await this.fileRegistryService.getProtectedDownload(
-        auth.tenantId,
-        id,
-        auth.userId,
-      );
+    const asset = await this.fileRegistryService.getFileMetadata(
+      auth.tenantId,
+      id,
+    );
+    await this.fileRegistryService.assertFileAccessForAuth(asset, auth);
+    await this.fileRegistryService.auditAccess(
+      auth.tenantId,
+      id,
+      auth.userId,
+      'download',
+    );
+    const content = await this.storageService.getObjectBuffer(asset.objectKey);
+    await this.fileRegistryService.assertFileAccessForAuth(asset, auth);
 
     res.setHeader('Content-Type', asset.mimeType);
     res.setHeader(

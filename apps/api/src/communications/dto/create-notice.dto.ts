@@ -29,6 +29,10 @@ export class CreateNoticeDto {
   attachmentUrl?: string;
 
   @IsOptional()
+  @IsString()
+  attachmentFileId?: string;
+
+  @IsOptional()
   @IsDateString()
   scheduledFor?: string;
 }

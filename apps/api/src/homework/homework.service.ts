@@ -58,6 +58,7 @@ export class HomeworkService {
   async listAssignments(actor: AuthContext, query: HomeworkQueryDto) {
     const skip = ((query.page ?? 1) - 1) * (query.limit ?? 20);
     const take = query.limit ?? 20;
+    let scopedStudentId: string | null = null;
 
     const where: Prisma.HomeworkAssignmentWhereInput = {
       tenantId: actor.tenantId,
@@ -75,6 +76,10 @@ export class HomeworkService {
         where: { tenantId: actor.tenantId, userId: actor.userId },
         select: { id: true, classId: true, sectionId: true },
       });
+      if (!student) {
+        return { items: [], total: 0 };
+      }
+      scopedStudentId = student.id;
       if (student) {
         where.classId = student.classId;
         if (student.sectionId) {
@@ -93,6 +98,10 @@ export class HomeworkService {
           where: { id: studentId },
           select: { classId: true, sectionId: true },
         });
+        if (!student) {
+          return { items: [], total: 0 };
+        }
+        scopedStudentId = studentId;
         if (student) {
           where.classId = student.classId;
           if (student.sectionId) {
@@ -101,10 +110,15 @@ export class HomeworkService {
             where.sectionId = null;
           }
         }
+      } else {
+        return { items: [], total: 0 };
       }
     }
 
     if (query.studentId) {
+      if (scopedStudentId && query.studentId !== scopedStudentId) {
+        return { items: [], total: 0 };
+      }
       where.submissions = {
         some: { studentId: query.studentId },
       };

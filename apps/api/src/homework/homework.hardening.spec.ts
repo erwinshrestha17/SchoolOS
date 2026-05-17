@@ -200,4 +200,75 @@ describe('Homework Hardening', () => {
       ).rejects.toThrow(); // Should throw ForbiddenException
     });
   });
+
+  describe('Parent and student list scoping', () => {
+    it('returns an empty homework list instead of tenant-wide rows when a parent has no linked student', async () => {
+      const p = prisma as any;
+      const parentActor: AuthContext = {
+        ...actor,
+        userId: 'parent-user-1',
+        roles: ['parent'],
+        permissions: ['homework:read'],
+      };
+      p.studentGuardian.findFirst.mockResolvedValue(null);
+
+      await expect(
+        homeworkService.listAssignments(parentActor, {}),
+      ).resolves.toEqual({ items: [], total: 0 });
+
+      expect(p.homeworkAssignment.findMany).not.toHaveBeenCalled();
+      expect(p.homeworkAssignment.count).not.toHaveBeenCalled();
+    });
+
+    it('blocks parent homework list queries for a student outside the guardian link', async () => {
+      const p = prisma as any;
+      const parentActor: AuthContext = {
+        ...actor,
+        userId: 'parent-user-1',
+        roles: ['parent'],
+        permissions: ['homework:read'],
+      };
+      p.studentGuardian.findFirst.mockResolvedValue(null);
+
+      await expect(
+        homeworkService.listAssignments(parentActor, {
+          studentId: 'other-student',
+        }),
+      ).resolves.toEqual({ items: [], total: 0 });
+
+      expect(p.studentGuardian.findFirst).toHaveBeenCalledWith({
+        where: {
+          tenantId: 'tenant-a',
+          guardian: { userId: 'parent-user-1' },
+          studentId: 'other-student',
+        },
+        select: { studentId: true },
+      });
+      expect(p.homeworkAssignment.findMany).not.toHaveBeenCalled();
+    });
+
+    it('blocks student homework list queries for another student id', async () => {
+      const p = prisma as any;
+      const studentActor: AuthContext = {
+        ...actor,
+        userId: 'student-user-1',
+        roles: ['student'],
+        permissions: ['homework:submit'],
+      };
+      p.student.findFirst.mockResolvedValue({
+        id: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+      });
+
+      await expect(
+        homeworkService.listAssignments(studentActor, {
+          studentId: 'student-2',
+        }),
+      ).resolves.toEqual({ items: [], total: 0 });
+
+      expect(p.homeworkAssignment.findMany).not.toHaveBeenCalled();
+      expect(p.homeworkAssignment.count).not.toHaveBeenCalled();
+    });
+  });
 });

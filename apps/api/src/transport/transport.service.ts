@@ -866,6 +866,19 @@ export class TransportService {
     this.assertValidLocationPing(dto);
 
     const recordedAt = dto.recordedAt ? new Date(dto.recordedAt) : new Date();
+    const redis = this.redisService.getClient();
+    const pressureAccepted = await redis.set(
+      this.locationPressureKey(actor.tenantId, trip.id, actor.userId),
+      '1',
+      'EX',
+      1,
+      'NX',
+    );
+
+    if (!pressureAccepted) {
+      throw new ConflictException('Location pings are being sent too quickly');
+    }
+
     const payload: LocationPayload = {
       tenantId: actor.tenantId,
       tripId: trip.id,
@@ -878,14 +891,12 @@ export class TransportService {
       recordedAt: recordedAt.toISOString(),
     };
 
-    await this.redisService
-      .getClient()
-      .set(
-        this.latestLocationKey(actor.tenantId, trip.id),
-        JSON.stringify(payload),
-        'EX',
-        60 * 60 * 6,
-      );
+    await redis.set(
+      this.latestLocationKey(actor.tenantId, trip.id),
+      JSON.stringify(payload),
+      'EX',
+      60 * 60 * 6,
+    );
 
     const latestPersisted = await this.prisma.transportLocationPing.findFirst({
       where: { tenantId: actor.tenantId, tripId: trip.id },
@@ -916,12 +927,10 @@ export class TransportService {
       });
     }
 
-    await this.redisService
-      .getClient()
-      .publish(
-        this.locationUpdateChannel(actor.tenantId, trip.id),
-        JSON.stringify(payload),
-      );
+    await redis.publish(
+      this.locationUpdateChannel(actor.tenantId, trip.id),
+      JSON.stringify(payload),
+    );
 
     return payload;
   }
@@ -1320,6 +1329,12 @@ export class TransportService {
       );
     }
 
+    if (daysToKeep < 1 || daysToKeep > 365) {
+      throw new BadRequestException(
+        'Location history retention must be between 1 and 365 days',
+      );
+    }
+
     const cutOff = new Date();
     cutOff.setDate(cutOff.getDate() - daysToKeep);
 
@@ -1638,6 +1653,14 @@ export class TransportService {
 
   private latestLocationKey(tenantId: string, tripId: string) {
     return `transport:${tenantId}:trip:${tripId}:latest-location`;
+  }
+
+  private locationPressureKey(
+    tenantId: string,
+    tripId: string,
+    userId: string,
+  ) {
+    return `transport:${tenantId}:trip:${tripId}:location-pressure:${userId}`;
   }
 
   private locationUpdateChannel(tenantId: string, tripId: string) {

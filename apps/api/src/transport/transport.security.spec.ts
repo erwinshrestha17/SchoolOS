@@ -1,10 +1,15 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { TransportService } from './transport.service';
 import { TransportHardeningService } from './transport-hardening.service';
 import { TransportTripStatus } from '@prisma/client';
 
 describe('Transport Security Boundaries', () => {
   let prisma: any;
+  let redisClient: any;
   let service: TransportService;
   let hardeningService: TransportHardeningService;
 
@@ -46,13 +51,24 @@ describe('Transport Security Boundaries', () => {
       transportTripStudentStatus: {
         findFirst: jest.fn(),
       },
+      transportLocationPing: {
+        findFirst: jest.fn(),
+        create: jest.fn(),
+        deleteMany: jest.fn(),
+      },
+    };
+    redisClient = {
+      set: jest.fn().mockResolvedValue('OK'),
+      get: jest.fn().mockResolvedValue(null),
+      publish: jest.fn().mockResolvedValue(1),
+      del: jest.fn(),
     };
 
     service = new TransportService(
       prisma as any,
       {} as any,
       {} as any,
-      {} as any,
+      { getClient: () => redisClient } as any,
     );
     hardeningService = new TransportHardeningService(
       prisma as any,
@@ -79,9 +95,38 @@ describe('Transport Security Boundaries', () => {
         staff: { userId: driverActor.userId },
       });
 
-      // We only test the permission check part of recordLocationPing indirectly
-      // by calling the private assertion if we could, but here we'll mock the whole flow
-      // Actually, since we want to prove the boundary, we check if ForbiddenException is thrown for wrong driver
+      prisma.transportLocationPing.findFirst.mockResolvedValue(null);
+
+      const result = await service.recordLocationPing(
+        tripId,
+        { latitude: 27.7172, longitude: 85.324 },
+        driverActor,
+      );
+
+      expect(result).toMatchObject({ tripId, vehicleId: 'v-1' });
+      expect(prisma.transportDriverAssignment.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { tenantId, id: assignmentId },
+        }),
+      );
+      expect(redisClient.set).toHaveBeenCalledWith(
+        expect.stringContaining(':location-pressure:driver-1'),
+        '1',
+        'EX',
+        1,
+        'NX',
+      );
+      expect(redisClient.set).toHaveBeenCalledWith(
+        expect.stringContaining(':latest-location'),
+        expect.any(String),
+        'EX',
+        21600,
+      );
+      expect(prisma.transportLocationPing.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ tenantId, tripId }),
+        }),
+      );
     });
 
     it('denies driver from recording location for another driver trip', async () => {
@@ -120,8 +165,47 @@ describe('Transport Security Boundaries', () => {
         vehicleId: 'v-1',
       });
 
-      // Admin bypasses assignment check
-      // This is verified by checking that findFirst for assignment is NOT called or doesn't matter
+      prisma.transportLocationPing.findFirst.mockResolvedValue({
+        recordedAt: new Date(),
+      });
+
+      await service.recordLocationPing(
+        tripId,
+        { latitude: 27.7172, longitude: 85.324 },
+        adminActor,
+      );
+
+      expect(prisma.transportDriverAssignment.findFirst).not.toHaveBeenCalled();
+      expect(prisma.transportLocationPing.create).not.toHaveBeenCalled();
+      expect(redisClient.publish).toHaveBeenCalledWith(
+        expect.stringContaining(':location-updates'),
+        expect.any(String),
+      );
+    });
+
+    it('rejects location ingestion pressure before cache or database writes', async () => {
+      prisma.transportTrip.findFirst.mockResolvedValue({
+        id: 'trip-1',
+        status: TransportTripStatus.ACTIVE,
+        driverAssignmentId: 'assignment-1',
+        vehicleId: 'v-1',
+      });
+      prisma.transportDriverAssignment.findFirst.mockResolvedValue({
+        id: 'assignment-1',
+        staff: { userId: driverActor.userId },
+      });
+      redisClient.set.mockResolvedValueOnce(null);
+
+      await expect(
+        service.recordLocationPing(
+          'trip-1',
+          { latitude: 27.7172, longitude: 85.324 },
+          driverActor,
+        ),
+      ).rejects.toThrow(ConflictException);
+
+      expect(prisma.transportLocationPing.create).not.toHaveBeenCalled();
+      expect(redisClient.publish).not.toHaveBeenCalled();
     });
   });
 
@@ -178,6 +262,15 @@ describe('Transport Security Boundaries', () => {
       expect(readiness.prohibitedEffects).toEqual(
         expect.arrayContaining(['invoice_create', 'journal_post']),
       );
+    });
+  });
+
+  describe('Location Retention Boundary', () => {
+    it('rejects unsafe cleanup retention windows', async () => {
+      await expect(
+        service.cleanupLocationHistory(adminActor, 0),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.transportLocationPing.deleteMany).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,10 +1,9 @@
 'use client';
 
-import type { ApiResponse } from '@schoolos/core';
+import type { NotificationDeliveryFailureSummary } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { RefreshCcw, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
-import { Badge } from '../ui/badge';
 import { LoadingState } from '../ui/loading-state';
 import { EmptyState } from '../ui/empty-state';
 import { cn } from '../../lib/utils';
@@ -59,14 +58,25 @@ export function DeliveryRetryPanel() {
   const queryClient = useQueryClient();
   const deliveriesQuery = useQuery({
     queryKey: ['notification-deliveries'],
-    queryFn: async () => (await api.listNotificationDeliveries()) as DeliveryRecord[],
+    queryFn: async () =>
+      (await api.listNotificationDeliveries()) as DeliveryRecord[],
+    enabled: status === 'authenticated',
+  });
+  const failuresQuery = useQuery({
+    queryKey: ['notification-delivery-failures'],
+    queryFn: api.listNotificationDeliveryFailures,
     enabled: status === 'authenticated',
   });
 
   const retryMutation = useMutation({
     mutationFn: api.retryNotificationDelivery,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['notification-deliveries'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['notification-delivery-failures'],
+      });
       void queryClient.invalidateQueries({ queryKey: ['notification-center'] });
     },
   });
@@ -74,14 +84,27 @@ export function DeliveryRetryPanel() {
   const retryAllMutation = useMutation({
     mutationFn: api.retryFailedNotificationDeliveries,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['notification-deliveries'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['notification-delivery-failures'],
+      });
       void queryClient.invalidateQueries({ queryKey: ['notification-center'] });
     },
   });
 
   const deliveries = deliveriesQuery.data ?? [];
-  const failedDeliveries = deliveries.filter((delivery) => delivery.status === 'FAILED');
-  const retryingDeliveries = deliveries.filter((delivery) => delivery.status === 'RETRYING');
+  const failureItems = failuresQuery.data?.items ?? [];
+  const failureById = new Map<string, NotificationDeliveryFailureSummary>(
+    failureItems.map((item) => [item.id, item]),
+  );
+  const failedDeliveries = deliveries.filter(
+    (delivery) => delivery.status === 'FAILED',
+  );
+  const retryingDeliveries = deliveries.filter(
+    (delivery) => delivery.status === 'RETRYING',
+  );
   const retryableDeliveries = deliveries.filter((delivery) =>
     retryableStatuses.has(delivery.status),
   );
@@ -97,7 +120,8 @@ export function DeliveryRetryPanel() {
             Retry failed records
           </h2>
           <p className="mt-2 max-w-2xl text-sm font-medium text-slate-500">
-            Manage and resolve delivery gaps. Failed notifications can be retried individually or in batches.
+            Manage and resolve delivery gaps. Failed notifications can be
+            retried individually or in batches.
           </p>
         </div>
 
@@ -107,7 +131,13 @@ export function DeliveryRetryPanel() {
           disabled={failedDeliveries.length === 0 || retryAllMutation.isPending}
           onClick={() => retryAllMutation.mutate()}
         >
-          <RefreshCcw size={14} className={cn("stroke-[3]", retryAllMutation.isPending ? 'animate-spin' : '')} />
+          <RefreshCcw
+            size={14}
+            className={cn(
+              'stroke-[3]',
+              retryAllMutation.isPending ? 'animate-spin' : '',
+            )}
+          />
           {retryAllMutation.isPending
             ? 'Retrying Batch...'
             : `Retry All Failed (${failedDeliveries.length})`}
@@ -115,17 +145,42 @@ export function DeliveryRetryPanel() {
       </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-4">
-        <RetryMetric label="Total Records" value={String(deliveries.length)} icon={<Clock size={16} />} />
-        <RetryMetric label="Failed" value={String(failedDeliveries.length)} tone="danger" icon={<AlertCircle size={16} />} />
-        <RetryMetric label="Retrying" value={String(retryingDeliveries.length)} tone="warning" icon={<RefreshCcw size={16} />} />
-        <RetryMetric label="Recoverable" value={String(retryableDeliveries.length)} tone="info" icon={<CheckCircle2 size={16} />} />
+        <RetryMetric
+          label="Total Records"
+          value={String(deliveries.length)}
+          icon={<Clock size={16} />}
+        />
+        <RetryMetric
+          label="Failed"
+          value={String(failureItems.length || failedDeliveries.length)}
+          tone="danger"
+          icon={<AlertCircle size={16} />}
+        />
+        <RetryMetric
+          label="Retrying"
+          value={String(retryingDeliveries.length)}
+          tone="warning"
+          icon={<RefreshCcw size={16} />}
+        />
+        <RetryMetric
+          label="Recoverable"
+          value={String(retryableDeliveries.length)}
+          tone="info"
+          icon={<CheckCircle2 size={16} />}
+        />
       </div>
 
       {retryMutation.isError ? (
-        <InlineRetryMessage tone="error" message={retryMutation.error.message} />
+        <InlineRetryMessage
+          tone="error"
+          message={retryMutation.error.message}
+        />
       ) : null}
       {retryAllMutation.isError ? (
-        <InlineRetryMessage tone="error" message={retryAllMutation.error.message} />
+        <InlineRetryMessage
+          tone="error"
+          message={retryAllMutation.error.message}
+        />
       ) : null}
       {retryMutation.isSuccess ? (
         <InlineRetryMessage
@@ -142,66 +197,92 @@ export function DeliveryRetryPanel() {
 
       <div className="mt-8 overflow-hidden rounded-[2rem] border border-slate-100 bg-slate-50/50">
         {deliveriesQuery.isLoading ? (
-          <LoadingState variant="spinner" label="Gathering delivery history..." />
+          <LoadingState
+            variant="spinner"
+            label="Gathering delivery history..."
+          />
         ) : deliveriesQuery.isError ? (
           <div className="p-8 text-center">
-            <p className="text-sm font-bold text-rose-600">Failed to sync delivery records.</p>
+            <p className="text-sm font-bold text-rose-600">
+              Failed to sync delivery records.
+            </p>
+          </div>
+        ) : failuresQuery.isError ? (
+          <div className="p-8 text-center">
+            <p className="text-sm font-bold text-rose-600">
+              Failed to load delivery failure detail.
+            </p>
           </div>
         ) : retryableDeliveries.length === 0 ? (
-          <EmptyState 
-            title="All systems clear" 
-            description="No failed or retrying notifications found in recent history." 
+          <EmptyState
+            title="All systems clear"
+            description="No failed or retrying notifications found in recent history."
           />
         ) : (
           <div className="divide-y divide-slate-100">
-            {retryableDeliveries.slice(0, 25).map((delivery) => (
-              <article
-                key={delivery.id}
-                className="grid gap-4 bg-white p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge status={delivery.status} />
-                    <span className="rounded-full bg-gray-100 px-2 py-1 text-[0.68rem] font-semibold uppercase text-gray-500">
-                      {delivery.channel}
-                    </span>
-                    <span className="rounded-full bg-gray-100 px-2 py-1 text-[0.68rem] font-semibold text-gray-500">
-                      {delivery.sourceType}
-                    </span>
-                  </div>
-                  <h3 className="mt-2 truncate text-sm font-semibold text-gray-950">
-                    {delivery.title}
-                  </h3>
-                  <p className="mt-1 line-clamp-2 text-sm leading-6 text-gray-500">
-                    {delivery.errorMessage || delivery.body}
-                  </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-400">
-                    <span>{resolveRecipientLabel(delivery)}</span>
-                    {delivery.noticeId ? (
-                      <Link
-                        href={`/dashboard/notices/${delivery.noticeId}`}
-                        className="font-semibold text-primary-700 hover:text-primary-800"
-                      >
-                        Open source notice
-                      </Link>
-                    ) : null}
-                  </div>
-                </div>
+            {retryableDeliveries.slice(0, 25).map((delivery) =>
+              (() => {
+                const failureDetail = failureById.get(delivery.id);
+                return (
+                  <article
+                    key={delivery.id}
+                    className="grid gap-4 bg-white p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge status={delivery.status} />
+                        <span className="rounded-full bg-gray-100 px-2 py-1 text-[0.68rem] font-semibold uppercase text-gray-500">
+                          {delivery.channel}
+                        </span>
+                        <span className="rounded-full bg-gray-100 px-2 py-1 text-[0.68rem] font-semibold text-gray-500">
+                          {delivery.sourceType}
+                        </span>
+                      </div>
+                      <h3 className="mt-2 truncate text-sm font-semibold text-gray-950">
+                        {delivery.title}
+                      </h3>
+                      <p className="mt-1 line-clamp-2 text-sm leading-6 text-gray-500">
+                        {failureDetail?.lastFailureReason ||
+                          delivery.errorMessage ||
+                          delivery.body}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-400">
+                        <span>{resolveRecipientLabel(delivery)}</span>
+                        {failureDetail ? (
+                          <span>
+                            Retries: {failureDetail.retryCount} /{' '}
+                            {formatRetryStatus(failureDetail.retryStatus)}
+                          </span>
+                        ) : null}
+                        {delivery.noticeId ? (
+                          <Link
+                            href={`/dashboard/notices/${delivery.noticeId}`}
+                            className="font-semibold text-primary-700 hover:text-primary-800"
+                          >
+                            Open source notice
+                          </Link>
+                        ) : null}
+                      </div>
+                    </div>
 
-                <button
-                  type="button"
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={retryMutation.isPending}
-                  onClick={() => retryMutation.mutate(delivery.id)}
-                >
-                  <RefreshCcw
-                    size={16}
-                    className={retryMutation.isPending ? 'animate-spin' : ''}
-                  />
-                  Retry
-                </button>
-              </article>
-            ))}
+                    <button
+                      type="button"
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={retryMutation.isPending}
+                      onClick={() => retryMutation.mutate(delivery.id)}
+                    >
+                      <RefreshCcw
+                        size={16}
+                        className={
+                          retryMutation.isPending ? 'animate-spin' : ''
+                        }
+                      />
+                      Retry
+                    </button>
+                  </article>
+                );
+              })(),
+            )}
           </div>
         )}
       </div>
@@ -228,12 +309,23 @@ function RetryMetric({
   }[tone];
 
   return (
-    <div className={cn("rounded-2xl p-5 border transition-all hover:shadow-md hover:shadow-slate-200/50 group", toneClass)}>
+    <div
+      className={cn(
+        'rounded-2xl p-5 border transition-all hover:shadow-md hover:shadow-slate-200/50 group',
+        toneClass,
+      )}
+    >
       <div className="flex items-center justify-between">
-        <p className="text-[10px] font-black uppercase tracking-widest opacity-60">{label}</p>
-        <span className="opacity-40 group-hover:opacity-100 transition-opacity">{icon}</span>
+        <p className="text-[10px] font-black uppercase tracking-widest opacity-60">
+          {label}
+        </p>
+        <span className="opacity-40 group-hover:opacity-100 transition-opacity">
+          {icon}
+        </span>
       </div>
-      <p className="mt-2 text-2xl font-black tabular-nums tracking-tight">{value}</p>
+      <p className="mt-2 text-2xl font-black tabular-nums tracking-tight">
+        {value}
+      </p>
     </div>
   );
 }
@@ -247,7 +339,9 @@ function StatusBadge({ status }: { status: string }) {
         : 'bg-blue-100 text-blue-700';
 
   return (
-    <span className={`rounded-full px-2 py-1 text-[0.68rem] font-bold uppercase ${tone}`}>
+    <span
+      className={`rounded-full px-2 py-1 text-[0.68rem] font-bold uppercase ${tone}`}
+    >
       {status}
     </span>
   );
@@ -275,7 +369,10 @@ function InlineRetryMessage({
 
 function resolveRecipientLabel(delivery: DeliveryRecord) {
   const guardianName = delivery.guardian?.fullName;
-  const studentName = [delivery.student?.firstNameEn, delivery.student?.lastNameEn]
+  const studentName = [
+    delivery.student?.firstNameEn,
+    delivery.student?.lastNameEn,
+  ]
     .filter(Boolean)
     .join(' ')
     .trim();
@@ -284,6 +381,17 @@ function resolveRecipientLabel(delivery: DeliveryRecord) {
     return `${guardianName} / ${studentName}`;
   }
 
-  return guardianName || studentName || delivery.destination || 'Recipient unavailable';
+  return (
+    guardianName ||
+    studentName ||
+    delivery.destination ||
+    'Recipient unavailable'
+  );
 }
 
+function formatRetryStatus(status: string) {
+  return status
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}

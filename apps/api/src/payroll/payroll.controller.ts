@@ -281,16 +281,22 @@ export class PayrollController {
 
   @Get('runs/:id/register')
   @Permissions('payroll:reports:read')
-  getPayrollRunRegister(@CurrentAuth() auth: AuthContext) {
-    return this.payrollService.getPayrollRegister(auth);
+  getPayrollRunRegister(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.getPayrollRegister(auth, id);
   }
 
   @Get('runs/:id/register/export.csv')
   @Header('Content-Type', 'text/csv')
   @Header('Content-Disposition', 'attachment; filename="payroll-register.csv"')
   @Permissions('payroll:exports:create')
-  exportPayrollRunRegisterCsv(@CurrentAuth() auth: AuthContext) {
-    return this.payrollService.exportPayrollRegisterCsv(auth);
+  exportPayrollRunRegisterCsv(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.exportPayrollRegisterCsv(auth, id);
   }
 
   @Get('reports/register')
@@ -308,13 +314,19 @@ export class PayrollController {
   @Get('reports/pf')
   @Permissions('payroll:reports:read')
   getPayrollPf(@CurrentAuth() auth: AuthContext) {
-    return this.payrollService.getPayrollRegister(auth);
+    return this.payrollService.getPayrollPfSummary(auth);
   }
 
   @Get('reports/tds')
   @Permissions('payroll:reports:read')
   getPayrollTds(@CurrentAuth() auth: AuthContext) {
-    return this.payrollService.getPayrollRegister(auth);
+    return this.payrollService.getPayrollTdsSummary(auth);
+  }
+
+  @Get('reports/salary-components')
+  @Permissions('payroll:reports:read')
+  getSalaryComponentSummary(@CurrentAuth() auth: AuthContext) {
+    return this.payrollService.getSalaryComponentSummary(auth);
   }
 
   @Get('reports/leave-deductions')

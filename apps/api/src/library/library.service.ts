@@ -1161,8 +1161,8 @@ export class LibraryService {
 
     const items = await Promise.all(
       popular.map(async (p) => {
-        const copy = await this.prisma.libraryCopy.findUnique({
-          where: { id: p.copyId },
+        const copy = await this.prisma.libraryCopy.findFirst({
+          where: { id: p.copyId, tenantId: actor.tenantId },
           include: { book: true },
         });
         return {
@@ -1193,6 +1193,7 @@ export class LibraryService {
         borrowerStaff: true,
       },
       orderBy: { issuedAt: 'desc' },
+      take: 100,
     });
 
     return { book, history: issues };
@@ -1216,6 +1217,7 @@ export class LibraryService {
         borrowerStaff: true,
       },
       orderBy: { issuedAt: 'desc' },
+      take: 100,
     });
 
     return { copy, history: issues };
@@ -1256,6 +1258,8 @@ export class LibraryService {
         borrowerStudent: true,
         borrowerStaff: true,
       },
+      orderBy: [{ dueAt: 'asc' }],
+      take: 100,
     });
 
     const rows = overdue.map((issue) => ({

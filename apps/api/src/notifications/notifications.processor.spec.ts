@@ -4,6 +4,9 @@ import { NotificationsProcessor } from './notifications.processor';
 describe('NotificationsProcessor', () => {
   const originalEmailMode = process.env.EMAIL_DELIVERY_MODE;
   const originalEmailWebhookUrl = process.env.EMAIL_WEBHOOK_URL;
+  const originalNotificationMode =
+    process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE;
+  const originalFetch = global.fetch;
 
   afterEach(() => {
     if (originalEmailMode === undefined) {
@@ -17,10 +20,22 @@ describe('NotificationsProcessor', () => {
     } else {
       process.env.EMAIL_WEBHOOK_URL = originalEmailWebhookUrl;
     }
+
+    if (originalNotificationMode === undefined) {
+      delete process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE;
+    } else {
+      process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE =
+        originalNotificationMode;
+    }
+
+    global.fetch = originalFetch;
   });
 
   it('marks queued delivery rows as sent after provider processing succeeds', async () => {
     const prisma = {
+      providerConfig: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       notificationDelivery: {
         update: jest.fn(),
       },
@@ -47,6 +62,9 @@ describe('NotificationsProcessor', () => {
       data: {
         status: NotificationStatus.SENT,
         sentAt: expect.any(Date),
+        deliveredAt: undefined,
+        failedAt: undefined,
+        providerMessageId: undefined,
         errorMessage: null,
       },
     });
@@ -54,9 +72,19 @@ describe('NotificationsProcessor', () => {
 
   it('marks delivery rows as failed when provider processing fails', async () => {
     delete process.env.EMAIL_WEBHOOK_URL;
-    process.env.EMAIL_DELIVERY_MODE = 'webhook';
+    process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE = 'configured-provider';
 
     const prisma = {
+      providerConfig: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'provider-1',
+          type: 'EMAIL',
+          name: 'generic-email',
+          enabled: true,
+          configEncrypted: {},
+          secretKeys: [],
+        }),
+      },
       notificationDelivery: {
         update: jest.fn(),
       },
@@ -79,15 +107,126 @@ describe('NotificationsProcessor', () => {
         },
       } as never),
     ).rejects.toThrow(
-      'EMAIL_WEBHOOK_URL must be configured when EMAIL_DELIVERY_MODE=webhook',
+      'email provider is configured-provider but no webhookUrl is configured',
     );
 
     expect(prisma.notificationDelivery.update).toHaveBeenCalledWith({
       where: { id: 'delivery-2' },
       data: {
         status: NotificationStatus.FAILED,
+        sentAt: undefined,
+        deliveredAt: undefined,
+        failedAt: expect.any(Date),
+        providerMessageId: undefined,
         errorMessage:
-          'EMAIL_WEBHOOK_URL must be configured when EMAIL_DELIVERY_MODE=webhook',
+          'email provider is configured-provider but no webhookUrl is configured',
+      },
+    });
+  });
+
+  it('marks delivery rows as skipped in disabled provider mode', async () => {
+    process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE = 'disabled';
+
+    const prisma = {
+      providerConfig: {
+        findFirst: jest.fn(),
+      },
+      notificationDelivery: {
+        update: jest.fn(),
+      },
+    };
+    const processor = new NotificationsProcessor(prisma as never);
+
+    await processor.process({
+      name: 'sendSms',
+      data: {
+        to: '+9779800000000',
+        message: 'School closed today.',
+        metadata: {
+          tenantId: 'tenant-1',
+          notificationDeliveryId: 'delivery-3',
+          sourceType: 'notice',
+          sourceId: 'notice-1',
+        },
+      },
+    } as never);
+
+    expect(prisma.providerConfig.findFirst).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.update).toHaveBeenCalledWith({
+      where: { id: 'delivery-3' },
+      data: {
+        status: NotificationStatus.SKIPPED,
+        sentAt: undefined,
+        deliveredAt: undefined,
+        failedAt: undefined,
+        providerMessageId: undefined,
+        errorMessage: 'sms provider disabled by configuration',
+      },
+    });
+  });
+
+  it('uses the configured provider adapter boundary with a mocked generic webhook', async () => {
+    process.env.SCHOOLOS_NOTIFICATION_PROVIDER_MODE = 'configured-provider';
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      headers: {
+        get: jest.fn().mockReturnValue('provider-msg-1'),
+      },
+    }) as never;
+
+    const prisma = {
+      providerConfig: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'provider-1',
+          type: 'EMAIL',
+          name: 'generic-email',
+          enabled: true,
+          configEncrypted: {
+            webhookUrl: 'https://provider.test/email',
+            apiToken: 'test-token',
+          },
+          secretKeys: ['apiToken'],
+        }),
+      },
+      notificationDelivery: {
+        update: jest.fn(),
+      },
+    };
+    const processor = new NotificationsProcessor(prisma as never);
+
+    await processor.process({
+      name: 'sendEmail',
+      data: {
+        to: 'guardian@school.test',
+        subject: 'Notice',
+        text: 'Read this notice',
+        metadata: {
+          tenantId: 'tenant-1',
+          notificationDeliveryId: 'delivery-4',
+          sourceType: 'notice',
+          sourceId: 'notice-1',
+        },
+      },
+    } as never);
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://provider.test/email',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer test-token',
+        }),
+      }),
+    );
+    expect(prisma.notificationDelivery.update).toHaveBeenCalledWith({
+      where: { id: 'delivery-4' },
+      data: {
+        status: NotificationStatus.SENT,
+        sentAt: expect.any(Date),
+        deliveredAt: undefined,
+        failedAt: undefined,
+        providerMessageId: 'provider-msg-1',
+        errorMessage: null,
       },
     });
   });

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
+import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { UsageModule } from '../usage/usage.module';
 import { CommunicationsService } from './communications.service';
@@ -20,7 +21,13 @@ import { NotificationDeliveriesAliasController } from './notification-deliveries
 import { NoticesController } from './notices.controller';
 
 @Module({
-  imports: [AuthModule, NotificationsModule, AuditModule, UsageModule],
+  imports: [
+    AuthModule,
+    NotificationsModule,
+    AuditModule,
+    UsageModule,
+    FileRegistryModule,
+  ],
   controllers: [
     NoticesController,
     NoticeDetailController,

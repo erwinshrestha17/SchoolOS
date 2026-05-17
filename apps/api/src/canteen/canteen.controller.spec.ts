@@ -34,6 +34,7 @@ function createController() {
     createPosSale: jest.fn(),
     completePosSale: jest.fn(),
     cancelPosSale: jest.fn(),
+    getPosReceipt: jest.fn(),
     listPosSales: jest.fn(),
     upsertSpendingControl: jest.fn(),
     getSpendingControl: jest.fn(),
@@ -349,6 +350,9 @@ describe('CanteenController M8C contracts', () => {
     canteenService.createPosSale.mockReturnValue({ id: 'sale-1' });
     canteenService.completePosSale.mockReturnValue({ status: 'COMPLETED' });
     canteenService.cancelPosSale.mockReturnValue({ status: 'CANCELLED' });
+    canteenService.getPosReceipt.mockReturnValue({
+      receiptNumber: 'POS-2026-000001',
+    });
     canteenService.listPosSales.mockReturnValue({ items: [] });
     canteenService.upsertSpendingControl.mockReturnValue({ id: 'control-1' });
     canteenService.getSpendingControl.mockReturnValue({ id: 'control-1' });
@@ -361,6 +365,9 @@ describe('CanteenController M8C contracts', () => {
     });
     expect(controller.cancelPosSale('sale-1', actor)).toEqual({
       status: 'CANCELLED',
+    });
+    expect(controller.getPosReceipt('sale-1', actor)).toEqual({
+      receiptNumber: 'POS-2026-000001',
     });
     expect(
       controller.listPosSales(
@@ -393,6 +400,7 @@ describe('CanteenController M8C contracts', () => {
       page: '1',
       limit: '20',
     });
+    expect(canteenService.getPosReceipt).toHaveBeenCalledWith('sale-1', actor);
   });
 
   it('delegates reports and CSV exports from backend service boundaries', () => {

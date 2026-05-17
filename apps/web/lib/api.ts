@@ -44,6 +44,7 @@ import type {
   ChatAvailabilityStatus,
   MoodLog,
   NotificationDelivery,
+  NotificationDeliveryFailureSummary,
   NoticeSummary,
   PayrollRunSummary,
   PayrollPreviewResult,
@@ -732,7 +733,7 @@ export const api = {
     }),
   listStudentDocuments: (studentId: string) =>
     request(withQuery('/student-documents', { studentId })),
-  uploadFile: async (file: File, module: string) => {
+  uploadFile: async (file: File, module: string, entityId?: string) => {
     const reader = new FileReader();
     const base64Promise = new Promise<string>((resolve) => {
       reader.onload = () => {
@@ -744,18 +745,21 @@ export const api = {
 
     const base64Content = await base64Promise;
 
-    return request<{ id: string; fileName: string; publicUrl: string | null }>(
-      '/files/upload',
-      {
-        method: 'POST',
-        json: {
-          fileName: file.name,
-          contentType: file.type,
-          base64Content,
-          module,
-        },
+    return request<{
+      id: string;
+      fileName: string;
+      publicUrl: string | null;
+      protectedUrl?: string;
+    }>('/files/upload', {
+      method: 'POST',
+      json: {
+        fileName: file.name,
+        contentType: file.type,
+        base64Content,
+        module,
+        ...(entityId ? { entityId } : {}),
       },
-    );
+    });
   },
   getFileView: (id: string) =>
     request<{
@@ -2192,6 +2196,11 @@ export const api = {
         method: 'POST',
       },
     ),
+  listNotificationDeliveryFailures: () =>
+    request<{
+      total: number;
+      items: NotificationDeliveryFailureSummary[];
+    }>('/communications/deliveries/failures'),
   retryFailedNotificationDeliveries: () =>
     request<any>('/communications/deliveries/retry-failed', { method: 'POST' }),
 

@@ -12,6 +12,7 @@ import {
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEventDto } from './dto/create-event.dto';
@@ -28,6 +29,7 @@ export class CommunicationsService {
     private readonly notificationsService: NotificationsService,
     private readonly auditService: AuditService,
     private readonly usageService: UsageService,
+    private readonly fileRegistryService?: FileRegistryService,
   ) {}
 
   async listNotices(actor: AuthContext) {
@@ -40,6 +42,7 @@ export class CommunicationsService {
 
   async createNotice(dto: CreateNoticeDto, actor: AuthContext) {
     await this.ensureAudienceRefs(actor, dto.classId, dto.sectionId);
+    const attachmentUrl = await this.resolveNoticeAttachment(dto, actor);
 
     const publishedAt = dto.scheduledFor ? null : new Date();
     const notice = await this.prisma.notice.create({
@@ -52,11 +55,21 @@ export class CommunicationsService {
         audienceType: dto.audienceType ?? AudienceType.ALL,
         classId: dto.classId ?? null,
         sectionId: dto.sectionId ?? null,
-        attachmentUrl: dto.attachmentUrl ?? null,
+        attachmentUrl,
         scheduledFor: dto.scheduledFor ? new Date(dto.scheduledFor) : null,
         publishedAt,
       },
     });
+
+    if (dto.attachmentFileId && this.fileRegistryService) {
+      await this.fileRegistryService.linkToEntity(
+        actor.tenantId,
+        dto.attachmentFileId,
+        'notices',
+        notice.id,
+        actor.userId,
+      );
+    }
 
     if (publishedAt) {
       await this.recordDeliveryRecords({
@@ -91,6 +104,7 @@ export class CommunicationsService {
         title: notice.title,
         priority: notice.priority,
         audienceType: notice.audienceType,
+        attachmentFileId: dto.attachmentFileId ?? null,
       },
     });
 
@@ -669,6 +683,30 @@ export class CommunicationsService {
         },
       });
     }
+  }
+
+  private async resolveNoticeAttachment(
+    dto: CreateNoticeDto,
+    actor: AuthContext,
+  ) {
+    if (!dto.attachmentFileId) {
+      return dto.attachmentUrl ?? null;
+    }
+
+    if (!this.fileRegistryService) {
+      throw new NotFoundException('File Registry is not available');
+    }
+
+    const asset = await this.fileRegistryService.getFileMetadata(
+      actor.tenantId,
+      dto.attachmentFileId,
+    );
+
+    if (asset.module && asset.module !== 'notices') {
+      throw new NotFoundException('Notice attachment file not found');
+    }
+
+    return this.fileRegistryService.getSignedUrl(actor.tenantId, asset.id);
   }
 
   private async ensureAudienceRefs(
