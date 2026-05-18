@@ -20,6 +20,7 @@ import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
 import { CreateSalaryStructureDto } from './dto/create-salary-structure.dto';
 import { PayrollActionDto } from './dto/payroll-action.dto';
 import { PayrollPreviewQueryDto } from './dto/payroll-preview-query.dto';
+import { PayrollReportQueryDto } from './dto/payroll-report-query.dto';
 import { UpdateSalaryStructureDto } from './dto/update-salary-structure.dto';
 import { PayrollSalarySlipService } from './payroll-salary-slip.service';
 import { PayrollService } from './payroll.service';
@@ -301,54 +302,78 @@ export class PayrollController {
 
   @Get('reports/register')
   @Permissions('payroll:reports:read')
-  getPayrollRegister(@CurrentAuth() auth: AuthContext) {
-    return this.payrollService.getPayrollRegister(auth);
+  getPayrollRegister(
+    @Query() query: PayrollReportQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.getPayrollRegister(auth, query);
   }
 
   @Get('reports/summary')
   @Permissions('payroll:reports:read')
-  getPayrollSummary(@CurrentAuth() auth: AuthContext) {
-    return this.payrollService.getPayrollSummary(auth);
+  getPayrollSummary(
+    @Query() query: PayrollReportQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.getPayrollSummary(auth, query);
   }
 
   @Get('reports/pf')
   @Permissions('payroll:reports:read')
-  getPayrollPf(@CurrentAuth() auth: AuthContext) {
-    return this.payrollService.getPayrollPfSummary(auth);
+  getPayrollPf(
+    @Query() query: PayrollReportQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.getPayrollPfSummary(auth, query);
   }
 
   @Get('reports/tds')
   @Permissions('payroll:reports:read')
-  getPayrollTds(@CurrentAuth() auth: AuthContext) {
-    return this.payrollService.getPayrollTdsSummary(auth);
+  getPayrollTds(
+    @Query() query: PayrollReportQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.getPayrollTdsSummary(auth, query);
   }
 
   @Get('reports/salary-components')
   @Permissions('payroll:reports:read')
-  getSalaryComponentSummary(@CurrentAuth() auth: AuthContext) {
-    return this.payrollService.getSalaryComponentSummary(auth);
+  getSalaryComponentSummary(
+    @Query() query: PayrollReportQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.getSalaryComponentSummary(auth, query);
   }
 
   @Get('reports/leave-deductions')
   @Permissions('payroll:reports:read')
-  getPayrollLeaveDeductions(@CurrentAuth() auth: AuthContext) {
-    return this.payrollService.getPayrollRegister(auth);
+  getPayrollLeaveDeductions(
+    @Query() query: PayrollReportQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.getPayrollLeaveDeductionSummary(auth, query);
   }
 
   @Get('reports/register.csv')
   @Header('Content-Type', 'text/csv')
   @Header('Content-Disposition', 'attachment; filename="payroll-register.csv"')
   @Permissions('payroll:exports:create')
-  exportPayrollRegisterCsv(@CurrentAuth() auth: AuthContext) {
-    return this.payrollService.exportPayrollRegisterCsv(auth);
+  exportPayrollRegisterCsv(
+    @Query() query: PayrollReportQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.exportPayrollRegisterCsv(auth, query);
   }
 
   @Get('reports/pf/export.csv')
   @Header('Content-Type', 'text/csv')
   @Header('Content-Disposition', 'attachment; filename="payroll-pf-report.csv"')
   @Permissions('payroll:exports:create')
-  exportPayrollPfCsv(@CurrentAuth() auth: AuthContext) {
-    return this.payrollService.exportPayrollRegisterCsv(auth);
+  exportPayrollPfCsv(
+    @Query() query: PayrollReportQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.exportPayrollPfCsv(auth, query);
   }
 
   @Get('reports/tds/export.csv')
@@ -358,7 +383,10 @@ export class PayrollController {
     'attachment; filename="payroll-tds-report.csv"',
   )
   @Permissions('payroll:exports:create')
-  exportPayrollTdsCsv(@CurrentAuth() auth: AuthContext) {
-    return this.payrollService.exportPayrollRegisterCsv(auth);
+  exportPayrollTdsCsv(
+    @Query() query: PayrollReportQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.payrollService.exportPayrollTdsCsv(auth, query);
   }
 }

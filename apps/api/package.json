@@ -109,6 +109,7 @@
     ],
     "rootDir": ".",
     "moduleNameMapper": {
+      "^@schoolos/core$": "<rootDir>/../../packages/core/dist/index.js",
       "^@prisma/client$": "<rootDir>/test/mocks/prisma-client.ts",
       "^bullmq$": "<rootDir>/test/mocks/bullmq.ts",
       "^ioredis$": "<rootDir>/test/mocks/ioredis.ts"

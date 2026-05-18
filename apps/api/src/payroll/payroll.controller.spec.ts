@@ -38,7 +38,10 @@ function createController() {
     getPayrollPfSummary: jest.fn(),
     getPayrollTdsSummary: jest.fn(),
     getSalaryComponentSummary: jest.fn(),
+    getPayrollLeaveDeductionSummary: jest.fn(),
     exportPayrollRegisterCsv: jest.fn(),
+    exportPayrollPfCsv: jest.fn(),
+    exportPayrollTdsCsv: jest.fn(),
   };
   const salarySlipService = {
     getApprovedSalarySlipPdf: jest.fn(),
@@ -222,6 +225,7 @@ describe('PayrollController M7 contracts', () => {
 
   it('delegates payroll reports and CSV export from backend service', () => {
     const { controller, payrollService } = createController();
+    const query = { year: 2026, month: 5 };
     payrollService.getPayrollRegister.mockReturnValue({ lines: [] });
     payrollService.getPayrollSummary.mockReturnValue({ totalNet: 0 });
     payrollService.getPayrollPfSummary.mockReturnValue({
@@ -229,20 +233,35 @@ describe('PayrollController M7 contracts', () => {
     });
     payrollService.getPayrollTdsSummary.mockReturnValue({ totalTds: 0 });
     payrollService.getSalaryComponentSummary.mockReturnValue({ netPayable: 0 });
+    payrollService.getPayrollLeaveDeductionSummary.mockReturnValue({
+      leaveDeductions: 0,
+    });
     payrollService.exportPayrollRegisterCsv.mockReturnValue(
       'Employee,Net\nE-001,50000',
     );
+    payrollService.exportPayrollPfCsv.mockReturnValue('Employee,PF\nE-001,0');
+    payrollService.exportPayrollTdsCsv.mockReturnValue('Employee,TDS\nE-001,0');
 
-    expect(controller.getPayrollRegister(actor)).toEqual({ lines: [] });
-    expect(controller.getPayrollSummary(actor)).toEqual({ totalNet: 0 });
-    expect(controller.getPayrollPf(actor)).toEqual({ totalContribution: 0 });
-    expect(controller.getPayrollTds(actor)).toEqual({ totalTds: 0 });
-    expect(controller.getSalaryComponentSummary(actor)).toEqual({
+    expect(controller.getPayrollRegister(query, actor)).toEqual({ lines: [] });
+    expect(controller.getPayrollSummary(query, actor)).toEqual({ totalNet: 0 });
+    expect(controller.getPayrollPf(query, actor)).toEqual({
+      totalContribution: 0,
+    });
+    expect(controller.getPayrollTds(query, actor)).toEqual({ totalTds: 0 });
+    expect(controller.getSalaryComponentSummary(query, actor)).toEqual({
       netPayable: 0,
     });
-    expect(controller.getPayrollLeaveDeductions(actor)).toEqual({ lines: [] });
-    expect(controller.exportPayrollRegisterCsv(actor)).toBe(
+    expect(controller.getPayrollLeaveDeductions(query, actor)).toEqual({
+      leaveDeductions: 0,
+    });
+    expect(controller.exportPayrollRegisterCsv(query, actor)).toBe(
       'Employee,Net\nE-001,50000',
+    );
+    expect(controller.exportPayrollPfCsv(query, actor)).toBe(
+      'Employee,PF\nE-001,0',
+    );
+    expect(controller.exportPayrollTdsCsv(query, actor)).toBe(
+      'Employee,TDS\nE-001,0',
     );
     expect(controller.getPayrollRunRegister('run-1', actor)).toEqual({
       lines: [],
@@ -250,21 +269,46 @@ describe('PayrollController M7 contracts', () => {
     expect(controller.exportPayrollRunRegisterCsv('run-1', actor)).toBe(
       'Employee,Net\nE-001,50000',
     );
-    expect(payrollService.getPayrollRegister).toHaveBeenCalledWith(actor);
+    expect(payrollService.getPayrollRegister).toHaveBeenCalledWith(
+      actor,
+      query,
+    );
     expect(payrollService.getPayrollRegister).toHaveBeenCalledWith(
       actor,
       'run-1',
     );
-    expect(payrollService.getPayrollSummary).toHaveBeenCalledWith(actor);
-    expect(payrollService.getPayrollPfSummary).toHaveBeenCalledWith(actor);
-    expect(payrollService.getPayrollTdsSummary).toHaveBeenCalledWith(actor);
+    expect(payrollService.getPayrollSummary).toHaveBeenCalledWith(actor, query);
+    expect(payrollService.getPayrollPfSummary).toHaveBeenCalledWith(
+      actor,
+      query,
+    );
+    expect(payrollService.getPayrollTdsSummary).toHaveBeenCalledWith(
+      actor,
+      query,
+    );
     expect(payrollService.getSalaryComponentSummary).toHaveBeenCalledWith(
       actor,
+      query,
     );
-    expect(payrollService.exportPayrollRegisterCsv).toHaveBeenCalledWith(actor);
+    expect(payrollService.getPayrollLeaveDeductionSummary).toHaveBeenCalledWith(
+      actor,
+      query,
+    );
+    expect(payrollService.exportPayrollRegisterCsv).toHaveBeenCalledWith(
+      actor,
+      query,
+    );
     expect(payrollService.exportPayrollRegisterCsv).toHaveBeenCalledWith(
       actor,
       'run-1',
+    );
+    expect(payrollService.exportPayrollPfCsv).toHaveBeenCalledWith(
+      actor,
+      query,
+    );
+    expect(payrollService.exportPayrollTdsCsv).toHaveBeenCalledWith(
+      actor,
+      query,
     );
   });
 });

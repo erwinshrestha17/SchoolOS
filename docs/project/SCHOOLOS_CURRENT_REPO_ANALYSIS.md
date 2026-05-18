@@ -1,6 +1,6 @@
 # SchoolOS Current Repo Status Analysis
 
-**Last updated:** 2026-05-17
+**Last updated:** 2026-05-18
 
 **Scope:** Full repo documentation review against `apps/api`, `apps/web`, `packages/core`, Prisma schema, and available tests.
 
@@ -60,7 +60,7 @@ Latest feature-depth implementation:
 ```text
 M10: explicit notification provider modes, adapter boundary, failure dashboard API, File Registry notice/chat attachment access, guardian-owned chat attachment tests, and notice composer attachment upload.
 M6: parent/student homework listing now fails closed when the actor is not linked to the requested student.
-M7: payroll register endpoints now honor run scope; PF, TDS, and salary-component summaries are explicit backend reports.
+M7: payroll register endpoints now honor run scope; PF, TDS, and salary-component summaries are explicit backend reports. Payroll report filters now support run/month/year/status/department/staff scope, PF/TDS CSV exports use dedicated backend report services, and the web payroll reports/dashboard no longer show hard-coded payroll or ledger figures.
 M8A: library fine-to-fees/accounting posting tests, staff borrower tests, purpose-limited QR test, and bounded history/report reads.
 M8C: POS receipt endpoint, receipt controller coverage, and wallet reversal/correction negative-balance guards.
 M8B: Redis-backed GPS pressure guard, latest-location cache/publish tests, throttled persistence coverage, and bounded cleanup retention.

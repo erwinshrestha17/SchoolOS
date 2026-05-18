@@ -203,7 +203,7 @@ export function PayrollRuns() {
   });
 
   const exportMutation = useMutation({
-    mutationFn: api.exportPayrollRegisterCsv,
+    mutationFn: () => api.exportPayrollRegisterCsv(),
   });
 
   const salarySlipMutation = useMutation({

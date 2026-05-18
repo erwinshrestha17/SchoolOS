@@ -198,7 +198,11 @@ describe('PayrollService hardening boundaries', () => {
       ],
     });
 
-    const register = await service.getPayrollRegister(actor as never, 'run-1');
+    const register = await service.getPayrollRegister(actor as never, {
+      payrollRunId: 'run-1',
+      department: 'Academics',
+      status: PayrollRunStatus.GENERATED,
+    });
     const pf = await service.getPayrollPfSummary(actor as never, 'run-1');
     const tds = await service.getPayrollTdsSummary(actor as never, 'run-1');
     const components = await service.getSalaryComponentSummary(
@@ -208,8 +212,23 @@ describe('PayrollService hardening boundaries', () => {
 
     expect(prisma.payrollRun.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { tenantId: actor.tenantId, id: 'run-1' },
+        where: {
+          tenantId: actor.tenantId,
+          id: 'run-1',
+          status: PayrollRunStatus.GENERATED,
+        },
         take: 100,
+      }),
+    );
+    expect(prisma.payrollRun.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          lines: expect.objectContaining({
+            where: expect.objectContaining({
+              staff: { department: 'Academics' },
+            }),
+          }),
+        }),
       }),
     );
     expect(register).toHaveLength(1);
@@ -430,6 +449,7 @@ function buildPayrollLine(overrides: Record<string, unknown> = {}) {
     pfEmployee: new Prisma.Decimal(0),
     pfEmployer: new Prisma.Decimal(0),
     tds: new Prisma.Decimal(0),
+    leaveDeductions: new Prisma.Decimal(0),
     netSalary: new Prisma.Decimal(49000),
     paidDays: new Prisma.Decimal(26),
     unpaidDays: new Prisma.Decimal(4),

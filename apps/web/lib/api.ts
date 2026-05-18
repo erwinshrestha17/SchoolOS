@@ -291,6 +291,27 @@ async function openPdfBlob(response: Response) {
   window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer');
 }
 
+async function downloadCsv(path: string, fileName: string) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(parseApiErrorMessage(text) || 'Export failed');
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
 async function downloadReport(reportKey: string, payload: ReportExportRequest) {
   const response = await fetch(
     `${API_BASE_URL}/reports/${encodeURIComponent(reportKey)}/export`,
@@ -1345,31 +1366,37 @@ export const api = {
       `/payroll/salary-structures/${encodeURIComponent(id)}/archive`,
       { method: 'POST', json: {} },
     ),
-  getPayrollRegister: () => request<unknown[]>('/payroll/reports/register'),
-  getPayrollReportSummary: () => request<unknown>('/payroll/reports/summary'),
-  exportPayrollRegisterCsv: async () => {
-    const response = await fetch(
-      `${API_BASE_URL}/payroll/reports/register.csv`,
-      {
-        credentials: 'include',
-      },
-    );
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(parseApiErrorMessage(text) || 'Export failed');
-    }
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `payroll-register-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  },
+  getPayrollRegister: (params?: JsonBody) =>
+    request<unknown[]>(withQuery('/payroll/reports/register', params ?? {})),
+  getPayrollReportSummary: (params?: JsonBody) =>
+    request<unknown>(withQuery('/payroll/reports/summary', params ?? {})),
+  getPayrollPfSummary: (params?: JsonBody) =>
+    request<unknown>(withQuery('/payroll/reports/pf', params ?? {})),
+  getPayrollTdsSummary: (params?: JsonBody) =>
+    request<unknown>(withQuery('/payroll/reports/tds', params ?? {})),
+  getPayrollSalaryComponentSummary: (params?: JsonBody) =>
+    request<unknown>(
+      withQuery('/payroll/reports/salary-components', params ?? {}),
+    ),
+  getPayrollLeaveDeductionSummary: (params?: JsonBody) =>
+    request<unknown>(
+      withQuery('/payroll/reports/leave-deductions', params ?? {}),
+    ),
+  exportPayrollRegisterCsv: (params?: JsonBody) =>
+    downloadCsv(
+      withQuery('/payroll/reports/register.csv', params ?? {}),
+      `payroll-register-${new Date().toISOString().slice(0, 10)}.csv`,
+    ),
+  exportPayrollPfCsv: (params?: JsonBody) =>
+    downloadCsv(
+      withQuery('/payroll/reports/pf/export.csv', params ?? {}),
+      `payroll-pf-${new Date().toISOString().slice(0, 10)}.csv`,
+    ),
+  exportPayrollTdsCsv: (params?: JsonBody) =>
+    downloadCsv(
+      withQuery('/payroll/reports/tds/export.csv', params ?? {}),
+      `payroll-tds-${new Date().toISOString().slice(0, 10)}.csv`,
+    ),
   listPayslips: () => request<PayslipSummary[]>('/payroll/payslips'),
   openPayrollRunStaffPayslipPdf: async (runId: string, staffId: string) => {
     const response = await fetch(

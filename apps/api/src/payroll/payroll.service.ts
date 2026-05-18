@@ -25,6 +25,17 @@ import { PayrollActionDto } from './dto/payroll-action.dto';
 import { PayrollPreviewQueryDto } from './dto/payroll-preview-query.dto';
 import { UpdateSalaryStructureDto } from './dto/update-salary-structure.dto';
 
+type PayrollReportFilters = {
+  payrollRunId?: string;
+  month?: number;
+  year?: number;
+  department?: string;
+  staffId?: string;
+  status?: PayrollRunStatus;
+};
+
+type PayrollReportFilterInput = string | PayrollReportFilters;
+
 @Injectable()
 export class PayrollService {
   constructor(
@@ -1363,10 +1374,32 @@ export class PayrollService {
     ];
   }
 
-  async getPayrollRegister(actor: AuthContext, payrollRunId?: string) {
+  async getPayrollRegister(
+    actor: AuthContext,
+    filtersInput?: PayrollReportFilterInput,
+  ) {
+    const filters = normalizePayrollReportFilters(filtersInput);
+    const lineWhere: Prisma.PayrollLineWhereInput = {
+      ...(filters.staffId ? { staffId: filters.staffId } : {}),
+      ...(filters.department
+        ? { staff: { department: filters.department } }
+        : {}),
+    };
+
     const runs = await this.prisma.payrollRun.findMany({
-      where: { tenantId: actor.tenantId, id: payrollRunId },
-      include: { lines: { include: { staff: true } } },
+      where: {
+        tenantId: actor.tenantId,
+        ...(filters.payrollRunId ? { id: filters.payrollRunId } : {}),
+        ...(filters.month ? { periodMonth: filters.month } : {}),
+        ...(filters.year ? { periodYear: filters.year } : {}),
+        ...(filters.status ? { status: filters.status } : {}),
+      },
+      include: {
+        lines: {
+          where: Object.keys(lineWhere).length > 0 ? lineWhere : undefined,
+          include: { staff: true },
+        },
+      },
       orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
       take: 100,
     });
@@ -1380,8 +1413,10 @@ export class PayrollService {
         staffId: line.staffId,
         employeeId: line.staff.employeeId,
         staffName: `${line.staff.firstName} ${line.staff.lastName}`,
+        department: line.staff.department,
         grossSalary: Number(line.grossSalary),
         deductions: Number(line.deductions),
+        leaveDeductions: Number(line.leaveDeductions),
         pfEmployee: Number(line.pfEmployee),
         pfEmployer: Number(line.pfEmployer),
         tds: Number(line.tds),
@@ -1392,58 +1427,47 @@ export class PayrollService {
     );
   }
 
-  async getPayrollSummary(actor: AuthContext) {
-    const runs = await this.prisma.payrollRun.findMany({
-      where: { tenantId: actor.tenantId },
-      include: { lines: true },
-      take: 100,
-    });
+  async getPayrollSummary(
+    actor: AuthContext,
+    filtersInput?: PayrollReportFilterInput,
+  ) {
+    const rows = await this.getPayrollRegister(actor, filtersInput);
+    const runIds = new Set(rows.map((row) => row.payrollRunId));
 
-    return runs.reduce(
-      (summary, run) => ({
-        runCount: summary.runCount + 1,
-        staffCount: summary.staffCount + run.lines.length,
-        gross: summary.gross + Number(run.grossAmount),
-        deductions: summary.deductions + Number(run.deductionAmount),
-        netPayable: summary.netPayable + Number(run.netAmount),
-        pf:
-          summary.pf +
-          Number(run.pfEmployeeAmount) +
-          Number(run.pfEmployerAmount),
-        tds: summary.tds + Number(run.tdsAmount),
-      }),
-      {
-        runCount: 0,
-        staffCount: 0,
-        gross: 0,
-        deductions: 0,
-        netPayable: 0,
-        pf: 0,
-        tds: 0,
-      },
-    );
+    return {
+      runCount: runIds.size,
+      staffCount: rows.length,
+      gross: decimalNumber(sumReportMoney(rows, (row) => row.grossSalary)),
+      deductions: decimalNumber(sumReportMoney(rows, (row) => row.deductions)),
+      netPayable: decimalNumber(sumReportMoney(rows, (row) => row.netPayable)),
+      pf: decimalNumber(
+        sumReportMoney(rows, (row) => row.pfEmployee + row.pfEmployer),
+      ),
+      tds: decimalNumber(sumReportMoney(rows, (row) => row.tds)),
+    };
   }
 
-  async getPayrollPfSummary(actor: AuthContext, payrollRunId?: string) {
-    const rows = await this.getPayrollRegister(actor, payrollRunId);
+  async getPayrollPfSummary(
+    actor: AuthContext,
+    filtersInput?: PayrollReportFilterInput,
+  ) {
+    const filters = normalizePayrollReportFilters(filtersInput);
+    const rows = await this.getPayrollRegister(actor, filters);
     const contributors = rows.filter(
       (row) => row.pfEmployee > 0 || row.pfEmployer > 0,
     );
 
     return {
-      payrollRunId: payrollRunId ?? null,
+      payrollRunId: filters.payrollRunId ?? null,
       staffCount: contributors.length,
-      employeeContribution: contributors.reduce(
-        (sum, row) => sum + row.pfEmployee,
-        0,
+      employeeContribution: decimalNumber(
+        sumReportMoney(contributors, (row) => row.pfEmployee),
       ),
-      employerContribution: contributors.reduce(
-        (sum, row) => sum + row.pfEmployer,
-        0,
+      employerContribution: decimalNumber(
+        sumReportMoney(contributors, (row) => row.pfEmployer),
       ),
-      totalContribution: contributors.reduce(
-        (sum, row) => sum + row.pfEmployee + row.pfEmployer,
-        0,
+      totalContribution: decimalNumber(
+        sumReportMoney(contributors, (row) => row.pfEmployee + row.pfEmployer),
       ),
       rows: contributors.map((row) => ({
         payrollRunId: row.payrollRunId,
@@ -1457,14 +1481,18 @@ export class PayrollService {
     };
   }
 
-  async getPayrollTdsSummary(actor: AuthContext, payrollRunId?: string) {
-    const rows = await this.getPayrollRegister(actor, payrollRunId);
+  async getPayrollTdsSummary(
+    actor: AuthContext,
+    filtersInput?: PayrollReportFilterInput,
+  ) {
+    const filters = normalizePayrollReportFilters(filtersInput);
+    const rows = await this.getPayrollRegister(actor, filters);
     const contributors = rows.filter((row) => row.tds > 0);
 
     return {
-      payrollRunId: payrollRunId ?? null,
+      payrollRunId: filters.payrollRunId ?? null,
       staffCount: contributors.length,
-      totalTds: contributors.reduce((sum, row) => sum + row.tds, 0),
+      totalTds: decimalNumber(sumReportMoney(contributors, (row) => row.tds)),
       rows: contributors.map((row) => ({
         payrollRunId: row.payrollRunId,
         employeeId: row.employeeId,
@@ -1476,41 +1504,85 @@ export class PayrollService {
     };
   }
 
-  async getSalaryComponentSummary(actor: AuthContext, payrollRunId?: string) {
-    const rows = await this.getPayrollRegister(actor, payrollRunId);
+  async getSalaryComponentSummary(
+    actor: AuthContext,
+    filtersInput?: PayrollReportFilterInput,
+  ) {
+    const filters = normalizePayrollReportFilters(filtersInput);
+    const rows = await this.getPayrollRegister(actor, filters);
 
     return {
-      payrollRunId: payrollRunId ?? null,
+      payrollRunId: filters.payrollRunId ?? null,
       staffCount: rows.length,
-      grossSalary: rows.reduce((sum, row) => sum + row.grossSalary, 0),
-      deductions: rows.reduce((sum, row) => sum + row.deductions, 0),
-      pfEmployee: rows.reduce((sum, row) => sum + row.pfEmployee, 0),
-      pfEmployer: rows.reduce((sum, row) => sum + row.pfEmployer, 0),
-      tds: rows.reduce((sum, row) => sum + row.tds, 0),
-      netPayable: rows.reduce((sum, row) => sum + row.netPayable, 0),
+      grossSalary: decimalNumber(
+        sumReportMoney(rows, (row) => row.grossSalary),
+      ),
+      deductions: decimalNumber(sumReportMoney(rows, (row) => row.deductions)),
+      leaveDeductions: decimalNumber(
+        sumReportMoney(rows, (row) => row.leaveDeductions),
+      ),
+      pfEmployee: decimalNumber(sumReportMoney(rows, (row) => row.pfEmployee)),
+      pfEmployer: decimalNumber(sumReportMoney(rows, (row) => row.pfEmployer)),
+      tds: decimalNumber(sumReportMoney(rows, (row) => row.tds)),
+      netPayable: decimalNumber(sumReportMoney(rows, (row) => row.netPayable)),
     };
   }
 
-  async exportPayrollRegisterCsv(actor: AuthContext, payrollRunId?: string) {
-    const rows = await this.getPayrollRegister(actor, payrollRunId);
+  async getPayrollLeaveDeductionSummary(
+    actor: AuthContext,
+    filtersInput?: PayrollReportFilterInput,
+  ) {
+    const filters = normalizePayrollReportFilters(filtersInput);
+    const rows = (await this.getPayrollRegister(actor, filters)).filter(
+      (row) => row.leaveDeductions > 0 || row.unpaidDays > 0,
+    );
+
+    return {
+      payrollRunId: filters.payrollRunId ?? null,
+      staffCount: rows.length,
+      leaveDeductions: decimalNumber(
+        sumReportMoney(rows, (row) => row.leaveDeductions),
+      ),
+      unpaidDays: decimalNumber(sumReportMoney(rows, (row) => row.unpaidDays)),
+      rows: rows.map((row) => ({
+        payrollRunId: row.payrollRunId,
+        employeeId: row.employeeId,
+        staffName: row.staffName,
+        department: row.department,
+        periodMonth: row.periodMonth,
+        periodYear: row.periodYear,
+        leaveDeductions: row.leaveDeductions,
+        unpaidDays: row.unpaidDays,
+      })),
+    };
+  }
+
+  async exportPayrollRegisterCsv(
+    actor: AuthContext,
+    filtersInput?: PayrollReportFilterInput,
+  ) {
+    const filters = normalizePayrollReportFilters(filtersInput);
+    const rows = await this.getPayrollRegister(actor, filters);
 
     await this.auditService.record({
       action: 'export',
       resource: 'payroll_register',
       tenantId: actor.tenantId,
       userId: actor.userId,
-      after: { rowCount: rows.length, payrollRunId: payrollRunId ?? null },
+      after: { rowCount: rows.length, filters },
     });
 
     return [
-      'Period,Employee ID,Staff Name,Gross,Deductions,PF Employee,PF Employer,TDS,Net Payable,Paid Days,Unpaid Days,Status',
+      'Period,Employee ID,Staff Name,Department,Gross,Deductions,Leave Deductions,PF Employee,PF Employer,TDS,Net Payable,Paid Days,Unpaid Days,Status',
       ...rows.map((row) =>
         [
           `${row.periodYear}-${String(row.periodMonth).padStart(2, '0')}`,
           row.employeeId,
           row.staffName,
+          row.department ?? '',
           row.grossSalary,
           row.deductions,
+          row.leaveDeductions,
           row.pfEmployee,
           row.pfEmployer,
           row.tds,
@@ -1518,7 +1590,71 @@ export class PayrollService {
           row.paidDays,
           row.unpaidDays,
           row.status,
-        ].join(','),
+        ]
+          .map(csvCell)
+          .join(','),
+      ),
+    ].join('\n');
+  }
+
+  async exportPayrollPfCsv(
+    actor: AuthContext,
+    filtersInput?: PayrollReportFilterInput,
+  ) {
+    const filters = normalizePayrollReportFilters(filtersInput);
+    const report = await this.getPayrollPfSummary(actor, filters);
+
+    await this.auditService.record({
+      action: 'export',
+      resource: 'payroll_pf_report',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: { rowCount: report.rows.length, filters },
+    });
+
+    return [
+      'Period,Employee ID,Staff Name,PF Employee,PF Employer,PF Total',
+      ...report.rows.map((row) =>
+        [
+          `${row.periodYear}-${String(row.periodMonth).padStart(2, '0')}`,
+          row.employeeId,
+          row.staffName,
+          row.pfEmployee,
+          row.pfEmployer,
+          row.pfEmployee + row.pfEmployer,
+        ]
+          .map(csvCell)
+          .join(','),
+      ),
+    ].join('\n');
+  }
+
+  async exportPayrollTdsCsv(
+    actor: AuthContext,
+    filtersInput?: PayrollReportFilterInput,
+  ) {
+    const filters = normalizePayrollReportFilters(filtersInput);
+    const report = await this.getPayrollTdsSummary(actor, filters);
+
+    await this.auditService.record({
+      action: 'export',
+      resource: 'payroll_tds_report',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: { rowCount: report.rows.length, filters },
+    });
+
+    return [
+      'Period,Employee ID,Staff Name,TDS',
+      ...report.rows.map((row) =>
+        [
+          `${row.periodYear}-${String(row.periodMonth).padStart(2, '0')}`,
+          row.employeeId,
+          row.staffName,
+          row.tds,
+        ]
+          .map(csvCell)
+          .join(','),
       ),
     ].join('\n');
   }
@@ -1732,6 +1868,46 @@ function moneyDecimal(value: Prisma.Decimal) {
 
 function decimalNumber(value: Prisma.Decimal | number | string) {
   return Number(new Prisma.Decimal(value));
+}
+
+function sumReportMoney<T>(
+  rows: T[],
+  pick: (row: T) => Prisma.Decimal | number | string,
+) {
+  return rows.reduce(
+    (sum, row) => sum.add(new Prisma.Decimal(pick(row))),
+    new Prisma.Decimal(0),
+  );
+}
+
+function normalizePayrollReportFilters(
+  input?: PayrollReportFilterInput,
+): PayrollReportFilters {
+  if (!input) {
+    return {};
+  }
+
+  if (typeof input === 'string') {
+    return { payrollRunId: input };
+  }
+
+  return {
+    payrollRunId: input.payrollRunId,
+    month: input.month,
+    year: input.year,
+    department: input.department?.trim() || undefined,
+    staffId: input.staffId,
+    status: input.status,
+  };
+}
+
+function csvCell(value: string | number | null | undefined) {
+  const text = value === null || value === undefined ? '' : String(value);
+  if (!/[",\n]/.test(text)) {
+    return text;
+  }
+
+  return `"${text.replaceAll('"', '""')}"`;
 }
 
 export function getOverlapDays(

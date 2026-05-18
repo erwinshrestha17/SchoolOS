@@ -1,6 +1,6 @@
 # SchoolOS Remaining Implementation Plan
 
-**Last updated:** 2026-05-17
+**Last updated:** 2026-05-18
 
 **Status source:** `docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md` and `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md`
 
@@ -297,7 +297,7 @@ Remaining backend:
 - [x] Payroll approval/posting lock depth and Accounting integration.
 - [x] Leave accrual idempotency locking.
 - [x] Sensitive staff field masking and permission-based visibility.
-- [x] Payroll register/report export hardening and PDF slips.
+- [x] Payroll register/report export hardening and PDF slips, including backend-filtered register/PF/TDS/component/leave summaries and dedicated PF/TDS CSV export actions.
 - [x] More HR/payroll permission tests (locks and mask checks).
 
 Remaining frontend:
@@ -305,6 +305,7 @@ Remaining frontend:
 - [x] HR/payroll dashboard polish and reversal workflows.
 - [x] Staff self-service PDF payslip access.
 - [x] Payslip PDF and reversal action UI.
+- [x] Payroll reports UI uses real backend totals and no hard-coded payroll/ledger status figures.
 - [ ] Browser smoke execution in staging environment.
 
 ### M8A - Library Management

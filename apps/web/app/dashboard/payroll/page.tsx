@@ -16,27 +16,49 @@ import { StatCard } from '../../../components/ui/stat-card';
 import { cn } from '../../../lib/utils';
 import Link from 'next/link';
 
+type PayrollSummary = {
+  gross?: number;
+  netPayable?: number;
+};
+
+const moneyFormatter = new Intl.NumberFormat('en-NP', {
+  style: 'currency',
+  currency: 'NPR',
+  maximumFractionDigits: 0,
+});
+
 export default function PayrollDashboardPage() {
   const runsQuery = useQuery({ queryKey: ['payroll-runs'], queryFn: api.listPayrollRuns });
-  const summaryQuery = useQuery({ queryKey: ['payroll-summary'], queryFn: api.getPayrollReportSummary });
+  const summaryQuery = useQuery({
+    queryKey: ['payroll-summary'],
+    queryFn: () => api.getPayrollReportSummary() as Promise<PayrollSummary>,
+  });
 
-  // In a real app, these would come from summaryQuery.data
+  const pendingApprovalCount =
+    runsQuery.data?.filter((run) =>
+      ['GENERATED', 'UNDER_REVIEW', 'REVIEWED'].includes(run.status),
+    ).length ?? 0;
+  const latestRun = runsQuery.data?.[0] ?? null;
+  const latestPostedRun = runsQuery.data?.find((run) =>
+    ['POSTED', 'PAID'].includes(run.status),
+  );
+
   const stats = [
     {
       title: "Gross Pay (Current)",
-      value: "NPR 1,240,500",
+      value: moneyFormatter.format(summaryQuery.data?.gross ?? 0),
       icon: <TrendingUp className="h-5 w-5" />,
       loading: summaryQuery.isLoading,
     },
     {
       title: "Net Pay (Current)",
-      value: "NPR 1,120,000",
+      value: moneyFormatter.format(summaryQuery.data?.netPayable ?? 0),
       icon: <Wallet className="h-5 w-5" />,
       loading: summaryQuery.isLoading,
     },
     {
       title: "Pending Approval",
-      value: runsQuery.data?.filter(r => r.status === 'PENDING').length ?? 0,
+      value: pendingApprovalCount,
       icon: <AlertCircle className="h-5 w-5" />,
       loading: runsQuery.isLoading,
       href: "/dashboard/payroll/runs"
@@ -93,9 +115,21 @@ export default function PayrollDashboardPage() {
           
           <div className="space-y-4">
             {[
-              { label: 'Latest Run Posted', status: 'Success', statusColor: 'text-emerald-400' },
-              { label: 'TDS Remittance', status: 'Pending', statusColor: 'text-amber-400' },
-              { label: 'PF Contribution', status: 'Pending', statusColor: 'text-amber-400' },
+              {
+                label: 'Latest Run',
+                status: latestRun?.status?.replaceAll('_', ' ') ?? 'No runs',
+                statusColor: latestRun ? 'text-blue-400' : 'text-slate-400',
+              },
+              {
+                label: 'Latest Posted Journal',
+                status: latestPostedRun?.journalEntryId ? 'Linked' : 'Not posted',
+                statusColor: latestPostedRun?.journalEntryId ? 'text-emerald-400' : 'text-amber-400',
+              },
+              {
+                label: 'Runs Awaiting Approval',
+                status: String(pendingApprovalCount),
+                statusColor: pendingApprovalCount > 0 ? 'text-amber-400' : 'text-emerald-400',
+              },
             ].map((item) => (
               <div key={item.label} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10">
                 <span className="text-slate-300 font-medium">{item.label}</span>
