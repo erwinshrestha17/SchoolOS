@@ -9,6 +9,7 @@ import type {
   StudentProfile,
 } from '@schoolos/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
 import type { Dispatch, SetStateAction } from 'react';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
@@ -1013,6 +1014,12 @@ function PostCard({
               </button>
             );
           })}
+          <Link
+            href={`/dashboard/activity/${post.id}`}
+            className="ml-auto inline-flex h-9 items-center rounded-full border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-widest text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            Open detail
+          </Link>
         </div>
       </div>
     </article>
@@ -1615,4 +1622,3 @@ function formatDateTime(value: string | Date | null | undefined) {
     timeStyle: 'short',
   }).format(new Date(value));
 }
-

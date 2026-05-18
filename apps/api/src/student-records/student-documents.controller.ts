@@ -30,6 +30,15 @@ export class StudentDocumentsController {
     return this.studentRecordsService.listDocuments(auth, studentId);
   }
 
+  @Get('history')
+  @Permissions('students:read')
+  listDocumentHistory(
+    @CurrentAuth() auth: AuthContext,
+    @Query('studentId') studentId?: string,
+  ) {
+    return this.studentRecordsService.listDocumentHistory(auth, studentId);
+  }
+
   @Post()
   @Permissions('student_documents:manage')
   uploadDocument(

@@ -91,6 +91,7 @@ import type {
   RevokeGeneratedStudentDocumentPayload,
   StudentAttendanceHistory,
   StudentAttendanceHistoryFilters,
+  StudentDocumentHistory,
   StudentProfileDetail,
   StudentArchivePayload,
   StudentDeletePayload,
@@ -754,6 +755,10 @@ export const api = {
     }),
   listStudentDocuments: (studentId: string) =>
     request(withQuery('/student-documents', { studentId })),
+  listStudentDocumentHistory: (studentId: string) =>
+    request<StudentDocumentHistory[]>(
+      withQuery('/student-documents/history', { studentId }),
+    ),
   uploadFile: async (file: File, module: string, entityId?: string) => {
     const reader = new FileReader();
     const base64Promise = new Promise<string>((resolve) => {
@@ -1790,6 +1795,39 @@ export const api = {
       { method: 'PATCH', json: body },
     ),
   listActivityPosts: () => request<ActivityPost[]>('/activity-feed/posts'),
+  getActivityPost: (postId: string) =>
+    request<ActivityPost>(`/activity-feed/posts/${encodeURIComponent(postId)}`),
+  updateActivityPost: (postId: string, body: JsonBody) =>
+    request<ActivityPost>(
+      `/activity-feed/posts/${encodeURIComponent(postId)}`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
+  deleteActivityPost: (postId: string, body: JsonBody) =>
+    request<ActivityPost>(
+      `/activity-feed/posts/${encodeURIComponent(postId)}`,
+      {
+        method: 'DELETE',
+        json: body,
+      },
+    ),
+  restoreActivityPost: (postId: string) =>
+    request<ActivityPost>(
+      `/activity-feed/posts/${encodeURIComponent(postId)}/restore`,
+      {
+        method: 'PATCH',
+      },
+    ),
+  moderateActivityPost: (postId: string, body: JsonBody) =>
+    request<ActivityPost>(
+      `/activity-feed/posts/${encodeURIComponent(postId)}/moderation`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
   previewActivityAttachment: async (attachmentId: string) => {
     const response = await fetch(
       `${API_BASE_URL}/activity-feed/attachments/${encodeURIComponent(attachmentId)}/preview`,

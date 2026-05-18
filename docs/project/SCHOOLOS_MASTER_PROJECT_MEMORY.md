@@ -113,11 +113,11 @@ Rules:
 | Module | Name | Current Status |
 |---|---|---|
 | M0 | Platform Core / SaaS Starter | Foundation completed across eight sprints; provider/queue pilot hardening implemented; entitlement/SaaS/staging depth remains |
-| M1 | Admissions & Student Profiles | Phase 1A/1B complete / pilot-ready |
+| M1 | Admissions & Student Profiles | Phase 1A/1B complete / pilot-ready with Student QR and document audit visibility foundations |
 | M2 | Smart Attendance | Phase 1A/1B complete / pilot-ready |
 | M3 | Fees & Receipts | Phase 1A/1B complete / pilot-ready |
 | M4 | Exams, CAS & Report Cards | Phase 2 backend/admin UI plus production PDF/report/correction/snapshot polish implemented |
-| M5 | Activity Feed & Milestones | Phase 1A/1B complete with media/moderation hardening foundations |
+| M5 | Activity Feed & Milestones | Phase 1A/1B complete with media/moderation hardening foundations, backend-backed web post detail, and web lifecycle/moderation controls |
 | M6 | Homework & Timetable | Phase 3 operational hardening complete plus parent/student homework access fail-closed depth |
 | M7 | HR & Payroll | Phase 3 operational hardening complete plus run-scoped register/PF/TDS/component reporting depth |
 | M8A | Library Management | Phase 3 admin/backend foundation plus fine-to-fees/accounting tests, staff borrower support, bounded history, and QR lookup |
@@ -158,6 +158,7 @@ Implemented M0 capabilities:
 - SaaS invoices, invoice lines, payments, and cancellation rules.
 - Provider config masking and secret-safe response shape.
 - Provider readiness detail API with dry-run validation, disabled-mode warnings, masked secret reporting, and S3-compatible object-storage readiness checks without paid external calls by default.
+- Shared storage service now performs env-backed S3-compatible R2 uploads/downloads instead of metadata-only R2 saves, while keeping provider secrets out of API responses.
 - Queue health, failed-job detail inspection, sanitized payload visibility, stack/timing detail, retry audit history, and audited retry endpoint.
 - Upload validation and dangerous extension blocking.
 - Private/protected file URL response shape.

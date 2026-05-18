@@ -43,6 +43,7 @@ Important working-tree note:
 ```text
 Phase Gate 0 verification was green before M0 and feature-depth work started.
 M0 provider/queue pilot hardening and M10/M6/M7/M8A/M8C/M8B feature-depth hardening have now been implemented and verified through build during their sprint gates.
+M0/File Registry storage hardening now includes real env-backed S3-compatible R2 upload/download support in `StorageService`; staging bucket verification remains environment-gated.
 `pnpm verify:production` must be rerun in local/staging if the current sandbox blocks browser E2E local-port binding.
 `pnpm smoke:phase1` still requires local Postgres, Redis, API, and web services.
 ```
@@ -124,6 +125,7 @@ Implemented:
 - SaaS billing records: profiles, invoices, invoice lines, payments.
 - Provider configuration masking.
 - Provider readiness detail API with dry-run validation, masked secrets, disabled-mode warnings, and S3-compatible object-storage readiness checks without paid external calls by default.
+- Env-backed S3-compatible R2 object upload/download in the shared storage service, with fail-closed config checks.
 - Queue health, failed-job detail inspection, sanitized payload visibility, stack/timing detail, retry audit history, and audited retry endpoint.
 - File Registry, report exports/history, health summary, onboarding checklist.
 - Platform dashboard/schools/settings/audit routes.
@@ -147,6 +149,7 @@ Implemented:
 
 - Admissions, student profiles, guardians, lifecycle, documents, student search.
 - Student photo/document access boundaries.
+- Student document audit trail API and profile visibility.
 - Student identity models.
 - Student QR credential model, secure token hashing, generate/rotate/revoke/resolve API, QR admin card, and Library/Canteen QR resolver foundations.
 
@@ -154,7 +157,7 @@ Remaining backend:
 
 - iEMIS final export mapping.
 - Duplicate merge workflow polish.
-- Storage-backed student photo/document hardening.
+- Staging verification for storage-backed student photo/document flows.
 - QR scan release verification and more tenant/permission tests.
 - ID-card QR PDF behavior verification.
 
@@ -162,7 +165,7 @@ Remaining frontend:
 
 - QR manual QA in student, library, and canteen flows.
 - Student photo/logo upload UX polish.
-- Student document audit trail visibility.
+- [x] Student document audit trail visibility.
 - Parent-safe student profile views later.
 
 ### M2 - Smart Attendance
@@ -241,23 +244,23 @@ Remaining frontend:
 Implemented:
 
 - Activity posts, targeting, attachments/media access, reactions.
-- Post lifecycle foundations.
+- Post lifecycle foundations with backend-backed web edit, moderation, archive, and audited removal controls.
 - Developmental milestones and mood log foundations.
+- Backend-backed activity post detail route in the web dashboard.
 - Media privacy tests.
 - Activity dashboard route.
 
 Remaining backend:
 
-- Real object-storage/direct upload hardening.
+- Direct-upload API/UX hardening beyond backend storage-service R2 read/write support.
 - Image compression queue depth for low-bandwidth Nepal usage.
-- Moderation/approval workflow.
-- Post edit/delete/soft-delete polish.
 
 Remaining frontend:
 
-- Activity detail page.
+- [x] Activity detail page for private media, student tags, and reactions.
+- [x] Moderation and lifecycle UI for draft edit, approve/reject/archive, and audited removal.
 - Parent-facing activity view.
-- Teacher media gallery and moderation UI.
+- Teacher media gallery.
 
 ### M6 - Homework & Timetable
 

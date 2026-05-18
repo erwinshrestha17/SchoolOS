@@ -21,6 +21,11 @@ Use this checklist for every staging or production deployment.
   - `EMAIL_WEBHOOK_URL`
   - `EMAIL_WEBHOOK_TOKEN`
 - If using R2 storage, set:
+  - `R2_BUCKET`
+  - `R2_ENDPOINT`
+  - `R2_ACCESS_KEY_ID`
+  - `R2_SECRET_ACCESS_KEY`
+  - `R2_REGION` (defaults to `auto`)
   - `R2_PUBLIC_BASE_URL`
 
 ## 3) Canonical verification command

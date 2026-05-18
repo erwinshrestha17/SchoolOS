@@ -32,6 +32,24 @@ export class StudentRecordsService {
     });
   }
 
+  async listDocumentHistory(actor: AuthContext, studentId?: string) {
+    return this.prisma.studentDocumentHistory.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        ...(studentId
+          ? {
+              document: {
+                studentId,
+                tenantId: actor.tenantId,
+              },
+            }
+          : {}),
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      take: 100,
+    });
+  }
+
   async uploadDocument(dto: UploadStudentDocumentDto, actor: AuthContext) {
     const student = await this.prisma.student.findFirst({
       where: {

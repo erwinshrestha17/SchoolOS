@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { StorageProvider } from '@prisma/client';
-import { randomUUID } from 'crypto';
-import { mkdir, writeFile } from 'fs/promises';
-import { dirname, join, posix } from 'path';
+import { createHash, createHmac, randomUUID } from 'crypto';
+import { mkdir, readFile, writeFile } from 'fs/promises';
+import { dirname, isAbsolute, join, normalize, posix } from 'path';
 import { ConfigService } from '../config/config.service';
 
 @Injectable()
@@ -40,6 +40,8 @@ export class StorageService {
     );
 
     if (this.configService.storageProvider === 'r2') {
+      await this.putR2Object(objectKey, input.content, input.contentType);
+
       return {
         provider: StorageProvider.R2,
         objectKey,
@@ -51,7 +53,7 @@ export class StorageService {
     }
 
     const localRoot = this.configService.localStorageRoot;
-    const absolutePath = join(process.cwd(), localRoot, objectKey);
+    const absolutePath = this.getLocalObjectPath(localRoot, objectKey);
     await mkdir(dirname(absolutePath), { recursive: true });
     await writeFile(absolutePath, input.content);
 
@@ -65,25 +67,158 @@ export class StorageService {
 
   async getObjectBuffer(objectKey: string) {
     if (this.configService.storageProvider === 'r2') {
-      throw new Error('R2 getObjectBuffer not implemented');
+      return this.getR2Object(objectKey);
     }
 
     const localRoot = this.configService.localStorageRoot;
-    const absolutePath = join(process.cwd(), localRoot, objectKey);
-    const { readFile } = await import('fs/promises');
+    const absolutePath = this.getLocalObjectPath(localRoot, objectKey);
     return readFile(absolutePath);
   }
 
   async checkReadiness() {
     if (this.configService.storageProvider === 'r2') {
-      if (!this.configService.r2Bucket)
-        throw new Error('R2 bucket not configured');
+      this.getR2Config();
     } else {
       const localRoot = this.configService.localStorageRoot;
-      const absolutePath = join(process.cwd(), localRoot);
+      const absolutePath = isAbsolute(localRoot)
+        ? localRoot
+        : join(process.cwd(), localRoot);
       await mkdir(absolutePath, { recursive: true });
     }
     return true;
+  }
+
+  private getLocalObjectPath(localRoot: string, objectKey: string) {
+    const root = normalize(
+      isAbsolute(localRoot) ? localRoot : join(process.cwd(), localRoot),
+    );
+    const resolved = normalize(join(root, objectKey));
+
+    if (resolved !== root && !resolved.startsWith(`${root}/`)) {
+      throw new Error('Invalid storage object key');
+    }
+
+    return resolved;
+  }
+
+  private async putR2Object(
+    objectKey: string,
+    content: Buffer,
+    contentType: string,
+  ) {
+    const request = this.buildR2Request({
+      method: 'PUT',
+      objectKey,
+      body: content,
+      contentType,
+    });
+
+    const response = await fetch(request.url, {
+      method: 'PUT',
+      headers: request.headers,
+      body: content as unknown as BodyInit,
+    });
+
+    await assertR2Response(response, 'upload');
+  }
+
+  private async getR2Object(objectKey: string) {
+    const request = this.buildR2Request({
+      method: 'GET',
+      objectKey,
+      body: Buffer.alloc(0),
+    });
+
+    const response = await fetch(request.url, {
+      method: 'GET',
+      headers: request.headers,
+    });
+
+    await assertR2Response(response, 'download');
+    return Buffer.from(await response.arrayBuffer());
+  }
+
+  private buildR2Request(input: {
+    method: 'GET' | 'PUT';
+    objectKey: string;
+    body: Buffer;
+    contentType?: string;
+  }) {
+    const config = this.getR2Config();
+    const endpoint = config.endpoint.replace(/\/$/, '');
+    const endpointUrl = new URL(endpoint);
+    const encodedPath = `/${encodePathSegment(config.bucket)}/${encodeObjectKey(input.objectKey)}`;
+    const url = `${endpoint}${encodedPath}`;
+    const now = new Date();
+    const amzDate = formatAmzDate(now);
+    const dateStamp = amzDate.slice(0, 8);
+    const payloadHash = hashHex(input.body);
+    const headers: Record<string, string> = {
+      host: endpointUrl.host,
+      'x-amz-content-sha256': payloadHash,
+      'x-amz-date': amzDate,
+    };
+
+    if (input.contentType) {
+      headers['content-type'] = input.contentType;
+    }
+
+    const signedHeaders = Object.keys(headers).sort().join(';');
+    const canonicalHeaders = Object.keys(headers)
+      .sort()
+      .map((name) => `${name}:${headers[name].trim()}\n`)
+      .join('');
+    const canonicalRequest = [
+      input.method,
+      encodedPath,
+      '',
+      canonicalHeaders,
+      signedHeaders,
+      payloadHash,
+    ].join('\n');
+    const credentialScope = `${dateStamp}/${config.region}/s3/aws4_request`;
+    const stringToSign = [
+      'AWS4-HMAC-SHA256',
+      amzDate,
+      credentialScope,
+      hashHex(canonicalRequest),
+    ].join('\n');
+    const signingKey = getSigningKey(
+      config.secretAccessKey,
+      dateStamp,
+      config.region,
+    );
+    const signature = createHmac('sha256', signingKey)
+      .update(stringToSign)
+      .digest('hex');
+
+    return {
+      url,
+      headers: {
+        ...headers,
+        authorization: [
+          'AWS4-HMAC-SHA256',
+          `Credential=${config.accessKeyId}/${credentialScope}`,
+          `SignedHeaders=${signedHeaders}`,
+          `Signature=${signature}`,
+        ].join(', '),
+      },
+    };
+  }
+
+  private getR2Config() {
+    const bucket = this.configService.r2Bucket?.trim();
+    const endpoint = this.configService.r2Endpoint?.trim();
+    const accessKeyId = this.configService.r2AccessKeyId?.trim();
+    const secretAccessKey = this.configService.r2SecretAccessKey?.trim();
+    const region = this.configService.r2Region.trim() || 'auto';
+
+    if (!bucket) throw new Error('R2 bucket not configured');
+    if (!endpoint) throw new Error('R2 endpoint not configured');
+    if (!accessKeyId) throw new Error('R2 access key not configured');
+    if (!secretAccessKey) throw new Error('R2 secret key not configured');
+
+    return { bucket, endpoint, accessKeyId, secretAccessKey, region };
   }
 }
 
@@ -95,4 +230,43 @@ function getExtension(fileName: string) {
   const match = /\.[a-zA-Z0-9]+$/.exec(fileName);
 
   return match?.[0]?.toLowerCase() ?? '';
+}
+
+function encodePathSegment(value: string) {
+  return encodeURIComponent(value).replace(
+    /[!'()*]/g,
+    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
+
+function encodeObjectKey(objectKey: string) {
+  return objectKey.split('/').map(encodePathSegment).join('/');
+}
+
+function hashHex(value: Buffer | string) {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function formatAmzDate(date: Date) {
+  return date.toISOString().replace(/[:-]|\.\d{3}/g, '');
+}
+
+function getSigningKey(secret: string, dateStamp: string, region: string) {
+  const dateKey = createHmac('sha256', `AWS4${secret}`)
+    .update(dateStamp)
+    .digest();
+  const regionKey = createHmac('sha256', dateKey).update(region).digest();
+  const serviceKey = createHmac('sha256', regionKey).update('s3').digest();
+  return createHmac('sha256', serviceKey).update('aws4_request').digest();
+}
+
+async function assertR2Response(response: Response, operation: string) {
+  if (response.ok) return;
+
+  const message = await response.text().catch(() => '');
+  throw new Error(
+    `R2 ${operation} failed with status ${response.status}${
+      message ? `: ${message.slice(0, 240)}` : ''
+    }`,
+  );
 }

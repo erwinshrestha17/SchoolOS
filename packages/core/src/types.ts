@@ -946,6 +946,17 @@ export type StudentDocument = {
   uploadedAt: string;
 };
 
+export type StudentDocumentHistory = {
+  id: string;
+  documentId: string | null;
+  action: string;
+  documentTitle: string | null;
+  documentKind: string | null;
+  performedBy: string;
+  reason: string | null;
+  createdAt: string;
+};
+
 export type GeneratedStudentDocument = {
   id: string;
   studentId: string;
@@ -1354,6 +1365,11 @@ export type ActivityPost = {
   caption?: string;
   category: string;
   audienceType: string;
+  status?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'ARCHIVED';
+  moderationReason?: string | null;
+  moderatedAt?: string | null;
+  editedAt?: string | null;
+  softDeletedAt?: string | null;
   classId: string | null;
   sectionId: string | null;
   publishedAt: string | null;

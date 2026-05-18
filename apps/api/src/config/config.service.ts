@@ -185,6 +185,22 @@ export class ConfigService {
     return process.env.R2_BUCKET;
   }
 
+  get r2Endpoint() {
+    return process.env.R2_ENDPOINT;
+  }
+
+  get r2AccessKeyId() {
+    return process.env.R2_ACCESS_KEY_ID;
+  }
+
+  get r2SecretAccessKey() {
+    return process.env.R2_SECRET_ACCESS_KEY;
+  }
+
+  get r2Region() {
+    return process.env.R2_REGION ?? 'auto';
+  }
+
   get port() {
     return Number(process.env.PORT ?? 4000);
   }
@@ -315,8 +331,24 @@ export class ConfigService {
       }
     }
 
-    if (this.storageProvider === 'r2' && !this.r2PublicBaseUrl) {
-      errors.push('R2_PUBLIC_BASE_URL is required when STORAGE_PROVIDER=r2');
+    if (this.storageProvider === 'r2') {
+      if (!this.r2Bucket) {
+        errors.push('R2_BUCKET is required when STORAGE_PROVIDER=r2');
+      }
+      if (!this.r2Endpoint) {
+        errors.push('R2_ENDPOINT is required when STORAGE_PROVIDER=r2');
+      }
+      if (!this.r2AccessKeyId) {
+        errors.push('R2_ACCESS_KEY_ID is required when STORAGE_PROVIDER=r2');
+      }
+      if (!this.r2SecretAccessKey) {
+        errors.push(
+          'R2_SECRET_ACCESS_KEY is required when STORAGE_PROVIDER=r2',
+        );
+      }
+      if (!this.r2PublicBaseUrl) {
+        errors.push('R2_PUBLIC_BASE_URL is required when STORAGE_PROVIDER=r2');
+      }
     }
 
     return errors;
