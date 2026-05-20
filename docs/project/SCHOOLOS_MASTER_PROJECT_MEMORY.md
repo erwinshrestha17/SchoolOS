@@ -122,7 +122,7 @@ Rules:
 | M7 | HR & Payroll | Phase 3 operational hardening complete plus run-scoped register/PF/TDS/component reporting depth |
 | M8A | Library Management | Phase 3 admin/backend foundation plus fine-to-fees/accounting tests, staff borrower support, bounded history, and QR lookup |
 | M8B | Transport Management | Phase 3 admin/trip/location/report foundation plus GPS pressure guard, Redis cache/fanout tests, and retention cleanup bounds; live/driver/parent later |
-| M8C | Canteen Management | Phase 3 admin/wallet/POS/inventory/vendor/report foundation plus POS receipt endpoint and wallet negative-balance guards; parent views later |
+| M8C | Canteen Management | Phase 3 admin/wallet/POS/inventory/vendor/report foundation plus POS receipt JSON/PDF reprint endpoints, supplier/item admin UI, wallet negative-balance guards, and meal-plan-to-M3 invoice linkage; parent views later |
 | M9 | Accounting & Finance | Phase 2D production-candidate complete plus PDF/snapshot/reconciliation polish implemented |
 | M10 | Notices & Communication | Phase 1A/1B + parent-teacher chat foundation plus provider modes, File Registry attachments, and failure-dashboard depth |
 | M11 | School Intelligence & Analytics | Roadmap only; implementation deferred |
@@ -491,7 +491,7 @@ Module estimates:
 | M9 Accounting | 98-100% |
 | M8A Library | 65-75% |
 | M8B Transport | 60-70% |
-| M8C Canteen | 65-75% |
+| M8C Canteen | 85-91% |
 | M11 Intelligence / AI | 0% implementation |
 
 Biggest risks:
@@ -504,7 +504,7 @@ Biggest risks:
 - Student QR foundation exists, but QR-in-PDF release behavior and cross-module manual QA still need verification.
 - Homework/Timetable schema/service/test stability after recent verification follow-ups.
 - Pilot operations exposing real-world data-entry, fee, attendance, guardian-contact, PDF, and slow-network issues.
-- Parent/mobile portal, driver app, live map/WebSocket, full canteen inventory/vendor workflows, and AI/ML implementation remain intentionally unbuilt.
+- Parent/mobile portal, driver app, live map/WebSocket, full canteen purchase-bill/wastage/vendor workflows, and AI/ML implementation remain intentionally unbuilt.
 - Tiered pricing and entitlements must be enforced backend-side before broad paid rollout; sidebar hiding alone is not security.
 ```
 

@@ -1,3 +1,4 @@
+import { StreamableFile } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
 import { CanteenController } from './canteen.controller';
 
@@ -35,6 +36,7 @@ function createController() {
     completePosSale: jest.fn(),
     cancelPosSale: jest.fn(),
     getPosReceipt: jest.fn(),
+    getPosReceiptPdf: jest.fn(),
     listPosSales: jest.fn(),
     upsertSpendingControl: jest.fn(),
     getSpendingControl: jest.fn(),
@@ -401,6 +403,21 @@ describe('CanteenController M8C contracts', () => {
       limit: '20',
     });
     expect(canteenService.getPosReceipt).toHaveBeenCalledWith('sale-1', actor);
+  });
+
+  it('streams POS receipt PDFs from the service boundary', async () => {
+    const { controller, canteenService } = createController();
+    canteenService.getPosReceiptPdf.mockResolvedValue(
+      Buffer.from('%PDF-1.4\n%%EOF'),
+    );
+
+    const result = await controller.getPosReceiptPdf('sale-1', actor);
+
+    expect(result).toBeInstanceOf(StreamableFile);
+    expect(canteenService.getPosReceiptPdf).toHaveBeenCalledWith(
+      'sale-1',
+      actor,
+    );
   });
 
   it('delegates reports and CSV exports from backend service boundaries', () => {

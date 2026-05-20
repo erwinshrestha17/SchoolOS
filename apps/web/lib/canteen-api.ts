@@ -1,7 +1,6 @@
 import { clearStoredSession } from './session';
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
 
 type ApiResponse<T> = {
   success: boolean;
@@ -21,27 +20,10 @@ let refreshPromise: Promise<boolean> | null = null;
 
 export type CanteenMenuItemStatus = 'ACTIVE' | 'INACTIVE';
 export type CanteenMealPlanStatus = 'ACTIVE' | 'INACTIVE';
-export type CanteenEnrollmentStatus =
-  | 'ACTIVE'
-  | 'PAUSED'
-  | 'CANCELLED'
-  | 'ENDED';
-export type CanteenMealServingStatus =
-  | 'SERVED'
-  | 'NOT_TAKEN'
-  | 'ABSENT'
-  | 'CANCELLED';
-export type CanteenWalletTransactionType =
-  | 'TOP_UP'
-  | 'DEDUCTION'
-  | 'REFUND'
-  | 'ADJUSTMENT';
-export type CanteenWalletTransactionSource =
-  | 'MANUAL'
-  | 'POS_SALE'
-  | 'MEAL_PURCHASE'
-  | 'FEE_INTEGRATION'
-  | 'ACCOUNTING_ADJUSTMENT';
+export type CanteenEnrollmentStatus = 'ACTIVE' | 'PAUSED' | 'CANCELLED' | 'ENDED';
+export type CanteenMealServingStatus = 'SERVED' | 'NOT_TAKEN' | 'ABSENT' | 'CANCELLED';
+export type CanteenWalletTransactionType = 'TOP_UP' | 'DEDUCTION' | 'REFUND' | 'ADJUSTMENT';
+export type CanteenWalletTransactionSource = 'MANUAL' | 'POS_SALE' | 'MEAL_PURCHASE' | 'FEE_INTEGRATION' | 'ACCOUNTING_ADJUSTMENT';
 export type CanteenPosSaleStatus = 'DRAFT' | 'COMPLETED' | 'CANCELLED';
 export type CanteenPaymentMethod = 'CASH' | 'WALLET' | 'STAFF_CREDIT';
 
@@ -88,6 +70,8 @@ export type CanteenStudentEnrollment = {
   startsOn: string;
   endsOn?: string | null;
   status: CanteenEnrollmentStatus;
+  feeInvoiceId?: string | null;
+  feePostedAt?: string | null;
   notes?: string | null;
   createdAt?: string;
   updatedAt?: string;
@@ -169,6 +153,35 @@ export type CanteenPosSale = {
   student?: CanteenStudentSummary | null;
 };
 
+export type CanteenPosReceipt = {
+  school: {
+    name: string;
+    panNumber?: string | null;
+  };
+  receiptNumber?: string | null;
+  saleId: string;
+  saleDate: string;
+  paymentMethod: CanteenPaymentMethod;
+  cashier?: string | null;
+  student?: {
+    id: string;
+    studentSystemId?: string | null;
+    name: string;
+  } | null;
+  staff?: { id: string; employeeId?: string | null; name: string } | null;
+  items: Array<{
+    name: string;
+    category: string;
+    quantity: number;
+    unitPrice: string | number;
+    lineTotal: string | number;
+  }>;
+  subtotal: string | number;
+  discountAmount: string | number;
+  totalAmount: string | number;
+  walletBalanceAfter?: string | number | null;
+};
+
 export type CanteenSpendingControl = {
   id: string;
   tenantId?: string;
@@ -180,6 +193,59 @@ export type CanteenSpendingControl = {
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type CanteenPaginatedResult<T> = {
+  items: T[];
+  meta?: {
+    page: number;
+    limit: number;
+    total: number;
+  };
+};
+
+export type CanteenSupplier = {
+  id: string;
+  tenantId?: string;
+  name: string;
+  contactName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  panNumber?: string | null;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type CanteenInventoryItem = {
+  id: string;
+  tenantId?: string;
+  name: string;
+  sku?: string | null;
+  category: string;
+  unit: string;
+  currentStock: string | number;
+  minStockLevel: string | number;
+  unitCost: string | number;
+  defaultSupplierId?: string | null;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type CanteenStockLedgerRow = {
+  id?: string;
+  tenantId?: string;
+  inventoryItemId?: string;
+  type?: string;
+  quantity?: string | number;
+  balanceAfter?: string | number;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  reason?: string | null;
+  movementDate?: string;
+  inventoryItem?: Pick<CanteenInventoryItem, 'id' | 'name' | 'unit'> | null;
 };
 
 export type CanteenMenuItemPayload = {
@@ -241,6 +307,25 @@ export type CanteenSpendingControlPayload = {
   isActive?: boolean;
 };
 
+export type CanteenSupplierPayload = {
+  name: string;
+  contactName?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  panNumber?: string;
+};
+
+export type CanteenInventoryItemPayload = {
+  name: string;
+  sku?: string;
+  category: string;
+  unit: string;
+  minStockLevel?: number;
+  unitCost?: number;
+  defaultSupplierId?: string;
+};
+
 export type DailyMealCountReport = {
   mealType: string;
   status: CanteenMealServingStatus;
@@ -267,10 +352,7 @@ export type StudentSpendingSummary = {
   };
 };
 
-function withQuery(
-  path: string,
-  params: Record<string, string | number | undefined | null>,
-) {
+function withQuery(path: string, params: Record<string, string | number | undefined | null>) {
   const searchParams = new URLSearchParams();
 
   for (const [key, value] of Object.entries(params)) {
@@ -295,12 +377,7 @@ async function request<T>(path: string, init?: RequestOptions): Promise<T> {
   });
 
   if (!response.ok) {
-    if (
-      response.status === 401 &&
-      init?.auth !== false &&
-      init?.retryOnUnauthorized !== false &&
-      (await refreshAccessCookie())
-    ) {
+    if (response.status === 401 && init?.auth !== false && init?.retryOnUnauthorized !== false && (await refreshAccessCookie())) {
       return request<T>(path, { ...init, retryOnUnauthorized: false });
     }
 
@@ -310,13 +387,39 @@ async function request<T>(path: string, init?: RequestOptions): Promise<T> {
       clearStoredSession();
     }
 
-    throw new Error(
-      parseApiErrorMessage(text) || `Request failed with status ${response.status}`,
-    );
+    throw new Error(parseApiErrorMessage(text) || `Request failed with status ${response.status}`);
   }
 
   const payload = (await response.json()) as ApiResponse<T>;
   return payload.data;
+}
+
+async function openPdfBlob(response: Response) {
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(parseApiErrorMessage(text) || `Request failed with status ${response.status}`);
+  }
+
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+
+  if (!contentType.includes('application/pdf')) {
+    const text = await response.text();
+    throw new Error(parseApiErrorMessage(text) || 'The server did not return a PDF document. Please try again or contact support.');
+  }
+
+  const blob = await response.blob();
+
+  if (blob.size === 0) {
+    throw new Error('The server returned an empty PDF document.');
+  }
+
+  const header = await blob.slice(0, 5).text();
+
+  if (header !== '%PDF-') {
+    throw new Error('The server returned an invalid PDF document.');
+  }
+
+  window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer');
 }
 
 function parseApiErrorMessage(text: string) {
@@ -327,9 +430,7 @@ function parseApiErrorMessage(text: string) {
       message?: string | string[];
       error?: string;
     };
-    const message = Array.isArray(payload.message)
-      ? payload.message.join(', ')
-      : payload.message;
+    const message = Array.isArray(payload.message) ? payload.message.join(', ') : payload.message;
 
     return message || payload.error || text;
   } catch {
@@ -361,64 +462,23 @@ async function refreshAccessCookie() {
 }
 
 export const canteenApi = {
-  listMenuItems: (params?: {
-    q?: string | null;
-    category?: string | null;
-    status?: string | null;
-  }) =>
-    request<CanteenMenuItem[]>(
-      withQuery('/canteen/menu-items', params ?? {}),
-    ),
+  listMenuItems: (params?: { q?: string | null; category?: string | null; status?: string | null }) => request<CanteenMenuItem[]>(withQuery('/canteen/menu-items', params ?? {})),
   createMenuItem: (body: CanteenMenuItemPayload) =>
     request<CanteenMenuItem>('/canteen/menu-items', {
       method: 'POST',
       json: body,
     }),
-  updateMenuItem: (itemId: string, body: Partial<CanteenMenuItemPayload>) =>
-    request<CanteenMenuItem>(
-      `/canteen/menu-items/${encodeURIComponent(itemId)}`,
-      { method: 'PATCH', json: body },
-    ),
-  updateMenuItemStatus: (
-    itemId: string,
-    body: { status: CanteenMenuItemStatus; reason?: string },
-  ) =>
-    request<CanteenMenuItem>(
-      `/canteen/menu-items/${encodeURIComponent(itemId)}/status`,
-      { method: 'PATCH', json: body },
-    ),
-  listMealPlans: (params?: {
-    q?: string | null;
-    status?: string | null;
-  }) =>
-    request<CanteenMealPlan[]>(
-      withQuery('/canteen/meal-plans', params ?? {}),
-    ),
+  updateMenuItem: (itemId: string, body: Partial<CanteenMenuItemPayload>) => request<CanteenMenuItem>(`/canteen/menu-items/${encodeURIComponent(itemId)}`, { method: 'PATCH', json: body }),
+  updateMenuItemStatus: (itemId: string, body: { status: CanteenMenuItemStatus; reason?: string }) => request<CanteenMenuItem>(`/canteen/menu-items/${encodeURIComponent(itemId)}/status`, { method: 'PATCH', json: body }),
+  listMealPlans: (params?: { q?: string | null; status?: string | null }) => request<CanteenMealPlan[]>(withQuery('/canteen/meal-plans', params ?? {})),
   createMealPlan: (body: CanteenMealPlanPayload) =>
     request<CanteenMealPlan>('/canteen/meal-plans', {
       method: 'POST',
       json: body,
     }),
-  updateMealPlan: (planId: string, body: Partial<CanteenMealPlanPayload>) =>
-    request<CanteenMealPlan>(
-      `/canteen/meal-plans/${encodeURIComponent(planId)}`,
-      { method: 'PATCH', json: body },
-    ),
-  updateMealPlanStatus: (
-    planId: string,
-    body: { status: CanteenMealPlanStatus; reason?: string },
-  ) =>
-    request<CanteenMealPlan>(
-      `/canteen/meal-plans/${encodeURIComponent(planId)}/status`,
-      { method: 'PATCH', json: body },
-    ),
-  listEnrollments: (params?: {
-    studentId?: string | null;
-    status?: string | null;
-  }) =>
-    request<CanteenStudentEnrollment[]>(
-      withQuery('/canteen/enrollments', params ?? {}),
-    ),
+  updateMealPlan: (planId: string, body: Partial<CanteenMealPlanPayload>) => request<CanteenMealPlan>(`/canteen/meal-plans/${encodeURIComponent(planId)}`, { method: 'PATCH', json: body }),
+  updateMealPlanStatus: (planId: string, body: { status: CanteenMealPlanStatus; reason?: string }) => request<CanteenMealPlan>(`/canteen/meal-plans/${encodeURIComponent(planId)}/status`, { method: 'PATCH', json: body }),
+  listEnrollments: (params?: { studentId?: string | null; status?: string | null }) => request<CanteenStudentEnrollment[]>(withQuery('/canteen/enrollments', params ?? {})),
   createEnrollment: (body: CanteenEnrollmentPayload) =>
     request<CanteenStudentEnrollment>('/canteen/enrollments', {
       method: 'POST',
@@ -426,115 +486,58 @@ export const canteenApi = {
     }),
   updateEnrollment: (
     enrollmentId: string,
-    body: Partial<CanteenEnrollmentPayload> & { status?: CanteenEnrollmentStatus },
-  ) =>
-    request<CanteenStudentEnrollment>(
-      `/canteen/enrollments/${encodeURIComponent(enrollmentId)}`,
-      { method: 'PATCH', json: body },
-    ),
-  cancelEnrollment: (enrollmentId: string, body?: { reason?: string }) =>
-    request<CanteenStudentEnrollment>(
-      `/canteen/enrollments/${encodeURIComponent(enrollmentId)}/cancel`,
-      { method: 'PATCH', json: body ?? {} },
-    ),
+    body: Partial<CanteenEnrollmentPayload> & {
+      status?: CanteenEnrollmentStatus;
+    },
+  ) => request<CanteenStudentEnrollment>(`/canteen/enrollments/${encodeURIComponent(enrollmentId)}`, { method: 'PATCH', json: body }),
+  cancelEnrollment: (enrollmentId: string, body?: { reason?: string }) => request<CanteenStudentEnrollment>(`/canteen/enrollments/${encodeURIComponent(enrollmentId)}/cancel`, { method: 'PATCH', json: body ?? {} }),
   serveMeal: (body: CanteenMealServingPayload) =>
     request<CanteenMealServing>('/canteen/servings', {
       method: 'POST',
       json: body,
     }),
-  listServings: (params?: {
-    studentId?: string | null;
-    date?: string | null;
-  }) =>
-    request<CanteenMealServing[]>(withQuery('/canteen/servings', params ?? {})),
-  getOrCreateWallet: (studentId: string) =>
-    request<CanteenWallet>(
-      `/canteen/wallets/student/${encodeURIComponent(studentId)}`,
-      { method: 'POST', json: {} },
-    ),
-  getWalletBalance: (studentId: string) =>
-    request<CanteenWallet>(
-      `/canteen/wallets/student/${encodeURIComponent(studentId)}/balance`,
-    ),
-  topUpWallet: (studentId: string, body: CanteenTopUpPayload) =>
-    request<CanteenWalletTransaction>(
-      `/canteen/wallets/student/${encodeURIComponent(studentId)}/top-up`,
-      { method: 'POST', json: body },
-    ),
-  listWalletTransactions: (studentId: string) =>
-    request<CanteenWalletTransaction[]>(
-      `/canteen/wallets/student/${encodeURIComponent(studentId)}/transactions`,
-    ),
-  reverseWalletTransaction: (transactionId: string, body: { reason: string }) =>
-    request<CanteenWalletTransaction>(
-      `/canteen/wallets/transactions/${encodeURIComponent(transactionId)}/reverse`,
-      { method: 'POST', json: body },
-    ),
-  correctWalletTransaction: (
-    transactionId: string,
-    body: { amount: number; reason: string; note?: string },
-  ) =>
-    request<CanteenWalletTransaction>(
-      `/canteen/wallets/transactions/${encodeURIComponent(transactionId)}/correct`,
-      { method: 'POST', json: body },
-    ),
+  listServings: (params?: { studentId?: string | null; date?: string | null }) => request<CanteenMealServing[]>(withQuery('/canteen/servings', params ?? {})),
+  getOrCreateWallet: (studentId: string) => request<CanteenWallet>(`/canteen/wallets/student/${encodeURIComponent(studentId)}`, { method: 'POST', json: {} }),
+  getWalletBalance: (studentId: string) => request<CanteenWallet>(`/canteen/wallets/student/${encodeURIComponent(studentId)}/balance`),
+  topUpWallet: (studentId: string, body: CanteenTopUpPayload) => request<CanteenWalletTransaction>(`/canteen/wallets/student/${encodeURIComponent(studentId)}/top-up`, { method: 'POST', json: body }),
+  listWalletTransactions: (studentId: string) => request<CanteenWalletTransaction[]>(`/canteen/wallets/student/${encodeURIComponent(studentId)}/transactions`),
+  reverseWalletTransaction: (transactionId: string, body: { reason: string }) => request<CanteenWalletTransaction>(`/canteen/wallets/transactions/${encodeURIComponent(transactionId)}/reverse`, { method: 'POST', json: body }),
+  correctWalletTransaction: (transactionId: string, body: { amount: number; reason: string; note?: string }) => request<CanteenWalletTransaction>(`/canteen/wallets/transactions/${encodeURIComponent(transactionId)}/correct`, { method: 'POST', json: body }),
   createPosSale: (body: CanteenPosSalePayload) =>
     request<CanteenPosSale>('/canteen/pos-sales', {
       method: 'POST',
       json: body,
     }),
-  completePosSale: (saleId: string, body?: { note?: string }) =>
-    request<CanteenPosSale>(
-      `/canteen/pos-sales/${encodeURIComponent(saleId)}/complete`,
-      { method: 'PATCH', json: body ?? {} },
-    ),
-  cancelPosSale: (saleId: string, body?: { reason?: string }) =>
-    request<CanteenPosSale>(
-      `/canteen/pos-sales/${encodeURIComponent(saleId)}/cancel`,
-      { method: 'PATCH', json: body ?? {} },
-    ),
-  listPosSales: (params?: {
-    studentId?: string | null;
-    status?: string | null;
-    date?: string | null;
-  }) =>
-    request<CanteenPosSale[]>(withQuery('/canteen/pos-sales', params ?? {})),
+  completePosSale: (saleId: string, body?: { note?: string }) => request<CanteenPosSale>(`/canteen/pos-sales/${encodeURIComponent(saleId)}/complete`, { method: 'PATCH', json: body ?? {} }),
+  cancelPosSale: (saleId: string, body?: { reason?: string }) => request<CanteenPosSale>(`/canteen/pos-sales/${encodeURIComponent(saleId)}/cancel`, { method: 'PATCH', json: body ?? {} }),
+  listPosSales: (params?: { studentId?: string | null; status?: string | null; date?: string | null }) => request<CanteenPosSale[]>(withQuery('/canteen/pos-sales', params ?? {})),
+  getPosReceipt: (saleId: string) => request<CanteenPosReceipt>(`/canteen/pos-sales/${encodeURIComponent(saleId)}/receipt`),
+  openPosReceiptPdf: async (saleId: string) => {
+    const response = await fetch(`${API_BASE_URL}/canteen/pos-sales/${encodeURIComponent(saleId)}/receipt.pdf`, { credentials: 'include' });
+
+    await openPdfBlob(response);
+  },
   upsertSpendingControl: (body: CanteenSpendingControlPayload) =>
     request<CanteenSpendingControl>('/canteen/spending-controls', {
       method: 'POST',
       json: body,
     }),
-  getSpendingControl: (studentId: string) =>
-    request<CanteenSpendingControl | null>(
-      `/canteen/spending-controls/student/${encodeURIComponent(studentId)}`,
-    ),
-  getDailyMealCountReport: (params?: { date?: string | null }) =>
-    request<DailyMealCountReport[]>(
-      withQuery('/canteen/reports/daily-meal-count', params ?? {}),
-    ),
-  getItemWiseSalesReport: (params?: {
-    from?: string | null;
-    to?: string | null;
-  }) =>
-    request<ItemWiseSalesReport[]>(
-      withQuery('/canteen/reports/item-wise-sales', params ?? {}),
-    ),
-  getLowBalanceWallets: (params?: { threshold?: number | null }) =>
-    request<CanteenWallet[]>(
-      withQuery('/canteen/reports/low-balance-wallets', params ?? {}),
-    ),
-  getStudentSpendingSummary: (params?: {
-    studentId?: string | null;
-    from?: string | null;
-    to?: string | null;
-  }) =>
-    request<StudentSpendingSummary[]>(
-      withQuery('/canteen/reports/student-spending-summary', params ?? {}),
-    ),
-  getStockLedger: (params?: {
-    inventoryItemId?: string | null;
-    from?: string | null;
-    to?: string | null;
-  }) =>
-    request<any[]>(withQuery('/canteen/reports/stock-ledger', params ?? {})),
+  getSpendingControl: (studentId: string) => request<CanteenSpendingControl | null>(`/canteen/spending-controls/student/${encodeURIComponent(studentId)}`),
+  listSuppliers: (params?: { page?: number; limit?: number }) => request<CanteenPaginatedResult<CanteenSupplier>>(withQuery('/canteen/suppliers', params ?? {})),
+  createSupplier: (body: CanteenSupplierPayload) =>
+    request<CanteenSupplier>('/canteen/suppliers', {
+      method: 'POST',
+      json: body,
+    }),
+  listInventoryItems: (params?: { category?: string | null; page?: number; limit?: number }) => request<CanteenPaginatedResult<CanteenInventoryItem>>(withQuery('/canteen/inventory-items', params ?? {})),
+  createInventoryItem: (body: CanteenInventoryItemPayload) =>
+    request<CanteenInventoryItem>('/canteen/inventory-items', {
+      method: 'POST',
+      json: body,
+    }),
+  getDailyMealCountReport: (params?: { date?: string | null }) => request<DailyMealCountReport[]>(withQuery('/canteen/reports/daily-meal-count', params ?? {})),
+  getItemWiseSalesReport: (params?: { from?: string | null; to?: string | null }) => request<ItemWiseSalesReport[]>(withQuery('/canteen/reports/item-wise-sales', params ?? {})),
+  getLowBalanceWallets: (params?: { threshold?: number | null }) => request<CanteenWallet[]>(withQuery('/canteen/reports/low-balance-wallets', params ?? {})),
+  getStudentSpendingSummary: (params?: { studentId?: string | null; from?: string | null; to?: string | null }) => request<StudentSpendingSummary[]>(withQuery('/canteen/reports/student-spending-summary', params ?? {})),
+  getStockLedger: (params?: { inventoryItemId?: string | null; from?: string | null; to?: string | null }) => request<CanteenStockLedgerRow[]>(withQuery('/canteen/reports/stock-ledger', params ?? {})),
 };

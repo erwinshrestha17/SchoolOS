@@ -55,51 +55,14 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('implements the shared UI primitives named by the UI/UX plan', () => {
-    const requiredComponents = [
-      'action-menu',
-      'audit-info',
-      'confirm-dialog',
-      'data-table',
-      'empty-state',
-      'export-button',
-      'filter-bar',
-      'loading-state',
-      'locked-record-banner',
-      'money-display',
-      'notification-badge',
-      'page-header',
-      'permission-state',
-      'report-toolbar',
-      'search-input',
-      'section-card',
-      'stat-card',
-      'status-badge',
-      'table-pagination',
-      'tabs',
-      'toast',
-    ];
+    const requiredComponents = ['action-menu', 'audit-info', 'confirm-dialog', 'data-table', 'empty-state', 'export-button', 'filter-bar', 'loading-state', 'locked-record-banner', 'money-display', 'notification-badge', 'page-header', 'permission-state', 'report-toolbar', 'search-input', 'section-card', 'stat-card', 'status-badge', 'table-pagination', 'tabs', 'toast'];
 
     for (const component of requiredComponents) {
-      assert.equal(
-        existsSync(join(webRoot, `components/ui/${component}.tsx`)),
-        true,
-        `Missing shared UI primitive: ${component}`,
-      );
+      assert.equal(existsSync(join(webRoot, `components/ui/${component}.tsx`)), true, `Missing shared UI primitive: ${component}`);
     }
 
     const statusBadge = read('components/ui/status-badge.tsx');
-    for (const status of [
-      'ACTIVE',
-      'PENDING',
-      'DRAFT',
-      'PUBLISHED',
-      'LOCKED',
-      'PAID',
-      'PARTIAL',
-      'UNPAID',
-      'OVERDUE',
-      'ESCALATED',
-    ]) {
+    for (const status of ['ACTIVE', 'PENDING', 'DRAFT', 'PUBLISHED', 'LOCKED', 'PAID', 'PARTIAL', 'UNPAID', 'OVERDUE', 'ESCALATED']) {
       assert.match(statusBadge, new RegExp(status));
     }
 
@@ -114,104 +77,16 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('keeps Phase 1 and Phase 2 admin dashboard routes present', () => {
-    const requiredRoutes = [
-      'admissions',
-      'attendance',
-      'fees',
-      'finance',
-      'activity',
-      'notices',
-      'academics',
-      'timetable',
-      'homework',
-      'hr',
-      'payroll',
-      'accounting',
-      'messaging',
-      'messages',
-      'settings',
-    ];
+    const requiredRoutes = ['admissions', 'attendance', 'fees', 'finance', 'activity', 'notices', 'academics', 'timetable', 'homework', 'hr', 'payroll', 'accounting', 'messaging', 'messages', 'settings'];
 
     for (const route of requiredRoutes) {
-      assert.equal(
-        existsSync(join(webRoot, `app/dashboard/${route}/page.tsx`)),
-        true,
-        `Missing dashboard route: ${route}`,
-      );
+      assert.equal(existsSync(join(webRoot, `app/dashboard/${route}/page.tsx`)), true, `Missing dashboard route: ${route}`);
     }
   });
 
   it('exposes client helpers for canonical Phase 1 and Phase 2 workflows', () => {
     const apiClient = read('lib/api.ts');
-    const requiredHelpers = [
-      'checkAdmissionDuplicates',
-      'bulkImportAdmissions',
-      'openStudentDocumentPdf',
-      'getStudentProfile',
-      'getInvoiceDetail',
-      'getStudentFeeLedger',
-      'refundPayment',
-      'previewCashierClose',
-      'listCashierCloses',
-      'finalizeCashierClose',
-      'getAttendanceRoster',
-      'syncAttendance',
-      'reviewAttendanceConflict',
-      'sendDefaulterReminders',
-      'openReceiptPdf',
-      'listLedgerEntries',
-      'createActivityReaction',
-      'createDevelopmentalMilestone',
-      'getGuardianConsentStatus',
-      'createSubject',
-      'createExamTerm',
-      'enterMark',
-      'generateReportCard',
-      'createTimetableSlot',
-      'listTimetablePeriods',
-      'createTimetablePeriod',
-      'listRooms',
-      'createRoom',
-      'listTimetableVersions',
-      'createTimetableVersion',
-      'validateTimetableVersion',
-      'publishTimetableVersion',
-      'lockTimetableVersion',
-      'archiveTimetableVersion',
-      'listTeacherAvailability',
-      'createTeacherAvailability',
-      'listSubstitutions',
-      'createSubstitution',
-      'assignSubstitution',
-      'createHomework',
-      'assignHomework',
-      'closeHomework',
-      'previewHomeworkReminders',
-      'sendHomeworkReminders',
-      'listHomeworkAssignmentSubmissions',
-      'reviewHomeworkSubmissionById',
-      'requestHomeworkCorrection',
-      'reviewHomeworkSubmission',
-      'createStaffContract',
-      'createPayrollRun',
-      'postPayrollRun',
-      'getPayrollPreview',
-      'listAccountingReports',
-      'createConversation',
-      'createMessage',
-      'markMessageRead',
-      'listStaffAttendanceSummary',
-      'listLeaveRequests',
-      'approveLeaveRequest',
-      'rejectLeaveRequest',
-      'listStaffLeaveBalances',
-      'listPlatformTenants',
-      'getPlatformTenantDetail',
-      'updatePlatformTenantStatus',
-      'getTenantSettings',
-      'getPublicTenantSettings',
-      'updateTenantSetting',
-    ];
+    const requiredHelpers = ['checkAdmissionDuplicates', 'bulkImportAdmissions', 'openStudentDocumentPdf', 'getStudentProfile', 'getInvoiceDetail', 'getStudentFeeLedger', 'refundPayment', 'previewCashierClose', 'listCashierCloses', 'finalizeCashierClose', 'getAttendanceRoster', 'syncAttendance', 'reviewAttendanceConflict', 'sendDefaulterReminders', 'openReceiptPdf', 'listLedgerEntries', 'createActivityReaction', 'createDevelopmentalMilestone', 'getGuardianConsentStatus', 'createSubject', 'createExamTerm', 'enterMark', 'generateReportCard', 'createTimetableSlot', 'listTimetablePeriods', 'createTimetablePeriod', 'listRooms', 'createRoom', 'listTimetableVersions', 'createTimetableVersion', 'validateTimetableVersion', 'publishTimetableVersion', 'lockTimetableVersion', 'archiveTimetableVersion', 'listTeacherAvailability', 'createTeacherAvailability', 'listSubstitutions', 'createSubstitution', 'assignSubstitution', 'createHomework', 'assignHomework', 'closeHomework', 'previewHomeworkReminders', 'sendHomeworkReminders', 'listHomeworkAssignmentSubmissions', 'reviewHomeworkSubmissionById', 'requestHomeworkCorrection', 'reviewHomeworkSubmission', 'createStaffContract', 'createPayrollRun', 'postPayrollRun', 'getPayrollPreview', 'listAccountingReports', 'createConversation', 'createMessage', 'markMessageRead', 'listStaffAttendanceSummary', 'listLeaveRequests', 'approveLeaveRequest', 'rejectLeaveRequest', 'listStaffLeaveBalances', 'listPlatformTenants', 'getPlatformTenantDetail', 'updatePlatformTenantStatus', 'getTenantSettings', 'getPublicTenantSettings', 'updateTenantSetting'];
 
     for (const helper of requiredHelpers) {
       assert.match(apiClient, new RegExp(`${helper}:`), `Missing API helper: ${helper}`);
@@ -234,17 +109,10 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('keeps platform administration routes present and secure', () => {
-    const platformRoutes = [
-      'dashboard',
-      'schools',
-    ];
+    const platformRoutes = ['dashboard', 'schools'];
 
     for (const route of platformRoutes) {
-      assert.equal(
-        existsSync(join(webRoot, `app/platform/${route}/page.tsx`)),
-        true,
-        `Missing platform route: ${route}`,
-      );
+      assert.equal(existsSync(join(webRoot, `app/platform/${route}/page.tsx`)), true, `Missing platform route: ${route}`);
     }
 
     const layout = read('app/platform/layout.tsx');
@@ -253,18 +121,7 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('does not keep raw demo replacement IDs in production-facing forms', () => {
-    const formFiles = [
-      'components/forms/admission-form.tsx',
-      'components/forms/attendance-form.tsx',
-      'components/forms/finance-form.tsx',
-      'components/forms/activity-feed-form.tsx',
-      'components/forms/communications-form.tsx',
-      'components/forms/academics-form.tsx',
-      'components/forms/timetable-homework-form.tsx',
-      'components/forms/payroll-form.tsx',
-      'components/forms/accounting-form.tsx',
-      'components/forms/messaging-form.tsx',
-    ];
+    const formFiles = ['components/forms/admission-form.tsx', 'components/forms/attendance-form.tsx', 'components/forms/finance-form.tsx', 'components/forms/activity-feed-form.tsx', 'components/forms/communications-form.tsx', 'components/forms/academics-form.tsx', 'components/forms/timetable-homework-form.tsx', 'components/forms/payroll-form.tsx', 'components/forms/accounting-form.tsx', 'components/forms/messaging-form.tsx'];
 
     for (const formFile of formFiles) {
       assert.doesNotMatch(read(formFile), /replace-me/i, `${formFile} has a raw replacement ID`);
@@ -288,11 +145,7 @@ describe('SchoolOS web production contracts', () => {
 
     assert.match(sessionModule, /Omit<AuthSession, 'accessToken'>/);
     assert.match(sessionModule, /toBrowserSession/);
-    assert.doesNotMatch(
-      sessionModule,
-      /JSON\.stringify\(session\)/,
-      'raw AuthSession must not be persisted',
-    );
+    assert.doesNotMatch(sessionModule, /JSON\.stringify\(session\)/, 'raw AuthSession must not be persisted');
   });
 
   it('parses API JSON error messages before surfacing them to forms', () => {
@@ -314,15 +167,7 @@ describe('SchoolOS web production contracts', () => {
 
   it('keeps Phase 1 pilot navigation permission-gated and prominent', () => {
     const sidebar = read('components/layout/sidebar.tsx');
-    const requiredPhaseOneLabels = [
-      'Students',
-      'Admissions',
-      'Attendance',
-      'Fees',
-      'Activity Feed',
-      'Notices',
-      'Settings',
-    ];
+    const requiredPhaseOneLabels = ['Students', 'Admissions', 'Attendance', 'Fees', 'Activity Feed', 'Notices', 'Settings'];
 
     assert.match(sidebar, /export const dashboardNavGroups/);
     assert.match(sidebar, /visibleGroups = filterNavGroups\(dashboardNavGroups\)/);
@@ -358,20 +203,7 @@ describe('SchoolOS web production contracts', () => {
 
   it('builds the admin dashboard from real Phase 1 APIs without fake KPI numbers', () => {
     const dashboard = read('app/dashboard/page.tsx');
-    const requiredApis = [
-      'api.listAcademicYears',
-      'api.listClasses',
-      'api.listFeePlans',
-      'api.listStudents',
-      'api.listAdmissions',
-      'api.listAttendanceAnalytics',
-      'api.listInvoices',
-      'api.listDefaulters',
-      'api.listReceipts',
-      'api.listActivityPosts',
-      'api.listNotices',
-      'api.listNotificationDeliveries',
-    ];
+    const requiredApis = ['api.listAcademicYears', 'api.listClasses', 'api.listFeePlans', 'api.listStudents', 'api.listAdmissions', 'api.listAttendanceAnalytics', 'api.listInvoices', 'api.listDefaulters', 'api.listReceipts', 'api.listActivityPosts', 'api.listNotices', 'api.listNotificationDeliveries'];
 
     for (const apiCall of requiredApis) {
       assert.match(dashboard, new RegExp(apiCall.replace('.', '\\.')));
@@ -385,14 +217,7 @@ describe('SchoolOS web production contracts', () => {
 
   it('keeps admin dashboard quick actions on existing Phase 1 routes', () => {
     const dashboard = read('app/dashboard/page.tsx');
-    const requiredRoutes = [
-      '/dashboard/admissions',
-      '/dashboard/attendance',
-      '/dashboard/fees',
-      '/dashboard/activity',
-      '/dashboard/notices',
-      '/dashboard/settings',
-    ];
+    const requiredRoutes = ['/dashboard/admissions', '/dashboard/attendance', '/dashboard/fees', '/dashboard/activity', '/dashboard/notices', '/dashboard/settings'];
 
     for (const route of requiredRoutes) {
       assert.match(dashboard, new RegExp(`href: '${route}'`));
@@ -410,13 +235,7 @@ describe('SchoolOS web production contracts', () => {
 
   it('keeps admissions enrollment as a multi-step pilot flow', () => {
     const admissionForm = read('components/forms/admission-form.tsx');
-    const requiredSteps = [
-      'Personal Info',
-      'Academic Placement',
-      'Guardian Contacts',
-      'Documents & Review',
-      'Success / Next Actions',
-    ];
+    const requiredSteps = ['Personal Info', 'Academic Placement', 'Guardian Contacts', 'Documents & Review', 'Success / Next Actions'];
 
     assert.match(admissionForm, /const enrollmentSteps = \[/);
 
@@ -491,11 +310,7 @@ describe('SchoolOS web production contracts', () => {
 
   it('keeps student profile and directory actions wired to real helpers', () => {
     const directory = read('components/forms/student-directory.tsx');
-    const detailPage = readMany([
-      'components/students/student-detail-page.tsx',
-      'components/students/profile/tabs/documents-tab.tsx',
-      'components/students/profile/tabs/fees-tab.tsx',
-    ]);
+    const detailPage = readMany(['components/students/student-detail-page.tsx', 'components/students/profile/tabs/documents-tab.tsx', 'components/students/profile/tabs/fees-tab.tsx']);
     const studentsPage = read('app/dashboard/students/page.tsx');
 
     assert.match(directory, /Profile/);
@@ -517,24 +332,12 @@ describe('SchoolOS web production contracts', () => {
     const route = read('app/dashboard/students/[studentId]/page.tsx');
     const detailPage = read('components/students/student-detail-page.tsx');
 
-    assert.equal(
-      existsSync(join(webRoot, 'app/dashboard/students/[studentId]/page.tsx')),
-      true,
-    );
+    assert.equal(existsSync(join(webRoot, 'app/dashboard/students/[studentId]/page.tsx')), true);
     assert.match(route, /useParams/);
     assert.match(route, /<StudentDetailPage studentId=/);
     assert.match(detailPage, /const detailTabs = \[/);
 
-    for (const tab of [
-      'Overview',
-      'Guardians',
-      'Health',
-      'Documents',
-      'Fees',
-      'Attendance',
-      'Activity',
-      'History',
-    ]) {
+    for (const tab of ['Overview', 'Guardians', 'Health', 'Documents', 'Fees', 'Attendance', 'Activity', 'History']) {
       assert.match(detailPage, new RegExp(tab));
     }
 
@@ -542,11 +345,7 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('adds student and guardian edit workflows to the student detail page', () => {
-    const detailPage = readMany([
-      'components/students/student-detail-page.tsx',
-      'components/students/profile/student-edit-card.tsx',
-      'components/students/profile/tabs/guardians-tab.tsx',
-    ]);
+    const detailPage = readMany(['components/students/student-detail-page.tsx', 'components/students/profile/student-edit-card.tsx', 'components/students/profile/tabs/guardians-tab.tsx']);
     const apiClient = read('lib/api.ts');
 
     assert.match(apiClient, /updateStudent:/);
@@ -565,21 +364,10 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('adds lifecycle and transfer actions to the student detail page', () => {
-    const detailPage = readMany([
-      'components/students/student-detail-page.tsx',
-      'components/students/profile/lifecycle-panel.tsx',
-      'components/students/profile/tabs/documents-tab.tsx',
-    ]);
+    const detailPage = readMany(['components/students/student-detail-page.tsx', 'components/students/profile/lifecycle-panel.tsx', 'components/students/profile/tabs/documents-tab.tsx']);
     const apiClient = read('lib/api.ts');
 
-    for (const helper of [
-      'getStudentFeeClearance',
-      'transferStudent',
-      'archiveStudent',
-      'archiveStudentAsAlumni',
-      'softDeleteStudent',
-      'revokeGeneratedStudentDocument',
-    ]) {
+    for (const helper of ['getStudentFeeClearance', 'transferStudent', 'archiveStudent', 'archiveStudentAsAlumni', 'softDeleteStudent', 'revokeGeneratedStudentDocument']) {
       assert.match(apiClient, new RegExp(`${helper}:`));
     }
 
@@ -597,10 +385,7 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('adds a dedicated student document manager without exposing storage internals', () => {
-    const detailPage = readMany([
-      'components/students/student-detail-page.tsx',
-      'components/students/profile/tabs/documents-tab.tsx',
-    ]);
+    const detailPage = readMany(['components/students/student-detail-page.tsx', 'components/students/profile/tabs/documents-tab.tsx']);
     const apiClient = read('lib/api.ts');
 
     assert.match(detailPage, /System Generated Docs/);
@@ -633,23 +418,8 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('keeps attendance screen wired to real roster, submit, sync, analytics, and conflict APIs', () => {
-    const attendanceForm = readMany([
-      'components/forms/attendance-form.tsx',
-      'app/dashboard/attendance/page.tsx',
-      'components/attendance/attendance-analytics.tsx',
-      'components/attendance/attendance-conflict-review.tsx',
-    ]);
-    const requiredApis = [
-      'api.listAcademicYears',
-      'api.listClasses',
-      'api.listSections',
-      'api.getAttendanceRoster',
-      'api.submitAttendance',
-      'api.syncAttendance',
-      'api.listAttendanceAnalytics',
-      'api.listAttendanceConflicts',
-      'api.reviewAttendanceConflict',
-    ];
+    const attendanceForm = readMany(['components/forms/attendance-form.tsx', 'app/dashboard/attendance/page.tsx', 'components/attendance/attendance-analytics.tsx', 'components/attendance/attendance-conflict-review.tsx']);
+    const requiredApis = ['api.listAcademicYears', 'api.listClasses', 'api.listSections', 'api.getAttendanceRoster', 'api.submitAttendance', 'api.syncAttendance', 'api.listAttendanceAnalytics', 'api.listAttendanceConflicts', 'api.reviewAttendanceConflict'];
 
     for (const apiCall of requiredApis) {
       assert.match(attendanceForm, new RegExp(apiCall.replace('.', '\\.')));
@@ -657,18 +427,8 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('supports the full Phase 1 attendance exception status cycle', () => {
-    const attendanceForm = readMany([
-      'components/forms/attendance-form.tsx',
-      'components/attendance/attendance-roster-item.tsx',
-    ]);
-    const statuses = [
-      'PRESENT',
-      'ABSENT',
-      'LATE',
-      'SICK_LEAVE',
-      'EXCUSED_LEAVE',
-      'UNEXCUSED_LEAVE',
-    ];
+    const attendanceForm = readMany(['components/forms/attendance-form.tsx', 'components/attendance/attendance-roster-item.tsx']);
+    const statuses = ['PRESENT', 'ABSENT', 'LATE', 'SICK_LEAVE', 'EXCUSED_LEAVE', 'UNEXCUSED_LEAVE'];
 
     assert.match(attendanceForm, /const statusCycle: AttendanceStatus\[\] = \[|STATUS_OPTIONS/);
 
@@ -678,11 +438,7 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('blocks future attendance dates and keeps teacher summary labels visible', () => {
-    const attendanceForm = readMany([
-      'components/forms/attendance-form.tsx',
-      'components/attendance/attendance-header.tsx',
-      'components/attendance/attendance-roster-item.tsx',
-    ]);
+    const attendanceForm = readMany(['components/forms/attendance-form.tsx', 'components/attendance/attendance-header.tsx', 'components/attendance/attendance-roster-item.tsx']);
 
     assert.match(attendanceForm, /max=\{today\}/);
     assert.match(attendanceForm, /Future dates cannot be submitted|Date Not Allowed/);
@@ -694,12 +450,7 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('keeps offline sync secondary and preserves analytics plus conflict review sections', () => {
-    const attendanceForm = readMany([
-      'components/forms/attendance-form.tsx',
-      'app/dashboard/attendance/page.tsx',
-      'components/attendance/attendance-analytics.tsx',
-      'components/attendance/attendance-conflict-review.tsx',
-    ]);
+    const attendanceForm = readMany(['components/forms/attendance-form.tsx', 'app/dashboard/attendance/page.tsx', 'components/attendance/attendance-analytics.tsx', 'components/attendance/attendance-conflict-review.tsx']);
 
     assert.match(attendanceForm, /Offline sync|syncAttendance|Sync offline draft/);
     assert.match(attendanceForm, /Recent Attendance Analytics|Attendance Risk Alerts/);
@@ -710,30 +461,7 @@ describe('SchoolOS web production contracts', () => {
 
   it('keeps finance screen wired to real Phase 1 finance APIs', () => {
     const financeForm = read('components/forms/finance-form.tsx');
-    const requiredApis = [
-      'api.listAcademicYears',
-      'api.listClasses',
-      'api.listFeeHeads',
-      'api.listFeePlans',
-      'api.listInvoices',
-      'api.getInvoiceDetail',
-      'api.listReceipts',
-      'api.listLedgerEntries',
-      'api.listDefaulters',
-      'api.listDiscounts',
-      'api.listWaivers',
-      'api.createFeeHead',
-      'api.createFeePlan',
-      'api.generateBillingRun',
-      'api.collectPayment',
-      'api.previewCashierClose',
-      'api.listCashierCloses',
-      'api.finalizeCashierClose',
-      'api.createDiscount',
-      'api.createWaiver',
-      'api.sendDefaulterReminders',
-      'api.openReceiptPdf',
-    ];
+    const requiredApis = ['api.listAcademicYears', 'api.listClasses', 'api.listFeeHeads', 'api.listFeePlans', 'api.listInvoices', 'api.getInvoiceDetail', 'api.listReceipts', 'api.listLedgerEntries', 'api.listDefaulters', 'api.listDiscounts', 'api.listWaivers', 'api.createFeeHead', 'api.createFeePlan', 'api.generateBillingRun', 'api.collectPayment', 'api.previewCashierClose', 'api.listCashierCloses', 'api.finalizeCashierClose', 'api.createDiscount', 'api.createWaiver', 'api.sendDefaulterReminders', 'api.openReceiptPdf'];
 
     for (const apiCall of requiredApis) {
       assert.match(financeForm, new RegExp(apiCall.replace('.', '\\.')));
@@ -776,10 +504,7 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('surfaces backend student fee ledger on the student detail page', () => {
-    const studentDetail = readMany([
-      'components/students/student-detail-page.tsx',
-      'components/students/profile/tabs/fees-tab.tsx',
-    ]);
+    const studentDetail = readMany(['components/students/student-detail-page.tsx', 'components/students/profile/tabs/fees-tab.tsx']);
 
     assert.match(studentDetail, /Billing History/);
     assert.match(studentDetail, /Collect Payment/);
@@ -842,36 +567,47 @@ describe('SchoolOS web production contracts', () => {
 
   it('keeps activity screen wired to real M5 and M10 APIs', () => {
     const activityForm = read('components/forms/activity-feed-form.tsx');
-    const requiredApis = [
-      'api.listClasses',
-      'api.listSections',
-      'api.listStudents',
-      'api.listActivityPosts',
-      'api.listMoodLogs',
-      'api.listDevelopmentalMilestones',
-      'api.listNotificationDeliveries',
-      'api.createActivityPost',
-      'api.createMoodLog',
-      'api.createActivityReaction',
-      'api.createDevelopmentalMilestone',
-      'filesToBase64Payloads',
-    ];
+    const requiredApis = ['api.listClasses', 'api.listSections', 'api.listStudents', 'api.listActivityPosts', 'api.listMoodLogs', 'api.listDevelopmentalMilestones', 'api.listNotificationDeliveries', 'api.createActivityPost', 'api.createMoodLog', 'api.createActivityReaction', 'api.createDevelopmentalMilestone', 'filesToBase64Payloads'];
 
     for (const apiCall of requiredApis) {
       assert.match(activityForm, new RegExp(apiCall.replace('.', '\\.')));
     }
   });
 
+  it('keeps canteen POS receipt preview and PDF reprint wired to real APIs', () => {
+    const canteenClient = read('lib/canteen-api.ts');
+    const canteenWorkspace = read('components/canteen/canteen-workspace.tsx');
+
+    assert.match(canteenClient, /getPosReceipt/);
+    assert.match(canteenClient, /openPosReceiptPdf/);
+    assert.match(canteenClient, /receipt\.pdf/);
+    assert.match(canteenWorkspace, /ReceiptPreview/);
+    assert.match(canteenWorkspace, /onReceiptPdf/);
+    assert.doesNotMatch(canteenWorkspace, /window\.print/);
+  });
+
+  it('keeps canteen inventory and supplier surfaces wired to real APIs', () => {
+    const canteenClient = read('lib/canteen-api.ts');
+    const canteenWorkspace = read('components/canteen/canteen-workspace.tsx');
+
+    for (const helper of ['listSuppliers', 'createSupplier', 'listInventoryItems', 'createInventoryItem', 'getStockLedger']) {
+      assert.match(canteenClient, new RegExp(`${helper}:`), `Missing canteen helper: ${helper}`);
+    }
+
+    for (const endpoint of ['/canteen/suppliers', '/canteen/inventory-items', '/canteen/reports/stock-ledger']) {
+      assert.match(canteenClient, new RegExp(endpoint.replaceAll('/', '\\/')));
+    }
+
+    assert.match(canteenWorkspace, /supplierMutation/);
+    assert.match(canteenWorkspace, /inventoryItemMutation/);
+    assert.match(canteenWorkspace, /Stock ledger/);
+    assert.equal(existsSync(join(webRoot, 'app/dashboard/canteen/inventory/page.tsx')), true);
+    assert.doesNotMatch(canteenWorkspace, /Inventory Later|Rice \(Premium\)|Cooking Oil/);
+  });
+
   it('keeps activity categories and upload limits explicit', () => {
     const activityForm = read('components/forms/activity-feed-form.tsx');
-    const categories = [
-      'LEARNING',
-      'OUTDOOR_PLAY',
-      'ART_AND_CRAFT',
-      'CELEBRATION',
-      'SPORTS',
-      'GENERAL',
-    ];
+    const categories = ['LEARNING', 'OUTDOOR_PLAY', 'ART_AND_CRAFT', 'CELEBRATION', 'SPORTS', 'GENERAL'];
 
     for (const category of categories) {
       assert.match(activityForm, new RegExp(category));
@@ -913,19 +649,7 @@ describe('SchoolOS web production contracts', () => {
 
   it('keeps notices screen wired to real M10 APIs', () => {
     const communicationsForm = read('components/forms/communications-form.tsx');
-    const requiredApis = [
-      'api.listClasses',
-      'api.listSections',
-      'api.listNotificationDeliveries',
-      'api.listNotices',
-      'api.listEvents',
-      'api.listAdmissions',
-      'api.getGuardianConsentStatus',
-      'api.createNotice',
-      'api.createEvent',
-      'api.captureGuardianConsent',
-      'api.revokeGuardianConsent',
-    ];
+    const requiredApis = ['api.listClasses', 'api.listSections', 'api.listNotificationDeliveries', 'api.listNotices', 'api.listEvents', 'api.listAdmissions', 'api.getGuardianConsentStatus', 'api.createNotice', 'api.createEvent', 'api.captureGuardianConsent', 'api.revokeGuardianConsent'];
 
     for (const apiCall of requiredApis) {
       assert.match(communicationsForm, new RegExp(apiCall.replace('.', '\\.')));
@@ -996,12 +720,12 @@ describe('SchoolOS web production contracts', () => {
     assert.match(page, /PayrollDashboardPage/);
     assert.match(page, /api\.listPayrollRuns/);
     assert.match(hrWorkspace, /'Staff Directory'|'Contracts'|'Leave Requests'|'Attendance Summary'|'Leave Balances'/);
-    
+
     assert.match(contractList, /api\.listStaffContracts/);
     assert.match(contractList, /api\.createStaffContract/);
     assert.match(contractList, /Base Salary/);
     assert.match(contractList, /Allowances/);
-    
+
     assert.match(leaveList, /api\.listLeaveRequests/);
     assert.match(leaveList, /api\.approveLeaveRequest/);
     assert.match(leaveList, /api\.rejectLeaveRequest/);
@@ -1010,7 +734,7 @@ describe('SchoolOS web production contracts', () => {
     const leaveBalanceList = read('components/hr/leave-balance-list.tsx');
     assert.match(leaveBalanceList, /api\.list(Staff|All)LeaveBalances/);
     assert.match(leaveBalanceList, /Entitlement|Used|Pending|Remaining/);
-    
+
     assert.match(attendanceSummary, /api\.listStaffAttendanceSummary/);
     assert.match(attendanceSummary, /Present|Late|Absent|Leave/);
 
@@ -1021,7 +745,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(payrollPreview, /payroll runs/);
     assert.match(payrollPreview, /created from this screen/);
     assert.match(payrollPreview, /Gross Pay|Net Pay|Deductions/);
-    
+
     // Negative checks: Payroll preview should be read-only and isolated from direct accounting writes in Phase 2C
     assert.doesNotMatch(payrollPreview, /api\.approvePayroll|api\.createPayrollRun|api\.postPayrollRun/);
     assert.doesNotMatch(payrollPreview, /api\.createJournalEntry|api\.getPayslipPdf/);

@@ -68,6 +68,59 @@ describe('CanteenService Phase 3C hardening', () => {
     ).rejects.toThrow(ConflictException);
   });
 
+  it('creates meal-plan fee invoices through the finance boundary', async () => {
+    const { service, tx, financeService } = buildService();
+
+    const result = await service.enrollStudent(
+      {
+        studentId: 'student-1',
+        mealPlanId: 'plan-1',
+        startsOn: '2026-05-06',
+      },
+      actor,
+    );
+
+    expect(financeService.createCanteenMealPlanInvoice).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        actor,
+        studentId: 'student-1',
+        mealPlanName: 'Lunch Plan',
+        amount: new Prisma.Decimal(1200),
+        sourceEnrollmentId: 'enrollment-1',
+      }),
+    );
+    expect(tx.canteenStudentEnrollment.update).toHaveBeenCalledWith({
+      where: { id: 'enrollment-1' },
+      data: expect.objectContaining({
+        feeInvoiceId: 'invoice-meal-1',
+      }),
+    });
+    expect(result).toEqual(
+      expect.objectContaining({ feeInvoiceId: 'invoice-meal-1' }),
+    );
+  });
+
+  it('blocks duplicate overlapping meal-plan fee assignments', async () => {
+    const { service, tx, financeService } = buildService({
+      duplicateEnrollment: { id: 'enrollment-existing' },
+    });
+
+    await expect(
+      service.enrollStudent(
+        {
+          studentId: 'student-1',
+          mealPlanId: 'plan-1',
+          startsOn: '2026-05-06',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    expect(tx.canteenStudentEnrollment.create).not.toHaveBeenCalled();
+    expect(financeService.createCanteenMealPlanInvoice).not.toHaveBeenCalled();
+  });
+
   it('creates wallet top-up transactions inside a transaction', async () => {
     const { service, tx } = buildService();
 
@@ -166,6 +219,7 @@ describe('CanteenService Phase 3C hardening', () => {
     expect(prisma.canteenPosSale.findFirst).toHaveBeenCalledWith({
       where: { id: 'sale-1', tenantId: actor.tenantId },
       include: {
+        tenant: true,
         items: true,
         student: true,
         staff: true,
@@ -178,6 +232,24 @@ describe('CanteenService Phase 3C hardening', () => {
         receiptNumber: 'POS-2026-000001',
         saleId: 'sale-1',
         totalAmount: new Prisma.Decimal(100),
+      }),
+    );
+  });
+
+  it('builds a PDF receipt and audits reprint access', async () => {
+    const { service, auditService } = buildService({
+      receiptSale: buildReceiptSale(),
+    });
+
+    const pdf = await service.getPosReceiptPdf('sale-1', actor);
+
+    expect(Buffer.isBuffer(pdf)).toBe(true);
+    expect(pdf.slice(0, 5).toString()).toBe('%PDF-');
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'reprint_receipt',
+        resource: 'canteen_pos_sale',
+        resourceId: 'sale-1',
       }),
     );
   });
@@ -300,6 +372,7 @@ function buildService(
     walletBalance?: Prisma.Decimal;
     posSale?: unknown;
     receiptSale?: unknown;
+    duplicateEnrollment?: unknown;
   } = {},
 ) {
   const student =
@@ -317,7 +390,9 @@ function buildService(
   const mealPlan = options.mealPlan ?? {
     id: 'plan-1',
     tenantId: actor.tenantId,
+    name: 'Lunch Plan',
     mealType: 'LUNCH',
+    price: new Prisma.Decimal(1200),
     status: CanteenMealPlanStatus.ACTIVE,
     duplicateServingPrevention: true,
   };
@@ -347,11 +422,34 @@ function buildService(
       create: jest.fn().mockResolvedValue({ id: 'serving-1' }),
     },
     canteenStudentEnrollment: {
-      findFirst: jest.fn().mockResolvedValue({
+      create: jest.fn().mockResolvedValue({ id: 'enrollment-1' }),
+      findFirst: jest.fn().mockImplementation(
+        async (query: {
+          where?: {
+            studentId?: string;
+            mealPlanId?: string;
+            status?: { in?: string[] };
+          };
+        }) => {
+          if (
+            query.where?.studentId &&
+            query.where?.mealPlanId &&
+            query.where?.status?.in
+          ) {
+            return options.duplicateEnrollment ?? null;
+          }
+          return {
+            id: 'enrollment-1',
+            mealPlanId: 'plan-1',
+            status: CanteenMealPlanStatus.ACTIVE,
+            mealPlan,
+          };
+        },
+      ),
+      update: jest.fn().mockResolvedValue({
         id: 'enrollment-1',
-        mealPlanId: 'plan-1',
-        status: CanteenMealPlanStatus.ACTIVE,
-        mealPlan,
+        feeInvoiceId: 'invoice-meal-1',
+        feePostedAt: new Date('2026-05-06T00:00:00.000Z'),
       }),
     },
     canteenWallet: {
@@ -448,7 +546,11 @@ function buildService(
   };
 
   const financeService = {
-    // mock methods if needed
+    createCanteenMealPlanInvoice: jest.fn().mockResolvedValue({
+      id: 'invoice-meal-1',
+      invoiceNumber: 'INV-2026-00001',
+      sourceEnrollmentId: 'enrollment-1',
+    }),
   };
 
   return {
@@ -460,6 +562,7 @@ function buildService(
     ),
     prisma,
     tx,
+    auditService,
     accountingPostingService,
     financeService,
   };
@@ -476,6 +579,11 @@ function buildReceiptSale() {
     status: CanteenPosSaleStatus.COMPLETED,
     subtotal: new Prisma.Decimal(100),
     totalAmount: new Prisma.Decimal(100),
+    discountAmount: new Prisma.Decimal(0),
+    tenant: {
+      name: 'Demo School',
+      panNumber: '123456789',
+    },
     items: [
       {
         itemName: 'Lunch Set',

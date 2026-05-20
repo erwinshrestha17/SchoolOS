@@ -29,6 +29,9 @@ Completed:
 - M7 payroll backend reports now expose explicit register, PF, TDS, and salary-component summaries instead of thin aliases.
 - M8A Library admin depth now has tests for fine-to-fees/accounting boundary, staff borrowers, and purpose-limited QR lookup.
 - M8C Canteen backend/admin depth now exposes a POS receipt endpoint and prevents wallet reversals/corrections from making balances negative.
+- M8C Canteen meal-plan enrollment now creates linked M3 fee invoices through backend FinanceService/M9 posting boundaries, and the enrollments UI shows the linked invoice marker.
+- M8C POS now has backend-protected receipt preview and PDF reprint actions in the admin canteen workspace.
+- M8C inventory now uses real supplier, inventory item, and stock ledger APIs for admin list/create and visibility surfaces.
 - M8B Transport backend/admin depth now guards GPS ingestion pressure, verifies Redis latest-location/cache fanout, and bounds retention cleanup.
 
 Deferred:
@@ -357,7 +360,8 @@ Completed:
 - [x] Credential-gated Phase 4 Library/Canteen/Transport Playwright smoke coverage.
 - [ ] Library barcode/QR scan polish beyond current admin scan/report surfaces.
 - [ ] Transport live map only after admin real-time readiness is product-approved.
-- [ ] Canteen inventory/vendor UI depth and POS/QR speed polish beyond current routes.
+- [ ] Canteen purchase-bill/wastage/manual-adjustment UI depth and POS/QR speed polish beyond current routes.
+- [ ] Canteen meal-plan cancellation/void and collection-link UX after product rules are finalized.
 - Full mobile/PWA later.
 
 - pnpm lint: passed

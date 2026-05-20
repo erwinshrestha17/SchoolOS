@@ -368,24 +368,26 @@ Implemented:
 - Menu items, meal plans, enrollments, serving.
 - Wallets, top-ups, transaction history, reversals/corrections.
 - POS sales, spending controls, low-balance reports.
-- POS receipt endpoint and wallet reversal/correction guards that prevent negative balances.
+- POS receipt JSON and protected PDF reprint endpoints, plus wallet reversal/correction guards that prevent negative balances.
+- Meal-plan enrollments create linked M3 invoices through `FinanceService`, post through the approved M9 `AccountingPostingService` boundary, and block overlapping duplicate active assignments.
 - QR resolve for canteen serving.
 - Suppliers, inventory items, purchase bills, stock movement, wastage, stock ledger.
 - Daily meal count, item-wise sales, low-balance, student spending, stock ledger reports and CSV exports.
 - Canteen dashboard, menu, plans, enrollments, serving, wallets, POS, controls, reports routes.
+- Admin supplier and inventory item list/create surfaces now use real canteen APIs and show backend stock ledger visibility.
 
 Remaining backend:
 
-- Meal plan fee-dues boundary through M3 Finance once product rules are approved.
+- Meal-plan cancellation/void collection rules after product decides how canteen enrollments should affect already-issued M3 dues.
 - Low-balance notification queue staging verification.
 - Inventory/vendor edge-case tests beyond purchase/wastage/negative-stock/idempotency coverage.
 
 Remaining frontend:
 
 - QR/student ID scan speed polish beyond current admin POS/serving surfaces.
-- Inventory/vendor UI depth beyond current menu/inventory/report surfaces.
+- Purchase-bill, wastage, and manual stock-adjustment UI depth beyond current supplier/item list-create and stock-ledger surfaces.
 - Parent wallet/menu/spending views later.
-- Canteen report/export polish.
+- Canteen report/export polish and deeper linked-invoice actions beyond the current enrollment invoice indicator and POS receipt preview/PDF actions.
 - Browser smoke execution in seeded staging.
 
 ### M9 - Accounting & Finance

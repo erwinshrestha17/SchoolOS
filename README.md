@@ -83,7 +83,7 @@ AI/ML implementation
 Parent/mobile portal
 Driver app
 Live transport map/WebSocket UI
-Full canteen inventory/vendor workflows
+Full canteen purchase-bill/wastage/vendor workflows
 Microservices
 ```
 
@@ -158,7 +158,7 @@ Rules:
 | M7 | HR & Payroll | Backend/admin UI foundation implemented; approval, reporting, self-service, and browser depth remains |
 | M8A | Library Management | Admin/backend foundation with fines, reports, history, and QR lookup |
 | M8B | Transport Management | Admin/trip/location/report foundation; live/driver/parent later |
-| M8C | Canteen Management | Admin/wallet/POS/inventory/vendor/report foundation; integrations and parent views later |
+| M8C | Canteen Management | Admin/wallet/POS receipt JSON/PDF/inventory/vendor/report foundation with meal-plan M3 invoice linkage and supplier/item admin UI; cancellation rules and parent views later |
 | M9 | Accounting & Finance | Phase 2D production-candidate complete |
 | M10 | Notices & Communication | Phase 1A/1B + parent-teacher chat foundation |
 | M11 | School Intelligence & Analytics | Roadmap only; implementation deferred |
@@ -359,5 +359,5 @@ Do not move M9 Accounting to a microservice yet.
 - Payment gateways such as eSewa/Khalti until manual/bank/cash reconciliation is production-ready.
 - Parent/mobile portal and driver app.
 - Live transport map/WebSocket UI.
-- Full canteen inventory/vendor workflows.
+- Full canteen purchase-bill/wastage/vendor workflows.
 - AI integrations until reliable production data and M11 foundations exist.

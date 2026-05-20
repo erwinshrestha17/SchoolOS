@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
@@ -466,6 +467,20 @@ export class CanteenController {
   @Permissions('canteen:pos:read')
   getPosReceipt(@Param('id') id: string, @CurrentAuth() auth: AuthContext) {
     return this.canteenService.getPosReceipt(id, auth);
+  }
+
+  @Get('pos-sales/:id/receipt.pdf')
+  @Header('Content-Type', 'application/pdf')
+  @Permissions('canteen:pos:read')
+  async getPosReceiptPdf(
+    @Param('id') id: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    const pdf = await this.canteenService.getPosReceiptPdf(id, auth);
+    return new StreamableFile(pdf, {
+      type: 'application/pdf',
+      disposition: `inline; filename="canteen-pos-receipt-${id}.pdf"`,
+    });
   }
 
   @Get('pos-sales')

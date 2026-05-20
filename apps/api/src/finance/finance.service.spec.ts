@@ -26,6 +26,74 @@ const actor = {
 };
 
 describe('finance production controls', () => {
+  it('creates canteen meal-plan invoices through the M3 invoice and M9 posting boundary', async () => {
+    const createdInvoice = {
+      id: 'invoice-meal-1',
+      invoiceNumber: 'INV-2026-00001',
+      studentId: 'student-1',
+      totalAmount: new Prisma.Decimal(1200),
+      lines: [
+        {
+          feeHead: { code: 'MEALPLAN', name: 'Canteen Meal Plan' },
+          totalAmount: new Prisma.Decimal(1200),
+        },
+      ],
+    };
+    const { service, prisma, accountingPostingService } = buildService({
+      invoice: null,
+      feeHead: null,
+      createdInvoice,
+    });
+
+    const result = await service.createCanteenMealPlanInvoice(prisma as never, {
+      actor,
+      studentId: 'student-1',
+      mealPlanName: 'Lunch Plan',
+      mealType: 'LUNCH',
+      amount: new Prisma.Decimal(1200),
+      dueDate: new Date('2026-05-06T00:00:00.000Z'),
+      servicePeriodStart: new Date('2026-05-06T00:00:00.000Z'),
+      servicePeriodEnd: null,
+      sourceEnrollmentId: 'enrollment-1',
+    });
+
+    expect(result).toEqual({
+      id: 'invoice-meal-1',
+      invoiceNumber: 'INV-2026-00001',
+      sourceEnrollmentId: 'enrollment-1',
+    });
+    expect(prisma.feeHead.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tenantId_code: { tenantId: actor.tenantId, code: 'MEALPLAN' },
+        },
+      }),
+    );
+    expect(prisma.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tenantId: actor.tenantId,
+          studentId: 'student-1',
+          totalAmount: new Prisma.Decimal(1200),
+        }),
+      }),
+    );
+    expect(accountingPostingService.postInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: actor.tenantId,
+        invoiceId: 'invoice-meal-1',
+        lines: [
+          expect.objectContaining({
+            accountCode: '4050',
+            accountName: 'Canteen Meal Plan',
+          }),
+        ],
+      }),
+      actor,
+      prisma,
+    );
+  });
+
   it('requires discount reason and tenant-owned target references', async () => {
     const feeHead = buildFeeHead();
     const classroom = { id: 'class-1', tenantId: actor.tenantId };
@@ -1318,6 +1386,8 @@ function buildFeeHead() {
 function buildService(options: {
   invoice: unknown;
   feeHead: unknown;
+  createdInvoice?: unknown;
+  invoiceCount?: number;
   student?: unknown;
   classroom?: unknown;
   feePlan?: unknown;
@@ -1364,6 +1434,8 @@ function buildService(options: {
     invoice: {
       findFirst: jest.fn().mockResolvedValue(options.invoice),
       findMany: jest.fn().mockResolvedValue(options.invoices ?? []),
+      count: jest.fn().mockResolvedValue(options.invoiceCount ?? 0),
+      create: jest.fn().mockResolvedValue(options.createdInvoice),
       update: jest.fn().mockResolvedValue(options.updatedInvoice),
     },
     discountRule: {
@@ -1376,6 +1448,16 @@ function buildService(options: {
     },
     feeHead: {
       findFirst: jest.fn().mockResolvedValue(options.feeHead),
+      upsert: jest.fn().mockResolvedValue(
+        options.feeHead ?? {
+          id: 'fee-head-meal',
+          code: 'MEALPLAN',
+          name: 'Canteen Meal Plan',
+        },
+      ),
+    },
+    academicYear: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'ay-1' }),
     },
     feePlan: {
       findFirst: jest.fn().mockResolvedValue(options.feePlan ?? null),
@@ -1471,6 +1553,11 @@ function buildService(options: {
       .fn()
       .mockResolvedValue(
         options.createdJournalEntry ?? { entryNumber: 'JE-WAV-1' },
+      ),
+    postInvoice: jest
+      .fn()
+      .mockResolvedValue(
+        options.createdJournalEntry ?? { entryNumber: 'JE-INV-1' },
       ),
     postPaymentRefund: jest
       .fn()

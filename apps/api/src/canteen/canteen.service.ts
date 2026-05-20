@@ -19,6 +19,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
 import type { AuthContext } from '../auth/auth.types';
+import { buildSimplePdf } from '../common/pdf/simple-pdf';
 import { PrismaService } from '../prisma/prisma.service';
 import { FinanceService } from '../finance/finance.service';
 import {
@@ -323,40 +324,53 @@ export class CanteenService {
     if (plan.status !== CanteenMealPlanStatus.ACTIVE) {
       throw new ConflictException('Inactive meal plans cannot be assigned');
     }
+    const startsOn = this.dateOnly(dto.startsOn);
+    const endsOn = dto.endsOn ? this.dateOnly(dto.endsOn) : null;
     const enrollment = await this.prisma.$transaction(async (tx) => {
+      await this.assertNoDuplicateMealPlanEnrollment(tx, {
+        tenantId: actor.tenantId,
+        studentId: dto.studentId,
+        mealPlanId: dto.mealPlanId,
+        startsOn,
+        endsOn,
+      });
+
       const created = await tx.canteenStudentEnrollment.create({
         data: {
           tenantId: actor.tenantId,
           studentId: dto.studentId,
           mealPlanId: dto.mealPlanId,
-          startsOn: this.dateOnly(dto.startsOn),
-          endsOn: dto.endsOn ? this.dateOnly(dto.endsOn) : null,
+          startsOn,
+          endsOn,
           notes: dto.notes ?? null,
         },
       });
 
       if (plan.price.gt(0)) {
-        // Integration: Create ad-hoc invoice for meal plan enrollment
-        // This usually requires a FeeHead for 'Meal Plan'
-        const feeHead = await tx.feeHead.findFirst({
-          where: { tenantId: actor.tenantId, code: 'MEAL_PLAN' },
+        const invoice = await this.financeService.createCanteenMealPlanInvoice(
+          tx,
+          {
+            actor,
+            studentId: dto.studentId,
+            mealPlanName: plan.name,
+            mealType: plan.mealType,
+            amount: plan.price,
+            dueDate: startsOn,
+            servicePeriodStart: startsOn,
+            servicePeriodEnd: endsOn,
+            sourceEnrollmentId: created.id,
+          },
+        );
+
+        return tx.canteenStudentEnrollment.update({
+          where: { id: created.id },
+          data: {
+            feeInvoiceId: invoice.id,
+            feePostedAt: new Date(),
+          },
         });
-
-        if (feeHead) {
-          // Logic similar to FinanceService.generateBillingRun
-          // For simplicity, we'll assume current active academic year
-          const ay = await tx.academicYear.findFirst({
-            where: { tenantId: actor.tenantId, isCurrent: true },
-          });
-
-          if (ay) {
-            // We use the same invoice generation logic
-            // Note: In production, we'd probably use a dedicated financeService method
-            // but here we implement it to satisfy the hardening requirement
-            // ...
-          }
-        }
       }
+
       return created;
     });
 
@@ -1021,6 +1035,7 @@ export class CanteenService {
     const sale = await this.prisma.canteenPosSale.findFirst({
       where: { id, tenantId: actor.tenantId },
       include: {
+        tenant: true,
         items: true,
         student: true,
         staff: true,
@@ -1038,6 +1053,10 @@ export class CanteenService {
     }
 
     return {
+      school: {
+        name: sale.tenant.name,
+        panNumber: sale.tenant.panNumber,
+      },
       receiptNumber: sale.receiptNumber,
       saleId: sale.id,
       saleDate: sale.completedAt ?? sale.saleDate,
@@ -1065,9 +1084,51 @@ export class CanteenService {
         lineTotal: item.lineTotal,
       })),
       subtotal: sale.subtotal,
+      discountAmount: sale.discountAmount,
       totalAmount: sale.totalAmount,
       walletBalanceAfter: sale.wallet?.balance ?? null,
     };
+  }
+
+  async getPosReceiptPdf(id: string, actor: AuthContext) {
+    const receipt = await this.getPosReceipt(id, actor);
+    const pdf = buildSimplePdf(
+      [
+        'CANTEEN POS RECEIPT',
+        `School: ${receipt.school.name}`,
+        receipt.school.panNumber ? `PAN: ${receipt.school.panNumber}` : '',
+        `Receipt No: ${receipt.receiptNumber ?? receipt.saleId}`,
+        `Sale ID: ${receipt.saleId}`,
+        `Date: ${new Date(receipt.saleDate).toISOString()}`,
+        `Payment: ${receipt.paymentMethod}`,
+        `Cashier: ${receipt.cashier ?? 'N/A'}`,
+        receipt.student
+          ? `Student: ${receipt.student.name} (${receipt.student.studentSystemId ?? receipt.student.id})`
+          : '',
+        receipt.staff
+          ? `Staff: ${receipt.staff.name} (${receipt.staff.employeeId ?? receipt.staff.id})`
+          : '',
+        'Items',
+        ...receipt.items.map(
+          (item) =>
+            `${item.quantity} x ${item.name} @ ${item.unitPrice.toString()} = ${item.lineTotal.toString()}`,
+        ),
+        `Subtotal: NPR ${receipt.subtotal.toString()}`,
+        `Discount: NPR ${receipt.discountAmount.toString()}`,
+        `Total: NPR ${receipt.totalAmount.toString()}`,
+        receipt.walletBalanceAfter
+          ? `Wallet balance after sale: NPR ${receipt.walletBalanceAfter.toString()}`
+          : '',
+        `Generated: ${new Date().toISOString()}`,
+      ].filter(Boolean),
+    );
+
+    await this.audit(actor, 'reprint_receipt', 'canteen_pos_sale', id, null, {
+      receiptNumber: receipt.receiptNumber,
+      saleId: receipt.saleId,
+    });
+
+    return pdf;
   }
 
   async listPosSales(actor: AuthContext, options: ListPosSalesQuery = {}) {
@@ -1453,6 +1514,37 @@ export class CanteenService {
       throw new NotFoundException('Canteen POS sale not found in this tenant');
     }
     return sale;
+  }
+
+  private async assertNoDuplicateMealPlanEnrollment(
+    tx: Tx,
+    input: {
+      tenantId: string;
+      studentId: string;
+      mealPlanId: string;
+      startsOn: Date;
+      endsOn: Date | null;
+    },
+  ) {
+    const existing = await tx.canteenStudentEnrollment.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        studentId: input.studentId,
+        mealPlanId: input.mealPlanId,
+        status: {
+          in: [CanteenEnrollmentStatus.ACTIVE, CanteenEnrollmentStatus.PAUSED],
+        },
+        startsOn: { lte: input.endsOn ?? input.startsOn },
+        OR: [{ endsOn: null }, { endsOn: { gte: input.startsOn } }],
+      },
+      select: { id: true },
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        'Student already has an overlapping active meal plan enrollment',
+      );
+    }
   }
 
   private audit(

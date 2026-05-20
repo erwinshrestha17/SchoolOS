@@ -1,7 +1,16 @@
-import { PrismaClient, AuthMethod, UserStatus, TenantSubscriptionStatus } from '@prisma/client';
+import {
+  PrismaClient,
+  AuthMethod,
+  UserStatus,
+  TenantSubscriptionStatus,
+} from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
 import 'dotenv/config';
+import {
+  PERMISSION_CATALOG,
+  SYSTEM_ROLE_PERMISSIONS,
+} from '../src/rbac/rbac.defaults';
 
 const adapter = new PrismaPg({
   connectionString:
@@ -19,16 +28,20 @@ const demoTenantSlug = 'pilot-school-demo';
 async function main() {
   console.log('--- M0 Platform Core Seed: Starting ---');
 
+  await seedPermissions();
+
   // 1. Ensure Platform Super Admin Role exists globally (system role)
-  // Note: system roles are typically managed via migration or startup logic, 
+  // Note: system roles are typically managed via migration or startup logic,
   // but we ensure it here for the seed.
-  
+
   // 2. Create/Update Platform Operator
   const passwordHash = await bcrypt.hash(platformPassword, 12);
-  
+
   // We need a "platform" tenant context for the operator if they are global
   // In our schema, users belong to tenants.
-  let platformTenant = await prisma.tenant.findUnique({ where: { slug: 'platform' } });
+  let platformTenant = await prisma.tenant.findUnique({
+    where: { slug: 'platform' },
+  });
   if (!platformTenant) {
     platformTenant = await prisma.tenant.create({
       data: {
@@ -36,7 +49,7 @@ async function main() {
         slug: 'platform',
         plan: 'platform',
         isActive: true,
-      }
+      },
     });
   }
 
@@ -62,15 +75,19 @@ async function main() {
 
   // Ensure role assignment
   const adminRole = await prisma.role.upsert({
-    where: { tenantId_name: { tenantId: platformTenant.id, name: platformRole } },
+    where: {
+      tenantId_name: { tenantId: platformTenant.id, name: platformRole },
+    },
     update: {},
     create: {
       tenantId: platformTenant.id,
       name: platformRole,
       description: 'Global platform administrator',
       isSystem: true,
-    }
+    },
   });
+
+  await syncRolePermissions(adminRole.id, platformRole);
 
   await prisma.userRole.upsert({
     where: {
@@ -78,7 +95,7 @@ async function main() {
         userId: operator.id,
         roleId: adminRole.id,
         scopeId: 'global',
-      }
+      },
     },
     update: {},
     create: {
@@ -86,7 +103,7 @@ async function main() {
       userId: operator.id,
       roleId: adminRole.id,
       scopeId: 'global',
-    }
+    },
   });
 
   console.log('✅ Platform operator seeded.');
@@ -113,15 +130,15 @@ async function main() {
           { featureKey: 'module.fees', enabled: true },
           { featureKey: 'module.exams', enabled: true },
           { featureKey: 'feature.report_card_pdf', enabled: true },
-        ]
+        ],
       },
       usageLimits: {
         create: [
           { usageKey: 'students.count', limit: 500, period: 'LIFETIME' },
           { usageKey: 'sms.sent', limit: 1000, period: 'MONTHLY' },
-        ]
-      }
-    }
+        ],
+      },
+    },
   });
 
   console.log('✅ Platform plans seeded.');
@@ -136,12 +153,12 @@ async function main() {
       plan: 'standard',
       isActive: true,
       panNumber: '600123456',
-    }
+    },
   });
 
   // Assign Subscription
   const existingSub = await (prisma as any).tenantSubscription.findFirst({
-    where: { tenantId: demoTenant.id }
+    where: { tenantId: demoTenant.id },
   });
 
   if (!existingSub) {
@@ -152,7 +169,7 @@ async function main() {
         status: TenantSubscriptionStatus.ACTIVE,
         startsAt: new Date(),
         renewsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      }
+      },
     });
   }
 
@@ -167,14 +184,16 @@ async function main() {
       billingAddress: 'Kathmandu, Nepal',
       panVatNumber: '600123456',
       preferredBillingCycle: 'MONTHLY',
-    }
+    },
   });
 
   console.log(`✅ Demo tenant "${demoTenant.name}" seeded.`);
 
   // 5. Seed Onboarding Overrides for Demo
   await (prisma as any).tenantOnboardingChecklistOverride.upsert({
-    where: { tenantId_itemKey: { tenantId: demoTenant.id, itemKey: 'file_storage' } },
+    where: {
+      tenantId_itemKey: { tenantId: demoTenant.id, itemKey: 'file_storage' },
+    },
     update: {},
     create: {
       tenantId: demoTenant.id,
@@ -182,10 +201,69 @@ async function main() {
       completed: true,
       reason: 'Auto-configured by platform seed',
       updatedBy: operator.id,
-    }
+    },
   });
 
   console.log('--- M0 Platform Core Seed: Completed ---');
+}
+
+async function seedPermissions() {
+  for (const permission of PERMISSION_CATALOG) {
+    await prisma.permission.upsert({
+      where: {
+        resource_action: {
+          resource: permission.resource,
+          action: permission.action,
+        },
+      },
+      update: {
+        description: permission.description,
+      },
+      create: permission,
+    });
+  }
+}
+
+async function syncRolePermissions(roleId: string, roleName: string) {
+  const permissionKeys = SYSTEM_ROLE_PERMISSIONS[roleName];
+
+  if (!permissionKeys?.length) {
+    throw new Error(`No default permissions configured for role ${roleName}.`);
+  }
+
+  await prisma.rolePermission.deleteMany({
+    where: { roleId },
+  });
+
+  for (const permissionKey of Array.from(new Set(permissionKeys))) {
+    const parts = permissionKey.split(':');
+    const action = parts.pop();
+    const resource = parts.join(':');
+
+    if (!resource || !action) {
+      throw new Error(`Invalid permission key: ${permissionKey}`);
+    }
+
+    const permission = await prisma.permission.findUnique({
+      where: {
+        resource_action: {
+          resource,
+          action,
+        },
+      },
+    });
+
+    if (!permission) {
+      throw new Error(`Permission ${permissionKey} was not created.`);
+    }
+
+    await prisma.rolePermission.create({
+      data: {
+        roleId,
+        permissionId: permission.id,
+      },
+    });
+  }
 }
 
 main()

@@ -4507,16 +4507,18 @@ model CanteenMealPlan {
 }
 
 model CanteenStudentEnrollment {
-  id         String                  @id @default(uuid())
-  tenantId   String
-  studentId  String
-  mealPlanId String
-  startsOn   DateTime                @db.Date
-  endsOn     DateTime?               @db.Date
-  status     CanteenEnrollmentStatus @default(ACTIVE)
-  notes      String?
-  createdAt  DateTime                @default(now())
-  updatedAt  DateTime                @updatedAt
+  id           String                  @id @default(uuid())
+  tenantId     String
+  studentId    String
+  mealPlanId   String
+  feeInvoiceId String?
+  feePostedAt  DateTime?
+  startsOn     DateTime                @db.Date
+  endsOn       DateTime?               @db.Date
+  status       CanteenEnrollmentStatus @default(ACTIVE)
+  notes        String?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
 
   tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   student  Student              @relation(fields: [studentId], references: [id], onDelete: Restrict)
@@ -4525,6 +4527,7 @@ model CanteenStudentEnrollment {
 
   @@index([tenantId, studentId])
   @@index([tenantId, mealPlanId, status])
+  @@index([tenantId, feeInvoiceId])
 }
 
 model CanteenMealServing {

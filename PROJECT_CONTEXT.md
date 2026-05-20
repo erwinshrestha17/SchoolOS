@@ -45,7 +45,7 @@ Phase 2 Accounting production polish completed
 Current stage: M0 platform foundation complete with provider readiness and queue failed-job detail hardening + M10 provider/attachment/retry hardening + M6/M7/M8A/M8C/M8B focused feature-depth hardening + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented
 ```
 
-Targeted web-admin polish and Phase2F smoke coverage have been completed. The latest feature-depth pass hardened M10 notifications/attachments, M6 homework parent/student scoping, M7 payroll reporting, M8A library fine/accounting tests, M8C POS/wallet receipts, and M8B GPS pressure/retention guards. Next focus is staging smoke/manual QA and remaining controlled-pilot reliability work in `docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`.
+Targeted web-admin polish and Phase2F smoke coverage have been completed. The latest feature-depth pass hardened M10 notifications/attachments, M6 homework parent/student scoping, M7 payroll reporting, M8A library fine/accounting tests, M8C POS/wallet receipts plus supplier/inventory item admin surfaces, and M8B GPS pressure/retention guards. Next focus is staging smoke/manual QA and remaining controlled-pilot reliability work in `docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`.
 
 The repo is ahead of older Phase 1B/Phase 2-transition notes. Phase 2A Academics backend/admin UI is complete and Phase 2 Academics polish is completed. M9 Accounting is completely finished. Student QR foundation is implemented. Foundations now exist for Homework/Timetable, HR/Payroll, Parent Communication/Messaging, Library, Transport, and Canteen.
 
@@ -106,7 +106,7 @@ Implemented or registered backend foundations now include:
 - Student QR identity foundation
 - M8A Library Management admin/backend foundation with fine-to-fees/accounting boundary tests, staff borrower coverage, reports, bounded history, and QR lookup
 - M8B Transport Management admin/trip/location/report foundation with Redis latest-location cache, throttled persistence, GPS pressure guard, retention cleanup bounds, and parent active-trip ownership tests
-- M8C Canteen Management admin/wallet/POS/inventory/vendor/report foundation with POS receipt endpoint, wallet reversal/correction negative-balance guards, idempotency, stock, and accounting-source hardening
+- M8C Canteen Management admin/wallet/POS/inventory/vendor/report foundation with POS receipt JSON/PDF reprint endpoints, meal-plan-to-M3 invoice linkage, supplier/inventory item admin UI, wallet reversal/correction negative-balance guards, idempotency, stock, and accounting-source hardening
 - M9 Accounting & Finance production-candidate completion plus Phase 2 PDF/snapshot/reconciliation polish
 - M10 Notices, Notifications, Communications, Messaging / Parent-Class Teacher foundation
 - M11 School Intelligence & Analytics roadmap only

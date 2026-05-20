@@ -17,6 +17,7 @@ import {
   PaymentStatus,
   Prisma,
   ChartAccountType,
+  FeeFrequency,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
@@ -2492,6 +2493,96 @@ export class FinanceService {
     });
   }
 
+  async createCanteenMealPlanInvoice(
+    tx: Prisma.TransactionClient,
+    input: {
+      actor: AuthContext;
+      studentId: string;
+      mealPlanName: string;
+      mealType: string;
+      amount: Prisma.Decimal;
+      dueDate: Date;
+      servicePeriodStart: Date;
+      servicePeriodEnd?: Date | null;
+      sourceEnrollmentId: string;
+    },
+  ) {
+    const academicYear = await tx.academicYear.findFirst({
+      where: { tenantId: input.actor.tenantId, isCurrent: true },
+      select: { id: true },
+    });
+
+    if (!academicYear) {
+      throw new NotFoundException(
+        'Current academic year is required for meal plan fee invoice',
+      );
+    }
+
+    const feeHead = await tx.feeHead.upsert({
+      where: {
+        tenantId_code: { tenantId: input.actor.tenantId, code: 'MEALPLAN' },
+      },
+      update: {},
+      create: {
+        tenantId: input.actor.tenantId,
+        name: 'Canteen Meal Plan',
+        code: 'MEALPLAN',
+        frequency: FeeFrequency.MONTHLY,
+        defaultAmount: input.amount,
+        vatApplicable: false,
+      },
+    });
+    const invoiceNumber = await this.generateInvoiceNumber(
+      input.actor.tenantId,
+      resolveFiscalYear(input.dueDate),
+      tx,
+    );
+    const serviceWindow = [
+      input.servicePeriodStart.toISOString().slice(0, 10),
+      input.servicePeriodEnd?.toISOString().slice(0, 10),
+    ]
+      .filter(Boolean)
+      .join(' to ');
+    const description = `Canteen meal plan: ${input.mealPlanName} (${input.mealType})${serviceWindow ? ` for ${serviceWindow}` : ''}`;
+
+    const invoice = await tx.invoice.create({
+      data: {
+        tenantId: input.actor.tenantId,
+        studentId: input.studentId,
+        academicYearId: academicYear.id,
+        invoiceNumber,
+        fiscalYear: resolveFiscalYear(input.dueDate),
+        billNumber: invoiceNumber,
+        dueDate: input.dueDate,
+        status: InvoiceStatus.ISSUED,
+        subtotal: input.amount,
+        vatAmount: new Prisma.Decimal(0),
+        totalAmount: input.amount,
+        lines: {
+          create: {
+            tenantId: input.actor.tenantId,
+            feeHeadId: feeHead.id,
+            description,
+            unitAmount: input.amount,
+            vatAmount: new Prisma.Decimal(0),
+            totalAmount: input.amount,
+          },
+        },
+      },
+      include: {
+        lines: { include: { feeHead: true } },
+      },
+    });
+
+    await this.postInvoiceToLedger(invoice, input.actor, tx);
+
+    return {
+      id: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      sourceEnrollmentId: input.sourceEnrollmentId,
+    };
+  }
+
   async collectPayment(dto: CollectPaymentDto, actor: AuthContext) {
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: dto.invoiceId, tenantId: actor.tenantId },
@@ -4013,6 +4104,8 @@ function resolveIncomeAccountCode(feeHeadCode: string) {
       return '4030';
     case 'LIBFINE':
       return '4040';
+    case 'MEALPLAN':
+      return '4050';
     default:
       return '4000';
   }
