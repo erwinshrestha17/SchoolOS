@@ -2,22 +2,23 @@
 
 import type { PermissionKey } from '@schoolos/core';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { ReactNode, useState } from 'react';
 import { useSession } from '../session-provider';
 import {
   Activity,
-  BarChart3,
   Building2,
   ChevronDown,
   CreditCard,
   FileClock,
+  Flag,
   LayoutDashboard,
   LogOut,
   Menu,
   MonitorCheck,
   School,
   ShieldCheck,
+  SlidersHorizontal,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -31,48 +32,108 @@ type PlatformNavItem = {
   disabled?: boolean;
 };
 
-const platformNavItems: PlatformNavItem[] = [
+type PlatformNavGroup = {
+  label: string;
+  items: PlatformNavItem[];
+};
+
+const platformNavGroups: PlatformNavGroup[] = [
   {
-    href: '/platform/dashboard',
-    label: 'Platform Overview',
-    description: 'Global SaaS health and tenant metrics',
-    icon: LayoutDashboard,
-    permissions: ['platform:read'],
+    label: 'Platform',
+    items: [
+      {
+        href: '/platform/dashboard',
+        label: 'Dashboard',
+        description: 'Global SaaS health and tenant metrics',
+        icon: LayoutDashboard,
+        permissions: ['platform:dashboard:read'],
+      },
+      {
+        href: '/platform/schools',
+        label: 'Schools',
+        description: 'Tenant onboarding, status and usage',
+        icon: Building2,
+        permissions: ['platform:tenants:read'],
+      },
+    ],
   },
   {
-    href: '/platform/schools',
-    label: 'Manage Schools',
-    description: 'Tenant onboarding, status and usage',
-    icon: Building2,
-    permissions: ['platform:manage'],
+    label: 'Operations',
+    items: [
+      {
+        href: '/platform/settings?tab=health',
+        label: 'System Health',
+        description: 'Infrastructure readiness',
+        icon: MonitorCheck,
+        permissions: ['platform:health:read'],
+      },
+      {
+        href: '/platform/audit',
+        label: 'Audit Logs',
+        description: 'Cross-tenant operator actions',
+        icon: FileClock,
+        permissions: ['platform:audit:read'],
+      },
+      {
+        href: '/platform/settings?tab=queues',
+        label: 'Queue Health',
+        description: 'Failed jobs and retry audit',
+        icon: Activity,
+        permissions: ['platform:queues:read'],
+      },
+    ],
   },
   {
-    href: '#platform-usage-coming-soon',
-    label: 'Tenant Usage',
-    description: 'Seats, storage, modules and activity',
-    icon: BarChart3,
-    permissions: ['platform:read'],
+    label: 'Configuration',
+    items: [
+      {
+        href: '/platform/settings/plans',
+        label: 'Plans',
+        description: 'SchoolOS subscription plans and limits',
+        icon: CreditCard,
+        permissions: ['platform:plans:read'],
+      },
+      {
+        href: '/platform/settings?tab=providers',
+        label: 'Providers',
+        description: 'SMS, email and storage providers',
+        icon: SlidersHorizontal,
+        permissions: ['platform:providers:read'],
+      },
+      {
+        href: '/platform/settings?tab=plans',
+        label: 'Modules / Features',
+        description: 'Plan-backed feature availability',
+        icon: Flag,
+        permissions: ['platform:plans:read'],
+      },
+    ],
   },
   {
-    href: '/platform/settings?tab=plans',
-    label: 'Plans & Billing',
-    description: 'Subscriptions, invoices and limits',
-    icon: CreditCard,
-    permissions: ['platform:manage'],
-  },
-  {
-    href: '/platform/settings?tab=health',
-    label: 'System Health',
-    description: 'Infrastructure, jobs and provider status',
-    icon: MonitorCheck,
-    permissions: ['platform:read'],
-  },
-  {
-    href: '/platform/audit',
-    label: 'Audit Logs',
-    description: 'Cross-tenant operator actions',
-    icon: FileClock,
-    permissions: ['platform:manage'],
+    label: 'Billing',
+    items: [
+      {
+        href: '/platform/schools?workflow=subscriptions',
+        label: 'Subscriptions',
+        description: 'Select a school to change its SaaS plan',
+        icon: CreditCard,
+        permissions: ['platform:subscriptions:read'],
+      },
+      {
+        href: '/platform/schools?workflow=saas-invoices',
+        label: 'SaaS Invoices',
+        description: 'SchoolOS subscription invoices only',
+        icon: FileClock,
+        permissions: ['platform:billing:read'],
+      },
+      {
+        href: '/platform/schools?workflow=payments',
+        label: 'Payments',
+        description: 'Platform SaaS payment records',
+        icon: CreditCard,
+        permissions: ['platform:billing:read'],
+      },
+    ],
   },
 ];
 
@@ -80,10 +141,17 @@ export function PlatformShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { session, logout } = useSession();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentSearch = searchParams.toString();
 
-  const visibleItems = platformNavItems.filter((item) =>
-    canSeeNavItem(item, session?.user.permissions ?? []),
-  );
+  const visibleGroups = platformNavGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) =>
+        canSeeNavItem(item, session?.user.permissions ?? []),
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
   const displayName = session?.user.email?.split('@')[0] ?? 'Operator';
   const primaryRole = session?.user.roles[0]?.replace(/_/g, ' ') ?? 'Platform user';
 
@@ -139,19 +207,24 @@ export function PlatformShell({ children }: { children: ReactNode }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Platform navigation">
-          <p className="px-3 pb-2 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Platform Control Plane
-          </p>
-          <div className="space-y-1">
-            {visibleItems.map((item) => (
-              <PlatformNavEntry
-                key={`${item.href}:${item.label}`}
-                item={item}
-                pathname={pathname}
-                onClick={() => setMobileOpen(false)}
-              />
-            ))}
-          </div>
+          {visibleGroups.map((group) => (
+            <div key={group.label} className="mb-5 last:mb-0">
+              <p className="px-3 pb-2 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                {group.label}
+              </p>
+              <div className="space-y-1">
+                {group.items.map((item) => (
+                  <PlatformNavEntry
+                    key={`${item.href}:${item.label}`}
+                    item={item}
+                    pathname={pathname}
+                    currentSearch={currentSearch}
+                    onClick={() => setMobileOpen(false)}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
         </nav>
 
         <div className="border-t border-white/10 p-4">
@@ -225,14 +298,16 @@ export function PlatformShell({ children }: { children: ReactNode }) {
 function PlatformNavEntry({
   item,
   pathname,
+  currentSearch,
   onClick,
 }: {
   item: PlatformNavItem;
   pathname: string | null;
+  currentSearch: string;
   onClick: () => void;
 }) {
   const Icon = item.icon;
-  const active = !item.disabled && pathname?.startsWith(item.href);
+  const active = !item.disabled && isActivePlatformRoute(item.href, pathname, currentSearch);
   const className = `group flex min-h-16 items-start gap-3 rounded-2xl px-3 py-3 transition-colors ${
     active
       ? 'bg-cyan-400/15 text-white ring-1 ring-cyan-400/30'
@@ -286,4 +361,30 @@ function canSeeNavItem(item: PlatformNavItem, permissions: PermissionKey[]) {
 
   const permissionSet = new Set(permissions);
   return item.permissions.some((permission) => permissionSet.has(permission));
+}
+
+function isActivePlatformRoute(
+  href: string,
+  pathname: string | null,
+  currentSearch: string,
+) {
+  const [hrefPath, hrefQuery = ''] = href.split('?');
+
+  if (!pathname) {
+    return false;
+  }
+
+  if (!hrefQuery) {
+    if (
+      hrefPath === '/platform/settings/plans' &&
+      pathname === '/platform/settings' &&
+      currentSearch === 'tab=plans'
+    ) {
+      return true;
+    }
+
+    return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
+  }
+
+  return pathname === hrefPath && currentSearch === hrefQuery;
 }

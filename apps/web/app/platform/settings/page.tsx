@@ -182,12 +182,12 @@ export default function PlatformSettings() {
             api.listPlatformFailedJobs({ limit: 50 }),
           ]);
 
-        setProviders(pResult);
-        setQueues(qResult);
+        setProviders(asArray<PlatformProviderConfigSummary>(pResult));
+        setQueues(asArray<PlatformQueueSummary>(qResult));
         setHealth(hResult);
-        setPlans(plResult);
-        setAuditLogs(aResult.items);
-        setFailedJobs(fjResult.items);
+        setPlans(asArray<PlatformPlanSummary>(plResult));
+        setAuditLogs(asArray<PlatformAuditLog>(aResult));
+        setFailedJobs(asArray<PlatformFailedJobSummary>(fjResult));
       } catch (err: any) {
         setError(err.message ?? 'Failed to load platform data');
       } finally {
@@ -208,12 +208,12 @@ export default function PlatformSettings() {
     setRetrying(retryDialog.queueName);
     try {
       const failedInQueue = retryDialog.jobId
-        ? failedJobs.filter(
+        ? safeFailedJobs.filter(
             (job) =>
               job.queueName === retryDialog.queueName &&
               job.id === retryDialog.jobId,
           )
-        : failedJobs.filter((job) => job.queueName === retryDialog.queueName);
+        : safeFailedJobs.filter((job) => job.queueName === retryDialog.queueName);
       if (failedInQueue.length === 0) {
         setActionMessage('No failed jobs found in this queue.');
         return;
@@ -340,6 +340,15 @@ export default function PlatformSettings() {
       minute: '2-digit',
     });
   };
+
+  const safeFailedJobs = asArray<PlatformFailedJobSummary>(failedJobs);
+  const safeQueues = asArray<PlatformQueueSummary>(queues);
+  const safeProviders = asArray<PlatformProviderConfigSummary>(providers);
+  const safePlans = asArray<PlatformPlanSummary>(plans);
+  const safeAuditLogs = asArray<PlatformAuditLog>(auditLogs);
+  const failedJobsForInspectingQueue = safeFailedJobs.filter(
+    (job) => job.queueName === inspectingQueue,
+  );
 
   if (loading)
     return (
@@ -547,7 +556,7 @@ export default function PlatformSettings() {
           className="space-y-8 animate-in fade-in slide-in-from-bottom-2"
         >
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {providers.map((provider) => (
+            {safeProviders.map((provider) => (
               <Card
                 key={provider.id}
                 className="rounded-3xl border-slate-100 shadow-sm transition-all hover:border-slate-200 hover:shadow-xl hover:shadow-slate-100/50 group"
@@ -670,7 +679,7 @@ export default function PlatformSettings() {
           className="space-y-8 animate-in fade-in slide-in-from-bottom-2"
         >
           <div className="grid gap-6 md:grid-cols-2">
-            {queues.map((queue) => (
+            {safeQueues.map((queue) => (
               <Card
                 key={queue.name}
                 className="rounded-3xl border-slate-100 shadow-sm overflow-hidden"
@@ -784,16 +793,13 @@ export default function PlatformSettings() {
                 </DialogDescription>
               </DialogHeader>
               <div className="py-6 space-y-4">
-                {failedJobs.filter((j) => j.queueName === inspectingQueue)
-                  .length === 0 ? (
+                {failedJobsForInspectingQueue.length === 0 ? (
                   <div className="text-center py-12 text-slate-400 font-bold bg-slate-50 rounded-2xl">
                     No failed jobs currently tracked for this queue.
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {failedJobs
-                      .filter((j) => j.queueName === inspectingQueue)
-                      .map((job: any) => (
+                    {failedJobsForInspectingQueue.map((job: any) => (
                         <div
                           key={job.id}
                           className="p-4 rounded-2xl border border-slate-100 bg-white space-y-3"
@@ -861,7 +867,7 @@ export default function PlatformSettings() {
           className="space-y-8 animate-in fade-in slide-in-from-bottom-2"
         >
           <div className="grid gap-8 lg:grid-cols-3">
-            {plans.map((plan) => (
+            {safePlans.map((plan) => (
               <Card
                 key={plan.id}
                 className="rounded-3xl border-slate-100 shadow-sm relative overflow-hidden group"
@@ -897,7 +903,7 @@ export default function PlatformSettings() {
                       Included Modules
                     </p>
                     <div className="grid grid-cols-2 gap-2">
-                      {plan.features.slice(0, 6).map((f: any) => (
+                      {asArray(plan.features).slice(0, 6).map((f) => (
                         <div
                           key={f.featureKey}
                           className="flex items-center gap-2 text-sm font-medium text-slate-600"
@@ -1030,7 +1036,7 @@ export default function PlatformSettings() {
               <Button
                 variant="outline"
                 className="rounded-xl font-bold gap-2"
-                onClick={() => exportSettingsAuditCsv(auditLogs)}
+                onClick={() => exportSettingsAuditCsv(safeAuditLogs)}
               >
                 Export current page CSV
               </Button>
@@ -1068,7 +1074,7 @@ export default function PlatformSettings() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {auditLogs.length === 0 ? (
+                    {safeAuditLogs.length === 0 ? (
                       <tr>
                         <td
                           colSpan={5}
@@ -1078,7 +1084,7 @@ export default function PlatformSettings() {
                         </td>
                       </tr>
                     ) : (
-                      auditLogs.map((log) => (
+                      safeAuditLogs.map((log) => (
                         <tr
                           key={log.id}
                           className="group hover:bg-slate-50/50 transition-colors"
@@ -1219,12 +1225,12 @@ export default function PlatformSettings() {
                   Retry audit history
                 </Label>
                 <div className="mt-2 divide-y divide-slate-100 rounded-2xl border border-slate-100">
-                  {(jobDetail.retryHistory ?? []).length === 0 ? (
+                  {asArray(jobDetail.retryHistory).length === 0 ? (
                     <div className="p-4 text-sm font-semibold text-slate-400">
                       No retry attempts recorded.
                     </div>
                   ) : (
-                    jobDetail.retryHistory?.map((entry) => (
+                    asArray(jobDetail.retryHistory).map((entry) => (
                       <div key={entry.id} className="p-4 text-sm">
                         <p className="font-bold text-slate-900">
                           {entry.reason ?? 'No reason recorded'}
@@ -1294,8 +1300,8 @@ export default function PlatformSettings() {
                 <StatusTile
                   label="Missing keys"
                   value={
-                    providerReadiness.missingKeys.length > 0
-                      ? providerReadiness.missingKeys.join(', ')
+                    asArray(providerReadiness.missingKeys).length > 0
+                      ? asArray(providerReadiness.missingKeys).join(', ')
                       : 'None'
                   }
                 />
@@ -1534,6 +1540,20 @@ function StatusTile({ label, value }: { label: string; value: string }) {
       </p>
     </div>
   );
+}
+
+function asArray<T>(
+  value: T[] | { items?: T[] | null } | null | undefined,
+): T[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (value && Array.isArray(value.items)) {
+    return value.items;
+  }
+
+  return [];
 }
 
 function exportSettingsAuditCsv(logs: PlatformAuditLog[]) {

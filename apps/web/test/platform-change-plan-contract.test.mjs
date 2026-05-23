@@ -119,6 +119,10 @@ describe('Platform tenant subscription change workflow contracts', () => {
       'Export current page CSV',
       'resourceId',
       'startDate',
+      'asArray<PlatformFailedJobSummary>(fjResult)',
+      'const safeFailedJobs = asArray<PlatformFailedJobSummary>(failedJobs)',
+      'const failedJobsForInspectingQueue = safeFailedJobs.filter',
+      'failedJobsForInspectingQueue.map',
       'router.replace(`/platform/settings?tab=${value}`)',
     ]) {
       assert.match(
@@ -127,6 +131,7 @@ describe('Platform tenant subscription change workflow contracts', () => {
       );
     }
 
+    assert.doesNotMatch(settings, /failedJobs\.filter/);
     assert.match(shell, /\/platform\/settings\?tab=plans/);
     assert.match(shell, /\/platform\/settings\?tab=health/);
     assert.match(apiClient, /enterPlatformSupportOverride/);
@@ -135,5 +140,39 @@ describe('Platform tenant subscription change workflow contracts', () => {
     assert.match(apiClient, /updatePlatformProviderStatus/);
     assert.match(apiClient, /getPlatformProviderReadiness/);
     assert.match(apiClient, /getPlatformJobDetail/);
+  });
+
+  it('keeps Plans and SchoolOS SaaS billing visible through platform-only navigation', () => {
+    const shell = read('components/layout/platform-shell.tsx');
+    const schoolsPage = read('app/platform/schools/page.tsx');
+
+    assert.equal(
+      existsSync(join(webRoot, 'app/platform/settings/plans/page.tsx')),
+      true,
+      'Missing platform settings plans redirect route',
+    );
+
+    for (const expected of [
+      "label: 'Platform'",
+      "label: 'Operations'",
+      "label: 'Configuration'",
+      "label: 'Billing'",
+      "label: 'Plans'",
+      "permissions: ['platform:plans:read']",
+      "label: 'Subscriptions'",
+      "permissions: ['platform:subscriptions:read']",
+      "label: 'SaaS Invoices'",
+      "label: 'Payments'",
+      "permissions: ['platform:billing:read']",
+    ]) {
+      assert.match(
+        shell,
+        new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      );
+    }
+
+    assert.match(schoolsPage, /SchoolOS SaaS billing/);
+    assert.match(schoolsPage, /not M3 student fee/);
+    assert.match(schoolsPage, /M9 school accounting/);
   });
 });

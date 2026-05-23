@@ -33,10 +33,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { Select } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function PlatformSchools() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const billingWorkflow = getBillingWorkflow(searchParams.get('workflow'));
   const [data, setData] = useState<PaginatedResult<PlatformTenantSummary>>({ 
     items: [], 
     total: 0,
@@ -111,6 +113,19 @@ export default function PlatformSchools() {
           Onboard New School
         </Button>
       </header>
+
+      {billingWorkflow && (
+        <div className="rounded-3xl border border-cyan-100 bg-cyan-50 p-5 text-sm font-semibold text-cyan-900">
+          <p className="font-black">
+            {billingWorkflow.heading}
+          </p>
+          <p className="mt-1 text-cyan-800">
+            Select a school to manage SchoolOS SaaS billing for that tenant.
+            This is platform subscription billing only, not M3 student fee
+            collection or M9 school accounting.
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative flex-1 max-w-md">
@@ -356,4 +371,20 @@ export default function PlatformSchools() {
       </Dialog>
     </div>
   );
+}
+
+function getBillingWorkflow(workflow: string | null) {
+  if (workflow === 'subscriptions') {
+    return { heading: 'SchoolOS SaaS subscriptions' };
+  }
+
+  if (workflow === 'saas-invoices') {
+    return { heading: 'SchoolOS SaaS invoices' };
+  }
+
+  if (workflow === 'payments') {
+    return { heading: 'SchoolOS SaaS payments' };
+  }
+
+  return null;
 }

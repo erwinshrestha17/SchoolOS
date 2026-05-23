@@ -45,13 +45,19 @@ const schoolRoutes = [
 const platformRoutes = [
   '/platform/dashboard',
   '/platform/schools',
+  '/platform/schools?workflow=subscriptions',
   '/platform/audit',
+  '/platform/settings?tab=plans',
+  '/platform/settings/plans',
 ] as const;
 
 const platformApiPathsByRoute: Record<(typeof platformRoutes)[number], RegExp> = {
   '/platform/dashboard': /\/platform\/dashboard(?:$|[?#])?/,
   '/platform/schools': /\/platform\/tenants(?:$|[/?#])?/,
+  '/platform/schools?workflow=subscriptions': /\/platform\/tenants(?:$|[/?#])?/,
   '/platform/audit': /\/platform\/audit-logs(?:$|[/?#])?/,
+  '/platform/settings?tab=plans': /\/platform\/plans(?:$|[?#])?/,
+  '/platform/settings/plans': /\/platform\/plans(?:$|[?#])?/,
 };
 
 const tenantApiPathsByRoute = {
