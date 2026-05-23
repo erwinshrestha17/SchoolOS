@@ -25,6 +25,20 @@ describe('Platform tenant SaaS billing page contracts', () => {
     assert.doesNotMatch(page, /SO-2024-00124/);
   });
 
+  it('uses shared platform operator state components', () => {
+    const page = read('app/platform/schools/[tenantId]/billing/page.tsx');
+
+    for (const expected of [
+      'PlatformSectionSkeleton',
+      'PlatformEmptyState',
+      'PlatformInlineError',
+      'PlatformBoundaryNote',
+      "from '../../../_components/platform-operator-states'",
+    ]) {
+      assert.match(page, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    }
+  });
+
   it('keeps SaaS billing clearly separated from M3 and M9', () => {
     const page = read('app/platform/schools/[tenantId]/billing/page.tsx');
 
