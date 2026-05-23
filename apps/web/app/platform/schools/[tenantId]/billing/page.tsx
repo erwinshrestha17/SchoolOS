@@ -1,13 +1,19 @@
 'use client';
 
 import type { PlatformSaaSInvoiceSummary, PlatformTenantDetail } from '@schoolos/core';
-import { AlertTriangle, ArrowLeft, CreditCard, FileClock, RefreshCw } from 'lucide-react';
+import { ArrowLeft, CreditCard, FileClock } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  PlatformBoundaryNote,
+  PlatformEmptyState,
+  PlatformInlineError,
+  PlatformSectionSkeleton,
+} from '../../../_components/platform-operator-states';
 import { api } from '../../../../../lib/api';
 
 export default function PlatformTenantBillingPage() {
@@ -45,31 +51,15 @@ export default function PlatformTenantBillingPage() {
   }, [tenantId]);
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="h-24 animate-pulse rounded-3xl bg-slate-100" />
-        <div className="grid gap-4 md:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="h-32 animate-pulse rounded-3xl bg-slate-100" />
-          ))}
-        </div>
-        <div className="h-80 animate-pulse rounded-3xl bg-slate-100" />
-      </div>
-    );
+    return <PlatformSectionSkeleton rows={6} />;
   }
 
   if (error || !tenant) {
     return (
-      <div className="rounded-3xl border border-rose-200 bg-rose-50 p-8 text-rose-800">
-        <div className="flex items-center gap-3 font-black">
-          <AlertTriangle size={20} />
-          Tenant billing unavailable
-        </div>
-        <p className="mt-2 text-sm">{error ?? 'The requested tenant could not be loaded.'}</p>
-        <Button asChild className="mt-5 rounded-2xl" variant="outline">
-          <Link href="/platform/schools">Back to schools</Link>
-        </Button>
-      </div>
+      <PlatformInlineError
+        title="Tenant billing unavailable"
+        message={error ?? 'The requested tenant could not be loaded.'}
+      />
     );
   }
 
@@ -97,13 +87,17 @@ export default function PlatformTenantBillingPage() {
             {tenant.name} billing
           </h1>
           <p className="mt-2 max-w-3xl text-slate-500">
-            Review SchoolOS-to-school subscription billing for this tenant. This is not M3 student fee collection and does not post school ledger entries into M9 Accounting.
+            Review SchoolOS-to-school subscription billing for this tenant.
           </p>
         </div>
         <Button asChild className="rounded-2xl bg-slate-900 px-6 font-bold hover:bg-slate-800">
           <Link href={`/platform/schools/${tenant.id}/change-plan`}>Change plan</Link>
         </Button>
       </header>
+
+      <PlatformBoundaryNote title="SaaS billing boundary">
+        This is SchoolOS-to-school subscription billing. It is not M3 student fee collection, and it does not post school ledger entries into M9 Accounting.
+      </PlatformBoundaryNote>
 
       <div className="grid gap-4 md:grid-cols-3">
         <BillingMetric label="Subscription" value={tenant.subscription?.planName ?? 'No plan'} helper={tenant.subscription?.status ?? 'UNASSIGNED'} />
@@ -115,20 +109,20 @@ export default function PlatformTenantBillingPage() {
         <CardHeader>
           <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-cyan-700">
             <CreditCard size={16} />
-            SaaS billing boundary
+            Platform subscription invoices
           </div>
-          <CardTitle className="text-2xl font-black">Platform subscription invoices</CardTitle>
+          <CardTitle className="text-2xl font-black">SaaS invoices</CardTitle>
           <CardDescription>
             These invoices are SchoolOS platform billing records. Student fee invoices remain in M3 Fees, and school accounting reports remain in M9 Accounting.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {invoices.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-10 text-center">
-              <FileClock className="mx-auto text-slate-300" size={40} />
-              <p className="mt-4 font-black text-slate-900">No SaaS invoices yet</p>
-              <p className="mt-1 text-sm text-slate-500">Create invoices from the tenant detail billing workflow when needed.</p>
-            </div>
+            <PlatformEmptyState
+              icon={FileClock}
+              title="No SaaS invoices yet"
+              description="Create invoices from the tenant detail billing workflow when needed. No fake billing records are shown here."
+            />
           ) : (
             <div className="overflow-hidden rounded-2xl border border-slate-100">
               <table className="w-full text-left text-sm">
