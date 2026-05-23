@@ -146,6 +146,50 @@ describe('Auth Security Hardening (Regression)', () => {
     );
   });
 
+  it('should throw ForbiddenException if override reason is shorter than 5 characters', async () => {
+    const payload = { sub: 'platform-user', tenantId: 'platform-tenant' };
+    (jwtService.verifyAsync as jest.Mock).mockResolvedValue(payload);
+
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'platform-user',
+      tenantId: 'platform-tenant',
+      status: 'ACTIVE',
+      tenant: { isActive: true },
+      userRoles: [
+        { role: { name: 'platform_super_admin', rolePermissions: [] } },
+      ],
+    });
+
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: 'school-tenant-1',
+      isActive: true,
+    });
+    prisma.supportOverride.findFirst.mockResolvedValue({
+      id: 'override-1',
+      isActive: true,
+      expiresAt: new Date(Date.now() + 3600000),
+    });
+
+    const request = {
+      headers: {
+        authorization: 'Bearer valid-token',
+        'x-schoolos-tenant-id': 'school-tenant-1',
+        'x-schoolos-tenant-override-reason': 'shrt',
+      },
+    } as any;
+
+    const context = {
+      switchToHttp: () => ({ getRequest: () => request }),
+    } as any;
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      ForbiddenException,
+    );
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      'Tenant override requires an explicit reason of at least 5 characters',
+    );
+  });
+
   it('should allow platform users to override tenant with an active SupportOverride session', async () => {
     const payload = { sub: 'platform-user', tenantId: 'platform-tenant' };
     (jwtService.verifyAsync as jest.Mock).mockResolvedValue(payload);

@@ -2321,7 +2321,11 @@ export function createPrismaMock() {
               }
             }
           }
-          return Promise.resolve(found ? { ...found } : null);
+          if (found) {
+            const enriched = applyIncludes(found, q.include || q.select);
+            return Promise.resolve({ ...enriched });
+          }
+          return Promise.resolve(null);
         }),
         updateMany: jest.fn((q: any) => {
           const items = (state as any)[actualStateKey] || [];

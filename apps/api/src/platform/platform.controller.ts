@@ -10,6 +10,7 @@ import {
   Query,
   Post,
   Delete,
+  NotFoundException,
 } from '@nestjs/common';
 import { PlatformService } from './platform.service';
 import { PlatformQueuesService } from './platform-queues.service';
@@ -297,6 +298,12 @@ export class PlatformController {
     return this.platformService.listProviders();
   }
 
+  @Get('providers/readiness')
+  @Permissions('platform:providers:read')
+  async getProvidersReadiness() {
+    return this.platformService.getProvidersReadiness();
+  }
+
   @Post('providers')
   @Permissions('platform:providers:manage')
   async upsertProvider(
@@ -482,6 +489,160 @@ export class PlatformController {
       startDate,
       endDate,
     });
+  }
+
+  @Get('schools/:tenantId/billing')
+  @Permissions('platform:billing:read')
+  async getSchoolBilling(@Param('tenantId') tenantId: string) {
+    return this.platformService.getTenantBillingDetail(tenantId);
+  }
+
+  @Get('tenants/:tenantId/billing')
+  @Permissions('platform:billing:read')
+  async getTenantBilling(@Param('tenantId') tenantId: string) {
+    return this.platformService.getTenantBillingDetail(tenantId);
+  }
+
+  @Post('schools/:tenantId/billing/invoices')
+  @Permissions('platform:billing:manage')
+  async createSchoolInvoice(
+    @Param('tenantId') tenantId: string,
+    @Body() body: CreateSaaSInvoiceDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformService.createSaaSInvoice(
+      tenantId,
+      body,
+      this.requireUser(req),
+    );
+  }
+
+  @Post('billing/invoices/:invoiceId/issue')
+  @Permissions('platform:billing:manage')
+  async issueInvoice(
+    @Param('invoiceId') invoiceId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformService.issueSaaSInvoice(invoiceId, this.requireUser(req));
+  }
+
+  @Post('billing/invoices/:invoiceId/payments')
+  @Permissions('platform:billing:manage')
+  async recordPaymentDirect(
+    @Param('invoiceId') invoiceId: string,
+    @Body() body: RecordSaaSPaymentDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const delegate = this.platformService.requireDelegate('saaSInvoice');
+    const invoice = await delegate.findUnique({ where: { id: invoiceId } });
+    if (!invoice) throw new NotFoundException('SaaS invoice not found');
+    return this.platformService.recordSaaSPayment(
+      String(invoice.tenantId),
+      invoiceId,
+      body,
+      this.requireUser(req),
+    );
+  }
+
+  @Post('billing/invoices/:invoiceId/mark-overdue')
+  @Permissions('platform:billing:manage')
+  async markOverdue(
+    @Param('invoiceId') invoiceId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformService.markInvoiceOverdue(invoiceId, this.requireUser(req));
+  }
+
+  @Post('billing/invoices/:invoiceId/cancel')
+  @Permissions('platform:billing:manage')
+  async cancelInvoiceDirect(
+    @Param('invoiceId') invoiceId: string,
+    @Body() body: CancelSaaSInvoiceDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const delegate = this.platformService.requireDelegate('saaSInvoice');
+    const invoice = await delegate.findUnique({ where: { id: invoiceId } });
+    if (!invoice) throw new NotFoundException('SaaS invoice not found');
+    return this.platformService.cancelSaaSInvoice(
+      String(invoice.tenantId),
+      invoiceId,
+      body,
+      this.requireUser(req),
+    );
+  }
+
+  @Post('schools/:tenantId/suspend-for-billing')
+  @Permissions('platform:tenants:status')
+  async suspendSchoolForBilling(
+    @Param('tenantId') tenantId: string,
+    @Body() body: { reason: string },
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformService.suspendTenantForBilling(
+      tenantId,
+      body.reason,
+      this.requireUser(req),
+    );
+  }
+
+  @Post('schools/:tenantId/reactivate-after-payment')
+  @Permissions('platform:tenants:status')
+  async reactivateSchoolAfterPayment(
+    @Param('tenantId') tenantId: string,
+    @Body() body: { reason: string },
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformService.reactivateTenantAfterPayment(
+      tenantId,
+      body.reason,
+      this.requireUser(req),
+    );
+  }
+
+  @Get('usage')
+  @Permissions('platform:usage:read')
+  async getGlobalUsage() {
+    return this.platformService.usageService.getGlobalUsageStats();
+  }
+
+  @Get('schools/:tenantId/usage')
+  @Permissions('platform:usage:read')
+  async getSchoolUsage(@Param('tenantId') tenantId: string) {
+    return this.platformService.getTenantUsage(tenantId);
+  }
+
+  @Get('schools/:tenantId/audit')
+  @Permissions('platform:audit:read')
+  async getSchoolAudit(
+    @Param('tenantId') tenantId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.platformService.listAuditLogs({ tenantId, page, limit });
+  }
+
+  @Get('audit/export')
+  @Permissions('platform:audit:read')
+  async exportAuditLogs(
+    @Query('tenantId') tenantId?: string,
+    @Query('action') action?: string,
+    @Query('userId') userId?: string,
+    @Query('actorId') actorId?: string,
+    @Query('resource') resource?: string,
+    @Query('resourceId') resourceId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformService.exportAuditLogsCsv({
+      tenantId,
+      action,
+      userId: actorId ?? userId,
+      resource,
+      resourceId,
+      startDate,
+      endDate,
+    }, this.requireUser(req));
   }
 
   private requireUser(req: AuthenticatedRequest) {

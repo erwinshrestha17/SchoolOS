@@ -110,6 +110,12 @@ export class JwtAuthGuard implements CanActivate {
         request.headers['x-schoolos-tenant-override-reason'],
       );
 
+      if (!reason || reason.trim().length < 5) {
+        throw new ForbiddenException(
+          'Tenant override requires an explicit reason of at least 5 characters',
+        );
+      }
+
       await this.auditService.record({
         action: 'tenant_override',
         resource: 'auth',
@@ -118,7 +124,7 @@ export class JwtAuthGuard implements CanActivate {
         after: {
           originalTenantId: payload.tenantId,
           effectiveTenantId: overrideTenantId,
-          reason: reason || 'Not specified',
+          reason,
         },
       });
 

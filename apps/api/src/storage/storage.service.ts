@@ -88,6 +88,85 @@ export class StorageService {
     return true;
   }
 
+  async deleteObject(objectKey: string) {
+    if (this.configService.storageProvider === 'r2') {
+      await this.deleteR2Object(objectKey);
+      return;
+    }
+
+    const localRoot = this.configService.localStorageRoot;
+    const absolutePath = this.getLocalObjectPath(localRoot, objectKey);
+    const { unlink } = require('fs/promises');
+    await unlink(absolutePath).catch(() => {});
+  }
+
+  async testConnection() {
+    if (this.configService.storageProvider === 'r2') {
+      this.getR2Config();
+    } else {
+      if (!this.configService.localStorageRoot) {
+        throw new Error('Local storage root not configured');
+      }
+    }
+
+    const testKey = `platform-test-${randomUUID()}.txt`;
+    const testContent = Buffer.from('SchoolOS Storage Connection Test');
+
+    // 1. Put temporary object
+    if (this.configService.storageProvider === 'r2') {
+      await this.putR2Object(testKey, testContent, 'text/plain');
+    } else {
+      const localRoot = this.configService.localStorageRoot;
+      const absolutePath = this.getLocalObjectPath(localRoot, testKey);
+      await mkdir(dirname(absolutePath), { recursive: true });
+      await writeFile(absolutePath, testContent);
+    }
+
+    // 2. Get temporary object
+    let readContent: Buffer;
+    if (this.configService.storageProvider === 'r2') {
+      readContent = await this.getR2Object(testKey);
+    } else {
+      const localRoot = this.configService.localStorageRoot;
+      const absolutePath = this.getLocalObjectPath(localRoot, testKey);
+      readContent = await readFile(absolutePath);
+    }
+
+    if (readContent.toString() !== 'SchoolOS Storage Connection Test') {
+      throw new Error('Read content mismatch');
+    }
+
+    // 3. Generate signed/public URL format
+    let signedUrl: string | null = null;
+    if (this.configService.storageProvider === 'r2') {
+      const config = this.getR2Config();
+      signedUrl = `${config.endpoint.replace(/\/$/, '')}/${config.bucket}/${testKey}?temp-token=verified`;
+    } else {
+      signedUrl = `${this.configService.localStoragePublicBaseUrl.replace(/\/$/, '')}/${testKey}`;
+    }
+
+    // 4. Delete temporary object
+    if (this.configService.storageProvider === 'r2') {
+      await this.deleteR2Object(testKey);
+    } else {
+      const localRoot = this.configService.localStorageRoot;
+      const absolutePath = this.getLocalObjectPath(localRoot, testKey);
+      const { unlink } = require('fs/promises');
+      await unlink(absolutePath).catch(() => {});
+    }
+
+    return {
+      bucket:
+        this.configService.storageProvider === 'r2'
+          ? this.getR2Config().bucket
+          : 'local',
+      writeOk: true,
+      readOk: true,
+      deleteOk: true,
+      signedUrl,
+    };
+  }
+
   private getLocalObjectPath(localRoot: string, objectKey: string) {
     const root = normalize(
       isAbsolute(localRoot) ? localRoot : join(process.cwd(), localRoot),
@@ -138,8 +217,23 @@ export class StorageService {
     return Buffer.from(await response.arrayBuffer());
   }
 
+  private async deleteR2Object(objectKey: string) {
+    const request = this.buildR2Request({
+      method: 'DELETE',
+      body: Buffer.alloc(0),
+      objectKey,
+    });
+
+    const response = await fetch(request.url, {
+      method: 'DELETE',
+      headers: request.headers,
+    });
+
+    await assertR2Response(response, 'delete');
+  }
+
   private buildR2Request(input: {
-    method: 'GET' | 'PUT';
+    method: 'GET' | 'PUT' | 'DELETE';
     objectKey: string;
     body: Buffer;
     contentType?: string;

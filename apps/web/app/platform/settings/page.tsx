@@ -68,6 +68,7 @@ export default function PlatformSettings() {
   const [auditLogs, setAuditLogs] = useState<PlatformAuditLog[]>([]);
   const [failedJobs, setFailedJobs] = useState<PlatformFailedJobSummary[]>([]);
 
+  const [providersReadiness, setProvidersReadiness] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -163,7 +164,7 @@ export default function PlatformSettings() {
       setError(null);
 
       try {
-        const [pResult, qResult, hResult, plResult, aResult, fjResult] =
+        const [pResult, qResult, hResult, plResult, aResult, fjResult, prResult] =
           await Promise.all([
             api.listPlatformProviders(),
             api.getPlatformQueueHealth(),
@@ -180,6 +181,7 @@ export default function PlatformSettings() {
               endDate: auditFilters.endDate || undefined,
             }),
             api.listPlatformFailedJobs({ limit: 50 }),
+            api.getPlatformProvidersReadiness().catch(() => []),
           ]);
 
         setProviders(asArray<PlatformProviderConfigSummary>(pResult));
@@ -188,6 +190,7 @@ export default function PlatformSettings() {
         setPlans(asArray<PlatformPlanSummary>(plResult));
         setAuditLogs(asArray<PlatformAuditLog>(aResult));
         setFailedJobs(asArray<PlatformFailedJobSummary>(fjResult));
+        setProvidersReadiness(asArray<any>(prResult));
       } catch (err: any) {
         setError(err.message ?? 'Failed to load platform data');
       } finally {
@@ -555,6 +558,54 @@ export default function PlatformSettings() {
           value="providers"
           className="space-y-8 animate-in fade-in slide-in-from-bottom-2"
         >
+          {providersReadiness.length > 0 && (
+            <Card className="rounded-[2.5rem] border-slate-100 shadow-sm overflow-hidden">
+              <CardHeader className="bg-slate-50/50 p-8">
+                <CardTitle className="text-2xl font-black flex items-center gap-2">
+                  <ShieldCheck className="text-emerald-500" size={24} />
+                  Operational Dependency Readiness
+                </CardTitle>
+                <CardDescription className="text-base font-medium text-slate-500">
+                  Real-time status check for database, SMS, email, FCM, object storage, and PDF generators.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-8">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                  {providersReadiness.map((pr) => (
+                    <div
+                      key={pr.providerKey}
+                      className="p-5 rounded-3xl bg-slate-50 border border-slate-100 flex flex-col justify-between"
+                    >
+                      <div>
+                        <h4 className="text-base font-black text-slate-900 leading-tight">{pr.displayName}</h4>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">{pr.providerKey}</p>
+                      </div>
+                      <div className="mt-6">
+                        <Badge
+                          variant={
+                            pr.status === 'READY'
+                              ? 'success'
+                              : pr.status === 'DISABLED'
+                                ? 'neutral'
+                                : pr.status === 'MISSING_CONFIG'
+                                  ? 'warning'
+                                  : 'destructive'
+                          }
+                          className="rounded-lg font-bold"
+                        >
+                          {pr.status}
+                        </Badge>
+                        <p className="text-[10px] text-slate-500 font-semibold mt-3 leading-snug">
+                          {pr.message}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {safeProviders.map((provider) => (
               <Card
@@ -619,6 +670,11 @@ export default function PlatformSettings() {
                     </pre>
                   </div>
                   <div className="mt-6 flex flex-col gap-2">
+                    {['SMS', 'EMAIL'].includes(provider.type) && (
+                      <p className="text-[10px] text-amber-600 font-semibold mb-2 bg-amber-50 p-2 rounded-xl border border-amber-100 leading-snug">
+                        “This test uses safe readiness checks and will not send real messages unless configured test mode supports it.”
+                      </p>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -1285,6 +1341,11 @@ export default function PlatformSettings() {
                   value={formatDate(providerReadiness.checkedAt)}
                 />
               </div>
+              {['SMS', 'EMAIL'].includes(providerReadiness.provider.type) && (
+                <p className="text-xs text-amber-600 font-semibold bg-amber-50 p-3 rounded-xl border border-amber-100 leading-snug">
+                  “This test uses safe readiness checks and will not send real messages unless configured test mode supports it.”
+                </p>
+              )}
               <div
                 className={`rounded-2xl border p-4 text-sm font-bold ${
                   providerReadiness.status === 'failed'

@@ -5,6 +5,7 @@ describe('PlatformService provider config hardening', () => {
   let service: PlatformService;
   let prisma: any;
   let auditService: { record: jest.Mock };
+  let storageService: { testConnection: jest.Mock };
 
   const makeQueue = () => ({
     getJobCounts: jest.fn(),
@@ -27,6 +28,11 @@ describe('PlatformService provider config hardening', () => {
       },
     };
     auditService = { record: jest.fn().mockResolvedValue({}) };
+    storageService = {
+      testConnection: jest
+        .fn()
+        .mockResolvedValue({ bucket: 'schoolos-private' }),
+    };
 
     service = new PlatformService(
       prisma,
@@ -35,6 +41,7 @@ describe('PlatformService provider config hardening', () => {
       {} as any,
       {} as any,
       {} as any,
+      storageService as any,
       makeQueue() as any,
       makeQueue() as any,
       makeQueue() as any,
@@ -47,6 +54,7 @@ describe('PlatformService provider config hardening', () => {
     service = new PlatformService(
       {} as any,
       auditService as any,
+      {} as any,
       {} as any,
       {} as any,
       {} as any,
@@ -449,7 +457,9 @@ describe('PlatformService provider config hardening', () => {
         missingKeys: [],
         paidExternalCallSkipped: true,
         secretKeysMasked: ['accessKeyId', 'secretAccessKey'],
-        message: expect.stringContaining('No external bucket call was made'),
+        message: expect.stringContaining(
+          'Object storage test connection succeeded',
+        ),
         provider: expect.objectContaining({
           config: expect.objectContaining({
             accessKeyId: '********',

@@ -86,3 +86,25 @@ export function hasAllPermissions(
 ) {
   return permissions.every((permission) => hasPermission(session, permission));
 }
+
+export function getSupportOverrideTenantId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.sessionStorage.getItem('x-schoolos-tenant-id');
+}
+
+export function getSupportOverrideReason(): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.sessionStorage.getItem('x-schoolos-tenant-override-reason');
+}
+
+export function setSupportOverride(tenantId: string, reason: string) {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.setItem('x-schoolos-tenant-id', tenantId);
+  window.sessionStorage.setItem('x-schoolos-tenant-override-reason', reason);
+}
+
+export function clearSupportOverride() {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.removeItem('x-schoolos-tenant-id');
+  window.sessionStorage.removeItem('x-schoolos-tenant-override-reason');
+}

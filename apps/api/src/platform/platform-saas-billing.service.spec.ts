@@ -31,6 +31,7 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
       },
       saaSPayment: {
         create: jest.fn(),
+        findFirst: jest.fn(),
       },
       tenantSubscription: {
         findMany: jest.fn(),
@@ -45,6 +46,7 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
     service = new PlatformService(
       prisma,
       auditService as any,
+      {} as any,
       {} as any,
       {} as any,
       {} as any,

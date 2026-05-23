@@ -43,11 +43,14 @@ import {
 } from './dto/platform-core.dto';
 import { ConfigService } from '../config/config.service';
 import { RedisService } from '../redis/redis.service';
+import { StorageService } from '../storage/storage.service';
 import { encryptSensitiveField } from '../common/security/field-encryption';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PlansService } from '../plans/plans.service';
 import { PlatformFailedJobSummary } from '@schoolos/core';
+import { buildSimplePdf } from '../common/pdf/simple-pdf';
+import QRCode from 'qrcode';
 
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['TRIAL', 'ACTIVE', 'GRACE']);
 
@@ -189,6 +192,7 @@ export class PlatformService {
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly plansService: PlansService,
+    private readonly storageService: StorageService,
     @InjectQueue('notifications') private readonly notificationsQueue: Queue,
     @InjectQueue('finance') private readonly financeQueue: Queue,
     @InjectQueue('payroll') private readonly payrollQueue: Queue,
@@ -255,7 +259,7 @@ export class PlatformService {
     let overdueCount = 0;
     for (const inv of unpaidInvoices) {
       const paidAmount = (inv.payments || []).reduce(
-        (sum: number, p: any) => sum + Number(p.amount),
+        (sum: number, p: { amount: unknown }) => sum + Number(p.amount),
         0,
       );
       totalUnpaidAmount += Number(inv.amount) - paidAmount;
@@ -284,7 +288,13 @@ export class PlatformService {
     );
     const usageWarnings = (await Promise.all(warningsPromises)).filter(
       Boolean,
-    ) as any[];
+    ) as {
+      tenantId: string;
+      tenantName: string;
+      usageKey: string;
+      value: number;
+      limit: number;
+    }[];
 
     // Fetch provider statuses
     const [redisHealth, storageProvider, emailProvider, smsProvider] =
@@ -303,7 +313,9 @@ export class PlatformService {
 
     const queueStatus = redisHealth.status === 'ok' ? 'ready' : 'failed';
 
-    const getStatus = (provider: any) => {
+    const getStatus = (
+      provider: Record<string, unknown> | null | undefined,
+    ) => {
       if (!provider) return 'not_configured' as const;
       const readiness = this.buildProviderReadinessDetail(
         provider,
@@ -314,7 +326,7 @@ export class PlatformService {
     };
 
     const providerReadinessStatus = {
-      queue: queueStatus as any,
+      queue: queueStatus as 'ready' | 'failed' | 'not_configured' | 'degraded',
       storage: getStatus(storageProvider),
       email: getStatus(emailProvider),
       sms: getStatus(smsProvider),
@@ -1046,7 +1058,7 @@ export class PlatformService {
         currency: 'NPR',
         issueDate: new Date(dto.issueDate),
         dueDate: new Date(dto.dueDate),
-        status: 'ISSUED',
+        status: (dto.status as any) || 'ISSUED',
         notes: dto.notes,
         createdBy: actorUserId,
         lines: { create: lines },
@@ -1083,6 +1095,17 @@ export class PlatformService {
       throw new BadRequestException('Cannot pay a cancelled invoice');
     }
     const amount = new Prisma.Decimal(dto.amount);
+    if (amount.lte(0)) {
+      throw new BadRequestException('Payment amount must be greater than zero');
+    }
+    if (dto.reference) {
+      const existingPayment = await paymentDelegate.findFirst({
+        where: { tenantId, invoiceId, reference: dto.reference },
+      });
+      if (existingPayment) {
+        throw new BadRequestException('Duplicate payment reference');
+      }
+    }
     const paid = this.sumPayments(asRecords(invoice.payments));
     if (paid.add(amount).gt(decimalValue(invoice.amount))) {
       throw new BadRequestException('Payment exceeds invoice balance');
@@ -1135,6 +1158,9 @@ export class PlatformService {
       include: { payments: true },
     });
     if (!invoice) throw new NotFoundException('SaaS invoice not found');
+    if (invoice.status === 'PAID') {
+      throw new BadRequestException('Cannot cancel an invoice with payments');
+    }
     if (asRecords(invoice.payments).length > 0) {
       throw new BadRequestException('Cannot cancel an invoice with payments');
     }
@@ -1160,6 +1186,250 @@ export class PlatformService {
     return this.toInvoiceSummary(updated);
   }
 
+  async getTenantBillingDetail(tenantId: string) {
+    await this.ensureTenant(tenantId);
+    const billingProfile = await this.getBillingProfile(tenantId);
+    const subscription = await this.getTenantSubscription(tenantId);
+    const invoices = await this.listSaaSInvoices(tenantId);
+    return {
+      billingProfile,
+      subscription,
+      invoices,
+    };
+  }
+
+  async issueSaaSInvoice(invoiceId: string, actorUserId: string) {
+    const delegate = this.requireDelegate('saaSInvoice');
+    const invoice = await delegate.findUnique({
+      where: { id: invoiceId },
+      include: { lines: true, payments: true },
+    });
+    if (!invoice) throw new NotFoundException('SaaS invoice not found');
+    if (invoice.status !== 'DRAFT') {
+      throw new BadRequestException('Only draft invoices can be issued');
+    }
+    const updated = await delegate.update({
+      where: { id: invoiceId },
+      data: { status: 'ISSUED' },
+      include: { lines: true, payments: true },
+    });
+    await this.platformAudit(
+      actorUserId,
+      'saas_invoice_issued',
+      'saas_billing',
+      invoiceId,
+      { status: 'DRAFT' },
+      { status: 'ISSUED' },
+      String(invoice.tenantId),
+    );
+    return this.toInvoiceSummary(updated);
+  }
+
+  async markInvoiceOverdue(invoiceId: string, actorUserId: string) {
+    const delegate = this.requireDelegate('saaSInvoice');
+    const invoice = await delegate.findUnique({
+      where: { id: invoiceId },
+      include: { lines: true, payments: true },
+    });
+    if (!invoice) throw new NotFoundException('SaaS invoice not found');
+    if (invoice.status === 'PAID' || invoice.status === 'CANCELLED') {
+      throw new BadRequestException('Cannot mark paid or cancelled invoice overdue');
+    }
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const inv = await tx.saaSInvoice.update({
+        where: { id: invoiceId },
+        data: { status: 'OVERDUE' },
+        include: { lines: true, payments: true },
+      });
+      if (invoice.subscriptionId) {
+        await tx.tenantSubscription.update({
+          where: { id: invoice.subscriptionId },
+          data: { status: 'GRACE' },
+        });
+      }
+      return inv;
+    });
+
+    await this.platformAudit(
+      actorUserId,
+      'saas_invoice_overdue',
+      'saas_billing',
+      invoiceId,
+      { status: invoice.status },
+      { status: 'OVERDUE' },
+      String(invoice.tenantId),
+    );
+    if (invoice.subscriptionId) {
+      await this.platformAudit(
+        actorUserId,
+        'subscription_grace_period_started',
+        'saas_billing',
+        invoice.subscriptionId,
+        null,
+        { status: 'GRACE' },
+        String(invoice.tenantId),
+      );
+    }
+    return this.toInvoiceSummary(updated);
+  }
+
+  async suspendTenantForBilling(tenantId: string, reason: string, actorUserId: string) {
+    if (!reason?.trim() || reason.trim().length < 5) {
+      throw new BadRequestException('Reason of at least 5 characters is required');
+    }
+    await this.ensureTenant(tenantId);
+    const subscription = await this.prisma.tenantSubscription.findFirst({
+      where: { tenantId, status: { in: ['ACTIVE', 'TRIAL', 'GRACE'] } },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.tenant.update({
+        where: { id: tenantId },
+        data: { isActive: false },
+      });
+      if (subscription) {
+        await tx.tenantSubscription.update({
+          where: { id: subscription.id },
+          data: { status: 'SUSPENDED' },
+        });
+      }
+    });
+
+    await this.platformAudit(
+      actorUserId,
+      'tenant_suspended_billing',
+      'tenants',
+      tenantId,
+      { isActive: true },
+      { isActive: false, reason: reason.trim() },
+      tenantId,
+    );
+    if (subscription) {
+      await this.platformAudit(
+        actorUserId,
+        'tenant_subscription_status_updated',
+        'subscriptions',
+        subscription.id,
+        { status: subscription.status },
+        { status: 'SUSPENDED', reason: reason.trim() },
+        tenantId,
+      );
+    }
+    return { success: true };
+  }
+
+  async reactivateTenantAfterPayment(tenantId: string, reason: string, actorUserId: string) {
+    if (!reason?.trim() || reason.trim().length < 5) {
+      throw new BadRequestException('Reason of at least 5 characters is required');
+    }
+    await this.ensureTenant(tenantId);
+    const subscription = await this.prisma.tenantSubscription.findFirst({
+      where: { tenantId, status: 'SUSPENDED' },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.tenant.update({
+        where: { id: tenantId },
+        data: { isActive: true },
+      });
+      if (subscription) {
+        await tx.tenantSubscription.update({
+          where: { id: subscription.id },
+          data: { status: 'ACTIVE' },
+        });
+      }
+    });
+
+    await this.platformAudit(
+      actorUserId,
+      'tenant_reactivated_billing',
+      'tenants',
+      tenantId,
+      { isActive: false },
+      { isActive: true, reason: reason.trim() },
+      tenantId,
+    );
+    if (subscription) {
+      await this.platformAudit(
+        actorUserId,
+        'tenant_subscription_status_updated',
+        'subscriptions',
+        subscription.id,
+        { status: 'SUSPENDED' },
+        { status: 'ACTIVE', reason: reason.trim() },
+        tenantId,
+      );
+    }
+    return { success: true };
+  }
+
+  async exportAuditLogsCsv(query: {
+    tenantId?: string;
+    action?: string;
+    userId?: string;
+    resource?: string;
+    resourceId?: string;
+    startDate?: string;
+    endDate?: string;
+  }, actorUserId: string): Promise<string> {
+    const where: Prisma.AuditLogWhereInput = {};
+    if (query.tenantId) where.tenantId = query.tenantId;
+    if (query.action) where.action = query.action;
+    if (query.userId) where.userId = query.userId;
+    if (query.resource) where.resource = query.resource;
+    if (query.resourceId) where.resourceId = query.resourceId;
+
+    if (query.startDate || query.endDate) {
+      where.createdAt = {};
+      if (query.startDate) where.createdAt.gte = new Date(query.startDate);
+      if (query.endDate) where.createdAt.lte = new Date(query.endDate);
+    }
+
+    const logs = await this.prisma.auditLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 10000,
+      include: {
+        user: {
+          select: {
+            email: true,
+          },
+        },
+      },
+    });
+
+    await this.platformAudit(
+      actorUserId,
+      'platform_audit_logs_exported',
+      'audit',
+      'export',
+      null,
+      { count: logs.length },
+      'platform',
+    );
+
+    const headers = ['ID', 'Timestamp', 'Action', 'Resource', 'Resource ID', 'Tenant ID', 'User', 'IP Address', 'User Agent', 'Request ID'];
+    const rows = logs.map((log) => [
+      log.id,
+      log.createdAt.toISOString(),
+      log.action,
+      log.resource,
+      log.resourceId || '',
+      log.tenantId,
+      log.user?.email || log.userId || 'System',
+      log.ipAddress || '',
+      (log.userAgent || '').replace(/"/g, '""'),
+      log.requestId || '',
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row) => row.map((val) => `"${val}"`).join(',')),
+    ].join('\n');
+
+    return csvContent;
+  }
+
   async listProviders(): Promise<PlatformProviderConfigSummary[]> {
     const delegate = this.delegate('providerConfig');
     if (!delegate) return [];
@@ -1172,16 +1442,35 @@ export class PlatformService {
   async getProviderReadinessDetail(
     providerId: string,
   ): Promise<PlatformProviderReadinessDetail> {
-    const provider = await this.prisma.providerConfig.findUnique({
+    let provider = await this.prisma.providerConfig.findUnique({
       where: { id: providerId },
     });
+
+    if (
+      !provider &&
+      [
+        'SMS',
+        'EMAIL',
+        'FCM',
+        'OBJECT_STORAGE',
+        'PAYMENT_GATEWAY',
+        'AI_PROVIDER',
+      ].includes(providerId.toUpperCase())
+    ) {
+      provider = await this.prisma.providerConfig.findFirst({
+        where: {
+          type: providerId.toUpperCase() as Prisma.ProviderConfigWhereInput['type'],
+        },
+      });
+    }
+
     if (!provider) throw new NotFoundException('Provider not found');
 
     const recentAudit = await this.prisma.auditLog.findMany({
       where: {
         tenantId: 'platform',
         resource: 'provider_config',
-        resourceId: providerId,
+        resourceId: provider.id,
       },
       orderBy: { createdAt: 'desc' },
       take: 10,
@@ -1193,6 +1482,180 @@ export class PlatformService {
       provider.lastValidatedAt ? toDate(provider.lastValidatedAt) : new Date(),
       recentAudit,
     );
+  }
+
+  async getProvidersReadiness() {
+    const checkedAt = new Date();
+    const result: Record<string, unknown>[] = [];
+
+    // 1. SMS
+    const smsProvider = await this.prisma.providerConfig.findFirst({
+      where: { type: 'SMS' },
+    });
+    result.push(
+      await this.checkServiceReadiness(
+        'SMS',
+        'SMS Service',
+        smsProvider,
+        checkedAt,
+      ),
+    );
+
+    // 2. Email
+    const emailProvider = await this.prisma.providerConfig.findFirst({
+      where: { type: 'EMAIL' },
+    });
+    result.push(
+      await this.checkServiceReadiness(
+        'EMAIL',
+        'Email Service',
+        emailProvider,
+        checkedAt,
+      ),
+    );
+
+    // 3. FCM
+    const fcmProvider = await this.prisma.providerConfig.findFirst({
+      where: { type: 'FCM' },
+    });
+    result.push(
+      await this.checkServiceReadiness(
+        'FCM',
+        'Push Notifications (FCM)',
+        fcmProvider,
+        checkedAt,
+      ),
+    );
+
+    // 4. Object Storage
+    const storageProvider = await this.prisma.providerConfig.findFirst({
+      where: { type: 'OBJECT_STORAGE' },
+    });
+    result.push(
+      await this.checkServiceReadiness(
+        'OBJECT_STORAGE',
+        'Object Storage',
+        storageProvider,
+        checkedAt,
+      ),
+    );
+
+    // 5. PDF/Report Generation Dependency
+    result.push(await this.checkPdfReadiness(checkedAt));
+
+    return result;
+  }
+
+  private async checkServiceReadiness(
+    type: string,
+    displayName: string,
+    provider: { enabled: boolean; configEncrypted: unknown } | null | undefined,
+    checkedAt: Date,
+  ) {
+    if (!provider) {
+      return {
+        providerKey: type.toLowerCase(),
+        displayName,
+        status: 'MISSING_CONFIG' as const,
+        message: `No configuration found for ${displayName}.`,
+        checkedAt: checkedAt.toISOString(),
+        requiredConfigMissing: this.getProviderRequiredKeys(type),
+      };
+    }
+
+    const requiredKeys = this.getProviderRequiredKeys(type);
+    const config = asRecord(provider.configEncrypted);
+    const missingKeys = requiredKeys.filter((key) => {
+      const value = config[key];
+      return (
+        value === null ||
+        typeof value === 'undefined' ||
+        (typeof value === 'string' && value.trim().length === 0)
+      );
+    });
+
+    if (!provider.enabled) {
+      return {
+        providerKey: type.toLowerCase(),
+        displayName,
+        status: 'DISABLED' as const,
+        message: `${displayName} is disabled.`,
+        checkedAt: checkedAt.toISOString(),
+        requiredConfigMissing: missingKeys,
+      };
+    }
+
+    if (missingKeys.length > 0) {
+      return {
+        providerKey: type.toLowerCase(),
+        displayName,
+        status: 'MISSING_CONFIG' as const,
+        message: `${displayName} is missing required configuration: ${missingKeys.join(', ')}.`,
+        checkedAt: checkedAt.toISOString(),
+        requiredConfigMissing: missingKeys,
+      };
+    }
+
+    if (type === 'OBJECT_STORAGE') {
+      try {
+        await this.storageService.testConnection();
+        return {
+          providerKey: type.toLowerCase(),
+          displayName,
+          status: 'READY' as const,
+          message:
+            'Object storage is configured and fully operational (Read/Write/Delete verified).',
+          checkedAt: checkedAt.toISOString(),
+          requiredConfigMissing: [],
+        };
+      } catch (err) {
+        return {
+          providerKey: type.toLowerCase(),
+          displayName,
+          status: 'FAILED' as const,
+          message: `Object storage test connection failed: ${err instanceof Error ? err.message : String(err)}`,
+          checkedAt: checkedAt.toISOString(),
+          requiredConfigMissing: [],
+        };
+      }
+    }
+
+    return {
+      providerKey: type.toLowerCase(),
+      displayName,
+      status: 'READY' as const,
+      message: `${displayName} passed dry-run configuration validation safely. No paid calls made.`,
+      checkedAt: checkedAt.toISOString(),
+      requiredConfigMissing: [],
+    };
+  }
+
+  private async checkPdfReadiness(checkedAt: Date) {
+    try {
+      const buffer = buildSimplePdf(['Readiness test']);
+      if (!buffer || buffer.length === 0) {
+        throw new Error('PDF build returned empty buffer');
+      }
+      await QRCode.toDataURL('test');
+
+      return {
+        providerKey: 'pdf_generator',
+        displayName: 'PDF & Report Generator',
+        status: 'READY' as const,
+        message: 'PDF generation dependencies are loaded and operational.',
+        checkedAt: checkedAt.toISOString(),
+        requiredConfigMissing: [],
+      };
+    } catch (err) {
+      return {
+        providerKey: 'pdf_generator',
+        displayName: 'PDF & Report Generator',
+        status: 'FAILED' as const,
+        message: `PDF generator failed readiness check: ${err instanceof Error ? err.message : String(err)}`,
+        checkedAt: checkedAt.toISOString(),
+        requiredConfigMissing: [],
+      };
+    }
   }
 
   async upsertProvider(dto: UpsertProviderConfigDto, actorUserId: string) {
@@ -1286,21 +1749,66 @@ export class PlatformService {
   }
 
   async testProviderConnection(providerId: string, actorUserId: string) {
-    const provider = await this.prisma.providerConfig.findUnique({
+    let provider = await this.prisma.providerConfig.findUnique({
       where: { id: providerId },
     });
+
+    if (
+      !provider &&
+      [
+        'SMS',
+        'EMAIL',
+        'FCM',
+        'OBJECT_STORAGE',
+        'PAYMENT_GATEWAY',
+        'AI_PROVIDER',
+      ].includes(providerId.toUpperCase())
+    ) {
+      provider = await this.prisma.providerConfig.findFirst({
+        where: {
+          type: providerId.toUpperCase() as Prisma.ProviderConfigWhereInput['type'],
+        },
+      });
+    }
+
     if (!provider) throw new NotFoundException('Provider not found');
 
     const checkedAt = new Date();
-    const readiness = this.buildProviderReadinessDetail(
-      provider,
-      checkedAt,
-      [],
-    );
+    let readiness: PlatformProviderReadinessDetail;
+
+    if (provider.type === 'OBJECT_STORAGE') {
+      try {
+        const testRes = await this.storageService.testConnection();
+        const baseReadiness = this.buildProviderReadinessDetail(
+          provider,
+          checkedAt,
+          [],
+        );
+        readiness = {
+          ...baseReadiness,
+          status: 'ready',
+          message: `Object storage test connection succeeded. Bucket: ${testRes.bucket}. Read/Write/Delete verified.`,
+        };
+      } catch (err) {
+        const baseReadiness = this.buildProviderReadinessDetail(
+          provider,
+          checkedAt,
+          [],
+        );
+        readiness = {
+          ...baseReadiness,
+          status: 'failed',
+          message: `Object storage test connection failed: ${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
+    } else {
+      readiness = this.buildProviderReadinessDetail(provider, checkedAt, []);
+    }
+
     const validationStatus = readiness.status.toUpperCase();
 
     await this.prisma.providerConfig.update({
-      where: { id: providerId },
+      where: { id: provider.id },
       data: {
         validationStatus,
         lastValidatedAt: checkedAt,
@@ -1311,7 +1819,7 @@ export class PlatformService {
       actorUserId,
       'provider_connection_tested',
       'provider_config',
-      providerId,
+      provider.id,
       null,
       {
         status: readiness.status,
@@ -1512,7 +2020,10 @@ export class PlatformService {
         }),
       ]);
 
-    const getProviderHealth = (provider: any, type: string) => {
+    const getProviderHealth = (
+      provider: Record<string, unknown> | null | undefined,
+      type: string,
+    ) => {
       if (!provider) {
         return {
           status: 'error' as const,
@@ -1560,7 +2071,7 @@ export class PlatformService {
     tenantId?: string;
     page?: number;
     limit?: number;
-  }): Promise<PaginatedResponse<any>> {
+  }): Promise<PaginatedResponse<unknown>> {
     const page = Number(query.page) || 1;
     const limit = Math.min(Number(query.limit) || 25, 100);
     const skip = (page - 1) * limit;
@@ -1993,9 +2504,9 @@ export class PlatformService {
       id: String(invoice.id),
       tenantId: String(invoice.tenantId),
       invoiceNumber: String(invoice.invoiceNumber),
-      amount: amount.toString(),
-      paidAmount: paidAmount.toString(),
-      balanceAmount: balanceAmount.toString(),
+      amount: amount.toFixed(2),
+      paidAmount: paidAmount.toFixed(2),
+      balanceAmount: balanceAmount.toFixed(2),
       currency: String(invoice.currency),
       issueDate: toDate(invoice.issueDate).toISOString(),
       dueDate: toDate(invoice.dueDate).toISOString(),
@@ -2010,8 +2521,8 @@ export class PlatformService {
         lineType: String(line.lineType),
         description: String(line.description),
         quantity: Number(line.quantity),
-        unitAmount: line.unitAmount?.toString?.() ?? String(line.unitAmount),
-        totalAmount: line.totalAmount?.toString?.() ?? String(line.totalAmount),
+        unitAmount: decimalValue(line.unitAmount).toFixed(2),
+        totalAmount: decimalValue(line.totalAmount).toFixed(2),
       })),
     };
   }

@@ -8,7 +8,7 @@ describe('PlansService entitlement and usage enforcement', () => {
   beforeEach(() => {
     prisma = {
       tenant: {
-        findUnique: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({ isActive: true }),
       },
       tenantFeatureOverride: {
         findUnique: jest.fn(),
@@ -138,5 +138,13 @@ describe('PlansService entitlement and usage enforcement', () => {
     await expect(
       service.validateLimit('tenant-1', 'students.count', 99),
     ).resolves.toBeUndefined();
+  });
+
+  it('rejects usage limit checks for suspended tenants', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({ isActive: false });
+
+    await expect(
+      service.validateLimit('tenant-1', 'students.count', 5),
+    ).rejects.toThrow(ForbiddenException);
   });
 });

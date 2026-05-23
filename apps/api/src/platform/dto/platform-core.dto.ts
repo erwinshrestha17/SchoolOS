@@ -232,6 +232,10 @@ export class CreateSaaSInvoiceDto {
 
   @IsOptional()
   @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
   notes?: string;
 
   @IsArray()

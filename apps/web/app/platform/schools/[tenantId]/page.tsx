@@ -138,6 +138,30 @@ export default function PlatformSchoolDetail() {
     }
   }, [tenantId, loadTenantData]);
 
+  const [cancellingSubscription, setCancellingSubscription] = useState(false);
+
+  const handleCancelSubscription = async () => {
+    if (!tenant || !tenant.subscription) return;
+    if (!window.confirm('Are you sure you want to cancel this school\'s subscription? This will disable access to all paid modules.')) {
+      return;
+    }
+    setCancellingSubscription(true);
+    setActionError(null);
+    setMessage(null);
+    try {
+      await api.updatePlatformSubscriptionStatus(tenant.id, tenant.subscription.id, {
+        status: 'CANCELLED',
+        notes: 'Cancelled from platform dashboard by operator',
+      });
+      setMessage('Subscription cancelled successfully.');
+      await loadTenantData();
+    } catch (error: any) {
+      setActionError(error.message || 'Failed to cancel subscription');
+    } finally {
+      setCancellingSubscription(false);
+    }
+  };
+
   const handleStatusUpdate = async () => {
     if (!tenant) return;
     if (statusReason.trim().length < 5) {
@@ -147,13 +171,18 @@ export default function PlatformSchoolDetail() {
 
     setUpdating(true);
     setStatusError(null);
+    setActionError(null);
+    setMessage(null);
     try {
       await api.updatePlatformTenantStatus(tenant.id, !tenant.isActive, statusReason);
+      const actionText = !tenant.isActive ? 'activated' : 'suspended';
+      setMessage(`Tenant has been successfully ${actionText}.`);
       await loadTenantData();
       setStatusDialogOpen(false);
       setStatusReason('');
     } catch (error: any) {
       setStatusError(error.message || 'Failed to update status');
+      setActionError(error.message || 'Failed to update status');
     } finally {
       setUpdating(false);
     }
@@ -163,6 +192,7 @@ export default function PlatformSchoolDetail() {
     if (!tenant || supportReason.trim().length < 5) return;
     setSupportSaving(true);
     setActionError(null);
+    setMessage(null);
     try {
       await api.enterPlatformSupportOverride({
         tenantId: tenant.id,
@@ -496,13 +526,26 @@ export default function PlatformSchoolDetail() {
                          </p>
                        </div>
                      </div>
-                     <Button
-                       variant="outline"
-                       className="rounded-xl font-bold border-slate-200 bg-white"
-                       onClick={() => router.push(`/platform/schools/${tenant.id}/change-plan`)}
-                     >
-                        Change Plan
-                     </Button>
+                     <div className="flex gap-2">
+                       <Button
+                         variant="outline"
+                         className="rounded-xl font-bold border-slate-200 bg-white"
+                         onClick={() => router.push(`/platform/schools/${tenant.id}/change-plan`)}
+                       >
+                          Change Plan
+                       </Button>
+                       {tenant.subscription && tenant.subscription.status !== 'CANCELLED' && (
+                         <Button
+                           variant="outline"
+                           className="rounded-xl font-bold border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 bg-white"
+                           onClick={handleCancelSubscription}
+                           disabled={cancellingSubscription}
+                           data-testid="cancel-subscription-button"
+                         >
+                           {cancellingSubscription ? 'Cancelling...' : 'Cancel Subscription'}
+                         </Button>
+                       )}
+                     </div>
                    </div>
 
                    <div className="mt-8 grid gap-4 sm:grid-cols-2">

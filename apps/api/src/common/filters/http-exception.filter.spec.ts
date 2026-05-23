@@ -71,7 +71,7 @@ describe('HttpExceptionFilter', () => {
     expect(mockJson).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
-        message: 'Unexpected error',
+        message: 'Internal server error',
         data: null,
         meta: {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,

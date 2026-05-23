@@ -10,6 +10,7 @@ import { AuthModule } from '../auth/auth.module';
 import { UsageModule } from '../usage/usage.module';
 import { ConfigModule } from '../config/config.module';
 import { RedisModule } from '../redis/redis.module';
+import { StorageModule } from '../storage/storage.module';
 
 import { PlatformBillingLifecycleService } from './platform-billing-lifecycle.service';
 
@@ -21,6 +22,7 @@ import { PlatformBillingLifecycleService } from './platform-billing-lifecycle.se
     UsageModule,
     ConfigModule,
     RedisModule,
+    StorageModule,
     BullModule.registerQueue(
       { name: 'notifications' },
       { name: 'finance' },

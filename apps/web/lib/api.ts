@@ -122,7 +122,13 @@ import type {
   CashierClosePreview,
   InvoiceDetail,
 } from '@schoolos/core';
-import { clearStoredSession } from './session';
+import {
+  clearStoredSession,
+  getSupportOverrideTenantId,
+  getSupportOverrideReason,
+  setSupportOverride,
+  clearSupportOverride,
+} from './session';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
@@ -189,14 +195,25 @@ export type PlatformAuditLogFilters = {
 
 async function request<T>(path: string, init?: RequestOptions) {
   const requestId = createRequestId();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Request-Id': requestId,
+    ...(init?.headers as Record<string, string> ?? {}),
+  };
+
+  const overrideTenantId = getSupportOverrideTenantId();
+  const overrideReason = getSupportOverrideReason();
+  if (overrideTenantId) {
+    headers['X-SchoolOS-Tenant-Id'] = overrideTenantId;
+  }
+  if (overrideReason) {
+    headers['X-SchoolOS-Tenant-Override-Reason'] = overrideReason;
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Request-Id': requestId,
-      ...(init?.headers ?? {}),
-    },
+    headers,
     body: init?.json ? JSON.stringify(init.json) : init?.body,
   });
 
@@ -1956,15 +1973,21 @@ export const api = {
         limit: params?.limit?.toString(),
       }),
     ),
-  enterPlatformSupportOverride: (body: PlatformSupportOverridePayload) =>
-    request<{ success: true; overrideId: string; expiresAt: string }>(
+  enterPlatformSupportOverride: async (body: PlatformSupportOverridePayload) => {
+    const res = await request<{ success: true; overrideId: string; expiresAt: string }>(
       '/platform/support/override/enter',
       { method: 'POST', json: body },
-    ),
-  exitPlatformSupportOverride: () =>
-    request<{ success: true }>('/platform/support/override/exit', {
+    );
+    setSupportOverride(body.tenantId, body.reason);
+    return res;
+  },
+  exitPlatformSupportOverride: async () => {
+    const res = await request<{ success: true }>('/platform/support/override/exit', {
       method: 'POST',
-    }),
+    });
+    clearSupportOverride();
+    return res;
+  },
   getPlatformDashboard: () =>
     request<PlatformDashboardSummary>('/platform/dashboard'),
   listPlatformPlans: () => request<PlatformPlanSummary[]>('/platform/plans'),
@@ -1996,6 +2019,15 @@ export const api = {
     request<PlatformTenantSubscriptionSummary>(
       `/platform/tenants/${encodeURIComponent(tenantId)}/subscriptions`,
       { method: 'POST', json: body },
+    ),
+  updatePlatformSubscriptionStatus: (
+    tenantId: string,
+    subId: string,
+    body: { status: string; notes?: string },
+  ) =>
+    request<PlatformTenantSubscriptionSummary>(
+      `/platform/tenants/${encodeURIComponent(tenantId)}/subscriptions/${encodeURIComponent(subId)}`,
+      { method: 'PATCH', json: body },
     ),
   setPlatformFeatureOverride: (tenantId: string, body: JsonBody) =>
     request(
@@ -2061,6 +2093,8 @@ export const api = {
     request<PlatformProviderReadinessDetail>(
       `/platform/providers/${encodeURIComponent(id)}/readiness`,
     ),
+  getPlatformProvidersReadiness: () =>
+    request<any[]>('/platform/providers/readiness'),
   updatePlatformProviderStatus: (id: string, body: JsonBody) =>
     request<PlatformProviderConfigSummary>(
       `/platform/providers/${encodeURIComponent(id)}/status`,

@@ -125,6 +125,21 @@ export class PlansService {
     usageKey: string,
     currentCount: number,
   ) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { isActive: true },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
+    }
+
+    if (!tenant.isActive) {
+      throw new ForbiddenException(
+        'Your school account is currently suspended. Please contact platform support.',
+      );
+    }
+
     const subscription = await this.prisma.tenantSubscription.findFirst({
       where: {
         tenantId,
@@ -149,7 +164,7 @@ export class PlansService {
         (usageKey === 'students.count' || usageKey === 'staff.count')
       ) {
         throw new ForbiddenException(
-          'No active subscription found. Free limit of 10 reached.',
+          'No active subscription found. Free limit of 10 reached. Please contact SchoolOS support.',
         );
       }
       return;
@@ -158,7 +173,7 @@ export class PlansService {
     const limit = subscription.plan?.usageLimits?.[0];
     if (limit && currentCount >= limit.limit) {
       throw new ForbiddenException(
-        `Plan limit reached for ${usageKey}. Current: ${currentCount}, Limit: ${limit.limit}. Please upgrade your plan.`,
+        `Plan limit reached for ${usageKey}. Current: ${currentCount}, Limit: ${limit.limit}. Please upgrade your plan or contact SchoolOS support.`,
       );
     }
   }

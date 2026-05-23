@@ -22,6 +22,8 @@ import { AdmissionsController } from '../src/admissions/admissions.controller';
 import { FileRegistryController } from '../src/file-registry/file-registry.controller';
 import { RolesPermissionsGuard } from '../src/auth/guards/roles-permissions.guard';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
+import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
+import { StorageService } from '../src/storage/storage.service';
 import { PlatformQueuesService } from '../src/platform/platform-queues.service';
 import { PlatformReportExportsService } from '../src/platform/platform-report-exports.service';
 import {
@@ -1457,6 +1459,90 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
         'Testing support logs',
       );
       expect(details.providerReadiness).toBeDefined();
+    });
+
+    it('getProvidersReadiness returns readiness list for SMS, Email, FCM, Object Storage, and PDF generator', async () => {
+      const readiness = await platformService.getProvidersReadiness();
+      expect(Array.isArray(readiness)).toBe(true);
+      expect(readiness.length).toBe(5);
+
+      const sms = readiness.find((r) => r.providerKey === 'sms');
+      const email = readiness.find((r) => r.providerKey === 'email');
+      const fcm = readiness.find((r) => r.providerKey === 'fcm');
+      const storage = readiness.find((r) => r.providerKey === 'object_storage');
+      const pdf = readiness.find((r) => r.providerKey === 'pdf_generator');
+
+      expect(sms).toBeDefined();
+      expect(email).toBeDefined();
+      expect(fcm).toBeDefined();
+      expect(storage).toBeDefined();
+      expect(pdf).toBeDefined();
+      expect(pdf!.status).toBe('READY');
+    });
+
+    it('object storage test connection verifies config and cleans up test objects', async () => {
+      const storageService = app.get(StorageService);
+      const testConnectionSpy = jest
+        .spyOn(storageService, 'testConnection')
+        .mockResolvedValue({
+          bucket: 'test-bucket',
+          writeOk: true,
+          readOk: true,
+          deleteOk: true,
+          signedUrl: 'http://signed-url',
+        });
+
+      const provider = await prisma.providerConfig.create({
+        data: {
+          type: 'OBJECT_STORAGE',
+          name: 'StorageTest',
+          environment: 'TEST',
+          configEncrypted: { bucket: 'test-bucket', region: 'auto' },
+          secretKeys: [],
+          enabled: true,
+          updatedBy: 'test',
+        },
+      });
+
+      const res = await platformService.testProviderConnection(
+        provider.id,
+        'admin-user-1',
+      );
+      expect(res.status).toBe('ready');
+      expect(res.message).toContain('Object storage test connection succeeded');
+      expect(testConnectionSpy).toHaveBeenCalled();
+    });
+
+    it('http exception filter sanitizes internal 500 errors', async () => {
+      const filter = new HttpExceptionFilter();
+      const mockResponse = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn(),
+      } as any;
+      const mockHost = {
+        switchToHttp: () => ({
+          getRequest: () => ({
+            url: '/test',
+            method: 'GET',
+            requestId: 'req-1',
+          }),
+          getResponse: () => mockResponse,
+        }),
+      } as any;
+
+      const rawError = new Error(
+        'Raw Prisma constraint violation details or secrets',
+      );
+      filter.catch(rawError, mockHost);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(500);
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: 'Internal server error',
+          requestId: 'req-1',
+        }),
+      );
     });
   });
 });

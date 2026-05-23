@@ -56,10 +56,25 @@ export default function PlatformTenantBillingPage() {
 
   if (error || !tenant) {
     return (
+<<<<<<< HEAD
       <PlatformInlineError
         title="Tenant billing unavailable"
         message={error ?? 'The requested tenant could not be loaded.'}
       />
+=======
+      <div className="rounded-3xl border border-rose-200 bg-rose-50 p-8 text-rose-800">
+        <div className="flex items-center gap-3 font-black">
+          <AlertTriangle size={20} />
+          Tenant billing unavailable
+        </div>
+        <p className="mt-2 text-sm">{error ?? 'The requested tenant could not be loaded.'}</p>
+        <Link href="/platform/schools">
+          <Button className="mt-5 rounded-2xl" variant="outline">
+            Back to schools
+          </Button>
+        </Link>
+      </div>
+>>>>>>> b6cb572 (feat(storage): add deleteObject and testConnection methods to StorageService)
     );
   }
 
@@ -90,9 +105,11 @@ export default function PlatformTenantBillingPage() {
             Review SchoolOS-to-school subscription billing for this tenant.
           </p>
         </div>
-        <Button asChild className="rounded-2xl bg-slate-900 px-6 font-bold hover:bg-slate-800">
-          <Link href={`/platform/schools/${tenant.id}/change-plan`}>Change plan</Link>
-        </Button>
+        <Link href={`/platform/schools/${tenant.id}/change-plan`}>
+          <Button className="rounded-2xl bg-slate-900 px-6 font-bold hover:bg-slate-800">
+            Change plan
+          </Button>
+        </Link>
       </header>
 
       <PlatformBoundaryNote title="SaaS billing boundary">
