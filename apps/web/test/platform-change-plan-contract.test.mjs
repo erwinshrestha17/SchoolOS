@@ -103,6 +103,28 @@ describe('Platform tenant subscription change workflow contracts', () => {
     }
   });
 
+  it('keeps tenant detail purpose tabs and support access audit cues visible', () => {
+    const page = read('app/platform/schools/[tenantId]/page.tsx');
+
+    for (const expected of [
+      'Overview',
+      'SaaS Billing',
+      'Entitlements',
+      'Audit Trail',
+      'Support Override History',
+      'Provider Readiness Summary',
+      'Usage Limit Warnings',
+      'Audit Reason',
+      'time-bound support override',
+      'This creates a platform SaaS invoice only',
+    ]) {
+      assert.match(
+        page,
+        new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      );
+    }
+  });
+
   it('wires platform settings provider, queue, audit, and tab deep-link workflows', () => {
     const settings = read('app/platform/settings/page.tsx');
     const shell = read('components/layout/platform-shell.tsx');
@@ -215,6 +237,19 @@ describe('Platform tenant subscription change workflow contracts', () => {
       const page = read(route);
       assert.match(page, /redirectToPlatformRoute/);
       assert.match(page, /\/platform\/schools/);
+    }
+  });
+
+  it('keeps focused platform settings wrappers using the shared redirect helper', () => {
+    for (const route of [
+      'app/platform/settings/plans/page.tsx',
+      'app/platform/settings/providers/page.tsx',
+      'app/platform/settings/modules/page.tsx',
+      'app/platform/settings/feature-flags/page.tsx',
+    ]) {
+      assert.equal(existsSync(join(webRoot, route)), true, `Missing ${route}`);
+      const page = read(route);
+      assert.match(page, /redirectToPlatformRoute/);
     }
   });
 
