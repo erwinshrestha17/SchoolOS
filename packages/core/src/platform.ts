@@ -31,6 +31,25 @@ export type PlatformTenantDetail = PlatformTenantSummary & {
   recentAudit?: PlatformAuditLog[];
   onboarding?: PlatformOnboardingChecklist;
   overrides?: Array<{ featureKey: string; enabled: boolean; reason: string }>;
+  enabledFeatures?: string[];
+  usageCounters?: PlatformUsageCounterSummary[];
+  providerReadiness?: Array<{
+    providerId: string;
+    type: string;
+    name: string;
+    status: 'ready' | 'degraded' | 'not_configured' | 'failed';
+    message: string;
+  }>;
+  supportOverrideHistory?: Array<{
+    id: string;
+    platformUserId: string;
+    platformUserEmail: string | null;
+    reason: string;
+    startsAt: string;
+    expiresAt: string;
+    isActive: boolean;
+    createdAt: string;
+  }>;
 };
 
 export type PlatformDashboardSummary = {
@@ -47,6 +66,23 @@ export type PlatformDashboardSummary = {
   healthStatus: 'ready' | 'degraded';
   failedJobsCount: number;
   recentAudit: PlatformAuditLog[];
+  providerReadinessStatus: Record<string, 'ready' | 'degraded' | 'not_configured' | 'failed'>;
+  subscriptionSummary?: {
+    activeSubscriptions: number;
+    graceSubscriptions: number;
+    expiredSubscriptions: number;
+  };
+  invoiceSummary?: {
+    totalUnpaidAmount: number;
+    overdueCount: number;
+  };
+  usageWarnings?: Array<{
+    tenantId: string;
+    tenantName: string;
+    usageKey: string;
+    value: number;
+    limit: number;
+  }>;
 };
 
 export type PlatformPlanSummary = {
@@ -147,7 +183,7 @@ export type PlatformProviderConfigSummary = {
 
 export type PlatformProviderReadinessDetail = {
   provider: PlatformProviderConfigSummary;
-  status: 'ok' | 'warning' | 'error';
+  status: 'ready' | 'degraded' | 'not_configured' | 'failed';
   mode: 'disabled' | 'dry_run';
   message: string;
   missingKeys: string[];

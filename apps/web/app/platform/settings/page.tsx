@@ -343,11 +343,23 @@ export default function PlatformSettings() {
 
   if (loading)
     return (
-      <div className="flex h-[60vh] flex-col items-center justify-center space-y-4">
-        <RefreshCw className="h-10 w-10 animate-spin text-slate-200" />
-        <p className="text-sm font-medium text-slate-400">
-          Securing control plane data...
-        </p>
+      <div className="space-y-8 animate-pulse p-8 bg-slate-950/5 rounded-3xl border border-slate-100">
+        <div className="pb-8 border-b border-slate-100 space-y-3">
+          <div className="h-4 w-24 bg-slate-200 rounded-lg" />
+          <div className="h-10 w-64 bg-slate-200 rounded-lg" />
+          <div className="h-4 w-96 bg-slate-200 rounded-lg" />
+        </div>
+        <div className="flex space-x-2 border-b border-slate-100 pb-4">
+          <div className="h-9 w-28 bg-slate-200 rounded-lg" />
+          <div className="h-9 w-28 bg-slate-200 rounded-lg" />
+          <div className="h-9 w-28 bg-slate-200 rounded-lg" />
+        </div>
+        <div className="grid gap-6 md:grid-cols-3">
+          <div className="h-32 bg-slate-200 rounded-3xl" />
+          <div className="h-32 bg-slate-200 rounded-3xl" />
+          <div className="h-32 bg-slate-200 rounded-3xl" />
+        </div>
+        <div className="h-64 bg-slate-100 rounded-3xl" />
       </div>
     );
 
@@ -569,11 +581,13 @@ export default function PlatformSettings() {
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Badge
                       variant={
-                        provider.validationStatus === 'OK'
+                        provider.validationStatus === 'READY'
                           ? 'success'
-                          : provider.validationStatus === 'ERROR'
+                          : provider.validationStatus === 'FAILED'
                             ? 'destructive'
-                            : 'neutral'
+                            : (provider.validationStatus === 'DEGRADED' || provider.validationStatus === 'NOT_CONFIGURED')
+                              ? 'warning'
+                              : 'neutral'
                       }
                       className="rounded-lg"
                     >
@@ -1267,9 +1281,9 @@ export default function PlatformSettings() {
               </div>
               <div
                 className={`rounded-2xl border p-4 text-sm font-bold ${
-                  providerReadiness.status === 'error'
+                  providerReadiness.status === 'failed'
                     ? 'border-rose-100 bg-rose-50 text-rose-700'
-                    : providerReadiness.status === 'warning'
+                    : (providerReadiness.status === 'degraded' || providerReadiness.status === 'not_configured')
                       ? 'border-amber-100 bg-amber-50 text-amber-800'
                       : 'border-emerald-100 bg-emerald-50 text-emerald-700'
                 }`}

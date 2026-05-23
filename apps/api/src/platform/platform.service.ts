@@ -213,6 +213,11 @@ export class PlatformService {
       failedJobs,
       onboarding,
       audit,
+      activeSubs,
+      graceSubs,
+      expiredSubs,
+      unpaidInvoices,
+      activeSubscriptions,
     ] = await Promise.all([
       this.prisma.tenant.count(),
       this.prisma.tenant.count({ where: { isActive: true } }),
@@ -221,8 +226,99 @@ export class PlatformService {
       this.listFailedJobs(),
       this.getOnboardingCounts(),
       this.listAuditLogs({ limit: 10 }),
+      this.prisma.tenantSubscription.count({ where: { status: 'ACTIVE' } }),
+      this.prisma.tenantSubscription.count({ where: { status: 'GRACE' } }),
+      this.prisma.tenantSubscription.count({ where: { status: 'EXPIRED' } }),
+      this.prisma.saaSInvoice.findMany({
+        where: { status: { in: ['ISSUED', 'PARTIAL', 'OVERDUE'] } },
+        select: {
+          amount: true,
+          status: true,
+          payments: { select: { amount: true } },
+        },
+      }),
+      this.prisma.tenantSubscription.findMany({
+        where: { status: { in: ['ACTIVE', 'TRIAL', 'GRACE'] } },
+        include: {
+          tenant: { select: { id: true, name: true } },
+          plan: {
+            include: {
+              usageLimits: true,
+            },
+          },
+        },
+      }),
     ]);
     const suspendedTenants = totalTenants - activeTenants;
+
+    let totalUnpaidAmount = 0;
+    let overdueCount = 0;
+    for (const inv of unpaidInvoices) {
+      const paidAmount = (inv.payments || []).reduce(
+        (sum: number, p: any) => sum + Number(p.amount),
+        0,
+      );
+      totalUnpaidAmount += Number(inv.amount) - paidAmount;
+      if (inv.status === 'OVERDUE') {
+        overdueCount++;
+      }
+    }
+
+    const warningsPromises = activeSubscriptions.flatMap((sub) =>
+      (sub.plan?.usageLimits || []).map(async (limit) => {
+        const current = await this.usageService.getCurrentUsageCount(
+          sub.tenantId,
+          limit.usageKey,
+        );
+        if (current >= limit.limit * 0.9) {
+          return {
+            tenantId: sub.tenantId,
+            tenantName: sub.tenant.name,
+            usageKey: limit.usageKey,
+            value: current,
+            limit: limit.limit,
+          };
+        }
+        return null;
+      }),
+    );
+    const usageWarnings = (await Promise.all(warningsPromises)).filter(
+      Boolean,
+    ) as any[];
+
+    // Fetch provider statuses
+    const [redisHealth, storageProvider, emailProvider, smsProvider] =
+      await Promise.all([
+        this.checkRedis(),
+        this.prisma.providerConfig.findFirst({
+          where: { type: 'OBJECT_STORAGE', enabled: true },
+        }),
+        this.prisma.providerConfig.findFirst({
+          where: { type: 'EMAIL', enabled: true },
+        }),
+        this.prisma.providerConfig.findFirst({
+          where: { type: 'SMS', enabled: true },
+        }),
+      ]);
+
+    const queueStatus = redisHealth.status === 'ok' ? 'ready' : 'failed';
+
+    const getStatus = (provider: any) => {
+      if (!provider) return 'not_configured' as const;
+      const readiness = this.buildProviderReadinessDetail(
+        provider,
+        new Date(),
+        [],
+      );
+      return readiness.status;
+    };
+
+    const providerReadinessStatus = {
+      queue: queueStatus as any,
+      storage: getStatus(storageProvider),
+      email: getStatus(emailProvider),
+      sms: getStatus(smsProvider),
+    };
 
     return {
       totalTenants,
@@ -233,6 +329,17 @@ export class PlatformService {
       healthStatus: health.status,
       failedJobsCount: failedJobs.length,
       recentAudit: audit.items,
+      providerReadinessStatus,
+      subscriptionSummary: {
+        activeSubscriptions: activeSubs,
+        graceSubscriptions: graceSubs,
+        expiredSubscriptions: expiredSubs,
+      },
+      invoiceSummary: {
+        totalUnpaidAmount,
+        overdueCount,
+      },
+      usageWarnings,
     };
   }
 
@@ -288,6 +395,9 @@ export class PlatformService {
       recentAudit,
       onboarding,
       overrides,
+      usageCounters,
+      enabledProviders,
+      supportOverrideHistoryRaw,
     ] = await Promise.all([
       this.usageService.getTenantUsageSummary(tenantId),
       this.getTenantSubscription(tenantId),
@@ -295,7 +405,56 @@ export class PlatformService {
       this.getTenantRecentAudit(tenantId),
       this.getOnboardingChecklist(tenantId),
       this.getTenantFeatureOverrides(tenantId),
+      this.listUsageCounters(tenantId),
+      this.prisma.providerConfig.findMany({ where: { enabled: true } }),
+      this.prisma.supportOverride.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        include: {
+          platformUser: {
+            select: {
+              id: true,
+              email: true,
+            },
+          },
+        },
+      }),
     ]);
+
+    const enabledFeatures: string[] = [];
+    await Promise.all(
+      FEATURE_KEYS.map(async (key) => {
+        const check = await this.checkEntitlement(tenantId, key);
+        if (check.allowed) {
+          enabledFeatures.push(key);
+        }
+      }),
+    );
+
+    const providerReadiness = await Promise.all(
+      enabledProviders.map(async (provider) => {
+        const detail = await this.getProviderReadinessDetail(provider.id);
+        return {
+          providerId: provider.id,
+          type: provider.type,
+          name: provider.name,
+          status: detail.status,
+          message: detail.message,
+        };
+      }),
+    );
+
+    const supportOverrideHistory = supportOverrideHistoryRaw.map((over) => ({
+      id: over.id,
+      platformUserId: over.platformUserId,
+      platformUserEmail: over.platformUser?.email || null,
+      reason: over.reason,
+      startsAt: over.startsAt.toISOString(),
+      expiresAt: over.expiresAt.toISOString(),
+      isActive: over.isActive,
+      createdAt: over.createdAt.toISOString(),
+    }));
 
     return {
       id: tenant.id,
@@ -314,6 +473,10 @@ export class PlatformService {
       recentAudit,
       onboarding,
       overrides,
+      enabledFeatures,
+      usageCounters,
+      providerReadiness,
+      supportOverrideHistory,
     };
   }
 
@@ -403,7 +566,19 @@ export class PlatformService {
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
-        include: {
+        select: {
+          id: true,
+          action: true,
+          resource: true,
+          resourceId: true,
+          tenantId: true,
+          userId: true,
+          before: true,
+          after: true,
+          ipAddress: true,
+          userAgent: true,
+          requestId: true,
+          createdAt: true,
           user: {
             select: {
               id: true,
@@ -1322,13 +1497,41 @@ export class PlatformService {
   }
 
   async getPlatformHealth(): Promise<PlatformHealthSummary> {
-    const [database, redis, storageProvider] = await Promise.all([
-      this.checkDatabase(),
-      this.checkRedis(),
-      this.prisma.providerConfig.findFirst({
-        where: { type: 'OBJECT_STORAGE', enabled: true },
-      }),
-    ]);
+    const [database, redis, storageProvider, emailProvider, smsProvider] =
+      await Promise.all([
+        this.checkDatabase(),
+        this.checkRedis(),
+        this.prisma.providerConfig.findFirst({
+          where: { type: 'OBJECT_STORAGE', enabled: true },
+        }),
+        this.prisma.providerConfig.findFirst({
+          where: { type: 'EMAIL', enabled: true },
+        }),
+        this.prisma.providerConfig.findFirst({
+          where: { type: 'SMS', enabled: true },
+        }),
+      ]);
+
+    const getProviderHealth = (provider: any, type: string) => {
+      if (!provider) {
+        return {
+          status: 'error' as const,
+          message: `No enabled ${type} provider`,
+        };
+      }
+      const readiness = this.buildProviderReadinessDetail(
+        provider,
+        new Date(),
+        [],
+      );
+      if (readiness.status === 'failed') {
+        return {
+          status: 'error' as const,
+          message: `${type} provider has invalid configuration: ${readiness.missingKeys.join(', ')}`,
+        };
+      }
+      return { status: 'ok' as const };
+    };
 
     const checks = {
       database,
@@ -1337,6 +1540,8 @@ export class PlatformService {
       objectStorage: storageProvider
         ? { status: 'ok' as const }
         : { status: 'error' as const, message: 'No enabled storage provider' },
+      email: getProviderHealth(emailProvider, 'EMAIL'),
+      sms: getProviderHealth(smsProvider, 'SMS'),
     };
 
     const ready = Object.values(checks).every((check) => check.status === 'ok');
@@ -1908,12 +2113,16 @@ export class PlatformService {
     });
     const enabled = Boolean(provider.enabled);
     const status = !enabled
-      ? 'warning'
+      ? missingKeys.length > 0
+        ? ('not_configured' as const)
+        : ('degraded' as const)
       : missingKeys.length > 0
-        ? 'error'
-        : 'ok';
+        ? ('failed' as const)
+        : ('ready' as const);
     const message = !enabled
-      ? 'Provider is disabled; delivery remains blocked until an operator enables it.'
+      ? missingKeys.length > 0
+        ? `Provider is disabled and has missing required keys: ${missingKeys.join(', ')}.`
+        : 'Provider is disabled; delivery remains blocked until an operator enables it.'
       : missingKeys.length > 0
         ? `Provider configuration is missing required keys: ${missingKeys.join(', ')}.`
         : providerType === 'OBJECT_STORAGE'

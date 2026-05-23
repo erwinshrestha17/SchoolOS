@@ -47,7 +47,7 @@ export interface PlatformFailedJobSummary {
 }
 
 const SECRET_KEY_PATTERN =
-  /(api[-_]?key|token|secret|password|credential|authorization|private[-_]?key)/i;
+  /(api[-_]?key|token|secret|password|credential|authorization|private[-_]?key|cookie|phone|email)/i;
 const MAX_STRING_LENGTH = 500;
 const MAX_ARRAY_LENGTH = 25;
 const MAX_OBJECT_KEYS = 50;

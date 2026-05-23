@@ -357,9 +357,24 @@ export default function PlatformSchoolDetail() {
   };
 
   if (loading) return (
-    <div className="flex h-[80vh] flex-col items-center justify-center space-y-4">
-      <RefreshCw className="h-10 w-10 animate-spin text-slate-300" />
-      <p className="text-sm font-medium text-slate-400">Loading school details...</p>
+    <div className="space-y-8 animate-pulse p-8 bg-slate-950/5 rounded-3xl border border-slate-100">
+      <div className="h-4 w-24 bg-slate-200 rounded-lg" />
+      <div className="flex justify-between items-center pb-8 border-b border-slate-100">
+        <div className="space-y-2">
+          <div className="h-10 w-64 bg-slate-200 rounded-lg" />
+          <div className="h-4 w-48 bg-slate-200 rounded-lg" />
+        </div>
+        <div className="flex gap-3">
+          <div className="h-10 w-36 bg-slate-200 rounded-lg" />
+          <div className="h-10 w-36 bg-slate-200 rounded-lg" />
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-6">
+        <div className="h-32 bg-slate-200 rounded-3xl" />
+        <div className="h-32 bg-slate-200 rounded-3xl" />
+        <div className="h-32 bg-slate-200 rounded-3xl" />
+      </div>
+      <div className="h-96 bg-slate-100 rounded-3xl" />
     </div>
   );
   
@@ -515,6 +530,124 @@ export default function PlatformSchoolDetail() {
                    <UsageValue label="Students" value={tenant.studentCount.toLocaleString()} />
                    <UsageValue label="Staff" value={tenant.staffCount.toLocaleString()} />
                    <UsageValue label="Storage" value={formatBytes(tenant.usage.storageSizeBytes ?? 0)} />
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-3xl border-slate-100 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-xl font-bold flex items-center gap-2">
+                    <Layers className="text-slate-400" size={22} />
+                    Active Entitlements
+                  </CardTitle>
+                  <CardDescription>Features and modules enabled for this tenant.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {!tenant.enabledFeatures || tenant.enabledFeatures.length === 0 ? (
+                      <span className="text-sm font-medium text-slate-400">No active entitlements.</span>
+                    ) : (
+                      tenant.enabledFeatures.map(feat => (
+                        <Badge key={feat} variant="success" className="rounded-lg font-bold">
+                          {feat.replace('module.', '').toUpperCase()}
+                        </Badge>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {tenant.usageCounters?.some(c => c.value >= (c.limit ?? 0) * 0.9) && (
+                <Card className="rounded-3xl border-rose-100 bg-rose-50/50 shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="text-lg font-bold text-rose-900 flex items-center gap-2">
+                      <AlertTriangle className="text-rose-500 animate-bounce" size={20} />
+                      Usage Limit Warnings
+                    </CardTitle>
+                    <CardDescription className="text-rose-700/80">
+                      The following usage metrics are at or above 90% of their plan limits.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {tenant.usageCounters?.filter(c => c.value >= (c.limit ?? 0) * 0.9).map(c => (
+                      <div key={c.usageKey} className="flex justify-between items-center bg-white/70 p-3 rounded-xl border border-rose-100">
+                        <span className="text-sm font-bold text-slate-800 uppercase tracking-tight">{c.usageKey}</span>
+                        <span className="text-sm font-black text-rose-700">{c.value} / {c.limit}</span>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card className="rounded-3xl border-slate-100 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-xl font-bold flex items-center gap-2">
+                    <Shield className="text-slate-400" size={22} />
+                    Provider Readiness Summary
+                  </CardTitle>
+                  <CardDescription>Core infrastructure provider configuration status.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4 sm:grid-cols-3">
+                  {!tenant.providerReadiness || tenant.providerReadiness.length === 0 ? (
+                    <span className="text-sm font-medium text-slate-400 col-span-3 text-center">No providers validated yet.</span>
+                  ) : (
+                    tenant.providerReadiness.map(pr => (
+                      <div key={pr.providerId} className="border border-slate-100 p-4 rounded-2xl bg-slate-50/50 space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{pr.type}</span>
+                          <Badge variant={pr.status === 'ready' ? 'success' : pr.status === 'failed' ? 'destructive' : 'warning'} className="rounded-lg">
+                            {pr.status.toUpperCase()}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-slate-600 font-medium line-clamp-2">{pr.message}</p>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-3xl border-slate-100 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-xl font-bold flex items-center gap-2">
+                    <History className="text-slate-400" size={22} />
+                    Support Override History
+                  </CardTitle>
+                  <CardDescription>Audited support session logs for this school.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                   <div className="rounded-2xl border border-slate-100 overflow-hidden text-sm">
+                      <table className="w-full text-left">
+                        <thead className="bg-slate-50 border-b border-slate-100">
+                          <tr>
+                            <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Operator</th>
+                            <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Reason</th>
+                            <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Duration</th>
+                            <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-widest text-[10px]">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {!tenant.supportOverrideHistory || tenant.supportOverrideHistory.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="px-6 py-8 text-center text-slate-400 font-bold">
+                                No support overrides recorded.
+                              </td>
+                            </tr>
+                          ) : (
+                            tenant.supportOverrideHistory.map((log) => (
+                              <tr key={log.id} className="hover:bg-slate-50/50">
+                                <td className="px-6 py-4 font-mono text-xs font-bold text-slate-900">{log.platformUserEmail || log.platformUserId}</td>
+                                <td className="px-6 py-4 text-xs text-slate-600 font-bold">{log.reason}</td>
+                                <td className="px-6 py-4 text-[10px] text-slate-400 font-mono">{formatDate(log.startsAt)} - {formatDate(log.expiresAt)}</td>
+                                <td className="px-6 py-4">
+                                  <Badge variant={log.isActive ? 'success' : 'neutral'} className="rounded-lg">
+                                    {log.isActive ? 'Active' : 'Expired'}
+                                  </Badge>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                   </div>
                 </CardContent>
               </Card>
             </div>

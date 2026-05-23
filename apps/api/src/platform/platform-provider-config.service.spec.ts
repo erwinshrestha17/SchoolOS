@@ -444,7 +444,7 @@ describe('PlatformService provider config hardening', () => {
       service.testProviderConnection('storage-provider-1', 'platform-user-1'),
     ).resolves.toEqual(
       expect.objectContaining({
-        status: 'ok',
+        status: 'ready',
         mode: 'dry_run',
         missingKeys: [],
         paidExternalCallSkipped: true,
@@ -461,7 +461,7 @@ describe('PlatformService provider config hardening', () => {
 
     expect(prisma.providerConfig.update).toHaveBeenCalledWith({
       where: { id: 'storage-provider-1' },
-      data: expect.objectContaining({ validationStatus: 'OK' }),
+      data: expect.objectContaining({ validationStatus: 'READY' }),
     });
     const auditPayload = JSON.stringify(auditService.record.mock.calls[0][0]);
     expect(auditPayload).not.toContain('encrypted-access-key');
@@ -502,7 +502,7 @@ describe('PlatformService provider config hardening', () => {
 
     expect(detail).toEqual(
       expect.objectContaining({
-        status: 'error',
+        status: 'failed',
         missingKeys: ['apiToken'],
         provider: expect.objectContaining({
           config: { senderId: 'SchoolOS', apiToken: '********' },
@@ -547,7 +547,7 @@ describe('PlatformService provider config hardening', () => {
       service.testProviderConnection('email-provider-1', 'platform-user-1'),
     ).resolves.toEqual(
       expect.objectContaining({
-        status: 'warning',
+        status: 'degraded',
         mode: 'disabled',
         paidExternalCallSkipped: true,
         message: expect.stringContaining('Provider is disabled'),
@@ -555,7 +555,7 @@ describe('PlatformService provider config hardening', () => {
     );
     expect(prisma.providerConfig.update).toHaveBeenCalledWith({
       where: { id: 'email-provider-1' },
-      data: expect.objectContaining({ validationStatus: 'WARNING' }),
+      data: expect.objectContaining({ validationStatus: 'DEGRADED' }),
     });
   });
 });

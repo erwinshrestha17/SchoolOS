@@ -90,7 +90,7 @@ describe('PlatformQueuesService', () => {
     );
     expect(jobs[0].data).toEqual({
       tenantId: 'tenant-1',
-      phone: '9800000000',
+      phone: '********',
       apiKey: '********',
       nested: {
         accessToken: '********',
