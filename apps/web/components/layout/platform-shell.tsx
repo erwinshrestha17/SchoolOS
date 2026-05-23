@@ -94,16 +94,23 @@ const platformNavGroups: PlatformNavGroup[] = [
         permissions: ['platform:plans:read'],
       },
       {
-        href: '/platform/settings?tab=providers',
+        href: '/platform/settings/providers',
         label: 'Providers',
         description: 'SMS, email and storage providers',
         icon: SlidersHorizontal,
         permissions: ['platform:providers:read'],
       },
       {
-        href: '/platform/settings?tab=plans',
+        href: '/platform/settings/modules',
         label: 'Modules / Features',
         description: 'Plan-backed feature availability',
+        icon: Flag,
+        permissions: ['platform:plans:read'],
+      },
+      {
+        href: '/platform/settings/feature-flags',
+        label: 'Feature Flags',
+        description: 'Platform rollout controls',
         icon: Flag,
         permissions: ['platform:plans:read'],
       },
@@ -113,21 +120,21 @@ const platformNavGroups: PlatformNavGroup[] = [
     label: 'Billing',
     items: [
       {
-        href: '/platform/schools?workflow=subscriptions',
+        href: '/platform/billing/subscriptions',
         label: 'Subscriptions',
-        description: 'Select a school to change its SaaS plan',
+        description: 'SchoolOS school subscriptions',
         icon: CreditCard,
         permissions: ['platform:subscriptions:read'],
       },
       {
-        href: '/platform/schools?workflow=saas-invoices',
+        href: '/platform/billing/invoices',
         label: 'SaaS Invoices',
         description: 'SchoolOS subscription invoices only',
         icon: FileClock,
         permissions: ['platform:billing:read'],
       },
       {
-        href: '/platform/schools?workflow=payments',
+        href: '/platform/billing/payments',
         label: 'Payments',
         description: 'Platform SaaS payment records',
         icon: CreditCard,
@@ -374,16 +381,39 @@ function isActivePlatformRoute(
     return false;
   }
 
-  if (!hrefQuery) {
-    if (
-      hrefPath === '/platform/settings/plans' &&
-      pathname === '/platform/settings' &&
-      currentSearch === 'tab=plans'
-    ) {
-      return true;
-    }
+  if (pathname === hrefPath || pathname.startsWith(`${hrefPath}/`)) {
+    return true;
+  }
 
-    return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
+  const redirectedTabRoutes: Record<string, string> = {
+    '/platform/settings/plans': 'tab=plans',
+    '/platform/settings/modules': 'tab=plans',
+    '/platform/settings/feature-flags': 'tab=plans',
+    '/platform/settings/providers': 'tab=providers',
+  };
+
+  const redirectedWorkflowRoutes: Record<string, string> = {
+    '/platform/billing/subscriptions': 'workflow=subscriptions',
+    '/platform/billing/invoices': 'workflow=saas-invoices',
+    '/platform/billing/payments': 'workflow=payments',
+  };
+
+  if (
+    pathname === '/platform/settings' &&
+    redirectedTabRoutes[hrefPath] === currentSearch
+  ) {
+    return true;
+  }
+
+  if (
+    pathname === '/platform/schools' &&
+    redirectedWorkflowRoutes[hrefPath] === currentSearch
+  ) {
+    return true;
+  }
+
+  if (!hrefQuery) {
+    return false;
   }
 
   return pathname === hrefPath && currentSearch === hrefQuery;
