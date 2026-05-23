@@ -132,8 +132,12 @@ describe('Platform tenant subscription change workflow contracts', () => {
     }
 
     assert.doesNotMatch(settings, /failedJobs\.filter/);
-    assert.match(shell, /\/platform\/settings\?tab=plans/);
+    assert.match(shell, /\/platform\/settings\/plans/);
+    assert.match(shell, /\/platform\/settings\/providers/);
+    assert.match(shell, /\/platform\/settings\/modules/);
+    assert.match(shell, /\/platform\/settings\/feature-flags/);
     assert.match(shell, /\/platform\/settings\?tab=health/);
+    assert.match(shell, /\/platform\/settings\?tab=queues/);
     assert.match(apiClient, /enterPlatformSupportOverride/);
     assert.match(apiClient, /exitPlatformSupportOverride/);
     assert.match(apiClient, /cancelPlatformSaaSInvoice/);
@@ -151,6 +155,21 @@ describe('Platform tenant subscription change workflow contracts', () => {
       true,
       'Missing platform settings plans redirect route',
     );
+    assert.equal(
+      existsSync(join(webRoot, 'app/platform/settings/providers/page.tsx')),
+      true,
+      'Missing platform settings providers focused route',
+    );
+    assert.equal(
+      existsSync(join(webRoot, 'app/platform/settings/modules/page.tsx')),
+      true,
+      'Missing platform settings modules focused route',
+    );
+    assert.equal(
+      existsSync(join(webRoot, 'app/platform/settings/feature-flags/page.tsx')),
+      true,
+      'Missing platform settings feature-flags focused route',
+    );
 
     for (const expected of [
       "label: 'Platform'",
@@ -158,11 +177,15 @@ describe('Platform tenant subscription change workflow contracts', () => {
       "label: 'Configuration'",
       "label: 'Billing'",
       "label: 'Plans'",
+      "href: '/platform/settings/plans'",
       "permissions: ['platform:plans:read']",
       "label: 'Subscriptions'",
+      "href: '/platform/billing/subscriptions'",
       "permissions: ['platform:subscriptions:read']",
       "label: 'SaaS Invoices'",
+      "href: '/platform/billing/invoices'",
       "label: 'Payments'",
+      "href: '/platform/billing/payments'",
       "permissions: ['platform:billing:read']",
     ]) {
       assert.match(
@@ -174,5 +197,68 @@ describe('Platform tenant subscription change workflow contracts', () => {
     assert.match(schoolsPage, /SchoolOS SaaS billing/);
     assert.match(schoolsPage, /not M3 student fee/);
     assert.match(schoolsPage, /M9 school accounting/);
+  });
+
+  it('keeps focused platform billing wrappers and redirect helper available', () => {
+    const helper = read('app/platform/_components/platform-route-redirect.tsx');
+
+    assert.match(helper, /redirectToPlatformRoute/);
+    assert.match(helper, /next\/navigation/);
+
+    for (const route of [
+      'app/platform/billing/page.tsx',
+      'app/platform/billing/subscriptions/page.tsx',
+      'app/platform/billing/invoices/page.tsx',
+      'app/platform/billing/payments/page.tsx',
+    ]) {
+      assert.equal(existsSync(join(webRoot, route)), true, `Missing ${route}`);
+      const page = read(route);
+      assert.match(page, /redirectToPlatformRoute/);
+      assert.match(page, /\/platform\/schools/);
+    }
+  });
+
+  it('keeps the redesigned platform dashboard focused on operator attention', () => {
+    const dashboard = read('app/platform/dashboard/page.tsx');
+
+    for (const expected of [
+      'Operator Attention Dashboard',
+      'Attention queue',
+      'Overdue SaaS invoices',
+      'Provider issues',
+      'usage warning',
+      'SaaS billing boundary',
+      'M3 student fee collection',
+      'M9 school',
+      'PlatformDashboardSkeleton',
+    ]) {
+      assert.match(
+        dashboard,
+        new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      );
+    }
+  });
+
+  it('keeps the redesigned schools page focused on tenant operations', () => {
+    const schoolsPage = read('app/platform/schools/page.tsx');
+
+    for (const expected of [
+      'Tenant Operations',
+      'Find a tenant',
+      'Visible schools',
+      'Active on page',
+      'Suspended on page',
+      'Confirm audited action',
+      'Minimum 5 characters',
+      'Open SaaS billing',
+      'SchoolOS SaaS billing',
+    ]) {
+      assert.match(
+        schoolsPage,
+        new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      );
+    }
+
+    assert.doesNotMatch(schoolsPage, /LayoutGrid/);
   });
 });
