@@ -1,7 +1,21 @@
 'use client';
 
 import type { PlatformDashboardSummary } from '@schoolos/core';
-import { Activity, AlertTriangle, ArrowRight, Database, School, ShieldCheck, Users } from 'lucide-react';
+import {
+  Activity,
+  AlertTriangle,
+  ArrowRight,
+  BellRing,
+  CheckCircle2,
+  Clock3,
+  CreditCard,
+  Database,
+  FileClock,
+  School,
+  ShieldCheck,
+  Users,
+  Zap,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -38,86 +52,328 @@ export default function PlatformDashboard() {
   }
 
   if (loading || !summary) {
-    return <div className="h-40 animate-pulse rounded-3xl bg-slate-100" />;
+    return <PlatformDashboardSkeleton />;
   }
 
   const s = summary as any;
+  const usageWarnings = asArray(s.usageWarnings);
+  const recentAudit = asArray(s.recentAudit ?? s.recentAuditLogs);
+  const overdueInvoices = Number(
+    s.saasInvoices?.overdueCount ?? s.invoiceSummary?.overdueCount ?? s.overdueInvoicesCount ?? 0,
+  );
+  const unpaidAmount = Number(
+    s.saasInvoices?.unpaidAmount ?? s.invoiceSummary?.unpaidAmount ?? s.unpaidInvoiceAmount ?? 0,
+  );
+  const failedJobs = Number(s.failedJobsCount ?? s.queues?.failedJobsCount ?? 0);
+  const providerIssues = getProviderIssueCount(s);
+  const onboardingIncomplete = Number(
+    s.onboardingIncompleteTenants ?? s.onboarding?.incompleteTenants ?? 0,
+  );
+
   const kpis = [
-    { label: 'Total Schools', value: s.totalTenants, icon: School },
-    { label: 'Active Schools', value: s.activeTenants, icon: ShieldCheck },
-    { label: 'Suspended', value: s.suspendedTenants, icon: Activity },
-    { label: 'Storage', value: formatBytes(s.usage?.totalStorageBytes || 0), icon: Database },
+    {
+      label: 'Active schools',
+      value: s.activeTenants ?? 0,
+      helper: `${s.totalTenants ?? 0} total schools`,
+      icon: ShieldCheck,
+      tone: 'text-emerald-700',
+    },
+    {
+      label: 'Suspended schools',
+      value: s.suspendedTenants ?? 0,
+      helper: 'Require lifecycle review',
+      icon: Activity,
+      tone: 'text-amber-700',
+    },
+    {
+      label: 'Overdue SaaS invoices',
+      value: overdueInvoices,
+      helper: formatMoney(unpaidAmount),
+      icon: CreditCard,
+      tone: overdueInvoices > 0 ? 'text-rose-700' : 'text-slate-600',
+    },
+    {
+      label: 'Failed jobs',
+      value: failedJobs,
+      helper: 'Retry actions are audited',
+      icon: Zap,
+      tone: failedJobs > 0 ? 'text-rose-700' : 'text-slate-600',
+    },
   ];
+
+  const attentionItems = [
+    failedJobs > 0
+      ? {
+          title: `${failedJobs} failed background job${failedJobs === 1 ? '' : 's'}`,
+          description: 'Inspect redacted payloads and retry only with an audit reason.',
+          href: '/platform/settings?tab=queues',
+          badge: 'Queues',
+          urgent: true,
+        }
+      : null,
+    overdueInvoices > 0
+      ? {
+          title: `${overdueInvoices} overdue SaaS invoice${overdueInvoices === 1 ? '' : 's'}`,
+          description: 'Review SchoolOS subscription billing risk. This is not student fee collection.',
+          href: '/platform/billing/invoices',
+          badge: 'Billing',
+          urgent: true,
+        }
+      : null,
+    providerIssues > 0
+      ? {
+          title: `${providerIssues} provider readiness issue${providerIssues === 1 ? '' : 's'}`,
+          description: 'Check SMS, email, storage, and infrastructure readiness before pilot use.',
+          href: '/platform/settings/providers',
+          badge: 'Providers',
+          urgent: true,
+        }
+      : null,
+    usageWarnings.length > 0
+      ? {
+          title: `${usageWarnings.length} usage warning${usageWarnings.length === 1 ? '' : 's'}`,
+          description: 'Some tenants are near configured plan limits and may need review.',
+          href: '/platform/schools',
+          badge: 'Usage',
+          urgent: false,
+        }
+      : null,
+    onboardingIncomplete > 0
+      ? {
+          title: `${onboardingIncomplete} onboarding checklist${onboardingIncomplete === 1 ? '' : 's'} incomplete`,
+          description: 'Help schools complete setup before live pilot operations.',
+          href: '/platform/schools',
+          badge: 'Onboarding',
+          urgent: false,
+        }
+      : null,
+  ].filter(Boolean) as Array<{
+    title: string;
+    description: string;
+    href: string;
+    badge: string;
+    urgent: boolean;
+  }>;
 
   return (
     <div className="space-y-8">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <Badge variant="neutral">Control Plane</Badge>
-          <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-slate-900">Platform Overview</h1>
+          <Badge variant="neutral">Platform Control Plane</Badge>
+          <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-slate-900">
+            Operator Attention Dashboard
+          </h1>
           <p className="mt-2 max-w-2xl text-slate-500">
-            Operational health and tenant lifecycle management for SchoolOS.
+            A focused command center for tenant lifecycle, SaaS billing risk,
+            provider readiness, queue failures, usage warnings, and audited
+            platform activity.
           </p>
         </div>
         <Link href="/platform/schools">
           <Button className="gap-2 rounded-2xl bg-slate-900 px-6 font-bold hover:bg-slate-800">
-            Manage Schools
+            View Schools
             <ArrowRight size={18} />
           </Button>
         </Link>
       </header>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {kpis.map((kpi) => (
           <div key={kpi.label} className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-            <kpi.icon className="mb-4 text-slate-500" size={24} />
-            <p className="text-sm font-bold uppercase tracking-wider text-slate-400">{kpi.label}</p>
-            <p className="mt-1 text-3xl font-black text-slate-900">{kpi.value?.toLocaleString?.() ?? kpi.value ?? 0}</p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+                  {kpi.label}
+                </p>
+                <p className="mt-2 text-3xl font-black text-slate-900">
+                  {formatValue(kpi.value)}
+                </p>
+                <p className="mt-1 text-sm font-medium text-slate-500">{kpi.helper}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-3">
+                <kpi.icon className={kpi.tone} size={24} />
+              </div>
+            </div>
           </div>
         ))}
       </div>
 
-      <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">Recent Platform Activity</h2>
-            <p className="mt-1 text-sm text-slate-500">Latest audited operator activity.</p>
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+        <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-cyan-700">
+                <BellRing size={16} />
+                Attention queue
+              </div>
+              <h2 className="mt-2 text-2xl font-black text-slate-900">
+                What needs operator action
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Prioritized platform risks across billing, queues, providers,
+                onboarding, and usage limits.
+              </p>
+            </div>
+            <Link href="/platform/schools" className="text-sm font-bold text-indigo-600 hover:text-indigo-700">
+              Open tenant directory
+            </Link>
           </div>
-          <Link href="/platform/audit" className="text-sm font-bold text-indigo-600 hover:text-indigo-700">
-            View Full Audit
-          </Link>
-        </div>
-        <div className="mt-6 space-y-3">
-          {s.recentAudit?.length ? (
-            s.recentAudit.map((log: any) => (
-              <div key={log.id} className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                <p className="font-bold text-slate-900">{log.action.replace(/_/g, ' ')}</p>
-                <p className="mt-1">
-                  {log.user?.email ?? 'System'} acted on {log.resource}{' '}
-                  <span className="font-medium tracking-tight text-slate-500">{log.resourceId?.slice(0, 8)}</span>
+
+          <div className="mt-6 space-y-3">
+            {attentionItems.length > 0 ? (
+              attentionItems.map((item) => (
+                <Link
+                  key={`${item.badge}:${item.title}`}
+                  href={item.href}
+                  className="group flex items-start justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-cyan-200 hover:bg-cyan-50"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant={item.urgent ? 'destructive' : 'neutral'}>{item.badge}</Badge>
+                      <h3 className="font-black text-slate-900">{item.title}</h3>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p>
+                  </div>
+                  <ArrowRight className="mt-1 shrink-0 text-slate-400 transition-transform group-hover:translate-x-1 group-hover:text-cyan-700" size={18} />
+                </Link>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 text-emerald-900">
+                <div className="flex items-center gap-3 font-black">
+                  <CheckCircle2 size={20} />
+                  No urgent platform actions right now
+                </div>
+                <p className="mt-2 text-sm text-emerald-800">
+                  Queue failures, provider readiness, usage warnings, overdue
+                  SaaS invoices, and onboarding issues are currently clear.
                 </p>
               </div>
-            ))
-          ) : (
-            <p className="text-sm text-slate-500">No recent activity recorded.</p>
-          )}
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">System readiness</h2>
+                <p className="mt-1 text-sm text-slate-500">Operational dependencies for platform workflows.</p>
+              </div>
+              <Link href="/platform/settings?tab=health" className="text-sm font-bold text-indigo-600 hover:text-indigo-700">
+                Details
+              </Link>
+            </div>
+            <div className="mt-5 space-y-3">
+              <ReadinessRow label="Queue health" value={`${failedJobs} failed`} warning={failedJobs > 0} />
+              <ReadinessRow label="Provider issues" value={`${providerIssues} issue${providerIssues === 1 ? '' : 's'}`} warning={providerIssues > 0} />
+              <ReadinessRow label="Storage tracked" value={formatBytes(s.usage?.totalStorageBytes || 0)} />
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-slate-500">
+              <CreditCard size={16} />
+              SaaS billing boundary
+            </div>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Platform billing is SchoolOS-to-school subscription billing. It is
+              intentionally separate from M3 student fee collection and M9 school
+              accounting ledgers.
+            </p>
+            <Link href="/platform/billing" className="mt-4 inline-flex text-sm font-bold text-indigo-600 hover:text-indigo-700">
+              Open SaaS billing
+            </Link>
+          </div>
         </div>
       </section>
 
       <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-xl font-bold text-slate-900">Infrastructure Health</h2>
-          <Link href="/platform/settings?tab=health" className="text-sm font-bold text-indigo-600 hover:text-indigo-700">
-            Health details
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.14em] text-slate-500">
+              <FileClock size={16} />
+              Recent platform audit
+            </div>
+            <h2 className="mt-2 text-xl font-black text-slate-900">Who did what recently</h2>
+          </div>
+          <Link href="/platform/audit" className="text-sm font-bold text-indigo-600 hover:text-indigo-700">
+            View full audit
           </Link>
         </div>
-        <div className="mt-4 flex items-center justify-between rounded-2xl bg-slate-50 p-4">
-          <span className="font-bold text-slate-700">Queue Health</span>
-          <Badge variant={s.failedJobsCount > 0 ? 'destructive' : 'neutral'}>{s.failedJobsCount || 0} Failed</Badge>
+        <div className="mt-6 space-y-3">
+          {recentAudit.length ? (
+            recentAudit.slice(0, 5).map((log: any) => (
+              <div key={log.id} className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="font-black text-slate-900">{formatAction(log.action)}</p>
+                  <span className="flex items-center gap-1 text-xs font-semibold text-slate-400">
+                    <Clock3 size={13} />
+                    {formatDate(log.createdAt)}
+                  </span>
+                </div>
+                <p className="mt-1">
+                  {log.user?.email ?? log.actorEmail ?? 'System'} acted on {log.resource ?? log.resourceType ?? 'platform resource'}{' '}
+                  <span className="font-medium tracking-tight text-slate-500">
+                    {String(log.resourceId ?? '').slice(0, 8)}
+                  </span>
+                </p>
+              </div>
+            ))
+          ) : (
+            <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
+              No recent platform audit activity recorded.
+            </p>
+          )}
         </div>
       </section>
     </div>
   );
+}
+
+function PlatformDashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="h-28 animate-pulse rounded-3xl bg-slate-100" />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="h-36 animate-pulse rounded-3xl bg-slate-100" />
+        ))}
+      </div>
+      <div className="h-80 animate-pulse rounded-3xl bg-slate-100" />
+    </div>
+  );
+}
+
+function ReadinessRow({
+  label,
+  value,
+  warning = false,
+}: {
+  label: string;
+  value: string;
+  warning?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
+      <span className="text-sm font-bold text-slate-700">{label}</span>
+      <Badge variant={warning ? 'destructive' : 'neutral'}>{value}</Badge>
+    </div>
+  );
+}
+
+function asArray(value: unknown): any[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function formatAction(action: unknown) {
+  return String(action ?? 'Platform action').replace(/_/g, ' ');
+}
+
+function formatDate(value: unknown) {
+  if (!value) return 'recently';
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return 'recently';
+  return date.toLocaleString();
 }
 
 function formatBytes(value: number) {
@@ -125,4 +381,25 @@ function formatBytes(value: number) {
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   const index = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
   return `${(value / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
+function formatMoney(value: number) {
+  if (!value) return 'No unpaid balance';
+  return `NPR ${value.toLocaleString()}`;
+}
+
+function formatValue(value: unknown) {
+  if (typeof value === 'number') return value.toLocaleString();
+  return String(value ?? 0);
+}
+
+function getProviderIssueCount(summary: any) {
+  const readiness = asArray(summary.providerReadiness ?? summary.providers);
+  if (readiness.length > 0) {
+    return readiness.filter((provider) =>
+      ['failed', 'degraded', 'not_configured'].includes(String(provider.status ?? '').toLowerCase()),
+    ).length;
+  }
+
+  return Number(summary.providerIssuesCount ?? summary.health?.providerIssuesCount ?? 0);
 }
