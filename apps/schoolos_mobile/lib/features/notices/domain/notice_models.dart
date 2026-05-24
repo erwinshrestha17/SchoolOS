@@ -69,4 +69,34 @@ class NotificationItem {
   final NoticeCategory category;
   final DateTime createdAt;
   final bool isRead;
+
+  factory NotificationItem.fromJson(Map<String, dynamic> json) {
+    return NotificationItem(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? 'Notification',
+      message: json['body'] as String? ?? json['message'] as String? ?? '',
+      category: _categoryFromSource(json['sourceType'] as String?),
+      createdAt:
+          DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          DateTime.now(),
+      isRead: json['isRead'] as bool? ?? false,
+    );
+  }
+}
+
+NoticeCategory _categoryFromSource(String? sourceType) {
+  switch (sourceType) {
+    case 'homework':
+      return NoticeCategory.homework;
+    case 'fee':
+    case 'fees':
+      return NoticeCategory.fee;
+    case 'transport':
+      return NoticeCategory.transport;
+    case 'attendance':
+      return NoticeCategory.academic;
+    case 'notice':
+    default:
+      return NoticeCategory.important;
+  }
 }

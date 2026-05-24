@@ -25,6 +25,7 @@ M8B Transport: Admin/trip/location foundation plus GPS pressure/cache/retention 
 M8C Canteen: Admin/wallet/POS/inventory foundation plus receipt/wallet-guard depth implemented
 M9 Accounting: Completed / Pilot-Ready
 M10 Communication/Chat: Foundation plus provider/attachment/retry depth implemented
+SchoolOS Flutter mobile app: Started in apps/schoolos_mobile with auth/API connection in progress
 M11 Intelligence/AI: Not started
 ```
 
@@ -59,8 +60,8 @@ Stabilize and harden existing modules one vertical at a time.
 Explicitly deferred until the plan allows it:
 
 ```text
-Parent/mobile portal
-Driver app
+Deep parent/mobile module expansion beyond the started Flutter companion app
+Driver live-trip workflow beyond the started mobile shell
 Live transport map/WebSocket/SSE UI
 AI/ML features
 Angular migration
@@ -98,7 +99,7 @@ Biometric workflows
 
 Implemented:
 
-- Cookie-first browser auth with bearer support for future API/mobile clients.
+- Cookie-first browser auth with bearer support for the active Flutter mobile app and future API clients.
 - RBAC and tenant context foundations.
 - Platform vs tenant route separation.
 - Super-admin tenant override audit behavior.
@@ -593,16 +594,23 @@ Exit criteria:
 Library, Transport, and Canteen are reliable admin operations modules and are clearly separated from future parent/driver/mobile experiences.
 ```
 
-### Phase 5 - Parent, Mobile, Driver, and Live Experiences
+### Phase 5 - Mobile Companion, Parent, Driver, and Live Experiences
 
-Purpose: expose safe role-specific experiences after admin modules are stable.
+Purpose: expose safe role-specific experiences from the started Flutter companion app without leaking admin-shaped data.
+
+Current status:
+
+```text
+Started: apps/schoolos_mobile exists in the monorepo and the auth/API foundation is being connected to the existing NestJS API.
+```
 
 Backend tasks:
 
-1. Build parent-safe APIs for attendance, fees, activity, notices, report cards, homework, timetable, canteen, library, and transport.
-2. Build driver-safe APIs for assigned route/trip workflows only.
-3. Add push notification support.
-4. Add child/route ownership tests for every endpoint.
+1. Keep mobile auth on existing `/auth/login`, `/auth/me`, `/auth/refresh`, and `/auth/logout` APIs with bearer tokens and secure refresh-token storage.
+2. Build parent-safe APIs for attendance, fees, activity, notices, report cards, homework, timetable, canteen, library, and transport.
+3. Build driver-safe APIs for assigned route/trip workflows only.
+4. Add push notification support.
+5. Add child/route ownership tests for every endpoint.
 
 Frontend tasks:
 
@@ -610,7 +618,7 @@ Frontend tasks:
 2. Parent views for attendance, fees, notices, report cards, homework, timetable, canteen, library, and transport.
 3. Parent-class teacher chat UI.
 4. Driver app/PWA trip workflow.
-5. Mobile/PWA role-specific navigation.
+5. Flutter role-specific navigation in `apps/schoolos_mobile`.
 
 Exit criteria:
 

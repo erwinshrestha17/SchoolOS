@@ -98,10 +98,10 @@ Rules:
 - Platform access must be explicit, permission-guarded, and audited.
 - Do not show platform pages inside the normal school operations sidebar unless the user is explicitly in a platform route/context.
 
-### 3.4 Mobile/PWA Portal Experience
+### 3.4 Mobile App Experience
 
-**Future target:** parent/teacher/student/driver mobile portal or app  
-**Users:** parents, teachers, students, drivers
+**Current target:** `apps/schoolos_mobile` Flutter companion app
+**Users:** parents, teachers, students, drivers, staff, and school admins
 
 Purpose:
 
@@ -1326,7 +1326,7 @@ Rules:
 
 ## 9. Mobile/PWA Direction
 
-Mobile must be role-specific and simpler than web.
+Mobile has started in `apps/schoolos_mobile` and must be role-specific and simpler than web.
 
 ### 9.1 Parent Mobile
 

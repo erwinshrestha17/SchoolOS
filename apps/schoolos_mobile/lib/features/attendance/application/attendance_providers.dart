@@ -1,11 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/connectivity_provider.dart';
 import '../data/attendance_repository.dart';
 import '../domain/attendance_models.dart';
 
 final attendanceRepositoryProvider = Provider<AttendanceRepository>((ref) {
-  return const AttendanceRepository();
+  return AttendanceRepository(ref.watch(apiClientProvider));
 });
 
 final parentAttendanceProvider =
@@ -130,6 +131,18 @@ class TeacherAttendanceController
     );
     try {
       final classes = await _repository.getTeacherAssignedClasses();
+      if (classes.isEmpty) {
+        state = state.copyWith(
+          isLoading: false,
+          classes: const [],
+          entries: const [],
+          isOffline: !_isOnline,
+          message:
+              'Teacher attendance sync needs a purpose-limited class roster API.',
+        );
+        return;
+      }
+
       final selectedClassId = state.selectedClassId ?? classes.first.id;
       final date = state.date ?? DateTime.now();
       final draft = await _repository.loadDraftAttendance(

@@ -134,6 +134,7 @@ describe('AuthService', () => {
     );
 
     expect(result.accessToken).toBe('access-token');
+    expect(result.refreshToken).toEqual(expect.any(String));
     expect(result.user.authMethod).toBe(AuthMethod.PASSWORD);
     expect(response.cookie).toHaveBeenCalledWith(
       'refresh_token',
@@ -314,6 +315,7 @@ describe('AuthService', () => {
     });
     expect(prisma.refreshToken.create).toHaveBeenCalled();
     expect(result.accessToken).toBe('access-token');
+    expect(result.refreshToken).toEqual(expect.any(String));
     expect(response.cookie).toHaveBeenCalledWith(
       'refresh_token',
       expect.any(String),
@@ -359,7 +361,7 @@ describe('AuthService', () => {
 
 function asSession(
   result:
-    | { accessToken: string; user: any }
+    | { accessToken: string; refreshToken?: string; user: any }
     | { requiresMfa: boolean; challengeToken: string },
 ) {
   if (!('accessToken' in result)) {
@@ -371,7 +373,7 @@ function asSession(
 
 function asChallenge(
   result:
-    | { accessToken: string; user: any }
+    | { accessToken: string; refreshToken?: string; user: any }
     | { requiresMfa: boolean; challengeToken: string },
 ) {
   if (!('challengeToken' in result)) {

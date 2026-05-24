@@ -25,6 +25,17 @@ class GuardianChild {
   final String rollNumber;
   final String academicYear;
   final String relationship;
+
+  factory GuardianChild.fromJson(Map<String, dynamic> json) {
+    return GuardianChild(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? 'Student',
+      classSection: json['classSection'] as String? ?? '',
+      rollNumber: json['rollNumber'] as String? ?? '',
+      academicYear: json['academicYear'] as String? ?? '',
+      relationship: json['relationship'] as String? ?? 'Child',
+    );
+  }
 }
 
 class ChildProfile {

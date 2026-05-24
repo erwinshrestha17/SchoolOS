@@ -38,6 +38,7 @@ import { LibraryModule } from './library/library.module';
 import { TransportModule } from './transport/transport.module';
 import { CanteenModule } from './canteen/canteen.module';
 import { PlatformModule } from './platform/platform.module';
+import { MobileModule } from './mobile/mobile.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from './config/config.service';
 import { ClsModule } from 'nestjs-cls';
@@ -101,6 +102,7 @@ import { RequestIdInterceptor } from './common/interceptors/request-id.intercept
     TransportModule,
     CanteenModule,
     PlatformModule,
+    MobileModule,
     SettingsModule,
     FileRegistryModule,
     ReportsModule,

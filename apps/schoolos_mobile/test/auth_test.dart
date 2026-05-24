@@ -49,9 +49,12 @@ void main() {
           },
           'user': {
             'id': 'user_id_123',
+            'tenantId': 'tenant_123',
+            'tenantSlug': 'test',
             'name': 'Test User',
             'email': 'test@school.edu',
-            'role': 'TEACHER',
+            'roles': ['teacher'],
+            'permissions': ['attendance:read'],
           },
         },
       );
@@ -65,7 +68,7 @@ void main() {
 
       final result = await repository.login(
         const LoginRequest(
-          tenantCode: 'test',
+          tenantSlug: 'test',
           usernameOrEmail: 'test@school.edu',
           password: 'password',
         ),
@@ -75,6 +78,21 @@ void main() {
       expect(result.tokenPair.refreshToken, 'refresh_token_123');
       expect(result.user.name, 'Test User');
       expect(result.user.role, 'TEACHER');
+      expect(result.user.tenantSlug, 'test');
+      expect(result.user.permissions, contains('attendance:read'));
+      final loginPayload =
+          verify(
+                () => mockApiClient.post<dynamic>(
+                  '/auth/login',
+                  data: captureAny(named: 'data'),
+                ),
+              ).captured.single
+              as Map<String, dynamic>;
+      expect(loginPayload, {
+        'tenantSlug': 'test',
+        'email': 'test@school.edu',
+        'password': 'password',
+      });
     });
 
     test('getMe returns AuthUser on successful HTTP request', () async {
@@ -82,10 +100,12 @@ void main() {
         requestOptions: RequestOptions(path: '/auth/me'),
         statusCode: 200,
         data: {
-          'id': 'user_id_123',
-          'name': 'Test User',
+          'userId': 'user_id_123',
+          'tenantId': 'tenant_123',
+          'tenantSlug': 'test',
           'email': 'test@school.edu',
-          'role': 'PARENT',
+          'roles': ['parent'],
+          'staff': {'firstName': 'Test', 'lastName': 'User'},
         },
       );
 
@@ -96,7 +116,9 @@ void main() {
       final result = await repository.getMe();
 
       expect(result.name, 'Test User');
+      expect(result.id, 'user_id_123');
       expect(result.role, 'PARENT');
+      expect(result.tenantId, 'tenant_123');
     });
 
     test('refreshToken returns TokenPair on successful HTTP request', () async {
@@ -129,12 +151,20 @@ void main() {
       );
 
       when(
-        () => mockApiClient.post<dynamic>('/auth/logout'),
+        () => mockApiClient.post<dynamic>(
+          '/auth/logout',
+          data: {'refreshToken': 'refresh_token_123'},
+        ),
       ).thenAnswer((_) async => mockResponse);
 
-      await repository.logout();
+      await repository.logout(refreshToken: 'refresh_token_123');
 
-      verify(() => mockApiClient.post<dynamic>('/auth/logout')).called(1);
+      verify(
+        () => mockApiClient.post<dynamic>(
+          '/auth/logout',
+          data: {'refreshToken': 'refresh_token_123'},
+        ),
+      ).called(1);
     });
     group('TokenRefreshInterceptor Tests', () {
       late MockTokenStorageService mockTokenStorage;

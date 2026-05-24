@@ -1,11 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/connectivity_provider.dart';
 import '../data/notices_repository.dart';
 import '../domain/notice_models.dart';
 
 final noticesRepositoryProvider = Provider<NoticesRepository>((ref) {
-  return const NoticesRepository();
+  return NoticesRepository(ref.watch(apiClientProvider));
 });
 
 final noticesControllerProvider =

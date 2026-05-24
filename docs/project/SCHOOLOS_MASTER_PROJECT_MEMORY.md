@@ -35,7 +35,8 @@ Phase 2 Academics production polish: Completed (report-card PDFs, corrections/hi
 Student QR Foundation: Implemented; release hardening remains
 Phase 2D M9 Accounting: Completed
 Phase 2 Accounting production polish: Completed (report PDFs, snapshots, reconciliation suggestions, audit trail, and smoke coverage)
-Current stage: M0 platform foundation complete with provider/queue hardening + M10 provider/attachment/retry depth + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3/4 operations feature-depth hardening for M6, M7, M8A, M8C, and M8B
+SchoolOS Flutter mobile app: Started under apps/schoolos_mobile with auth/API wiring now in progress
+Current stage: M0 platform foundation complete with provider/queue hardening + M10 provider/attachment/retry depth + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3/4 operations feature-depth hardening for M6, M7, M8A, M8C, and M8B + mobile companion app foundation started
 ```
 
 Targeted web-admin frontend polish and Phase 2F browser smoke coverage are now present on main.
@@ -60,7 +61,7 @@ Strict Phase Gate 0 from docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md
 → then add remaining depth only where pilot evidence shows risk
 ```
 
-Do not expand Phase 2/3 modules broadly at once. Existing Phase 3 admin modules may be polished and hardened, but parent/mobile and driver-facing experiences remain separate future scope.
+Do not expand Phase 2/3 modules broadly at once. Existing Phase 3 admin modules may be polished and hardened. The Flutter mobile companion app has started, but parent/driver-facing feature depth must stay purpose-limited, tenant-scoped, and backed by ownership tests before release.
 
 ---
 
@@ -73,6 +74,7 @@ Database: PostgreSQL + Prisma
 Cache/queues: Redis + BullMQ
 Shared package: packages/core
 Current frontend: Next.js dashboard in apps/web
+Mobile app: Flutter companion app in apps/schoolos_mobile
 Future frontend target: apps/web public site + apps/admin Angular dashboard later
 ```
 
@@ -84,6 +86,7 @@ Rules:
 - Do not rename `tenantId` to `schoolId` without a deliberate migration.
 - Backend-first for data integrity.
 - UI must consume real APIs.
+- Mobile must consume the existing modular-monolith APIs with bearer tokens and secure refresh-token storage; do not create mobile-only response shapes without versioning.
 - Every tenant-owned query must be scoped by authenticated `tenantId`.
 - Every business-critical write must be audited.
 
@@ -504,7 +507,7 @@ Biggest risks:
 - Student QR foundation exists, but QR-in-PDF release behavior and cross-module manual QA still need verification.
 - Homework/Timetable schema/service/test stability after recent verification follow-ups.
 - Pilot operations exposing real-world data-entry, fee, attendance, guardian-contact, PDF, and slow-network issues.
-- Parent/mobile portal, driver app, live map/WebSocket, full canteen purchase-bill/wastage/vendor workflows, and AI/ML implementation remain intentionally unbuilt.
+- Deep parent/mobile workflows beyond the started Flutter companion app, driver live-trip workflow, live map/WebSocket, full canteen purchase-bill/wastage/vendor workflows, and AI/ML implementation remain intentionally unbuilt.
 - Tiered pricing and entitlements must be enforced backend-side before broad paid rollout; sidebar hiding alone is not security.
 ```
 

@@ -32,7 +32,10 @@ class AuthRepository {
   }
 
   /// Gracefully sign out on servers
-  Future<void> logout() async {
-    await client.post('/auth/logout');
+  Future<void> logout({String? refreshToken}) async {
+    await client.post(
+      '/auth/logout',
+      data: refreshToken == null ? null : {'refreshToken': refreshToken},
+    );
   }
 }

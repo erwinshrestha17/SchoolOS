@@ -1,34 +1,37 @@
+import '../../../core/network/api_client.dart';
 import '../domain/parent_models.dart';
 
 class ParentRepository {
-  const ParentRepository();
+  const ParentRepository(this._client);
+
+  final ApiClient _client;
 
   Future<List<GuardianChild>> getGuardianChildren() async {
-    await Future<void>.delayed(const Duration(milliseconds: 260));
-    return _children;
+    final response = await _client.get('/mobile/me/students');
+    final data = response.data as Map<String, dynamic>;
+    final items = data['items'] as List<dynamic>? ?? const [];
+
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(GuardianChild.fromJson)
+        .toList();
   }
 
   Future<ChildProfile> getChildProfile(String childId) async {
-    await Future<void>.delayed(const Duration(milliseconds: 240));
-    final child = _children.firstWhere(
+    final children = await getGuardianChildren();
+    final child = children.firstWhere(
       (item) => item.id == childId,
-      orElse: () => _children.first,
+      orElse: () => children.first,
     );
 
     return ChildProfile(
       child: child,
-      classTeacher: child.id == 'child-aarav' ? 'Mrs. Sharma' : 'Ms. Lama',
-      guardianSummary: 'Primary guardian linked. Emergency contact verified.',
+      classTeacher: 'Class teacher will appear after timetable sync.',
+      guardianSummary: 'Guardian access verified by SchoolOS.',
       canViewGuardianSummary: true,
-      attendanceSummary: child.id == 'child-aarav'
-          ? 'Present today, 94% this month'
-          : 'Present today, 97% this month',
-      homeworkSummary: child.id == 'child-aarav'
-          ? '2 tasks pending'
-          : 'No homework due today',
-      feesSummary: child.id == 'child-aarav'
-          ? 'NPR 4,200 due'
-          : 'All dues cleared',
+      attendanceSummary: 'Open attendance for the latest monthly summary.',
+      homeworkSummary: 'Homework sync is pending a parent-safe API slice.',
+      feesSummary: 'Fee summary sync is pending a parent-safe API slice.',
       qrLabel:
           'School identity QR will be shown after QR permissions are enabled.',
       healthWarning: null,
@@ -39,44 +42,56 @@ class ParentRepository {
   Future<ParentDashboardSummary> getParentDashboardSummary(
     String childId,
   ) async {
-    await Future<void>.delayed(const Duration(milliseconds: 260));
-    final child = _children.firstWhere(
+    final children = await getGuardianChildren();
+    final child = children.firstWhere(
       (item) => item.id == childId,
-      orElse: () => _children.first,
+      orElse: () => children.first,
+    );
+    final attendance = await _client.get(
+      '/attendance/students/$childId/summary',
+    );
+    final notifications = await _client.get('/communications/notifications');
+    final transportData = await _getOptionalMap(
+      '/transport/parent/students/$childId/active-trip',
     );
 
-    final isFirstChild = child.id == 'child-aarav';
+    final attendanceData = attendance.data as Map<String, dynamic>;
+    final notificationData = notifications.data as Map<String, dynamic>;
+    final monthSummary =
+        attendanceData['monthSummary'] as Map<String, dynamic>? ?? const {};
+
+    final attendancePercent =
+        (monthSummary['attendancePercentage'] as num?)?.toStringAsFixed(1) ??
+        '0.0';
     return ParentDashboardSummary(
       child: child,
-      attendanceToday: 'Present at 09:12 AM',
-      homeworkPending: isFirstChild ? 2 : 0,
-      feesDue: isFirstChild ? 4200 : 0,
-      unreadNotices: isFirstChild ? 3 : 1,
-      transportStatus: 'Bus on route',
-      canteenBalance: isFirstChild ? 1250 : 860,
-      latestActivity: isFirstChild
-          ? 'Science project reminder posted by class teacher.'
-          : 'Reading activity completed in class.',
-      lastUpdated: DateTime.now().subtract(const Duration(minutes: 8)),
+      attendanceToday: '$attendancePercent% attendance this month',
+      homeworkPending: 0,
+      feesDue: 0,
+      unreadNotices: notificationData['unreadCount'] as int? ?? 0,
+      transportStatus: _formatTransportStatus(transportData),
+      canteenBalance: 0,
+      latestActivity: 'Latest activity sync is pending a parent-safe API slice.',
+      lastUpdated: DateTime.now(),
     );
   }
-}
 
-const _children = [
-  GuardianChild(
-    id: 'child-aarav',
-    name: 'Aarav S.',
-    classSection: 'Grade 4 - Lotus',
-    rollNumber: '12',
-    academicYear: '2082 BS',
-    relationship: 'Son',
-  ),
-  GuardianChild(
-    id: 'child-anika',
-    name: 'Anika S.',
-    classSection: 'Grade 1 - Jasmine',
-    rollNumber: '04',
-    academicYear: '2082 BS',
-    relationship: 'Daughter',
-  ),
-];
+  Future<Map<String, dynamic>?> _getOptionalMap(String path) async {
+    try {
+      final response = await _client.get(path);
+      return response.data as Map<String, dynamic>?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _formatTransportStatus(Map<String, dynamic>? data) {
+    if (data == null || data.isEmpty || data['activeTrip'] == null) {
+      return 'No active trip';
+    }
+
+    final trip = data['activeTrip'] as Map<String, dynamic>;
+    final status = trip['status'] as String? ?? 'ACTIVE';
+    return 'Trip ${status.toLowerCase().replaceAll('_', ' ')}';
+  }
+}

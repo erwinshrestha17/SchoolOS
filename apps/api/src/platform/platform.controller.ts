@@ -624,6 +624,7 @@ export class PlatformController {
   @Get('audit/export')
   @Permissions('platform:audit:read')
   async exportAuditLogs(
+    @Req() req: AuthenticatedRequest,
     @Query('tenantId') tenantId?: string,
     @Query('action') action?: string,
     @Query('userId') userId?: string,
@@ -632,7 +633,6 @@ export class PlatformController {
     @Query('resourceId') resourceId?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
-    @Req() req: AuthenticatedRequest,
   ) {
     return this.platformService.exportAuditLogsCsv({
       tenantId,

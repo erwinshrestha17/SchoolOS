@@ -123,7 +123,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final response = await _authRepository.login(
         LoginRequest(
-          tenantCode: tenantCode,
+          tenantSlug: tenantCode,
           usernameOrEmail: usernameOrEmail,
           password: password,
         ),
@@ -179,7 +179,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     state = state.copyWith(status: AuthStatus.loading);
     try {
-      await _authRepository.logout();
+      await _authRepository.logout(
+        refreshToken: await _tokenStorage.getRefreshToken(),
+      );
     } catch (_) {
       // Ignore network errors during logout
     } finally {

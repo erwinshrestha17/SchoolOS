@@ -69,3 +69,16 @@ For a real phone on the same Wi-Fi network, pass your Mac's local IP:
 ipconfig getifaddr en0
 flutter run --dart-define=SCHOOL_OS_API_BASE_URL=http://<mac-local-ip>:4000/api/v1
 ```
+
+### API Auth Contract
+
+SchoolOS Mobile uses the existing SchoolOS NestJS API:
+
+```txt
+POST /auth/login    { tenantSlug, email, password }
+GET  /auth/me       Authorization: Bearer <accessToken>
+POST /auth/refresh  { refreshToken }
+POST /auth/logout   { refreshToken }
+```
+
+The app stores access and refresh tokens in secure storage. Web cookie auth remains supported by the backend, but mobile should use bearer auth.

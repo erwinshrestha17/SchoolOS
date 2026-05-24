@@ -42,7 +42,8 @@ Phase 2 Academics production polish completed
 Student QR Foundation implemented / release hardening remains
 Phase 2D M9 Accounting completed
 Phase 2 Accounting production polish completed
-Current stage: M0 platform foundation complete with provider readiness and queue failed-job detail hardening + M10 provider/attachment/retry hardening + M6/M7/M8A/M8C/M8B focused feature-depth hardening + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented
+SchoolOS Flutter mobile app started in apps/schoolos_mobile with auth/API wiring underway
+Current stage: M0 platform foundation complete with provider readiness and queue failed-job detail hardening + M10 provider/attachment/retry hardening + M6/M7/M8A/M8C/M8B focused feature-depth hardening + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented + mobile companion app foundation started
 ```
 
 Targeted web-admin polish and Phase2F smoke coverage have been completed. The latest feature-depth pass hardened M10 notifications/attachments, M6 homework parent/student scoping, M7 payroll reporting, M8A library fine/accounting tests, M8C POS/wallet receipts plus supplier/inventory item admin surfaces, and M8B GPS pressure/retention guards. Next focus is staging smoke/manual QA and remaining controlled-pilot reliability work in `docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`.
@@ -64,10 +65,9 @@ Strict Phase Gate 0
 Explicitly deferred unless requested:
 
 ```text
-Parent/mobile portal
-Driver app
+Deep parent/mobile module expansion beyond the started Flutter companion app
+Driver live-trip workflow beyond the started mobile shell
 Live transport map/WebSocket UI
-Driver app
 Broad SaaS billing automation
 AI/ML implementation
 Microservices
@@ -82,6 +82,7 @@ Angular migration
 - Cache/queues: Redis + BullMQ
 - Shared package: `packages/core`
 - Current frontend: Next.js dashboard in `apps/web`
+- Mobile app: Flutter companion app in `apps/schoolos_mobile`
 - Future frontend target:
   - `apps/web` = public website, SEO/admissions/public pages
   - `apps/admin` = Angular internal dashboard later
@@ -95,6 +96,7 @@ Do not rename `tenantId` to `schoolId`.
 Implemented or registered backend foundations now include:
 
 - Auth/RBAC/Tenant Isolation
+- Mobile API foundation: bearer-token auth, refresh-token storage, tenant slug login, and role-aware Flutter shell in `apps/schoolos_mobile`
 - M0 Platform Core: platform tenant control, tenant settings, file registry, reports, usage service, plan service foundations, provider readiness detail, queue failed-job detail, and retry audit history
 - M1 Admissions & Student Profiles
 - M2 Smart Attendance

@@ -32,6 +32,7 @@ Phase 2D M9 Accounting: Completed / Pilot-Ready
 Phase 2 Accounting polish: Completed (report PDFs, bank reconciliation PDFs, File Registry snapshots, audit trail, auto-match suggestions, raster logo embedding, and browser smoke coverage)
 Phase 2E M10 Parent communication/chat: Foundation implemented
 Student QR Identity: Backend model/API/service and admin UI foundation implemented
+SchoolOS Flutter Mobile: Started in `apps/schoolos_mobile`; auth/API connection is now part of active implementation
 Phase 3 M8A/M8B/M8C: Admin/backend foundations implemented with more depth than older docs showed
 Phase 4 M11 Intelligence/AI: Roadmap only
 ```
@@ -145,7 +146,7 @@ Exit criteria:
 
 Allowed work: verification fixes, migration fixes, seed fixes, tenant isolation fixes, doc alignment.
 
-Blocked work: AI, Angular migration, microservices, parent/mobile, driver app, broad new modules.
+Blocked work: AI, Angular migration, microservices, deep parent/mobile expansion beyond the started Flutter companion app, driver live-trip workflow, broad new modules.
 
 ### Phase 1 - Pilot Reliability for Existing Core
 
@@ -233,14 +234,14 @@ Library barcode/QR scan UX, transport live map only after real-time backend desi
 
 Exit criteria: operations modules are reliable admin products, not just demos.
 
-### Phase 5 - Parent, Mobile, Driver, and Live Experiences
+### Phase 5 - Mobile Companion, Parent, Driver, and Live Experiences
 
-Start only after Phases 0-4 are green.
+Started as a thin Flutter companion app track while the main product remains stabilization-first.
 
 Scope:
 
 ```text
-Parent portal, mobile/PWA shell, parent chat UI, parent academic/fee/attendance views, driver app, parent transport tracking, push notifications.
+apps/schoolos_mobile auth/API foundation, parent chat UI, parent academic/fee/attendance views, driver trip workflow, parent transport tracking, push notifications.
 ```
 
 Rules:

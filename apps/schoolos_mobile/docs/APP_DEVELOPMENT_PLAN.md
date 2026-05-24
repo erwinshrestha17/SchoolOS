@@ -230,10 +230,10 @@ Real phone:        http://<mac-local-ip>:4000/api/v1
 Expected auth endpoints:
 
 ```txt
-POST /auth/login
-POST /auth/refresh
-POST /auth/logout
-GET  /auth/me
+POST /auth/login    { tenantSlug, email, password }
+GET  /auth/me       Authorization: Bearer <accessToken>
+POST /auth/refresh  { refreshToken }
+POST /auth/logout   { refreshToken }
 ```
 
 The API layer must include:
@@ -243,6 +243,7 @@ The API layer must include:
 - Bearer token interceptor
 - Tenant context header when required
 - Refresh token handling
+- Secure token storage for mobile access/refresh tokens
 - Timeout handling
 - Offline/network error detection
 - Human-friendly error mapper

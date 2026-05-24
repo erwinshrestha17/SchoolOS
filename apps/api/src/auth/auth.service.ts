@@ -407,7 +407,12 @@ export class AuthService {
         requestId: requestMeta?.requestId,
       });
 
-      return this.buildAuthSession(session.accessToken, authContext, tenant);
+      return this.buildAuthSession(
+        session.accessToken,
+        authContext,
+        tenant,
+        session.refreshToken,
+      );
     } catch (error) {
       if (error instanceof Error) {
         this.logger.error(`Refresh failed: ${error.message}`, error.stack);
@@ -562,7 +567,12 @@ export class AuthService {
       requestId: requestMeta?.requestId,
     });
 
-    return this.buildAuthSession(session.accessToken, authContext, tenant);
+    return this.buildAuthSession(
+      session.accessToken,
+      authContext,
+      tenant,
+      session.refreshToken,
+    );
   }
 
   private async resolveTenantAndUser(tenantSlug: string, email: string) {
@@ -907,6 +917,7 @@ export class AuthService {
     accessToken: string,
     authContext: AuthContext,
     tenant: Tenant,
+    refreshToken?: string,
   ) {
     const decoded =
       typeof this.jwtService.decode === 'function'
@@ -915,6 +926,7 @@ export class AuthService {
 
     return {
       accessToken,
+      refreshToken,
       accessTokenExpiresAt: decoded?.exp
         ? new Date(decoded.exp * 1000).toISOString()
         : null,

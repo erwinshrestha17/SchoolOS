@@ -33,6 +33,7 @@ Database: PostgreSQL + Prisma
 Cache/queues: Redis + BullMQ
 Shared package: packages/core
 Current frontend: Next.js dashboard in apps/web
+Mobile app: Flutter companion app in apps/schoolos_mobile
 Future frontend target: apps/web public site + apps/admin Angular dashboard later
 ```
 
@@ -105,13 +106,14 @@ Expected high-level structure:
 
 ```text
 apps/
-  api/      NestJS backend
-  web/      Current Next.js dashboard and later public website
-  admin/    Future Angular internal dashboard, not now
+  api/              NestJS backend
+  web/              Current Next.js dashboard and later public website
+  schoolos_mobile/  Flutter parent/teacher/student/admin companion app
+  admin/            Future Angular internal dashboard, not now
 packages/
-  core/     Shared validation, types, contracts, permissions
+  core/             Shared validation, types, contracts, permissions
 docs/
-  project/  Master memory, plans, and roadmaps
+  project/          Master memory, plans, and roadmaps
 ```
 
 Current implementation snapshot:
@@ -122,7 +124,7 @@ Current implementation snapshot:
 - Phase 2D M9 Accounting is production-candidate complete.
 - Phase 2 foundations exist for Homework/Timetable, HR/Payroll, and Parent-Class Teacher Chat.
 - Phase 3 admin/backend foundations exist for Library, Transport, and Canteen, with reports, QR/scan foundations, and inventory/location/POS depth depending on the vertical.
-- Deferred surfaces remain: parent/mobile portal, driver app, live transport map/WebSocket UI, full canteen inventory/vendor workflows, and AI/ML.
+- The Flutter mobile companion app has started under `apps/schoolos_mobile`; deeper parent/driver/live transport experiences remain gated behind purpose-limited APIs, ownership tests, and staging verification.
 
 Suggested frontend namespaces inside `apps/web`:
 
@@ -166,7 +168,7 @@ Suggested frontend namespaces inside `apps/web`:
 ## Auth and Tenant Isolation
 
 - Browser auth is cookie-first with httpOnly access and refresh cookies.
-- API bearer tokens remain supported for future mobile/API clients.
+- API bearer tokens are used by the Flutter mobile app and remain supported for API clients.
 - Tenant context is seeded from verified auth/session data.
 - Super-admin tenant override must be explicit, validated, and audited.
 - Frontend should not be trusted for access control.

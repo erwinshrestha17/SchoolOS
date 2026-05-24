@@ -80,8 +80,8 @@ Explicitly deferred unless requested:
 ```text
 Angular migration
 AI/ML implementation
-Parent/mobile portal
-Driver app
+Deep parent/mobile module expansion beyond the started Flutter companion app
+Driver live-trip workflow beyond the started mobile shell
 Live transport map/WebSocket UI
 Full canteen purchase-bill/wastage/vendor workflows
 Microservices
@@ -98,6 +98,7 @@ Database: PostgreSQL + Prisma
 Cache/queues: Redis + BullMQ
 Shared package: packages/core
 Current frontend: Next.js dashboard in apps/web
+Mobile app: Flutter companion app in apps/schoolos_mobile
 Future frontend target: apps/web public site + apps/admin Angular dashboard later
 ```
 
@@ -252,7 +253,7 @@ Staging/pilot verification
 - Super-admin tenant override validated and audited.
 - Cookie-first browser auth with `httpOnly` access/refresh cookies.
 - Browser dashboard no longer stores raw tokens.
-- API still supports bearer tokens for future mobile/API clients.
+- API supports bearer tokens for the active Flutter mobile app and future API clients.
 - Docker Postgres/Redis smoke script added.
 - `verify:production` gate exists.
 - PDF response validation added.
@@ -399,10 +400,10 @@ Do not move M9 Accounting to a microservice yet.
 ## Deferred / Later
 
 - Angular internal dashboard migration.
-- Parent and teacher mobile apps.
+- Deep parent and teacher mobile workflows beyond the started Flutter app foundation.
 - Real SMS/push/R2 provider credentials until adapters are selected.
 - Payment gateways such as eSewa/Khalti until manual/bank/cash reconciliation is production-ready.
-- Parent/mobile portal and driver app.
+- Driver live-trip workflow beyond the started mobile shell.
 - Live transport map/WebSocket UI.
 - Full canteen purchase-bill/wastage/vendor workflows.
 - AI integrations until reliable production data and M11 foundations exist.

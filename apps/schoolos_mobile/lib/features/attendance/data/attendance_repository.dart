@@ -1,22 +1,43 @@
+import '../../../core/network/api_client.dart';
 import '../domain/attendance_models.dart';
 
 class AttendanceRepository {
-  const AttendanceRepository();
+  const AttendanceRepository(this._client);
+
+  final ApiClient _client;
 
   Future<AttendanceSummary> getAttendanceSummary(
     String studentId,
     DateTimeRangeValue range,
   ) async {
-    await Future<void>.delayed(const Duration(milliseconds: 240));
+    final response = await _client.get(
+      '/attendance/students/$studentId/summary',
+      queryParameters: {
+        'month': range.start.month,
+        'year': range.start.year,
+      },
+    );
+    final data = response.data as Map<String, dynamic>;
+    final monthSummary =
+        data['monthSummary'] as Map<String, dynamic>? ?? const {};
+    final present = monthSummary['present'] as int? ?? 0;
+    final absent = monthSummary['absent'] as int? ?? 0;
+    final late = monthSummary['late'] as int? ?? 0;
+    final leave = monthSummary['leave'] as int? ?? 0;
+
     return AttendanceSummary(
       studentId: studentId,
-      studentName: studentId == 'child-anika' ? 'Anika S.' : 'Aarav S.',
-      todayStatus: AttendanceStatus.present,
-      presentCount: 21,
-      absentCount: 1,
-      lateCount: 2,
-      leaveCount: 1,
-      lastUpdated: DateTime.now().subtract(const Duration(minutes: 11)),
+      studentName: 'Student',
+      todayStatus: present > 0
+          ? AttendanceStatus.present
+          : absent > 0
+          ? AttendanceStatus.absent
+          : AttendanceStatus.present,
+      presentCount: present,
+      absentCount: absent,
+      lateCount: late,
+      leaveCount: leave,
+      lastUpdated: DateTime.now(),
     );
   }
 
@@ -24,69 +45,65 @@ class AttendanceRepository {
     String studentId,
     DateTime month,
   ) async {
-    await Future<void>.delayed(const Duration(milliseconds: 240));
     final first = DateTime(month.year, month.month);
-    return List.generate(30, (index) {
-      final date = first.add(Duration(days: index));
-      final status = switch (index) {
-        5 => AttendanceStatus.absent,
-        9 || 17 => AttendanceStatus.late,
-        12 => AttendanceStatus.leave,
-        19 => AttendanceStatus.festival,
-        20 => AttendanceStatus.holiday,
-        _ => AttendanceStatus.present,
-      };
-      return AttendanceDay(date: date, status: status);
-    });
+    final last = DateTime(month.year, month.month + 1, 0);
+    final response = await _client.get(
+      '/attendance/students/$studentId/history',
+      queryParameters: {
+        'startDate': _dateOnly(first),
+        'endDate': _dateOnly(last),
+      },
+    );
+    final items = response.data as List<dynamic>? ?? const [];
+
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map((item) {
+          return AttendanceDay(
+            date: DateTime.tryParse(item['date'] as String? ?? '') ?? first,
+            status: _statusFromApi(item['status'] as String?),
+          );
+        })
+        .toList();
+  }
+
+  String _dateOnly(DateTime value) {
+    final month = value.month.toString().padLeft(2, '0');
+    final day = value.day.toString().padLeft(2, '0');
+    return '${value.year}-$month-$day';
+  }
+
+  AttendanceStatus _statusFromApi(String? status) {
+    switch (status) {
+      case 'ABSENT':
+        return AttendanceStatus.absent;
+      case 'LATE':
+        return AttendanceStatus.late;
+      case 'LEAVE':
+      case 'SICK_LEAVE':
+      case 'EXCUSED_LEAVE':
+      case 'UNEXCUSED_LEAVE':
+        return AttendanceStatus.leave;
+      case 'HOLIDAY':
+        return AttendanceStatus.holiday;
+      case 'PRESENT':
+      default:
+        return AttendanceStatus.present;
+    }
   }
 
   Future<List<TeacherClassSection>> getTeacherAssignedClasses() async {
-    await Future<void>.delayed(const Duration(milliseconds: 220));
-    return const [
-      TeacherClassSection(
-        id: 'grade-4-lotus',
-        name: 'Grade 4 - Lotus',
-        subject: 'Mathematics',
-      ),
-      TeacherClassSection(
-        id: 'grade-5-rose',
-        name: 'Grade 5 - Rose',
-        subject: 'Mathematics',
-      ),
-    ];
+    // Purpose-limited teacher class APIs are not exposed yet. Keep this empty
+    // instead of reusing admin-shaped class/timetable data in mobile.
+    return const [];
   }
 
   Future<List<AttendanceStudentEntry>> getClassAttendanceSheet(
     String classSectionId,
     DateTime date,
   ) async {
-    await Future<void>.delayed(const Duration(milliseconds: 260));
-    return const [
-      AttendanceStudentEntry(
-        studentId: 's-1',
-        studentName: 'Aarav S.',
-        rollNumber: '12',
-        status: AttendanceStatus.present,
-      ),
-      AttendanceStudentEntry(
-        studentId: 's-2',
-        studentName: 'Riya K.',
-        rollNumber: '13',
-        status: AttendanceStatus.present,
-      ),
-      AttendanceStudentEntry(
-        studentId: 's-3',
-        studentName: 'Samir T.',
-        rollNumber: '14',
-        status: AttendanceStatus.present,
-      ),
-      AttendanceStudentEntry(
-        studentId: 's-4',
-        studentName: 'Nisha L.',
-        rollNumber: '15',
-        status: AttendanceStatus.present,
-      ),
-    ];
+    // Purpose-limited teacher attendance sheet APIs are not exposed yet.
+    return const [];
   }
 
   Future<AttendanceSyncStatus> submitAttendance(
@@ -94,23 +111,20 @@ class AttendanceRepository {
     DateTime date,
     List<AttendanceStudentEntry> entries,
   ) async {
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    return AttendanceSyncStatus.synced;
+    // Purpose-limited teacher attendance submission APIs are not exposed yet.
+    return AttendanceSyncStatus.failed;
   }
 
   Future<void> saveDraftAttendanceLocally(
     String classSectionId,
     DateTime date,
     List<AttendanceStudentEntry> entries,
-  ) async {
-    await Future<void>.delayed(const Duration(milliseconds: 120));
-  }
+  ) async {}
 
   Future<List<AttendanceStudentEntry>> loadDraftAttendance(
     String classSectionId,
     DateTime date,
   ) async {
-    await Future<void>.delayed(const Duration(milliseconds: 120));
     return const [];
   }
 }

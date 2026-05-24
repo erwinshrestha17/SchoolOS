@@ -55,8 +55,8 @@ Explicitly deferred unless requested:
 
 ```text
 Angular migration
-Parent/mobile portal
-Driver app
+Deep parent/mobile module expansion beyond the started Flutter companion app
+Driver live-trip workflow beyond the started mobile shell
 Live transport map/WebSocket UI
 Full canteen inventory/vendor workflows
 AI/ML implementation
@@ -71,7 +71,7 @@ Microservices
 - Do not rewrite unrelated files.
 - Do not change architecture without explicit instruction.
 - Do not start broad new Phase 3 or Phase 4 scope unless explicitly requested.
-- Treat existing Phase 3 Library/Transport/Canteen admin workspaces as foundations to polish and harden, not as permission to build parent/mobile or driver experiences.
+- Treat existing Phase 3 Library/Transport/Canteen admin workspaces as foundations to polish and harden; mobile screens must use purpose-limited APIs and must not reuse admin-shaped data directly.
 - Do not start AI/ML features until reliable production data exists.
 - Use `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md` as the long-term source of truth.
 - Use `docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md` for current repo risk/completion estimates.
@@ -114,6 +114,7 @@ Microservices
 ## Frontend Rules
 
 - UI must consume real APIs.
+- `apps/schoolos_mobile` must consume the existing SchoolOS API with bearer auth, secure refresh-token storage, tenant slug login, and human-readable mobile error mapping.
 - Do not use fake production data for implemented workflows.
 - Preserve cookie-first browser auth.
 - Do not store raw access/refresh tokens in browser storage.

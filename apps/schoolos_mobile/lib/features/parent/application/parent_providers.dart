@@ -2,11 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/connectivity_provider.dart';
 import '../../../core/storage/app_preferences_service.dart';
+import '../../../core/auth/auth_provider.dart';
 import '../data/parent_repository.dart';
 import '../domain/parent_models.dart';
 
 final parentRepositoryProvider = Provider<ParentRepository>((ref) {
-  return const ParentRepository();
+  return ParentRepository(ref.watch(apiClientProvider));
 });
 
 final parentControllerProvider =
