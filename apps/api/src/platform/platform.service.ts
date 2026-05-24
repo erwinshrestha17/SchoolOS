@@ -544,6 +544,10 @@ export class PlatformService {
     return this.usageService.getTenantUsageSummary(tenantId);
   }
 
+  async getGlobalUsageStats() {
+    return this.usageService.getGlobalUsageStats();
+  }
+
   async listAuditLogs(query: {
     page?: number;
     limit?: number;
@@ -1186,6 +1190,38 @@ export class PlatformService {
     return this.toInvoiceSummary(updated);
   }
 
+  async recordSaaSPaymentDirect(
+    invoiceId: string,
+    body: RecordSaaSPaymentDto,
+    actorUserId: string,
+  ) {
+    const delegate = this.requireDelegate('saaSInvoice');
+    const invoice = await delegate.findUnique({ where: { id: invoiceId } });
+    if (!invoice) throw new NotFoundException('SaaS invoice not found');
+    return this.recordSaaSPayment(
+      String(invoice.tenantId),
+      invoiceId,
+      body,
+      actorUserId,
+    );
+  }
+
+  async cancelSaaSInvoiceDirect(
+    invoiceId: string,
+    body: CancelSaaSInvoiceDto,
+    actorUserId: string,
+  ) {
+    const delegate = this.requireDelegate('saaSInvoice');
+    const invoice = await delegate.findUnique({ where: { id: invoiceId } });
+    if (!invoice) throw new NotFoundException('SaaS invoice not found');
+    return this.cancelSaaSInvoice(
+      String(invoice.tenantId),
+      invoiceId,
+      body,
+      actorUserId,
+    );
+  }
+
   async getTenantBillingDetail(tenantId: string) {
     await this.ensureTenant(tenantId);
     const billingProfile = await this.getBillingProfile(tenantId);
@@ -1241,9 +1277,13 @@ export class PlatformService {
         data: { status: 'OVERDUE' },
         include: { lines: true, payments: true },
       });
-      if (invoice.subscriptionId) {
+      const subscriptionId = invoice.subscriptionId;
+      if (subscriptionId) {
+        if (typeof subscriptionId !== 'string' || !subscriptionId.trim()) {
+          throw new BadRequestException('SaaS Invoice subscriptionId is invalid');
+        }
         await tx.tenantSubscription.update({
-          where: { id: invoice.subscriptionId },
+          where: { id: subscriptionId },
           data: { status: 'GRACE' },
         });
       }
@@ -1259,12 +1299,16 @@ export class PlatformService {
       { status: 'OVERDUE' },
       String(invoice.tenantId),
     );
-    if (invoice.subscriptionId) {
+    const subscriptionId = invoice.subscriptionId;
+    if (subscriptionId) {
+      if (typeof subscriptionId !== 'string' || !subscriptionId.trim()) {
+        throw new BadRequestException('SaaS Invoice subscriptionId is invalid');
+      }
       await this.platformAudit(
         actorUserId,
         'subscription_grace_period_started',
         'saas_billing',
-        invoice.subscriptionId,
+        subscriptionId,
         null,
         { status: 'GRACE' },
         String(invoice.tenantId),

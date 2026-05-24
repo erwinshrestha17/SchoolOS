@@ -533,11 +533,7 @@ export class PlatformController {
     @Body() body: RecordSaaSPaymentDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    const delegate = this.platformService.requireDelegate('saaSInvoice');
-    const invoice = await delegate.findUnique({ where: { id: invoiceId } });
-    if (!invoice) throw new NotFoundException('SaaS invoice not found');
-    return this.platformService.recordSaaSPayment(
-      String(invoice.tenantId),
+    return this.platformService.recordSaaSPaymentDirect(
       invoiceId,
       body,
       this.requireUser(req),
@@ -560,11 +556,7 @@ export class PlatformController {
     @Body() body: CancelSaaSInvoiceDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    const delegate = this.platformService.requireDelegate('saaSInvoice');
-    const invoice = await delegate.findUnique({ where: { id: invoiceId } });
-    if (!invoice) throw new NotFoundException('SaaS invoice not found');
-    return this.platformService.cancelSaaSInvoice(
-      String(invoice.tenantId),
+    return this.platformService.cancelSaaSInvoiceDirect(
       invoiceId,
       body,
       this.requireUser(req),
@@ -602,7 +594,7 @@ export class PlatformController {
   @Get('usage')
   @Permissions('platform:usage:read')
   async getGlobalUsage() {
-    return this.platformService.usageService.getGlobalUsageStats();
+    return this.platformService.getGlobalUsageStats();
   }
 
   @Get('schools/:tenantId/usage')

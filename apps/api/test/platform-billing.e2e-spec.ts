@@ -7,7 +7,6 @@ import { PlatformController } from '../src/platform/platform.controller';
 import { PlansService } from '../src/plans/plans.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { PrismaMock, createPrismaMock, createQueueMock } from './test-helpers';
-import { PlatformSaaSInvoiceLineType } from '@schoolos/core';
 
 describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
   let app: INestApplication;
@@ -206,7 +205,9 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
         (log) => log.action === 'tenant_suspended_billing',
       );
       expect(suspendAudit).toBeDefined();
-      expect(suspendAudit.after.reason).toBe('Unpaid balance for overdue invoice');
+      if (suspendAudit) {
+        expect((suspendAudit.after as any)?.reason).toBe('Unpaid balance for overdue invoice');
+      }
     });
 
     it('payment -> reactivate tenant works', async () => {
@@ -242,7 +243,9 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
         (log) => log.action === 'tenant_reactivated_billing',
       );
       expect(reactivateAudit).toBeDefined();
-      expect(reactivateAudit.after.reason).toBe('Payment received for past due invoice');
+      if (reactivateAudit) {
+        expect((reactivateAudit.after as any)?.reason).toBe('Payment received for past due invoice');
+      }
     });
 
     it('cancel invoice rejects cancellation of paid invoices and prevents payments on cancelled invoice', async () => {
@@ -422,6 +425,7 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
       prisma.__state.tenantFeatureOverrides = [];
       prisma.__state.usageLimits = [];
       prisma.__state.usageCounters = [];
+      prisma.__state.platformPlans = [];
 
       await prisma.tenant.create({
         data: {
@@ -429,6 +433,14 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
           name: 'Entitlement School',
           slug: 'entitlement-school',
           plan: 'basic',
+        },
+      });
+
+      await prisma.platformPlan.create({
+        data: {
+          id: 'basic-plan',
+          key: 'basic',
+          name: 'Basic Plan',
         },
       });
     });

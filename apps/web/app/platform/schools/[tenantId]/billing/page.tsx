@@ -56,25 +56,10 @@ export default function PlatformTenantBillingPage() {
 
   if (error || !tenant) {
     return (
-<<<<<<< HEAD
       <PlatformInlineError
         title="Tenant billing unavailable"
         message={error ?? 'The requested tenant could not be loaded.'}
       />
-=======
-      <div className="rounded-3xl border border-rose-200 bg-rose-50 p-8 text-rose-800">
-        <div className="flex items-center gap-3 font-black">
-          <AlertTriangle size={20} />
-          Tenant billing unavailable
-        </div>
-        <p className="mt-2 text-sm">{error ?? 'The requested tenant could not be loaded.'}</p>
-        <Link href="/platform/schools">
-          <Button className="mt-5 rounded-2xl" variant="outline">
-            Back to schools
-          </Button>
-        </Link>
-      </div>
->>>>>>> b6cb572 (feat(storage): add deleteObject and testConnection methods to StorageService)
     );
   }
 
