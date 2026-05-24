@@ -29,6 +29,22 @@ packages/core/src/*.d.ts
 packages/core/src/*.js
 packages/core/src/*.js.map
 
+# Flutter mobile app local artifacts
+apps/schoolos_mobile/.dart_tool/
+apps/schoolos_mobile/.flutter-plugins
+apps/schoolos_mobile/.flutter-plugins-dependencies
+apps/schoolos_mobile/.pub-cache/
+apps/schoolos_mobile/.pub/
+apps/schoolos_mobile/build/
+apps/schoolos_mobile/coverage/
+apps/schoolos_mobile/doc/api/
+apps/schoolos_mobile/ios/Flutter/.last_build_id
+apps/schoolos_mobile/android/app/debug/
+apps/schoolos_mobile/android/app/profile/
+apps/schoolos_mobile/android/app/release/
+apps/schoolos_mobile/.idea/
+apps/schoolos_mobile/**/*.iml
+
 *.log
 pnpm-debug.log*
 .pnpm-home/

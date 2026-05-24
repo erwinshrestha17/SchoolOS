@@ -114,13 +114,58 @@ Rules:
 
 ```text
 apps/
-  api/      NestJS backend
-  web/      Current Next.js dashboard and later public website
-  admin/    Future Angular internal dashboard, not now
+  api/              NestJS backend
+  web/              Current Next.js dashboard and later public website
+  schoolos_mobile/  Flutter parent/teacher/student/admin mobile app
+  admin/            Future Angular internal dashboard, not now
 packages/
-  core/     Shared validation, types, contracts, permissions
+  core/             Shared validation, types, contracts, permissions
 docs/
-  project/  Master memory, plans, and roadmaps
+  project/          Master memory, plans, and roadmaps
+```
+
+For now, keep the Flutter mobile app as a standalone app under `apps/`.
+Do not add it to `pnpm` workspaces; run it with Flutter commands.
+
+## Running Locally
+
+Run backend and web from the SchoolOS root:
+
+```bash
+pnpm dev
+```
+
+Run the mobile app from its Flutter app directory:
+
+```bash
+cd apps/schoolos_mobile
+flutter pub get
+flutter run
+```
+
+The local backend API is usually available at:
+
+```text
+http://localhost:4000/api/v1
+```
+
+For iOS Simulator, the default mobile API base URL can use localhost:
+
+```bash
+flutter run --dart-define=SCHOOL_OS_API_BASE_URL=http://localhost:4000/api/v1
+```
+
+For Android Emulator, point the app to the host machine through `10.0.2.2`:
+
+```bash
+flutter run --dart-define=SCHOOL_OS_API_BASE_URL=http://10.0.2.2:4000/api/v1
+```
+
+For a real phone on the same Wi-Fi network, get the Mac's local IP and use it:
+
+```bash
+ipconfig getifaddr en0
+flutter run --dart-define=SCHOOL_OS_API_BASE_URL=http://<mac-local-ip>:4000/api/v1
 ```
 
 ---
