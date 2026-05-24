@@ -1,3 +1,4 @@
+import { StorageProvider } from '@prisma/client';
 import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -36,7 +37,12 @@ describe('StorageService', () => {
     await expect(service.getObjectBuffer(saved.objectKey)).resolves.toEqual(
       Buffer.from('pdf-body'),
     );
-    expect(saved.publicUrl).toBe(`/protected-storage/${saved.objectKey}`);
+    expect(saved.provider).toBe(StorageProvider.LOCAL);
+    expect(saved.objectKey).toMatch(
+      /^tenant-a\/student-documents\/[a-f0-9-]+\.pdf$/,
+    );
+    expect(saved.publicUrl).toBeNull();
+    expect(saved.checksumSha256).toHaveLength(64);
   });
 
   it('rejects unsafe local object keys', async () => {
@@ -51,7 +57,25 @@ describe('StorageService', () => {
     );
   });
 
-  it('uploads R2 objects instead of returning metadata for an unwritten file', async () => {
+  it('creates short-lived signed local read URLs', async () => {
+    tempRoot = await mkdtemp(join(tmpdir(), 'schoolos-storage-'));
+    process.env.STORAGE_PROVIDER = 'local';
+    process.env.LOCAL_STORAGE_ROOT = tempRoot;
+    process.env.LOCAL_STORAGE_PUBLIC_BASE_URL = '/protected-storage';
+    process.env.STORAGE_SIGNED_READ_URL_TTL_SECONDS = '120';
+    process.env.STORAGE_SIGNING_SECRET = 'test-signing-secret';
+
+    const service = new StorageService(new ConfigService());
+    const signedUrl = await service.createSignedReadUrl({
+      objectKey: 'tenant-a/notices/file.pdf',
+    });
+
+    expect(signedUrl).toContain('/protected-storage/');
+    expect(signedUrl).toContain('expires=');
+    expect(signedUrl).toContain('signature=');
+  });
+
+  it('uploads S3-compatible objects through normalized R2 aliases', async () => {
     configureR2Env();
     const fetchMock = jest
       .spyOn(globalThis, 'fetch')
@@ -71,6 +95,8 @@ describe('StorageService', () => {
     expect(String(url)).toBe(
       `https://account.r2.cloudflarestorage.com/schoolos-assets/${saved.objectKey}`,
     );
+    expect(saved.provider).toBe(StorageProvider.R2);
+    expect(saved.publicUrl).toBeNull();
     expect(options?.method).toBe('PUT');
     expect(options?.body).toEqual(Buffer.from('image-body'));
     expect(options?.headers).toEqual(
@@ -87,7 +113,7 @@ describe('StorageService', () => {
     ).not.toContain('secret-key');
   });
 
-  it('downloads R2 objects through signed requests', async () => {
+  it('downloads S3-compatible objects through signed requests', async () => {
     configureR2Env();
     const fetchMock = jest
       .spyOn(globalThis, 'fetch')
@@ -111,6 +137,21 @@ describe('StorageService', () => {
     );
   });
 
+  it('creates bounded S3-compatible signed read URLs', async () => {
+    configureR2Env();
+    process.env.STORAGE_SIGNED_READ_URL_TTL_SECONDS = '60';
+    const service = new StorageService(new ConfigService());
+
+    const signedUrl = await service.createSignedReadUrl({
+      objectKey: 'tenant-a/notices/file.pdf',
+      expiresInSeconds: 120,
+    });
+
+    expect(signedUrl).toContain('X-Amz-Expires=60');
+    expect(signedUrl).toContain('X-Amz-Signature=');
+    expect(signedUrl).not.toContain('secret-key');
+  });
+
   it('fails closed when R2 credentials are incomplete', async () => {
     process.env.STORAGE_PROVIDER = 'r2';
     process.env.R2_BUCKET = 'schoolos-assets';
@@ -118,7 +159,7 @@ describe('StorageService', () => {
     const service = new StorageService(new ConfigService());
 
     await expect(service.checkReadiness()).rejects.toThrow(
-      'R2 endpoint not configured',
+      'OBJECT_STORAGE_ENDPOINT or R2_ENDPOINT is required',
     );
   });
 });

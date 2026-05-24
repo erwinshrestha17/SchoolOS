@@ -83,6 +83,47 @@ describe('M0 File & Report boundary contracts', () => {
   // ─── 3. URL Protection & Signed URLs ──────────────────────────────────
 
   describe('URL protection contracts', () => {
+    it('StorageService delegates provider behavior through adapter contracts', () => {
+      const storageService = read('src/storage/storage.service.ts');
+      const storageTypes = read('src/storage/storage.types.ts');
+
+      expect(storageTypes).toContain('export interface StorageAdapter');
+      expect(storageTypes).toContain('createSignedReadUrl');
+      expect(storageTypes).toContain('createSignedUploadUrl');
+      expect(storageService).toContain('createStorageAdapter');
+      expect(storageService).toContain('LocalStorageAdapter');
+      expect(storageService).toContain('S3CompatibleStorageAdapter');
+    });
+
+    it('feature modules do not import provider SDKs or direct production file storage APIs', () => {
+      const featureFiles = [
+        'src/activity-feed/activity-media.service.ts',
+        'src/students/students.service.ts',
+        'src/student-records/student-records.service.ts',
+        'src/admissions/admissions.service.ts',
+        'src/communications/communications.service.ts',
+        'src/homework/homework.service.ts',
+        'src/academics/report-card-pdf.service.ts',
+        'src/accounting/accounting-report-exports.service.ts',
+      ];
+      const forbiddenPatterns = [
+        /@aws-sdk/,
+        /@google-cloud\/storage/,
+        /S3Client/,
+        /R2_/,
+        /cloudflarestorage/,
+        /from ['"]fs['"]/,
+        /from ['"]fs\/promises['"]/,
+      ];
+
+      const violations = featureFiles.filter((file) => {
+        const source = read(file);
+        return forbiddenPatterns.some((pattern) => pattern.test(source));
+      });
+
+      expect(violations).toEqual([]);
+    });
+
     it('getSignedUrl returns protected internal API paths, not raw S3/CDN URLs', () => {
       const service = read('src/file-registry/file-registry.service.ts');
 

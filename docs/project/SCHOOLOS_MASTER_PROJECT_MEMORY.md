@@ -116,7 +116,7 @@ Rules:
 | Module | Name | Current Status |
 |---|---|---|
 | M0 | Platform Core / SaaS Starter | Foundation completed across eight sprints; provider/queue pilot hardening implemented; entitlement/SaaS/staging depth remains |
-| M1 | Admissions & Student Profiles | Phase 1A/1B complete / pilot-ready with Student QR and document audit visibility foundations |
+| M1 | Admissions & Student Profiles | Phase 1A/1B complete / pilot-ready with Student QR, document audit visibility, and generated PDF storage-route hardening foundations |
 | M2 | Smart Attendance | Phase 1A/1B complete / pilot-ready |
 | M3 | Fees & Receipts | Phase 1A/1B complete / pilot-ready |
 | M4 | Exams, CAS & Report Cards | Phase 2 backend/admin UI plus production PDF/report/correction/snapshot polish implemented |
@@ -161,7 +161,7 @@ Implemented M0 capabilities:
 - SaaS invoices, invoice lines, payments, and cancellation rules.
 - Provider config masking and secret-safe response shape.
 - Provider readiness detail API with dry-run validation, disabled-mode warnings, masked secret reporting, and S3-compatible object-storage readiness checks without paid external calls by default.
-- Shared storage service now performs env-backed S3-compatible R2 uploads/downloads instead of metadata-only R2 saves, while keeping provider secrets out of API responses.
+- Shared storage service now uses a provider-neutral adapter contract with normalized local/s3/r2/minio/gcp config, local and S3-compatible adapters, backward-compatible R2 env aliases, private-by-default writes, and short-lived signed URL helpers while keeping provider secrets out of API responses.
 - Queue health, failed-job detail inspection, sanitized payload visibility, stack/timing detail, retry audit history, and audited retry endpoint.
 - Upload validation and dangerous extension blocking.
 - Private/protected file URL response shape.
@@ -227,17 +227,19 @@ Current M0 pilot-hardening snapshot:
 ```text
 Implemented:
 - Provider readiness detail and dry-run validation.
-- Object-storage readiness checks for S3/MinIO/R2-style provider configuration without unsafe external calls by default.
+- Object-storage readiness checks for normalized local/S3/MinIO/R2-style provider configuration without unsafe external calls by default.
+- M0 storage readiness now starts from normalized StorageService config and no longer requires a legacy ProviderConfig row to report env-backed readiness.
 - Queue failed-job detail with sanitized payload, failure metadata, stack trace, and retry audit history.
 - Platform settings provider readiness and queue job detail surfaces.
 
 Verified:
 - Targeted platform API tests passed.
 - Web contract tests passed.
-- pnpm typecheck, pnpm test, pnpm test:e2e, and pnpm build passed.
+- Storage Sprint 1 passed pnpm db:generate, pnpm db:validate, pnpm verify:openapi, pnpm lint, pnpm typecheck, and pnpm test.
 
 Blocked:
-- pnpm verify:production reached Playwright webServer startup and failed to bind 127.0.0.1:3101 in the sandbox.
+- Current storage rollout pnpm test:e2e is blocked by existing non-storage e2e failures: SaaS invoice Decimal string formatting, finance/M9 suspended-tenant setup, and missing student lifecycle tenant fixture.
+- pnpm build and pnpm verify:production were not rerun after the failed e2e gate.
 - pnpm smoke:phase1 still requires local Postgres, Redis, API, and web services.
 ```
 
@@ -252,6 +254,7 @@ Remaining M0 hardening work:
 - SaaS billing lifecycle tests: invoice -> payment -> overdue/cancel/suspend.
 - Entitlement enforcement tests against real school APIs.
 - Object storage readiness verification against explicit staging provider.
+- File Registry signed URL/direct-upload hardening and M1-M10 module-by-module storage migration audit.
 - Docker-backed smoke once Postgres, Redis, and API are running.
 ```
 

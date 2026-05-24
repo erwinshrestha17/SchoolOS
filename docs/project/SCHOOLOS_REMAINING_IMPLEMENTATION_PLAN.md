@@ -44,7 +44,7 @@ Important working-tree note:
 ```text
 Phase Gate 0 verification was green before M0 and feature-depth work started.
 M0 provider/queue pilot hardening and M10/M6/M7/M8A/M8C/M8B feature-depth hardening have now been implemented and verified through build during their sprint gates.
-M0/File Registry storage hardening now includes real env-backed S3-compatible R2 upload/download support in `StorageService`; staging bucket verification remains environment-gated.
+M0/File Registry storage hardening now includes a provider-neutral `StorageAdapter` contract, normalized local/s3/r2/minio/gcp config, backward-compatible R2 aliases, private-by-default object writes, short-lived signed URL helpers, and StorageService delegation through local and S3-compatible adapters. M0 platform storage readiness has started using the normalized config; staging bucket verification remains environment-gated.
 `pnpm verify:production` must be rerun in local/staging if the current sandbox blocks browser E2E local-port binding.
 `pnpm smoke:phase1` still requires local Postgres, Redis, API, and web services.
 ```
@@ -126,7 +126,7 @@ Implemented:
 - SaaS billing records: profiles, invoices, invoice lines, payments.
 - Provider configuration masking.
 - Provider readiness detail API with dry-run validation, masked secrets, disabled-mode warnings, and S3-compatible object-storage readiness checks without paid external calls by default.
-- Env-backed S3-compatible R2 object upload/download in the shared storage service, with fail-closed config checks.
+- Env-backed cloud-agnostic storage adapter boundary for local, R2, S3, and MinIO-compatible providers, with fail-closed config checks and R2 alias compatibility.
 - Queue health, failed-job detail inspection, sanitized payload visibility, stack/timing detail, retry audit history, and audited retry endpoint.
 - File Registry, report exports/history, health summary, onboarding checklist.
 - Platform dashboard/schools/settings/audit routes.
@@ -136,6 +136,8 @@ Remaining backend:
 - SaaS billing lifecycle automation beyond records.
 - Entitlement enforcement tests against real school APIs.
 - Object-storage readiness verification against an explicit staging provider.
+- File Registry signed read/download/upload API hardening after adapter rollout.
+- M1-M10 module-by-module migration audit to remove any remaining direct file/provider assumptions.
 - Provider real connection checks only where safe, configured, and non-paid.
 
 Remaining frontend:
@@ -160,7 +162,7 @@ Remaining backend:
 - Duplicate merge workflow polish.
 - Staging verification for storage-backed student photo/document flows.
 - QR scan release verification and more tenant/permission tests.
-- ID-card QR PDF behavior verification.
+- ID-card QR PDF behavior verification. Generated student PDFs now store protected API routes instead of adapter public URLs and mark File Registry assets uploaded after storage succeeds.
 
 Remaining frontend:
 
@@ -487,6 +489,12 @@ pnpm test:e2e
 pnpm build
 pnpm verify:production
 pnpm smoke:phase1 with API/web/Postgres/Redis running
+```
+
+Current storage rollout verification note:
+
+```text
+Storage Sprint 1 passed through pnpm test. The next gate is blocked at pnpm test:e2e by existing non-storage e2e issues: SaaS invoice Decimal string formatting, finance/M9 suspended-tenant setup, and missing student lifecycle tenant fixture. Do not claim build or verify:production for this storage rollout until e2e is repaired or explicitly waived.
 ```
 
 ### Phase 1 - Controlled Pilot Reliability

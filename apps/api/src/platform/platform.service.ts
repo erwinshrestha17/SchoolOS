@@ -1062,7 +1062,7 @@ export class PlatformService {
         currency: 'NPR',
         issueDate: new Date(dto.issueDate),
         dueDate: new Date(dto.dueDate),
-        status: (dto.status as any) || 'ISSUED',
+        status: dto.status ?? 'ISSUED',
         notes: dto.notes,
         createdBy: actorUserId,
         lines: { create: lines },
@@ -1269,7 +1269,9 @@ export class PlatformService {
     });
     if (!invoice) throw new NotFoundException('SaaS invoice not found');
     if (invoice.status === 'PAID' || invoice.status === 'CANCELLED') {
-      throw new BadRequestException('Cannot mark paid or cancelled invoice overdue');
+      throw new BadRequestException(
+        'Cannot mark paid or cancelled invoice overdue',
+      );
     }
     const updated = await this.prisma.$transaction(async (tx) => {
       const inv = await tx.saaSInvoice.update({
@@ -1280,7 +1282,9 @@ export class PlatformService {
       const subscriptionId = invoice.subscriptionId;
       if (subscriptionId) {
         if (typeof subscriptionId !== 'string' || !subscriptionId.trim()) {
-          throw new BadRequestException('SaaS Invoice subscriptionId is invalid');
+          throw new BadRequestException(
+            'SaaS Invoice subscriptionId is invalid',
+          );
         }
         await tx.tenantSubscription.update({
           where: { id: subscriptionId },
@@ -1317,9 +1321,15 @@ export class PlatformService {
     return this.toInvoiceSummary(updated);
   }
 
-  async suspendTenantForBilling(tenantId: string, reason: string, actorUserId: string) {
+  async suspendTenantForBilling(
+    tenantId: string,
+    reason: string,
+    actorUserId: string,
+  ) {
     if (!reason?.trim() || reason.trim().length < 5) {
-      throw new BadRequestException('Reason of at least 5 characters is required');
+      throw new BadRequestException(
+        'Reason of at least 5 characters is required',
+      );
     }
     await this.ensureTenant(tenantId);
     const subscription = await this.prisma.tenantSubscription.findFirst({
@@ -1362,9 +1372,15 @@ export class PlatformService {
     return { success: true };
   }
 
-  async reactivateTenantAfterPayment(tenantId: string, reason: string, actorUserId: string) {
+  async reactivateTenantAfterPayment(
+    tenantId: string,
+    reason: string,
+    actorUserId: string,
+  ) {
     if (!reason?.trim() || reason.trim().length < 5) {
-      throw new BadRequestException('Reason of at least 5 characters is required');
+      throw new BadRequestException(
+        'Reason of at least 5 characters is required',
+      );
     }
     await this.ensureTenant(tenantId);
     const subscription = await this.prisma.tenantSubscription.findFirst({
@@ -1407,15 +1423,18 @@ export class PlatformService {
     return { success: true };
   }
 
-  async exportAuditLogsCsv(query: {
-    tenantId?: string;
-    action?: string;
-    userId?: string;
-    resource?: string;
-    resourceId?: string;
-    startDate?: string;
-    endDate?: string;
-  }, actorUserId: string): Promise<string> {
+  async exportAuditLogsCsv(
+    query: {
+      tenantId?: string;
+      action?: string;
+      userId?: string;
+      resource?: string;
+      resourceId?: string;
+      startDate?: string;
+      endDate?: string;
+    },
+    actorUserId: string,
+  ): Promise<string> {
     const where: Prisma.AuditLogWhereInput = {};
     if (query.tenantId) where.tenantId = query.tenantId;
     if (query.action) where.action = query.action;
@@ -1452,7 +1471,18 @@ export class PlatformService {
       'platform',
     );
 
-    const headers = ['ID', 'Timestamp', 'Action', 'Resource', 'Resource ID', 'Tenant ID', 'User', 'IP Address', 'User Agent', 'Request ID'];
+    const headers = [
+      'ID',
+      'Timestamp',
+      'Action',
+      'Resource',
+      'Resource ID',
+      'Tenant ID',
+      'User',
+      'IP Address',
+      'User Agent',
+      'Request ID',
+    ];
     const rows = logs.map((log) => [
       log.id,
       log.createdAt.toISOString(),
@@ -1596,6 +1626,10 @@ export class PlatformService {
     provider: { enabled: boolean; configEncrypted: unknown } | null | undefined,
     checkedAt: Date,
   ) {
+    if (!provider && type === 'OBJECT_STORAGE') {
+      return this.checkObjectStorageReadiness(displayName, checkedAt);
+    }
+
     if (!provider) {
       return {
         providerKey: type.toLowerCase(),
@@ -1641,27 +1675,7 @@ export class PlatformService {
     }
 
     if (type === 'OBJECT_STORAGE') {
-      try {
-        await this.storageService.testConnection();
-        return {
-          providerKey: type.toLowerCase(),
-          displayName,
-          status: 'READY' as const,
-          message:
-            'Object storage is configured and fully operational (Read/Write/Delete verified).',
-          checkedAt: checkedAt.toISOString(),
-          requiredConfigMissing: [],
-        };
-      } catch (err) {
-        return {
-          providerKey: type.toLowerCase(),
-          displayName,
-          status: 'FAILED' as const,
-          message: `Object storage test connection failed: ${err instanceof Error ? err.message : String(err)}`,
-          checkedAt: checkedAt.toISOString(),
-          requiredConfigMissing: [],
-        };
-      }
+      return this.checkObjectStorageReadiness(displayName, checkedAt);
     }
 
     return {
@@ -1672,6 +1686,42 @@ export class PlatformService {
       checkedAt: checkedAt.toISOString(),
       requiredConfigMissing: [],
     };
+  }
+
+  private async checkObjectStorageReadiness(
+    displayName: string,
+    checkedAt: Date,
+  ) {
+    try {
+      await this.storageService.checkReadiness();
+      const storageConfig = this.configService.storageConfig;
+      return {
+        providerKey: 'object_storage',
+        displayName,
+        status: 'READY' as const,
+        message:
+          'Object storage configuration is valid for the selected provider. No external bucket call was made.',
+        checkedAt: checkedAt.toISOString(),
+        requiredConfigMissing: [],
+        provider: storageConfig.provider,
+        bucket: 'bucket' in storageConfig ? storageConfig.bucket : 'local',
+        endpoint: 'endpoint' in storageConfig ? storageConfig.endpoint : null,
+        forcePathStyle:
+          'forcePathStyle' in storageConfig
+            ? storageConfig.forcePathStyle
+            : null,
+        signedReadUrlTtlSeconds: storageConfig.signedReadUrlTtlSeconds,
+      };
+    } catch (err) {
+      return {
+        providerKey: 'object_storage',
+        displayName,
+        status: 'FAILED' as const,
+        message: `Object storage configuration failed validation: ${safeErrorMessage(err)}`,
+        checkedAt: checkedAt.toISOString(),
+        requiredConfigMissing: [],
+      };
+    }
   }
 
   private async checkPdfReadiness(checkedAt: Date) {
@@ -2088,13 +2138,13 @@ export class PlatformService {
       return { status: 'ok' as const };
     };
 
+    const storageHealth = await this.getObjectStorageHealth(storageProvider);
+
     const checks = {
       database,
       redis,
       queue: redis,
-      objectStorage: storageProvider
-        ? { status: 'ok' as const }
-        : { status: 'error' as const, message: 'No enabled storage provider' },
+      objectStorage: storageHealth,
       email: getProviderHealth(emailProvider, 'EMAIL'),
       sms: getProviderHealth(smsProvider, 'SMS'),
     };
@@ -2219,7 +2269,7 @@ export class PlatformService {
       accounting_fiscal_year: fiscalYearCount > 0,
       chart_of_accounts: chartAccountCount > 0,
       communication_settings: settingKeys.has('parent_notification_enabled'),
-      file_storage: true,
+      file_storage: await this.isObjectStorageConfigured(),
     };
     const overrideMap = new Map(
       asRecords(overrides).map((override) => [override.itemKey, override]),
@@ -2719,6 +2769,35 @@ export class PlatformService {
     }
   }
 
+  private async getObjectStorageHealth(
+    storageProvider: Record<string, unknown> | null | undefined,
+  ) {
+    try {
+      await this.storageService.checkReadiness();
+      const storageConfig = this.configService.storageConfig;
+      return {
+        status: 'ok' as const,
+        message: storageProvider
+          ? undefined
+          : `Using ${storageConfig.provider} storage from normalized environment configuration`,
+      };
+    } catch (error) {
+      return {
+        status: 'error' as const,
+        message: `Object storage configuration failed validation: ${safeErrorMessage(error)}`,
+      };
+    }
+  }
+
+  private async isObjectStorageConfigured() {
+    try {
+      await this.storageService.checkReadiness();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private async checkRedis() {
     try {
       const response = await this.redisService.ping();
@@ -2808,6 +2887,18 @@ function preserveMaskedProviderSecrets(
 
 function decimalValue(value: unknown): Prisma.Decimal {
   return new Prisma.Decimal(String(value ?? 0));
+}
+
+function safeErrorMessage(error: unknown) {
+  const raw =
+    error instanceof Error ? error.message : 'Storage configuration failed';
+
+  return raw
+    .replace(
+      /(secret|token|key|password|credential)([^,\s]*)?[:=]\s*[^,\s]+/gi,
+      '$1$2=********',
+    )
+    .slice(0, 240);
 }
 
 function asNullableUser(value: unknown) {

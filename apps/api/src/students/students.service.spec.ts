@@ -657,7 +657,8 @@ describe('students lifecycle hardening', () => {
       studentFindFirstQueue: [student],
       generatedStudentDocumentFindFirstQueue: [latestVersion],
     });
-    const { service, storageService } = buildService(prisma);
+    const { service, storageService, fileRegistryService } =
+      buildService(prisma);
 
     const pdf = await service.generateStudentDocumentPdf(
       student.id,
@@ -696,7 +697,7 @@ describe('students lifecycle hardening', () => {
         studentId: student.id,
         kind: 'enrollment-confirmation',
         generatedById: actor.userId,
-        pdfUrl: '/storage/generated-doc.pdf',
+        pdfUrl: `/api/v1/students/${student.id}/documents/enrollment-confirmation.pdf`,
         storageObjectKey: `tenant-1/students/${student.id}/generated-documents/enrollment-confirmation/generated-doc.pdf`,
         checksumSha256: expect.any(String),
         signedAt: expect.any(Date),
@@ -710,6 +711,11 @@ describe('students lifecycle hardening', () => {
         retentionUntil: expect.any(Date),
       }),
     });
+    expect(fileRegistryService.markUploaded).toHaveBeenCalledWith(
+      actor.tenantId,
+      'generated-file-asset',
+      actor.userId,
+    );
   });
 
   it('generates a valid PDF header for student ID cards', async () => {
@@ -1342,7 +1348,8 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
     })),
   };
   const fileRegistryService = {
-    registerFile: jest.fn(),
+    registerFile: jest.fn().mockResolvedValue({ id: 'generated-file-asset' }),
+    markUploaded: jest.fn().mockResolvedValue({ id: 'generated-file-asset' }),
     getSignedUrl: jest.fn(),
     listFilesByEntity: jest.fn().mockResolvedValue([]),
   };
@@ -1364,6 +1371,7 @@ function buildService(prisma: ReturnType<typeof buildPrisma>) {
     prisma,
     auditService,
     storageService,
+    fileRegistryService,
   };
 }
 

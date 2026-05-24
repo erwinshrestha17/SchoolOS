@@ -5,7 +5,17 @@ describe('PlatformService provider config hardening', () => {
   let service: PlatformService;
   let prisma: any;
   let auditService: { record: jest.Mock };
-  let storageService: { testConnection: jest.Mock };
+  let configService: {
+    storageConfig: {
+      provider: 'local';
+      localRoot: string;
+      publicBaseUrl: string;
+      signingSecret: string;
+      signedReadUrlTtlSeconds: number;
+      signedUploadUrlTtlSeconds: number;
+    };
+  };
+  let storageService: { testConnection: jest.Mock; checkReadiness: jest.Mock };
 
   const makeQueue = () => ({
     getJobCounts: jest.fn(),
@@ -18,6 +28,7 @@ describe('PlatformService provider config hardening', () => {
   beforeEach(() => {
     prisma = {
       providerConfig: {
+        findFirst: jest.fn(),
         findMany: jest.fn(),
         findUnique: jest.fn(),
         upsert: jest.fn(),
@@ -28,17 +39,28 @@ describe('PlatformService provider config hardening', () => {
       },
     };
     auditService = { record: jest.fn().mockResolvedValue({}) };
+    configService = {
+      storageConfig: {
+        provider: 'local',
+        localRoot: 'storage',
+        publicBaseUrl: '/storage',
+        signingSecret: 'test-secret',
+        signedReadUrlTtlSeconds: 300,
+        signedUploadUrlTtlSeconds: 300,
+      },
+    };
     storageService = {
       testConnection: jest
         .fn()
         .mockResolvedValue({ bucket: 'schoolos-private' }),
+      checkReadiness: jest.fn().mockResolvedValue(true),
     };
 
     service = new PlatformService(
       prisma,
       auditService as any,
       {} as any,
-      {} as any,
+      configService as any,
       {} as any,
       {} as any,
       storageService as any,
@@ -55,7 +77,7 @@ describe('PlatformService provider config hardening', () => {
       {} as any,
       auditService as any,
       {} as any,
-      {} as any,
+      configService as any,
       {} as any,
       {} as any,
       {} as any,
@@ -476,6 +498,27 @@ describe('PlatformService provider config hardening', () => {
     const auditPayload = JSON.stringify(auditService.record.mock.calls[0][0]);
     expect(auditPayload).not.toContain('encrypted-access-key');
     expect(auditPayload).not.toContain('encrypted-secret-key');
+  });
+
+  it('uses normalized storage config for M0 readiness when no provider row exists', async () => {
+    prisma.providerConfig.findFirst.mockResolvedValue(null);
+
+    const readiness = await service.getProvidersReadiness();
+    const storage = readiness.find(
+      (item) => item.providerKey === 'object_storage',
+    );
+
+    expect(storage).toEqual(
+      expect.objectContaining({
+        providerKey: 'object_storage',
+        status: 'READY',
+        provider: 'local',
+        bucket: 'local',
+        signedReadUrlTtlSeconds: 300,
+      }),
+    );
+    expect(storageService.checkReadiness).toHaveBeenCalled();
+    expect(storageService.testConnection).not.toHaveBeenCalled();
   });
 
   it('returns provider readiness failure details without exposing secrets', async () => {

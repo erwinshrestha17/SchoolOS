@@ -6,6 +6,7 @@ import {
   IsEmail,
   IsEnum,
   IsInt,
+  IsIn,
   IsNotEmpty,
   IsNumberString,
   IsObject,
@@ -16,6 +17,16 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+const SAAS_INVOICE_STATUSES = [
+  'DRAFT',
+  'ISSUED',
+  'PAID',
+  'PARTIAL',
+  'OVERDUE',
+  'CANCELLED',
+] as const;
+export type SaaSInvoiceStatusValue = (typeof SAAS_INVOICE_STATUSES)[number];
 
 export class CreatePlatformPlanFeatureDto {
   @IsString()
@@ -231,8 +242,8 @@ export class CreateSaaSInvoiceDto {
   dueDate!: string;
 
   @IsOptional()
-  @IsString()
-  status?: string;
+  @IsIn(SAAS_INVOICE_STATUSES)
+  status?: SaaSInvoiceStatusValue;
 
   @IsOptional()
   @IsString()

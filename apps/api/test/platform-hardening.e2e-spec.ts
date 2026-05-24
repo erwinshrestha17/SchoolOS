@@ -1485,6 +1485,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
       const testConnectionSpy = jest
         .spyOn(storageService, 'testConnection')
         .mockResolvedValue({
+          provider: 'r2',
           bucket: 'test-bucket',
           writeOk: true,
           readOk: true,

@@ -1,6 +1,6 @@
 # SchoolOS Cloud-Agnostic Storage Guide
 
-**Status:** Implementation guide for upcoming storage hardening
+**Status:** Sprint 1 implemented; M0 rollout started; later module migrations remain
 **Scope:** Images, media, documents, PDFs, exports, and generated reports
 **Applies to:** M0, M1, M3, M4, M5, M6, M7, M8A, M8B, M8C, M9, M10, mobile companion app
 **Architecture rule:** Storage providers are infrastructure details. SchoolOS modules must use `FileRegistryService` and `StorageService`, not provider SDKs directly.
@@ -115,6 +115,7 @@ export interface StorageReadinessResult {
   readOk: boolean;
   deleteOk: boolean;
   signedUrlOk?: boolean;
+  signedUrl?: string | null;
 }
 
 export interface StorageAdapter {
@@ -155,10 +156,16 @@ Wasabi
 Backblaze B2 S3 API
 ```
 
-Recommended dependencies:
+Future dependency option:
 
 ```bash
 pnpm --filter @schoolos/api add @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
+```
+
+Current implementation note:
+
+```text
+Sprint 1 introduced the adapter contract, normalized config, and local/S3-compatible adapters using the existing SigV4 implementation. AWS SDK adoption remains optional and should only happen if it reduces maintenance risk without changing module contracts.
 ```
 
 Generic env variables:
@@ -450,16 +457,17 @@ provider-specific signed URL generation
 ## 11. Implementation Order
 
 ```text
-Sprint 1: Storage adapter contract and config normalization
-Sprint 2: Local + S3-compatible adapter using AWS SDK
-Sprint 3: Refactor StorageService to delegate to adapters
-Sprint 4: File Registry signed read/download/upload APIs
-Sprint 5: M1/M5/M10 high-value media/document migration
-Sprint 6: M3/M4/M7/M9 generated PDF/report snapshot migration
-Sprint 7: M6/M8A/M8B/M8C module-specific files/reports migration
-Sprint 8: Direct upload flow and image compression queue
-Sprint 9: Staging provider verification and browser smoke
-Sprint 10: Optional GCP adapter and migration fallback strategy
+[x] Sprint 1: Storage adapter contract and config normalization.
+[x] Sprint 1A: Refactor StorageService to delegate to LocalStorageAdapter and S3CompatibleStorageAdapter.
+[x] Sprint 1B: Add normalized local/s3/r2/minio/gcp config with backward-compatible R2 aliases.
+[x] Sprint 1C: Start M0 readiness rollout by wiring platform storage readiness to normalized config without paid external calls.
+[ ] Sprint 2: File Registry signed read/download/upload API hardening.
+[~] Sprint 3: M1/M5/M10 high-value media/document migration. M1 generated student PDFs now use protected API routes and uploaded File Registry assets; remaining M1 staging/manual checks, M5, and M10 remain.
+[ ] Sprint 4: M3/M4/M7/M9 generated PDF/report snapshot migration.
+[ ] Sprint 5: M6/M8A/M8B/M8C module-specific files/reports migration.
+[ ] Sprint 6: Direct upload flow and image compression queue.
+[ ] Sprint 7: Staging provider verification and browser smoke.
+[ ] Sprint 8: Optional GCP adapter and migration fallback strategy.
 ```
 
 Do not start Sprint 8 until normal upload/download is stable with File Registry and signed URLs.
@@ -480,6 +488,22 @@ pnpm test
 pnpm test:e2e
 pnpm build
 pnpm verify:production
+```
+
+Current verification snapshot:
+
+```text
+Passed:
+- pnpm db:generate
+- pnpm db:validate
+- pnpm verify:openapi
+- pnpm lint
+- pnpm typecheck
+- pnpm test
+
+Blocked:
+- pnpm test:e2e failed on existing non-storage e2e issues: SaaS invoice Decimal string formatting, suspended-tenant plan validation in finance/M9 tests, and missing lifecycle test tenant fixture.
+- pnpm build and pnpm verify:production were not run after the failed e2e gate.
 ```
 
 For staging provider checks, also run:

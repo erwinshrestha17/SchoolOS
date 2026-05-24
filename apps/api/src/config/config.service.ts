@@ -11,12 +11,16 @@ import {
   PASSWORD_RESET_TTL_MINUTES,
   REFRESH_TOKEN_TTL_DAYS,
 } from '../auth/auth.constants';
+import { normalizeStorageConfig } from '../storage/storage.config';
+import type { SchoolOSStorageConfig } from '../storage/storage.config';
+import type { SchoolOSStorageProvider } from '../storage/storage.types';
 
 @Injectable()
 export class ConfigService {
   validateForRuntime() {
     const errors = [
       ...this.validateNumericEnv(),
+      ...this.validateStorageEnv(),
       ...(this.isProduction ? this.validateProductionEnv() : []),
     ];
 
@@ -143,10 +147,12 @@ export class ConfigService {
     return process.env.EMAIL_FROM_ADDRESS ?? 'no-reply@schoolos.local';
   }
 
-  get storageProvider(): 'local' | 'r2' {
-    const provider = process.env.STORAGE_PROVIDER?.toLowerCase();
+  get storageConfig(): SchoolOSStorageConfig {
+    return normalizeStorageConfig(process.env);
+  }
 
-    return provider === 'r2' ? 'r2' : 'local';
+  get storageProvider(): SchoolOSStorageProvider {
+    return this.storageConfig.provider;
   }
 
   get localStorageRoot() {
@@ -178,27 +184,35 @@ export class ConfigService {
   }
 
   get r2PublicBaseUrl() {
-    return process.env.R2_PUBLIC_BASE_URL;
+    return (
+      process.env.OBJECT_STORAGE_PUBLIC_BASE_URL ??
+      process.env.R2_PUBLIC_BASE_URL
+    );
   }
 
   get r2Bucket() {
-    return process.env.R2_BUCKET;
+    return process.env.OBJECT_STORAGE_BUCKET ?? process.env.R2_BUCKET;
   }
 
   get r2Endpoint() {
-    return process.env.R2_ENDPOINT;
+    return process.env.OBJECT_STORAGE_ENDPOINT ?? process.env.R2_ENDPOINT;
   }
 
   get r2AccessKeyId() {
-    return process.env.R2_ACCESS_KEY_ID;
+    return (
+      process.env.OBJECT_STORAGE_ACCESS_KEY_ID ?? process.env.R2_ACCESS_KEY_ID
+    );
   }
 
   get r2SecretAccessKey() {
-    return process.env.R2_SECRET_ACCESS_KEY;
+    return (
+      process.env.OBJECT_STORAGE_SECRET_ACCESS_KEY ??
+      process.env.R2_SECRET_ACCESS_KEY
+    );
   }
 
   get r2Region() {
-    return process.env.R2_REGION ?? 'auto';
+    return process.env.OBJECT_STORAGE_REGION ?? process.env.R2_REGION ?? 'auto';
   }
 
   get port() {
@@ -331,27 +345,20 @@ export class ConfigService {
       }
     }
 
-    if (this.storageProvider === 'r2') {
-      if (!this.r2Bucket) {
-        errors.push('R2_BUCKET is required when STORAGE_PROVIDER=r2');
-      }
-      if (!this.r2Endpoint) {
-        errors.push('R2_ENDPOINT is required when STORAGE_PROVIDER=r2');
-      }
-      if (!this.r2AccessKeyId) {
-        errors.push('R2_ACCESS_KEY_ID is required when STORAGE_PROVIDER=r2');
-      }
-      if (!this.r2SecretAccessKey) {
-        errors.push(
-          'R2_SECRET_ACCESS_KEY is required when STORAGE_PROVIDER=r2',
-        );
-      }
-      if (!this.r2PublicBaseUrl) {
-        errors.push('R2_PUBLIC_BASE_URL is required when STORAGE_PROVIDER=r2');
-      }
-    }
-
     return errors;
+  }
+
+  private validateStorageEnv() {
+    try {
+      this.storageConfig;
+      return [];
+    } catch (error) {
+      return [
+        error instanceof Error
+          ? error.message
+          : 'Storage configuration is invalid',
+      ];
+    }
   }
 
   private requireProductionSecret(

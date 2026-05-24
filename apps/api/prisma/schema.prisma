@@ -221,7 +221,10 @@ enum EventType {
 
 enum StorageProvider {
   LOCAL
+  S3
   R2
+  MINIO
+  GCP
 }
 
 enum StudentDocumentKind {

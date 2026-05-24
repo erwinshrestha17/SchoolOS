@@ -3,14 +3,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  ActivityAttachment,
-  ActivityPostStatus,
-  StorageProvider,
-} from '@prisma/client';
-import { createReadStream } from 'fs';
-import { access } from 'fs/promises';
-import { join, normalize } from 'path';
+import { ActivityAttachment, ActivityPostStatus } from '@prisma/client';
+import { Readable } from 'stream';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
 import {
@@ -21,6 +15,7 @@ import {
 } from '../common/security/parent-scope';
 import { ConfigService } from '../config/config.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 
 export interface ActivityMediaFile {
   stream?: NodeJS.ReadableStream;
@@ -46,6 +41,7 @@ export class ActivityMediaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly storageService: StorageService,
     private readonly auditService: AuditService,
   ) {}
 
@@ -75,26 +71,10 @@ export class ActivityMediaService {
         ? attachment.optimizedObjectKey
         : fileAsset.objectKey;
 
-    if (
-      attachment.provider === StorageProvider.R2 &&
-      objectKey.startsWith('http')
-    ) {
-      return {
-        redirectUrl: objectKey,
-        fileName: attachment.fileName,
-        contentType: attachment.contentType,
-        sizeBytes:
-          action === 'preview' && attachment.optimizedSizeBytes
-            ? attachment.optimizedSizeBytes
-            : attachment.sizeBytes,
-      };
-    }
-
-    const absolutePath = this.resolveLocalObjectPath(objectKey);
-    await access(absolutePath);
+    const content = await this.storageService.getObjectBuffer(objectKey);
 
     return {
-      stream: createReadStream(absolutePath),
+      stream: Readable.from(content),
       fileName: attachment.fileName,
       contentType: attachment.contentType,
       sizeBytes:
@@ -185,17 +165,6 @@ export class ActivityMediaService {
     });
 
     return attachment;
-  }
-
-  private resolveLocalObjectPath(objectKey: string) {
-    const localRoot = join(process.cwd(), this.configService.localStorageRoot);
-    const absolutePath = normalize(join(localRoot, objectKey));
-
-    if (!absolutePath.startsWith(normalize(localRoot))) {
-      throw new ForbiddenException('Invalid activity media object path');
-    }
-
-    return absolutePath;
   }
 
   private get apiBaseUrl() {

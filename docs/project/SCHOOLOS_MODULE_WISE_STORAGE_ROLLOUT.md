@@ -1,6 +1,6 @@
 # SchoolOS Module-Wise Cloud-Agnostic Storage Rollout
 
-**Status:** Active implementation companion for `SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`
+**Status:** Active implementation companion for `SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`; Sprint 1 complete, M0 rollout started
 **Depends on:** `docs/project/SCHOOLOS_CLOUD_AGNOSTIC_STORAGE_GUIDE.md`
 **Goal:** As each remaining SchoolOS module is completed, all images, media, documents, PDFs, exports, and generated files must move through the same provider-agnostic File Registry and StorageService boundary.
 
@@ -33,14 +33,14 @@ permanent public URL as source of truth
 Before broad remaining implementation continues:
 
 ```text
-1. Read docs/project/SCHOOLOS_CLOUD_AGNOSTIC_STORAGE_GUIDE.md.
-2. Refactor StorageService into adapter pattern.
-3. Normalize storage config for local, s3, r2, minio, and optional gcp.
-4. Preserve existing R2 env aliases during migration.
-5. Ensure object keys are tenant-scoped.
-6. Ensure File Registry remains the source of truth.
-7. Add tests for local and S3-compatible adapter behavior.
-8. Run full verification gate.
+[x] 1. Read docs/project/SCHOOLOS_CLOUD_AGNOSTIC_STORAGE_GUIDE.md.
+[x] 2. Refactor StorageService into adapter pattern.
+[x] 3. Normalize storage config for local, s3, r2, minio, and optional gcp.
+[x] 4. Preserve existing R2 env aliases during migration.
+[x] 5. Ensure object keys are tenant-scoped.
+[x] 6. Ensure File Registry remains the source of truth.
+[x] 7. Add tests for local and S3-compatible adapter behavior.
+[~] 8. Run full verification gate. Passed through pnpm test; e2e is blocked by existing non-storage failures.
 ```
 
 Exit requirement:
@@ -87,6 +87,8 @@ Storage impact:
 Remaining implementation alignment:
 
 ```text
+- normalized storage config now drives platform storage readiness without requiring a legacy ProviderConfig row
+- SaaS onboarding file_storage now depends on StorageService readiness instead of always passing
 - entitlement tests should cover file-producing APIs where plan limits apply
 - object-storage readiness verification should run against explicit staging provider
 - provider real connection checks must remain safe, configured, and non-paid by default
@@ -99,6 +101,16 @@ Manual smoke:
 - R2 provider testConnection in staging
 - MinIO testConnection locally
 - failed provider config shows safe error
+```
+
+Started implementation:
+
+```text
+M0 rollout has started with provider-neutral readiness:
+- getProvidersReadiness validates selected storage provider config through StorageService.checkReadiness.
+- platform health can report env-backed local/S3/R2/MinIO storage readiness even before a ProviderConfig row exists.
+- tenant onboarding file_storage is computed from real storage readiness.
+- readiness response surfaces provider, bucket, endpoint, forcePathStyle, and signed URL TTL metadata without secrets.
 ```
 
 ---
@@ -129,6 +141,8 @@ Required behavior:
 Remaining implementation alignment:
 
 ```text
+- generated student PDFs now ignore adapter publicUrl values, persist protected SchoolOS API routes, and mark their File Registry asset as uploaded after storage succeeds
+- student profile sanitization continues to remove raw object keys, public URLs, generated PDF URLs, and storage object keys before controller responses
 - storage-backed student photo/document staging verification
 - ID-card QR PDF behavior verification
 - student photo/logo upload UX polish
@@ -142,6 +156,16 @@ Tests:
 - cross-tenant student document denial
 - revoked/deleted document cannot be previewed
 - ID card generation does not use raw public cloud URL
+```
+
+Started implementation:
+
+```text
+M1 rollout has started with generated student document hardening:
+- generateStudentDocumentPdf stores generated PDFs through StorageService and FileRegistryService.
+- pdfUrl is now the protected `/api/v1/students/:id/documents/:kind.pdf` route, never an adapter public URL.
+- generated FileAsset records are marked uploaded after successful storage.
+- focused M1 service/sanitizer/photo/document-access tests passed.
 ```
 
 ---

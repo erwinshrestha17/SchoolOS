@@ -523,7 +523,10 @@ export class PlatformController {
     @Param('invoiceId') invoiceId: string,
     @Req() req: AuthenticatedRequest,
   ) {
-    return this.platformService.issueSaaSInvoice(invoiceId, this.requireUser(req));
+    return this.platformService.issueSaaSInvoice(
+      invoiceId,
+      this.requireUser(req),
+    );
   }
 
   @Post('billing/invoices/:invoiceId/payments')
@@ -546,7 +549,10 @@ export class PlatformController {
     @Param('invoiceId') invoiceId: string,
     @Req() req: AuthenticatedRequest,
   ) {
-    return this.platformService.markInvoiceOverdue(invoiceId, this.requireUser(req));
+    return this.platformService.markInvoiceOverdue(
+      invoiceId,
+      this.requireUser(req),
+    );
   }
 
   @Post('billing/invoices/:invoiceId/cancel')
@@ -626,15 +632,18 @@ export class PlatformController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.platformService.exportAuditLogsCsv({
-      tenantId,
-      action,
-      userId: actorId ?? userId,
-      resource,
-      resourceId,
-      startDate,
-      endDate,
-    }, this.requireUser(req));
+    return this.platformService.exportAuditLogsCsv(
+      {
+        tenantId,
+        action,
+        userId: actorId ?? userId,
+        resource,
+        resourceId,
+        startDate,
+        endDate,
+      },
+      this.requireUser(req),
+    );
   }
 
   private requireUser(req: AuthenticatedRequest) {

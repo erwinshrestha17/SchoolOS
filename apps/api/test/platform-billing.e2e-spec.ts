@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  INestApplication,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { PlatformService } from '../src/platform/platform.service';
@@ -95,12 +99,16 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
       expect(invoice.amount).toBe('10000.00');
 
       // 2. Issue the invoice
-      const issued = await platformService.issueSaaSInvoice(invoice.id, 'admin-user');
+      const issued = await platformService.issueSaaSInvoice(
+        invoice.id,
+        'admin-user',
+      );
       expect(issued.status).toBe('ISSUED');
 
       // Verify audit logged for saas_invoice_issued
       const issueAudit = prisma.__state.auditLogs.find(
-        (log) => log.action === 'saas_invoice_issued' && log.resourceId === invoice.id,
+        (log) =>
+          log.action === 'saas_invoice_issued' && log.resourceId === invoice.id,
       );
       expect(issueAudit).toBeDefined();
 
@@ -123,7 +131,9 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
 
       // Verify audit logged for saas_payment_recorded
       const paymentAudit = prisma.__state.auditLogs.find(
-        (log) => log.action === 'saas_payment_recorded' && log.resourceId === invoice.id,
+        (log) =>
+          log.action === 'saas_payment_recorded' &&
+          log.resourceId === invoice.id,
       );
       expect(paymentAudit).toBeDefined();
     });
@@ -160,7 +170,10 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
       );
 
       // 3. Mark overdue
-      const overdue = await platformService.markInvoiceOverdue(invoice.id, 'admin-user');
+      const overdue = await platformService.markInvoiceOverdue(
+        invoice.id,
+        'admin-user',
+      );
       expect(overdue.status).toBe('OVERDUE');
 
       // Verify subscription status updated to GRACE
@@ -188,10 +201,16 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
       });
 
       // 2. Suspend tenant
-      await platformService.suspendTenantForBilling(tenantId, 'Unpaid balance for overdue invoice', 'admin-user');
+      await platformService.suspendTenantForBilling(
+        tenantId,
+        'Unpaid balance for overdue invoice',
+        'admin-user',
+      );
 
       // Verify tenant is inactive
-      const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+      });
       expect(tenant.isActive).toBe(false);
 
       // Verify subscription is suspended
@@ -206,7 +225,9 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
       );
       expect(suspendAudit).toBeDefined();
       if (suspendAudit) {
-        expect((suspendAudit.after as any)?.reason).toBe('Unpaid balance for overdue invoice');
+        expect((suspendAudit.after as any)?.reason).toBe(
+          'Unpaid balance for overdue invoice',
+        );
       }
     });
 
@@ -226,10 +247,16 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
       });
 
       // 2. Reactivate tenant
-      await platformService.reactivateTenantAfterPayment(tenantId, 'Payment received for past due invoice', 'admin-user');
+      await platformService.reactivateTenantAfterPayment(
+        tenantId,
+        'Payment received for past due invoice',
+        'admin-user',
+      );
 
       // Verify tenant is active
-      const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+      });
       expect(tenant.isActive).toBe(true);
 
       // Verify subscription is active
@@ -244,7 +271,9 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
       );
       expect(reactivateAudit).toBeDefined();
       if (reactivateAudit) {
-        expect((reactivateAudit.after as any)?.reason).toBe('Payment received for past due invoice');
+        expect((reactivateAudit.after as any)?.reason).toBe(
+          'Payment received for past due invoice',
+        );
       }
     });
 
@@ -452,7 +481,10 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
         data: { isActive: false },
       });
 
-      const res = await plansService.checkFeatureEnabled(tenantId, 'module.students');
+      const res = await plansService.checkFeatureEnabled(
+        tenantId,
+        'module.students',
+      );
       expect(res.allowed).toBe(false);
       expect(res.reason).toBe('tenant_inactive');
       expect(res.message).toContain('school account is currently suspended');
@@ -478,7 +510,10 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
         },
       });
 
-      const res = await plansService.checkFeatureEnabled(tenantId, 'module.library');
+      const res = await plansService.checkFeatureEnabled(
+        tenantId,
+        'module.library',
+      );
       expect(res.allowed).toBe(true);
     });
 
@@ -592,7 +627,9 @@ describe('M0 SaaS Billing & Entitlements & Observability (E2E)', () => {
       });
 
       const csv = await platformService.exportAuditLogsCsv({}, 'admin-user');
-      expect(csv).toContain('ID,Timestamp,Action,Resource,Resource ID,Tenant ID');
+      expect(csv).toContain(
+        'ID,Timestamp,Action,Resource,Resource ID,Tenant ID',
+      );
       expect(csv).toContain('tenant_suspended');
       expect(csv).not.toContain('dont-leak-me');
 

@@ -2548,9 +2548,10 @@ export class StudentsService {
       contentType: 'application/pdf',
       content: pdf,
     });
-    const pdfUrl =
-      stored.publicUrl ??
-      `/api/v1/students/${student.id}/documents/${normalizedKind}.pdf`;
+    const pdfUrl = `/api/v1/students/${encodeURIComponent(
+      student.id,
+    )}/documents/${encodeURIComponent(normalizedKind)}.pdf`;
+    let generatedFileAssetId: string | null = null;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.generatedStudentDocument.updateMany({
@@ -2605,7 +2606,7 @@ export class StudentsService {
         },
       });
 
-      await this.fileRegistryService.registerFile({
+      const generatedFileAsset = await this.fileRegistryService.registerFile({
         tenantId: actor.tenantId,
         uploadedByUserId: actor.userId,
         originalFilename: fileName,
@@ -2621,7 +2622,16 @@ export class StudentsService {
           version,
         },
       });
+      generatedFileAssetId = generatedFileAsset.id;
     });
+
+    if (generatedFileAssetId) {
+      await this.fileRegistryService.markUploaded(
+        actor.tenantId,
+        generatedFileAssetId,
+        actor.userId,
+      );
+    }
 
     await this.auditService.record({
       action: 'generate',
