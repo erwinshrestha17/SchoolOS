@@ -61,6 +61,8 @@ import type {
   PlatformAuditLog,
   PlatformDashboardSummary,
   PlatformPlanSummary,
+  PlatformApiKeyCreated,
+  PlatformApiKeySummary,
   PlatformProviderConfigSummary,
   PlatformProviderReadinessDetail,
   PlatformQueueSummary,
@@ -2073,6 +2075,20 @@ export const api = {
   ) =>
     request<PlatformSaaSInvoiceSummary>(
       `/platform/tenants/${encodeURIComponent(tenantId)}/saas-invoices/${encodeURIComponent(invoiceId)}/cancel`,
+      { method: 'POST', json: body },
+    ),
+  listPlatformApiKeys: (tenantId: string) =>
+    request<PlatformApiKeySummary[]>(
+      `/platform/tenants/${encodeURIComponent(tenantId)}/api-keys`,
+    ),
+  createPlatformApiKey: (tenantId: string, body: JsonBody) =>
+    request<PlatformApiKeyCreated>(
+      `/platform/tenants/${encodeURIComponent(tenantId)}/api-keys`,
+      { method: 'POST', json: body },
+    ),
+  revokePlatformApiKey: (tenantId: string, apiKeyId: string, body: JsonBody) =>
+    request<PlatformApiKeySummary>(
+      `/platform/tenants/${encodeURIComponent(tenantId)}/api-keys/${encodeURIComponent(apiKeyId)}/revoke`,
       { method: 'POST', json: body },
     ),
   listPlatformProviders: () =>

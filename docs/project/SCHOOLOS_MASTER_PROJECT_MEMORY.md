@@ -160,6 +160,7 @@ Implemented M0 capabilities:
 - Manual tenant billing profile.
 - SaaS invoices, invoice lines, payments, and cancellation rules.
 - Provider config masking and secret-safe response shape.
+- Tenant-scoped platform API key management with server-generated one-time secrets, SHA-256 hashed storage, masked metadata responses, revoke flow, and audit records.
 - Provider readiness detail API with dry-run validation, disabled-mode warnings, masked secret reporting, and S3-compatible object-storage readiness checks without paid external calls by default.
 - Shared storage service now uses a provider-neutral adapter contract with normalized local/s3/r2/minio/gcp config, local and S3-compatible adapters, backward-compatible R2 env aliases, private-by-default writes, and short-lived signed URL helpers while keeping provider secrets out of API responses.
 - Queue health, failed-job detail inspection, sanitized payload visibility, stack/timing detail, retry audit history, and audited retry endpoint.
@@ -185,6 +186,7 @@ TenantBillingProfile
 SaaSInvoice
 SaaSInvoiceLine
 SaaSPayment
+PlatformApiKey
 ProviderConfig
 ReportExport
 TenantOnboardingChecklistOverride
@@ -193,9 +195,9 @@ TenantOnboardingChecklistOverride
 M0 permission, audit, and security notes:
 
 ```text
-- Granular platform permissions exist for dashboard, tenants, plans, subscriptions, usage, billing, providers, queues, audit, health, reports, and onboarding.
+- Granular platform permissions exist for dashboard, tenants, plans, subscriptions, usage, billing, providers, API keys, queues, audit, health, reports, and onboarding.
 - Feature keys and usage keys are exposed through platform APIs.
-- Platform actions affecting tenants, plans, subscriptions, overrides, billing, providers, queues, exports, and onboarding are audited.
+- Platform actions affecting tenants, plans, subscriptions, overrides, billing, providers, API keys, queues, exports, and onboarding are audited.
 - Reason fields are required where tenant-impacting actions need accountability.
 - Provider secrets must never be returned raw.
 - Queue retry actions must be permission-guarded and audited.
@@ -227,6 +229,7 @@ Current M0 pilot-hardening snapshot:
 ```text
 Implemented:
 - Provider readiness detail and dry-run validation.
+- Tenant API key create/list/revoke backend endpoints with hashed secrets and safe summaries.
 - Object-storage readiness checks for normalized local/S3/MinIO/R2-style provider configuration without unsafe external calls by default.
 - M0 storage readiness now starts from normalized StorageService config and no longer requires a legacy ProviderConfig row to report env-backed readiness.
 - Queue failed-job detail with sanitized payload, failure metadata, stack trace, and retry audit history.
@@ -236,10 +239,11 @@ Verified:
 - Targeted platform API tests passed.
 - Web contract tests passed.
 - Storage Sprint 1 passed pnpm db:generate, pnpm db:validate, pnpm verify:openapi, pnpm lint, pnpm typecheck, and pnpm test.
+- API-key M0 slice passed pnpm db:generate, pnpm db:validate, pnpm verify:openapi, focused platform tests, pnpm lint, pnpm typecheck, pnpm test, and pnpm build.
 
 Blocked:
 - Current storage rollout pnpm test:e2e is blocked by existing non-storage e2e failures: SaaS invoice Decimal string formatting, finance/M9 suspended-tenant setup, and missing student lifecycle tenant fixture.
-- pnpm build and pnpm verify:production were not rerun after the failed e2e gate.
+- pnpm verify:production is still blocked at pnpm test:e2e by existing non-API-key e2e failures: SaaS invoice Decimal string formatting, finance/M9 suspended-tenant setup, and missing student lifecycle tenant fixture.
 - pnpm smoke:phase1 still requires local Postgres, Redis, API, and web services.
 ```
 
@@ -251,6 +255,8 @@ Remaining M0 hardening work:
 - Demo Nepal tenant seed expansion.
 - Credentialed web E2E coverage where seeded credentials are available.
 - Platform/school route denial browser tests.
+- API key management UI and browser regression coverage.
+- Webhook system: endpoint registry, signed delivery, retries, and delivery audit history.
 - SaaS billing lifecycle tests: invoice -> payment -> overdue/cancel/suspend.
 - Entitlement enforcement tests against real school APIs.
 - Object storage readiness verification against explicit staging provider.

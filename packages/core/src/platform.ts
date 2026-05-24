@@ -168,6 +168,26 @@ export type PlatformSaaSInvoiceSummary = {
   }>;
 };
 
+export type PlatformApiKeySummary = {
+  id: string;
+  tenantId: string;
+  name: string;
+  prefix: string;
+  keyPreview: string;
+  scopes: string[];
+  status: 'ACTIVE' | 'REVOKED';
+  expiresAt?: string | null;
+  lastUsedAt?: string | null;
+  revokedAt?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PlatformApiKeyCreated = PlatformApiKeySummary & {
+  secret: string;
+};
+
 export type PlatformProviderConfigSummary = {
   id: string;
   type: string;

@@ -35,7 +35,7 @@ Current delivery stage:
 Phase 0 completed
 Phase 1A completed / pilot-ready
 Phase 1B completed / pilot-ready
-M0 Platform Core Foundation Depth completed with provider/queue pilot hardening
+M0 Platform Core Foundation Depth completed with provider/queue/API-key pilot hardening
 M10 Communication/provider/attachment depth implemented for admin web scope
 Phase 2A M4 Academics backend/admin UI completed
 Phase 2 Academics production polish completed
@@ -43,7 +43,7 @@ Student QR Foundation implemented / release hardening remains
 Phase 2D M9 Accounting completed
 Phase 2 Accounting production polish completed
 SchoolOS Flutter mobile app started in apps/schoolos_mobile with auth/API wiring underway
-Current stage: M0 platform foundation complete with provider readiness, queue failed-job detail hardening, and cloud-agnostic storage adapter/config Sprint 1 implemented + M10 provider/attachment/retry hardening + M6/M7/M8A/M8C/M8B focused feature-depth hardening + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented + mobile companion app foundation started
+Current stage: M0 platform foundation complete with provider readiness, queue failed-job detail hardening, tenant-scoped API key management, and cloud-agnostic storage adapter/config Sprint 1 implemented + M10 provider/attachment/retry hardening + M6/M7/M8A/M8C/M8B focused feature-depth hardening + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented + mobile companion app foundation started
 ```
 
 Targeted web-admin polish and Phase2F smoke coverage have been completed. The latest feature-depth pass hardened M10 notifications/attachments, M6 homework parent/student scoping, M7 payroll reporting, M8A library fine/accounting tests, M8C POS/wallet receipts plus supplier/inventory item admin surfaces, and M8B GPS pressure/retention guards. Next focus is staging smoke/manual QA and remaining controlled-pilot reliability work in `docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`.
@@ -97,7 +97,7 @@ Implemented or registered backend foundations now include:
 
 - Auth/RBAC/Tenant Isolation
 - Mobile API foundation: bearer-token auth, refresh-token storage, tenant slug login, and role-aware Flutter shell in `apps/schoolos_mobile`
-- M0 Platform Core: platform tenant control, tenant settings, file registry, reports, usage service, plan service foundations, provider readiness detail, queue failed-job detail, and retry audit history
+- M0 Platform Core: platform tenant control, tenant settings, file registry, reports, usage service, plan service foundations, provider readiness detail, queue failed-job detail, retry audit history, and tenant-scoped API key management with hashed secrets
 - M0 Storage Foundation: provider-neutral StorageAdapter contract, normalized local/s3/r2/minio/gcp config, R2 alias compatibility, local and S3-compatible adapters, private-by-default writes, and M0 readiness wired to normalized storage config
 - M1 Admissions & Student Profiles, including student photos/documents through File Registry and generated student PDFs stored behind protected SchoolOS API routes instead of adapter public URLs
 - M2 Smart Attendance

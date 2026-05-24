@@ -15,6 +15,7 @@ import {
 import { PlatformService } from './platform.service';
 import { PlatformQueuesService } from './platform-queues.service';
 import { PlatformReportExportsService } from './platform-report-exports.service';
+import { PlatformApiKeysService } from './platform-api-keys.service';
 import { PlatformGuard } from '../auth/guards/platform.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/auth-request.interface';
@@ -33,10 +34,12 @@ import { UpdatePlatformTenantStatusDto } from './dto/update-platform-tenant-stat
 import {
   AssignTenantSubscriptionDto,
   CancelSaaSInvoiceDto,
+  CreatePlatformApiKeyDto,
   CreatePlatformPlanDto,
   CreateSaaSInvoiceDto,
   OnboardingOverrideDto,
   RecordSaaSPaymentDto,
+  RevokePlatformApiKeyDto,
   RetryFailedJobDto,
   TenantFeatureOverrideDto,
   UpdateBillingProfileDto,
@@ -52,6 +55,7 @@ export class PlatformController {
     private readonly platformService: PlatformService,
     private readonly platformQueuesService: PlatformQueuesService,
     private readonly platformReportExportsService: PlatformReportExportsService,
+    private readonly platformApiKeysService: PlatformApiKeysService,
   ) {}
 
   @Get('dashboard')
@@ -287,6 +291,42 @@ export class PlatformController {
     return this.platformService.cancelSaaSInvoice(
       tenantId,
       invoiceId,
+      body,
+      this.requireUser(req),
+    );
+  }
+
+  @Get('tenants/:tenantId/api-keys')
+  @Permissions('platform:api-keys:read')
+  async listApiKeys(@Param('tenantId') tenantId: string) {
+    return this.platformApiKeysService.listApiKeys(tenantId);
+  }
+
+  @Post('tenants/:tenantId/api-keys')
+  @Permissions('platform:api-keys:manage')
+  async createApiKey(
+    @Param('tenantId') tenantId: string,
+    @Body() body: CreatePlatformApiKeyDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformApiKeysService.createApiKey(
+      tenantId,
+      body,
+      this.requireUser(req),
+    );
+  }
+
+  @Post('tenants/:tenantId/api-keys/:apiKeyId/revoke')
+  @Permissions('platform:api-keys:manage')
+  async revokeApiKey(
+    @Param('tenantId') tenantId: string,
+    @Param('apiKeyId') apiKeyId: string,
+    @Body() body: RevokePlatformApiKeyDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformApiKeysService.revokeApiKey(
+      tenantId,
+      apiKeyId,
       body,
       this.requireUser(req),
     );

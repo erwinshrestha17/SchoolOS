@@ -4,6 +4,7 @@ import { PlatformController } from './platform.controller';
 import { PlatformService } from './platform.service';
 import { PlatformQueuesService } from './platform-queues.service';
 import { PlatformReportExportsService } from './platform-report-exports.service';
+import { PlatformApiKeysService } from './platform-api-keys.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
@@ -36,12 +37,14 @@ import { PlatformBillingLifecycleService } from './platform-billing-lifecycle.se
     PlatformService,
     PlatformQueuesService,
     PlatformReportExportsService,
+    PlatformApiKeysService,
     PlatformBillingLifecycleService,
   ],
   exports: [
     PlatformService,
     PlatformQueuesService,
     PlatformReportExportsService,
+    PlatformApiKeysService,
   ],
 })
 export class PlatformModule {}

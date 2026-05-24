@@ -111,6 +111,7 @@ M0 rollout has started with provider-neutral readiness:
 - platform health can report env-backed local/S3/R2/MinIO storage readiness even before a ProviderConfig row exists.
 - tenant onboarding file_storage is computed from real storage readiness.
 - readiness response surfaces provider, bucket, endpoint, forcePathStyle, and signed URL TTL metadata without secrets.
+- parallel M0 platform core hardening now includes tenant API key management; API key secrets are hashed and not part of storage/provider responses.
 ```
 
 ---

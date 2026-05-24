@@ -43,7 +43,7 @@ Important working-tree note:
 
 ```text
 Phase Gate 0 verification was green before M0 and feature-depth work started.
-M0 provider/queue pilot hardening and M10/M6/M7/M8A/M8C/M8B feature-depth hardening have now been implemented and verified through build during their sprint gates.
+M0 provider/queue/API-key pilot hardening and M10/M6/M7/M8A/M8C/M8B feature-depth hardening have now been implemented and verified through build during their sprint gates.
 M0/File Registry storage hardening now includes a provider-neutral `StorageAdapter` contract, normalized local/s3/r2/minio/gcp config, backward-compatible R2 aliases, private-by-default object writes, short-lived signed URL helpers, and StorageService delegation through local and S3-compatible adapters. M0 platform storage readiness has started using the normalized config; staging bucket verification remains environment-gated.
 `pnpm verify:production` must be rerun in local/staging if the current sandbox blocks browser E2E local-port binding.
 `pnpm smoke:phase1` still requires local Postgres, Redis, API, and web services.
@@ -124,6 +124,7 @@ Implemented:
 - Reason-required tenant suspend/activate behavior.
 - Plans, features, tenant subscriptions, feature overrides, usage limits/counters.
 - SaaS billing records: profiles, invoices, invoice lines, payments.
+- Tenant-scoped platform API key management with generated one-time secrets, SHA-256 hashed storage, masked list responses, revoke flow, and audit records.
 - Provider configuration masking.
 - Provider readiness detail API with dry-run validation, masked secrets, disabled-mode warnings, and S3-compatible object-storage readiness checks without paid external calls by default.
 - Env-backed cloud-agnostic storage adapter boundary for local, R2, S3, and MinIO-compatible providers, with fail-closed config checks and R2 alias compatibility.
@@ -134,6 +135,7 @@ Implemented:
 Remaining backend:
 
 - SaaS billing lifecycle automation beyond records.
+- Webhook endpoint registry and signed outbound/inbound webhook delivery history.
 - Entitlement enforcement tests against real school APIs.
 - Object-storage readiness verification against an explicit staging provider.
 - File Registry signed read/download/upload API hardening after adapter rollout.
@@ -145,6 +147,7 @@ Remaining frontend:
 - Platform tenant-action manual QA.
 - Broader browser coverage for queue/provider failure detail surfaces.
 - Browser coverage for suspend/activate, overrides, billing, providers, and queue retry.
+- API key management UI and browser regression coverage.
 
 ### M1 - Admissions & Student Profiles
 

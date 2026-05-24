@@ -974,6 +974,16 @@ export const PERMISSION_CATALOG: PermissionDefinition[] = [
     description: 'Update platform provider configuration',
   },
   {
+    resource: 'platform:api-keys',
+    action: 'read',
+    description: 'Read tenant API key metadata',
+  },
+  {
+    resource: 'platform:api-keys',
+    action: 'manage',
+    description: 'Create and revoke tenant API keys',
+  },
+  {
     resource: 'platform:queues',
     action: 'read',
     description: 'Read platform queue health',
@@ -1065,6 +1075,8 @@ const PLATFORM_PERMISSION_KEYS = [
   'platform:billing:manage',
   'platform:providers:read',
   'platform:providers:manage',
+  'platform:api-keys:read',
+  'platform:api-keys:manage',
   'platform:queues:read',
   'platform:queues:retry',
   'platform:queues:manage',

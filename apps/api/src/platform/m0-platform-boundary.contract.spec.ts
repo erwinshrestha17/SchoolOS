@@ -61,6 +61,7 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
           expect(rolePermissions).not.toContain('platform:tenants:status');
           expect(rolePermissions).not.toContain('platform:billing:manage');
           expect(rolePermissions).not.toContain('platform:providers:manage');
+          expect(rolePermissions).not.toContain('platform:api-keys:manage');
           expect(rolePermissions).not.toContain('platform:queues:retry');
         }
       }
@@ -151,6 +152,7 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
       expect(billingPermissions).toContain('platform:billing:manage');
       expect(billingPermissions).toContain('platform:subscriptions:manage');
       expect(billingPermissions).not.toContain('platform:providers:manage');
+      expect(billingPermissions).not.toContain('platform:api-keys:manage');
       expect(billingPermissions).not.toContain('platform:queues:retry');
     });
   });
@@ -211,6 +213,13 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
     it('provider config changes are audited', () => {
       const service = read('src/platform/platform.service.ts');
       expect(service).toContain('provider_config_updated');
+    });
+
+    it('API key lifecycle actions are audited and tenant-scoped', () => {
+      const service = read('src/platform/platform-api-keys.service.ts');
+      expect(service).toContain('platform_api_key_created');
+      expect(service).toContain('platform_api_key_revoked');
+      expect(service).toContain('where: { id: apiKeyId, tenantId }');
     });
   });
 

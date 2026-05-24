@@ -461,6 +461,7 @@ provider-specific signed URL generation
 [x] Sprint 1A: Refactor StorageService to delegate to LocalStorageAdapter and S3CompatibleStorageAdapter.
 [x] Sprint 1B: Add normalized local/s3/r2/minio/gcp config with backward-compatible R2 aliases.
 [x] Sprint 1C: Start M0 readiness rollout by wiring platform storage readiness to normalized config without paid external calls.
+[x] M0 parallel hardening note: tenant API key management now stores only hashed secrets and keeps provider/storage secrets out of platform responses.
 [ ] Sprint 2: File Registry signed read/download/upload API hardening.
 [~] Sprint 3: M1/M5/M10 high-value media/document migration. M1 generated student PDFs now use protected API routes and uploaded File Registry assets; remaining M1 staging/manual checks, M5, and M10 remain.
 [ ] Sprint 4: M3/M4/M7/M9 generated PDF/report snapshot migration.

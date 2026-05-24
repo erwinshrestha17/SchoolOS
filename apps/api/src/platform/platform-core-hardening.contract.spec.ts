@@ -20,6 +20,8 @@ describe('M0 Platform Core hardening contracts', () => {
       "@Permissions('platform:tenants:status')",
       "@Permissions('platform:billing:read')",
       "@Permissions('platform:billing:manage')",
+      "@Permissions('platform:api-keys:read')",
+      "@Permissions('platform:api-keys:manage')",
       "@Permissions('platform:providers:read')",
       "@Permissions('platform:providers:manage')",
       "@Permissions('platform:queues:read')",
@@ -83,6 +85,29 @@ describe('M0 Platform Core hardening contracts', () => {
     expect(service).toContain('saas_payment_recorded');
     expect(service).toContain('saas_invoice_cancelled');
     expect(service).not.toContain('AccountingPostingService');
+  });
+
+  it('keeps tenant API key management hashed, tenant-scoped, and audited', () => {
+    const controller = read('src/platform/platform.controller.ts');
+    const service = read('src/platform/platform-api-keys.service.ts');
+    const schema = read('prisma/schema.prisma');
+
+    expect(schema).toContain('model PlatformApiKey');
+    expect(schema).toContain('keyHash');
+    expect(schema).toContain('@@index([tenantId, status])');
+    expect(controller).toContain("@Get('tenants/:tenantId/api-keys')");
+    expect(controller).toContain("@Post('tenants/:tenantId/api-keys')");
+    expect(controller).toContain(
+      "@Post('tenants/:tenantId/api-keys/:apiKeyId/revoke')",
+    );
+    expect(controller).toContain("@Permissions('platform:api-keys:read')");
+    expect(controller).toContain("@Permissions('platform:api-keys:manage')");
+    expect(service).toContain('createHash');
+    expect(service).toContain('keyHash: this.hashSecret(secret)');
+    expect(service).toContain('select: this.safeSelect()');
+    expect(service).toContain('where: { id: apiKeyId, tenantId }');
+    expect(service).toContain('platform_api_key_created');
+    expect(service).toContain('platform_api_key_revoked');
   });
 
   it('keeps provider config responses masked and provider changes audited', () => {

@@ -12,6 +12,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  Matches,
   Min,
   MinLength,
   ValidateNested,
@@ -276,6 +277,29 @@ export class RecordSaaSPaymentDto {
 }
 
 export class CancelSaaSInvoiceDto {
+  @IsString()
+  @MinLength(5)
+  reason!: string;
+}
+
+export class CreatePlatformApiKeyDto {
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(3)
+  name!: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @Matches(/^[a-z][a-z0-9:._-]{1,80}$/i, { each: true })
+  scopes?: string[];
+
+  @IsOptional()
+  @IsDateString()
+  expiresAt?: string;
+}
+
+export class RevokePlatformApiKeyDto {
   @IsString()
   @MinLength(5)
   reason!: string;

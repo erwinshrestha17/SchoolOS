@@ -713,6 +713,11 @@ enum SaaSPaymentMethod {
   OTHER
 }
 
+enum PlatformApiKeyStatus {
+  ACTIVE
+  REVOKED
+}
+
 enum ProviderType {
   SMS
   EMAIL
@@ -882,6 +887,7 @@ model Tenant {
   billingProfile                TenantBillingProfile?
   saasInvoices                  SaaSInvoice[]
   saasPayments                  SaaSPayment[]
+  platformApiKeys               PlatformApiKey[]
   reportExports                 ReportExport[]
   onboardingOverrides           TenantOnboardingChecklistOverride[]
   studentMergeHistory           StudentMergeHistory[]
@@ -1280,6 +1286,31 @@ model SaaSPayment {
 
   @@index([tenantId, paymentDate])
   @@index([invoiceId])
+}
+
+model PlatformApiKey {
+  id           String               @id @default(uuid())
+  tenantId     String
+  name         String
+  prefix       String               @unique
+  keyHash      String               @unique
+  keySuffix    String
+  scopes       String[]             @default([])
+  status       PlatformApiKeyStatus @default(ACTIVE)
+  expiresAt    DateTime?
+  lastUsedAt   DateTime?
+  revokedAt    DateTime?
+  revokedBy    String?
+  revokeReason String?
+  createdBy    String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([expiresAt])
 }
 
 model ProviderConfig {
