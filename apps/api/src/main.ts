@@ -32,9 +32,26 @@ async function bootstrap() {
 
   app.enableCors({
     origin: (origin, callback) => {
-      if (!origin || configService.frontendOrigins.includes(origin)) {
+      if (!origin) {
         callback(null, true);
         return;
+      }
+
+      if (configService.frontendOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      if (!configService.isProduction) {
+        const isLocal =
+          origin.startsWith('http://localhost:') ||
+          origin === 'http://localhost' ||
+          origin.startsWith('http://127.0.0.1:') ||
+          origin === 'http://127.0.0.1';
+        if (isLocal) {
+          callback(null, true);
+          return;
+        }
       }
 
       callback(new Error(`Origin ${origin} is not allowed by CORS`), false);

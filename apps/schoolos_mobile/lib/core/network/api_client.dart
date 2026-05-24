@@ -24,6 +24,7 @@ class ApiClient {
     );
 
     _dio.interceptors.addAll([
+      _envelopeInterceptor(),
       _authInterceptor(),
       TokenRefreshInterceptor(
         tokenStorage: tokenStorage,
@@ -40,6 +41,21 @@ class ApiClient {
   void Function()? onSessionExpired;
 
   Dio get dio => _dio;
+
+  /// Interceptor to unwrap standard NestJS response envelope
+  Interceptor _envelopeInterceptor() {
+    return InterceptorsWrapper(
+      onResponse: (response, handler) {
+        final data = response.data;
+        if (data is Map<String, dynamic> &&
+            data.containsKey('success') &&
+            data.containsKey('data')) {
+          response.data = data['data'];
+        }
+        return handler.next(response);
+      },
+    );
+  }
 
   /// GET Request
   Future<Response<T>> get<T>(

@@ -43,9 +43,13 @@ class TokenRefreshInterceptor extends Interceptor {
         data: {'refreshToken': refreshToken},
       );
 
-      final tokenPair = TokenPair.fromJson(
-        response.data as Map<String, dynamic>,
-      );
+      final responseMap = response.data as Map<String, dynamic>;
+      final unwrappedData = responseMap.containsKey('success') &&
+              responseMap.containsKey('data')
+          ? responseMap['data'] as Map<String, dynamic>
+          : responseMap;
+
+      final tokenPair = TokenPair.fromJson(unwrappedData);
 
       // 2. Persist new tokens
       await tokenStorage.saveAccessToken(tokenPair.accessToken);

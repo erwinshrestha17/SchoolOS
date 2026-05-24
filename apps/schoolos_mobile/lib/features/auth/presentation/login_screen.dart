@@ -21,11 +21,11 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _tenantController = TextEditingController(text: 'holyland');
-  final _emailController = TextEditingController(text: 'demo@school.edu.np');
-  final _passwordController = TextEditingController(text: 'password123');
+  final _tenantController = TextEditingController(text: 'default-school');
+  final _emailController = TextEditingController(text: 'admin@schoolos.com');
+  final _passwordController = TextEditingController(text: 'admin123');
 
-  String _selectedRole = 'PARENT';
+  String _selectedRole = 'ADMIN';
 
   final List<Map<String, dynamic>> _rolesList = [
     {
