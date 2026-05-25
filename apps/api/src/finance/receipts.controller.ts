@@ -16,12 +16,16 @@ import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { FinanceService } from './finance.service';
 import { ReprintReceiptDto } from './dto/reprint-receipt.dto';
+import { FinanceCompatService } from './finance-compat.service';
 
 @Controller('receipts')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
 @Entitlement('module.fees')
 export class ReceiptsController {
-  constructor(private readonly financeService: FinanceService) {}
+  constructor(
+    private readonly financeService: FinanceService,
+    private readonly financeCompatService: FinanceCompatService,
+  ) {}
 
   @Get()
   @Permissions('receipts:read')
@@ -60,6 +64,15 @@ export class ReceiptsController {
       type: 'application/pdf',
       disposition: `attachment; filename="${safePdfFileName(fileName)}"`,
     });
+  }
+
+  @Get(':id/reprint-history')
+  @Permissions('receipts:manage')
+  getReceiptReprintHistory(
+    @Param('id') receiptId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeCompatService.getReceiptReprintHistory(receiptId, auth);
   }
 }
 

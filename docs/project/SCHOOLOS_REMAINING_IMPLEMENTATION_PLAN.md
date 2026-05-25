@@ -1,6 +1,6 @@
 # SchoolOS Remaining Implementation Plan
 
-**Last updated:** 2026-05-18
+**Last updated:** 2026-05-25
 
 **Status source:** `docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md` and `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md`
 
@@ -79,7 +79,7 @@ Biometric workflows
 | M0 Platform Core | Foundation complete with provider/queue pilot hardening; broader pilot hardening remains | 85-90% |
 | M1 Admissions & Student Profiles | Pilot-ready plus Student QR foundation | 90-95% |
 | M2 Smart Attendance | Pilot-ready | 85-90% |
-| M3 Fees & Receipts | Pilot-ready | 85-90% |
+| M3 Fees & Receipts | Pilot-ready plus focused finance hardening slice | 90-95% |
 | M4 Academics / Exams / CAS / Report Cards | Completed / Pilot-Ready | 100% |
 | M5 Activity Feed & Milestones | Strong Phase 1 foundation | 75-85% |
 | M6 Homework & Timetable | Completed / Pilot-Ready | 100% |
@@ -188,18 +188,19 @@ Implemented:
 - Monthly/history analytics and exports.
 - Teacher-scope and correction/sync tests.
 - Attendance daily and register routes.
+- M2 hardening slice: correction requests now persist previous status and reason-required review metadata, correction lists are paginated, teacher lock-window failures use the school-friendly correction message, parent/student attendance access checks correctly honor guardian-owned children, attendance register exports register generated artifacts through File Registry when available, and the web attendance form has tenant/user/class/date-scoped local draft recovery plus sync/conflict states.
 
 Remaining backend:
 
-- True offline draft persistence hardening.
-- Attendance report/export stabilization.
-- Parent attendance summary API later.
+- Broader attendance report/export staging verification against real object storage.
+- Parent/mobile attendance summary route polish outside the current admin dashboard.
+- More service-level permission tests for correction approval/rejection, guardian denial, and tenant isolation.
 
 Remaining frontend:
 
-- Offline/slow-network attendance UX.
-- Correction request polish.
+- Correction request/admin review workspace polish.
 - Parent attendance view later.
+- Browser/manual QA for offline reload recovery and reconnect conflict choices.
 
 ### M3 - Fees & Receipts
 
@@ -209,19 +210,20 @@ Implemented:
 - Payments, receipts, refunds/reversals, cashier close.
 - Student fee ledger, dues/report foundations, M9 consistency coverage.
 - Fees/finance collection and ledger UI foundations.
+- M3 hardening slice: receipt reprints now record payment/student/File Registry metadata and list latest reprint history, reversal paths require service-level permission and reason, already-reversed and closed-cashier-day reversals are blocked with school-friendly messages, cashier close uses a deterministic duplicate-protection key, reconciliation summaries include payment-method rollups and registered CSV artifacts, and gateway readiness exposes disabled/configured status without fake payment collection.
 
 Remaining backend:
 
-- Online payment gateway readiness.
-- Receipt reprint history depth.
-- Payment reversal/correction test depth.
-- Cashier-close verification and export/PDF hardening.
+- Real online payment provider initiation/webhook implementation after provider config and settlement contracts are approved.
+- Broader receipt/report export PDF polish and staging File Registry verification.
+- More concurrent cashier-close race tests against a real database.
+- Full day-end close PDF report polish.
 
 Remaining frontend:
 
-- Fee-head/period dues table polish.
-- Gateway payment UX when backend is approved.
-- Finance reports/export polish.
+- More detailed fee-head/period dues table interactions in the main counter screen.
+- Gateway payment collection UX after backend provider integration is approved.
+- Finance reports/export polish beyond current receipt history, gateway-readiness notice, and reconciliation export foundations.
 
 ### M4 - Academics, Exams, CAS, Report Cards
 

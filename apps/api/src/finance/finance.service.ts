@@ -1,8 +1,10 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
@@ -30,6 +32,7 @@ import { UsageService } from '../usage/usage.service';
 import { buildSimplePdf, buildReceiptPdf } from '../common/pdf/simple-pdf';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { CashierCloseWindowDto } from './dto/cashier-close-window.dto';
 import { CollectPaymentDto } from './dto/collect-payment.dto';
 import { CreateCashierCloseDto } from './dto/create-cashier-close.dto';
@@ -140,6 +143,8 @@ export class FinanceService {
     private readonly accountingPostingService: AccountingPostingService,
     private readonly eventEmitter: EventEmitter2,
     private readonly usageService: UsageService,
+    @Optional()
+    private readonly fileRegistryService?: FileRegistryService,
   ) {}
 
   async reprintReceipt(
@@ -147,6 +152,15 @@ export class FinanceService {
     dto: ReprintReceiptDto,
     actor: AuthContext,
   ) {
+    assertFinancePermission(actor, 'receipts:manage');
+    const reason = dto.reason?.trim();
+
+    if (!reason) {
+      throw new BadRequestException(
+        'A reason is required to reprint this receipt.',
+      );
+    }
+
     const receipt = await this.prisma.receipt.findFirst({
       where: { id: receiptId, tenantId: actor.tenantId },
       include: {
@@ -175,29 +189,6 @@ export class FinanceService {
     const student = receipt.payment.student;
     const invoice = receipt.payment.invoice;
 
-    // Record reprint history
-    await this.prisma.receiptReprintHistory.create({
-      data: {
-        tenantId: actor.tenantId,
-        receiptId: receipt.id,
-        reprintedById: actor.userId,
-        reason: dto.reason,
-      },
-    });
-
-    await this.auditService.record({
-      action: 'reprint',
-      resource: 'receipt',
-      resourceId: receipt.id,
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-      after: {
-        reason: dto.reason,
-        receiptNumber: receipt.receiptNumber,
-      },
-    });
-
-    // Generate PDF with REPRINT marker
     const pdf = buildReceiptPdf({
       schoolName: school?.name || 'SchoolOS',
       panNumber: school?.panNumber,
@@ -223,14 +214,69 @@ export class FinanceService {
       balance: Number(invoice.totalAmount.sub(receipt.payment.amount)),
       isReprint: true,
     });
+    const fileName = `Receipt_${receipt.receiptNumber}_Reprint.pdf`;
+    const fileAsset = this.fileRegistryService
+      ? await this.fileRegistryService.registerGeneratedFile({
+          tenantId: actor.tenantId,
+          generatedByUserId: actor.userId,
+          originalFilename: fileName,
+          content: pdf,
+          mimeType: 'application/pdf',
+          module: 'fees',
+          entityId: receipt.id,
+          metadata: {
+            kind: 'receipt_reprint',
+            receiptId: receipt.id,
+            receiptNumber: receipt.receiptNumber,
+            paymentId: receipt.paymentId,
+            studentId: receipt.payment.studentId,
+          },
+        })
+      : null;
+
+    const history = await this.prisma.receiptReprintHistory.create({
+      data: {
+        tenantId: actor.tenantId,
+        receiptId: receipt.id,
+        paymentId: receipt.paymentId,
+        studentId: receipt.payment.studentId,
+        reprintedById: actor.userId,
+        reason,
+        format: 'pdf',
+        delivery: 'download',
+        fileAssetId: fileAsset?.id ?? null,
+        metadata: {
+          receiptNumber: receipt.receiptNumber,
+          fileName,
+          fileAssetId: fileAsset?.id ?? null,
+        },
+      },
+    });
+
+    await this.auditService.record({
+      action: 'reprint',
+      resource: 'receipt',
+      resourceId: receipt.id,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        reason,
+        receiptNumber: receipt.receiptNumber,
+        paymentId: receipt.paymentId,
+        studentId: receipt.payment.studentId,
+        reprintHistoryId: history.id,
+        fileAssetId: fileAsset?.id ?? null,
+      },
+    });
 
     return {
       pdf,
-      fileName: `Receipt_${receipt.receiptNumber}_Reprint.pdf`,
+      fileName,
     };
   }
 
   async getDuesTableReport(query: DuesQueryDto, actor: AuthContext) {
+    assertFinancePermission(actor, 'fees:manage');
     const page = query.page || 1;
     const limit = query.limit || 50;
     const skip = (page - 1) * limit;
@@ -281,6 +327,7 @@ export class FinanceService {
         where,
         include: {
           student: { include: { class: true, sectionRef: true } },
+          billingRun: true,
           lines: { include: { feeHead: true } },
           payments: { include: { refunds: true } },
         },
@@ -346,7 +393,25 @@ export class FinanceService {
             studentSystemId: invoice.student.studentSystemId,
             className: invoice.student.class.name,
             sectionName: invoice.student.sectionRef?.name || '-',
+            feeHeadId: line.feeHeadId,
             feeHead: line.feeHead.name,
+            billingPeriod: invoice.billingRun
+              ? {
+                  month: invoice.billingRun.runMonth,
+                  year: invoice.billingRun.runYear,
+                  label: `${invoice.billingRun.runYear}-${String(invoice.billingRun.runMonth).padStart(2, '0')}`,
+                }
+              : null,
+            originalAmount: Number(lineBilled),
+            discountAmount: 0,
+            fineAmount: 0,
+            paidAmount: Number(linePaid),
+            remainingDue: Number(outstanding),
+            status: resolveDuesRowStatus(
+              invoice.dueDate,
+              linePaid,
+              outstanding,
+            ),
             billed: Number(lineBilled),
             waived: Number(lineWaiver),
             paid: Number(linePaid),
@@ -2584,6 +2649,7 @@ export class FinanceService {
   }
 
   async collectPayment(dto: CollectPaymentDto, actor: AuthContext) {
+    assertFinancePermission(actor, 'payments:collect');
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: dto.invoiceId, tenantId: actor.tenantId },
       include: {
@@ -2814,6 +2880,7 @@ export class FinanceService {
     dto: CreatePaymentRefundDto,
     actor: AuthContext,
   ) {
+    assertFinancePermission(actor, 'payments:refund');
     const reason = dto.reason?.trim();
 
     if (!reason) {
@@ -2994,6 +3061,15 @@ export class FinanceService {
     dto: { reason: string },
     actor: AuthContext,
   ) {
+    assertFinancePermission(actor, 'payments:reverse');
+    const reason = dto.reason?.trim();
+
+    if (!reason) {
+      throw new BadRequestException(
+        'A reason is required to reverse this payment.',
+      );
+    }
+
     const payment = await this.prisma.payment.findFirst({
       where: { id: paymentId, tenantId: actor.tenantId },
       include: {
@@ -3004,12 +3080,40 @@ export class FinanceService {
     });
 
     if (!payment) {
-      throw new NotFoundException('Payment not found');
+      throw new NotFoundException('Payment not found in this tenant');
+    }
+
+    if (payment.status === PaymentStatus.REVERSED || payment.reversedAt) {
+      throw new ConflictException('This payment is already reversed.');
     }
 
     if (payment.refunds.length > 0) {
       throw new ConflictException(
         'Cannot reverse a payment that has been partially or fully refunded. Void the refunds first.',
+      );
+    }
+
+    const closedWindow = await this.prisma.cashierClose.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        openedAt: { lte: payment.paidAt },
+        closedAt: { gte: payment.paidAt },
+        OR: [
+          { collectorUserId: null },
+          { collectorUserId: payment.collectedById },
+        ],
+        AND: [
+          {
+            OR: [{ paymentMethod: null }, { paymentMethod: payment.method }],
+          },
+        ],
+      },
+      select: { id: true, closeNumber: true },
+    });
+
+    if (closedWindow) {
+      throw new ConflictException(
+        'This cashier day is already closed. Please contact an administrator.',
       );
     }
 
@@ -3028,14 +3132,28 @@ export class FinanceService {
       );
     }
 
+    await this.auditService.record({
+      action: 'reversal_requested',
+      resource: 'payment',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      resourceId: payment.id,
+      before: {
+        invoiceId: payment.invoiceId,
+        amount: Number(payment.amount),
+        receiptNumber: payment.receipt?.receiptNumber ?? null,
+      },
+      after: { reason },
+    });
+
     const result = await this.prisma.$transaction(async (tx) => {
       const reversal = await this.accountingPostingService.postReversal(
         {
           tenantId: actor.tenantId,
           originalEntryId: sourceJournal.id,
           reversalDate: new Date(),
-          narration: `Voiding Payment ${payment.receipt?.receiptNumber ?? payment.id}: ${dto.reason}`,
-          reason: dto.reason,
+          narration: `Voiding Payment ${payment.receipt?.receiptNumber ?? payment.id}: ${reason}`,
+          reason,
           lines: sourceJournal.lines.map((line) => ({
             chartAccountId: line.chartAccountId,
             side:
@@ -3056,12 +3174,13 @@ export class FinanceService {
           status: PaymentStatus.REVERSED,
           reversedAt: new Date(),
           reversedById: actor.userId,
-          reversalReason: dto.reason,
+          reversalReason: reason,
         },
       });
 
       const remainingPayments = await tx.payment.findMany({
         where: {
+          tenantId: actor.tenantId,
           invoiceId: payment.invoiceId,
           status: { not: PaymentStatus.REVERSED },
         },
@@ -3085,7 +3204,7 @@ export class FinanceService {
     });
 
     await this.auditService.record({
-      action: 'reverse',
+      action: 'reversal_completed',
       resource: 'payment',
       tenantId: actor.tenantId,
       userId: actor.userId,
@@ -3093,7 +3212,7 @@ export class FinanceService {
       after: {
         invoiceId: payment.invoiceId,
         amount: Number(payment.amount),
-        reason: dto.reason,
+        reason,
       },
     });
 
@@ -3101,6 +3220,7 @@ export class FinanceService {
   }
 
   async previewCashierClose(query: CashierCloseWindowDto, actor: AuthContext) {
+    assertFinancePermission(actor, 'payments:close');
     const window = resolveWindow(query.openedAt, query.closedAt);
     const summary = await this.buildCashierCloseSummary(
       {
@@ -3134,6 +3254,7 @@ export class FinanceService {
   }
 
   async listCashierCloses(query: ListCashierClosesDto, actor: AuthContext) {
+    assertFinancePermission(actor, 'payments:close');
     const closes = await this.prisma.cashierClose.findMany({
       where: {
         tenantId: actor.tenantId,
@@ -3160,7 +3281,27 @@ export class FinanceService {
   }
 
   async finalizeCashierClose(dto: CreateCashierCloseDto, actor: AuthContext) {
+    assertFinancePermission(actor, 'payments:close');
     const window = resolveWindow(dto.openedAt, dto.closedAt);
+    const closeWindowKey = buildCashierCloseWindowKey({
+      openedAt: window.openedAt,
+      closedAt: window.closedAt,
+      collectorUserId: dto.collectorUserId,
+      paymentMethod: dto.paymentMethod,
+    });
+    const exactExisting = await this.prisma.cashierClose.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        closeWindowKey,
+      },
+    });
+
+    if (exactExisting) {
+      throw new ConflictException(
+        'This cashier window is already closed for today.',
+      );
+    }
+
     const existing = await this.prisma.cashierClose.findFirst({
       where: {
         tenantId: actor.tenantId,
@@ -3209,38 +3350,68 @@ export class FinanceService {
 
     const closeNumber = await this.generateCashierCloseNumber(actor.tenantId);
 
-    const close = await this.prisma.cashierClose.create({
-      data: {
-        tenantId: actor.tenantId,
-        closeNumber,
-        openedAt: window.openedAt,
-        closedAt: window.closedAt,
-        collectorUserId: dto.collectorUserId ?? null,
-        paymentMethod: dto.paymentMethod ?? null,
-        grossCollected: new Prisma.Decimal(summary.grossCollected),
-        totalRefunded: new Prisma.Decimal(summary.totalRefunded),
-        netCollected: new Prisma.Decimal(summary.netCollected),
-        expectedCashAmount,
-        actualCashAmount,
-        varianceAmount,
-        varianceReason: hasCashVariance ? dto.varianceReason?.trim() : null,
-        denominationBreakdown:
-          (dto.denominationBreakdown as Prisma.InputJsonValue | undefined) ??
-          Prisma.JsonNull,
-        methodBreakdown: summary.methodBreakdown,
+    let close: CashierCloseWithUsers;
 
-        paymentCount: summary.paymentCount,
-        refundCount: summary.refundCount,
-        firstReceiptNumber: summary.firstReceiptNumber,
-        lastReceiptNumber: summary.lastReceiptNumber,
-        notes: dto.notes ?? null,
-        closedById: actor.userId,
-      },
-      include: {
-        collectorUser: true,
-        closedBy: true,
-      },
-    });
+    try {
+      close = await this.prisma.$transaction(async (tx) => {
+        const duplicate = await tx.cashierClose.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            closeWindowKey,
+          },
+          select: { id: true },
+        });
+
+        if (duplicate) {
+          throw new ConflictException(
+            'This cashier window is already closed for today.',
+          );
+        }
+
+        return tx.cashierClose.create({
+          data: {
+            tenantId: actor.tenantId,
+            closeNumber,
+            closeWindowKey,
+            openedAt: window.openedAt,
+            closedAt: window.closedAt,
+            collectorUserId: dto.collectorUserId ?? null,
+            paymentMethod: dto.paymentMethod ?? null,
+            grossCollected: new Prisma.Decimal(summary.grossCollected),
+            totalRefunded: new Prisma.Decimal(summary.totalRefunded),
+            netCollected: new Prisma.Decimal(summary.netCollected),
+            expectedCashAmount,
+            actualCashAmount,
+            varianceAmount,
+            varianceReason: hasCashVariance ? dto.varianceReason?.trim() : null,
+            denominationBreakdown:
+              (dto.denominationBreakdown as
+                | Prisma.InputJsonValue
+                | undefined) ?? Prisma.JsonNull,
+            methodBreakdown: summary.methodBreakdown,
+
+            paymentCount: summary.paymentCount,
+            refundCount: summary.refundCount,
+            firstReceiptNumber: summary.firstReceiptNumber,
+            lastReceiptNumber: summary.lastReceiptNumber,
+            notes: dto.notes ?? null,
+            closedById: actor.userId,
+          },
+          include: {
+            collectorUser: true,
+            closedBy: true,
+          },
+        });
+      });
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error)) {
+        throw new ConflictException(
+          'This cashier window is already closed for today.',
+        );
+      }
+
+      throw error;
+    }
 
     await this.auditService.record({
       action: 'finalize',
@@ -3279,6 +3450,15 @@ export class FinanceService {
     dto: { reason: string },
     actor: AuthContext,
   ) {
+    assertFinancePermission(actor, 'payments:close');
+    const reason = dto.reason?.trim();
+
+    if (!reason) {
+      throw new BadRequestException(
+        'A reason is required to reopen this close.',
+      );
+    }
+
     const close = await this.prisma.cashierClose.findFirst({
       where: { id: closeId, tenantId: actor.tenantId },
     });
@@ -3304,7 +3484,7 @@ export class FinanceService {
         resourceId: closeId,
         after: {
           closeNumber: close.closeNumber,
-          reason: dto.reason,
+          reason,
         },
       });
     });
@@ -3369,7 +3549,13 @@ export class FinanceService {
     query: ReconciliationQueryDto,
     actor: AuthContext,
   ) {
+    assertAnyFinancePermission(actor, [
+      'payments:close',
+      'fees:manage',
+      'accounting:read',
+    ]);
     const rows = await this.buildReconciliationRows(query, actor);
+    const methodSummary = buildPaymentMethodReconciliation(rows);
 
     return {
       openedAt: query.openedAt,
@@ -3378,6 +3564,8 @@ export class FinanceService {
       grossCollected: rows.reduce((sum, row) => sum + row.grossAmount, 0),
       totalRefunded: rows.reduce((sum, row) => sum + row.refundedAmount, 0),
       netCollected: rows.reduce((sum, row) => sum + row.netAmount, 0),
+      methodSummary,
+      varianceTotal: methodSummary.reduce((sum, row) => sum + row.variance, 0),
       rows,
     };
   }
@@ -3386,12 +3574,20 @@ export class FinanceService {
     query: ReconciliationQueryDto,
     actor: AuthContext,
   ) {
+    assertAnyFinancePermission(actor, [
+      'payments:close',
+      'fees:manage',
+      'accounting:read',
+    ]);
     const rows = await this.buildReconciliationRows(query, actor);
+    const csv = buildReconciliationCsv(rows);
+    const generatedAt = new Date();
     const payload = {
-      generatedAt: new Date().toISOString(),
+      generatedAt: generatedAt.toISOString(),
       openedAt: query.openedAt,
       closedAt: query.closedAt,
       totalRows: rows.length,
+      methodSummary: buildPaymentMethodReconciliation(rows),
       rows,
     };
 
@@ -3399,10 +3595,34 @@ export class FinanceService {
       return payload;
     }
 
-    return buildReconciliationCsv(payload.rows);
+    if (this.fileRegistryService) {
+      await this.fileRegistryService.registerGeneratedFile({
+        tenantId: actor.tenantId,
+        generatedByUserId: actor.userId,
+        originalFilename: `payment-method-reconciliation-${generatedAt.toISOString().slice(0, 10)}.csv`,
+        content: Buffer.from(csv),
+        mimeType: 'text/csv',
+        module: 'fees',
+        metadata: {
+          kind: 'payment_method_reconciliation_export',
+          generatedAt: generatedAt.toISOString(),
+          filters: {
+            openedAt: query.openedAt,
+            closedAt: query.closedAt,
+            collectorUserId: query.collectorUserId ?? null,
+            paymentMethod: query.paymentMethod ?? null,
+            classId: query.classId ?? null,
+            studentId: query.studentId ?? null,
+          },
+        },
+      });
+    }
+
+    return csv;
   }
 
   async listPayments(actor: AuthContext) {
+    assertAnyFinancePermission(actor, ['payments:collect', 'fees:manage']);
     const payments = await this.prisma.payment.findMany({
       where: { tenantId: actor.tenantId },
       include: {
@@ -3431,7 +3651,79 @@ export class FinanceService {
     }));
   }
 
+  async getPaymentGatewayReadiness(actor: AuthContext) {
+    assertAnyFinancePermission(actor, ['payments:collect', 'fees:manage']);
+
+    const provider = await this.prisma.providerConfig.findFirst({
+      where: {
+        type: 'PAYMENT_GATEWAY',
+        enabled: true,
+      },
+      orderBy: [{ updatedAt: 'desc' }],
+      select: {
+        id: true,
+        name: true,
+        enabled: true,
+        environment: true,
+        validationStatus: true,
+        lastValidatedAt: true,
+        configEncrypted: true,
+      },
+    });
+
+    if (!provider) {
+      return {
+        enabled: false,
+        status: 'not_configured',
+        provider: null,
+        supportedPaymentMethods: [],
+        webhookReady: false,
+        paymentIntentReady: false,
+        idempotencyRequired: true,
+        settlementTrackingReady: false,
+        message: 'Online payments are not enabled for this school.',
+      };
+    }
+
+    const config = normalizeJsonObject(provider.configEncrypted);
+    const webhookReady = Boolean(config?.webhookUrl || config?.webhookPath);
+    const paymentIntentReady = Boolean(
+      config?.initiateUrl || config?.intentUrl,
+    );
+
+    return {
+      enabled: Boolean(
+        provider.enabled &&
+        provider.validationStatus === 'VALID' &&
+        webhookReady &&
+        paymentIntentReady,
+      ),
+      status:
+        provider.validationStatus === 'VALID'
+          ? webhookReady && paymentIntentReady
+            ? 'ready'
+            : 'configuration_incomplete'
+          : (provider.validationStatus ?? 'not_validated'),
+      provider: {
+        id: provider.id,
+        name: provider.name,
+        environment: provider.environment,
+        lastValidatedAt: provider.lastValidatedAt,
+      },
+      supportedPaymentMethods: ['MOBILE', 'TRANSFER'],
+      webhookReady,
+      paymentIntentReady,
+      idempotencyRequired: true,
+      settlementTrackingReady: Boolean(config?.settlementStatusUrl),
+      message:
+        webhookReady && paymentIntentReady
+          ? 'Online payment gateway readiness is configured. Payments must still be marked paid only after trusted server-side verification.'
+          : 'Online payments are not enabled for this school.',
+    };
+  }
+
   async listReceipts(actor: AuthContext) {
+    assertFinancePermission(actor, 'receipts:read');
     const receipts = await this.prisma.receipt.findMany({
       where: { tenantId: actor.tenantId },
       include: {
@@ -3441,6 +3733,18 @@ export class FinanceService {
             student: true,
             refunds: true,
           },
+        },
+        reprintHistory: {
+          include: {
+            reprintedBy: {
+              select: {
+                id: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: [{ reprintedAt: 'desc' }],
+          take: 5,
         },
       },
       orderBy: [{ issuedAt: 'desc' }],
@@ -3461,10 +3765,26 @@ export class FinanceService {
         id: receipt.payment.student.id,
         name: `${receipt.payment.student.firstNameEn} ${receipt.payment.student.lastNameEn}`.trim(),
       },
+      reprintCount: receipt.reprintHistory.length,
+      latestReprint: receipt.reprintHistory[0]
+        ? {
+            reprintedAt: receipt.reprintHistory[0].reprintedAt,
+            reason: receipt.reprintHistory[0].reason,
+            format: receipt.reprintHistory[0].format,
+            delivery: receipt.reprintHistory[0].delivery,
+            reprintedBy: receipt.reprintHistory[0].reprintedBy
+              ? {
+                  id: receipt.reprintHistory[0].reprintedBy.id,
+                  email: receipt.reprintHistory[0].reprintedBy.email,
+                }
+              : null,
+          }
+        : null,
     }));
   }
 
   async getReceiptPdf(receiptNumber: string, actor: AuthContext) {
+    assertFinancePermission(actor, 'receipts:read');
     const receipt = await this.prisma.receipt.findFirst({
       where: {
         tenantId: actor.tenantId,
@@ -4469,6 +4789,110 @@ function escapeCsv(value: string) {
   }
 
   return value;
+}
+
+function assertFinancePermission(actor: AuthContext, permission: string) {
+  if (!actor.permissions?.includes(permission)) {
+    throw new ForbiddenException(
+      'You do not have permission for this finance action.',
+    );
+  }
+}
+
+function assertAnyFinancePermission(actor: AuthContext, permissions: string[]) {
+  if (
+    !permissions.some((permission) => actor.permissions?.includes(permission))
+  ) {
+    throw new ForbiddenException(
+      'You do not have permission for this finance action.',
+    );
+  }
+}
+
+function resolveDuesRowStatus(
+  dueDate: Date,
+  paidAmount: Prisma.Decimal,
+  outstandingAmount: Prisma.Decimal,
+) {
+  if (outstandingAmount.lte(0)) {
+    return 'paid';
+  }
+
+  if (paidAmount.gt(0)) {
+    return 'partial';
+  }
+
+  return dueDate < new Date() ? 'overdue' : 'unpaid';
+}
+
+function buildCashierCloseWindowKey(input: {
+  openedAt: Date;
+  closedAt: Date;
+  collectorUserId?: string | null;
+  paymentMethod?: PaymentMethod | null;
+}) {
+  return [
+    input.openedAt.toISOString(),
+    input.closedAt.toISOString(),
+    input.collectorUserId || 'all-collectors',
+    input.paymentMethod || 'all-methods',
+  ].join('|');
+}
+
+function isPrismaUniqueConstraintError(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002'
+  );
+}
+
+function buildPaymentMethodReconciliation(
+  rows: Array<{
+    method: PaymentMethod;
+    grossAmount: number;
+    refundedAmount: number;
+    netAmount: number;
+    collector: { id?: string | null } | null;
+    receiptNumber: string | null;
+  }>,
+) {
+  const grouped = new Map<
+    PaymentMethod,
+    {
+      paymentMethod: PaymentMethod;
+      receiptCount: number;
+      grossCollected: number;
+      reversalsAndRefunds: number;
+      netAmount: number;
+      declaredAmount: number | null;
+      variance: number;
+    }
+  >();
+
+  for (const row of rows) {
+    const current = grouped.get(row.method) ?? {
+      paymentMethod: row.method,
+      receiptCount: 0,
+      grossCollected: 0,
+      reversalsAndRefunds: 0,
+      netAmount: 0,
+      declaredAmount: null,
+      variance: 0,
+    };
+
+    current.receiptCount += row.receiptNumber ? 1 : 0;
+    current.grossCollected += row.grossAmount;
+    current.reversalsAndRefunds += row.refundedAmount;
+    current.netAmount += row.netAmount;
+    grouped.set(row.method, current);
+  }
+
+  return Array.from(grouped.values()).map((row) => ({
+    ...row,
+    grossCollected: Number(row.grossCollected.toFixed(2)),
+    reversalsAndRefunds: Number(row.reversalsAndRefunds.toFixed(2)),
+    netAmount: Number(row.netAmount.toFixed(2)),
+  }));
 }
 
 export function resolveInvoiceStatusAfterAdjustment(

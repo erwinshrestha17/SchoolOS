@@ -173,7 +173,7 @@ describe('Attendance Hardening', () => {
       };
 
       await expect(service.submitAttendance(dto, mockActor)).rejects.toThrow(
-        'Attendance session is locked',
+        'Attendance for this date is locked. Please request a correction.',
       );
     });
 

@@ -11,6 +11,7 @@ import type {
   InvoiceDetail,
   InvoiceSummary,
   JournalEntryView,
+  PaymentGatewayReadiness,
   ReceiptView,
   WaiverRecord,
 } from '@schoolos/core';
@@ -246,6 +247,11 @@ export function FinanceForm() {
   const receiptsQuery = useQuery({
     queryKey: ['receipts'],
     queryFn: api.listReceipts,
+  });
+  const gatewayReadinessQuery = useQuery({
+    queryKey: ['payment-gateway-readiness'],
+    queryFn: api.getPaymentGatewayReadiness,
+    enabled: activeSection === 'Collection Counter',
   });
   const ledgerQuery = useQuery({
     queryKey: ['ledger-entries'],
@@ -580,6 +586,7 @@ export function FinanceForm() {
           overpaymentBlocked={overpaymentBlocked}
           requiresReference={requiresReference}
           paymentMutation={paymentMutation}
+          gatewayReadiness={gatewayReadinessQuery.data}
           selectInvoice={selectInvoice}
           submitPayment={submitPayment}
         />
@@ -704,6 +711,7 @@ function CollectionCounterSection({
   overpaymentBlocked,
   requiresReference,
   paymentMutation,
+  gatewayReadiness,
   selectInvoice,
   submitPayment,
 }: {
@@ -737,6 +745,7 @@ function CollectionCounterSection({
   overpaymentBlocked: boolean;
   requiresReference: boolean;
   paymentMutation: PaymentMutation;
+  gatewayReadiness: PaymentGatewayReadiness | undefined;
   selectInvoice: (invoice: InvoiceForUi) => void;
   submitPayment: () => void;
 }) {
@@ -837,6 +846,7 @@ function CollectionCounterSection({
           paymentMutation={paymentMutation}
           submitPayment={submitPayment}
         />
+        <GatewayReadinessNotice readiness={gatewayReadiness} />
         <LedgerPreview invoice={selectedInvoice} amount={payment.amount} method={payment.method} />
         <PaymentSuccessPanel result={paymentMutation.data} invoice={selectedInvoice} />
       </div>
@@ -1373,6 +1383,34 @@ function PaymentPanel({
         >
           {paymentMutation.isPending ? 'Posting payment...' : 'Confirm Payment & Generate Receipt'}
         </button>
+      </div>
+    </section>
+  );
+}
+
+function GatewayReadinessNotice({
+  readiness,
+}: {
+  readiness: PaymentGatewayReadiness | undefined;
+}) {
+  if (!readiness) {
+    return null;
+  }
+
+  return (
+    <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-5 shadow-sm backdrop-blur-sm">
+      <p className="label">Online Payments</p>
+      <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <p className="text-sm font-semibold text-amber-900">
+          {readiness.enabled
+            ? 'Gateway readiness is configured. Payments are confirmed only after server-side verification.'
+            : 'Online payments are not enabled for this school.'}
+        </p>
+        <p className="mt-1 text-xs text-amber-800">
+          Webhook: {readiness.webhookReady ? 'ready' : 'not ready'} / payment intent:{' '}
+          {readiness.paymentIntentReady ? 'ready' : 'not ready'} / settlement:{' '}
+          {readiness.settlementTrackingReady ? 'ready' : 'not ready'}
+        </p>
       </div>
     </section>
   );
@@ -2496,6 +2534,16 @@ function ReceiptsLedgerSection({
                 <p className="text-sm text-[var(--muted)]">
                   {receipt.student?.name ?? 'Student'} / {formatCurrency(receipt.amount)}
                 </p>
+                <p className="mt-1 text-xs font-semibold text-[var(--muted)]">
+                  Issued {formatDate(receipt.issuedAt)} / reprinted {receipt.reprintCount ?? 0} time
+                  {(receipt.reprintCount ?? 0) === 1 ? '' : 's'}
+                </p>
+                {receipt.latestReprint ? (
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    Latest reprint: {formatDate(receipt.latestReprint.reprintedAt)} by{' '}
+                    {receipt.latestReprint.reprintedBy?.email ?? 'SchoolOS'} / {receipt.latestReprint.reason}
+                  </p>
+                ) : null}
                 <button
                   type="button"
                   className="mt-3 min-h-10 rounded-full border border-[var(--line)] px-3 py-2 text-xs font-semibold"

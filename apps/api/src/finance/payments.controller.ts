@@ -43,6 +43,12 @@ export class PaymentsController {
     return this.financeService.collectPayment(dto, auth);
   }
 
+  @Get('gateway-readiness')
+  @Permissions('payments:collect')
+  getPaymentGatewayReadiness(@CurrentAuth() auth: AuthContext) {
+    return this.financeService.getPaymentGatewayReadiness(auth);
+  }
+
   @Get('cashier-close/preview')
   @Permissions('payments:close')
   previewCashierClose(

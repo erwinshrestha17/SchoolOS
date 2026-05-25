@@ -20,7 +20,13 @@ describe('ReceiptsController PDF responses', () => {
         .fn()
         .mockResolvedValue(Buffer.from('%PDF-1.4\n%%EOF')),
     };
-    const controller = new ReceiptsController(service as never);
+    const compatService = {
+      getReceiptReprintHistory: jest.fn(),
+    };
+    const controller = new ReceiptsController(
+      service as never,
+      compatService as never,
+    );
 
     const result = await controller.getReceiptPdf('REC-2026-00001', actor);
 

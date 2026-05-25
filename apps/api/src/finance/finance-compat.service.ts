@@ -61,8 +61,13 @@ export class FinanceCompatService {
       receiptNumber: receipt.receiptNumber,
       items: history.map((item) => ({
         id: item.id,
+        paymentId: item.paymentId,
+        studentId: item.studentId,
+        fileAssetId: item.fileAssetId,
         reprintedAt: item.reprintedAt,
         reason: item.reason,
+        format: item.format,
+        delivery: item.delivery,
         reprintedBy: item.reprintedBy
           ? {
               id: item.reprintedBy.id,

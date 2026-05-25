@@ -98,6 +98,9 @@ describe('FinanceService - Dues & Reprints', () => {
       (prisma.tenant.findUnique as jest.Mock).mockResolvedValue({
         name: 'School',
       });
+      (prisma.receiptReprintHistory.create as jest.Mock).mockResolvedValue({
+        id: 'history-1',
+      });
 
       const result = await service.reprintReceipt(
         'r1',

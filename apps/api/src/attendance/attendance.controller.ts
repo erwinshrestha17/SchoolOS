@@ -29,6 +29,7 @@ import { SyncAttendanceDto } from './dto/sync-attendance.dto';
 import { UpsertCalendarDayDto } from './dto/upsert-calendar-day.dto';
 import { CreateAttendanceCorrectionDto } from './dto/create-attendance-correction.dto';
 import { ReviewAttendanceCorrectionDto } from './dto/review-attendance-correction.dto';
+import { ListAttendanceCorrectionRequestsDto } from './dto/list-attendance-correction-requests.dto';
 import { GetMonthlyRegisterDto } from './dto/get-monthly-register.dto';
 import { GetStudentHistoryDto } from './dto/get-student-history.dto';
 import { UpsertAttendanceDraftDto } from './dto/upsert-attendance-draft.dto';
@@ -281,8 +282,11 @@ export class AttendanceController {
 
   @Get('corrections')
   @Permissions('attendance:read')
-  listCorrectionRequests(@CurrentAuth() auth: AuthContext) {
-    return this.attendanceService.listCorrectionRequests(auth);
+  listCorrectionRequests(
+    @Query() query: ListAttendanceCorrectionRequestsDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.attendanceService.listCorrectionRequests(auth, query);
   }
 
   @Patch('corrections/:id/approve')

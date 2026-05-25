@@ -50,6 +50,7 @@ import type {
   PayrollPreviewResult,
   PaymentRefundPayload,
   PaymentRefundSummary,
+  PaymentGatewayReadiness,
   PaginatedResult,
   PaginatedResponse,
   ParentTeacherMessageSummary,
@@ -953,6 +954,42 @@ export const api = {
         year: params.year ? String(params.year) : undefined,
       }),
     ),
+  exportAttendanceRegister: async (
+    params: {
+      academicYearId: string;
+      classId: string;
+      sectionId?: string | null;
+      month: number;
+      year: number;
+    },
+    format: 'csv' | 'pdf',
+  ) => {
+    const response = await fetch(
+      `${API_BASE_URL}${withQuery('/attendance/register/export', {
+        ...params,
+        sectionId: params.sectionId ?? undefined,
+        format,
+      })}`,
+      { credentials: 'include' },
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(parseApiErrorMessage(text) || 'Attendance export failed');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `attendance-register-${params.year}-${String(
+      params.month,
+    ).padStart(2, '0')}.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
   exportRoster: async (params?: {
     academicYearId?: string;
     classId?: string;
@@ -990,6 +1027,8 @@ export const api = {
       method: 'POST',
       json: body,
     }),
+  saveAttendanceDraft: (body: JsonBody) =>
+    request('/attendance/drafts', { method: 'POST', json: body }),
   reviewAttendanceConflict: (id: string, body: JsonBody) =>
     request<AttendanceConflict>(`/attendance/conflicts/${id}/review`, {
       method: 'PATCH',
@@ -1047,6 +1086,8 @@ export const api = {
     request('/fees/plans', { method: 'POST', json: body }),
   collectPayment: (body: JsonBody) =>
     request('/payments', { method: 'POST', json: body }),
+  getPaymentGatewayReadiness: () =>
+    request<PaymentGatewayReadiness>('/payments/gateway-readiness'),
   refundPayment: (paymentId: string, body: PaymentRefundPayload) =>
     request<PaymentRefundSummary>(
       `/payments/${encodeURIComponent(paymentId)}/refund`,

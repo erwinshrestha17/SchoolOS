@@ -44,7 +44,7 @@ M1 photo/logo/iEMIS/document audit/duplicate candidate hardening slice implement
 Phase 2D M9 Accounting completed
 Phase 2 Accounting production polish completed
 SchoolOS Flutter mobile app started in apps/schoolos_mobile with auth/API wiring underway
-Current stage: M0 platform foundation complete with provider readiness, queue failed-job detail hardening, tenant-scoped API key management, and cloud-agnostic storage adapter/config Sprint 1 implemented + M1 photo/logo/iEMIS/document audit/duplicate candidate hardening slice implemented + M10 provider/attachment/retry hardening + M6/M7/M8A/M8C/M8B focused feature-depth hardening + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation plus credential history hardening implemented + mobile companion app foundation started
+Current stage: M0 platform foundation complete with provider readiness, queue failed-job detail hardening, tenant-scoped API key management, and cloud-agnostic storage adapter/config Sprint 1 implemented + M1 photo/logo/iEMIS/document audit/duplicate candidate hardening slice implemented + M2 attendance correction/offline-draft hardening slice implemented + M3 fees/receipts reprint/reversal/close/readiness hardening slice implemented + M10 provider/attachment/retry hardening + M6/M7/M8A/M8C/M8B focused feature-depth hardening + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation plus credential history hardening implemented + mobile companion app foundation started
 ```
 
 Targeted web-admin polish and Phase2F smoke coverage have been completed. The latest feature-depth pass hardened M10 notifications/attachments, M6 homework parent/student scoping, M7 payroll reporting, M8A library fine/accounting tests, M8C POS/wallet receipts plus supplier/inventory item admin surfaces, and M8B GPS pressure/retention guards. Next focus is staging smoke/manual QA and remaining controlled-pilot reliability work in `docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`.
@@ -144,7 +144,7 @@ Auth/Security/Tenant: 90-95%
 M0 Platform Core: 85-90%
 M1 Students: 90-95%
 M2 Attendance: 85-90%
-M3 Fees: 85-90%
+M3 Fees: 90-95%
 M4 Academics: 95-100%
 M5 Activity: 75-85%
 M6 Homework/Timetable: 95-100%

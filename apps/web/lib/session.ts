@@ -7,6 +7,17 @@ export const SESSION_CLEARED_EVENT = 'schoolos:session-cleared';
 // backed by httpOnly cookies; future BFF work should also remove access tokens
 // from browser-visible login/refresh response bodies.
 export type BrowserSession = Omit<AuthSession, 'accessToken'>;
+export type AttendanceDraftStorageValue = {
+  academicYearId: string;
+  classId: string;
+  sectionId: string;
+  attendanceDate: string;
+  exceptions: Record<string, string>;
+  remarks: Record<string, string>;
+  savedAt: string;
+  serverSessionId: string | null;
+  serverSubmittedAt: string | null;
+};
 
 export function toBrowserSession(session: AuthSession): BrowserSession {
   return {
@@ -71,6 +82,50 @@ export function storeSession(
 
 export function clearStoredSession() {
   storeSession(null);
+}
+
+export function readAttendanceDraft(key: string | null) {
+  if (typeof window === 'undefined' || !key) {
+    return null;
+  }
+
+  const rawDraft = window.localStorage.getItem(key);
+  if (!rawDraft) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawDraft) as AttendanceDraftStorageValue;
+
+    if (!parsed.academicYearId || !parsed.classId || !parsed.attendanceDate) {
+      window.localStorage.removeItem(key);
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    window.localStorage.removeItem(key);
+    return null;
+  }
+}
+
+export function storeAttendanceDraft(
+  key: string | null,
+  draft: AttendanceDraftStorageValue,
+) {
+  if (typeof window === 'undefined' || !key) {
+    return;
+  }
+
+  window.localStorage.setItem(key, JSON.stringify(draft));
+}
+
+export function clearAttendanceDraft(key: string | null) {
+  if (typeof window === 'undefined' || !key) {
+    return;
+  }
+
+  window.localStorage.removeItem(key);
 }
 
 export function hasPermission(

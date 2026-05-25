@@ -1400,6 +1400,17 @@ export type ReceiptView = {
     id: string;
     name: string;
   };
+  reprintCount?: number;
+  latestReprint?: {
+    reprintedAt: string | Date;
+    reason: string;
+    format: string;
+    delivery: string;
+    reprintedBy: {
+      id: string;
+      email: string | null;
+    } | null;
+  } | null;
   payment?: {
     id: string;
     amount: number;
@@ -1408,6 +1419,23 @@ export type ReceiptView = {
     invoiceId: string;
     studentId: string;
   };
+};
+
+export type PaymentGatewayReadiness = {
+  enabled: boolean;
+  status: string;
+  provider: {
+    id: string;
+    name: string;
+    environment: string;
+    lastValidatedAt: string | Date | null;
+  } | null;
+  supportedPaymentMethods: string[];
+  webhookReady: boolean;
+  paymentIntentReady: boolean;
+  idempotencyRequired: boolean;
+  settlementTrackingReady: boolean;
+  message: string;
 };
 
 export type ActivityAttachment = {

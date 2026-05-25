@@ -15,6 +15,7 @@ import { FinanceProcessor } from './finance.processor';
 import { FinanceCron } from './finance.cron';
 
 import { AccountingPostingModule } from '../accounting/accounting-posting.module';
+import { FileRegistryModule } from '../file-registry/file-registry.module';
 import { UsageModule } from '../usage/usage.module';
 
 @Module({
@@ -23,6 +24,7 @@ import { UsageModule } from '../usage/usage.module';
     AuditModule,
     CommunicationsModule,
     AccountingPostingModule,
+    FileRegistryModule,
     BullModule.registerQueue({
       name: 'finance',
     }),

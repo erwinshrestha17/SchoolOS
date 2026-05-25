@@ -1928,6 +1928,7 @@ model AttendanceCorrectionRequest {
   studentId           String
   attendanceDate      DateTime
   requestedStatus     AttendanceStatus
+  previousStatus      AttendanceStatus?
   reason              String
   status              AttendanceCorrectionStatus @default(PENDING)
   requestedById       String
@@ -1935,7 +1936,10 @@ model AttendanceCorrectionRequest {
   reviewedById        String?
   reviewedAt          DateTime?
   reviewNote          String?
+  reviewReason        String?
   metadata            Json?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
 
   tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   record      AttendanceRecord?  @relation(fields: [attendanceRecordId], references: [id], onDelete: SetNull)
@@ -1946,6 +1950,9 @@ model AttendanceCorrectionRequest {
 
   @@index([tenantId, status])
   @@index([tenantId, studentId, attendanceDate])
+  @@index([tenantId, attendanceDate, status])
+  @@index([tenantId, attendanceSessionId, status])
+  @@index([tenantId, requestedById, requestedAt])
 }
 
 model StaffAttendance {
@@ -2222,6 +2229,7 @@ model CashierClose {
   id                    String         @id @default(uuid())
   tenantId              String
   closeNumber           String
+  closeWindowKey        String?
   openedAt              DateTime
   closedAt              DateTime
   collectorUserId       String?
@@ -2248,6 +2256,7 @@ model CashierClose {
   closedBy      User?  @relation("ClosedCashierCloses", fields: [closedById], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, closeNumber])
+  @@unique([tenantId, closeWindowKey])
   @@index([tenantId, openedAt, closedAt])
   @@index([tenantId, collectorUserId, paymentMethod])
 }
@@ -2276,9 +2285,14 @@ model ReceiptReprintHistory {
   id            String   @id @default(uuid())
   tenantId      String
   receiptId     String
+  paymentId     String?
+  studentId     String?
+  fileAssetId   String?
   reprintedById String?
   reprintedAt   DateTime @default(now())
   reason        String
+  format        String   @default("pdf")
+  delivery      String   @default("download")
   metadata      Json?
 
   tenant      Tenant  @relation(fields: [tenantId], references: [id])
@@ -2286,6 +2300,8 @@ model ReceiptReprintHistory {
   reprintedBy User?   @relation("ReceiptReprinter", fields: [reprintedById], references: [id], onDelete: SetNull)
 
   @@index([tenantId, receiptId])
+  @@index([tenantId, studentId, reprintedAt])
+  @@index([tenantId, paymentId])
 }
 
 model FeeDueSchedule {

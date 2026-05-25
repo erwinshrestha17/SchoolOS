@@ -1,6 +1,6 @@
 # SchoolOS Master Project Memory
 
-**Status:** M0 Platform Core Provider/Queue Hardening + M10 Provider/Attachment Depth + Phase 2 Academics/Accounting Production Polish + Student QR Foundation + Phase 3/4 Operations Depth Hardened
+**Status:** M0 Platform Core Provider/Queue Hardening + M10 Provider/Attachment Depth + Phase 2 Academics/Accounting Production Polish + Student QR Foundation + M2 Attendance Hardening Slice + M3 Fees/Receipts Hardening Slice + Phase 3/4 Operations Depth Hardened
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard
 
@@ -36,7 +36,7 @@ Student QR Foundation: Implemented; release hardening remains
 Phase 2D M9 Accounting: Completed
 Phase 2 Accounting production polish: Completed (report PDFs, snapshots, reconciliation suggestions, audit trail, and smoke coverage)
 SchoolOS Flutter mobile app: Started under apps/schoolos_mobile with auth/API wiring now in progress
-Current stage: M0 platform foundation complete with provider/queue hardening + M10 provider/attachment/retry depth + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3/4 operations feature-depth hardening for M6, M7, M8A, M8C, and M8B + mobile companion app foundation started
+Current stage: M0 platform foundation complete with provider/queue hardening + M10 provider/attachment/retry depth + Phase 1 pilot-ready core + M2 attendance correction/offline-draft hardening slice + M3 fees/receipts reprint/reversal/close/readiness hardening slice + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3/4 operations feature-depth hardening for M6, M7, M8A, M8C, and M8B + mobile companion app foundation started
 ```
 
 Targeted web-admin frontend polish and Phase 2F browser smoke coverage are now present on main.
@@ -117,8 +117,8 @@ Rules:
 |---|---|---|
 | M0 | Platform Core / SaaS Starter | Foundation completed across eight sprints; provider/queue pilot hardening implemented; entitlement/SaaS/staging depth remains |
 | M1 | Admissions & Student Profiles | Phase 1A/1B complete / pilot-ready with Student QR, storage-hardened student photo and school logo uploads, document audit visibility, iEMIS export artifact registration, duplicate candidate review, and generated PDF storage-route hardening foundations |
-| M2 | Smart Attendance | Phase 1A/1B complete / pilot-ready |
-| M3 | Fees & Receipts | Phase 1A/1B complete / pilot-ready |
+| M2 | Smart Attendance | Phase 1A/1B complete / pilot-ready plus correction/offline-draft hardening slice |
+| M3 | Fees & Receipts | Phase 1A/1B complete / pilot-ready plus receipt reprint, reversal, cashier-close, reconciliation, and gateway-readiness hardening slice |
 | M4 | Exams, CAS & Report Cards | Phase 2 backend/admin UI plus production PDF/report/correction/snapshot polish implemented |
 | M5 | Activity Feed & Milestones | Phase 1A/1B complete with media/moderation hardening foundations, backend-backed web post detail, and web lifecycle/moderation controls |
 | M6 | Homework & Timetable | Phase 3 operational hardening complete plus parent/student homework access fail-closed depth |
@@ -495,7 +495,7 @@ Module estimates:
 | M0 Platform Core | 85-90% |
 | M1 Admissions & Student Profiles | 90-95% |
 | M2 Attendance | 85-90% |
-| M3 Fees & Receipts | 85-90% |
+| M3 Fees & Receipts | 90-95% |
 | M5 Activity Feed | 75-85% |
 | M10 Notices & Communication | 85-90% |
 | M4 Academics | 100% |

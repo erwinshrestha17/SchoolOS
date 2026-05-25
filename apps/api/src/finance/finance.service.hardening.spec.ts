@@ -13,7 +13,11 @@ import {
   PaymentStatus,
   JournalSourceType,
 } from '@prisma/client';
-import { ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 
 describe('FinanceService - Hardening', () => {
   let service: FinanceService;
@@ -23,7 +27,13 @@ describe('FinanceService - Hardening', () => {
     tenantId: 't1',
     userId: 'u1',
     roles: ['admin'],
-    permissions: ['fees:manage', 'fees:refund'],
+    permissions: [
+      'fees:manage',
+      'payments:refund',
+      'payments:reverse',
+      'payments:close',
+      'receipts:manage',
+    ],
     authMethod: AuthMethod.PASSWORD,
   };
 
@@ -116,15 +126,35 @@ describe('FinanceService - Hardening', () => {
           },
           actor as any,
         ),
-      ).rejects.toThrow('CC-001 already overlaps the selected window');
+      ).rejects.toThrow('This cashier window is already closed for today.');
     });
   });
 
   describe('reversePayment', () => {
+    it('blocks reversal without service-level permission', async () => {
+      await expect(
+        service.reversePayment('p1', { reason: 'Incorrect collection' }, {
+          ...actor,
+          permissions: [],
+        } as any),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(prisma.payment.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('requires a reason before reversing a payment', async () => {
+      await expect(
+        service.reversePayment('p1', { reason: '   ' }, actor as any),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.payment.findFirst).not.toHaveBeenCalled();
+    });
+
     it('prevents reversal of already refunded payments', async () => {
       const mockPayment = {
         id: 'p1',
         amount: new Prisma.Decimal(1000),
+        status: PaymentStatus.SUCCESS,
         refunds: [{ id: 'r1', amount: new Prisma.Decimal(100) }],
         tenantId: 't1',
         invoiceId: 'i1',
@@ -137,13 +167,72 @@ describe('FinanceService - Hardening', () => {
       ).rejects.toThrow(ConflictException);
     });
 
+    it('prevents reversal of already reversed payments', async () => {
+      const mockPayment = {
+        id: 'p1',
+        amount: new Prisma.Decimal(1000),
+        status: PaymentStatus.REVERSED,
+        reversedAt: new Date('2026-05-01T10:00:00.000Z'),
+        refunds: [],
+        tenantId: 't1',
+        invoiceId: 'i1',
+      };
+
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
+
+      await expect(
+        service.reversePayment(
+          'p1',
+          { reason: 'Incorrect collection' },
+          actor as any,
+        ),
+      ).rejects.toThrow('This payment is already reversed.');
+    });
+
+    it('blocks reversal for a closed cashier day', async () => {
+      const mockPayment = {
+        id: 'p1',
+        amount: new Prisma.Decimal(1000),
+        status: PaymentStatus.SUCCESS,
+        refunds: [],
+        tenantId: 't1',
+        invoiceId: 'i1',
+        paidAt: new Date('2026-05-01T10:00:00.000Z'),
+        collectedById: 'cashier-1',
+        method: 'CASH',
+        invoice: { id: 'i1', totalAmount: new Prisma.Decimal(1000) },
+      };
+
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(mockPayment);
+      (prisma.cashierClose.findFirst as jest.Mock).mockResolvedValue({
+        id: 'close-1',
+        closeNumber: 'CLS-001',
+      });
+
+      await expect(
+        service.reversePayment(
+          'p1',
+          { reason: 'Incorrect collection' },
+          actor as any,
+        ),
+      ).rejects.toThrow(
+        'This cashier day is already closed. Please contact an administrator.',
+      );
+
+      expect(prisma.journalEntry.findFirst).not.toHaveBeenCalled();
+    });
+
     it('correctly updates statuses and posts to ledger on valid reversal', async () => {
       const mockPayment = {
         id: 'p1',
         amount: new Prisma.Decimal(1000),
+        status: PaymentStatus.SUCCESS,
         refunds: [],
         tenantId: 't1',
         invoiceId: 'i1',
+        paidAt: new Date('2026-05-01T10:00:00.000Z'),
+        collectedById: 'cashier-1',
+        method: 'CASH',
         invoice: { id: 'i1', totalAmount: new Prisma.Decimal(1000) },
       };
 

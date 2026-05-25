@@ -53,8 +53,13 @@ describe('FinanceCompatService', () => {
     prisma.receiptReprintHistory.findMany.mockResolvedValue([
       {
         id: 'history-1',
+        paymentId: 'payment-1',
+        studentId: 'student-1',
+        fileAssetId: 'file-1',
         reprintedAt: new Date('2026-05-09T08:00:00.000Z'),
         reason: 'Parent requested copy',
+        format: 'pdf',
+        delivery: 'download',
         reprintedBy: { id: 'user-1', email: 'accountant@school.test' },
       },
     ]);
@@ -84,8 +89,13 @@ describe('FinanceCompatService', () => {
       items: [
         {
           id: 'history-1',
+          paymentId: 'payment-1',
+          studentId: 'student-1',
+          fileAssetId: 'file-1',
           reprintedAt: new Date('2026-05-09T08:00:00.000Z'),
           reason: 'Parent requested copy',
+          format: 'pdf',
+          delivery: 'download',
           reprintedBy: { id: 'user-1', email: 'accountant@school.test' },
         },
       ],

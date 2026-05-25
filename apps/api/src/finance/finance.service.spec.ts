@@ -22,7 +22,16 @@ const actor = {
   email: 'accountant@schoolos.test',
   authMethod: AuthMethod.PASSWORD,
   roles: ['accountant'],
-  permissions: ['fees:adjust', 'payments:refund', 'payments:close'],
+  permissions: [
+    'fees:adjust',
+    'fees:manage',
+    'payments:collect',
+    'payments:refund',
+    'payments:reverse',
+    'payments:close',
+    'receipts:read',
+    'receipts:manage',
+  ],
 };
 
 describe('finance production controls', () => {
@@ -1151,7 +1160,7 @@ describe('finance production controls', () => {
         },
         actor,
       ),
-    ).rejects.toThrow('Cashier close CLS-2026-00001 already overlaps');
+    ).rejects.toThrow('This cashier window is already closed for today.');
   });
 
   it('builds reconciliation rows and csv export from the same payments', async () => {
@@ -1223,6 +1232,66 @@ describe('finance production controls', () => {
     );
     expect(csv).toContain('REC-2026-00001');
     expect(csv).toContain('RFD-2026-00001');
+  });
+
+  it('reports payment gateway readiness without pretending online payments are enabled', async () => {
+    const { service, prisma } = buildService({
+      invoice: null,
+      feeHead: null,
+      gatewayProvider: null,
+    });
+
+    const result = await service.getPaymentGatewayReadiness(actor);
+
+    expect(prisma.providerConfig.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          type: 'PAYMENT_GATEWAY',
+          enabled: true,
+        }),
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        enabled: false,
+        status: 'not_configured',
+        webhookReady: false,
+        paymentIntentReady: false,
+        message: 'Online payments are not enabled for this school.',
+      }),
+    );
+  });
+
+  it('marks configured payment gateways ready only when webhook and intent config exist', async () => {
+    const { service } = buildService({
+      invoice: null,
+      feeHead: null,
+      gatewayProvider: {
+        id: 'provider-1',
+        name: 'Nepal Gateway',
+        enabled: true,
+        environment: 'TEST',
+        validationStatus: 'VALID',
+        lastValidatedAt: new Date('2026-05-01T00:00:00.000Z'),
+        configEncrypted: {
+          webhookPath: '/payments/webhooks/nepal-gateway',
+          intentUrl: 'https://gateway.test/intent',
+          settlementStatusUrl: 'https://gateway.test/settlement',
+        },
+      },
+    });
+
+    const result = await service.getPaymentGatewayReadiness(actor);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        enabled: true,
+        status: 'ready',
+        webhookReady: true,
+        paymentIntentReady: true,
+        settlementTrackingReady: true,
+      }),
+    );
   });
 
   it('rejects missing invoices, fee heads, and source journals', async () => {
@@ -1421,6 +1490,7 @@ function buildService(options: {
   reconciliationPayments?: unknown[];
   reconciliationPaymentEntries?: unknown[];
   reconciliationRefundEntries?: unknown[];
+  gatewayProvider?: unknown;
 }) {
   const prisma = {
     student: {
@@ -1504,6 +1574,9 @@ function buildService(options: {
             return options.reconciliationPaymentEntries ?? [];
           },
         ),
+    },
+    providerConfig: {
+      findFirst: jest.fn().mockResolvedValue(options.gatewayProvider ?? null),
     },
     invoiceLine: {
       findFirst: jest
