@@ -6,3 +6,4 @@ export * from './settings.js';
 export * from './payroll.js';
 export * from './validation.js';
 export * from './attendance-history.js';
+export * from './entitlements.js';

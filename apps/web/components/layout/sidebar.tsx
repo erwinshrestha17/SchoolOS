@@ -4,6 +4,7 @@ import type { PermissionKey } from '@schoolos/core';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession } from '../session-provider';
+import { useEntitlements } from '../entitlements-provider';
 import {
   LayoutDashboard,
   Users,
@@ -48,6 +49,25 @@ export type NavGroup = {
 const academicPermissions: PermissionKey[] = ['academics:read', 'academics:manage'];
 const timetablePermissions: PermissionKey[] = ['timetable:read'];
 const homeworkPermissions: PermissionKey[] = ['homework:read'];
+
+function getRequiredModuleForHref(href: string): string | null {
+  if (href.startsWith('/dashboard/students')) return 'students';
+  if (href.startsWith('/dashboard/admissions')) return 'students';
+  if (href.startsWith('/dashboard/attendance')) return 'attendance';
+  if (href.startsWith('/dashboard/academics')) return 'exams';
+  if (href.startsWith('/dashboard/homework')) return 'homework';
+  if (href.startsWith('/dashboard/fees')) return 'fees';
+  if (href.startsWith('/dashboard/accounting')) return 'accounting';
+  if (href.startsWith('/dashboard/hr')) return 'hr';
+  if (href.startsWith('/dashboard/payroll')) return 'hr';
+  if (href.startsWith('/dashboard/library')) return 'library';
+  if (href.startsWith('/dashboard/transport')) return 'transport';
+  if (href.startsWith('/dashboard/canteen')) return 'canteen';
+  if (href.startsWith('/dashboard/notices')) return 'notices';
+  if (href.startsWith('/dashboard/activity')) return 'activity';
+  if (href.startsWith('/dashboard/messages')) return 'notices';
+  return null;
+}
 
 export const dashboardNavGroups: NavGroup[] = [
   {
@@ -244,12 +264,23 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const { session } = useSession();
+  const { hasModule } = useEntitlements();
 
   const filterNavGroups = (groups: NavGroup[]) => {
     return groups
       .map((group) => ({
         ...group,
-        items: group.items.filter((item) => canSeeNavItem(item, session)),
+        items: group.items.filter((item) => {
+          const canSee = canSeeNavItem(item, session);
+          if (!canSee) return false;
+
+          const requiredModule = getRequiredModuleForHref(item.href);
+          if (requiredModule && !hasModule(requiredModule)) {
+            return false;
+          }
+
+          return true;
+        }),
       }))
       .filter((group) => group.items.length > 0);
   };

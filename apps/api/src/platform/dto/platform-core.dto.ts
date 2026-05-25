@@ -136,6 +136,11 @@ export class AssignTenantSubscriptionDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  addOns?: string[];
 }
 
 export class TenantFeatureOverrideDto {

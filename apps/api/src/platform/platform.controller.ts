@@ -158,7 +158,7 @@ export class PlatformController {
   async updateSubscriptionStatus(
     @Param('tenantId') tenantId: string,
     @Param('subId') subId: string,
-    @Body() dto: { status: string; notes?: string },
+    @Body() dto: { status: string; notes?: string; addOns?: string[] },
     @Req() req: AuthenticatedRequest,
   ) {
     return this.platformService.updateSubscriptionStatus(

@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import { Reflector } from '@nestjs/core';
 import { PlansService } from '../plans/plans.service';
+import { EntitlementsService } from '../plans/entitlements.service';
 import { Response } from 'express';
 
 describe('AccountingReportsController', () => {
@@ -54,6 +55,13 @@ describe('AccountingReportsController', () => {
           provide: PlansService,
           useValue: {
             checkFeatureEnabled: jest.fn().mockResolvedValue({ allowed: true }),
+          },
+        },
+        {
+          provide: EntitlementsService,
+          useValue: {
+            checkFeatureEnabled: jest.fn().mockResolvedValue(true),
+            checkModuleEnabled: jest.fn().mockResolvedValue(true),
           },
         },
         Reflector,

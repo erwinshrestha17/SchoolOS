@@ -29,8 +29,20 @@ describe('Student Lifecycle Hardening (E2E)', () => {
   let prisma: PrismaService;
   let studentsService: StudentsService;
 
+  const tenantId = 'test-tenant-lifecycle';
+  const actor = createAuthContextMock({ tenantId, userId: 'test-admin' });
+
   beforeAll(async () => {
     const prismaMock = createPrismaMock();
+    prismaMock.__state.tenants.push({
+      id: tenantId,
+      slug: 'test-tenant-lifecycle',
+      name: 'Test Tenant Lifecycle',
+      plan: 'standard',
+      mode: 'MULTI',
+      isActive: true,
+      createdAt: new Date(),
+    });
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -67,9 +79,6 @@ describe('Student Lifecycle Hardening (E2E)', () => {
       await app.close();
     }
   });
-
-  const tenantId = 'test-tenant-lifecycle';
-  const actor = createAuthContextMock({ tenantId, userId: 'test-admin' });
 
   let classId: string;
   let academicYearId: string;

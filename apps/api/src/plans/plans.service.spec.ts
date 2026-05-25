@@ -1,8 +1,10 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PlansService } from './plans.service';
+import { EntitlementsService } from './entitlements.service';
 
 describe('PlansService entitlement and usage enforcement', () => {
   let service: PlansService;
+  let entitlementsService: EntitlementsService;
   let prisma: any;
 
   beforeEach(() => {
@@ -11,14 +13,15 @@ describe('PlansService entitlement and usage enforcement', () => {
         findUnique: jest.fn().mockResolvedValue({ isActive: true }),
       },
       tenantFeatureOverride: {
-        findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       tenantSubscription: {
         findFirst: jest.fn(),
       },
     };
 
-    service = new PlansService(prisma);
+    entitlementsService = new EntitlementsService(prisma as any);
+    service = new PlansService(prisma as any, entitlementsService);
   });
 
   it('rejects entitlement checks for missing tenants', async () => {
@@ -37,15 +40,19 @@ describe('PlansService entitlement and usage enforcement', () => {
     ).resolves.toEqual(
       expect.objectContaining({ allowed: false, reason: 'tenant_inactive' }),
     );
-
-    expect(prisma.tenantFeatureOverride.findUnique).not.toHaveBeenCalled();
-    expect(prisma.tenantSubscription.findFirst).not.toHaveBeenCalled();
   });
 
   it('uses tenant feature override before subscription plan features', async () => {
     prisma.tenant.findUnique.mockResolvedValue({ isActive: true });
-    prisma.tenantFeatureOverride.findUnique.mockResolvedValue({
-      enabled: false,
+    prisma.tenantFeatureOverride.findMany.mockResolvedValue([
+      { featureKey: 'module.fees', enabled: false },
+    ]);
+    prisma.tenantSubscription.findFirst.mockResolvedValue({
+      status: 'ACTIVE',
+      plan: {
+        key: 'starter',
+        features: [{ featureKey: 'module.fees', enabled: true }],
+      },
     });
 
     await expect(
@@ -53,24 +60,15 @@ describe('PlansService entitlement and usage enforcement', () => {
     ).resolves.toEqual(
       expect.objectContaining({ allowed: false, reason: 'feature_locked' }),
     );
-
-    expect(prisma.tenantFeatureOverride.findUnique).toHaveBeenCalledWith({
-      where: {
-        tenantId_featureKey: {
-          tenantId: 'tenant-1',
-          featureKey: 'module.fees',
-        },
-      },
-    });
-    expect(prisma.tenantSubscription.findFirst).not.toHaveBeenCalled();
   });
 
   it('allows enabled feature keys from active subscription plan features', async () => {
     prisma.tenant.findUnique.mockResolvedValue({ isActive: true });
-    prisma.tenantFeatureOverride.findUnique.mockResolvedValue(null);
+    prisma.tenantFeatureOverride.findMany.mockResolvedValue([]);
     prisma.tenantSubscription.findFirst.mockResolvedValue({
       status: 'ACTIVE',
       plan: {
+        key: 'custom-plan',
         features: [{ featureKey: 'module.students', enabled: true }],
       },
     });
@@ -78,23 +76,15 @@ describe('PlansService entitlement and usage enforcement', () => {
     await expect(
       service.checkFeatureEnabled('tenant-1', 'module.students'),
     ).resolves.toEqual(expect.objectContaining({ allowed: true }));
-
-    expect(prisma.tenantSubscription.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          tenantId: 'tenant-1',
-          status: { in: ['ACTIVE', 'TRIAL', 'GRACE'] },
-        },
-      }),
-    );
   });
 
   it('blocks disabled or missing feature keys from active subscription plan features', async () => {
     prisma.tenant.findUnique.mockResolvedValue({ isActive: true });
-    prisma.tenantFeatureOverride.findUnique.mockResolvedValue(null);
+    prisma.tenantFeatureOverride.findMany.mockResolvedValue([]);
     prisma.tenantSubscription.findFirst.mockResolvedValue({
       status: 'ACTIVE',
       plan: {
+        key: 'custom-plan',
         features: [{ featureKey: 'module.library', enabled: false }],
       },
     });

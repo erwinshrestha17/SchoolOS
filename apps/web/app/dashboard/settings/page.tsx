@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { cn } from '../../../lib/utils';
 import { api } from '../../../lib/api';
 import { TenantSettingSummary, TenantSettingKey } from '@schoolos/core';
@@ -24,7 +24,9 @@ import {
   FileText,
   Upload,
   Download,
-  ShieldCheck
+  ShieldCheck,
+  Lock,
+  ArrowUpRight
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
@@ -35,6 +37,8 @@ import { Input } from '../../../components/ui/input';
 import { Select } from '../../../components/ui/select';
 import { Checkbox } from '../../../components/ui/checkbox';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEntitlements } from '../../../components/entitlements-provider';
 
 // --- Helpers ---
 
@@ -171,9 +175,47 @@ const SECURITY_SETTING_KEYS: TenantSettingKey[] = [
 // --- Components ---
 
 export default function TenantSettingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-[400px] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+      </div>
+    }>
+      <TenantSettingsContent />
+    </Suspense>
+  );
+}
+
+function TenantSettingsContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tab = searchParams.get('tab');
+
   const [settings, setSettings] = useState<TenantSettingSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const activeTab = [
+    'profile',
+    'branding',
+    'academic',
+    'fees',
+    'attendance',
+    'payroll',
+    'accounting',
+    'communication',
+    'security',
+    'data',
+    'audit',
+    'subscription',
+    'billing'
+  ].includes(tab ?? '')
+    ? tab!
+    : 'profile';
+
+  const onTabChange = (value: string) => {
+    router.replace(`/dashboard/settings?tab=${value}`);
+  };
 
   useEffect(() => {
     fetchSettings();
@@ -219,7 +261,7 @@ export default function TenantSettingsPage() {
         <p className="text-slate-500">Configure your school&apos;s profile, branding, and operational rules.</p>
       </div>
 
-      <Tabs defaultValue="profile" className="space-y-6">
+      <Tabs value={activeTab === 'billing' ? 'subscription' : activeTab} onValueChange={onTabChange} className="space-y-6">
         <TabsList className="bg-slate-100 p-1 overflow-x-auto flex-nowrap scrollbar-hide">
           <TabsTrigger value="profile" className="gap-2"><School size={16} /> Profile</TabsTrigger>
           <TabsTrigger value="branding" className="gap-2"><Palette size={16} /> Branding</TabsTrigger>
@@ -232,6 +274,7 @@ export default function TenantSettingsPage() {
           <TabsTrigger value="security" className="gap-2"><Shield size={16} /> Security</TabsTrigger>
           <TabsTrigger value="data" className="gap-2"><Download size={16} /> Import/Export</TabsTrigger>
           <TabsTrigger value="audit" className="gap-2"><FileText size={16} /> Audit Logs</TabsTrigger>
+          <TabsTrigger value="subscription" className="gap-2"><CreditCard size={16} /> Subscription</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile">
@@ -266,6 +309,12 @@ export default function TenantSettingsPage() {
         </TabsContent>
         <TabsContent value="audit">
           <SectionAudit initialValues={settings} />
+        </TabsContent>
+        <TabsContent value="subscription">
+          <SectionSubscription />
+        </TabsContent>
+        <TabsContent value="billing">
+          <SectionSubscription />
         </TabsContent>
       </Tabs>
     </div>
@@ -909,5 +958,195 @@ function DataActionCard({ title, description, href }: { title: string, descripti
       </div>
       <p className="text-[11px] text-slate-500 leading-relaxed">{description}</p>
     </Link>
+  );
+}
+
+function SectionSubscription() {
+  const { entitlements, loading, error } = useEntitlements();
+
+  if (loading) {
+    return (
+      <div className="flex h-[200px] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  if (error || !entitlements) {
+    return (
+      <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-rose-700">
+        <div className="flex items-center gap-2 font-semibold">
+          <AlertCircle size={20} />
+          <span>Error Loading Subscription Details</span>
+        </div>
+        <p className="mt-1 text-sm">Please refresh the page or try again later.</p>
+      </div>
+    );
+  }
+
+  const moduleFriendlyNames: Record<string, string> = {
+    students: 'M1 Admissions & Student Profiles',
+    attendance: 'M2 Smart Attendance',
+    fees: 'M3 Fees & Receipts',
+    exams: 'M4 Exams, CAS & Report Cards',
+    activity: 'M5 Activity Feed & Milestones',
+    homework: 'M6 Homework & Timetable',
+    hr: 'M7 HR & Payroll',
+    library: 'M8A Library Management',
+    transport: 'M8B Transport Management',
+    canteen: 'M8C Canteen Management',
+    accounting: 'M9 Accounting & Finance',
+    notices: 'M10 Notices & Communication',
+  };
+
+  // Defense-in-depth: Filter out M0/Platform core modules in the UI
+  const activeModules = (entitlements.modules ?? []).filter(
+    (m) => m !== 'm0' && m !== 'platform' && !m.includes('m0') && !m.includes('platform')
+  );
+
+  const tierColors: Record<string, { bg: string, text: string, border: string, gradient: string }> = {
+    STARTER: {
+      bg: 'bg-emerald-50',
+      text: 'text-emerald-700',
+      border: 'border-emerald-100',
+      gradient: 'from-emerald-500 to-teal-600',
+    },
+    STANDARD: {
+      bg: 'bg-indigo-50',
+      text: 'text-indigo-700',
+      border: 'border-indigo-100',
+      gradient: 'from-indigo-500 to-blue-600',
+    },
+    PROFESSIONAL: {
+      bg: 'bg-violet-50',
+      text: 'text-violet-700',
+      border: 'border-violet-100',
+      gradient: 'from-violet-500 to-purple-600',
+    },
+    ENTERPRISE: {
+      bg: 'bg-amber-50',
+      text: 'text-amber-700',
+      border: 'border-amber-100',
+      gradient: 'from-amber-500 to-orange-600',
+    },
+  };
+
+  const tier = entitlements.tier?.toUpperCase() || 'STARTER';
+  const colors = tierColors[tier] || tierColors.STARTER;
+
+  const standardAddons = [
+    { key: 'library', name: 'M8A Library Management', desc: 'Manage books, cataloging, and student checkout logs.' },
+    { key: 'transport', name: 'M8B Transport Management', desc: 'Route assignment, vehicle logs, and driver reports.' },
+    { key: 'canteen', name: 'M8C Canteen Management', desc: 'Inventory control, POS sales, and student wallets.' },
+  ];
+
+  return (
+    <Card className="border-slate-200 shadow-sm overflow-hidden">
+      <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <CardTitle className="text-xl font-bold">Billing & Subscription</CardTitle>
+            <CardDescription>View your school&apos;s current subscription plan, active modules, and add-ons.</CardDescription>
+          </div>
+          <a
+            href="mailto:support@schoolos.io?subject=SchoolOS Plan Upgrade Request"
+            className="inline-flex h-10 items-center justify-center rounded-xl bg-indigo-600 px-4 text-xs font-semibold text-white shadow-md shadow-indigo-600/10 transition-all hover:bg-indigo-700 hover:shadow-lg gap-2"
+          >
+            Upgrade Plan <ArrowUpRight size={14} />
+          </a>
+        </div>
+      </CardHeader>
+      
+      <CardContent className="p-6 space-y-8">
+        {/* Tier Summary Card */}
+        <div className="relative overflow-hidden rounded-3xl bg-slate-900 text-white p-8 shadow-lg">
+          <div className="absolute right-0 top-0 h-48 w-48 translate-x-12 -translate-y-12 rounded-full bg-white/[0.03] blur-xl" />
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Current Plan</span>
+              <h3 className="text-3xl font-black tracking-tight mt-1 flex items-center gap-3">
+                {tier} Plan
+                <Badge className={cn("px-2.5 py-0.5 rounded-full uppercase tracking-wider text-[10px] font-bold border", colors.bg, colors.text, colors.border)}>
+                  Active
+                </Badge>
+              </h3>
+              <p className="text-slate-400 text-sm mt-2 max-w-md">
+                Your school has access to the {tier.toLowerCase()} tier features. Add-ons can be customized by contacting support.
+              </p>
+            </div>
+            <div className="bg-white/[0.06] rounded-2xl p-5 border border-white/[0.08] min-w-[200px]">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Billing Account Status</span>
+              <span className="text-lg font-black text-emerald-400 mt-1 block">Good Standing</span>
+              <span className="text-xs text-slate-400 mt-1 block">Renews automatically</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Modules Grid */}
+        <div className="space-y-4">
+          <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Included Modules</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {activeModules.map((m) => (
+              <div key={m} className="flex items-center gap-3 rounded-2xl border border-slate-100 p-4 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                <div className="h-6 w-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <CheckCircle2 size={16} />
+                </div>
+                <span className="text-xs font-bold text-slate-800">{moduleFriendlyNames[m] || m}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Add-ons Section */}
+        {tier === 'STANDARD' && (
+          <div className="space-y-4 pt-4 border-t border-slate-100">
+            <div>
+              <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Plan Add-ons</h4>
+              <p className="text-xs text-slate-500 mt-1">Enhance your Standard Plan with individual service modules.</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {standardAddons.map((addon) => {
+                const isActive = (entitlements.addOns ?? []).includes(addon.key);
+                return (
+                  <div 
+                    key={addon.key} 
+                    className={cn(
+                      "rounded-3xl border p-5 relative overflow-hidden transition-all shadow-sm",
+                      isActive 
+                        ? "border-indigo-200 bg-indigo-50/30" 
+                        : "border-slate-100 bg-white"
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-bold text-slate-800">{addon.name}</span>
+                      {isActive ? (
+                        <Badge className="bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 text-[10px] uppercase rounded-full">
+                          Active Add-on
+                        </Badge>
+                      ) : (
+                        <Badge variant="neutral" className="bg-slate-100 text-slate-500 font-bold border border-slate-200 text-[10px] uppercase rounded-full flex items-center gap-1">
+                          <Lock size={10} /> Locked
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-relaxed mb-4">{addon.desc}</p>
+                    {!isActive && (
+                      <a
+                        href="mailto:support@schoolos.io?subject=Request Standard Plan Add-on"
+                        className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white py-2 text-xs font-bold text-slate-700 transition-all hover:bg-slate-50"
+                      >
+                        Request Add-on
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

@@ -108,6 +108,7 @@ export type PlatformTenantSubscriptionSummary = {
   endsAt?: string | null;
   renewsAt?: string | null;
   trialEndsAt?: string | null;
+  addOns?: string[];
 };
 
 export type PlatformEntitlementCheck = {

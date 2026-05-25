@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+import { EntitlementsService } from './entitlements.service';
+
 export enum PlanKey {
   FREE = 'free',
   BASIC = 'basic',
@@ -24,7 +26,10 @@ export interface EntitlementCheckResult {
 
 @Injectable()
 export class PlansService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly entitlementsService: EntitlementsService,
+  ) {}
 
   async getTenantStatus(tenantId: string) {
     return this.prisma.tenant.findUnique({
@@ -55,37 +60,11 @@ export class PlansService {
       };
     }
 
-    // 1. Check for manual overrides
-    const override = await this.prisma.tenantFeatureOverride.findUnique({
-      where: { tenantId_featureKey: { tenantId, featureKey } },
-    });
-
-    if (override) {
-      return {
-        allowed: override.enabled,
-        reason: override.enabled ? undefined : 'feature_locked',
-        message: override.enabled
-          ? undefined
-          : `The feature '${featureKey}' has been manually disabled for your tenant.`,
-      };
-    }
-
-    // 2. Check active subscription
     const subscription = await this.prisma.tenantSubscription.findFirst({
       where: {
         tenantId,
         status: { in: ['ACTIVE', 'TRIAL', 'GRACE'] },
       },
-      include: {
-        plan: {
-          include: {
-            features: {
-              where: { featureKey },
-            },
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
     });
 
     if (!subscription) {
@@ -96,17 +75,20 @@ export class PlansService {
       };
     }
 
-    // 3. Check plan features
-    const feature = subscription.plan?.features?.[0];
-    const allowed = feature?.enabled ?? false;
+    const allowed = await this.entitlementsService.checkFeatureEnabled(
+      tenantId,
+      featureKey,
+    );
 
-    return {
-      allowed,
-      reason: allowed ? undefined : 'feature_locked',
-      message: allowed
-        ? undefined
-        : `The feature '${featureKey}' is not included in your current '${subscription.plan?.name}' plan.`,
-    };
+    if (!allowed) {
+      return {
+        allowed: false,
+        reason: 'feature_locked',
+        message: `The feature '${featureKey}' is not included in your current subscription plan.`,
+      };
+    }
+
+    return { allowed: true };
   }
 
   async checkModuleEnabled(

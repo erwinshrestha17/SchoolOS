@@ -468,6 +468,12 @@ export const api = {
       auth: false,
     }),
   getProfile: () => request('/auth/me'),
+  getEntitlements: () => request<{
+    tier: string | null;
+    modules: string[];
+    features: string[];
+    addOns: string[];
+  }>('/me/entitlements'),
   registerTenant: (body: JsonBody) =>
     request('/tenants/register', { method: 'POST', json: body, auth: false }),
   listAcademicYears: () => request<AcademicYearSummary[]>('/academic-years'),

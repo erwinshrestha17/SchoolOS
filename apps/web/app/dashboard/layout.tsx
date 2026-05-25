@@ -4,7 +4,28 @@ import { ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useSession } from '../../components/session-provider';
+import { useEntitlements } from '../../components/entitlements-provider';
 import { DashboardShell } from '../../components/layout/dashboard-shell';
+import { UpgradePrompt } from '../../components/layout/upgrade-prompt';
+
+function getRequiredModuleForHref(href: string): string | null {
+  if (href.startsWith('/dashboard/students')) return 'students';
+  if (href.startsWith('/dashboard/admissions')) return 'students';
+  if (href.startsWith('/dashboard/attendance')) return 'attendance';
+  if (href.startsWith('/dashboard/academics')) return 'exams';
+  if (href.startsWith('/dashboard/homework')) return 'homework';
+  if (href.startsWith('/dashboard/fees')) return 'fees';
+  if (href.startsWith('/dashboard/accounting')) return 'accounting';
+  if (href.startsWith('/dashboard/hr')) return 'hr';
+  if (href.startsWith('/dashboard/payroll')) return 'hr';
+  if (href.startsWith('/dashboard/library')) return 'library';
+  if (href.startsWith('/dashboard/transport')) return 'transport';
+  if (href.startsWith('/dashboard/canteen')) return 'canteen';
+  if (href.startsWith('/dashboard/notices')) return 'notices';
+  if (href.startsWith('/dashboard/activity')) return 'activity';
+  if (href.startsWith('/dashboard/messages')) return 'notices';
+  return null;
+}
 
 export default function DashboardLayout({
   children,
@@ -14,6 +35,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const { session, status } = useSession();
+  const { entitlements, hasModule, loading: entitlementsLoading } = useEntitlements();
 
   useEffect(() => {
     if (status === 'anonymous') {
@@ -59,6 +81,19 @@ export default function DashboardLayout({
           </p>
         </div>
       </div>
+    );
+  }
+
+  // Enforce frontend entitlement gating on direct URL access
+  const requiredModule = getRequiredModuleForHref(pathname || '');
+  if (requiredModule && !entitlementsLoading && !hasModule(requiredModule)) {
+    return (
+      <DashboardShell>
+        <UpgradePrompt
+          moduleName={requiredModule}
+          currentTier={entitlements?.tier}
+        />
+      </DashboardShell>
     );
   }
 

@@ -200,7 +200,11 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
     });
 
     const planId = 'plan-basic';
-    // (Plan basic already setup in first test, but we can re-verify if needed)
+    prisma.__state.platformPlans.push({
+      id: planId,
+      key: 'basic',
+      name: 'Basic Plan',
+    });
 
     prisma.__state.tenantSubscriptions.push({
       id: 'sub-3',

@@ -759,7 +759,7 @@ describe('M0 Platform Backend Hardening (E2E - Internal)', () => {
 
       expect(invoice.invoiceNumber).toMatch(/^SO-\d{4}-\d{5}$/);
       expect(invoice.status).toBe('ISSUED');
-      expect(invoice.amount.toString()).toBe('12000');
+      expect(invoice.amount.toString()).toBe('12000.00');
 
       const partial = await platformService.recordSaaSPayment(
         premiumTenantId,

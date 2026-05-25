@@ -959,28 +959,37 @@ export default function PlatformSettings() {
                       Included Modules
                     </p>
                     <div className="grid grid-cols-2 gap-2">
-                      {asArray(plan.features).slice(0, 6).map((f) => (
-                        <div
-                          key={f.featureKey}
-                          className="flex items-center gap-2 text-sm font-medium text-slate-600"
-                        >
-                          <CheckCircle2
-                            size={14}
-                            className={
-                              f.enabled ? 'text-indigo-500' : 'text-slate-200'
-                            }
-                          />
-                          <span
-                            className={
-                              f.enabled
-                                ? 'text-slate-900'
-                                : 'text-slate-400 line-through'
-                            }
+                      {asArray(plan.features)
+                        .filter((f) => {
+                          const lower = f.featureKey.toLowerCase();
+                          return !(
+                            lower.includes('m0') ||
+                            lower.includes('platform')
+                          );
+                        })
+                        .slice(0, 6)
+                        .map((f) => (
+                          <div
+                            key={f.featureKey}
+                            className="flex items-center gap-2 text-sm font-medium text-slate-600"
                           >
-                            {f.featureKey}
-                          </span>
-                        </div>
-                      ))}
+                            <CheckCircle2
+                              size={14}
+                              className={
+                                f.enabled ? 'text-indigo-500' : 'text-slate-200'
+                              }
+                            />
+                            <span
+                              className={
+                                f.enabled
+                                  ? 'text-slate-900'
+                                  : 'text-slate-400 line-through'
+                              }
+                            >
+                              {f.featureKey}
+                            </span>
+                          </div>
+                        ))}
                     </div>
                   </div>
                   <Button

@@ -745,6 +745,7 @@ export class PlatformService {
         renewsAt: dto.renewsAt ? new Date(dto.renewsAt) : null,
         trialEndsAt: dto.trialEndsAt ? new Date(dto.trialEndsAt) : null,
         notes: dto.notes,
+        addOns: dto.addOns ?? [],
       },
       include: { plan: true },
     });
@@ -761,6 +762,7 @@ export class PlatformService {
         tenantId,
         planId: dto.planId,
         status: dto.status,
+        addOns: dto.addOns ?? [],
         closedPreviousSubscriptionIds: previousActiveSubscriptions.map((item) =>
           String(item.id),
         ),
@@ -773,7 +775,7 @@ export class PlatformService {
   async updateSubscriptionStatus(
     tenantId: string,
     subscriptionId: string,
-    dto: { status: string; notes?: string },
+    dto: { status: string; notes?: string; addOns?: string[] },
     actorUserId: string,
   ) {
     const delegate = this.requireDelegate('tenantSubscription');
@@ -787,6 +789,7 @@ export class PlatformService {
       data: {
         status: dto.status,
         notes: dto.notes,
+        addOns: dto.addOns,
       },
     });
 
@@ -796,7 +799,7 @@ export class PlatformService {
       'subscriptions',
       String(subscription.id),
       before,
-      { status: dto.status, notes: dto.notes },
+      { status: dto.status, notes: dto.notes, addOns: dto.addOns },
       tenantId,
     );
 
@@ -2526,6 +2529,9 @@ export class PlatformService {
       trialEndsAt: subscription.trialEndsAt
         ? toDate(subscription.trialEndsAt).toISOString()
         : null,
+      addOns: Array.isArray(subscription.addOns)
+        ? subscription.addOns.map(String)
+        : [],
     };
   }
 

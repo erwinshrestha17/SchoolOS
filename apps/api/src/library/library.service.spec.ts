@@ -347,7 +347,7 @@ describe('LibraryService Phase 3A foundation', () => {
     const { service, tx, prisma } = buildService();
     const issue = {
       id: 'issue-1',
-      dueAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+      dueAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 + 60_000), // 5 days ago
       copyId: 'copy-1',
       tenantId: actor.tenantId,
       status: LibraryIssueStatus.ISSUED,

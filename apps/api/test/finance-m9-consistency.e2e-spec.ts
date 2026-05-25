@@ -47,7 +47,18 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
   let auditService: AuditService;
 
   const tenantId = 'tenant-finance-integration';
-  const actor = createAuthContextMock({ tenantId });
+  const actor = createAuthContextMock({
+    tenantId,
+    permissions: [
+      'payments:collect',
+      'payments:refund',
+      'payments:reverse',
+      'payments:close',
+      'fees:manage',
+      'receipts:manage',
+      'receipts:read',
+    ],
+  });
 
   beforeEach(async () => {
     prisma = createPrismaMock() as unknown as PrismaMock;
@@ -64,6 +75,22 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
       id: tenantId,
       name: 'Integration Test School',
       panNumber: 'PAN123',
+      isActive: true,
+    });
+
+    prisma.__state.platformPlans.push({
+      id: 'professional-plan',
+      key: 'professional',
+      name: 'Professional Plan',
+    });
+
+    prisma.__state.tenantSubscriptions.push({
+      id: 'sub-1',
+      tenantId,
+      planId: 'professional-plan',
+      status: 'ACTIVE',
+      startsAt: new Date(),
+      createdAt: new Date(),
     });
 
     prisma.__state.students.push({

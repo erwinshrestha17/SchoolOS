@@ -33,6 +33,7 @@ import { buildSimplePdf, buildReceiptPdf } from '../common/pdf/simple-pdf';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
+import { EntitlementsService } from '../plans/entitlements.service';
 import { CashierCloseWindowDto } from './dto/cashier-close-window.dto';
 import { CollectPaymentDto } from './dto/collect-payment.dto';
 import { CreateCashierCloseDto } from './dto/create-cashier-close.dto';
@@ -145,6 +146,8 @@ export class FinanceService {
     private readonly usageService: UsageService,
     @Optional()
     private readonly fileRegistryService?: FileRegistryService,
+    @Optional()
+    private readonly entitlementsService?: EntitlementsService,
   ) {}
 
   async reprintReceipt(
@@ -3062,6 +3065,12 @@ export class FinanceService {
     actor: AuthContext,
   ) {
     assertFinancePermission(actor, 'payments:reverse');
+    if (this.entitlementsService) {
+      await this.entitlementsService.assertFeatureEnabled(
+        actor.tenantId,
+        'feature.fees.reversals',
+      );
+    }
     const reason = dto.reason?.trim();
 
     if (!reason) {
@@ -3282,6 +3291,12 @@ export class FinanceService {
 
   async finalizeCashierClose(dto: CreateCashierCloseDto, actor: AuthContext) {
     assertFinancePermission(actor, 'payments:close');
+    if (this.entitlementsService) {
+      await this.entitlementsService.assertFeatureEnabled(
+        actor.tenantId,
+        'feature.fees.cashier_close',
+      );
+    }
     const window = resolveWindow(dto.openedAt, dto.closedAt);
     const closeWindowKey = buildCashierCloseWindowKey({
       openedAt: window.openedAt,
