@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -31,6 +31,12 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
   const [showConfirmRevoke, setShowConfirmRevoke] = useState(false);
   const [rotateReason, setRotateReason] = useState('');
   const [revokeReason, setRevokeReason] = useState('');
+  const qrStatusQuery = useQuery({
+    queryKey: ['student-qr-status', studentId],
+    queryFn: () => api.getStudentQrStatus(studentId),
+  });
+  const currentCredential = qrStatusQuery.data?.activeCredential ?? qrCredential ?? null;
+  const credentialHistory = qrStatusQuery.data?.history ?? [];
 
   const generateMutation = useMutation({
     mutationFn: () => api.generateStudentQr(studentId),
@@ -42,6 +48,7 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
         setRawToken(data.rawToken);
       }
       void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
+      void queryClient.invalidateQueries({ queryKey: ['student-qr-status', studentId] });
     },
   });
 
@@ -57,6 +64,7 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
       setShowConfirmRotate(false);
       setRotateReason('');
       void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
+      void queryClient.invalidateQueries({ queryKey: ['student-qr-status', studentId] });
     },
   });
 
@@ -68,10 +76,11 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
       setShowConfirmRevoke(false);
       setRevokeReason('');
       void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
+      void queryClient.invalidateQueries({ queryKey: ['student-qr-status', studentId] });
     },
   });
 
-  const status = qrCredential?.status || 'NOT_GENERATED';
+  const status = currentCredential?.status || 'NOT_GENERATED';
   const isActive = status === 'ACTIVE';
 
   return (
@@ -145,10 +154,10 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
 
         {isActive && !qrSvg && (
           <div className="space-y-3">
-            {qrCredential?.lastScannedAt && (
+            {currentCredential?.lastScannedAt && (
               <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/30 px-4 py-2.5 text-xs text-slate-500">
                 <ShieldCheck size={14} className="text-success-500" />
-                <span>Last scanned {new Date(qrCredential.lastScannedAt).toLocaleDateString('en-NP', { dateStyle: 'medium' })}</span>
+                <span>Last scanned {new Date(currentCredential.lastScannedAt).toLocaleDateString('en-NP', { dateStyle: 'medium' })}</span>
               </div>
             )}
             <div className="grid grid-cols-2 gap-3">
@@ -239,6 +248,29 @@ export function StudentQrCard({ studentId, studentSystemId, qrCredential, onOpen
         {(generateMutation.error || rotateMutation.error || revokeMutation.error) && (
           <div className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-xs font-bold text-danger-600 animate-in fade-in">
             {(generateMutation.error || rotateMutation.error || revokeMutation.error)?.message || 'An error occurred'}
+          </div>
+        )}
+
+        {credentialHistory.length > 0 && (
+          <div className="rounded-2xl border border-slate-100 bg-white p-4">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Credential history</p>
+            <div className="mt-3 space-y-2">
+              {credentialHistory.slice(0, 4).map((item) => (
+                <div key={item.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                  <div>
+                    <StatusBadge status={item.status} />
+                    <p className="mt-1 text-[0.65rem] text-slate-500">
+                      Issued {new Date(item.createdAt).toLocaleDateString('en-NP', { dateStyle: 'medium' })}
+                    </p>
+                  </div>
+                  {(item.rotateReason || item.revokeReason) && (
+                    <span className="max-w-[12rem] truncate text-[0.65rem] font-semibold text-slate-500">
+                      {item.rotateReason ?? item.revokeReason}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

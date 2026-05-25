@@ -116,7 +116,7 @@ Rules:
 | Module | Name | Current Status |
 |---|---|---|
 | M0 | Platform Core / SaaS Starter | Foundation completed across eight sprints; provider/queue pilot hardening implemented; entitlement/SaaS/staging depth remains |
-| M1 | Admissions & Student Profiles | Phase 1A/1B complete / pilot-ready with Student QR, document audit visibility, and generated PDF storage-route hardening foundations |
+| M1 | Admissions & Student Profiles | Phase 1A/1B complete / pilot-ready with Student QR, storage-hardened student photo and school logo uploads, document audit visibility, iEMIS export artifact registration, duplicate candidate review, and generated PDF storage-route hardening foundations |
 | M2 | Smart Attendance | Phase 1A/1B complete / pilot-ready |
 | M3 | Fees & Receipts | Phase 1A/1B complete / pilot-ready |
 | M4 | Exams, CAS & Report Cards | Phase 2 backend/admin UI plus production PDF/report/correction/snapshot polish implemented |
@@ -335,7 +335,7 @@ Remaining Phase 2A polish:
 
 ## 8. Student Identity QR Foundation
 
-Status: **Implemented foundation; release hardening remains.**
+Status: **Implemented foundation with credential history hardening; release QA remains.**
 
 Student QR identity belongs to M1 Admissions & Student Profiles, not Library-only, Canteen-only, or Transport-only.
 
@@ -344,7 +344,8 @@ Implemented foundation:
 ```text
 - StudentQrCredential model and StudentQrStatus enum.
 - Secure QR credential generation with token hashing.
-- Generate, rotate, revoke, and resolve API.
+- Generate, rotate, revoke, resolve, and safe status/history API.
+- Transactional QR rotation now marks the old credential ROTATED and creates a new ACTIVE credential, preserving audit-safe credential history instead of overwriting the old row.
 - Purpose-based scan responses for general, Library, Canteen, Transport, and Attendance contexts.
 - Student profile QR management card.
 - Shared QR resolver UI foundation.
@@ -356,8 +357,8 @@ Remaining hardening:
 
 ```text
 - Verify immutable student identity code behavior across all admission paths.
-- Verify ID-card PDF QR rendering before release; the simple PDF engine has been extended for Phase 2 report exports and should be visually checked with real QR assets.
-- Add deeper QR tenant, permission, role-purpose, and audit tests.
+- ID-card PDF generation has backend integration coverage for opaque QR payload rendering paths without tokenHash exposure; visual QR rendering still needs manual/staging verification with real generated cards.
+- Add deeper QR tenant, permission, role-purpose, and audit/browser tests.
 - Add QR manual QA across Student profile, Library issue/return, and Canteen serving/POS.
 - Add optional Transport QR usage only where it improves operator flow.
 - Add parent/mobile QR-related views later, after Phase 5 opens.

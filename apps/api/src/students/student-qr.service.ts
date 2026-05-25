@@ -25,9 +25,14 @@ interface QrCredentialRecord {
   studentId: string;
   tokenHash: string;
   status: StudentQrStatus;
+  createdById: string | null;
+  updatedById: string | null;
+  expiresAt: Date | null;
   createdAt: Date;
   rotatedAt: Date | null;
   revokedAt: Date | null;
+  rotateReason: string | null;
+  revokeReason: string | null;
   lastScannedAt: Date | null;
 }
 
@@ -35,9 +40,14 @@ export interface SafeQrCredential {
   id: string;
   studentId: string;
   status: StudentQrStatus;
+  createdById: string | null;
+  updatedById: string | null;
+  expiresAt: string | null;
   createdAt: string;
   rotatedAt: string | null;
   revokedAt: string | null;
+  rotateReason: string | null;
+  revokeReason: string | null;
   lastScannedAt: string | null;
 }
 
@@ -47,6 +57,11 @@ export interface PrintableQrResult {
   qrImageAvailable: boolean;
   qrImageMessage?: string;
   rawToken?: string;
+}
+
+export interface StudentQrStatusHistory {
+  activeCredential: SafeQrCredential | null;
+  history: SafeQrCredential[];
 }
 
 const PURPOSE_PERMISSIONS: Record<StudentQrResolvePurpose, string[]> = {
@@ -101,8 +116,9 @@ export class StudentQrService {
   ): Promise<PrintableQrResult> {
     await this.assertActiveStudent(tenantId, studentId);
 
-    const existing = await this.prisma.studentQrCredential.findUnique({
-      where: { tenantId_studentId: { tenantId, studentId } },
+    const existing = await this.prisma.studentQrCredential.findFirst({
+      where: { tenantId, studentId, status: StudentQrStatus.ACTIVE },
+      orderBy: { createdAt: 'desc' },
     });
 
     if (existing?.status === StudentQrStatus.ACTIVE) {
@@ -123,11 +139,7 @@ export class StudentQrService {
       };
     }
 
-    const issued = await this.issueCredential(
-      tenantId,
-      studentId,
-      existing?.id,
-    );
+    const issued = await this.issueCredential(tenantId, studentId, auth.userId);
 
     await this.auditService.record({
       action: 'QR_GENERATED',
@@ -160,22 +172,29 @@ export class StudentQrService {
 
     await this.assertActiveStudent(tenantId, studentId);
 
-    const existing = await this.prisma.studentQrCredential.findUnique({
-      where: { tenantId_studentId: { tenantId, studentId } },
+    const existing = await this.prisma.studentQrCredential.findFirst({
+      where: { tenantId, studentId, status: StudentQrStatus.ACTIVE },
+      orderBy: { createdAt: 'desc' },
     });
 
     if (!existing) {
       throw new NotFoundException('QR credential not found');
     }
 
-    const issued = await this.issueCredential(
-      tenantId,
-      studentId,
-      existing.id,
-      {
-        rotatedAt: new Date(),
-      },
-    );
+    const rotatedAt = new Date();
+    const issued = await this.prisma.$transaction(async (tx) => {
+      await tx.studentQrCredential.update({
+        where: { id: existing.id },
+        data: {
+          status: StudentQrStatus.ROTATED,
+          rotatedAt,
+          updatedById: auth.userId,
+          rotateReason: reason.trim(),
+        },
+      });
+
+      return this.issueCredential(tenantId, studentId, auth.userId, tx);
+    });
 
     await this.auditService.record({
       action: 'QR_ROTATED',
@@ -211,8 +230,9 @@ export class StudentQrService {
       );
     }
 
-    const existing = await this.prisma.studentQrCredential.findUnique({
-      where: { tenantId_studentId: { tenantId, studentId } },
+    const existing = await this.prisma.studentQrCredential.findFirst({
+      where: { tenantId, studentId, status: StudentQrStatus.ACTIVE },
+      orderBy: { createdAt: 'desc' },
     });
 
     if (existing?.tenantId !== tenantId) {
@@ -224,6 +244,8 @@ export class StudentQrService {
       data: {
         status: StudentQrStatus.REVOKED,
         revokedAt: new Date(),
+        updatedById: auth.userId,
+        revokeReason: reason.trim(),
       },
     });
 
@@ -242,6 +264,26 @@ export class StudentQrService {
     });
 
     return this.sanitizeCredential(credential);
+  }
+
+  async getQrStatus(
+    tenantId: string,
+    studentId: string,
+  ): Promise<StudentQrStatusHistory> {
+    await this.assertTenantStudent(tenantId, studentId);
+
+    const history = await this.prisma.studentQrCredential.findMany({
+      where: { tenantId, studentId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+
+    const active =
+      history.find((item) => item.status === StudentQrStatus.ACTIVE) ?? null;
+
+    return {
+      activeCredential: active ? this.sanitizeCredential(active) : null,
+      history: history.map((item) => this.sanitizeCredential(item)),
+    };
   }
 
   async resolveQr(
@@ -303,14 +345,18 @@ export class StudentQrService {
             : credential.tenantId !== tenantId
               ? 'wrong_tenant'
               : credential.status !== StudentQrStatus.ACTIVE
-                ? 'revoked'
+                ? credential.status === StudentQrStatus.ROTATED
+                  ? 'rotated'
+                  : 'revoked'
                 : 'inactive_student',
           reason: !credential
             ? 'not_found'
             : credential.tenantId !== tenantId
               ? 'wrong_tenant'
               : credential.status !== StudentQrStatus.ACTIVE
-                ? 'revoked'
+                ? credential.status === StudentQrStatus.ROTATED
+                  ? 'rotated'
+                  : 'revoked'
                 : 'inactive_student',
           timestamp: new Date().toISOString(),
         },
@@ -532,33 +578,36 @@ export class StudentQrService {
     }
   }
 
+  private async assertTenantStudent(tenantId: string, studentId: string) {
+    const student = await this.prisma.student.findFirst({
+      where: { id: studentId, tenantId },
+      select: { id: true },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+  }
+
   private async issueCredential(
     tenantId: string,
     studentId: string,
-    existingId?: string,
-    extra?: { rotatedAt?: Date },
+    actorUserId: string,
+    tx: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = hashToken(rawToken);
 
-    const credential = existingId
-      ? await this.prisma.studentQrCredential.update({
-          where: { id: existingId },
-          data: {
-            tokenHash,
-            status: StudentQrStatus.ACTIVE,
-            revokedAt: null,
-            rotatedAt: extra?.rotatedAt ?? null,
-          },
-        })
-      : await this.prisma.studentQrCredential.create({
-          data: {
-            tenantId,
-            studentId,
-            tokenHash,
-            status: StudentQrStatus.ACTIVE,
-          },
-        });
+    const credential = await tx.studentQrCredential.create({
+      data: {
+        tenantId,
+        studentId,
+        tokenHash,
+        status: StudentQrStatus.ACTIVE,
+        createdById: actorUserId,
+        updatedById: actorUserId,
+      },
+    });
 
     return { credential, rawToken };
   }
@@ -568,9 +617,14 @@ export class StudentQrService {
       id: credential.id,
       studentId: credential.studentId,
       status: credential.status,
+      createdById: credential.createdById ?? null,
+      updatedById: credential.updatedById ?? null,
+      expiresAt: credential.expiresAt?.toISOString() ?? null,
       createdAt: credential.createdAt.toISOString(),
       rotatedAt: credential.rotatedAt?.toISOString() ?? null,
       revokedAt: credential.revokedAt?.toISOString() ?? null,
+      rotateReason: credential.rotateReason ?? null,
+      revokeReason: credential.revokeReason ?? null,
       lastScannedAt: credential.lastScannedAt?.toISOString() ?? null,
     };
   }

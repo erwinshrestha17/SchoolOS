@@ -22,6 +22,7 @@ function createController() {
     updateStudentGuardian: jest.fn(),
     exportIemis: jest.fn(),
     exportRoster: jest.fn(),
+    listDuplicateStudentCandidates: jest.fn(),
     mergeDuplicateStudent: jest.fn(),
     getFeeClearance: jest.fn(),
     requestTransfer: jest.fn(),
@@ -117,6 +118,23 @@ describe('StudentsController M1 contracts', () => {
 
     expect(service.mergeDuplicateStudent).toHaveBeenCalledWith(dto, actor);
     expect(result).toEqual({ success: true });
+  });
+
+  it('delegates duplicate candidate review through lifecycle permission route', () => {
+    const { controller, service } = createController();
+    const query = { studentId: 'student-1', limit: 10 };
+    service.listDuplicateStudentCandidates.mockReturnValue({ candidates: [] });
+
+    const result = controller.listDuplicateStudentCandidates(
+      query as never,
+      actor,
+    );
+
+    expect(service.listDuplicateStudentCandidates).toHaveBeenCalledWith(
+      query,
+      actor,
+    );
+    expect(result).toEqual({ candidates: [] });
   });
 
   it('delegates transfer lifecycle action with reason-bearing payload', () => {

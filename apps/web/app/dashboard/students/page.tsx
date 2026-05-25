@@ -6,9 +6,13 @@ import { StudentDirectory } from '../../../components/forms/student-directory';
 import { PageHeader } from '../../../components/ui/page-header';
 import { Users } from 'lucide-react';
 import { useState } from 'react';
+import { useSession } from '../../../components/session-provider';
 
 export default function StudentsPage() {
   const [pdfError, setPdfError] = useState('');
+  const [isExportingIemis, setIsExportingIemis] = useState(false);
+  const { hasPermissions } = useSession();
+  const canManageStudentLifecycle = hasPermissions(['students:manage_lifecycle']);
 
   const [filters, setFilters] = useState<{
     academicYearId?: string;
@@ -39,6 +43,11 @@ export default function StudentsPage() {
     queryKey: ['students', filters], 
     queryFn: () => api.listStudents(filters) 
   });
+  const duplicateCandidatesQuery = useQuery({
+    queryKey: ['student-duplicate-candidates'],
+    queryFn: () => api.listDuplicateStudentCandidates({ limit: 5 }),
+    enabled: canManageStudentLifecycle,
+  });
 
   async function openStudentPdf(studentId: string, kind: string) {
     setPdfError('');
@@ -67,6 +76,23 @@ export default function StudentsPage() {
       });
     } catch (error) {
       setPdfError(error instanceof Error ? error.message : 'Export failed');
+    }
+  }
+
+  async function handleExportIemis() {
+    setPdfError('');
+    setIsExportingIemis(true);
+    try {
+      const result = await api.exportIemisStudents();
+      setPdfError(
+        `iEMIS export prepared: ${result.validRecords}/${result.totalRecords} valid records (${result.fileName}).`,
+      );
+    } catch (error) {
+      setPdfError(
+        error instanceof Error ? error.message : 'iEMIS export failed',
+      );
+    } finally {
+      setIsExportingIemis(false);
     }
   }
 
@@ -101,6 +127,17 @@ export default function StudentsPage() {
         onOpenPdf={(studentId, kind) => void openStudentPdf(studentId, kind)}
         onExportRoster={(format, filters) =>
           void handleExportRoster(format, filters)
+        }
+        onExportIemis={() => void handleExportIemis()}
+        canExportIemis={hasPermissions(['students:read'])}
+        isExportingIemis={isExportingIemis}
+        canManageDuplicates={canManageStudentLifecycle}
+        duplicateCandidates={duplicateCandidatesQuery.data?.candidates ?? []}
+        isLoadingDuplicateCandidates={duplicateCandidatesQuery.isLoading}
+        duplicateCandidatesError={
+          duplicateCandidatesQuery.error instanceof Error
+            ? duplicateCandidatesQuery.error.message
+            : ''
         }
         onFilterChange={setFilters}
       />

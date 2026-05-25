@@ -35,6 +35,7 @@ describe('StudentsService (Duplicate Merge)', () => {
             student: {
               findFirst: jest.fn(),
               findUnique: jest.fn(),
+              findMany: jest.fn(),
               update: jest.fn(),
             },
             studentGuardian: {
@@ -179,6 +180,66 @@ describe('StudentsService (Duplicate Merge)', () => {
 
     expect(result.mergeCounts.invoices).toBe(2);
     expect(result.isProbableDuplicate).toBe(true);
+  });
+
+  it('lists duplicate candidates using tenant-scoped matching signals', async () => {
+    (prisma.student.findMany as jest.Mock).mockResolvedValue([
+      {
+        ...sourceStudent,
+        admissionNumber: 'ADM-001',
+        previousSchool: 'Sunrise Montessori',
+        class: { name: 'Class 1' },
+        sectionRef: { name: 'A' },
+        guardianLinks: [
+          {
+            guardian: {
+              fullName: 'James Doe',
+              primaryPhone: '9800000000',
+              secondaryPhone: null,
+            },
+          },
+        ],
+      },
+      {
+        ...targetStudent,
+        admissionNumber: 'ADM-001',
+        previousSchool: 'Sunrise Montessori',
+        class: { name: 'Class 1' },
+        sectionRef: { name: 'A' },
+        guardianLinks: [
+          {
+            guardian: {
+              fullName: 'James Doe',
+              primaryPhone: '9800000000',
+              secondaryPhone: null,
+            },
+          },
+        ],
+      },
+    ]);
+
+    const result = await service.listDuplicateStudentCandidates(
+      { limit: 10 },
+      mockAuth,
+    );
+
+    expect(prisma.student.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ tenantId: mockAuth.tenantId }),
+        take: 100,
+      }),
+    );
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0].confidence).toBe('HIGH');
+    expect(result.candidates[0].reasons).toEqual(
+      expect.arrayContaining([
+        'Similar student name',
+        'Same date of birth',
+        'Admission number conflict',
+        'Shared guardian phone',
+        'Same previous school',
+      ]),
+    );
   });
 
   it('should execute merge transactionally', async () => {

@@ -94,7 +94,10 @@ import type {
   StudentAttendanceHistory,
   StudentAttendanceHistoryFilters,
   StudentDocumentHistory,
+  StudentDuplicateCandidatesResult,
+  IemisExportResult,
   StudentProfileDetail,
+  StudentQrStatusHistory,
   StudentArchivePayload,
   StudentDeletePayload,
   StudentFeeClearance,
@@ -255,6 +258,19 @@ function createRequestId() {
   }
 
   return `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function readFileAsBase64(file: File) {
+  const reader = new FileReader();
+
+  return new Promise<string>((resolve, reject) => {
+    reader.onload = () => {
+      const encoded = String(reader.result ?? '').split(',')[1] ?? '';
+      resolve(encoded);
+    };
+    reader.onerror = () => reject(new Error('Unable to read file'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function parseApiErrorMessage(text: string) {
@@ -564,6 +580,10 @@ export const api = {
       qrImageMessage?: string;
       rawToken?: string;
     }>(`/students/${encodeURIComponent(studentId)}/qr`, { method: 'POST' }),
+  getStudentQrStatus: (studentId: string) =>
+    request<StudentQrStatusHistory>(
+      `/students/${encodeURIComponent(studentId)}/qr`,
+    ),
   rotateStudentQr: (studentId: string, body: { reason: string }) =>
     request<{
       credential: any;
@@ -814,6 +834,57 @@ export const api = {
       sizeBytes: number;
       url: string;
     }>(`/files/${encodeURIComponent(id)}/view`),
+
+  uploadStudentPhoto: async (
+    studentId: string,
+    file: File,
+    note?: string,
+  ) => {
+    const base64Content = await readFileAsBase64(file);
+
+    return request<{
+      studentId: string;
+      photoFileId: string;
+      fileName: string;
+      mimeType: string;
+      sizeBytes: number;
+      previewUrl: string;
+      downloadUrl: string;
+    }>(`/students/${encodeURIComponent(studentId)}/photo`, {
+      method: 'POST',
+      json: {
+        fileName: file.name,
+        mimeType: file.type,
+        base64Content,
+        ...(note ? { note } : {}),
+      },
+    });
+  },
+  removeStudentPhoto: (studentId: string) =>
+    request<{ success: true; deleted: boolean }>(
+      `/students/${encodeURIComponent(studentId)}/photo`,
+      { method: 'DELETE' },
+    ),
+  getStudentPhotoPreview: (studentId: string) =>
+    request<{
+      studentId: string;
+      photoFileId: string;
+      fileName: string;
+      mimeType: string;
+      sizeBytes: number;
+      url: string;
+      expiresInSeconds: number;
+    }>(`/students/${encodeURIComponent(studentId)}/photo/preview`),
+
+  exportIemisStudents: () =>
+    request<IemisExportResult>('/students/iemis/export'),
+  listDuplicateStudentCandidates: (params?: {
+    studentId?: string;
+    limit?: number;
+  }) =>
+    request<StudentDuplicateCandidatesResult>(
+      withQuery('/students/duplicates/candidates', params ?? {}),
+    ),
 
   uploadStudentDocument: (body: UploadStudentDocumentPayload) =>
     request('/student-documents', {

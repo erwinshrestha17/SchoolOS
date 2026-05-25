@@ -6,6 +6,7 @@ import type {
   ClassSummary,
   SectionSummary,
   StudentProfile,
+  StudentDuplicateCandidate,
   PaginatedResponse,
 } from '@schoolos/core';
 import Link from 'next/link';
@@ -32,6 +33,7 @@ import {
   Users,
   Wallet,
   ChevronRight,
+  AlertTriangle,
 } from 'lucide-react';
 import { StatusBadge } from '../ui/status-badge';
 
@@ -53,6 +55,13 @@ type StudentDirectoryProps = {
       sectionId?: string;
     },
   ) => void;
+  onExportIemis: () => void;
+  canExportIemis: boolean;
+  isExportingIemis: boolean;
+  canManageDuplicates: boolean;
+  duplicateCandidates: StudentDuplicateCandidate[];
+  isLoadingDuplicateCandidates: boolean;
+  duplicateCandidatesError: string;
   onFilterChange: (filters: {
     academicYearId?: string;
     classId?: string;
@@ -74,6 +83,13 @@ export function StudentDirectory({
   sections,
   studentsResponse,
   onExportRoster,
+  onExportIemis,
+  canExportIemis,
+  isExportingIemis,
+  canManageDuplicates,
+  duplicateCandidates,
+  isLoadingDuplicateCandidates,
+  duplicateCandidatesError,
   onFilterChange,
 }: StudentDirectoryProps) {
   const students = studentsResponse?.items ?? [];
@@ -170,6 +186,15 @@ export function StudentDirectory({
           >
             <Download size={18} />
             Export CSV
+          </button>
+          <button
+            type="button"
+            className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={onExportIemis}
+            disabled={!canExportIemis || isExportingIemis}
+          >
+            <Download size={18} />
+            {isExportingIemis ? 'Exporting...' : 'iEMIS'}
           </button>
            <Link
             href="/dashboard/admissions"
@@ -277,6 +302,72 @@ export function StudentDirectory({
           </div>
         </div>
       </SectionCard>
+
+      {canManageDuplicates ? (
+        <SectionCard
+          title="Duplicate Review"
+          description="Admin-only candidate review based on name, guardian phone, DOB, admission number, and previous school."
+        >
+          {isLoadingDuplicateCandidates ? (
+            <div className="grid gap-3">
+              <div className="h-16 animate-pulse rounded-2xl bg-slate-50" />
+              <div className="h-16 animate-pulse rounded-2xl bg-slate-50" />
+            </div>
+          ) : duplicateCandidatesError ? (
+            <div className="rounded-2xl border border-danger-100 bg-danger-50 p-4 text-sm font-semibold text-danger-700">
+              {duplicateCandidatesError}
+            </div>
+          ) : duplicateCandidates.length > 0 ? (
+            <div className="grid gap-3">
+              {duplicateCandidates.map((candidate) => (
+                <div
+                  key={`${candidate.sourceStudent.id}-${candidate.candidateStudent.id}`}
+                  className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4"
+                >
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-warning-600">
+                        <AlertTriangle size={18} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-slate-900">
+                          {candidate.sourceStudent.fullNameEn} may match {candidate.candidateStudent.fullNameEn}
+                        </p>
+                        <p className="mt-1 text-xs font-medium text-slate-600">
+                          {candidate.reasons.join(', ')}
+                        </p>
+                        {candidate.blockedReason ? (
+                          <p className="mt-2 text-xs font-bold text-warning-700">
+                            {candidate.blockedReason}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant="phase2"
+                        className="border-amber-200 bg-white text-amber-700"
+                      >
+                        {candidate.confidence} / {candidate.score}
+                      </Badge>
+                      <Link
+                        href={`/dashboard/students/${encodeURIComponent(candidate.sourceStudent.id)}`}
+                        className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Review
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5 text-sm font-semibold text-slate-600">
+              No duplicate candidates found in the current review window.
+            </div>
+          )}
+        </SectionCard>
+      ) : null}
 
       <SectionCard
         title="Student Roster"

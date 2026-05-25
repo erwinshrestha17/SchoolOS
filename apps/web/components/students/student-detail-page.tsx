@@ -106,6 +106,20 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
     },
   });
 
+  const photoUploadMutation = useMutation({
+    mutationFn: (file: File) => api.uploadStudentPhoto(studentId, file),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
+    },
+  });
+
+  const photoRemoveMutation = useMutation({
+    mutationFn: () => api.removeStudentPhoto(studentId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
+    },
+  });
+
   async function openStudentPdf(kind: string, token?: string) {
     setPdfError('');
     try {
@@ -141,6 +155,11 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
           profile={profile}
           isSaving={studentUpdateMutation.isPending}
           error={studentUpdateMutation.error}
+          isUploadingPhoto={photoUploadMutation.isPending}
+          photoError={photoUploadMutation.error ?? photoRemoveMutation.error}
+          onUploadPhoto={(file) => photoUploadMutation.mutate(file)}
+          onRemovePhoto={() => photoRemoveMutation.mutate()}
+          isRemovingPhoto={photoRemoveMutation.isPending}
           onCancel={() => setIsEditingStudent(false)}
           onSave={(body) => studentUpdateMutation.mutate(body)}
         />

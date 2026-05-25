@@ -22,14 +22,49 @@ export class StudentRecordsService {
   ) {}
 
   async listDocuments(actor: AuthContext, studentId?: string) {
-    return this.prisma.studentDocument.findMany({
+    const documents = await this.prisma.studentDocument.findMany({
       where: {
         tenantId: actor.tenantId,
         ...(studentId ? { studentId } : {}),
       },
+      select: {
+        id: true,
+        studentId: true,
+        fileId: true,
+        kind: true,
+        status: true,
+        title: true,
+        fileName: true,
+        contentType: true,
+        sizeBytes: true,
+        provider: true,
+        notes: true,
+        expiryDate: true,
+        verifiedAt: true,
+        uploadedById: true,
+        createdAt: true,
+      },
       orderBy: [{ createdAt: 'desc' }],
       take: 100,
     });
+
+    return documents.map((document) => ({
+      id: document.id,
+      studentId: document.studentId,
+      fileId: document.fileId,
+      kind: document.kind,
+      status: document.status,
+      title: document.title,
+      fileName: document.fileName,
+      contentType: document.contentType,
+      sizeBytes: document.sizeBytes,
+      provider: document.provider,
+      notes: document.notes,
+      expiryDate: document.expiryDate?.toISOString() ?? null,
+      verifiedAt: document.verifiedAt?.toISOString() ?? null,
+      uploadedById: document.uploadedById,
+      uploadedAt: document.createdAt.toISOString(),
+    }));
   }
 
   async listDocumentHistory(actor: AuthContext, studentId?: string) {
@@ -238,43 +273,55 @@ export class StudentRecordsService {
     assetId: string,
     action: 'preview' | 'download',
   ) {
-    // 1. Audit the access via Registry
+    const asset = await this.prisma.fileAsset.findFirst({
+      where: {
+        id: assetId,
+        tenantId: actor.tenantId,
+      },
+    });
+
+    if (!asset) {
+      throw new NotFoundException('File not found');
+    }
+
+    const doc = await this.prisma.studentDocument.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        OR: [{ fileId: asset.id }, { objectKey: asset.objectKey }],
+      },
+    });
+
+    if (!doc) {
+      throw new NotFoundException('Student document not found in this tenant');
+    }
+
     await this.fileRegistryService.auditAccess(
       actor.tenantId,
-      assetId,
+      asset.id,
       actor.userId,
       action,
     );
 
-    // 2. Log to StudentDocumentHistory
-    const asset = await this.prisma.fileAsset.findUnique({
-      where: { id: assetId },
+    await this.prisma.studentDocumentHistory.create({
+      data: {
+        tenantId: actor.tenantId,
+        documentId: doc.id,
+        action: action === 'preview' ? 'PREVIEW' : 'DOWNLOAD',
+        documentTitle: doc.title,
+        documentKind: doc.kind,
+        performedBy: actor.userId,
+        metadata: {
+          fileAssetId: asset.id,
+          result: 'SIGNED_URL_CREATED',
+        },
+      },
     });
-    if (asset) {
-      const doc = await this.prisma.studentDocument.findFirst({
-        where: { tenantId: actor.tenantId, objectKey: asset.objectKey },
-      });
-      if (doc) {
-        await this.prisma.studentDocumentHistory.create({
-          data: {
-            tenantId: actor.tenantId,
-            documentId: doc.id,
-            action: 'VIEW',
-            documentTitle: doc.title,
-            documentKind: doc.kind,
-            performedBy: actor.userId,
-            metadata: { action },
-          },
-        });
-      }
-    }
 
-    // 3. Get the signed URL
     let url: string;
     try {
       url = await this.fileRegistryService.getSignedUrl(
         actor.tenantId,
-        assetId,
+        asset.id,
       );
     } catch (error) {
       if (error instanceof ForbiddenException) {

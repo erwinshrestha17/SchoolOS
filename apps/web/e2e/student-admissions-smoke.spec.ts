@@ -55,11 +55,15 @@ test.describe('Students & Admissions Workflow Smoke', () => {
     await expect(page.getByRole('button', { name: /Enroll Student/i })).toBeVisible();
     
     // Search for a known student (if any) or just check empty state
-    await page.getByPlaceholder('Name, Code, or Phone...').fill('UnknownStudentXYZ');
-    await expect(page.getByText('No students match your filters')).toBeVisible();
+    await page
+      .getByLabel(/Search students by name, student code, guardian name, or phone/i)
+      .fill('UnknownStudentXYZ');
+    await expect(page.getByText(/No students found/i)).toBeVisible();
     
     await page.getByRole('button', { name: /Reset All/i }).click();
-    await expect(page.getByPlaceholder('Name, Code, or Phone...')).toHaveValue('');
+    await expect(
+      page.getByLabel(/Search students by name, student code, guardian name, or phone/i),
+    ).toHaveValue('');
   });
 });
 

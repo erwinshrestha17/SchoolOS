@@ -155,23 +155,28 @@ Implemented:
 
 - Admissions, student profiles, guardians, lifecycle, documents, student search.
 - Student photo/document access boundaries.
-- Student document audit trail API and profile visibility.
+- Student photo uploads now enforce MIME, extension, size, safe filename, image signature, tenant-scoped storage keys, File Registry metadata, short-lived preview/download URLs, replace/remove audit actions, and profile edit UI controls.
+- School logo uploads now use the same private object storage + File Registry pattern with tenant-scoped preview/download URLs, validation, update/remove audit logs, and PDF-safe file asset IDs in `school_logo`.
+- Student document audit trail API and profile visibility, with sanitized document list responses that avoid raw storage keys and read-history entries for preview/download access.
 - Student identity models.
-- Student QR credential model, secure token hashing, generate/rotate/revoke/resolve API, QR admin card, and Library/Canteen QR resolver foundations.
+- Student QR credential model, secure token hashing, generate/rotate/revoke/resolve API, transactional rotation that preserves old credentials as ROTATED history, safe status/history API, QR admin card, and Library/Canteen QR resolver foundations.
+- iEMIS export now persists a tenant-scoped CSV artifact through File Registry/report export history and exposes a directory export action.
+- Duplicate review now has an admin-only candidate list endpoint and directory UI based on name, guardian phone, DOB, admission number, and previous-school signals.
 
 Remaining backend:
 
-- iEMIS final export mapping.
-- Duplicate merge workflow polish.
-- Staging verification for storage-backed student photo/document flows.
-- QR scan release verification and more tenant/permission tests.
-- ID-card QR PDF behavior verification. Generated student PDFs now store protected API routes instead of adapter public URLs and mark File Registry assets uploaded after storage succeeds.
+- iEMIS final export mapping still needs staging validation against a real Nepal iEMIS template; unsupported schema fields must stay blank/documented until modeled.
+- Duplicate merge execution remains implemented but still needs broader linked-module staging verification before enabling aggressive admin workflows.
+- Staging verification for storage-backed student photo/document/logo flows.
+- QR scan release verification, browser coverage, and more tenant/permission tests.
+- ID-card QR PDF behavior has backend integration coverage for opaque QR payload support; visual/manual PDF QR rendering still needs staging verification with real generated cards.
 
 Remaining frontend:
 
 - QR manual QA in student, library, and canteen flows.
-- Student photo/logo upload UX polish.
+- Student photo/logo upload UX polish beyond the current profile-edit and settings API foundations.
 - [x] Student document audit trail visibility.
+- [x] Student directory duplicate candidate review visibility for lifecycle admins.
 - Parent-safe student profile views later.
 
 ### M2 - Smart Attendance

@@ -116,8 +116,14 @@ export type StudentProfile = {
   qrCredential?: {
     id: string;
     status: string;
+    createdById?: string | null;
+    updatedById?: string | null;
+    expiresAt?: string | null;
     createdAt: string;
     rotatedAt: string | null;
+    revokedAt?: string | null;
+    rotateReason?: string | null;
+    revokeReason?: string | null;
     lastScannedAt: string | null;
   } | null;
 };
@@ -129,6 +135,26 @@ export enum StudentQrResolvePurpose {
   TRANSPORT = 'TRANSPORT',
   ATTENDANCE = 'ATTENDANCE',
 }
+
+export type StudentQrCredentialSummary = {
+  id: string;
+  studentId: string;
+  status: 'ACTIVE' | 'ROTATED' | 'REVOKED';
+  createdById: string | null;
+  updatedById: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  rotatedAt: string | null;
+  revokedAt: string | null;
+  rotateReason: string | null;
+  revokeReason: string | null;
+  lastScannedAt: string | null;
+};
+
+export type StudentQrStatusHistory = {
+  activeCredential: StudentQrCredentialSummary | null;
+  history: StudentQrCredentialSummary[];
+};
 
 export type StudentProfileEnrollment = {
   id: string;
@@ -780,6 +806,9 @@ export type IemisExportRow = {
 export type IemisExportResult = {
   formatVersion: 'SCHOLOS-IEMIS-1.0';
   exportedAt: string;
+  exportId: string;
+  fileAssetId: string;
+  fileName: string;
   totalRecords: number;
   validRecords: number;
   invalidRecords: number;
@@ -787,6 +816,34 @@ export type IemisExportResult = {
   headers: Array<keyof IemisExportRow>;
   rows: IemisExportRow[];
   csv: string;
+};
+
+export type StudentDuplicateCandidateStudent = {
+  id: string;
+  studentSystemId: string;
+  fullNameEn: string;
+  dateOfBirth: string;
+  admissionNumber: string | null;
+  previousSchool: string | null;
+  lifecycleStatus: StudentLifecycleStatus;
+  className: string | null;
+  sectionName: string | null;
+  guardianPhones: string[];
+};
+
+export type StudentDuplicateCandidate = {
+  sourceStudent: StudentDuplicateCandidateStudent;
+  candidateStudent: StudentDuplicateCandidateStudent;
+  score: number;
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  reasons: string[];
+  blockedReason: string | null;
+};
+
+export type StudentDuplicateCandidatesResult = {
+  candidates: StudentDuplicateCandidate[];
+  limit: number;
+  reviewedStudentId: string | null;
 };
 
 export type JournalEntryView = {
@@ -935,14 +992,20 @@ export type RoleSummary = {
 export type StudentDocument = {
   id: string;
   studentId: string;
+  fileId?: string | null;
   kind: string;
+  status?: string;
   title: string;
   fileName: string;
   contentType: string;
   sizeBytes: number;
   provider: string;
-  objectKey: string;
-  publicUrl: string | null;
+  objectKey?: string;
+  publicUrl?: string | null;
+  notes?: string | null;
+  expiryDate?: string | null;
+  verifiedAt?: string | null;
+  uploadedById?: string | null;
   uploadedAt: string;
 };
 

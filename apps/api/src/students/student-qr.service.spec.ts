@@ -17,9 +17,12 @@ function createService() {
     },
     studentQrCredential: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
     },
+    $transaction: jest.fn(async (callback) => callback(prisma)),
     subjectTeacherAssignment: {
       findFirst: jest.fn(),
     },
@@ -66,9 +69,14 @@ const baseCredential = {
   studentId: 'student-1',
   tokenHash: hashToken('qr-token'),
   status: StudentQrStatus.ACTIVE,
+  createdById: 'user-admin',
+  updatedById: 'user-admin',
+  expiresAt: null,
   createdAt: issuedAt,
   rotatedAt: null,
   revokedAt: null,
+  rotateReason: null,
+  revokeReason: null,
   lastScannedAt: null,
 };
 
@@ -99,7 +107,7 @@ describe('StudentQrService', () => {
   it('stores only tokenHash and never returns raw QR token on generation', async () => {
     const { service, prisma } = createService();
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
-    prisma.studentQrCredential.findUnique.mockResolvedValue(null);
+    prisma.studentQrCredential.findFirst.mockResolvedValue(null);
     prisma.studentQrCredential.create.mockImplementation(async ({ data }) => ({
       ...baseCredential,
       ...data,
@@ -136,7 +144,7 @@ describe('StudentQrService', () => {
   it('does not expose a printable image for an already-active credential', async () => {
     const { service, prisma } = createService();
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
-    prisma.studentQrCredential.findUnique.mockResolvedValue(baseCredential);
+    prisma.studentQrCredential.findFirst.mockResolvedValue(baseCredential);
 
     const result = await service.generateQr('tenant-1', 'student-1', adminAuth);
 
@@ -174,6 +182,86 @@ describe('StudentQrService', () => {
         adminAuth,
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('rotates by preserving old credential history and creating a new active credential transactionally', async () => {
+    const { service, prisma, auditService } = createService();
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.studentQrCredential.findFirst.mockResolvedValue(baseCredential);
+    prisma.studentQrCredential.update.mockResolvedValue({
+      ...baseCredential,
+      status: StudentQrStatus.ROTATED,
+      rotatedAt: new Date('2026-05-13T01:00:00.000Z'),
+      rotateReason: 'Lost printed card',
+    });
+    prisma.studentQrCredential.create.mockImplementation(async ({ data }) => ({
+      ...baseCredential,
+      ...data,
+      id: 'qr-new',
+      createdAt: new Date('2026-05-13T01:00:00.000Z'),
+      rotatedAt: null,
+      revokedAt: null,
+      rotateReason: null,
+      revokeReason: null,
+      lastScannedAt: null,
+    }));
+
+    const result = await service.rotateQr(
+      'tenant-1',
+      'student-1',
+      adminAuth,
+      'Lost printed card',
+    );
+
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.studentQrCredential.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'qr-1' },
+        data: expect.objectContaining({
+          status: StudentQrStatus.ROTATED,
+          rotateReason: 'Lost printed card',
+          updatedById: adminAuth.userId,
+        }),
+      }),
+    );
+    expect(prisma.studentQrCredential.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: 'tenant-1',
+        studentId: 'student-1',
+        status: StudentQrStatus.ACTIVE,
+        createdById: adminAuth.userId,
+        tokenHash: expect.any(String),
+      }),
+    });
+    expect(result.credential.id).toBe('qr-new');
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'QR_ROTATED',
+        resource: 'student_qr',
+        after: expect.objectContaining({ reason: 'Lost printed card' }),
+      }),
+    );
+  });
+
+  it('returns safe QR status history without token hashes', async () => {
+    const { service, prisma } = createService();
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.studentQrCredential.findMany.mockResolvedValue([
+      baseCredential,
+      {
+        ...baseCredential,
+        id: 'qr-old',
+        status: StudentQrStatus.ROTATED,
+        rotatedAt: new Date('2026-05-13T01:00:00.000Z'),
+        rotateReason: 'Lost printed card',
+      },
+    ]);
+
+    const result = await service.getQrStatus('tenant-1', 'student-1');
+
+    expect(result.activeCredential?.id).toBe('qr-1');
+    expect(result.history).toHaveLength(2);
+    expect(result.history[0]).not.toHaveProperty('tokenHash');
   });
 
   it('keeps QR scans tenant-scoped', async () => {
@@ -278,7 +366,7 @@ describe('StudentQrService', () => {
   it('creates audit log for QR generation', async () => {
     const { service, prisma, auditService } = createService();
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
-    prisma.studentQrCredential.findUnique.mockResolvedValue(null);
+    prisma.studentQrCredential.findFirst.mockResolvedValue(null);
     prisma.studentQrCredential.create.mockImplementation(async ({ data }) => ({
       ...baseCredential,
       ...data,
@@ -312,11 +400,22 @@ describe('StudentQrService', () => {
   it('creates audit log for QR rotation', async () => {
     const { service, prisma, auditService } = createService();
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
-    prisma.studentQrCredential.findUnique.mockResolvedValue(baseCredential);
+    prisma.studentQrCredential.findFirst.mockResolvedValue(baseCredential);
     prisma.studentQrCredential.update.mockImplementation(async ({ data }) => ({
       ...baseCredential,
       ...data,
       id: baseCredential.id,
+    }));
+    prisma.studentQrCredential.create.mockImplementation(async ({ data }) => ({
+      ...baseCredential,
+      ...data,
+      id: 'qr-rotated-new',
+      createdAt: new Date('2026-05-13T01:00:00.000Z'),
+      rotatedAt: null,
+      revokedAt: null,
+      rotateReason: null,
+      revokeReason: null,
+      lastScannedAt: null,
     }));
 
     await service.rotateQr(
@@ -342,11 +441,12 @@ describe('StudentQrService', () => {
 
   it('creates audit log for QR revocation', async () => {
     const { service, prisma, auditService } = createService();
-    prisma.studentQrCredential.findUnique.mockResolvedValue(baseCredential);
+    prisma.studentQrCredential.findFirst.mockResolvedValue(baseCredential);
     prisma.studentQrCredential.update.mockResolvedValue({
       ...baseCredential,
       status: StudentQrStatus.REVOKED,
       revokedAt: new Date(),
+      revokeReason: 'Disciplinary action',
     });
 
     await service.revokeQr(
@@ -444,7 +544,7 @@ describe('StudentQrService', () => {
   it('rotate replaces the old token hash (previous QR becomes invalid)', async () => {
     const { service, prisma } = createService();
     prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
-    prisma.studentQrCredential.findUnique.mockResolvedValue(baseCredential);
+    prisma.studentQrCredential.findFirst.mockResolvedValue(baseCredential);
 
     const oldTokenHash = baseCredential.tokenHash;
 
@@ -452,6 +552,17 @@ describe('StudentQrService', () => {
       ...baseCredential,
       ...data,
       id: baseCredential.id,
+    }));
+    prisma.studentQrCredential.create.mockImplementation(async ({ data }) => ({
+      ...baseCredential,
+      ...data,
+      id: 'qr-new-after-rotate',
+      createdAt: new Date('2026-05-13T01:00:00.000Z'),
+      rotatedAt: null,
+      revokedAt: null,
+      rotateReason: null,
+      revokeReason: null,
+      lastScannedAt: null,
     }));
 
     const result = await service.rotateQr(
@@ -462,9 +573,12 @@ describe('StudentQrService', () => {
     );
 
     const updateCall = prisma.studentQrCredential.update.mock.calls[0][0];
-    expect(updateCall.data.tokenHash).toBeDefined();
-    expect(updateCall.data.tokenHash).not.toBe(oldTokenHash);
-    expect(updateCall.data.status).toBe(StudentQrStatus.ACTIVE);
+    expect(updateCall.data.status).toBe(StudentQrStatus.ROTATED);
+    expect(updateCall.data.tokenHash).toBeUndefined();
+    const createCall = prisma.studentQrCredential.create.mock.calls[0][0];
+    expect(createCall.data.tokenHash).toBeDefined();
+    expect(createCall.data.tokenHash).not.toBe(oldTokenHash);
+    expect(createCall.data.status).toBe(StudentQrStatus.ACTIVE);
     expect(result.qrImageAvailable).toBe(true);
     expect(result.qrImageSvg).toContain('<svg');
   });

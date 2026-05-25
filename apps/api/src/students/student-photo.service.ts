@@ -1,22 +1,14 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { FileStatus } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
+import { validateImageUpload } from '../common/files/image-upload-validation';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { UploadStudentPhotoDto } from './dto/upload-student-photo.dto';
 
 const MAX_STUDENT_PHOTO_BYTES = 2 * 1024 * 1024;
-const ALLOWED_PHOTO_MIME_TYPES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-]);
 
 @Injectable()
 export class StudentPhotoService {
@@ -34,34 +26,28 @@ export class StudentPhotoService {
   ) {
     const student = await this.findStudentOrThrow(studentId, actor);
 
-    if (!ALLOWED_PHOTO_MIME_TYPES.has(dto.mimeType)) {
-      throw new BadRequestException('Unsupported student photo MIME type');
-    }
-
-    const content = Buffer.from(dto.base64Content, 'base64');
-
-    if (content.byteLength === 0) {
-      throw new BadRequestException('Student photo file is empty');
-    }
-
-    if (content.byteLength > MAX_STUDENT_PHOTO_BYTES) {
-      throw new BadRequestException('Student photo must be 2MB or smaller');
-    }
+    const image = validateImageUpload({
+      base64Content: dto.base64Content,
+      fileName: dto.fileName,
+      mimeType: dto.mimeType,
+      maxBytes: MAX_STUDENT_PHOTO_BYTES,
+      label: 'Student photo',
+    });
 
     const stored = await this.storageService.saveBufferObject({
       tenantId: actor.tenantId,
       prefix: `students/${student.id}/photo`,
-      fileName: dto.fileName,
-      contentType: dto.mimeType,
-      content,
+      fileName: image.safeFileName,
+      contentType: image.mimeType,
+      content: image.content,
     });
 
     const asset = await this.fileRegistryService.registerFile({
       tenantId: actor.tenantId,
       uploadedByUserId: actor.userId,
-      originalFilename: dto.fileName,
+      originalFilename: image.safeFileName,
       objectKey: stored.objectKey,
-      mimeType: dto.mimeType,
+      mimeType: image.mimeType,
       sizeBytes: stored.sizeBytes,
       module: 'students',
       entityId: student.id,
@@ -69,6 +55,7 @@ export class StudentPhotoService {
         kind: 'PHOTO',
         title: 'Student Photo',
         note: dto.note ?? null,
+        originalFileName: dto.fileName,
       },
     });
 
@@ -97,7 +84,9 @@ export class StudentPhotoService {
     }
 
     await this.auditService.record({
-      action: 'student_photo_uploaded',
+      action: previousPhotoFileId
+        ? 'student_photo_replaced'
+        : 'student_photo_uploaded',
       resource: 'student',
       resourceId: student.id,
       tenantId: actor.tenantId,
@@ -105,8 +94,8 @@ export class StudentPhotoService {
       before: { photoFileId: previousPhotoFileId },
       after: {
         photoFileId: asset.id,
-        fileName: dto.fileName,
-        mimeType: dto.mimeType,
+        fileName: image.safeFileName,
+        mimeType: image.mimeType,
         sizeBytes: stored.sizeBytes,
       },
     });
@@ -193,7 +182,7 @@ export class StudentPhotoService {
     });
 
     await this.auditService.record({
-      action: 'student_photo_deleted',
+      action: 'student_photo_removed',
       resource: 'student',
       resourceId: student.id,
       tenantId: actor.tenantId,

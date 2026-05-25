@@ -742,6 +742,7 @@ enum ReportExportStatus {
 
 enum StudentQrStatus {
   ACTIVE
+  ROTATED
   REVOKED
 }
 
@@ -2606,17 +2607,22 @@ model StudentQrCredential {
   studentId     String
   tokenHash     String
   status        StudentQrStatus @default(ACTIVE)
+  createdById   String?
+  updatedById   String?
+  expiresAt     DateTime?
   createdAt     DateTime        @default(now())
   rotatedAt     DateTime?
   revokedAt     DateTime?
+  rotateReason  String?
+  revokeReason  String?
   lastScannedAt DateTime?
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, studentId])
   @@unique([tokenHash])
   @@index([tenantId, studentId])
+  @@index([tenantId, studentId, status])
   @@index([tenantId, status])
 }
 

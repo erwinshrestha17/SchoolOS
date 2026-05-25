@@ -718,7 +718,7 @@ describe('students lifecycle hardening', () => {
     );
   });
 
-  it('generates a valid PDF header for student ID cards', async () => {
+  it('generates student ID cards with opaque QR payload support', async () => {
     const student = buildStudent({
       guardianLinks: [
         {
@@ -742,10 +742,15 @@ describe('students lifecycle hardening', () => {
     const pdf = await service.generateStudentDocumentPdf(
       student.id,
       'id-card',
-      actor,
+      {
+        ...actor,
+        qrToken: 'schoolos_qr_opaque_test_token',
+      } as typeof actor & { qrToken: string },
     );
 
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+    expect(pdf.toString('latin1')).not.toContain('tokenHash');
+    expect(pdf.toString('latin1')).not.toContain('student-1:tenant-1');
   });
 
   it('returns a clean validation error for unsupported student document kinds', async () => {

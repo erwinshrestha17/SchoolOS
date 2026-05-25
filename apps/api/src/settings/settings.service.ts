@@ -3,12 +3,23 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { Prisma } from '@prisma/client';
 import { TenantSettingKey, TenantSettingSummary } from '@schoolos/core';
+import type { AuthContext } from '../auth/auth.types';
+import { validateImageUpload } from '../common/files/image-upload-validation';
+import { FileRegistryService } from '../file-registry/file-registry.service';
+import { StorageService } from '../storage/storage.service';
+import { UploadTenantLogoDto } from './dto/upload-tenant-logo.dto';
+
+const MAX_TENANT_LOGO_BYTES = 1024 * 1024;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 @Injectable()
 export class SettingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly storageService: StorageService,
+    private readonly fileRegistryService: FileRegistryService,
   ) {}
 
   private readonly allowedKeys: TenantSettingKey[] = [
@@ -184,6 +195,176 @@ export class SettingsService {
     });
   }
 
+  async uploadSchoolLogo(dto: UploadTenantLogoDto, actor: AuthContext) {
+    const image = validateImageUpload({
+      base64Content: dto.base64Content,
+      fileName: dto.fileName,
+      mimeType: dto.mimeType,
+      maxBytes: MAX_TENANT_LOGO_BYTES,
+      label: 'School logo',
+    });
+
+    const existing = await this.prisma.tenantSetting.findUnique({
+      where: { tenantId_key: { tenantId: actor.tenantId, key: 'school_logo' } },
+    });
+    const previousFileAssetId = this.extractLogoFileAssetId(existing?.value);
+
+    const stored = await this.storageService.saveBufferObject({
+      tenantId: actor.tenantId,
+      prefix: 'settings/branding/logo',
+      fileName: image.safeFileName,
+      contentType: image.mimeType,
+      content: image.content,
+    });
+
+    const asset = await this.fileRegistryService.registerFile({
+      tenantId: actor.tenantId,
+      uploadedByUserId: actor.userId,
+      originalFilename: image.safeFileName,
+      objectKey: stored.objectKey,
+      mimeType: image.mimeType,
+      sizeBytes: stored.sizeBytes,
+      module: 'settings',
+      entityId: actor.tenantId,
+      metadata: {
+        kind: 'SCHOOL_LOGO',
+        title: 'School Logo',
+        note: dto.note ?? null,
+        originalFileName: dto.fileName,
+      },
+    });
+
+    await this.fileRegistryService.markUploaded(
+      actor.tenantId,
+      asset.id,
+      actor.userId,
+    );
+
+    await this.prisma.tenantSetting.upsert({
+      where: { tenantId_key: { tenantId: actor.tenantId, key: 'school_logo' } },
+      create: {
+        tenantId: actor.tenantId,
+        key: 'school_logo',
+        value: asset.id,
+      },
+      update: {
+        value: asset.id,
+      },
+    });
+
+    if (previousFileAssetId && previousFileAssetId !== asset.id) {
+      await this.fileRegistryService.softDeleteFile(
+        actor.tenantId,
+        previousFileAssetId,
+        actor.userId,
+      );
+    }
+
+    await this.auditService.record({
+      action: previousFileAssetId
+        ? 'school_logo_updated'
+        : 'school_logo_uploaded',
+      resource: 'settings',
+      resourceId: 'school_logo',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      before: { fileAssetId: previousFileAssetId },
+      after: {
+        fileAssetId: asset.id,
+        fileName: image.safeFileName,
+        mimeType: image.mimeType,
+        sizeBytes: stored.sizeBytes,
+      },
+    });
+
+    return {
+      fileAssetId: asset.id,
+      fileName: asset.originalFilename,
+      mimeType: asset.mimeType,
+      sizeBytes: Number(asset.sizeBytes),
+      previewUrl: '/api/v1/settings/branding/logo/preview',
+      downloadUrl: '/api/v1/settings/branding/logo/download',
+    };
+  }
+
+  async getSchoolLogoAccess(
+    actor: AuthContext,
+    action: 'preview' | 'download',
+  ) {
+    const setting = await this.prisma.tenantSetting.findUnique({
+      where: { tenantId_key: { tenantId: actor.tenantId, key: 'school_logo' } },
+    });
+    const fileAssetId = this.extractLogoFileAssetId(setting?.value);
+
+    if (!fileAssetId) {
+      throw new BadRequestException('School logo is not configured');
+    }
+
+    const asset = await this.fileRegistryService.getFileMetadata(
+      actor.tenantId,
+      fileAssetId,
+    );
+
+    if (asset.module !== 'settings' || asset.entityId !== actor.tenantId) {
+      throw new BadRequestException('School logo is not linked to this tenant');
+    }
+
+    await this.fileRegistryService.auditAccess(
+      actor.tenantId,
+      asset.id,
+      actor.userId,
+      action,
+    );
+
+    return {
+      fileAssetId: asset.id,
+      fileName: asset.originalFilename,
+      mimeType: asset.mimeType,
+      sizeBytes: Number(asset.sizeBytes),
+      url: await this.fileRegistryService.getSignedUrl(
+        actor.tenantId,
+        asset.id,
+      ),
+      expiresInSeconds: 60,
+    };
+  }
+
+  async removeSchoolLogo(actor: AuthContext) {
+    const existing = await this.prisma.tenantSetting.findUnique({
+      where: { tenantId_key: { tenantId: actor.tenantId, key: 'school_logo' } },
+    });
+    const previousFileAssetId = this.extractLogoFileAssetId(existing?.value);
+
+    if (!previousFileAssetId) {
+      return { success: true, removed: false };
+    }
+
+    await this.fileRegistryService.softDeleteFile(
+      actor.tenantId,
+      previousFileAssetId,
+      actor.userId,
+    );
+
+    await this.prisma.tenantSetting.deleteMany({
+      where: {
+        tenantId: actor.tenantId,
+        key: 'school_logo',
+      },
+    });
+
+    await this.auditService.record({
+      action: 'school_logo_removed',
+      resource: 'settings',
+      resourceId: 'school_logo',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      before: { fileAssetId: previousFileAssetId },
+      after: { fileAssetId: null },
+    });
+
+    return { success: true, removed: true };
+  }
+
   private validateSettingValue(key: TenantSettingKey, value: unknown): void {
     switch (key) {
       case 'branding_primary_color':
@@ -308,5 +489,13 @@ export class SettingsService {
         // No specific validation for others yet
         break;
     }
+  }
+
+  private extractLogoFileAssetId(value: Prisma.JsonValue | undefined | null) {
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    return UUID_PATTERN.test(value) ? value : null;
   }
 }

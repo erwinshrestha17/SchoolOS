@@ -4,18 +4,34 @@ import { useState } from 'react';
 import { StudentProfileDetail, UpdateStudentProfilePayload } from '@schoolos/core';
 import { SectionCard } from '@/components/ui/section-card';
 import { Badge } from '@/components/ui/badge';
-import { User, Calendar, Hash, MapPin, Heart, Phone, ShieldAlert, Save, X } from 'lucide-react';
+import { Heart, ImageUp, Save, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type StudentEditCardProps = {
   profile: StudentProfileDetail;
   isSaving: boolean;
   error: any;
+  photoError?: Error | null;
+  isUploadingPhoto?: boolean;
+  isRemovingPhoto?: boolean;
   onCancel: () => void;
+  onUploadPhoto?: (file: File) => void;
+  onRemovePhoto?: () => void;
   onSave: (body: UpdateStudentProfilePayload) => void;
 };
 
-export function StudentEditCard({ profile, isSaving, error, onCancel, onSave }: StudentEditCardProps) {
+export function StudentEditCard({
+  profile,
+  isSaving,
+  error,
+  photoError,
+  isUploadingPhoto,
+  isRemovingPhoto,
+  onCancel,
+  onUploadPhoto,
+  onRemovePhoto,
+  onSave,
+}: StudentEditCardProps) {
   const { student } = profile;
   
   const [firstNameEn, setFirstNameEn] = useState(student.firstNameEn ?? '');
@@ -61,6 +77,73 @@ export function StudentEditCard({ profile, isSaving, error, onCancel, onSave }: 
   return (
     <SectionCard title="Edit Profile" description={`Updating record for ${student.studentSystemId}`} className="animate-in fade-in slide-in-from-top-4">
       <div className="grid gap-8">
+        <div className="rounded-[2rem] border border-slate-100 bg-slate-50 p-6">
+          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-4">
+              {student.photoUrl ? (
+                <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={student.photoUrl}
+                  alt={`${student.firstNameEn} ${student.lastNameEn} profile photo`}
+                  className="h-20 w-20 rounded-2xl object-cover ring-4 ring-white"
+                />
+                </>
+              ) : (
+                <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white text-slate-300 ring-4 ring-white">
+                  <ImageUp size={28} />
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-bold text-slate-900">Student Photo</p>
+                <p className="mt-1 max-w-md text-xs font-medium text-slate-500">
+                  JPG, PNG, or WEBP only. Files are stored privately and served
+                  through short-lived preview URLs.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800">
+                <ImageUp size={16} />
+                {isUploadingPhoto ? 'Uploading...' : student.photoUrl ? 'Replace' : 'Upload'}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  disabled={isUploadingPhoto || isRemovingPhoto}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file && onUploadPhoto) {
+                      onUploadPhoto(file);
+                    }
+                    event.currentTarget.value = '';
+                  }}
+                />
+              </label>
+              {student.photoUrl ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('Remove this student photo?')) {
+                      onRemovePhoto?.();
+                    }
+                  }}
+                  disabled={isUploadingPhoto || isRemovingPhoto}
+                  className="inline-flex items-center gap-2 rounded-xl border border-danger-100 bg-white px-4 py-2.5 text-sm font-bold text-danger-600 transition hover:bg-danger-50 disabled:opacity-50"
+                >
+                  <Trash2 size={16} />
+                  {isRemovingPhoto ? 'Removing...' : 'Remove'}
+                </button>
+              ) : null}
+            </div>
+          </div>
+          {photoError ? (
+            <p className="mt-3 text-sm font-bold text-danger-500">
+              {photoError.message}
+            </p>
+          ) : null}
+        </div>
+
         <div className="grid gap-6 md:grid-cols-2">
            <FormField label="First Name (EN)">
              <input className="premium-input" value={firstNameEn} onChange={(e) => setFirstNameEn(e.target.value)} />

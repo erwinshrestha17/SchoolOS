@@ -13,6 +13,11 @@ const actor: AuthContext = {
   authMethod: 'PASSWORD',
 };
 
+const validJpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+const validPng = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00,
+]);
+
 function createServiceMocks() {
   const prisma = {
     student: {
@@ -59,7 +64,7 @@ describe('StudentPhotoService', () => {
         {
           fileName: 'photo.jpg',
           mimeType: 'image/jpeg',
-          base64Content: Buffer.from('photo').toString('base64'),
+          base64Content: validJpeg.toString('base64'),
         },
         actor,
       ),
@@ -101,6 +106,54 @@ describe('StudentPhotoService', () => {
     expect(storageService.saveBufferObject).not.toHaveBeenCalled();
   });
 
+  it('rejects student photos whose extension does not match the MIME type', async () => {
+    const { service, prisma, storageService } = createServiceMocks();
+    prisma.student.findFirst.mockResolvedValue({
+      id: 'student-1',
+      tenantId: actor.tenantId,
+      photoFileId: null,
+      lifecycleStatus: 'ACTIVE',
+    });
+
+    await expect(
+      service.uploadPhoto(
+        'student-1',
+        {
+          fileName: 'photo.exe',
+          mimeType: 'image/jpeg',
+          base64Content: validJpeg.toString('base64'),
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(storageService.saveBufferObject).not.toHaveBeenCalled();
+  });
+
+  it('rejects student photos whose content does not match the declared MIME type', async () => {
+    const { service, prisma, storageService } = createServiceMocks();
+    prisma.student.findFirst.mockResolvedValue({
+      id: 'student-1',
+      tenantId: actor.tenantId,
+      photoFileId: null,
+      lifecycleStatus: 'ACTIVE',
+    });
+
+    await expect(
+      service.uploadPhoto(
+        'student-1',
+        {
+          fileName: 'photo.jpg',
+          mimeType: 'image/jpeg',
+          base64Content: Buffer.from('not-a-real-jpeg').toString('base64'),
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(storageService.saveBufferObject).not.toHaveBeenCalled();
+  });
+
   it('rejects student photos larger than 2MB', async () => {
     const { service, prisma, storageService } = createServiceMocks();
     prisma.student.findFirst.mockResolvedValue({
@@ -116,7 +169,10 @@ describe('StudentPhotoService', () => {
         {
           fileName: 'large.jpg',
           mimeType: 'image/jpeg',
-          base64Content: Buffer.alloc(2 * 1024 * 1024 + 1).toString('base64'),
+          base64Content: Buffer.concat([
+            validJpeg,
+            Buffer.alloc(2 * 1024 * 1024 + 1),
+          ]).toString('base64'),
         },
         actor,
       ),
@@ -157,13 +213,21 @@ describe('StudentPhotoService', () => {
     const result = await service.uploadPhoto(
       'student-1',
       {
-        fileName: 'new.jpg',
+        fileName: '../new unsafe.jpg',
         mimeType: 'image/jpeg',
-        base64Content: Buffer.from('photo').toString('base64'),
+        base64Content: validJpeg.toString('base64'),
       },
       actor,
     );
 
+    expect(storageService.saveBufferObject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: actor.tenantId,
+        prefix: 'students/student-1/photo',
+        fileName: 'new-unsafe.jpg',
+        contentType: 'image/jpeg',
+      }),
+    );
     expect(fileRegistryService.softDeleteFile).toHaveBeenCalledWith(
       actor.tenantId,
       'old-photo-file',
@@ -178,7 +242,7 @@ describe('StudentPhotoService', () => {
     });
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: 'student_photo_uploaded',
+        action: 'student_photo_replaced',
         resource: 'student',
         resourceId: 'student-1',
         tenantId: actor.tenantId,
@@ -189,6 +253,46 @@ describe('StudentPhotoService', () => {
         studentId: 'student-1',
         photoFileId: 'new-photo-file',
         previewUrl: '/api/v1/students/student-1/photo/preview',
+      }),
+    );
+  });
+
+  it('accepts valid PNG photo uploads after signature and extension checks', async () => {
+    const { service, prisma, storageService, fileRegistryService } =
+      createServiceMocks();
+    prisma.student.findFirst.mockResolvedValue({
+      id: 'student-1',
+      tenantId: actor.tenantId,
+      photoFileId: null,
+      lifecycleStatus: 'ACTIVE',
+    });
+    storageService.saveBufferObject.mockResolvedValue({
+      objectKey: 'tenant-1/students/student-1/photo/photo.png',
+      sizeBytes: validPng.byteLength,
+    });
+    fileRegistryService.registerFile.mockResolvedValue({
+      id: 'photo-file',
+      originalFilename: 'photo.png',
+      mimeType: 'image/png',
+      sizeBytes: BigInt(validPng.byteLength),
+    });
+    fileRegistryService.markUploaded.mockResolvedValue({ id: 'photo-file' });
+    prisma.student.update.mockResolvedValue({ id: 'student-1' });
+
+    await service.uploadPhoto(
+      'student-1',
+      {
+        fileName: 'photo.png',
+        mimeType: 'image/png',
+        base64Content: validPng.toString('base64'),
+      },
+      actor,
+    );
+
+    expect(fileRegistryService.registerFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        originalFilename: 'photo.png',
+        mimeType: 'image/png',
       }),
     );
   });
@@ -254,5 +358,40 @@ describe('StudentPhotoService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
 
     expect(fileRegistryService.auditAccess).not.toHaveBeenCalled();
+  });
+
+  it('soft-deletes and audits photo removal without deleting the student', async () => {
+    const { service, prisma, fileRegistryService, auditService } =
+      createServiceMocks();
+    prisma.student.findFirst.mockResolvedValue({
+      id: 'student-1',
+      tenantId: actor.tenantId,
+      photoFileId: 'photo-file',
+      lifecycleStatus: 'ACTIVE',
+    });
+    prisma.student.update.mockResolvedValue({ id: 'student-1' });
+
+    const result = await service.deletePhoto('student-1', actor);
+
+    expect(fileRegistryService.softDeleteFile).toHaveBeenCalledWith(
+      actor.tenantId,
+      'photo-file',
+      actor.userId,
+    );
+    expect(prisma.student.update).toHaveBeenCalledWith({
+      where: { id: 'student-1' },
+      data: {
+        photoFileId: null,
+        photoUrl: null,
+      },
+    });
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'student_photo_removed',
+        resource: 'student',
+        resourceId: 'student-1',
+      }),
+    );
+    expect(result).toEqual({ success: true, deleted: true });
   });
 });

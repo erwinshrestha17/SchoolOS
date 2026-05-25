@@ -133,4 +133,82 @@ describe('StudentRecordsService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(storageService.saveBase64Object).not.toHaveBeenCalled();
   });
+
+  it('lists student documents without raw storage keys or public URLs', async () => {
+    const createdAt = new Date('2026-05-25T08:00:00.000Z');
+    prisma.studentDocument.findMany.mockResolvedValue([
+      {
+        id: 'document-1',
+        studentId: 'student-1',
+        fileId: 'asset-1',
+        kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+        status: 'ACTIVE',
+        title: 'Birth certificate',
+        fileName: 'birth.pdf',
+        contentType: 'application/pdf',
+        sizeBytes: 12,
+        provider: StorageProvider.LOCAL,
+        notes: null,
+        expiryDate: null,
+        verifiedAt: null,
+        uploadedById: 'user-1',
+        createdAt,
+      },
+    ]);
+
+    const result = await service.listDocuments(actor, 'student-1');
+
+    expect(prisma.studentDocument.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tenantId: actor.tenantId, studentId: 'student-1' },
+        select: expect.not.objectContaining({
+          objectKey: true,
+          publicUrl: true,
+        }),
+      }),
+    );
+    expect(result[0]).toEqual(
+      expect.objectContaining({
+        id: 'document-1',
+        fileId: 'asset-1',
+        uploadedAt: createdAt.toISOString(),
+      }),
+    );
+    expect(result[0]).not.toHaveProperty('objectKey');
+    expect(result[0]).not.toHaveProperty('publicUrl');
+  });
+
+  it('audits preview and download access after tenant-scoped file checks', async () => {
+    prisma.fileAsset.findFirst.mockResolvedValue({
+      id: 'asset-1',
+      tenantId: actor.tenantId,
+      objectKey: 'tenant-1/students/student-1/documents/birth.pdf',
+      originalFilename: 'birth.pdf',
+    });
+    prisma.studentDocument.findFirst.mockResolvedValue({
+      id: 'document-1',
+      title: 'Birth certificate',
+      kind: StudentDocumentKind.BIRTH_CERTIFICATE,
+    });
+    fileRegistryService.getSignedUrl.mockResolvedValue(
+      'https://signed.example/birth.pdf',
+    );
+
+    const result = await service.getSignedUrl(actor, 'asset-1', 'preview');
+
+    expect(fileRegistryService.auditAccess).toHaveBeenCalledWith(
+      actor.tenantId,
+      'asset-1',
+      actor.userId,
+      'preview',
+    );
+    expect(prisma.studentDocumentHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        documentId: 'document-1',
+        action: 'PREVIEW',
+      }),
+    });
+    expect(result).toEqual({ url: 'https://signed.example/birth.pdf' });
+  });
 });

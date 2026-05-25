@@ -13,6 +13,11 @@ import { AuthContext } from '../auth/auth.types';
 describe('StudentsService (iEMIS Export)', () => {
   let service: StudentsService;
   let prisma: PrismaService;
+  let storageService: { saveBufferObject: jest.Mock };
+  let fileRegistryService: {
+    registerFile: jest.Mock;
+    markUploaded: jest.Mock;
+  };
 
   const mockAuth: AuthContext = {
     userId: 'user-1',
@@ -49,13 +54,36 @@ describe('StudentsService (iEMIS Export)', () => {
           provide: UsageService,
           useValue: { verifyLimit: jest.fn(), checkLimit: jest.fn() },
         },
-        { provide: StorageService, useValue: {} },
-        { provide: FileRegistryService, useValue: {} },
+        {
+          provide: StorageService,
+          useValue: {
+            saveBufferObject: jest.fn(),
+          },
+        },
+        {
+          provide: FileRegistryService,
+          useValue: {
+            registerFile: jest.fn(),
+            markUploaded: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<StudentsService>(StudentsService);
     prisma = module.get<PrismaService>(PrismaService);
+    storageService = module.get(StorageService) as never;
+    fileRegistryService = module.get(FileRegistryService) as never;
+    storageService.saveBufferObject.mockResolvedValue({
+      objectKey: 'tenant-1/exports/iemis/iemis-students-school-1.csv',
+      sizeBytes: 256,
+    });
+    fileRegistryService.registerFile.mockResolvedValue({
+      id: 'file-asset-1',
+    });
+    fileRegistryService.markUploaded.mockResolvedValue({
+      id: 'file-asset-1',
+    });
   });
 
   it('should export valid students to iEMIS CSV format', async () => {
@@ -108,11 +136,31 @@ describe('StudentsService (iEMIS Export)', () => {
     expect(result.totalRecords).toBe(1);
     expect(result.validRecords).toBe(1);
     expect(result.exportId).toBe('export-1');
+    expect(result.fileAssetId).toBe('file-asset-1');
+    expect(result.fileName).toMatch(
+      /^iemis-students-school-1-\d{4}-\d{2}-\d{2}\.csv$/,
+    );
+    expect(storageService.saveBufferObject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: mockAuth.tenantId,
+        prefix: 'exports/iemis',
+        contentType: 'text/csv',
+      }),
+    );
+    expect(fileRegistryService.registerFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: mockAuth.tenantId,
+        module: 'students',
+        entityId: mockAuth.tenantId,
+        mimeType: 'text/csv',
+      }),
+    );
     expect(prisma.reportExport.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           reportKey: 'iemis_student_export',
           status: 'COMPLETED',
+          fileAssetId: 'file-asset-1',
         }),
       }),
     );

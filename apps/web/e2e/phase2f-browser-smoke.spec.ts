@@ -94,7 +94,18 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
     if (await firstStudent.isVisible()) {
       await firstStudent.click();
       await expect(page.getByText(/Student Profile/i)).toBeVisible();
-      await expect(page.getByText(/Collect Fees|Attendance|Documents/i).first()).toBeVisible();
+      await expect(page.getByRole('button', { name: /Edit/i })).toBeVisible();
+      await expect(page.getByRole('button', { name: /ID Card/i })).toBeVisible();
+      await expect(page.getByRole('tab', { name: /Documents/i })).toBeVisible();
+      await expect(page.getByRole('tab', { name: /History/i })).toBeVisible();
+      await expect(page.getByText(/QR Identity|QR/i).first()).toBeVisible();
+      await page.getByRole('tab', { name: /Documents/i }).click();
+      await expect(page.getByText(/Document Audit Trail/i)).toBeVisible();
+      await page.getByRole('button', { name: /Edit/i }).click();
+      await expect(page.getByText(/Student Photo/i)).toBeVisible();
+      await expect(
+        page.getByText(/Upload|Replace/i).or(page.getByText(/Remove/i)).first(),
+      ).toBeVisible();
     }
   });
 

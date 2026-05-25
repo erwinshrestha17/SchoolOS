@@ -38,6 +38,7 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { ListStudentsDto } from './dto/list-students.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
 import { InviteGuardianDto } from './dto/invite-guardian.dto';
+import { ListDuplicateStudentCandidatesDto } from './dto/list-duplicate-student-candidates.dto';
 import { MergeDuplicateStudentDto } from './dto/merge-duplicate-student.dto';
 import { MergeDuplicateStudentPreviewDto } from './dto/merge-duplicate-student-preview.dto';
 import { CreateGuardianIdentityVerificationDto } from './dto/create-guardian-identity-verification.dto';
@@ -1384,6 +1385,110 @@ export class StudentsService {
     };
   }
 
+  async listDuplicateStudentCandidates(
+    query: ListDuplicateStudentCandidatesDto,
+    actor: AuthContext,
+  ) {
+    const limit = query.limit ?? 20;
+    const students = await this.prisma.student.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        lifecycleStatus: {
+          in: [StudentLifecycleStatus.ACTIVE, StudentLifecycleStatus.ARCHIVED],
+        },
+        ...(query.studentId ? { id: query.studentId } : {}),
+      },
+      select: {
+        id: true,
+        studentSystemId: true,
+        firstNameEn: true,
+        lastNameEn: true,
+        dateOfBirth: true,
+        admissionNumber: true,
+        previousSchool: true,
+        lifecycleStatus: true,
+        class: { select: { name: true } },
+        sectionRef: { select: { name: true } },
+        guardianLinks: {
+          select: {
+            guardian: {
+              select: {
+                fullName: true,
+                primaryPhone: true,
+                secondaryPhone: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ studentSystemId: 'asc' }],
+      take: query.studentId ? 1 : 100,
+    });
+
+    if (query.studentId && students.length === 0) {
+      throw new NotFoundException('Student not found in this tenant');
+    }
+
+    const comparisonPool = query.studentId
+      ? await this.prisma.student.findMany({
+          where: {
+            tenantId: actor.tenantId,
+            id: { not: query.studentId },
+            lifecycleStatus: {
+              in: [
+                StudentLifecycleStatus.ACTIVE,
+                StudentLifecycleStatus.ARCHIVED,
+              ],
+            },
+          },
+          select: {
+            id: true,
+            studentSystemId: true,
+            firstNameEn: true,
+            lastNameEn: true,
+            dateOfBirth: true,
+            admissionNumber: true,
+            previousSchool: true,
+            lifecycleStatus: true,
+            class: { select: { name: true } },
+            sectionRef: { select: { name: true } },
+            guardianLinks: {
+              select: {
+                guardian: {
+                  select: {
+                    fullName: true,
+                    primaryPhone: true,
+                    secondaryPhone: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: [{ studentSystemId: 'asc' }],
+          take: 100,
+        })
+      : students;
+
+    const pairs = buildDuplicateCandidatePairs(students, comparisonPool, limit);
+
+    await this.auditService.record({
+      action: 'duplicate_candidates_reviewed',
+      resource: 'student',
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        studentId: query.studentId ?? null,
+        candidateCount: pairs.length,
+      },
+    });
+
+    return {
+      candidates: pairs,
+      limit,
+      reviewedStudentId: query.studentId ?? null,
+    };
+  }
+
   async previewMergeDuplicateStudent(
     dto: MergeDuplicateStudentPreviewDto,
     actor: AuthContext,
@@ -2016,15 +2121,46 @@ export class StudentsService {
 
     const csv = buildCsv(headers, rows);
     const exportedAt = new Date();
+    const fileName = buildIemisExportFileName(actor, exportedAt);
+    const stored = await this.storageService.saveBufferObject({
+      tenantId: actor.tenantId,
+      prefix: 'exports/iemis',
+      fileName,
+      contentType: 'text/csv',
+      content: Buffer.from(csv, 'utf8'),
+    });
+    const fileAsset = await this.fileRegistryService.registerFile({
+      tenantId: actor.tenantId,
+      uploadedByUserId: actor.userId,
+      originalFilename: fileName,
+      objectKey: stored.objectKey,
+      mimeType: 'text/csv',
+      sizeBytes: stored.sizeBytes,
+      module: 'students',
+      entityId: actor.tenantId,
+      metadata: {
+        kind: 'IEMIS_EXPORT',
+        reportKey: 'iemis_student_export',
+        totalStudents: students.length,
+        validStudents: rows.length,
+      },
+    });
+    await this.fileRegistryService.markUploaded(
+      actor.tenantId,
+      fileAsset.id,
+      actor.userId,
+    );
 
     const exportRecord = await this.prisma.reportExport.create({
       data: {
         tenantId: actor.tenantId,
         reportKey: 'iemis_student_export',
         format: 'csv',
+        fileAssetId: fileAsset.id,
         filters: {
           totalStudents: students.length,
           validStudents: rows.length,
+          fileName,
         },
         requestedBy: actor.userId,
         status: 'COMPLETED',
@@ -2042,6 +2178,8 @@ export class StudentsService {
         totalRecords: students.length,
         validRecords: rows.length,
         exportId: exportRecord.id,
+        fileAssetId: fileAsset.id,
+        fileName,
       },
     });
 
@@ -2049,6 +2187,8 @@ export class StudentsService {
       formatVersion: 'SCHOLOS-IEMIS-1.0',
       exportedAt: exportedAt.toISOString(),
       exportId: exportRecord.id,
+      fileAssetId: fileAsset.id,
+      fileName,
       totalRecords: students.length,
       validRecords: rows.length,
       invalidRecords: validationResults.filter(
@@ -2066,7 +2206,7 @@ export class StudentsService {
         ),
       headers,
       rows,
-      csv: buildCsv(headers, rows),
+      csv,
     };
   }
 
@@ -3270,6 +3410,17 @@ function escapeCsvValue(value: unknown) {
   return text;
 }
 
+function buildIemisExportFileName(actor: AuthContext, exportedAt: Date) {
+  const date = exportedAt.toISOString().slice(0, 10);
+  const tenant = (actor.tenantSlug || actor.tenantId)
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+
+  return `iemis-students-${tenant || 'tenant'}-${date}.csv`;
+}
+
 function normalizeNullableString(value: string | null | undefined) {
   const trimmed = value?.trim();
 
@@ -3350,6 +3501,168 @@ function isProbableDuplicateStudent(
       targetStudent.admissionNumber?.trim().toLowerCase();
 
   return nameDobMatch || admissionMatch;
+}
+
+type DuplicateCandidateStudent = {
+  id: string;
+  studentSystemId: string;
+  firstNameEn: string;
+  lastNameEn: string;
+  dateOfBirth: Date;
+  admissionNumber?: string | null;
+  previousSchool?: string | null;
+  lifecycleStatus: StudentLifecycleStatus;
+  class?: { name: string } | null;
+  sectionRef?: { name: string } | null;
+  guardianLinks: Array<{
+    guardian: {
+      fullName: string;
+      primaryPhone?: string | null;
+      secondaryPhone?: string | null;
+    };
+  }>;
+};
+
+function buildDuplicateCandidatePairs(
+  sourceStudents: DuplicateCandidateStudent[],
+  comparisonPool: DuplicateCandidateStudent[],
+  limit: number,
+) {
+  const seen = new Set<string>();
+  const pairs: Array<{
+    sourceStudent: ReturnType<typeof summarizeDuplicateCandidateStudent>;
+    candidateStudent: ReturnType<typeof summarizeDuplicateCandidateStudent>;
+    score: number;
+    confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+    reasons: string[];
+    blockedReason: string | null;
+  }> = [];
+
+  for (const source of sourceStudents) {
+    for (const candidate of comparisonPool) {
+      if (source.id === candidate.id) {
+        continue;
+      }
+
+      const pairKey = [source.id, candidate.id].sort().join(':');
+      if (seen.has(pairKey)) {
+        continue;
+      }
+      seen.add(pairKey);
+
+      const scored = scoreDuplicateCandidate(source, candidate);
+      if (scored.score <= 0) {
+        continue;
+      }
+
+      pairs.push({
+        sourceStudent: summarizeDuplicateCandidateStudent(source),
+        candidateStudent: summarizeDuplicateCandidateStudent(candidate),
+        score: scored.score,
+        confidence:
+          scored.score >= 70 ? 'HIGH' : scored.score >= 40 ? 'MEDIUM' : 'LOW',
+        reasons: scored.reasons,
+        blockedReason:
+          scored.score < 40
+            ? 'Candidate needs stronger matching evidence before merge preview.'
+            : null,
+      });
+    }
+  }
+
+  return pairs.sort((a, b) => b.score - a.score).slice(0, limit);
+}
+
+function scoreDuplicateCandidate(
+  source: DuplicateCandidateStudent,
+  candidate: DuplicateCandidateStudent,
+) {
+  let score = 0;
+  const reasons: string[] = [];
+  const sourceName = `${source.firstNameEn} ${source.lastNameEn}`;
+  const candidateName = `${candidate.firstNameEn} ${candidate.lastNameEn}`;
+  const nameSimilarity = calculateNameSimilarity(sourceName, candidateName);
+
+  if (nameSimilarity >= 0.85) {
+    score += 25;
+    reasons.push('Similar student name');
+  }
+
+  if (
+    source.dateOfBirth.toISOString().slice(0, 10) ===
+    candidate.dateOfBirth.toISOString().slice(0, 10)
+  ) {
+    score += 20;
+    reasons.push('Same date of birth');
+  }
+
+  if (
+    source.admissionNumber &&
+    source.admissionNumber.trim().toLowerCase() ===
+      candidate.admissionNumber?.trim().toLowerCase()
+  ) {
+    score += 50;
+    reasons.push('Admission number conflict');
+  }
+
+  if (sharedGuardianPhone(source, candidate)) {
+    score += 30;
+    reasons.push('Shared guardian phone');
+  }
+
+  if (
+    source.previousSchool &&
+    source.previousSchool.trim().toLowerCase() ===
+      candidate.previousSchool?.trim().toLowerCase()
+  ) {
+    score += 10;
+    reasons.push('Same previous school');
+  }
+
+  return { score: Math.min(score, 100), reasons };
+}
+
+function summarizeDuplicateCandidateStudent(
+  student: DuplicateCandidateStudent,
+) {
+  return {
+    id: student.id,
+    studentSystemId: student.studentSystemId,
+    fullNameEn: `${student.firstNameEn} ${student.lastNameEn}`.trim(),
+    dateOfBirth: student.dateOfBirth.toISOString().slice(0, 10),
+    admissionNumber: student.admissionNumber ?? null,
+    previousSchool: student.previousSchool ?? null,
+    lifecycleStatus: student.lifecycleStatus,
+    className: student.class?.name ?? null,
+    sectionName: student.sectionRef?.name ?? null,
+    guardianPhones: guardianPhones(student),
+  };
+}
+
+function sharedGuardianPhone(
+  source: DuplicateCandidateStudent,
+  candidate: DuplicateCandidateStudent,
+) {
+  const sourcePhones = new Set(guardianPhones(source));
+  return guardianPhones(candidate).some((phone) => sourcePhones.has(phone));
+}
+
+function guardianPhones(student: DuplicateCandidateStudent) {
+  return student.guardianLinks
+    .flatMap((link) => [
+      link.guardian.primaryPhone?.trim(),
+      link.guardian.secondaryPhone?.trim(),
+    ])
+    .filter((phone): phone is string => Boolean(phone));
+}
+
+function calculateNameSimilarity(a: string, b: string) {
+  const left = new Set(normalizeStudentIdentityName(a).split(' '));
+  const right = new Set(normalizeStudentIdentityName(b).split(' '));
+  const intersection = [...left].filter((part) => right.has(part)).length;
+  const union = new Set([...left, ...right]).size;
+
+  return union === 0 ? 0 : intersection / union;
 }
 
 function normalizeStudentIdentityName(value: string) {

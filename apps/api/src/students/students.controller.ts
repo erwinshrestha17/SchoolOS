@@ -21,6 +21,7 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { ListStudentsDto } from './dto/list-students.dto';
 import { DeleteStudentDto } from './dto/delete-student.dto';
 import { InviteGuardianDto } from './dto/invite-guardian.dto';
+import { ListDuplicateStudentCandidatesDto } from './dto/list-duplicate-student-candidates.dto';
 import { MergeDuplicateStudentDto } from './dto/merge-duplicate-student.dto';
 import { MergeDuplicateStudentPreviewDto } from './dto/merge-duplicate-student-preview.dto';
 import { CreateGuardianIdentityVerificationDto } from './dto/create-guardian-identity-verification.dto';
@@ -46,6 +47,15 @@ export class StudentsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.studentsService.listStudents(query, auth);
+  }
+
+  @Get('duplicates/candidates')
+  @Permissions('students:manage_lifecycle')
+  listDuplicateStudentCandidates(
+    @Query() query: ListDuplicateStudentCandidatesDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentsService.listDuplicateStudentCandidates(query, auth);
   }
 
   @Get(':id')

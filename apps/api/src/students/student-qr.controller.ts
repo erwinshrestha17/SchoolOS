@@ -28,6 +28,18 @@ import { StudentQrService } from './student-qr.service';
 export class StudentQrController {
   constructor(private readonly studentQrService: StudentQrService) {}
 
+  @Get(':studentId/qr')
+  @Permissions('students:qr:read')
+  @ApiOperation({
+    summary: 'Get safe student QR credential status and history',
+  })
+  async getQrStatus(
+    @Param('studentId') studentId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.studentQrService.getQrStatus(auth.tenantId, studentId);
+  }
+
   @Post(':studentId/qr')
   @Permissions('students:qr:generate')
   @ApiOperation({
