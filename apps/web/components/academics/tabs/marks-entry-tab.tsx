@@ -62,7 +62,7 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
   const batchMut = useMutation({
     mutationFn: (payload: any) => api.batchEnterMarks(payload),
     onSuccess: (data) => {
-      setSaveSuccess(data.saved);
+      setSaveSuccess(data.updated);
       void queryClient.invalidateQueries({ queryKey: ['marks', filters] });
       setMarks({});
       setStatuses({});
@@ -88,20 +88,26 @@ export function MarksEntryTab({ academicYears, classes, allSections, students, e
   const changedEntries = useMemo(() => {
     const studentIds = new Set([...Object.keys(marks), ...Object.keys(statuses), ...Object.keys(remarks)]);
     return Array.from(studentIds).map(studentId => ({
-      examTermId: filters.examTermId,
-      assessmentComponentId: filters.assessmentComponentId,
       studentId,
       marksObtained: marks[studentId] ? Number(marks[studentId]) : undefined,
-      status: statuses[studentId] || 'SUBMITTED',
+      isAbsent: statuses[studentId] === 'ABSENT' || statuses[studentId] === 'EXCUSED',
+      isWithheld: statuses[studentId] === 'WITHHELD',
       remarks: remarks[studentId] || undefined,
     }));
-  }, [marks, statuses, remarks, filters]);
+  }, [marks, statuses, remarks]);
 
   const canSave = changedEntries.length > 0 && !batchMut.isPending && !isLocked;
 
   const handleSave = () => {
     if (!canSave) return;
-    batchMut.mutate({ entries: changedEntries });
+    batchMut.mutate({
+      examTermId: filters.examTermId,
+      assessmentComponentId: filters.assessmentComponentId,
+      classId: filters.classId,
+      sectionId: filters.sectionId || undefined,
+      subjectId: filters.subjectId,
+      entries: changedEntries,
+    });
   };
 
   const getExistingMark = (existing: any[] | undefined, studentId: string) => {

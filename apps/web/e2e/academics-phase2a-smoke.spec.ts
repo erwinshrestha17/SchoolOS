@@ -11,7 +11,7 @@ const schoolAdminCredentials = {
   password: process.env.SCHOOLOS_E2E_PASSWORD ?? 'admin123',
 };
 
-test.describe.serial('SchoolOS Phase 2A Academics Admin Flow Smoke Tests', () => {
+test.describe.serial('SchoolOS M4 Academics Admin Flow Smoke Tests', () => {
   test.beforeEach(async ({ context, page }) => {
     // Check if API is available
     try {
@@ -33,19 +33,16 @@ test.describe.serial('SchoolOS Phase 2A Academics Admin Flow Smoke Tests', () =>
     await expect(page.getByRole('heading', { name: /Academic Workflow/i })).toBeVisible();
     
     const workflowSteps = [
-      'Exam Terms',
-      'Assessment Components',
-      'Marks Entry',
-      'CAS Records',
-      'Marks Lock',
-      'Result Preview',
+      'Setup',
+      'Marks/CAS',
+      'Lock',
       'Report Cards',
       'Promotion',
-      'Publish Results'
+      'Publish'
     ];
 
     for (const step of workflowSteps) {
-      await expect(page.getByRole('heading', { name: new RegExp(step, 'i') })).toBeVisible();
+      await expect(page.getByRole('heading', { name: new RegExp(step, 'i') }).first()).toBeVisible();
     }
   });
 
@@ -92,7 +89,23 @@ test.describe.serial('SchoolOS Phase 2A Academics Admin Flow Smoke Tests', () =>
     if ((await downloadButtons.count()) > 0) {
       await expect(downloadButtons.first()).toBeVisible();
     }
+    const correctionButtons = page.locator('[data-testid="report-card-regenerate"]');
+    if ((await correctionButtons.count()) > 0) {
+      await correctionButtons.first().click();
+      await expect(page.getByTestId('report-card-correction-panel')).toBeVisible();
+      await expect(page.getByTestId('report-card-submit-correction')).toBeDisabled();
+      await page.getByTestId('report-card-correction-reason').fill('Corrected teacher remark after review');
+      await expect(page.getByTestId('report-card-submit-correction')).toBeEnabled();
+    }
     await expect(page.getByTestId('report-card-history').or(page.getByText(/Select History on a report card/i))).toBeVisible();
+  });
+
+  test('Result Preview: Backend-calculated validation screen', async ({ page }) => {
+    await page.goto('/dashboard/academics/results');
+    await expect(page.getByRole('heading', { name: /Result Preview/i })).toBeVisible();
+    await expect(page.getByText(/Select class and term/i)).toBeVisible();
+    await expect(page.getByText(/backend-calculated results/i)).toBeVisible();
+    await expect(page.getByRole('link', { name: /Review & Lock/i })).toBeVisible();
   });
 
   test('Promotion Readiness: Eligibility check', async ({ page }) => {

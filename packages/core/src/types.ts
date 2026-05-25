@@ -1443,9 +1443,9 @@ export type ActivityAttachment = {
   fileName: string;
   contentType: string;
   sizeBytes: number;
-  publicUrl: string | null;
-  fileAssetId: string | null;
   previewUrl?: string | null;
+  accessBlockedReason?: string | null;
+  processingStatus?: string | null;
   sortOrder: number;
 };
 

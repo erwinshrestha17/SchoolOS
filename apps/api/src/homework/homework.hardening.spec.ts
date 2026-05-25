@@ -270,5 +270,58 @@ describe('Homework Hardening', () => {
       expect(p.homeworkAssignment.findMany).not.toHaveBeenCalled();
       expect(p.homeworkAssignment.count).not.toHaveBeenCalled();
     });
+
+    it('scopes parent submission lists to linked students only', async () => {
+      const p = prisma as any;
+      const parentActor: AuthContext = {
+        ...actor,
+        userId: 'parent-user-1',
+        roles: ['parent'],
+        permissions: ['homework:read'],
+      };
+      p.studentGuardian.findMany.mockResolvedValue([
+        { studentId: 'student-1' },
+      ]);
+      p.homeworkSubmission.findMany.mockResolvedValue([]);
+      p.homeworkSubmission.count.mockResolvedValue(0);
+
+      await homeworkService.listSubmissions(parentActor, 'hw-1', {});
+
+      expect(p.homeworkSubmission.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: 'tenant-a',
+            homeworkId: 'hw-1',
+            studentId: { in: ['student-1'] },
+          }),
+        }),
+      );
+    });
+
+    it('blocks student submission detail reads for another student', async () => {
+      const p = prisma as any;
+      const studentActor: AuthContext = {
+        ...actor,
+        userId: 'student-user-1',
+        roles: ['student'],
+        permissions: ['homework:read'],
+      };
+      p.student.findFirst.mockResolvedValue({ id: 'student-1' });
+      p.homeworkSubmission.findFirst.mockResolvedValue(null);
+
+      await expect(
+        homeworkService.getSubmission(studentActor, 'submission-other'),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(p.homeworkSubmission.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: 'submission-other',
+            tenantId: 'tenant-a',
+            studentId: { in: ['student-1'] },
+          }),
+        }),
+      );
+    });
   });
 });

@@ -44,10 +44,10 @@ M1 photo/logo/iEMIS/document audit/duplicate candidate hardening slice implement
 Phase 2D M9 Accounting completed
 Phase 2 Accounting production polish completed
 SchoolOS Flutter mobile app started in apps/schoolos_mobile with auth/API wiring underway
-Current stage: M0 platform foundation complete with provider readiness, queue failed-job detail hardening, tenant-scoped API key management, and cloud-agnostic storage adapter/config Sprint 1 implemented + M1 photo/logo/iEMIS/document audit/duplicate candidate hardening slice implemented + M2 attendance correction/offline-draft hardening slice implemented + M3 fees/receipts reprint/reversal/close/readiness hardening slice implemented + M10 provider/attachment/retry hardening + M6/M7/M8A/M8C/M8B focused feature-depth hardening + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation plus credential history hardening implemented + mobile companion app foundation started
+Current stage: M0 platform foundation complete with provider readiness, queue failed-job detail hardening, tenant-scoped API key management, and cloud-agnostic storage adapter/config Sprint 1 implemented + M1 photo/logo/iEMIS/document audit/duplicate candidate hardening slice implemented + M2 attendance correction/offline-draft hardening slice implemented + M3 fees/receipts reprint/reversal/close/readiness hardening slice implemented + M5 activity media privacy hardening + M10 provider/attachment/retry hardening + M6/M7/M8A/M8C/M8B focused feature-depth hardening + Phase 1 pilot-ready core + Phase 2 Academics/Accounting complete + Student QR foundation plus credential history hardening implemented + mobile companion app foundation started
 ```
 
-Targeted web-admin polish and Phase2F smoke coverage have been completed. The latest feature-depth pass hardened M10 notifications/attachments, M6 homework parent/student scoping, M7 payroll reporting, M8A library fine/accounting tests, M8C POS/wallet receipts plus supplier/inventory item admin surfaces, and M8B GPS pressure/retention guards. Next focus is staging smoke/manual QA and remaining controlled-pilot reliability work in `docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`.
+Targeted web-admin polish and Phase2F smoke coverage have been completed. The latest feature-depth pass hardened M5 activity media response sanitization, parent PHOTO_USAGE consent blocking, and a parent activity feed route; it also tightened M6 homework submission list/detail scoping for parent/student actors. Prior depth work hardened M10 notifications/attachments, M7 payroll reporting, M8A library fine/accounting tests, M8C POS/wallet receipts plus supplier/inventory item admin surfaces, and M8B GPS pressure/retention guards. Next focus is staging smoke/manual QA and remaining controlled-pilot reliability work in `docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md`.
 
 The repo is ahead of older Phase 1B/Phase 2-transition notes. Phase 2A Academics backend/admin UI is complete and Phase 2 Academics polish is completed. M9 Accounting is completely finished. Student QR foundation is implemented. Foundations now exist for Homework/Timetable, HR/Payroll, Parent Communication/Messaging, Library, Transport, and Canteen.
 
@@ -104,8 +104,8 @@ Implemented or registered backend foundations now include:
 - M2 Smart Attendance
 - M3 Fees & Receipts
 - M4 Academics, Exams, CAS, Report Cards backend/admin UI plus Phase 2 PDF/report/correction/snapshot polish
-- M5 Activity Feed & Milestones
-- M6 Homework & Timetable depth: File Registry attachment workflows, reminders, timetable/substitution hardening, and parent/student fail-closed assignment listing
+- M5 Activity Feed & Milestones, including File Registry-backed private media, sanitized media responses, consent-aware parent media blocking, backend-controlled preview/download routes, lifecycle/moderation controls, and a parent activity feed route
+- M6 Homework & Timetable depth: File Registry attachment workflows, reminders, timetable/substitution hardening, and parent/student fail-closed assignment/submission access
 - M7 Staff/HR and Payroll depth: posting locks, reversal/accounting integration, PII masking, and run-scoped PF/TDS/component reporting
 - Student QR identity foundation with token hashing, purpose-based resolve, transactional rotate-to-history, and safe status/history API
 - M8A Library Management admin/backend foundation with fine-to-fees/accounting boundary tests, staff borrower coverage, reports, bounded history, and QR lookup
@@ -146,7 +146,7 @@ M1 Students: 90-95%
 M2 Attendance: 85-90%
 M3 Fees: 90-95%
 M4 Academics: 95-100%
-M5 Activity: 75-85%
+M5 Activity: 80-90%
 M6 Homework/Timetable: 95-100%
 M7 HR/Payroll: 95-100%
 M8A Library: 80-90%

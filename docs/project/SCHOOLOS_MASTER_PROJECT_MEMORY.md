@@ -36,7 +36,7 @@ Student QR Foundation: Implemented; release hardening remains
 Phase 2D M9 Accounting: Completed
 Phase 2 Accounting production polish: Completed (report PDFs, snapshots, reconciliation suggestions, audit trail, and smoke coverage)
 SchoolOS Flutter mobile app: Started under apps/schoolos_mobile with auth/API wiring now in progress
-Current stage: M0 platform foundation complete with provider/queue hardening + M10 provider/attachment/retry depth + Phase 1 pilot-ready core + M2 attendance correction/offline-draft hardening slice + M3 fees/receipts reprint/reversal/close/readiness hardening slice + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3/4 operations feature-depth hardening for M6, M7, M8A, M8C, and M8B + mobile companion app foundation started
+Current stage: M0 platform foundation complete with provider/queue hardening + M5 activity media privacy hardening + M10 provider/attachment/retry depth + Phase 1 pilot-ready core + M2 attendance correction/offline-draft hardening slice + M3 fees/receipts reprint/reversal/close/readiness hardening slice + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3/4 operations feature-depth hardening for M6, M7, M8A, M8C, and M8B + mobile companion app foundation started
 ```
 
 Targeted web-admin frontend polish and Phase 2F browser smoke coverage are now present on main.
@@ -120,8 +120,8 @@ Rules:
 | M2 | Smart Attendance | Phase 1A/1B complete / pilot-ready plus correction/offline-draft hardening slice |
 | M3 | Fees & Receipts | Phase 1A/1B complete / pilot-ready plus receipt reprint, reversal, cashier-close, reconciliation, and gateway-readiness hardening slice |
 | M4 | Exams, CAS & Report Cards | Phase 2 backend/admin UI plus production PDF/report/correction/snapshot polish implemented |
-| M5 | Activity Feed & Milestones | Phase 1A/1B complete with media/moderation hardening foundations, backend-backed web post detail, and web lifecycle/moderation controls |
-| M6 | Homework & Timetable | Phase 3 operational hardening complete plus parent/student homework access fail-closed depth |
+| M5 | Activity Feed & Milestones | Phase 1A/1B complete with media/moderation hardening foundations, sanitized private-media responses, PHOTO_USAGE consent-aware parent media blocking, backend-backed web post detail, parent activity feed route, and web lifecycle/moderation controls |
+| M6 | Homework & Timetable | Phase 3 operational hardening complete plus parent/student homework assignment and submission access fail-closed depth |
 | M7 | HR & Payroll | Phase 3 operational hardening complete plus run-scoped register/PF/TDS/component reporting depth |
 | M8A | Library Management | Phase 3 admin/backend foundation plus fine-to-fees/accounting tests, staff borrower support, bounded history, and QR lookup |
 | M8B | Transport Management | Phase 3 admin/trip/location/report foundation plus GPS pressure guard, Redis cache/fanout tests, and retention cleanup bounds; live/driver/parent later |
@@ -496,7 +496,7 @@ Module estimates:
 | M1 Admissions & Student Profiles | 90-95% |
 | M2 Attendance | 85-90% |
 | M3 Fees & Receipts | 90-95% |
-| M5 Activity Feed | 75-85% |
+| M5 Activity Feed | 80-90% |
 | M10 Notices & Communication | 85-90% |
 | M4 Academics | 100% |
 | M6 Homework & Timetable | 95-100% |
@@ -515,7 +515,7 @@ Biggest risks:
 - Phase Gate 0 in the remaining implementation plan must be completed before broad new scope.
 - Existing Phase 2/3 breadth needs vertical hardening outside M4 and M9.
 - Student QR foundation exists, but QR-in-PDF release behavior and cross-module manual QA still need verification.
-- Homework/Timetable schema/service/test stability after recent verification follow-ups.
+- Homework/Timetable schema/service/test stability after recent verification follow-ups, including parent/student submission list/detail scoping.
 - Pilot operations exposing real-world data-entry, fee, attendance, guardian-contact, PDF, and slow-network issues.
 - Deep parent/mobile workflows beyond the started Flutter companion app, driver live-trip workflow, live map/WebSocket, full canteen purchase-bill/wastage/vendor workflows, and AI/ML implementation remain intentionally unbuilt.
 - Tiered pricing and entitlements must be enforced backend-side before broad paid rollout; sidebar hiding alone is not security.

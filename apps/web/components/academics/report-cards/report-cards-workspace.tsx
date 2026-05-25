@@ -31,6 +31,8 @@ export function ReportCardsWorkspace() {
   const [sectionId, setSectionId] = useState('');
   const [remarks, setRemarks] = useState('');
   const [selectedReportCardId, setSelectedReportCardId] = useState<string | null>(null);
+  const [correctionTargetId, setCorrectionTargetId] = useState<string | null>(null);
+  const [correctionReason, setCorrectionReason] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,6 +87,8 @@ export function ReportCardsWorkspace() {
     onSuccess: () => {
       setMessage('Corrected report card regenerated as a new version.');
       setError(null);
+      setCorrectionTargetId(null);
+      setCorrectionReason('');
       queryClient.invalidateQueries({ queryKey: ['report-cards'] });
       queryClient.invalidateQueries({ queryKey: ['report-card-history'] });
     },
@@ -117,13 +121,21 @@ export function ReportCardsWorkspace() {
     }
   };
 
-  const handleRegenerate = (id: string) => {
-    const reason = window.prompt('Reason for correcting/regenerating this locked report card');
-    if (!reason?.trim()) {
+  const prepareCorrection = (id: string) => {
+    setSelectedReportCardId(id);
+    setCorrectionTargetId(id);
+    setCorrectionReason('');
+    setMessage(null);
+    setError(null);
+  };
+
+  const submitCorrection = () => {
+    if (!correctionTargetId) return;
+    if (!correctionReason.trim()) {
       setError('A correction reason is required.');
       return;
     }
-    regenerateMutation.mutate({ id, reason });
+    regenerateMutation.mutate({ id: correctionTargetId, reason: correctionReason.trim() });
   };
 
   const openPdf = async (reportCardId: string) => {
@@ -191,7 +203,7 @@ export function ReportCardsWorkspace() {
             History
           </Button>
           {row.status === 'LOCKED' && (
-            <Button variant="ghost" size="sm" onClick={() => handleRegenerate(row.id)} data-testid="report-card-regenerate">
+            <Button variant="ghost" size="sm" onClick={() => prepareCorrection(row.id)} data-testid="report-card-regenerate">
               <RotateCcw size={14} className="mr-2" />
               Correct
             </Button>
@@ -322,6 +334,46 @@ export function ReportCardsWorkspace() {
                   </div>
                 </SectionCard>
                 <SectionCard title="Generation History" description="Previous locked versions and correction requests.">
+                  {correctionTargetId && (
+                    <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50 p-4" data-testid="report-card-correction-panel">
+                      <div className="mb-3">
+                        <p className="text-sm font-black text-amber-900">Locked report-card correction</p>
+                        <p className="text-xs font-medium leading-5 text-amber-800">
+                          Corrections create a new report-card version with history. The original artifact is not overwritten.
+                        </p>
+                      </div>
+                      <TextArea
+                        value={correctionReason}
+                        onChange={(event: any) => setCorrectionReason(event.target.value)}
+                        placeholder="Required correction reason for audit history..."
+                        className="min-h-[96px] bg-white"
+                        data-testid="report-card-correction-reason"
+                      />
+                      <div className="mt-3 flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={submitCorrection}
+                          disabled={regenerateMutation.isPending || !correctionReason.trim()}
+                          data-testid="report-card-submit-correction"
+                        >
+                          <RotateCcw size={14} className="mr-2" />
+                          {regenerateMutation.isPending ? 'Regenerating...' : 'Regenerate Corrected Card'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setCorrectionTargetId(null);
+                            setCorrectionReason('');
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                   {selectedReportCardId ? (
                     <div className="space-y-3 text-sm" data-testid="report-card-history">
                       {(historyQuery.data?.history ?? []).map((item: any) => (

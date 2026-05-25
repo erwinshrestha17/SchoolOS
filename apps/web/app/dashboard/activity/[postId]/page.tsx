@@ -283,8 +283,15 @@ function ActivityPostDetail({
                   <div className="flex h-full flex-col items-center justify-center text-slate-400">
                     <Camera size={28} />
                     <p className="mt-2 text-xs font-bold uppercase tracking-widest">
-                      Private media
+                      {attachment.accessBlockedReason
+                        ? 'Media hidden'
+                        : 'Private media'}
                     </p>
+                    {attachment.accessBlockedReason ? (
+                      <p className="mt-2 max-w-[15rem] text-center text-xs font-semibold leading-relaxed text-slate-500">
+                        Some media is hidden because of student photo consent settings.
+                      </p>
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -303,6 +310,7 @@ function ActivityPostDetail({
                     onClick={() =>
                       void api.previewActivityAttachment(attachment.id)
                     }
+                    disabled={Boolean(attachment.accessBlockedReason)}
                     className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
                   >
                     <Eye size={14} />
@@ -316,6 +324,7 @@ function ActivityPostDetail({
                         attachment.fileName,
                       )
                     }
+                    disabled={Boolean(attachment.accessBlockedReason)}
                     className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 text-xs font-bold text-white hover:bg-slate-800"
                   >
                     <Download size={14} />

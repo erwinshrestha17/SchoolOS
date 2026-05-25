@@ -34,6 +34,12 @@ import {
 } from '../common/security/parent-scope';
 
 const MAX_ACTIVITY_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const ACTIVITY_MEDIA_CONSENT_BLOCK_REASON = 'PHOTO_USAGE_CONSENT_REQUIRED';
+
+type ActorMediaAccess = {
+  blocked: boolean;
+  reason?: string;
+};
 
 @Injectable()
 export class ActivityFeedService {
@@ -111,25 +117,9 @@ export class ActivityFeedService {
       take: 50,
     });
 
-    return Promise.all(
-      posts.map(async (post) => ({
-        ...post,
-        attachments: await Promise.all(
-          post.attachments.map(async (attachment) => ({
-            ...attachment,
-            previewUrl: (
-              attachment as ActivityAttachment & { fileAssetId?: string }
-            ).fileAssetId
-              ? await this.fileRegistryService.getSignedUrl(
-                  actor.tenantId,
-                  (attachment as ActivityAttachment & { fileAssetId?: string })
-                    .fileAssetId,
-                )
-              : null,
-          })),
-        ),
-      })),
-    );
+    const mediaAccess = await this.resolveActorMediaAccess(actor);
+
+    return posts.map((post) => this.serializePostForActor(post, mediaAccess));
   }
 
   async getPostDetail(postId: string, actor: AuthContext) {
@@ -169,20 +159,9 @@ export class ActivityFeedService {
       throw new NotFoundException('Activity post not found');
     }
 
-    return {
-      ...post,
-      attachments: await Promise.all(
-        post.attachments.map(async (attachment) => ({
-          ...attachment,
-          previewUrl: attachment.fileAssetId
-            ? await this.fileRegistryService.getSignedUrl(
-                actor.tenantId,
-                attachment.fileAssetId,
-              )
-            : null,
-        })),
-      ),
-    };
+    const mediaAccess = await this.resolveActorMediaAccess(actor);
+
+    return this.serializePostForActor(post, mediaAccess);
   }
 
   async listGallery(
@@ -225,23 +204,14 @@ export class ActivityFeedService {
       skip: filters.offset ?? 0,
     });
 
-    return Promise.all(
-      attachments.map(async (attachment) => ({
-        id: attachment.id,
-        postId: attachment.activityPostId,
-        fileName: attachment.fileName,
-        contentType: attachment.contentType,
-        sizeBytes: attachment.sizeBytes,
-        createdAt: attachment.createdAt,
-        previewUrl: attachment.fileAssetId
-          ? await this.fileRegistryService.getSignedUrl(
-              actor.tenantId,
-              attachment.fileAssetId,
-            )
-          : null,
-        postTitle: attachment.activityPost.title,
-      })),
-    );
+    const mediaAccess = await this.resolveActorMediaAccess(actor);
+
+    return attachments.map((attachment) => ({
+      ...this.serializeAttachmentForActor(attachment, mediaAccess),
+      postId: attachment.activityPostId,
+      createdAt: attachment.createdAt,
+      postTitle: attachment.activityPost.title,
+    }));
   }
 
   async getReactionAnalytics(actor: AuthContext) {
@@ -657,6 +627,23 @@ export class ActivityFeedService {
     }
 
     await this.ensurePostVisibleToActor(actor, attachment.activityPostId);
+    const mediaAccess = await this.resolveActorMediaAccess(actor);
+    if (mediaAccess.blocked) {
+      await this.auditService.record({
+        action: 'activity_attachment_denied_consent',
+        resource: 'activity_attachment',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        resourceId: attachment.id,
+        after: {
+          activityPostId: attachment.activityPostId,
+          reason: mediaAccess.reason,
+        },
+      });
+      throw new ForbiddenException(
+        'Some media is hidden because of student photo consent settings.',
+      );
+    }
 
     await this.fileRegistryService.auditAccess(
       actor.tenantId,
@@ -915,6 +902,33 @@ export class ActivityFeedService {
         'Activity attachment exceeds the 10MB size limit',
       );
     }
+
+    const extension = attachment.fileName.toLowerCase().split('.').pop();
+    const allowedExtensions = new Set([
+      'jpg',
+      'jpeg',
+      'png',
+      'webp',
+      'heic',
+      'heif',
+    ]);
+
+    if (!extension || !allowedExtensions.has(extension)) {
+      throw new BadRequestException(
+        'Activity attachment must use a standard image file extension',
+      );
+    }
+
+    if (/[/\\]|\.\./.test(attachment.fileName)) {
+      throw new BadRequestException('Activity attachment filename is not safe');
+    }
+
+    const signature = Buffer.from(attachment.base64Content, 'base64');
+    if (!hasAllowedImageSignature(signature, attachment.contentType)) {
+      throw new BadRequestException(
+        'Activity attachment content does not match the selected image type',
+      );
+    }
   }
 
   private async buildActorPostVisibilityFilter(
@@ -1043,6 +1057,94 @@ export class ActivityFeedService {
       throw new ForbiddenException('Activity post is outside your scope');
     }
   }
+
+  private async resolveActorMediaAccess(
+    actor: AuthContext,
+  ): Promise<ActorMediaAccess> {
+    if (!isParentOnly(actor)) {
+      return { blocked: false };
+    }
+
+    const guardian = await this.prisma.guardian.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+      select: { id: true },
+    });
+
+    if (!guardian) {
+      return {
+        blocked: true,
+        reason: ACTIVITY_MEDIA_CONSENT_BLOCK_REASON,
+      };
+    }
+
+    const latestConsent = await this.prisma.guardianConsent.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        guardianId: guardian.id,
+        consentType: ConsentType.PHOTO_USAGE,
+      },
+      orderBy: { capturedAt: 'desc' },
+      select: { granted: true, revokedAt: true },
+    });
+
+    if (!latestConsent?.granted || latestConsent.revokedAt) {
+      return {
+        blocked: true,
+        reason: ACTIVITY_MEDIA_CONSENT_BLOCK_REASON,
+      };
+    }
+
+    return { blocked: false };
+  }
+
+  private serializePostForActor<
+    TPost extends {
+      attachments: ActivityAttachment[];
+    },
+  >(post: TPost, mediaAccess: ActorMediaAccess) {
+    return {
+      ...post,
+      attachments: post.attachments.map((attachment) =>
+        this.serializeAttachmentForActor(attachment, mediaAccess),
+      ),
+    };
+  }
+
+  private serializeAttachmentForActor(
+    attachment: ActivityAttachment,
+    mediaAccess: ActorMediaAccess,
+  ) {
+    const isBlocked = Boolean(mediaAccess.blocked && attachment.fileAssetId);
+
+    return {
+      id: attachment.id,
+      fileName: attachment.fileName,
+      contentType: attachment.contentType,
+      sizeBytes: attachment.sizeBytes,
+      sortOrder: attachment.sortOrder,
+      processingStatus: attachment.processingStatus,
+      previewUrl: isBlocked
+        ? null
+        : attachment.fileAssetId
+          ? this.buildActivityAttachmentUrl(attachment.id, 'preview')
+          : null,
+      accessBlockedReason: isBlocked ? mediaAccess.reason : null,
+    };
+  }
+
+  private buildActivityAttachmentUrl(
+    attachmentId: string,
+    action: 'preview' | 'download',
+  ) {
+    const configuredBaseUrl = process.env.API_PUBLIC_BASE_URL?.trim();
+    const apiBaseUrl = configuredBaseUrl
+      ? configuredBaseUrl.replace(/\/$/, '')
+      : 'http://localhost:4000/api/v1';
+
+    return `${apiBaseUrl}/activity-feed/attachments/${encodeURIComponent(
+      attachmentId,
+    )}/${action}`;
+  }
 }
 
 function getMonthRange(month: string) {
@@ -1068,4 +1170,39 @@ function canManageAllActivity(actor: AuthContext) {
   return actor.roles.some((role) =>
     ['platform_super_admin', 'admin', 'principal'].includes(role),
   );
+}
+
+function hasAllowedImageSignature(buffer: Buffer, contentType: string) {
+  if (buffer.length < 4) {
+    return false;
+  }
+
+  const normalizedType = contentType.toLowerCase();
+
+  if (normalizedType === 'image/jpeg') {
+    return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  }
+
+  if (normalizedType === 'image/png') {
+    return (
+      buffer[0] === 0x89 &&
+      buffer[1] === 0x50 &&
+      buffer[2] === 0x4e &&
+      buffer[3] === 0x47
+    );
+  }
+
+  if (normalizedType === 'image/webp') {
+    return (
+      buffer.length >= 12 &&
+      buffer.toString('ascii', 0, 4) === 'RIFF' &&
+      buffer.toString('ascii', 8, 12) === 'WEBP'
+    );
+  }
+
+  if (normalizedType === 'image/heic' || normalizedType === 'image/heif') {
+    return buffer.length >= 12 && buffer.toString('ascii', 4, 8) === 'ftyp';
+  }
+
+  return false;
 }

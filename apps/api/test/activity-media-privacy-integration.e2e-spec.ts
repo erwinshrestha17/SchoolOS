@@ -70,6 +70,7 @@ interface ActivityPrivacyState {
   sections: Record<string, unknown>[];
   students: Record<string, unknown>[];
   guardians: Record<string, unknown>[];
+  guardianConsents: Record<string, unknown>[];
   activityPosts: ActivityPostRecord[];
   activityAttachments: ActivityAttachmentRecord[];
   fileAssets: Record<string, unknown>[];
@@ -189,7 +190,9 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
           {
             fileName: 'art.jpg',
             contentType: 'image/jpeg',
-            base64Content: Buffer.from('image-data').toString('base64'),
+            base64Content: Buffer.from([0xff, 0xd8, 0xff, 0xdb]).toString(
+              'base64',
+            ),
           },
         ],
       },
@@ -267,18 +270,29 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
       expect.arrayContaining(['post-tagged-own-child', 'post-class-wide']),
     );
     expect(postIds).not.toContain('post-other-child');
-    expect(fileRegistryService.getSignedUrl).toHaveBeenCalledWith(
-      tenantId,
-      'file-post-tagged-own-child',
+    expect(posts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'post-tagged-own-child',
+          attachments: [
+            expect.objectContaining({
+              previewUrl:
+                'http://localhost:4000/api/v1/activity-feed/attachments/attachment-post-tagged-own-child/preview',
+            }),
+          ],
+        }),
+        expect.objectContaining({
+          id: 'post-class-wide',
+          attachments: [
+            expect.objectContaining({
+              previewUrl:
+                'http://localhost:4000/api/v1/activity-feed/attachments/attachment-post-class-wide/preview',
+            }),
+          ],
+        }),
+      ]),
     );
-    expect(fileRegistryService.getSignedUrl).toHaveBeenCalledWith(
-      tenantId,
-      'file-post-class-wide',
-    );
-    expect(fileRegistryService.getSignedUrl).not.toHaveBeenCalledWith(
-      tenantId,
-      'file-post-other-child',
-    );
+    expect(fileRegistryService.getSignedUrl).not.toHaveBeenCalled();
   });
 
   it('blocks parent feed reads and media previews outside own child scope', async () => {
@@ -530,6 +544,17 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
         studentLinks: [{ studentId: 'student-1' }],
       },
     ],
+    guardianConsents: [
+      {
+        id: 'consent-1',
+        tenantId,
+        guardianId: 'guardian-1',
+        consentType: ConsentType.PHOTO_USAGE,
+        granted: true,
+        capturedAt: new Date(),
+        revokedAt: null,
+      },
+    ],
     activityPosts: [],
     activityAttachments: [],
     fileAssets: [],
@@ -602,6 +627,24 @@ function buildPrismaMock(tenantId: string, otherTenantId: string) {
               guardian.userId === q.where?.userId,
           ) ?? null,
       ),
+    },
+    guardianConsent: {
+      findFirst: jest.fn(async (q: { where?: Record<string, unknown> }) => {
+        return (
+          state.guardianConsents
+            .filter(
+              (consent) =>
+                consent.tenantId === q.where?.tenantId &&
+                consent.guardianId === q.where?.guardianId &&
+                consent.consentType === q.where?.consentType,
+            )
+            .sort(
+              (a, b) =>
+                (b.capturedAt as Date).getTime() -
+                (a.capturedAt as Date).getTime(),
+            )[0] ?? null
+        );
+      }),
     },
     activityPost: {
       create: jest.fn(

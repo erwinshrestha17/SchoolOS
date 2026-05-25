@@ -97,7 +97,7 @@ export function AcademicsWorkspace({ initialSection }: AcademicsWorkspaceProps) 
           <div className="max-w-xl">
             <div className="mb-4 flex items-center gap-2">
               <span className="rounded-full bg-primary-500/20 px-4 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-primary-300 backdrop-blur-md border border-primary-500/30">
-                Phase 2A Academics
+                Academics Workflow
               </span>
               <div className="h-1 w-1 rounded-full bg-white/30" />
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
@@ -105,7 +105,7 @@ export function AcademicsWorkspace({ initialSection }: AcademicsWorkspaceProps) 
               </span>
             </div>
             <h1 className="text-4xl font-black tracking-tight sm:text-6xl italic uppercase">
-              Mission <span className="text-primary-400">Control</span>
+              Academic <span className="text-primary-400">Workflow</span>
             </h1>
             <p className="mt-4 text-lg font-medium text-slate-300 leading-relaxed">
               Step-by-step academic management from curriculum setup to result delivery.

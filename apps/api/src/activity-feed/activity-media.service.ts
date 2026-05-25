@@ -3,7 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ActivityAttachment, ActivityPostStatus } from '@prisma/client';
+import {
+  ActivityAttachment,
+  ActivityPostStatus,
+  ConsentType,
+} from '@prisma/client';
 import { Readable } from 'stream';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -35,6 +39,8 @@ export interface ActivityMediaAccessUrl {
 }
 
 const ACTIVITY_MEDIA_ACCESS_TTL_SECONDS = 60;
+const ACTIVITY_MEDIA_CONSENT_MESSAGE =
+  'Some media is hidden because of student photo consent settings.';
 
 @Injectable()
 export class ActivityMediaService {
@@ -139,6 +145,7 @@ export class ActivityMediaService {
     }
 
     await this.ensureAttachmentVisibleToActor(actor, attachment);
+    await this.ensurePhotoConsentAllowsActor(actor, attachment);
 
     const fileAsset = attachment.fileAsset;
 
@@ -238,5 +245,57 @@ export class ActivityMediaService {
     if (!visibleStudentInAudience) {
       throw new ForbiddenException('Activity media is outside your scope');
     }
+  }
+
+  private async ensurePhotoConsentAllowsActor(
+    actor: AuthContext,
+    attachment: ActivityAttachment & {
+      activityPost: {
+        id: string;
+      };
+      fileAsset?: {
+        id: string;
+      } | null;
+    },
+  ) {
+    if (!isParentOnly(actor)) {
+      return;
+    }
+
+    const guardian = await this.prisma.guardian.findFirst({
+      where: { tenantId: actor.tenantId, userId: actor.userId },
+      select: { id: true },
+    });
+
+    const latestConsent = guardian
+      ? await this.prisma.guardianConsent.findFirst({
+          where: {
+            tenantId: actor.tenantId,
+            guardianId: guardian.id,
+            consentType: ConsentType.PHOTO_USAGE,
+          },
+          orderBy: { capturedAt: 'desc' },
+          select: { granted: true, revokedAt: true },
+        })
+      : null;
+
+    if (latestConsent?.granted && !latestConsent.revokedAt) {
+      return;
+    }
+
+    await this.auditService.record({
+      action: 'activity_attachment_denied_consent',
+      resource: 'activity_attachment',
+      resourceId: attachment.id,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        activityPostId: attachment.activityPost.id,
+        fileAssetId: attachment.fileAsset?.id ?? null,
+        reason: 'PHOTO_USAGE_CONSENT_REQUIRED',
+      },
+    });
+
+    throw new ForbiddenException(ACTIVITY_MEDIA_CONSENT_MESSAGE);
   }
 }

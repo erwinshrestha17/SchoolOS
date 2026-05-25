@@ -116,7 +116,7 @@ export default function AcademicsOverviewPage() {
           <div className="max-w-2xl">
             <div className="mb-4 flex items-center gap-2">
               <span className="rounded-full bg-primary-500/20 px-4 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-primary-300 backdrop-blur-md border border-primary-500/30">
-                Phase 2A Operations
+                Exams, CAS & Report Cards
               </span>
             </div>
             <h1 className="text-4xl font-black tracking-tight md:text-7xl italic uppercase">

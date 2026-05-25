@@ -634,26 +634,26 @@ export const api = {
       method: 'POST',
       json: body,
     }),
-  listExamTerms: () => request<ExamTermSummary[]>('/academics/exams'),
+  listExamTerms: () => request<ExamTermSummary[]>('/academics/exam-terms'),
   createExamTerm: (body: JsonBody) =>
-    request<ExamTermSummary>('/academics/exams', {
+    request<ExamTermSummary>('/academics/exam-terms', {
       method: 'POST',
       json: body,
     }),
   updateExamTerm: (id: string, body: JsonBody) =>
-    request<ExamTermSummary>(`/academics/exams/${encodeURIComponent(id)}`, {
+    request<ExamTermSummary>(`/academics/exam-terms/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       json: body,
     }),
   deleteExamTerm: (id: string) =>
     request<{ deleted: true; examTermId: string }>(
-      `/academics/exams/${encodeURIComponent(id)}`,
+      `/academics/exam-terms/${encodeURIComponent(id)}`,
       {
         method: 'DELETE',
       },
     ),
   createAssessmentComponent: (body: JsonBody) =>
-    request<AssessmentComponentSummary>('/academics/exams/components', {
+    request<AssessmentComponentSummary>('/academics/assessment-components', {
       method: 'POST',
       json: body,
     }),
@@ -664,15 +664,17 @@ export const api = {
     sectionId?: string | null;
     subjectId?: string | null;
   }) =>
-    request<MarkEntrySummary[]>(withQuery('/academics/marks', params ?? {})),
+    request<PaginatedResponse<MarkEntrySummary> | MarkEntrySummary[]>(
+      withQuery('/academics/marks', params ?? {}),
+    ).then((result) => (Array.isArray(result) ? result : result.items)),
   enterMark: (body: JsonBody) =>
     request<MarkEntrySummary>('/academics/marks', {
       method: 'POST',
       json: body,
     }),
   batchEnterMarks: (body: JsonBody) =>
-    request<{ saved: number; entries: MarkEntrySummary[] }>(
-      '/academics/marks/batch',
+    request<{ updated: number; entries: MarkEntrySummary[] }>(
+      '/academics/marks/bulk-upsert',
       {
         method: 'POST',
         json: body,
@@ -682,14 +684,18 @@ export const api = {
     examTermId: string,
     params?: { subjectId?: string | null },
   ) =>
-    request<AssessmentComponentSummary[]>(
-      withQuery(
-        `/academics/exams/${encodeURIComponent(examTermId)}/components`,
-        params ?? {},
-      ),
-    ),
+    request<
+      | PaginatedResponse<AssessmentComponentSummary>
+      | { items: AssessmentComponentSummary[] }
+      | AssessmentComponentSummary[]
+    >(
+      withQuery('/academics/assessment-components', {
+        ...(params ?? {}),
+        examTermId,
+      }),
+    ).then((result) => (Array.isArray(result) ? result : result.items)),
   createCasRecord: (body: JsonBody) =>
-    request<CasRecordSummary>('/academics/cas', { method: 'POST', json: body }),
+    request<CasRecordSummary>('/academics/cas-records', { method: 'POST', json: body }),
   listReportCards: (params?: {
     academicYearId?: string;
     examTermId?: string;
@@ -754,6 +760,44 @@ export const api = {
     request<ResultPublishingReadiness[]>(
       withQuery('/academics/results/publishing', params),
     ),
+  previewClassResults: (params: {
+    examTermId: string;
+    classId: string;
+    sectionId?: string;
+    includeCas?: boolean;
+    page?: number;
+    limit?: number;
+  }) =>
+    request<{
+      items: Array<{
+        student: {
+          id: string;
+          studentSystemId: string;
+          name: string;
+          className: string;
+          sectionName: string | null;
+          rollNumber: number | null;
+        };
+        summary: {
+          totalObtained: number;
+          totalFullMarks: number;
+          percentage: number;
+          gpa: number;
+          grade: string;
+          resultStatus: string;
+          subjectCount: number;
+          failedSubjectCount: number;
+          incompleteSubjectCount: number;
+          withheldSubjectCount: number;
+        };
+      }>;
+      meta: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+      };
+    }>(withQuery('/academics/results/preview', params)),
   publishResults: (body: JsonBody) =>
     request<PublishingResult>('/academics/results/publishing/publish', {
       method: 'POST',
@@ -1926,6 +1970,14 @@ export const api = {
       { method: 'PATCH', json: body },
     ),
   listActivityPosts: () => request<ActivityPost[]>('/activity-feed/posts'),
+  listParentActivityPosts: (params?: {
+    studentId?: string | null;
+    category?: string | null;
+    month?: string | null;
+  }) =>
+    request<ActivityPost[]>(
+      withQuery('/activity-feed/parent', params ?? {}),
+    ),
   getActivityPost: (postId: string) =>
     request<ActivityPost>(`/activity-feed/posts/${encodeURIComponent(postId)}`),
   updateActivityPost: (postId: string, body: JsonBody) =>
@@ -2340,15 +2392,19 @@ export const api = {
     examTermId: string,
     params?: { subjectId?: string | null },
   ) =>
-    request<AssessmentComponentSummary[]>(
-      withQuery(
-        `/academics/exams/${encodeURIComponent(examTermId)}/components`,
-        params ?? {},
-      ),
-    ),
+    request<
+      | PaginatedResponse<AssessmentComponentSummary>
+      | { items: AssessmentComponentSummary[] }
+      | AssessmentComponentSummary[]
+    >(
+      withQuery('/academics/assessment-components', {
+        ...(params ?? {}),
+        examTermId,
+      }),
+    ).then((result) => (Array.isArray(result) ? result : result.items)),
   updateAssessmentComponent: (id: string, body: JsonBody) =>
     request<AssessmentComponentSummary>(
-      `/academics/exams/components/${encodeURIComponent(id)}`,
+      `/academics/assessment-components/${encodeURIComponent(id)}`,
       {
         method: 'PATCH',
         json: body,
@@ -2356,7 +2412,7 @@ export const api = {
     ),
   deleteAssessmentComponent: (id: string) =>
     request<{ deleted: true; assessmentComponentId: string }>(
-      `/academics/exams/components/${encodeURIComponent(id)}`,
+      `/academics/assessment-components/${encodeURIComponent(id)}`,
       {
         method: 'DELETE',
       },
@@ -2388,27 +2444,33 @@ export const api = {
       examTermId: string;
       unlocked: true;
       request: MarkLockRequestSummary;
-    }>(`/academics/exams/${encodeURIComponent(id)}/unlock`, {
+    }>(`/academics/exam-terms/${encodeURIComponent(id)}/unlock`, {
       method: 'PATCH',
       json: body,
     }),
 
   // Academics - CAS
   listCasRecords: (filters?: CasListFilters) =>
-    request<CasRecordSummary[]>(withQuery('/academics/cas', filters ?? {})),
+    request<
+      | PaginatedResponse<CasRecordSummary>
+      | { items: CasRecordSummary[] }
+      | CasRecordSummary[]
+    >(withQuery('/academics/cas-records', filters ?? {})).then((result) =>
+      Array.isArray(result) ? result : result.items,
+    ),
   updateCasRecord: (id: string, body: JsonBody) =>
-    request<CasRecordSummary>(`/academics/cas/${encodeURIComponent(id)}`, {
+    request<CasRecordSummary>(`/academics/cas-records/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       json: body,
     }),
   deleteCasRecord: (id: string) =>
     request<{ deleted: true; casRecordId: string }>(
-      `/academics/cas/${encodeURIComponent(id)}`,
+      `/academics/cas-records/${encodeURIComponent(id)}`,
       { method: 'DELETE' },
     ),
   batchCreateCasRecords: (body: JsonBody) =>
-    request<{ created: number; entries: CasRecordSummary[] }>(
-      '/academics/cas/batch',
+    request<{ count: number; items: CasRecordSummary[] }>(
+      '/academics/cas-records/bulk-upsert',
       {
         method: 'POST',
         json: body,

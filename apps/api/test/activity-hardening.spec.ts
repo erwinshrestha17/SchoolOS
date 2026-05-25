@@ -67,7 +67,10 @@ describe('Activity Hardening Verification', () => {
         update: jest.fn(),
         updateMany: jest.fn(),
       },
-      guardianConsent: { findMany: jest.fn().mockResolvedValue([]) },
+      guardianConsent: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       fileAsset: { update: jest.fn() },
     };
 
@@ -206,7 +209,9 @@ describe('Activity Hardening Verification', () => {
             {
               fileName: 'a.jpg',
               contentType: 'image/jpeg',
-              base64Content: 'abc',
+              base64Content: Buffer.from([0xff, 0xd8, 0xff, 0xdb]).toString(
+                'base64',
+              ),
             },
           ],
         },
@@ -242,6 +247,57 @@ describe('Activity Hardening Verification', () => {
           }),
         }),
       );
+    });
+
+    it('does not expose storage fields and blocks parent media when photo consent is missing', async () => {
+      prisma.guardian.findFirst.mockResolvedValue({
+        id: 'g-1',
+        studentLinks: [{ studentId: 's-1' }],
+      });
+      prisma.guardianConsent.findFirst.mockResolvedValue(null);
+      prisma.student.findMany.mockResolvedValue([
+        { id: 's-1', classId: 'c-1', sectionId: 'sec-1' },
+      ]);
+      prisma.activityPost.findMany.mockResolvedValue([
+        {
+          id: 'post-1',
+          tenantId,
+          classId: 'c-1',
+          sectionId: 'sec-1',
+          title: 'Class photo',
+          caption: 'Learning together',
+          category: ActivityCategory.LEARNING,
+          audienceType: AudienceType.SECTION,
+          status: ActivityPostStatus.APPROVED,
+          publishedAt: new Date(),
+          attachments: [
+            {
+              id: 'att-1',
+              fileName: 'class.jpg',
+              contentType: 'image/jpeg',
+              sizeBytes: 10,
+              sortOrder: 0,
+              processingStatus: 'READY',
+              objectKey: 'tenant-hardening/private/class.jpg',
+              publicUrl: '/private/class.jpg',
+              fileAssetId: 'file-1',
+            },
+          ],
+          studentTags: [{ studentId: 's-1' }],
+          reactions: [],
+        },
+      ]);
+
+      const posts = await feedService.listPosts(parentActor);
+      const attachment = posts[0].attachments[0] as Record<string, unknown>;
+
+      expect(attachment.previewUrl).toBeNull();
+      expect(attachment.accessBlockedReason).toBe(
+        'PHOTO_USAGE_CONSENT_REQUIRED',
+      );
+      expect(attachment.objectKey).toBeUndefined();
+      expect(attachment.publicUrl).toBeUndefined();
+      expect(attachment.fileAssetId).toBeUndefined();
     });
   });
 });

@@ -52,6 +52,7 @@ interface ReportPdfSubject {
   totalMax: number;
   percentage: number;
   grade: string;
+  gradePoint: number;
 }
 
 @Injectable()
@@ -229,7 +230,7 @@ export class ReportCardPdfService {
             }
           : undefined,
         totalGrade: s.grade,
-        gradePoint: s.grade === 'NG' ? 0 : 4, // Placeholder for actual GPA calc
+        gradePoint: s.gradePoint,
       })),
       summary: {
         totalMarks: Number(reportCard.totalMarks),
@@ -356,6 +357,7 @@ export class ReportCardPdfService {
         ),
         percentage: result.percentage,
         grade: result.grade,
+        gradePoint: result.gpa,
       });
     }
 

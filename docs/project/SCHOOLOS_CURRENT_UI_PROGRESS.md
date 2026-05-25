@@ -5,7 +5,7 @@ This file records the latest web-admin UI/UX implementation progress so large ro
 ## Current UI Sprint
 
 ```text
-Current UI sprint: M10 communication/provider/attachment depth and M6/M7/M8A/M8C/M8B backend/admin feature-depth hardening are implemented; next UI work is staging/browser QA plus targeted polish where pilot evidence shows risk.
+Current UI sprint: M5 activity media privacy hardening and parent activity feed foundation are implemented alongside M10 communication/provider/attachment depth and M6/M7/M8A/M8C/M8B backend/admin feature-depth hardening; next UI work is staging/browser QA plus targeted polish where pilot evidence shows risk.
 ```
 
 Current repo reality:
@@ -25,7 +25,9 @@ Completed:
 
 - Notice composer now uploads a protected File Registry attachment and passes the attachment file id to the real notice API.
 - Delivery retry UI now reads backend failure dashboard data including retry count, retry status, last failure reason, and recipient summary.
-- M6 homework/timetable backend role depth now fails closed for parent/student homework queries that are not linked to the requested student.
+- M5 activity cards/detail views now show a consent-aware hidden-media state instead of exposing blocked private media.
+- M5 has a parent activity feed foundation backed by the real `/activity-feed/parent` API.
+- M6 homework/timetable backend role depth now fails closed for parent/student homework assignment and submission queries that are not linked to the requested student.
 - M7 payroll backend reports now expose explicit register, PF, TDS, and salary-component summaries instead of thin aliases.
 - M8A Library admin depth now has tests for fine-to-fees/accounting boundary, staff borrowers, and purpose-limited QR lookup.
 - M8C Canteen backend/admin depth now exposes a POS receipt endpoint and prevents wallet reversals/corrections from making balances negative.

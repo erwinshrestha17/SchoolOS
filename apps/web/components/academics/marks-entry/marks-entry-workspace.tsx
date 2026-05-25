@@ -110,7 +110,8 @@ export function MarksEntryWorkspace() {
     const entries = Object.entries(marks).map(([studentId, marksObtained]) => ({
       studentId,
       marksObtained: Number(marksObtained),
-      status: statuses[studentId] || 'PRESENT',
+      isAbsent: statuses[studentId] === 'ABSENT' || statuses[studentId] === 'EXCUSED',
+      isWithheld: statuses[studentId] === 'WITHHELD',
       remarks: remarks[studentId],
     })).filter(e => !isNaN(e.marksObtained));
 
@@ -119,6 +120,9 @@ export function MarksEntryWorkspace() {
     batchMutation.mutate({
       examTermId,
       assessmentComponentId: componentId,
+      classId,
+      sectionId: sectionId || undefined,
+      subjectId,
       entries,
     });
   };

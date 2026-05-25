@@ -176,8 +176,19 @@ export class HomeworkService {
   }
 
   async getSubmission(actor: AuthContext, id: string) {
+    const studentScope = await this.resolveVisibleStudentIdsForRead(actor);
     const submission = await this.prisma.homeworkSubmission.findFirst({
-      where: { id, tenantId: actor.tenantId },
+      where: {
+        id,
+        tenantId: actor.tenantId,
+        ...(studentScope
+          ? {
+              studentId: {
+                in: studentScope.length ? studentScope : ['__none__'],
+              },
+            }
+          : {}),
+      },
       include: homeworkSubmissionInclude(),
     });
     if (!submission) throw new NotFoundException('Submission not found');
@@ -466,12 +477,29 @@ export class HomeworkService {
   ) {
     const skip = ((query.page ?? 1) - 1) * (query.limit ?? 20);
     const take = query.limit ?? 20;
+    const studentScope = await this.resolveVisibleStudentIdsForRead(actor);
+
+    if (studentScope && studentScope.length === 0) {
+      return { items: [], total: 0 };
+    }
+
+    if (
+      studentScope &&
+      query.studentId &&
+      !studentScope.includes(query.studentId)
+    ) {
+      return { items: [], total: 0 };
+    }
 
     const where: Prisma.HomeworkSubmissionWhereInput = {
       tenantId: actor.tenantId,
       ...(assignmentId ? { homeworkId: assignmentId } : {}),
       ...(query.status ? { status: query.status } : {}),
-      ...(query.studentId ? { studentId: query.studentId } : {}),
+      ...(studentScope
+        ? { studentId: query.studentId ?? { in: studentScope } }
+        : query.studentId
+          ? { studentId: query.studentId }
+          : {}),
     };
 
     const [items, total] = await Promise.all([
@@ -766,8 +794,19 @@ export class HomeworkService {
   }
 
   private async findSubmissionOrThrow(actor: AuthContext, id: string) {
+    const studentScope = await this.resolveVisibleStudentIdsForRead(actor);
     const item = await this.prisma.homeworkSubmission.findFirst({
-      where: { id, tenantId: actor.tenantId },
+      where: {
+        id,
+        tenantId: actor.tenantId,
+        ...(studentScope
+          ? {
+              studentId: {
+                in: studentScope.length ? studentScope : ['__none__'],
+              },
+            }
+          : {}),
+      },
       include: homeworkSubmissionInclude(),
     });
     if (!item) throw new NotFoundException('Homework submission not found');
@@ -1372,6 +1411,30 @@ export class HomeworkService {
     }
 
     return requestedStudentId ?? null;
+  }
+
+  private async resolveVisibleStudentIdsForRead(actor: AuthContext) {
+    if (actor.roles.includes('student')) {
+      const student = await this.prisma.student.findFirst({
+        where: { tenantId: actor.tenantId, userId: actor.userId },
+        select: { id: true },
+      });
+      return student ? [student.id] : [];
+    }
+
+    if (actor.roles.includes('parent')) {
+      const links = await this.prisma.studentGuardian.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          guardian: { userId: actor.userId },
+        },
+        select: { studentId: true },
+      });
+
+      return links.map((link) => link.studentId);
+    }
+
+    return null;
   }
 
   async getHomeworkCompletionReport(

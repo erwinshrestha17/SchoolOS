@@ -81,7 +81,7 @@ Biometric workflows
 | M2 Smart Attendance | Pilot-ready | 85-90% |
 | M3 Fees & Receipts | Pilot-ready plus focused finance hardening slice | 90-95% |
 | M4 Academics / Exams / CAS / Report Cards | Completed / Pilot-Ready | 100% |
-| M5 Activity Feed & Milestones | Strong Phase 1 foundation | 75-85% |
+| M5 Activity Feed & Milestones | Strong Phase 1 foundation plus media privacy hardening | 80-90% |
 | M6 Homework & Timetable | Completed / Pilot-Ready | 100% |
 | M7 HR & Payroll | Completed / Pilot-Ready | 100% |
 | M8A Library Management | Admin/backend foundation plus controlled fine-to-fees posting, accounting-boundary tests, staff borrowers, and QR lookup implemented | 80-90% |
@@ -261,18 +261,22 @@ Implemented:
 - Developmental milestones and mood log foundations.
 - Backend-backed activity post detail route in the web dashboard.
 - Media privacy tests.
+- Activity media responses now avoid raw storage keys, public URLs, and File Registry IDs; feed/detail/gallery previews route through controlled backend preview endpoints.
+- Parent media previews now fail closed when PHOTO_USAGE consent is missing and show a school-friendly hidden-media state in the web UI.
+- Parent activity feed route added for approved child-scoped activity posts.
 - Activity dashboard route.
 
 Remaining backend:
 
 - Direct-upload API/UX hardening beyond backend storage-service R2 read/write support.
-- Image compression queue depth for low-bandwidth Nepal usage.
+- Real image compression/variant generation depth for low-bandwidth Nepal usage beyond the current queue pattern.
+- Staging object-storage verification for private activity media preview/download.
 
 Remaining frontend:
 
 - [x] Activity detail page for private media, student tags, and reactions.
 - [x] Moderation and lifecycle UI for draft edit, approve/reject/archive, and audited removal.
-- Parent-facing activity view.
+- [x] Parent-facing activity view foundation.
 - Teacher media gallery.
 
 ### M6 - Homework & Timetable
@@ -282,6 +286,7 @@ Implemented:
 - Homework assignment lifecycle, submissions, review, correction requests, reminders, reports, attachment access.
 - Timetable periods, rooms, versions, slots, compare/restore, validation, publish/lock/archive/reopen.
 - Teacher availability, workload limits, subject weekly requirements, substitutions.
+- Parent/student homework assignment and submission list/detail reads fail closed to authorized linked students.
 - Homework and timetable dashboard routes, builder, versions, substitutions, review pages.
 
 Remaining backend:

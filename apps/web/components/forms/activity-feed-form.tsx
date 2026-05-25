@@ -966,7 +966,16 @@ function PostCard({
               ) : (
                 <div className="h-full flex flex-col items-center justify-center p-4 text-center">
                   <Camera className="h-6 w-6 text-slate-300 mb-2" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Private Media</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    {attachment.accessBlockedReason
+                      ? 'Media hidden'
+                      : 'Private Media'}
+                  </p>
+                  {attachment.accessBlockedReason ? (
+                    <p className="mt-2 max-w-[14rem] text-xs font-semibold leading-relaxed text-slate-500">
+                      Some media is hidden because of student photo consent settings.
+                    </p>
+                  ) : null}
                 </div>
               )}
             </div>

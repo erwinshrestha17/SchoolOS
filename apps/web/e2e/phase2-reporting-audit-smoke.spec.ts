@@ -11,7 +11,7 @@ const schoolAdminCredentials = {
   password: process.env.SCHOOLOS_E2E_PASSWORD ?? 'admin123',
 };
 
-test.describe.serial('Phase 2: Reporting and Audit Smoke Tests', () => {
+test.describe.serial('SchoolOS reporting and audit smoke tests', () => {
   test.beforeEach(async ({ context, page }) => {
     // Check if API is available
     try {
@@ -32,7 +32,7 @@ test.describe.serial('Phase 2: Reporting and Audit Smoke Tests', () => {
     await expect(page).toHaveURL(/\/dashboard\/reports/);
     await expect(page.getByRole('heading', { name: /Reports Dashboard/i })).toBeVisible();
 
-    // Verify presence of specific Phase 2 reports
+    // Verify presence of academic reports that support the M4 workflow.
     const expectedReports = [
       'CAS Summary',
       'Promotion Readiness',
@@ -78,7 +78,7 @@ test.describe.serial('Phase 2: Reporting and Audit Smoke Tests', () => {
     await page.goto('/dashboard/accounting/reconciliation');
     await expect(page.getByRole('heading', { name: /Bank Reconciliation/i })).toBeVisible();
     
-    // Check for the "Export PDF" button which was added in Phase 2
+    // Check for the export control when an account context is selected.
     const exportPdfBtn = page.getByTestId('bank-reconciliation-pdf-export');
     // If the button exists (depending on if an account is selected)
     // For now, we just check if the UI is ready to show it
@@ -90,7 +90,7 @@ test.describe.serial('Phase 2: Reporting and Audit Smoke Tests', () => {
     await page.getByRole('tab', { name: /Advanced Reports/i }).click();
     
     // Verify it links to the central hub
-    await expect(page.getByRole('link', { name: /Central Reporting Dashboard/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Go to Reports Dashboard/i })).toBeVisible();
   });
 });
 

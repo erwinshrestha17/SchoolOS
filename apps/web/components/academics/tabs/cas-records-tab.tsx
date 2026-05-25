@@ -204,7 +204,7 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
       invalidate();
       setBatchDraft({});
       setBatchNotes({});
-      setSuccessMessage(`Saved ${data.created} observations successfully.`);
+      setSuccessMessage(`Saved ${data.count} observations successfully.`);
       window.setTimeout(() => setSuccessMessage(''), 5000);
     },
   });
@@ -220,10 +220,10 @@ export function CasRecordsTab({ academicYears, classes, allSections, students, s
         return {
           studentId: student.id,
           score,
-          note: batchNotes[student.id]?.trim() || undefined,
+          remarks: batchNotes[student.id]?.trim() || undefined,
         };
       })
-      .filter((entry): entry is { studentId: string; score: number; note: string | undefined } => !!entry);
+      .filter((entry): entry is { studentId: string; score: number; remarks: string | undefined } => !!entry);
   }, [formStudentsForClass, batchDraft, batchNotes]);
   const invalidBatchEntries = batchEntries.filter((entry) => entry.score < 0 || entry.score > cas.maxScore);
 

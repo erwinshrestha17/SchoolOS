@@ -39,6 +39,9 @@ describe('ActivityFeedService', () => {
       guardian: {
         findFirst: jest.fn(),
       },
+      guardianConsent: {
+        findFirst: jest.fn(),
+      },
       activityPost: {
         create: jest.fn(),
         findMany: jest.fn(),
@@ -133,7 +136,9 @@ describe('ActivityFeedService', () => {
           {
             fileName: 'photo.jpg',
             contentType: 'image/jpeg',
-            base64Content: 'aGVsbG8=',
+            base64Content: Buffer.from([0xff, 0xd8, 0xff, 0xdb]).toString(
+              'base64',
+            ),
           },
         ],
       },
@@ -205,7 +210,9 @@ describe('ActivityFeedService', () => {
             {
               fileName: 'photo.jpg',
               contentType: 'image/jpeg',
-              base64Content: 'aGVsbG8=',
+              base64Content: Buffer.from([0xff, 0xd8, 0xff, 0xdb]).toString(
+                'base64',
+              ),
             },
           ],
         },
