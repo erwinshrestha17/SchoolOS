@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   Download
 } from 'lucide-react';
+import { AdmissionsPipeline } from '../admissions/admissions-pipeline';
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -47,14 +48,14 @@ const documentKinds = [
 ] as const;
 
 const workspaceTabs = [
+  ['pipeline', 'Admissions Pipeline'],
   ['enrollment', 'New Enrollment'],
   ['bulk', 'Bulk Import'],
-  ['recent', 'Recent Admissions'],
 ] as const;
 
 export function AdmissionForm() {
   const queryClient = useQueryClient();
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<typeof workspaceTabs[number][0]>('enrollment');
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<typeof workspaceTabs[number][0]>('pipeline');
   const [activeStep, setActiveStep] = useState(0);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [documentKind, setDocumentKind] = useState('BIRTH_CERTIFICATE');
@@ -569,30 +570,8 @@ export function AdmissionForm() {
         </SectionCard>
       )}
 
-      {activeWorkspaceTab === 'recent' && (
-        <SectionCard title="Recent Admissions" description="Latest admission records from the backend.">
-          {(admissionsQuery.data?.items ?? []).length === 0 ? (
-            <EmptyState title="No recent admissions" description="New student admissions will appear here after enrollment." />
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {(admissionsQuery.data?.items ?? []).slice(0, 10).map((admission) => (
-                <div key={admission.id} className="flex flex-wrap items-center justify-between gap-3 py-4">
-                  <div>
-                    <p className="font-bold text-slate-900">
-                      {admission.fullNameEn}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {admission.studentSystemId} / {admission.className ?? 'Class pending'}
-                    </p>
-                  </div>
-                  <Link href={`/dashboard/students/${encodeURIComponent(admission.id)}`} className="text-sm font-bold text-primary-600">
-                    View Profile
-                  </Link>
-                </div>
-              ))}
-            </div>
-          )}
-        </SectionCard>
+      {activeWorkspaceTab === 'pipeline' && (
+        <AdmissionsPipeline />
       )}
     </div>
   );

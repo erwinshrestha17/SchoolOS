@@ -8,6 +8,7 @@ import { useEntitlements } from '../entitlements-provider';
 import {
   LayoutDashboard,
   Users,
+  UserPlus,
   CalendarCheck,
   Wallet,
   Images,
@@ -71,11 +72,11 @@ function getRequiredModuleForHref(href: string): string | null {
 
 export const dashboardNavGroups: NavGroup[] = [
   {
-    label: 'Overview',
+    label: 'Home',
     items: [{ href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }],
   },
   {
-    label: 'Students & Admissions',
+    label: 'Students',
     items: [
       {
         href: '/dashboard/students',
@@ -86,13 +87,13 @@ export const dashboardNavGroups: NavGroup[] = [
       {
         href: '/dashboard/admissions',
         label: 'Admissions',
-        icon: Users,
+        icon: UserPlus,
         permissions: ['students:read', 'students:create'],
       },
     ],
   },
   {
-    label: 'Academic Operations',
+    label: 'Daily Operations',
     items: [
       {
         href: '/dashboard/attendance',
@@ -101,64 +102,32 @@ export const dashboardNavGroups: NavGroup[] = [
         permissions: ['attendance:read', 'attendance:mark'],
       },
       {
+        href: '/dashboard/homework',
+        label: 'Homework',
+        icon: BookOpen,
+        permissions: homeworkPermissions,
+      },
+    ],
+  },
+  {
+    label: 'Academics',
+    items: [
+      {
         href: '/dashboard/academics/report-cards',
         label: 'Exams, CAS & Reports',
         icon: FileCheck2,
         permissions: academicPermissions,
       },
       {
-        href: '/dashboard/homework',
-        label: 'Homework & Timetable',
-        icon: BookOpen,
-        permissions: [...homeworkPermissions, ...timetablePermissions],
-      },
-    ],
-  },
-  {
-    label: 'Finance & Accounts',
-    items: [
-      {
-        href: '/dashboard/fees',
-        label: 'Fees',
-        icon: Wallet,
-        permissions: [
-          'fees:manage',
-          'fees:bill',
-          'payments:collect',
-          'receipts:read',
-        ],
-      },
-      {
-        href: '/dashboard/accounting',
-        label: 'Accounting',
-        icon: Calculator,
-        permissions: [
-          'accounting:read',
-          'accounting:accounts:read',
-          'accounting:reports:read',
-        ],
-      },
-    ],
-  },
-  {
-    label: 'Human Resources',
-    items: [
-      {
-        href: '/dashboard/hr',
-        label: 'HR / Staff',
-        icon: UserCog,
-        permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
-      },
-      {
-        href: '/dashboard/payroll',
-        label: 'Payroll',
+        href: '/dashboard/timetable',
+        label: 'Timetable',
         icon: CalendarDays,
-        permissions: ['payroll:read', 'payroll:manage'],
+        permissions: timetablePermissions,
       },
     ],
   },
   {
-    label: 'School Services',
+    label: 'School Operations',
     items: [
       {
         href: '/dashboard/library',
@@ -186,14 +155,9 @@ export const dashboardNavGroups: NavGroup[] = [
           'canteen:enrollments:read',
         ],
       },
-    ],
-  },
-  {
-    label: 'Communication',
-    items: [
       {
         href: '/dashboard/notices',
-        label: 'Notices & Communications',
+        label: 'Notices',
         icon: Megaphone,
         permissions: ['notices:read', 'notices:create'],
       },
@@ -203,11 +167,53 @@ export const dashboardNavGroups: NavGroup[] = [
         icon: Images,
         permissions: ['activity_feed:read', 'activity_feed:create'],
       },
-      { href: '/dashboard/messages', label: 'Messages', icon: MessageSquare },
+      {
+        href: '/dashboard/messages',
+        label: 'Messages',
+        icon: MessageSquare,
+      },
     ],
   },
   {
-    label: 'Insights & System',
+    label: 'Staff & Finance',
+    items: [
+      {
+        href: '/dashboard/fees',
+        label: 'Fees',
+        icon: Wallet,
+        permissions: [
+          'fees:manage',
+          'fees:bill',
+          'payments:collect',
+          'receipts:read',
+        ],
+      },
+      {
+        href: '/dashboard/hr',
+        label: 'HR / Staff',
+        icon: UserCog,
+        permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
+      },
+      {
+        href: '/dashboard/payroll',
+        label: 'Payroll',
+        icon: CalendarDays,
+        permissions: ['payroll:read', 'payroll:manage'],
+      },
+      {
+        href: '/dashboard/accounting',
+        label: 'Accounting',
+        icon: Calculator,
+        permissions: [
+          'accounting:read',
+          'accounting:accounts:read',
+          'accounting:reports:read',
+        ],
+      },
+    ],
+  },
+  {
+    label: 'Reports',
     items: [
       {
         href: '/dashboard/reports',
@@ -215,6 +221,11 @@ export const dashboardNavGroups: NavGroup[] = [
         icon: ClipboardList,
         permissions: ['accounting:reports:read', 'library:reports:read'],
       },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
       {
         href: '/dashboard/settings',
         label: 'Settings',

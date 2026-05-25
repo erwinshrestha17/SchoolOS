@@ -844,7 +844,7 @@ export const api = {
       json: body,
     }),
   listStudentDocuments: (studentId: string) =>
-    request(withQuery('/student-documents', { studentId })),
+    request<any[]>(withQuery('/student-documents', { studentId })),
   listStudentDocumentHistory: (studentId: string) =>
     request<StudentDocumentHistory[]>(
       withQuery('/student-documents/history', { studentId }),
@@ -948,6 +948,16 @@ export const api = {
     request<{ url: string }>(`/student-documents/${id}/download`),
   deleteStudentDocument: (id: string) =>
     request(`/student-documents/${id}`, { method: 'DELETE' }),
+  verifyStudentDocument: (documentId: string, body: { status: 'VERIFIED' | 'REJECTED'; notes: string }) =>
+    request<{ success: boolean }>(`/student-documents/${encodeURIComponent(documentId)}/verify`, {
+      method: 'POST',
+      json: body,
+    }),
+  archiveStudentDocument: (documentId: string, body: { reason: string }) =>
+    request<{ success: boolean }>(`/student-documents/${encodeURIComponent(documentId)}/archive`, {
+      method: 'POST',
+      json: body,
+    }),
   openStudentDocumentPdf: async (
     studentId: string,
     kind: string,

@@ -29,12 +29,12 @@ type LifecycleRequest =
 
 const detailTabs = [
   'Overview',
-  'Guardians',
-  'Health',
-  'Documents',
-  'Fees',
   'Attendance',
+  'Fees',
+  'Documents',
   'Activity',
+  'Academics',
+  'Guardians',
   'History',
 ] as const;
 
@@ -205,8 +205,8 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
               onSaveGuardian={(id, body) => guardianUpdateMutation.mutate({ guardianId: id, body })}
             />
           </TabsContent>
-          <TabsContent value="Health" className="mt-0">
-            <ProfileTabs.HealthTab profile={profile} />
+          <TabsContent value="Academics" className="mt-0">
+            <ProfileTabs.AcademicsTab profile={profile} onOpenPdf={openStudentPdf} />
           </TabsContent>
           <TabsContent value="Documents" className="mt-0">
             <ProfileTabs.DocumentsTab 

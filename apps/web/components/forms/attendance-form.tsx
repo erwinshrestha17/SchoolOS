@@ -28,6 +28,7 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -71,6 +72,7 @@ export function AttendanceForm() {
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [conflictMessage, setConflictMessage] = useState('');
   const [hasDraftChanges, setHasDraftChanges] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years'],
@@ -674,21 +676,7 @@ export function AttendanceForm() {
 
           <button
             type="button"
-            onClick={() =>
-              mutation.mutate({
-                academicYearId,
-                classId,
-                sectionId: sectionId || null,
-                attendanceDate: new Date(attendanceDate).toISOString(),
-                exceptions: Object.entries(exceptions).map(
-                  ([studentId, status]) => ({
-                    studentId,
-                    status,
-                    remark: remarks[studentId]?.trim() || null,
-                  }),
-                ),
-              })
-            }
+            onClick={() => setIsConfirmOpen(true)}
             disabled={
               mutation.isPending || roster.length === 0 || futureDateBlocked
             }
@@ -786,6 +774,32 @@ export function AttendanceForm() {
           Export CSV
         </button>
       </div>
+
+      <ConfirmDialog
+        isOpen={isConfirmOpen}
+        title="Confirm Attendance Submission"
+        description={`Are you sure you want to submit attendance for Class ${classesQuery.data?.find(c => c.id === classId)?.name ?? ''}? This will lock today's records.`}
+        confirmLabel={mutation.isPending ? "Submitting..." : "Submit"}
+        cancelLabel="Review"
+        isConfirming={mutation.isPending}
+        onConfirm={() => {
+          mutation.mutate({
+            academicYearId,
+            classId,
+            sectionId: sectionId || null,
+            attendanceDate: new Date(attendanceDate).toISOString(),
+            exceptions: Object.entries(exceptions).map(
+              ([studentId, status]) => ({
+                studentId,
+                status,
+                remark: remarks[studentId]?.trim() || null,
+              }),
+            ),
+          });
+          setIsConfirmOpen(false);
+        }}
+        onClose={() => setIsConfirmOpen(false)}
+      />
     </div>
   );
 }

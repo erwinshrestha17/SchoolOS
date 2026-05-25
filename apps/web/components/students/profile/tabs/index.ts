@@ -6,3 +6,4 @@ export * from './fees-tab';
 export * from './attendance-tab';
 export * from './activity-tab';
 export * from './history-tab';
+export * from './academics-tab';

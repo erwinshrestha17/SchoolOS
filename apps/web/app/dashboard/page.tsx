@@ -124,6 +124,7 @@ export default function DashboardPage() {
       : 0;
 
   const collectedThisMonth = sumReceiptsThisMonth(receiptsQuery.data ?? []);
+  const collectedToday = sumReceiptsToday(receiptsQuery.data ?? []);
   const outstandingFees = sumOutstandingFees(
     defaultersQuery.data ?? [],
     invoicesQuery.data ?? [],
@@ -151,6 +152,17 @@ export default function DashboardPage() {
       href: '/dashboard/settings',
       cta: 'Open Settings',
     })),
+    ...(totalMarkedToday === 0
+      ? [
+          {
+            tone: 'warning' as const,
+            title: 'Attendance not marked today',
+            body: 'Make sure to mark attendance for all classes today.',
+            href: '/dashboard/attendance',
+            cta: 'Mark Attendance',
+          },
+        ]
+      : []),
     ...(attendanceQuery.data?.below80Warnings?.length
       ? [
           {
@@ -286,8 +298,8 @@ export default function DashboardPage() {
           href="/dashboard/attendance"
         />
         <StatCard
-          title="Monthly Collection"
-          value={formatMoney(collectedThisMonth)}
+          title="Fee Collected Today"
+          value={formatMoney(collectedToday)}
           icon={<Wallet size={20} />}
           loading={receiptsQuery.isLoading}
           href="/dashboard/fees"
@@ -303,7 +315,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-8 lg:grid-cols-3">
         {operationalAlerts.length > 0 ? (
-          <SectionCard title="Setup needs attention" className="lg:col-span-3">
+          <SectionCard title="What Needs Attention Today" className="lg:col-span-3">
             <div className="grid gap-3 md:grid-cols-3">
               {operationalAlerts.slice(0, 3).map((alert) => (
                 <Link
@@ -715,4 +727,19 @@ function sumOutstandingFees(
         sum + Math.max(0, invoice.totalAmount - (invoice.paidAmount ?? 0)),
       0,
     );
+}
+
+function sumReceiptsToday(receipts: ReceiptView[]) {
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+
+  return (receipts || []).reduce((sum, receipt) => {
+    const paidAtDate = new Date(receipt.payment?.paidAt ?? receipt.issuedAt);
+    const paidAtStr = paidAtDate.toISOString().slice(0, 10);
+    if (paidAtStr !== todayStr) {
+      return sum;
+    }
+    const gross = receipt.amount ?? receipt.payment?.amount ?? 0;
+    return sum + Math.max(0, gross - (receipt.refundedAmount ?? 0));
+  }, 0);
 }
