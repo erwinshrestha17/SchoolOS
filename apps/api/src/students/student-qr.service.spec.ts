@@ -655,4 +655,22 @@ describe('StudentQrService', () => {
       }),
     );
   });
+
+  it('rejects rotated QR scans (rotated/revoked QR cannot resolve as active)', async () => {
+    const { service, prisma } = createService();
+    prisma.studentQrCredential.findUnique.mockResolvedValue({
+      ...baseCredential,
+      status: StudentQrStatus.ROTATED,
+      student: activeStudent,
+    });
+
+    await expect(
+      service.resolveQr(
+        'tenant-1',
+        'qr-token',
+        StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP,
+        adminAuth,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
 });

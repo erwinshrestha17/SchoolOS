@@ -523,6 +523,68 @@ export class ReportsService {
           );
         }
 
+        const classroom = await this.prisma.class.findFirst({
+          where: { id: classId, tenantId: actor.tenantId },
+        });
+        if (!classroom) {
+          throw new NotFoundException('Class not found in this school.');
+        }
+
+        if (sectionId) {
+          const section = await this.prisma.section.findFirst({
+            where: { id: sectionId, tenantId: actor.tenantId },
+          });
+          if (!section) {
+            throw new NotFoundException('Section not found in this school.');
+          }
+        }
+
+        const isTeacherOnly =
+          actor.roles.includes('teacher') &&
+          !actor.permissions.includes('attendance:read_all') &&
+          !actor.permissions.includes('reports:read_all') &&
+          !actor.permissions.includes('attendance:mark_all') &&
+          !actor.permissions.includes('attendance:override_lock');
+
+        if (isTeacherOnly) {
+          const staff = await this.prisma.staff.findFirst({
+            where: { userId: actor.userId, tenantId: actor.tenantId },
+          });
+          if (!staff) {
+            throw new ForbiddenException('Staff record not found in this tenant');
+          }
+
+          let isAssigned = false;
+          if (sectionId) {
+            const section = await this.prisma.section.findFirst({
+              where: {
+                id: sectionId,
+                classTeacherId: staff.id,
+                tenantId: actor.tenantId,
+              },
+            });
+            if (section) isAssigned = true;
+          }
+
+          if (!isAssigned) {
+            const assignment = await this.prisma.subjectTeacherAssignment.findFirst({
+              where: {
+                staffId: staff.id,
+                classId,
+                ...(sectionId ? { sectionId } : {}),
+                tenantId: actor.tenantId,
+              },
+            });
+            if (assignment) isAssigned = true;
+          }
+
+          if (!isAssigned) {
+            throw new ForbiddenException(
+              'You are not assigned as Class Teacher or Subject Teacher for this section',
+            );
+          }
+        }
+
         const startDate = new Date(year, month - 1, 1);
         const endDate = new Date(year, month, 0);
 

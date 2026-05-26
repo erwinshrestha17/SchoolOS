@@ -16,6 +16,7 @@ import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { CashierCloseWindowDto } from './dto/cashier-close-window.dto';
 import { CollectPaymentDto } from './dto/collect-payment.dto';
+import { InitiateOnlinePaymentDto } from './dto/initiate-online-payment.dto';
 import { CreateCashierCloseDto } from './dto/create-cashier-close.dto';
 import { CreatePaymentRefundDto } from './dto/create-payment-refund.dto';
 import { ListCashierClosesDto } from './dto/list-cashier-closes.dto';
@@ -41,6 +42,15 @@ export class PaymentsController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.financeService.collectPayment(dto, auth);
+  }
+
+  @Post('online/initiate')
+  @Permissions('payments:collect')
+  initiateOnlinePayment(
+    @Body() dto: InitiateOnlinePaymentDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.financeService.initiateOnlinePayment(dto, auth);
   }
 
   @Get('gateway-readiness')

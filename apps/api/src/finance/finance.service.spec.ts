@@ -1496,11 +1496,6 @@ function buildService(options: {
     student: {
       findFirst: jest.fn().mockResolvedValue(options.student ?? null),
     },
-    tenant: {
-      findUniqueOrThrow: jest
-        .fn()
-        .mockResolvedValue(options.tenant ?? { id: actor.tenantId }),
-    },
     invoice: {
       findFirst: jest.fn().mockResolvedValue(options.invoice),
       findMany: jest.fn().mockResolvedValue(options.invoices ?? []),
@@ -1591,6 +1586,13 @@ function buildService(options: {
     receipt: {
       count: jest.fn().mockResolvedValue(options.receiptCount ?? 0),
       findFirst: jest.fn().mockResolvedValue(options.receipt ?? null),
+    },
+    fileAsset: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    tenant: {
+      findUnique: jest.fn().mockResolvedValue(options.tenant ?? { id: actor.tenantId, name: 'SchoolOS' }),
+      findUniqueOrThrow: jest.fn().mockResolvedValue(options.tenant ?? { id: actor.tenantId, name: 'SchoolOS' }),
     },
     chartAccount: {
       findUniqueOrThrow: jest

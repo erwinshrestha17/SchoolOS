@@ -292,6 +292,13 @@ export function createPrismaMock() {
     providerConfigs: [] as Record<string, unknown>[],
     reportExports: [] as Record<string, unknown>[],
     studentGuardians: [] as Record<string, unknown>[],
+    guardians: [] as Record<string, unknown>[],
+    attendanceCorrectionRequests: [] as Record<string, unknown>[],
+    sections: [] as Record<string, unknown>[],
+    subjectTeacherAssignments: [] as Record<string, unknown>[],
+    attendanceSessions: [] as Record<string, unknown>[],
+    attendanceRecords: [] as Record<string, unknown>[],
+    schoolCalendarDays: [] as Record<string, unknown>[],
     transportRoutes: [] as Record<string, unknown>[],
     transportStops: [] as Record<string, unknown>[],
     transportVehicles: [] as Record<string, unknown>[],
@@ -786,20 +793,12 @@ export function createPrismaMock() {
     academicYear: {
       findFirst: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
-          state.academicYears.find(
-            (item) =>
-              item.id === q.where?.id &&
-              (!q.where?.tenantId || item.tenantId === q.where.tenantId),
-          ),
+          state.academicYears.find((item) => matchesWhere(item, q?.where)),
         ),
       ),
       findUnique: jest.fn((q: PrismaQuery) =>
         Promise.resolve(
-          state.academicYears.find(
-            (item) =>
-              item.id === q.where?.id &&
-              (!q.where?.tenantId || item.tenantId === q.where.tenantId),
-          ),
+          state.academicYears.find((item) => matchesWhere(item, q?.where)),
         ),
       ),
       upsert: jest.fn((q: PrismaQuery) => {
@@ -2065,10 +2064,6 @@ export function createPrismaMock() {
       findMany: jest.fn(() => Promise.resolve([])),
       upsert: jest.fn((q: any) => Promise.resolve(q.create || {})),
     },
-    subjectTeacherAssignment: {
-      findFirst: jest.fn(() => Promise.resolve(null)),
-      findMany: jest.fn(() => Promise.resolve([])),
-    },
   });
 
   prisma.generatedStudentDocument = {
@@ -2201,6 +2196,12 @@ export function createPrismaMock() {
     'providerConfig',
     'reportExport',
     'studentGuardian',
+    'guardian',
+    'attendanceCorrectionRequest',
+    'section',
+    'subjectTeacherAssignment',
+    'attendanceSession',
+    'schoolCalendarDay',
     'transportRoute',
     'transportStop',
     'transportVehicle',

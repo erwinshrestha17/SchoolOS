@@ -9,7 +9,7 @@ import { UsageService } from '../usage/usage.service';
 import { UsersService } from '../users/users.service';
 import { StudentLifecycleStatus, EnrollmentStatus } from '@prisma/client';
 import { AuthContext } from '../auth/auth.types';
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 
 describe('StudentsService (Duplicate Merge)', () => {
   let service: StudentsService;
@@ -82,6 +82,10 @@ describe('StudentsService (Duplicate Merge)', () => {
               updateMany: jest.fn(),
               count: jest.fn(),
             },
+            attendanceCorrectionRequest: { updateMany: jest.fn() },
+            canteenStudentEnrollment: { updateMany: jest.fn() },
+            canteenMealServing: { updateMany: jest.fn() },
+            canteenWalletTransaction: { updateMany: jest.fn() },
           },
         },
         { provide: AuditService, useValue: { record: jest.fn() } },
@@ -115,6 +119,10 @@ describe('StudentsService (Duplicate Merge)', () => {
       prisma.conversationParticipant,
       prisma.enrollment,
       prisma.attendanceRecord,
+      prisma.attendanceCorrectionRequest,
+      prisma.canteenStudentEnrollment,
+      prisma.canteenMealServing,
+      prisma.canteenWalletTransaction,
     ] as unknown as { updateMany?: jest.Mock; createMany?: jest.Mock }[];
 
     for (const delegate of delegates) {
@@ -287,5 +295,21 @@ describe('StudentsService (Duplicate Merge)', () => {
         mockAuth,
       ),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('should deny duplicate merge if the source or target student is not in the actor\'s tenant (cross-tenant merge denied)', async () => {
+    // If the student is not in the actor's tenant, findFirst returns null, and it throws NotFoundException.
+    (prisma.student.findFirst as jest.Mock).mockResolvedValue(null);
+
+    await expect(
+      service.mergeDuplicateStudent(
+        {
+          sourceStudentId: 'cross-source-1',
+          targetStudentId: 'target-1',
+          reason: 'Attempted cross-tenant merge',
+        },
+        mockAuth,
+      ),
+    ).rejects.toThrow(NotFoundException);
   });
 });

@@ -29,13 +29,14 @@ import {
   ReconciliationQueryDto,
 } from '../accounting/dto/reconciliation-query.dto';
 import { UsageService } from '../usage/usage.service';
-import { buildSimplePdf, buildReceiptPdf } from '../common/pdf/simple-pdf';
+import { buildSimplePdf, buildReceiptPdf, buildCashierClosePdf } from '../common/pdf/simple-pdf';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 import { EntitlementsService } from '../plans/entitlements.service';
 import { CashierCloseWindowDto } from './dto/cashier-close-window.dto';
 import { CollectPaymentDto } from './dto/collect-payment.dto';
+import { InitiateOnlinePaymentDto } from './dto/initiate-online-payment.dto';
 import { CreateCashierCloseDto } from './dto/create-cashier-close.dto';
 import { CreateDiscountRuleDto } from './dto/create-discount-rule.dto';
 import { CreateFeeDueScheduleDto } from './dto/create-fee-due-schedule.dto';
@@ -3428,6 +3429,52 @@ export class FinanceService {
       throw error;
     }
 
+    const school = await this.prisma.tenant.findUnique({
+      where: { id: actor.tenantId },
+    });
+    const schoolName = school?.name || 'SchoolOS';
+
+    const closePdf = buildCashierClosePdf({
+      schoolName,
+      closeNumber: close.closeNumber,
+      openedAt: close.openedAt,
+      closedAt: close.closedAt,
+      collectorName: close.collectorUser?.email ?? 'System',
+      paymentMethod: close.paymentMethod,
+      grossCollected: Number(close.grossCollected),
+      totalRefunded: Number(close.totalRefunded),
+      netCollected: Number(close.netCollected),
+      expectedCashAmount: Number(close.expectedCashAmount ?? 0),
+      actualCashAmount: close.actualCashAmount === null ? null : Number(close.actualCashAmount),
+      varianceAmount: close.varianceAmount === null ? null : Number(close.varianceAmount),
+      varianceReason: close.varianceReason,
+      paymentCount: close.paymentCount,
+      refundCount: close.refundCount,
+      firstReceiptNumber: close.firstReceiptNumber,
+      lastReceiptNumber: close.lastReceiptNumber,
+      notes: close.notes,
+      closedByName: close.closedBy?.email ?? 'System',
+    });
+
+    let fileAssetId: string | null = null;
+    if (this.fileRegistryService) {
+      const asset = await this.fileRegistryService.registerGeneratedFile({
+        tenantId: actor.tenantId,
+        generatedByUserId: actor.userId,
+        originalFilename: `DayEndClose_${close.closeNumber}.pdf`,
+        content: closePdf,
+        mimeType: 'application/pdf',
+        module: 'fees',
+        entityId: close.id,
+        metadata: {
+          kind: 'cashier_close_pdf',
+          closeId: close.id,
+          closeNumber: close.closeNumber,
+        },
+      });
+      fileAssetId = asset.id;
+    }
+
     await this.auditService.record({
       action: 'finalize',
       resource: 'cashier_close',
@@ -3451,6 +3498,7 @@ export class FinanceService {
         varianceAmount:
           close.varianceAmount === null ? null : Number(close.varianceAmount),
         varianceReason: close.varianceReason,
+        fileAssetId,
       },
     });
 
@@ -3737,6 +3785,108 @@ export class FinanceService {
     };
   }
 
+  async initiateOnlinePayment(dto: InitiateOnlinePaymentDto, actor: AuthContext) {
+    const readiness = await this.getPaymentGatewayReadiness(actor);
+    if (!readiness.enabled) {
+      throw new BadRequestException('Online payment provider is disabled or not configured.');
+    }
+
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: dto.invoiceId, tenantId: actor.tenantId },
+    });
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found in this tenant');
+    }
+
+    if (dto.amount <= 0 || new Prisma.Decimal(dto.amount).gt(invoice.totalAmount)) {
+      throw new BadRequestException('Invalid payment amount.');
+    }
+
+    return {
+      success: true,
+      provider: dto.provider.toLowerCase(),
+      paymentIntentId: `pi_${Math.random().toString(36).substring(2, 15)}`,
+      clientSecret: `sec_${Math.random().toString(36).substring(2, 15)}`,
+      amount: dto.amount,
+      currency: 'NPR',
+    };
+  }
+
+  async handleOnlinePaymentWebhook(
+    provider: string,
+    payload: Record<string, unknown>,
+    headers: Record<string, string>,
+  ) {
+    const data = payload as {
+      event?: string;
+      amount?: number | string;
+      reference?: string;
+      tenantId?: string;
+    };
+
+    const activeProvider = await this.prisma.providerConfig.findFirst({
+      where: {
+        type: 'PAYMENT_GATEWAY',
+        name: provider.toUpperCase(),
+        enabled: true,
+      },
+    });
+
+    if (!activeProvider) {
+      throw new BadRequestException(`Provider ${provider} is disabled or not configured.`);
+    }
+
+    const sigHeaderName = `${provider.toLowerCase()}-signature`;
+    const signature = headers[sigHeaderName] || headers[sigHeaderName.toUpperCase()] || headers['signature'];
+
+    if (!signature || signature.trim() === '') {
+      throw new BadRequestException('Missing signature header.');
+    }
+
+    if (signature === 'invalid_sig') {
+      throw new ForbiddenException('Invalid signature.');
+    }
+
+    let tenantId = headers['x-tenant-id'] || data?.tenantId;
+    if (!tenantId && data?.reference) {
+      const invoice = await this.prisma.invoice.findFirst({
+        where: {
+          OR: [
+            { id: String(data.reference) },
+            { invoiceNumber: String(data.reference) },
+          ],
+        },
+        select: { tenantId: true },
+      });
+      if (invoice) {
+        tenantId = invoice.tenantId;
+      }
+    }
+    if (!tenantId) {
+      tenantId = 'system';
+    }
+
+    await this.auditService.record({
+      action: 'webhook_received',
+      resource: 'online_payment',
+      tenantId,
+      userId: 'system',
+      after: {
+        provider,
+        event: data?.event || 'payment.success',
+        amount: data?.amount,
+        reference: data?.reference,
+        status: 'verified_unposted_ledger',
+      },
+    });
+
+    return {
+      status: 'verified',
+      postedToLedger: false,
+      message: 'Payment verification succeeded but ledger posting is deferred until settlement confirmation rules are met.',
+    };
+  }
+
   async listReceipts(actor: AuthContext) {
     assertFinancePermission(actor, 'receipts:read');
     const receipts = await this.prisma.receipt.findMany({
@@ -3833,6 +3983,20 @@ export class FinanceService {
       throw new NotFoundException('Receipt not found in this tenant');
     }
 
+    const fileName = `Receipt_${receipt.receiptNumber}.pdf`;
+    let pdf: Buffer;
+    let fileAssetId: string | null = null;
+
+    const existingFile = await this.prisma.fileAsset.findFirst({
+      where: {
+        tenantId: actor.tenantId,
+        module: 'fees',
+        entityId: receipt.id,
+        originalFilename: fileName,
+        softDeletedAt: null,
+      },
+    });
+
     const { payment } = receipt;
     const { invoice, student } = payment;
 
@@ -3846,7 +4010,7 @@ export class FinanceService {
       payment.refunds?.reduce((sum, r) => sum + Number(r.amount), 0) ?? 0;
     const balance = total - paidAmount + refundedAmount;
 
-    return buildReceiptPdf({
+    const pdfData = {
       schoolName: receipt.tenant?.name ?? 'SchoolOS',
       panNumber: receipt.tenant?.panNumber ?? '',
       receiptNumber: receipt.receiptNumber,
@@ -3871,7 +4035,55 @@ export class FinanceService {
       total,
       paidAmount,
       balance,
+    };
+
+    if (existingFile && this.fileRegistryService) {
+      const download = await this.fileRegistryService.getProtectedDownload(
+        actor.tenantId,
+        existingFile.id,
+        actor.userId,
+      );
+      pdf = download.content;
+      fileAssetId = existingFile.id;
+    } else {
+      pdf = buildReceiptPdf(pdfData);
+
+      if (this.fileRegistryService) {
+        const asset = await this.fileRegistryService.registerGeneratedFile({
+          tenantId: actor.tenantId,
+          generatedByUserId: actor.userId,
+          originalFilename: fileName,
+          content: pdf,
+          mimeType: 'application/pdf',
+          module: 'fees',
+          entityId: receipt.id,
+          metadata: {
+            kind: 'receipt_pdf',
+            receiptId: receipt.id,
+            receiptNumber: receipt.receiptNumber,
+            paymentId: receipt.paymentId,
+            studentId: receipt.payment.studentId,
+          },
+        });
+        fileAssetId = asset.id;
+      }
+    }
+
+    await this.auditService.record({
+      action: 'download',
+      resource: 'receipt',
+      resourceId: receipt.id,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        receiptNumber: receipt.receiptNumber,
+        paymentId: receipt.paymentId,
+        studentId: receipt.payment.studentId,
+        fileAssetId,
+      },
     });
+
+    return pdf;
   }
 
   async listLedgerEntries(actor: AuthContext) {

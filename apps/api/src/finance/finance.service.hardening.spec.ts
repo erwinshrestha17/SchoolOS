@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UsageService } from '../usage/usage.service';
 import { FinanceService } from './finance.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { AuditService } from '../audit/audit.service';
 import { CommunicationsService } from '../communications/communications.service';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
@@ -22,6 +23,8 @@ import {
 describe('FinanceService - Hardening', () => {
   let service: FinanceService;
   let prisma: PrismaService;
+  let fileRegistry: FileRegistryService;
+  let auditService: AuditService;
 
   const actor = {
     tenantId: 't1',
@@ -33,28 +36,35 @@ describe('FinanceService - Hardening', () => {
       'payments:reverse',
       'payments:close',
       'receipts:manage',
+      'receipts:read',
     ],
     authMethod: AuthMethod.PASSWORD,
   };
 
   beforeEach(async () => {
+    const mockPrisma = {
+      payment: {
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        update: jest.fn(),
+      },
+      paymentRefund: { count: jest.fn(), create: jest.fn() },
+      invoice: { findUnique: jest.fn(), update: jest.fn(), findFirst: jest.fn() },
+      cashierClose: { findFirst: jest.fn(), create: jest.fn(), count: jest.fn() },
+      journalEntry: { findFirst: jest.fn() },
+      receipt: { findFirst: jest.fn(), count: jest.fn() },
+      fileAsset: { findFirst: jest.fn() },
+      tenant: { findUnique: jest.fn() },
+      providerConfig: { findFirst: jest.fn() },
+      $transaction: jest.fn((cb) => cb(mockPrisma)),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FinanceService,
         {
           provide: PrismaService,
-          useValue: {
-            payment: {
-              findFirst: jest.fn(),
-              findMany: jest.fn(),
-              update: jest.fn(),
-            },
-            paymentRefund: { count: jest.fn(), create: jest.fn() },
-            invoice: { findUnique: jest.fn(), update: jest.fn() },
-            cashierClose: { findFirst: jest.fn(), create: jest.fn() },
-            journalEntry: { findFirst: jest.fn() },
-            $transaction: jest.fn((cb) => cb(prisma)),
-          },
+          useValue: mockPrisma,
         },
         { provide: AuditService, useValue: { record: jest.fn() } },
         { provide: CommunicationsService, useValue: {} },
@@ -74,11 +84,20 @@ describe('FinanceService - Hardening', () => {
             incrementUsage: jest.fn().mockResolvedValue(undefined),
           } as any,
         },
+        {
+          provide: FileRegistryService,
+          useValue: {
+            registerGeneratedFile: jest.fn(),
+            getProtectedDownload: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<FinanceService>(FinanceService);
     prisma = module.get<PrismaService>(PrismaService);
+    fileRegistry = module.get<FileRegistryService>(FileRegistryService);
+    auditService = module.get<AuditService>(AuditService);
   });
 
   describe('refundPayment', () => {

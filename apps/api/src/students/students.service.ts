@@ -1524,6 +1524,11 @@ export class StudentsService {
             libraryIssues: true,
             transportEnrollments: true,
             transportLogs: true,
+            attendanceRecords: true,
+            attendanceCorrectionRequests: true,
+            canteenEnrollments: true,
+            canteenMealServings: true,
+            canteenWalletTransactions: true,
           },
         },
       },
@@ -1554,6 +1559,13 @@ export class StudentsService {
           where: { tenantId: actor.tenantId, studentId: sourceStudent.id },
         },
       ),
+      attendanceRecords: financialSummary?._count.attendanceRecords ?? 0,
+      attendanceCorrectionRequests:
+        financialSummary?._count.attendanceCorrectionRequests ?? 0,
+      canteenEnrollments: financialSummary?._count.canteenEnrollments ?? 0,
+      canteenMealServings: financialSummary?._count.canteenMealServings ?? 0,
+      canteenWalletTransactions:
+        financialSummary?._count.canteenWalletTransactions ?? 0,
     };
 
     return {
@@ -1657,6 +1669,11 @@ export class StudentsService {
         transportLogs,
         conversations,
         conversationParticipants,
+        attendanceRecords,
+        attendanceCorrectionRequests,
+        canteenEnrollments,
+        canteenMealServings,
+        canteenWalletTransactions,
       ] = await Promise.all([
         missingGuardianLinks.length > 0
           ? tx.studentGuardian.createMany({
@@ -1762,6 +1779,34 @@ export class StudentsService {
           },
           data: { studentId: targetStudent.id },
         }),
+        tx.attendanceCorrectionRequest.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          data: { studentId: targetStudent.id },
+        }),
+        tx.canteenStudentEnrollment.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          data: { studentId: targetStudent.id },
+        }),
+        tx.canteenMealServing.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          data: { studentId: targetStudent.id },
+        }),
+        tx.canteenWalletTransaction.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            studentId: sourceStudent.id,
+          },
+          data: { studentId: targetStudent.id },
+        }),
       ]);
 
       if (sourceDocs.length > 0) {
@@ -1817,6 +1862,7 @@ export class StudentsService {
               documents: documents.count,
               invoices: invoices.count,
               payments: payments.count,
+              attendanceRecords: attendanceRecords.count,
             },
           },
         },
@@ -1855,6 +1901,11 @@ export class StudentsService {
         transportLogs: transportLogs.count,
         conversations: conversations.count,
         conversationParticipants: conversationParticipants.count,
+        attendanceRecords: attendanceRecords.count,
+        attendanceCorrectionRequests: attendanceCorrectionRequests.count,
+        canteenEnrollments: canteenEnrollments.count,
+        canteenMealServings: canteenMealServings.count,
+        canteenWalletTransactions: canteenWalletTransactions.count,
       };
     });
 
@@ -2117,10 +2168,25 @@ export class StudentsService {
       };
     });
 
+    const iemisCodeSetting = await this.prisma.tenantSetting.findUnique({
+      where: {
+        tenantId_key: {
+          tenantId: actor.tenantId,
+          key: 'iemis_school_code',
+        },
+      },
+    });
+    const iemisSchoolCode =
+      typeof iemisCodeSetting?.value === 'string'
+        ? iemisCodeSetting.value
+        : iemisCodeSetting?.value
+          ? String(iemisCodeSetting.value)
+          : '';
+
     const headers = buildIemisHeaders();
     const rows = validationResults
       .filter((result) => result.issues.length === 0)
-      .map(({ student }) => buildIemisRow(student));
+      .map(({ student }) => buildIemisRow(student, iemisSchoolCode));
 
     const csv = buildCsv(headers, rows);
     const exportedAt = new Date();
@@ -3358,16 +3424,32 @@ function buildIemisHeaders() {
     'primaryGuardianEmail',
     'wardNumber',
     'guardianCount',
+    'iemisSchoolCode',
+    'fatherName',
+    'motherName',
+    'stream',
+    'dobBs',
   ];
 }
 
-function buildIemisRow(student: StudentDocumentPayload) {
+function buildIemisRow(student: StudentDocumentPayload, iemisSchoolCode: string) {
   const latestEnrollment = student.enrollments[0] ?? null;
   const primaryGuardianLink =
     student.guardianLinks.find((link) => link.isPrimary) ??
     student.guardianLinks[0] ??
     null;
   const primaryGuardian = primaryGuardianLink?.guardian ?? null;
+
+  const fatherLink = student.guardianLinks.find(
+    (link) =>
+      link.relation.toLowerCase() === 'father' ||
+      link.relation.toLowerCase() === 'father/guardian'
+  );
+  const motherLink = student.guardianLinks.find(
+    (link) =>
+      link.relation.toLowerCase() === 'mother' ||
+      link.relation.toLowerCase() === 'mother/guardian'
+  );
 
   return {
     studentSystemId: student.studentSystemId,
@@ -3399,6 +3481,11 @@ function buildIemisRow(student: StudentDocumentPayload) {
     primaryGuardianEmail: primaryGuardian?.email ?? '',
     wardNumber: primaryGuardian?.wardNumber ?? '',
     guardianCount: student.guardianLinks.length,
+    iemisSchoolCode: iemisSchoolCode || '',
+    fatherName: fatherLink?.guardian.fullName ?? '',
+    motherName: motherLink?.guardian.fullName ?? '',
+    stream: '',
+    dobBs: '',
   };
 }
 

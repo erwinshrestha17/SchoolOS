@@ -1475,6 +1475,18 @@ function buildPrisma(options: {
           options.transactionGuardianIdentityVerificationUpdateResult ?? null,
         ),
     },
+    attendanceCorrectionRequest: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    canteenStudentEnrollment: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    canteenMealServing: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    canteenWalletTransaction: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
   };
 
   const prisma = {
@@ -1605,6 +1617,9 @@ function buildPrisma(options: {
     },
     reportExport: {
       create: jest.fn().mockResolvedValue({ id: 'export-1' }),
+    },
+    tenantSetting: {
+      findUnique: jest.fn().mockResolvedValue(null),
     },
     $transaction: jest
       .fn()

@@ -45,6 +45,9 @@ describe('StudentsService (iEMIS Export)', () => {
             reportExport: {
               create: jest.fn(),
             },
+            tenantSetting: {
+              findUnique: jest.fn(),
+            },
           },
         },
         { provide: AuditService, useValue: { record: jest.fn() } },
@@ -84,6 +87,7 @@ describe('StudentsService (iEMIS Export)', () => {
     fileRegistryService.markUploaded.mockResolvedValue({
       id: 'file-asset-1',
     });
+    (prisma.tenantSetting.findUnique as jest.Mock).mockResolvedValue(null);
   });
 
   it('should export valid students to iEMIS CSV format', async () => {
@@ -127,6 +131,10 @@ describe('StudentsService (iEMIS Export)', () => {
     ];
 
     (prisma.student.findMany as jest.Mock).mockResolvedValue(mockStudents);
+    (prisma.tenantSetting.findUnique as jest.Mock).mockResolvedValue({
+      key: 'iemis_school_code',
+      value: 'school-code-123',
+    });
     (prisma.reportExport.create as jest.Mock).mockResolvedValue({
       id: 'export-1',
     });
@@ -140,6 +148,19 @@ describe('StudentsService (iEMIS Export)', () => {
     expect(result.fileName).toMatch(
       /^iemis-students-school-1-\d{4}-\d{2}-\d{2}\.csv$/,
     );
+    expect(result.headers).toContain('iemisSchoolCode');
+    expect(result.headers).toContain('fatherName');
+    expect(result.headers).toContain('motherName');
+    expect(result.headers).toContain('stream');
+    expect(result.headers).toContain('dobBs');
+
+    const firstRow = result.rows[0];
+    expect(firstRow.iemisSchoolCode).toBe('school-code-123');
+    expect(firstRow.fatherName).toBe('James Doe');
+    expect(firstRow.motherName).toBe('');
+    expect(firstRow.stream).toBe('');
+    expect(firstRow.dobBs).toBe('');
+
     expect(storageService.saveBufferObject).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: mockAuth.tenantId,

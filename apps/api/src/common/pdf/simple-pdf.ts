@@ -889,3 +889,115 @@ export function getJpegDimensions(buffer: Buffer): {
 
   throw new Error('Invalid JPEG: SOF marker not found');
 }
+
+export function buildCashierClosePdf(input: {
+  schoolName: string;
+  closeNumber: string;
+  openedAt: Date;
+  closedAt: Date;
+  collectorName: string;
+  paymentMethod: string | null;
+  grossCollected: number;
+  totalRefunded: number;
+  netCollected: number;
+  expectedCashAmount: number;
+  actualCashAmount: number | null;
+  varianceAmount: number | null;
+  varianceReason: string | null;
+  paymentCount: number;
+  refundCount: number;
+  firstReceiptNumber: string | null;
+  lastReceiptNumber: string | null;
+  notes: string | null;
+  closedByName: string;
+  logo?: PdfImage | null;
+}) {
+  const contentParts = [
+    ...pageFrame(
+      'CASHIER WINDOW CLOSE REPORT',
+      input.schoolName,
+      `Close Number: ${input.closeNumber}`,
+      input.logo ? 'Img1' : undefined,
+    ),
+    infoBox(48, 620, 240, 62),
+    sectionLabel('Window Identification', 60, 668),
+    text(`Close Number: ${input.closeNumber}`, 60, 654, 9, 'F2'),
+    text(`Collector: ${input.collectorName}`, 60, 640, 9, 'F1'),
+    text(`Method Scope: ${input.paymentMethod || 'ALL METHODS'}`, 60, 626, 9, 'F1'),
+
+    infoBox(304, 620, 240, 62),
+    sectionLabel('Time Boundaries', 316, 668),
+    text(`Opened At: ${formatDateTime(input.openedAt)}`, 316, 654, 9, 'F1'),
+    text(`Closed At: ${formatDateTime(input.closedAt)}`, 316, 640, 9, 'F1'),
+    text(`Closed By: ${input.closedByName}`, 316, 626, 9, 'F1'),
+
+    infoBox(48, 510, 496, 96),
+    sectionLabel('Financial Summary', 60, 592),
+    text('Gross Collected:', 60, 574, 10, 'F1'),
+    moneyText(input.grossCollected, 210, 574, 'F1'),
+
+    text('Total Refunded:', 60, 556, 10, 'F1'),
+    moneyText(-input.totalRefunded, 210, 556, 'F1'),
+
+    '60 546 m 250 546 l S',
+    text('Net Collected:', 60, 532, 10, 'F2'),
+    moneyText(input.netCollected, 210, 532, 'F2'),
+
+    // Cash Reconciliation
+    sectionLabel('Cash Reconciliation', 316, 592),
+    text('Expected Cash:', 316, 574, 10, 'F1'),
+    moneyText(input.expectedCashAmount, 450, 574, 'F1'),
+
+    text('Actual Cash:', 316, 556, 10, 'F1'),
+    input.actualCashAmount !== null
+      ? moneyText(input.actualCashAmount, 450, 556, 'F1')
+      : text('N/A', 450, 556, 10, 'F1'),
+
+    '316 546 m 500 546 l S',
+    text('Variance:', 316, 532, 10, 'F2'),
+    input.varianceAmount !== null
+      ? moneyText(input.varianceAmount, 450, 532, 'F2')
+      : text('N/A', 450, 532, 10, 'F2'),
+
+    // Activity summary box
+    infoBox(48, 410, 496, 86),
+    sectionLabel('Activity Details', 60, 482),
+    text(`Total Payments Count: ${input.paymentCount}`, 60, 464, 9, 'F1'),
+    text(`Total Refunds Count: ${input.refundCount}`, 60, 448, 9, 'F1'),
+    text(`First Receipt: ${input.firstReceiptNumber || '—'}`, 304, 464, 9, 'F1'),
+    text(`Last Receipt: ${input.lastReceiptNumber || '—'}`, 304, 448, 9, 'F1'),
+
+    // Variance Reason & Notes
+    infoBox(48, 250, 496, 146),
+    sectionLabel('Auditable Explanations & Notes', 60, 382),
+    text('Variance Reason:', 60, 364, 9, 'F2'),
+    ...(input.varianceReason
+      ? wrapPdfLine(input.varianceReason, 60, 350, 460, 9)
+      : [text('None recorded', 60, 350, 9, 'F1')]
+    ),
+    text('General Handoff Notes:', 60, 300, 9, 'F2'),
+    ...(input.notes
+      ? wrapPdfLine(input.notes, 60, 286, 460, 9)
+      : [text('No notes provided', 60, 286, 9, 'F1')]
+    ),
+
+    '72 138 m 220 138 l S',
+    text('Cashier Signature', 108, 122, 9, 'F1'),
+    '360 138 m 508 138 l S',
+    text('Supervisor Signature', 390, 122, 9, 'F1'),
+
+    text('Confidential day-end cashier close summary.', 176, 72, 10, 'F2'),
+    text(
+      'This document is an official financial close record and must be retained in audit history.',
+      106,
+      54,
+      8,
+      'F1',
+    ),
+  ];
+
+  return buildPdfFromContent(
+    contentParts.filter(Boolean).join('\n'),
+    input.logo,
+  );
+}

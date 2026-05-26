@@ -826,6 +826,13 @@ export class AttendanceService {
           : Promise.resolve(null),
       ]);
 
+    if (!classroom) {
+      throw new NotFoundException('Class not found in this school.');
+    }
+    if (dto.sectionId && !section) {
+      throw new NotFoundException('Section not found in this school.');
+    }
+
     const sessionByDate = new Map(
       sessions.map((s) => [s.attendanceDate.toISOString().split('T')[0], s]),
     );
@@ -3277,26 +3284,74 @@ export class AttendanceService {
     studentId: string,
     actor: AuthContext,
   ) {
-    const parentStudentIds = await getParentStudentIds(this.prisma, actor);
-    if (parentStudentIds !== null && !parentStudentIds.includes(studentId)) {
-      throw new ForbiddenException('Access denied to this student attendance.');
-    }
-
-    const ownStudentId = await getStudentOwnId(this.prisma, actor);
-    if (ownStudentId !== null && ownStudentId !== studentId) {
-      throw new ForbiddenException('Access denied to this student attendance.');
-    }
-
     const student = await this.prisma.student.findFirst({
       where: {
         id: studentId,
         tenantId: actor.tenantId,
       },
-      select: { id: true },
+      select: {
+        id: true,
+        classId: true,
+        sectionId: true,
+      },
     });
 
     if (!student) {
       throw new NotFoundException('Student not found in this school.');
+    }
+
+    if (actor.roles.includes('parent')) {
+      const guardian = await this.prisma.guardian.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+        },
+        include: {
+          studentLinks: true,
+        },
+      });
+      const allowedStudentIds = guardian
+        ? guardian.studentLinks.map((link) => link.studentId)
+        : [];
+      if (!allowedStudentIds.includes(studentId)) {
+        throw new ForbiddenException('Access denied to this student attendance.');
+      }
+      return;
+    }
+
+    if (actor.roles.includes('student')) {
+      const ownStudent = await this.prisma.student.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+        },
+        select: { id: true },
+      });
+      if (!ownStudent || ownStudent.id !== studentId) {
+        throw new ForbiddenException('Access denied to this student attendance.');
+      }
+      return;
+    }
+
+    if (
+      actor.permissions.includes('attendance:read_all') ||
+      actor.permissions.includes('attendance:mark_all') ||
+      actor.permissions.includes('attendance:override_lock')
+    ) {
+      return;
+    }
+
+    if (actor.roles.includes('teacher')) {
+      await this.checkTeacherAssignment(
+        actor,
+        student.classId,
+        student.sectionId,
+      );
+      return;
+    }
+
+    if (!actor.permissions.includes('attendance:read')) {
+      throw new ForbiddenException('Access denied to this student attendance.');
     }
   }
 

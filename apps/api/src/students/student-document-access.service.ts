@@ -121,6 +121,7 @@ export class StudentDocumentAccessService {
           d."studentId",
           COALESCE(to_jsonb(d) ->> 'status', NULL) AS "status",
           COALESCE(
+            to_jsonb(d) ->> 'fileId',
             to_jsonb(d) ->> 'fileAssetId',
             to_jsonb(d) ->> 'documentFileId'
           ) AS "documentFileId",

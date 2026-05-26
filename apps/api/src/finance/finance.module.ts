@@ -9,6 +9,7 @@ import { FinanceService } from './finance.service';
 import { LedgerController } from './ledger.controller';
 import { PaymentsController } from './payments.controller';
 import { ReceiptsController } from './receipts.controller';
+import { PaymentsWebhookController } from './payments-webhook.controller';
 
 import { BullModule } from '@nestjs/bullmq';
 import { FinanceProcessor } from './finance.processor';
@@ -34,6 +35,7 @@ import { UsageModule } from '../usage/usage.module';
     FeesController,
     FinanceCompatController,
     PaymentsController,
+    PaymentsWebhookController,
     LedgerController,
     ReceiptsController,
   ],

@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Student } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
 import {
@@ -6,6 +6,7 @@ import {
   getStudentOwnId,
 } from '../common/security/parent-scope';
 import { PrismaService } from '../prisma/prisma.service';
+import { AttendanceService } from '../attendance/attendance.service';
 
 interface MobileStudentRow extends Student {
   class: { id: string; name: string };
@@ -26,7 +27,10 @@ interface MobileStudentRow extends Student {
 
 @Injectable()
 export class MobileService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly attendanceService: AttendanceService,
+  ) {}
 
   async listMyStudents(actor: AuthContext) {
     const studentIds = await this.getAllowedStudentIds(actor);
@@ -86,6 +90,35 @@ export class MobileService {
     return {
       items: students.map((student) => toMobileStudent(student)),
     };
+  }
+
+  async getStudentAttendanceSummary(
+    studentId: string,
+    actor: AuthContext,
+    query?: { month?: number; year?: number },
+  ) {
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: studentId,
+        tenantId: actor.tenantId,
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Student not found in this school.');
+    }
+
+    const parentStudentIds = await getParentStudentIds(this.prisma, actor);
+    if (parentStudentIds !== null && !parentStudentIds.includes(studentId)) {
+      throw new ForbiddenException('Access denied to this student attendance.');
+    }
+
+    const ownStudentId = await getStudentOwnId(this.prisma, actor);
+    if (ownStudentId !== null && ownStudentId !== studentId) {
+      throw new ForbiddenException('Access denied to this student attendance.');
+    }
+
+    return this.attendanceService.getParentSummary(studentId, actor, query);
   }
 
   private async getAllowedStudentIds(actor: AuthContext) {

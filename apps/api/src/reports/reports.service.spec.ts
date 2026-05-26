@@ -149,6 +149,12 @@ describe('ReportsService', () => {
                 },
               ]),
             },
+            class: {
+              findFirst: jest.fn().mockResolvedValue({ id: 'c1', name: 'Grade 1' }),
+            },
+            section: {
+              findFirst: jest.fn().mockResolvedValue({ id: 'sec1', name: 'A' }),
+            },
           },
         },
         {
