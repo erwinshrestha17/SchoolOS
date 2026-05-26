@@ -96,6 +96,9 @@ export class FileRegistryController {
       objectKey: stored.objectKey,
       mimeType: dto.contentType,
       sizeBytes: stored.sizeBytes,
+      provider: stored.provider,
+      bucket: stored.bucket,
+      checksumSha256: stored.checksumSha256,
       module: dto.module,
       entityId: dto.entityId,
     });
@@ -129,6 +132,49 @@ export class FileRegistryController {
     };
   }
 
+  @Get(':id/signed-preview')
+  async getSignedPreview(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') id: string,
+  ) {
+    return this.fileRegistryService.createSignedPreviewUrl(auth, id);
+  }
+
+  @Get(':id/signed-download')
+  async getSignedDownload(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') id: string,
+  ) {
+    return this.fileRegistryService.createSignedDownloadUrl(auth, id);
+  }
+
+  @Get(':id/preview')
+  async previewFile(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const asset = await this.fileRegistryService.getFileMetadata(
+      auth.tenantId,
+      id,
+    );
+    await this.fileRegistryService.assertFileAccessForAuth(asset, auth);
+    await this.fileRegistryService.auditAccess(
+      auth.tenantId,
+      id,
+      auth.userId,
+      'preview',
+    );
+    const content = await this.storageService.getObjectBuffer(asset.objectKey);
+
+    res.setHeader('Content-Type', asset.mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${asset.originalFilename.replace(/"/g, '')}"`,
+    );
+    return res.send(content);
+  }
+
   @Get(':id/download')
   async downloadFile(
     @CurrentAuth() auth: AuthContext,
@@ -147,7 +193,6 @@ export class FileRegistryController {
       'download',
     );
     const content = await this.storageService.getObjectBuffer(asset.objectKey);
-    await this.fileRegistryService.assertFileAccessForAuth(asset, auth);
 
     res.setHeader('Content-Type', asset.mimeType);
     res.setHeader(

@@ -316,7 +316,16 @@ export const JournalEntryStatus = {
 
 export const StorageProvider = {
   LOCAL: 'LOCAL',
+  S3: 'S3',
   R2: 'R2',
+  MINIO: 'MINIO',
+  GCP: 'GCP',
+} as const;
+
+export const FileVisibility = {
+  PRIVATE: 'PRIVATE',
+  TENANT: 'TENANT',
+  OWNER: 'OWNER',
 } as const;
 
 export const FileStatus = {

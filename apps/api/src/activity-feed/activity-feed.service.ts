@@ -293,6 +293,9 @@ export class ActivityFeedService {
           objectKey: stored.objectKey,
           mimeType: attachment.contentType,
           sizeBytes: stored.sizeBytes,
+          provider: stored.provider,
+          bucket: stored.bucket,
+          checksumSha256: stored.checksumSha256,
           module: 'activity',
           metadata: { sortOrder: index },
         });

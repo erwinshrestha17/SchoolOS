@@ -12,6 +12,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUrl,
   Matches,
   Min,
   MinLength,
@@ -114,8 +115,23 @@ export class AssignTenantSubscriptionDto {
   @IsNotEmpty()
   planId!: string;
 
-  @IsEnum(['TRIAL', 'ACTIVE', 'GRACE', 'SUSPENDED', 'EXPIRED', 'CANCELLED'])
-  status!: 'TRIAL' | 'ACTIVE' | 'GRACE' | 'SUSPENDED' | 'EXPIRED' | 'CANCELLED';
+  @IsEnum([
+    'TRIAL',
+    'ACTIVE',
+    'OVERDUE',
+    'GRACE',
+    'SUSPENDED',
+    'EXPIRED',
+    'CANCELLED',
+  ])
+  status!:
+    | 'TRIAL'
+    | 'ACTIVE'
+    | 'OVERDUE'
+    | 'GRACE'
+    | 'SUSPENDED'
+    | 'EXPIRED'
+    | 'CANCELLED';
 
   @IsOptional()
   @IsDateString()
@@ -285,6 +301,65 @@ export class CancelSaaSInvoiceDto {
   @IsString()
   @MinLength(5)
   reason!: string;
+}
+
+export class CreatePlatformWebhookEndpointDto {
+  @IsEnum(['PLATFORM', 'TENANT'])
+  ownerType!: 'PLATFORM' | 'TENANT';
+
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
+
+  @IsUrl({ require_tld: false, require_protocol: true })
+  url!: string;
+
+  @IsString()
+  @MinLength(16)
+  signingSecret!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  eventTypes!: string[];
+}
+
+export class UpdatePlatformWebhookEndpointDto {
+  @IsOptional()
+  @IsEnum(['ACTIVE', 'DISABLED'])
+  status?: 'ACTIVE' | 'DISABLED';
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  eventTypes?: string[];
+}
+
+export class RecordPlatformWebhookDeliveryDto {
+  @IsString()
+  @IsNotEmpty()
+  eventType!: string;
+
+  @IsObject()
+  payload!: Record<string, unknown>;
+
+  @IsOptional()
+  @IsEnum(['PENDING', 'DELIVERED', 'FAILED', 'RETRYING'])
+  status?: 'PENDING' | 'DELIVERED' | 'FAILED' | 'RETRYING';
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  retryCount?: number;
+
+  @IsOptional()
+  @IsInt()
+  responseCode?: number;
+
+  @IsOptional()
+  @IsString()
+  responseMessageSummary?: string;
 }
 
 export class CreatePlatformApiKeyDto {

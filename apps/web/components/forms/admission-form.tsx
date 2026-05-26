@@ -571,7 +571,15 @@ export function AdmissionForm() {
       )}
 
       {activeWorkspaceTab === 'pipeline' && (
-        <AdmissionsPipeline />
+        <div className="space-y-4">
+          <div className="px-1">
+            <h2 className="text-lg font-bold text-slate-900">Recent Admissions</h2>
+            <p className="text-sm font-medium text-slate-500">
+              Review candidate files, document checks, and admission status before creating the active student record.
+            </p>
+          </div>
+          <AdmissionsPipeline />
+        </div>
       )}
     </div>
   );

@@ -39,6 +39,16 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
         create: jest.fn(),
         update: jest.fn(),
       },
+      platformWebhookEndpoint: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
+        update: jest.fn(),
+      },
+      platformWebhookDelivery: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+      },
     };
 
     auditService = { record: jest.fn().mockResolvedValue({}) };
@@ -340,6 +350,7 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
     for (const status of [
       'TRIAL',
       'ACTIVE',
+      'OVERDUE',
       'GRACE',
       'SUSPENDED',
       'EXPIRED',
@@ -381,7 +392,7 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
       );
     }
 
-    expect(auditService.record).toHaveBeenCalledTimes(6);
+    expect(auditService.record).toHaveBeenCalledTimes(7);
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'tenant_subscription_status_updated',
@@ -390,6 +401,145 @@ describe('PlatformService SaaS billing lifecycle hardening', () => {
         userId: 'platform-user-1',
       }),
     );
+  });
+
+  it('registers webhook endpoints without returning provider secrets', async () => {
+    prisma.platformWebhookEndpoint.create.mockResolvedValue({
+      id: 'webhook-endpoint-1',
+      ownerType: 'TENANT',
+      tenantId: 'tenant-1',
+      url: 'https://school.example/webhooks',
+      signingSecretHash:
+        '4bdec24f2738f6f0f661dba346077aa783cd9d2ba0f9ec13aab4f1b902f3d974',
+      eventTypes: ['invoice.paid', 'tenant.suspended'],
+      status: 'ACTIVE',
+      createdAt: new Date('2026-05-26T00:00:00.000Z'),
+      updatedAt: new Date('2026-05-26T00:00:00.000Z'),
+    });
+
+    const endpoint = await service.createWebhookEndpoint(
+      {
+        ownerType: 'TENANT',
+        tenantId: 'tenant-1',
+        url: 'https://school.example/webhooks',
+        signingSecret: 'super-secret-webhook-token',
+        eventTypes: ['tenant.suspended', 'invoice.paid'],
+      },
+      'platform-user-1',
+    );
+
+    expect(endpoint).toEqual({
+      id: 'webhook-endpoint-1',
+      ownerType: 'TENANT',
+      tenantId: 'tenant-1',
+      url: 'https://school.example/webhooks',
+      eventTypes: ['invoice.paid', 'tenant.suspended'],
+      status: 'ACTIVE',
+      createdAt: '2026-05-26T00:00:00.000Z',
+      updatedAt: '2026-05-26T00:00:00.000Z',
+    });
+    expect(endpoint).not.toHaveProperty('signingSecret');
+    expect(endpoint).not.toHaveProperty('signingSecretHash');
+    expect(prisma.platformWebhookEndpoint.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        signingSecretHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        eventTypes: ['invoice.paid', 'tenant.suspended'],
+      }),
+    });
+  });
+
+  it('records webhook delivery history with payload checksum and safe response summary', async () => {
+    prisma.platformWebhookEndpoint.findFirst.mockResolvedValue({
+      id: 'webhook-endpoint-1',
+      tenantId: 'tenant-1',
+      status: 'ACTIVE',
+      eventTypes: ['invoice.paid'],
+    });
+    prisma.platformWebhookDelivery.create.mockResolvedValue({
+      id: 'delivery-1',
+      endpointId: 'webhook-endpoint-1',
+      tenantId: 'tenant-1',
+      eventType: 'invoice.paid',
+      payloadChecksum:
+        '4bdec24f2738f6f0f661dba346077aa783cd9d2ba0f9ec13aab4f1b902f3d974',
+      status: 'DELIVERED',
+      retryCount: 1,
+      responseCode: 200,
+      responseMessageSummary: 'ok token=hidden',
+      createdAt: new Date('2026-05-26T00:00:00.000Z'),
+      lastAttemptAt: new Date('2026-05-26T00:01:00.000Z'),
+      deliveredAt: new Date('2026-05-26T00:01:00.000Z'),
+    });
+
+    const delivery = await service.recordWebhookDelivery(
+      'webhook-endpoint-1',
+      {
+        eventType: 'invoice.paid',
+        payload: { invoiceId: 'invoice-1', amount: '1000.00' },
+        status: 'DELIVERED',
+        retryCount: 1,
+        responseCode: 200,
+        responseMessageSummary: 'ok\ntoken=hidden',
+      },
+      'platform-user-1',
+    );
+
+    expect(delivery).toEqual(
+      expect.objectContaining({
+        id: 'delivery-1',
+        endpointId: 'webhook-endpoint-1',
+        eventType: 'invoice.paid',
+        status: 'DELIVERED',
+        retryCount: 1,
+        responseCode: 200,
+      }),
+    );
+    expect(prisma.platformWebhookDelivery.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        payloadChecksum: expect.stringMatching(/^[a-f0-9]{64}$/),
+        responseMessageSummary: 'ok token=hidden',
+      }),
+    });
+  });
+
+  it('verifies signed inbound webhooks only for approved providers', () => {
+    const payload = { id: 'evt-1', type: 'invoice.paid' };
+    const now = new Date('2026-05-26T00:00:00.000Z');
+    const signature = service.signWebhookPayload(
+      payload,
+      'approved-secret',
+      now,
+    );
+
+    expect(
+      service.verifyInboundWebhookSignature({
+        provider: 'schoolos-platform',
+        payload,
+        signatureHeader: signature,
+        secret: 'approved-secret',
+        now,
+      }),
+    ).toBe(true);
+
+    expect(() =>
+      service.verifyInboundWebhookSignature({
+        provider: 'unapproved-provider',
+        payload,
+        signatureHeader: signature,
+        secret: 'approved-secret',
+        now,
+      }),
+    ).toThrow(BadRequestException);
+
+    expect(() =>
+      service.verifyInboundWebhookSignature({
+        provider: 'schoolos-platform',
+        payload,
+        signatureHeader: signature.replace(/.$/, '0'),
+        secret: 'approved-secret',
+        now,
+      }),
+    ).toThrow(BadRequestException);
   });
 
   it('expires previous active-like subscriptions before assigning a new active subscription', async () => {

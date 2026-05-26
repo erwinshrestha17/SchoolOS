@@ -227,6 +227,12 @@ enum StorageProvider {
   GCP
 }
 
+enum FileVisibility {
+  PRIVATE
+  TENANT
+  OWNER
+}
+
 enum StudentDocumentKind {
   BIRTH_CERTIFICATE
   TRANSFER_CERTIFICATE
@@ -672,10 +678,23 @@ enum PlatformPlanStatus {
 enum TenantSubscriptionStatus {
   TRIAL
   ACTIVE
+  OVERDUE
   GRACE
   SUSPENDED
   EXPIRED
   CANCELLED
+}
+
+enum PlatformWebhookEndpointStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum PlatformWebhookDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+  RETRYING
 }
 
 enum UsagePeriod {
@@ -884,6 +903,8 @@ model Tenant {
   fileAssets                    FileAsset[]
   subscriptions                 TenantSubscription[]
   featureOverrides              TenantFeatureOverride[]
+  platformWebhookEndpoints      PlatformWebhookEndpoint[]
+  platformWebhookDeliveries     PlatformWebhookDelivery[]
   usageCounters                 UsageCounter[]
   billingProfile                TenantBillingProfile?
   saasInvoices                  SaaSInvoice[]
@@ -1088,20 +1109,27 @@ model TenantSetting {
 }
 
 model FileAsset {
-  id               String     @id @default(uuid())
+  id               String          @id @default(uuid())
   tenantId         String
   uploadedByUserId String?
   originalFilename String
-  objectKey        String     @unique
+  objectKey        String          @unique
   mimeType         String
   sizeBytes        BigInt
   module           String?
   entityId         String?
-  status           FileStatus @default(UPLOADED)
+  storageProvider  StorageProvider @default(LOCAL)
+  bucket           String?
+  checksumSha256   String?
+  ownerType        String?
+  ownerId          String?
+  visibility       FileVisibility  @default(PRIVATE)
+  status           FileStatus      @default(UPLOADED)
   metadata         Json?
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
   softDeletedAt    DateTime?
+  deletedAt        DateTime?
 
   tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   uploadedBy          User?                @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
@@ -1113,6 +1141,9 @@ model FileAsset {
   reportCardHistories ReportCardHistory[]  @relation("ReportCardHistoryFile")
 
   @@index([tenantId, module, entityId])
+  @@index([tenantId, ownerType, ownerId])
+  @@index([tenantId, storageProvider])
+  @@index([tenantId, visibility])
 }
 
 model PlatformPlan {
@@ -1288,6 +1319,49 @@ model SaaSPayment {
 
   @@index([tenantId, paymentDate])
   @@index([invoiceId])
+}
+
+model PlatformWebhookEndpoint {
+  id                String                        @id @default(uuid())
+  ownerType         String
+  tenantId          String?
+  url               String
+  signingSecretHash String
+  eventTypes        String[]                      @default([])
+  status            PlatformWebhookEndpointStatus @default(ACTIVE)
+  createdBy         String?
+  disabledAt        DateTime?
+  disabledBy        String?
+  createdAt         DateTime                      @default(now())
+  updatedAt         DateTime                      @updatedAt
+
+  tenant     Tenant?                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deliveries PlatformWebhookDelivery[]
+
+  @@index([tenantId, status])
+  @@index([ownerType, status])
+}
+
+model PlatformWebhookDelivery {
+  id                     String                        @id @default(uuid())
+  endpointId             String
+  tenantId               String?
+  eventType              String
+  payloadChecksum        String
+  status                 PlatformWebhookDeliveryStatus @default(PENDING)
+  retryCount             Int                           @default(0)
+  responseCode           Int?
+  responseMessageSummary String?
+  createdAt              DateTime                      @default(now())
+  lastAttemptAt          DateTime?
+  deliveredAt            DateTime?
+
+  endpoint PlatformWebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  tenant   Tenant?                  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([endpointId, createdAt])
+  @@index([tenantId, eventType, createdAt])
+  @@index([status, createdAt])
 }
 
 model PlatformApiKey {

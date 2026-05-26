@@ -31,6 +31,7 @@ const detailTabs = [
   'Overview',
   'Attendance',
   'Fees',
+  'Health',
   'Documents',
   'Activity',
   'Academics',
@@ -218,6 +219,9 @@ export function StudentDetailPage({ studentId }: { studentId: string }) {
           </TabsContent>
           <TabsContent value="Fees" className="mt-0">
             <ProfileTabs.FeesTab studentId={studentId} invoices={profile.invoices} />
+          </TabsContent>
+          <TabsContent value="Health" className="mt-0">
+            <ProfileTabs.HealthTab profile={profile} />
           </TabsContent>
           <TabsContent value="Attendance" className="mt-0">
             <ProfileTabs.AttendanceTab studentId={studentId} />

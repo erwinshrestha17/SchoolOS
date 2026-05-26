@@ -36,14 +36,17 @@ import {
   CancelSaaSInvoiceDto,
   CreatePlatformApiKeyDto,
   CreatePlatformPlanDto,
+  CreatePlatformWebhookEndpointDto,
   CreateSaaSInvoiceDto,
   OnboardingOverrideDto,
+  RecordPlatformWebhookDeliveryDto,
   RecordSaaSPaymentDto,
   RevokePlatformApiKeyDto,
   RetryFailedJobDto,
   TenantFeatureOverrideDto,
   UpdateBillingProfileDto,
   UpdatePlatformPlanDto,
+  UpdatePlatformWebhookEndpointDto,
   UpsertProviderConfigDto,
   UsageIncrementDto,
 } from './dto/platform-core.dto';
@@ -383,6 +386,58 @@ export class PlatformController {
       body.enabled,
       this.requireUser(req),
       body.reason,
+    );
+  }
+
+  @Get('webhook-endpoints')
+  @Permissions('platform:providers:read')
+  async listWebhookEndpoints() {
+    return this.platformService.listWebhookEndpoints();
+  }
+
+  @Post('webhook-endpoints')
+  @Permissions('platform:providers:manage')
+  async createWebhookEndpoint(
+    @Body() body: CreatePlatformWebhookEndpointDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformService.createWebhookEndpoint(
+      body,
+      this.requireUser(req),
+    );
+  }
+
+  @Patch('webhook-endpoints/:id')
+  @Permissions('platform:providers:manage')
+  async updateWebhookEndpoint(
+    @Param('id') id: string,
+    @Body() body: UpdatePlatformWebhookEndpointDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformService.updateWebhookEndpoint(
+      id,
+      body,
+      this.requireUser(req),
+    );
+  }
+
+  @Get('webhook-deliveries')
+  @Permissions('platform:providers:read')
+  async listWebhookDeliveries(@Query('endpointId') endpointId?: string) {
+    return this.platformService.listWebhookDeliveries(endpointId);
+  }
+
+  @Post('webhook-endpoints/:id/deliveries')
+  @Permissions('platform:providers:manage')
+  async recordWebhookDelivery(
+    @Param('id') id: string,
+    @Body() body: RecordPlatformWebhookDeliveryDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.platformService.recordWebhookDelivery(
+      id,
+      body,
+      this.requireUser(req),
     );
   }
 

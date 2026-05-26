@@ -91,19 +91,24 @@ export function normalizeStorageConfig(
     };
   }
 
+  const bucket = requireEnv(
+    firstEnv(env.OBJECT_STORAGE_BUCKET, env.R2_BUCKET),
+    storageEnvName(provider, 'OBJECT_STORAGE_BUCKET', 'R2_BUCKET'),
+  );
+  const region =
+    firstEnv(env.OBJECT_STORAGE_REGION, env.R2_REGION) ||
+    defaultRegion(provider);
+  const endpoint = resolveS3CompatibleEndpoint(
+    provider,
+    region,
+    firstEnv(env.OBJECT_STORAGE_ENDPOINT, env.R2_ENDPOINT),
+  );
+
   return {
     provider,
-    bucket: requireEnv(
-      firstEnv(env.OBJECT_STORAGE_BUCKET, env.R2_BUCKET),
-      storageEnvName(provider, 'OBJECT_STORAGE_BUCKET', 'R2_BUCKET'),
-    ),
-    region:
-      firstEnv(env.OBJECT_STORAGE_REGION, env.R2_REGION) ||
-      defaultRegion(provider),
-    endpoint: requireEnv(
-      firstEnv(env.OBJECT_STORAGE_ENDPOINT, env.R2_ENDPOINT),
-      storageEnvName(provider, 'OBJECT_STORAGE_ENDPOINT', 'R2_ENDPOINT'),
-    ),
+    bucket,
+    region,
+    endpoint,
     accessKeyId: requireEnv(
       firstEnv(env.OBJECT_STORAGE_ACCESS_KEY_ID, env.R2_ACCESS_KEY_ID),
       storageEnvName(
@@ -191,6 +196,27 @@ function firstEnv(...values: Array<string | undefined>) {
 function defaultRegion(provider: SchoolOSStorageProvider) {
   if (provider === 'r2') return 'auto';
   return 'us-east-1';
+}
+
+function resolveS3CompatibleEndpoint(
+  provider: SchoolOSStorageProvider,
+  region: string,
+  configuredEndpoint: string | undefined,
+) {
+  const normalized = configuredEndpoint?.trim();
+
+  if (normalized) {
+    return normalized;
+  }
+
+  if (provider === 's3') {
+    return `https://s3.${region}.amazonaws.com`;
+  }
+
+  return requireEnv(
+    normalized,
+    storageEnvName(provider, 'OBJECT_STORAGE_ENDPOINT', 'R2_ENDPOINT'),
+  );
 }
 
 function storageEnvName(

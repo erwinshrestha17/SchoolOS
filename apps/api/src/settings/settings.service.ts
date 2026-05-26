@@ -224,6 +224,9 @@ export class SettingsService {
       objectKey: stored.objectKey,
       mimeType: image.mimeType,
       sizeBytes: stored.sizeBytes,
+      provider: stored.provider,
+      bucket: stored.bucket,
+      checksumSha256: stored.checksumSha256,
       module: 'settings',
       entityId: actor.tenantId,
       metadata: {

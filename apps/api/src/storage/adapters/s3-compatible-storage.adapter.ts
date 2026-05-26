@@ -1,4 +1,13 @@
-import { createHmac, randomUUID } from 'crypto';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { randomUUID } from 'crypto';
+import { Readable } from 'stream';
 import { S3CompatibleStorageConfig } from '../storage.config';
 import {
   PutObjectInput,
@@ -12,33 +21,55 @@ import {
   buildExpiresAt,
   buildObjectKey,
   clampSignedUrlTtl,
-  encodeObjectKey,
-  encodePathSegment,
-  formatAmzDate,
-  getSigningKey,
   hashHex,
   StorageOperationError,
 } from '../storage.utils';
 
+type S3Command =
+  | PutObjectCommand
+  | GetObjectCommand
+  | DeleteObjectCommand
+  | HeadBucketCommand;
+
+type S3ClientLike = {
+  send(command: S3Command): Promise<unknown>;
+};
+
+type PresignCommand = GetObjectCommand | PutObjectCommand;
+
+type PresignUrl = (
+  client: S3Client,
+  command: PresignCommand,
+  options: { expiresIn: number },
+) => Promise<string>;
+
 export class S3CompatibleStorageAdapter implements StorageAdapter {
-  constructor(private readonly config: S3CompatibleStorageConfig) {}
+  private readonly client: S3ClientLike;
+  private readonly presignClient: S3Client;
+  private readonly presignUrl: PresignUrl;
+
+  constructor(
+    private readonly config: S3CompatibleStorageConfig,
+    client?: S3ClientLike,
+    presignUrl: PresignUrl = getSignedUrl,
+  ) {
+    const sdkClient = createS3Client(config);
+    this.client = client ?? sdkClient;
+    this.presignClient = sdkClient;
+    this.presignUrl = presignUrl;
+  }
 
   async putObject(input: PutObjectInput): Promise<StoredObjectResult> {
     const objectKey = buildObjectKey(input);
-    const request = this.buildSignedHeaderRequest({
-      method: 'PUT',
-      objectKey,
-      body: input.content,
-      contentType: input.contentType,
-    });
-
-    const response = await fetch(request.url, {
-      method: 'PUT',
-      headers: request.headers,
-      body: input.content as unknown as BodyInit,
-    });
-
-    await assertStorageResponse(response, 'upload');
+    await this.sendCommand(
+      new PutObjectCommand({
+        Bucket: this.config.bucket,
+        Key: objectKey,
+        Body: input.content,
+        ContentType: input.contentType,
+      }),
+      'upload',
+    );
 
     return {
       provider: this.config.provider,
@@ -51,45 +82,52 @@ export class S3CompatibleStorageAdapter implements StorageAdapter {
   }
 
   async getObjectBuffer(objectKey: string) {
-    const request = this.buildSignedHeaderRequest({
-      method: 'GET',
-      objectKey,
-      body: Buffer.alloc(0),
-    });
+    const response = await this.sendCommand<{ Body?: unknown }>(
+      new GetObjectCommand({
+        Bucket: this.config.bucket,
+        Key: objectKey,
+      }),
+      'download',
+    );
 
-    const response = await fetch(request.url, {
-      method: 'GET',
-      headers: request.headers,
-    });
+    if (!response.Body) {
+      throw new StorageOperationError(
+        'Object storage download returned no data',
+      );
+    }
 
-    await assertStorageResponse(response, 'download');
-    return Buffer.from(await response.arrayBuffer());
+    return streamBodyToBuffer(response.Body);
   }
 
   async deleteObject(objectKey: string) {
-    const request = this.buildSignedHeaderRequest({
-      method: 'DELETE',
-      body: Buffer.alloc(0),
-      objectKey,
-    });
-
-    const response = await fetch(request.url, {
-      method: 'DELETE',
-      headers: request.headers,
-    });
-
-    await assertStorageResponse(response, 'delete');
+    try {
+      await this.sendCommand(
+        new DeleteObjectCommand({
+          Bucket: this.config.bucket,
+          Key: objectKey,
+        }),
+        'delete',
+      );
+    } catch (error) {
+      if (isProviderNotFoundError(error)) return;
+      throw error;
+    }
   }
 
   async createSignedReadUrl(input: SignedUrlInput) {
-    return this.buildPresignedUrl({
-      method: 'GET',
-      objectKey: input.objectKey,
-      expiresInSeconds: clampSignedUrlTtl(
-        input.expiresInSeconds,
-        this.config.signedReadUrlTtlSeconds,
-      ),
-    }).url;
+    const expiresIn = clampSignedUrlTtl(
+      input.expiresInSeconds,
+      this.config.signedReadUrlTtlSeconds,
+    );
+
+    return this.createPresignedUrl(
+      new GetObjectCommand({
+        Bucket: this.config.bucket,
+        Key: input.objectKey,
+      }),
+      expiresIn,
+      'signed read URL',
+    );
   }
 
   async createSignedUploadUrl(
@@ -99,19 +137,24 @@ export class S3CompatibleStorageAdapter implements StorageAdapter {
       input.expiresInSeconds,
       this.config.signedUploadUrlTtlSeconds,
     );
-    const signed = this.buildPresignedUrl({
-      method: 'PUT',
-      objectKey: input.objectKey,
+    const url = await this.createPresignedUrl(
+      new PutObjectCommand({
+        Bucket: this.config.bucket,
+        Key: input.objectKey,
+        ContentType: input.contentType,
+      }),
       expiresInSeconds,
-      contentType: input.contentType,
-    });
+      'signed upload URL',
+    );
 
     return {
-      url: signed.url,
+      url,
       method: 'PUT',
       objectKey: input.objectKey,
       expiresAt: buildExpiresAt(expiresInSeconds),
-      headers: signed.headers,
+      headers: input.contentType
+        ? { 'content-type': input.contentType }
+        : undefined,
     };
   }
 
@@ -125,26 +168,34 @@ export class S3CompatibleStorageAdapter implements StorageAdapter {
 
     const testKey = `platform-test-${randomUUID()}.txt`;
     const testContent = Buffer.from('SchoolOS Storage Connection Test');
+    let deleteAttempted = false;
 
-    await this.putRawObject(testKey, testContent, 'text/plain');
-    const readContent = await this.getObjectBuffer(testKey);
+    try {
+      await this.putRawObject(testKey, testContent, 'text/plain');
+      const readContent = await this.getObjectBuffer(testKey);
 
-    if (readContent.toString() !== testContent.toString()) {
-      throw new StorageOperationError('Storage readiness read check failed');
+      if (readContent.toString() !== testContent.toString()) {
+        throw new StorageOperationError('Storage readiness read check failed');
+      }
+
+      const signedUrl = await this.createSignedReadUrl({ objectKey: testKey });
+      await this.deleteObject(testKey);
+      deleteAttempted = true;
+
+      return {
+        provider: this.config.provider,
+        bucket: this.config.bucket,
+        writeOk: true,
+        readOk: true,
+        deleteOk: true,
+        signedUrlOk: signedUrl.includes('X-Amz-Signature='),
+        signedUrl,
+      };
+    } finally {
+      if (!deleteAttempted) {
+        await this.deleteObject(testKey).catch(() => undefined);
+      }
     }
-
-    const signedUrl = await this.createSignedReadUrl({ objectKey: testKey });
-    await this.deleteObject(testKey);
-
-    return {
-      provider: this.config.provider,
-      bucket: this.config.bucket,
-      writeOk: true,
-      readOk: true,
-      deleteOk: true,
-      signedUrlOk: signedUrl.includes('X-Amz-Signature='),
-      signedUrl,
-    };
   }
 
   private async putRawObject(
@@ -152,193 +203,147 @@ export class S3CompatibleStorageAdapter implements StorageAdapter {
     content: Buffer,
     contentType: string,
   ) {
-    const request = this.buildSignedHeaderRequest({
-      method: 'PUT',
-      objectKey,
-      body: content,
-      contentType,
-    });
-    const response = await fetch(request.url, {
-      method: 'PUT',
-      headers: request.headers,
-      body: content as unknown as BodyInit,
-    });
-    await assertStorageResponse(response, 'upload');
-  }
-
-  private buildSignedHeaderRequest(input: {
-    method: 'GET' | 'PUT' | 'DELETE';
-    objectKey: string;
-    body: Buffer;
-    contentType?: string;
-  }) {
-    const target = this.getObjectTarget(input.objectKey);
-    const now = new Date();
-    const amzDate = formatAmzDate(now);
-    const dateStamp = amzDate.slice(0, 8);
-    const payloadHash = hashHex(input.body);
-    const headers: Record<string, string> = {
-      host: target.host,
-      'x-amz-content-sha256': payloadHash,
-      'x-amz-date': amzDate,
-    };
-
-    if (input.contentType) {
-      headers['content-type'] = input.contentType;
-    }
-
-    const signedHeaders = Object.keys(headers).sort().join(';');
-    const canonicalHeaders = Object.keys(headers)
-      .sort()
-      .map((name) => `${name}:${headers[name].trim()}\n`)
-      .join('');
-    const canonicalRequest = [
-      input.method,
-      target.path,
-      '',
-      canonicalHeaders,
-      signedHeaders,
-      payloadHash,
-    ].join('\n');
-    const credentialScope = this.getCredentialScope(dateStamp);
-    const stringToSign = [
-      'AWS4-HMAC-SHA256',
-      amzDate,
-      credentialScope,
-      hashHex(canonicalRequest),
-    ].join('\n');
-    const signingKey = getSigningKey(
-      this.config.secretAccessKey,
-      dateStamp,
-      this.config.region,
+    await this.sendCommand(
+      new PutObjectCommand({
+        Bucket: this.config.bucket,
+        Key: objectKey,
+        Body: content,
+        ContentType: contentType,
+      }),
+      'upload',
     );
-    const signature = createHmac('sha256', signingKey)
-      .update(stringToSign)
-      .digest('hex');
-
-    return {
-      url: target.url,
-      headers: {
-        ...headers,
-        authorization: [
-          'AWS4-HMAC-SHA256',
-          `Credential=${this.config.accessKeyId}/${credentialScope}`,
-          `SignedHeaders=${signedHeaders}`,
-          `Signature=${signature}`,
-        ].join(', '),
-      },
-    };
   }
 
-  private buildPresignedUrl(input: {
-    method: 'GET' | 'PUT';
-    objectKey: string;
-    expiresInSeconds: number;
-    contentType?: string;
-  }) {
-    const target = this.getObjectTarget(input.objectKey);
-    const now = new Date();
-    const amzDate = formatAmzDate(now);
-    const dateStamp = amzDate.slice(0, 8);
-    const credentialScope = this.getCredentialScope(dateStamp);
-    const headers: Record<string, string> = { host: target.host };
-
-    if (input.contentType) {
-      headers['content-type'] = input.contentType;
+  private async createPresignedUrl(
+    command: PresignCommand,
+    expiresIn: number,
+    operation: string,
+  ) {
+    try {
+      return await this.presignUrl(this.presignClient, command, {
+        expiresIn,
+      });
+    } catch (error) {
+      throw normalizeProviderError(error, operation);
     }
-
-    const signedHeaders = Object.keys(headers).sort().join(';');
-    const canonicalHeaders = Object.keys(headers)
-      .sort()
-      .map((name) => `${name}:${headers[name].trim()}\n`)
-      .join('');
-    const query = new URLSearchParams({
-      'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
-      'X-Amz-Credential': `${this.config.accessKeyId}/${credentialScope}`,
-      'X-Amz-Date': amzDate,
-      'X-Amz-Expires': String(input.expiresInSeconds),
-      'X-Amz-SignedHeaders': signedHeaders,
-    });
-    const canonicalQuery = toCanonicalQueryString(query);
-    const canonicalRequest = [
-      input.method,
-      target.path,
-      canonicalQuery,
-      canonicalHeaders,
-      signedHeaders,
-      'UNSIGNED-PAYLOAD',
-    ].join('\n');
-    const stringToSign = [
-      'AWS4-HMAC-SHA256',
-      amzDate,
-      credentialScope,
-      hashHex(canonicalRequest),
-    ].join('\n');
-    const signingKey = getSigningKey(
-      this.config.secretAccessKey,
-      dateStamp,
-      this.config.region,
-    );
-    const signature = createHmac('sha256', signingKey)
-      .update(stringToSign)
-      .digest('hex');
-    query.set('X-Amz-Signature', signature);
-
-    return {
-      url: `${target.url}?${toCanonicalQueryString(query)}`,
-      headers: input.contentType
-        ? { 'content-type': input.contentType }
-        : undefined,
-    };
   }
 
-  private getObjectTarget(objectKey: string) {
-    const endpoint = new URL(this.config.endpoint.replace(/\/$/, ''));
-    const encodedKey = encodeObjectKey(objectKey);
+  private async sendCommand<T>(command: S3Command, operation: string) {
+    try {
+      return (await this.client.send(command)) as T;
+    } catch (error) {
+      if (operation === 'delete' && isRawProviderNotFoundError(error)) {
+        throw error;
+      }
 
-    if (this.config.forcePathStyle) {
-      const path = `/${encodePathSegment(this.config.bucket)}/${encodedKey}`;
-      return {
-        host: endpoint.host,
-        path,
-        url: `${endpoint.origin}${path}`,
-      };
+      throw normalizeProviderError(error, operation);
     }
-
-    const host = `${this.config.bucket}.${endpoint.host}`;
-    const path = `/${encodedKey}`;
-    return {
-      host,
-      path,
-      url: `${endpoint.protocol}//${host}${path}`,
-    };
-  }
-
-  private getCredentialScope(dateStamp: string) {
-    return `${dateStamp}/${this.config.region}/s3/aws4_request`;
   }
 
   private assertConfig() {
-    if (!this.config.bucket || !this.config.endpoint) {
+    if (
+      !this.config.bucket ||
+      !this.config.endpoint ||
+      !this.config.accessKeyId ||
+      !this.config.secretAccessKey
+    ) {
       throw new StorageOperationError('Object storage is not configured');
     }
   }
 }
 
-function toCanonicalQueryString(params: URLSearchParams) {
-  return Array.from(params.entries())
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(
-      ([key, value]) =>
-        `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
-    )
-    .join('&');
+function createS3Client(config: S3CompatibleStorageConfig) {
+  return new S3Client({
+    region: config.region,
+    endpoint: config.endpoint,
+    forcePathStyle: config.forcePathStyle,
+    credentials: {
+      accessKeyId: config.accessKeyId,
+      secretAccessKey: config.secretAccessKey,
+    },
+  });
 }
 
-async function assertStorageResponse(response: Response, operation: string) {
-  if (response.ok) return;
+async function streamBodyToBuffer(body: unknown): Promise<Buffer> {
+  if (Buffer.isBuffer(body)) {
+    return body;
+  }
+
+  if (body instanceof Uint8Array) {
+    return Buffer.from(body);
+  }
+
+  if (typeof body === 'string') {
+    return Buffer.from(body);
+  }
+
+  if (
+    typeof body === 'object' &&
+    body !== null &&
+    'transformToByteArray' in body &&
+    typeof body.transformToByteArray === 'function'
+  ) {
+    return Buffer.from(await body.transformToByteArray());
+  }
+
+  if (body instanceof Readable) {
+    const chunks: Buffer[] = [];
+    for await (const chunk of body) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
 
   throw new StorageOperationError(
-    `Object storage ${operation} failed with status ${response.status}`,
+    'Object storage download returned unreadable data',
+  );
+}
+
+function normalizeProviderError(error: unknown, operation: string) {
+  const statusCode = getProviderStatusCode(error);
+  const statusLabel = statusCode ? ` with status ${statusCode}` : '';
+
+  return new StorageOperationError(
+    `Object storage ${operation} failed${statusLabel}`,
+  );
+}
+
+function getProviderStatusCode(error: unknown) {
+  if (typeof error !== 'object' || error === null) {
+    return null;
+  }
+
+  const metadata = '$metadata' in error ? error.$metadata : null;
+  if (
+    typeof metadata === 'object' &&
+    metadata !== null &&
+    'httpStatusCode' in metadata &&
+    typeof metadata.httpStatusCode === 'number'
+  ) {
+    return metadata.httpStatusCode;
+  }
+
+  return null;
+}
+
+function isRawProviderNotFoundError(error: unknown) {
+  const statusCode = getProviderStatusCode(error);
+  if (statusCode === 404) return true;
+
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+
+  const name =
+    'name' in error && typeof error.name === 'string' ? error.name : '';
+
+  return ['NoSuchKey', 'NotFound', 'NotFoundException'].includes(name);
+}
+
+function isProviderNotFoundError(error: unknown) {
+  return (
+    isRawProviderNotFoundError(error) ||
+    (error instanceof StorageOperationError &&
+      /Object storage delete failed with status 404/.test(error.message))
   );
 }

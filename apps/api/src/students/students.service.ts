@@ -843,6 +843,9 @@ export class StudentsService {
         objectKey: stored.objectKey,
         mimeType: 'image/jpeg',
         sizeBytes: stored.sizeBytes,
+        provider: stored.provider,
+        bucket: stored.bucket,
+        checksumSha256: stored.checksumSha256,
         module: 'students',
         entityId: student.id,
         metadata: {
@@ -2136,6 +2139,9 @@ export class StudentsService {
       objectKey: stored.objectKey,
       mimeType: 'text/csv',
       sizeBytes: stored.sizeBytes,
+      provider: stored.provider,
+      bucket: stored.bucket,
+      checksumSha256: stored.checksumSha256,
       module: 'students',
       entityId: actor.tenantId,
       metadata: {
@@ -2250,6 +2256,9 @@ export class StudentsService {
       objectKey: stored.objectKey,
       mimeType: dto.contentType || 'application/octet-stream',
       sizeBytes: stored.sizeBytes,
+      provider: stored.provider,
+      bucket: stored.bucket,
+      checksumSha256: stored.checksumSha256,
       module: 'students',
       entityId: student.id,
       metadata: {
@@ -2753,6 +2762,9 @@ export class StudentsService {
         objectKey: stored.objectKey,
         mimeType: 'application/pdf',
         sizeBytes: stored.sizeBytes,
+        provider: stored.provider,
+        bucket: stored.bucket,
+        checksumSha256: stored.checksumSha256,
         module: 'students',
         entityId: student.id,
         metadata: {

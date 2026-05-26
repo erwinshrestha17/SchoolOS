@@ -7,10 +7,20 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { ConfigService } from '../config/config.service';
 import { StorageService } from '../storage/storage.service';
-import { FileStatus, Prisma } from '@prisma/client';
+import {
+  FileStatus,
+  FileVisibility,
+  Prisma,
+  StorageProvider,
+} from '@prisma/client';
 import { UsageService } from '../usage/usage.service';
 import type { AuthContext } from '../auth/auth.types';
-import { isParentOnly } from '../common/security/parent-scope';
+import {
+  getParentStudentIds,
+  getStudentOwnId,
+  isParentOnly,
+} from '../common/security/parent-scope';
+import { MAX_SIGNED_URL_TTL_SECONDS } from '../storage/storage.types';
 
 @Injectable()
 export class FileRegistryService {
@@ -31,6 +41,12 @@ export class FileRegistryService {
     sizeBytes: number;
     module?: string;
     entityId?: string;
+    provider?: StorageProvider;
+    bucket?: string | null;
+    checksumSha256?: string | null;
+    ownerType?: string | null;
+    ownerId?: string | null;
+    visibility?: FileVisibility;
     metadata?: Prisma.InputJsonValue;
   }) {
     await this.usageService.checkLimit(
@@ -50,6 +66,12 @@ export class FileRegistryService {
         sizeBytes: BigInt(input.sizeBytes),
         module: input.module,
         entityId: input.entityId,
+        storageProvider: input.provider ?? this.currentStorageProvider(),
+        bucket: input.bucket ?? this.currentStorageBucket(),
+        checksumSha256: input.checksumSha256 ?? null,
+        ownerType: input.ownerType ?? input.module ?? 'file_registry',
+        ownerId: input.ownerId ?? input.entityId ?? null,
+        visibility: input.visibility ?? FileVisibility.PRIVATE,
         metadata: input.metadata || {},
         status: FileStatus.PENDING,
       },
@@ -98,6 +120,9 @@ export class FileRegistryService {
       objectKey: stored.objectKey,
       mimeType: input.mimeType,
       sizeBytes: stored.sizeBytes,
+      provider: stored.provider,
+      bucket: stored.bucket,
+      checksumSha256: stored.checksumSha256,
       module: input.module,
       entityId: input.entityId,
       metadata: input.metadata,
@@ -160,7 +185,7 @@ export class FileRegistryService {
       where: { id: assetId },
     });
 
-    if (!asset || asset.softDeletedAt) {
+    if (!asset || asset.softDeletedAt || asset.deletedAt) {
       throw new NotFoundException('File not found');
     }
 
@@ -179,23 +204,64 @@ export class FileRegistryService {
       throw new ForbiddenException('Access denied');
     }
 
+    if (asset.visibility === FileVisibility.OWNER) {
+      await this.assertOwnerScopedAccess(asset, auth);
+      return;
+    }
+
     if (asset.module === 'notices' || asset.module === 'notice-delivery') {
       if (!auth.permissions.includes('notices:read')) {
-        throw new ForbiddenException('Insufficient notice file access');
+        throw new ForbiddenException(
+          'You do not have permission to view this notice file',
+        );
       }
       return;
     }
 
     if (asset.module === 'messages') {
       if (!auth.permissions.includes('messaging:read')) {
-        throw new ForbiddenException('Insufficient message file access');
+        throw new ForbiddenException(
+          'You do not have permission to view this message file',
+        );
       }
       return;
     }
 
     if (asset.module === 'parent-teacher-chat') {
       await this.assertParentTeacherChatFileAccess(asset.entityId, auth);
+      return;
     }
+
+    if (asset.module === 'students') {
+      await this.assertStudentFileAccess(asset.entityId, auth);
+      return;
+    }
+
+    const requiredPermissions = FILE_READ_PERMISSIONS[asset.module ?? ''];
+    if (requiredPermissions) {
+      if (
+        !requiredPermissions.some((permission) =>
+          auth.permissions.includes(permission),
+        )
+      ) {
+        throw new ForbiddenException(
+          'You do not have permission to view this file',
+        );
+      }
+      return;
+    }
+
+    if (asset.uploadedByUserId && asset.uploadedByUserId === auth.userId) {
+      return;
+    }
+
+    if (auth.roles.some((role) => TENANT_FILE_ADMIN_ROLES.includes(role))) {
+      return;
+    }
+
+    throw new ForbiddenException(
+      'You do not have permission to view this file',
+    );
   }
 
   async softDeleteFile(tenantId: string, assetId: string, userId: string) {
@@ -206,6 +272,7 @@ export class FileRegistryService {
       data: {
         status: FileStatus?.DELETED || 'DELETED',
         softDeletedAt: new Date(),
+        deletedAt: new Date(),
       },
     });
 
@@ -275,6 +342,14 @@ export class FileRegistryService {
     return `${this.apiBaseUrl}/files/${encodeURIComponent(asset.id)}/preview`;
   }
 
+  async createSignedPreviewUrl(auth: AuthContext, assetId: string) {
+    return this.createSignedFileUrl(auth, assetId, 'preview');
+  }
+
+  async createSignedDownloadUrl(auth: AuthContext, assetId: string) {
+    return this.createSignedFileUrl(auth, assetId, 'download');
+  }
+
   async getProtectedDownload(
     tenantId: string,
     assetId: string,
@@ -335,6 +410,124 @@ export class FileRegistryService {
     throw new ForbiddenException('You cannot access this chat attachment');
   }
 
+  private async createSignedFileUrl(
+    auth: AuthContext,
+    assetId: string,
+    action: 'preview' | 'download',
+  ) {
+    const asset = await this.getFileMetadata(auth.tenantId, assetId);
+    await this.assertFileAccessForAuth(asset, auth);
+
+    const expiresInSeconds = this.signedReadUrlTtlSeconds();
+    const url = await this.storageService.createSignedReadUrl({
+      objectKey: asset.objectKey,
+      expiresInSeconds,
+    });
+
+    await this.auditAccess(auth.tenantId, asset.id, auth.userId, action);
+
+    return {
+      id: asset.id,
+      fileName: asset.originalFilename,
+      mimeType: asset.mimeType,
+      sizeBytes: Number(asset.sizeBytes),
+      url,
+      expiresAt: new Date(Date.now() + expiresInSeconds * 1000),
+      expiresInSeconds,
+    };
+  }
+
+  private async assertOwnerScopedAccess(
+    asset: Awaited<ReturnType<FileRegistryService['getFileMetadata']>>,
+    auth: AuthContext,
+  ) {
+    if (!asset.ownerType || !asset.ownerId) {
+      throw new ForbiddenException('This file is missing owner information');
+    }
+
+    if (asset.ownerType === 'student' || asset.ownerType === 'students') {
+      await this.assertStudentFileAccess(asset.ownerId, auth);
+      return;
+    }
+
+    if (asset.uploadedByUserId === auth.userId) {
+      return;
+    }
+
+    throw new ForbiddenException(
+      'You do not have permission to view this file',
+    );
+  }
+
+  private async assertStudentFileAccess(
+    studentId: string | null,
+    auth: AuthContext,
+  ) {
+    if (!studentId) {
+      throw new ForbiddenException('Student file is not linked to a student');
+    }
+
+    const parentStudentIds = await getParentStudentIds(this.prisma, auth);
+    if (parentStudentIds !== null) {
+      if (parentStudentIds.includes(studentId)) return;
+      throw new ForbiddenException(
+        'You can only view files for your linked child',
+      );
+    }
+
+    const studentOwnId = await getStudentOwnId(this.prisma, auth);
+    if (studentOwnId !== null) {
+      if (studentOwnId === studentId) return;
+      throw new ForbiddenException('You can only view your own student files');
+    }
+
+    if (
+      auth.permissions.includes('student_documents:manage') ||
+      auth.permissions.includes('students:read')
+    ) {
+      return;
+    }
+
+    throw new ForbiddenException(
+      'You do not have permission to view student files',
+    );
+  }
+
+  private currentStorageProvider(): StorageProvider {
+    const provider = this.configService.storageProvider;
+
+    switch (provider) {
+      case 's3':
+        return StorageProvider.S3;
+      case 'r2':
+        return StorageProvider.R2;
+      case 'minio':
+        return StorageProvider.MINIO;
+      case 'gcp':
+        return StorageProvider.GCP;
+      case 'local':
+      default:
+        return StorageProvider.LOCAL;
+    }
+  }
+
+  private currentStorageBucket() {
+    const config = this.configService.storageConfig;
+    if (!config) {
+      return null;
+    }
+    return 'bucket' in config ? config.bucket : null;
+  }
+
+  private signedReadUrlTtlSeconds() {
+    const config = this.configService.storageConfig;
+    if (!config) {
+      return 300;
+    }
+
+    return Math.min(config.signedReadUrlTtlSeconds, MAX_SIGNED_URL_TTL_SECONDS);
+  }
+
   private get apiBaseUrl() {
     const configuredBaseUrl = process.env.API_PUBLIC_BASE_URL?.trim();
 
@@ -345,3 +538,18 @@ export class FileRegistryService {
     return `http://localhost:${this.configService.port}/api/v1`;
   }
 }
+
+const TENANT_FILE_ADMIN_ROLES = ['platform_super_admin', 'admin', 'principal'];
+
+const FILE_READ_PERMISSIONS: Record<string, string[]> = {
+  activity: ['activity_feed:read'],
+  homework: ['homework:read', 'homework:create', 'homework:update'],
+  'homework-submission': ['homework:read', 'homework:submit'],
+  attendance: ['attendance:read', 'reports:read'],
+  reports: ['reports:read', 'reports:export'],
+  academics: ['academics:read', 'reports:read'],
+  accounting: ['accounting:read', 'accounting:reports:read'],
+  finance: ['fees:manage', 'receipts:read', 'receipts:manage'],
+  admissions: ['admissions:read'],
+  settings: ['settings:read'],
+};

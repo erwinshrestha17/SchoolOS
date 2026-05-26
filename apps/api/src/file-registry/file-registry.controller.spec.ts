@@ -21,6 +21,8 @@ describe('FileRegistryController upload safety', () => {
       getFileMetadata: jest.fn(),
       assertFileAccessForAuth: jest.fn(),
       auditAccess: jest.fn(),
+      createSignedPreviewUrl: jest.fn(),
+      createSignedDownloadUrl: jest.fn(),
     };
     storageService = {
       saveBase64Object: jest.fn(),
@@ -93,6 +95,9 @@ describe('FileRegistryController upload safety', () => {
     storageService.saveBase64Object.mockResolvedValue({
       objectKey: 'tenant-1/homework/report.pdf',
       sizeBytes: 128,
+      provider: 'LOCAL',
+      bucket: null,
+      checksumSha256: 'checksum-1',
     });
     fileRegistryService.registerFile.mockResolvedValue({
       id: 'file-1',
@@ -131,6 +136,9 @@ describe('FileRegistryController upload safety', () => {
         objectKey: 'tenant-1/homework/report.pdf',
         mimeType: 'application/pdf',
         sizeBytes: 128,
+        provider: 'LOCAL',
+        bucket: null,
+        checksumSha256: 'checksum-1',
         module: 'homework',
         entityId: undefined,
       }),
@@ -142,6 +150,9 @@ describe('FileRegistryController upload safety', () => {
     storageService.saveBase64Object.mockResolvedValue({
       objectKey: 'tenant-1/notices/notice.pdf',
       sizeBytes: 128,
+      provider: 'LOCAL',
+      bucket: null,
+      checksumSha256: 'checksum-1',
     });
     fileRegistryService.registerFile.mockResolvedValue({
       id: 'file-notice',
@@ -209,5 +220,55 @@ describe('FileRegistryController upload safety', () => {
 
     expect(storageService.saveBase64Object).not.toHaveBeenCalled();
     expect(fileRegistryService.registerFile).not.toHaveBeenCalled();
+  });
+
+  it('returns signed preview URL responses through the File Registry service', async () => {
+    fileRegistryService.createSignedPreviewUrl.mockResolvedValue({
+      id: 'file-1',
+      fileName: 'report.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 128,
+      url: 'https://signed-storage.test/preview',
+      expiresAt: new Date('2026-05-26T00:05:00.000Z'),
+      expiresInSeconds: 300,
+    });
+
+    await expect(controller.getSignedPreview(auth, 'file-1')).resolves.toEqual(
+      expect.objectContaining({
+        id: 'file-1',
+        url: 'https://signed-storage.test/preview',
+        expiresInSeconds: 300,
+      }),
+    );
+
+    expect(fileRegistryService.createSignedPreviewUrl).toHaveBeenCalledWith(
+      auth,
+      'file-1',
+    );
+  });
+
+  it('returns signed download URL responses through the File Registry service', async () => {
+    fileRegistryService.createSignedDownloadUrl.mockResolvedValue({
+      id: 'file-1',
+      fileName: 'report.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 128,
+      url: 'https://signed-storage.test/download',
+      expiresAt: new Date('2026-05-26T00:05:00.000Z'),
+      expiresInSeconds: 300,
+    });
+
+    await expect(controller.getSignedDownload(auth, 'file-1')).resolves.toEqual(
+      expect.objectContaining({
+        id: 'file-1',
+        url: 'https://signed-storage.test/download',
+        expiresInSeconds: 300,
+      }),
+    );
+
+    expect(fileRegistryService.createSignedDownloadUrl).toHaveBeenCalledWith(
+      auth,
+      'file-1',
+    );
   });
 });

@@ -148,6 +148,9 @@ export class StudentRecordsService {
       objectKey: stored.objectKey,
       mimeType: dto.contentType,
       sizeBytes: stored.sizeBytes,
+      provider: stored.provider,
+      bucket: stored.bucket,
+      checksumSha256: stored.checksumSha256,
       module: 'students',
       entityId: student.id,
       metadata: {

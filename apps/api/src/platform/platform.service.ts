@@ -1,3 +1,4 @@
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import {
   BadRequestException,
   ForbiddenException,
@@ -31,12 +32,15 @@ import {
   AssignTenantSubscriptionDto,
   CancelSaaSInvoiceDto,
   CreatePlatformPlanDto,
+  CreatePlatformWebhookEndpointDto,
   CreateSaaSInvoiceDto,
+  RecordPlatformWebhookDeliveryDto,
   RecordSaaSPaymentDto,
   RetryFailedJobDto,
   TenantFeatureOverrideDto,
   UpdateBillingProfileDto,
   UpdatePlatformPlanDto,
+  UpdatePlatformWebhookEndpointDto,
   UpsertProviderConfigDto,
   UsageIncrementDto,
   OnboardingOverrideDto,
@@ -1223,6 +1227,206 @@ export class PlatformService {
       body,
       actorUserId,
     );
+  }
+
+  async createWebhookEndpoint(
+    dto: CreatePlatformWebhookEndpointDto,
+    actorUserId: string,
+  ) {
+    if (dto.ownerType === 'TENANT') {
+      if (!dto.tenantId) {
+        throw new BadRequestException('A tenant webhook requires tenantId');
+      }
+      await this.ensureTenant(dto.tenantId);
+    }
+
+    if (dto.ownerType === 'PLATFORM' && dto.tenantId) {
+      throw new BadRequestException(
+        'Platform webhooks cannot include tenantId',
+      );
+    }
+
+    const delegate = this.requireDelegate('platformWebhookEndpoint');
+    const endpoint = await delegate.create({
+      data: {
+        ownerType: dto.ownerType,
+        tenantId: dto.ownerType === 'TENANT' ? dto.tenantId : null,
+        url: dto.url,
+        signingSecretHash: hashWebhookSecret(dto.signingSecret),
+        eventTypes: normalizeWebhookEventTypes(dto.eventTypes),
+        status: 'ACTIVE',
+        createdBy: actorUserId,
+      },
+    });
+
+    await this.platformAudit(
+      actorUserId,
+      'platform_webhook_endpoint_created',
+      'webhook_endpoints',
+      String(endpoint.id),
+      null,
+      this.toWebhookEndpointSummary(endpoint),
+      dto.tenantId ?? 'platform',
+    );
+
+    return this.toWebhookEndpointSummary(endpoint);
+  }
+
+  async listWebhookEndpoints() {
+    const delegate = this.delegate('platformWebhookEndpoint');
+    if (!delegate) return [];
+    const endpoints = await delegate.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+    return asRecords(endpoints).map((endpoint) =>
+      this.toWebhookEndpointSummary(endpoint),
+    );
+  }
+
+  async updateWebhookEndpoint(
+    endpointId: string,
+    dto: UpdatePlatformWebhookEndpointDto,
+    actorUserId: string,
+  ) {
+    const delegate = this.requireDelegate('platformWebhookEndpoint');
+    const before = await delegate.findFirst({ where: { id: endpointId } });
+    if (!before) {
+      throw new NotFoundException('Webhook endpoint not found');
+    }
+
+    const updated = await delegate.update({
+      where: { id: endpointId },
+      data: {
+        status: dto.status,
+        eventTypes: dto.eventTypes
+          ? normalizeWebhookEventTypes(dto.eventTypes)
+          : undefined,
+        disabledAt: dto.status === 'DISABLED' ? new Date() : undefined,
+        disabledBy: dto.status === 'DISABLED' ? actorUserId : undefined,
+      },
+    });
+
+    await this.platformAudit(
+      actorUserId,
+      'platform_webhook_endpoint_updated',
+      'webhook_endpoints',
+      endpointId,
+      this.toWebhookEndpointSummary(before),
+      this.toWebhookEndpointSummary(updated),
+      nullableString(updated.tenantId) ?? 'platform',
+    );
+
+    return this.toWebhookEndpointSummary(updated);
+  }
+
+  async recordWebhookDelivery(
+    endpointId: string,
+    dto: RecordPlatformWebhookDeliveryDto,
+    actorUserId: string,
+  ) {
+    const endpointDelegate = this.requireDelegate('platformWebhookEndpoint');
+    const deliveryDelegate = this.requireDelegate('platformWebhookDelivery');
+    const endpoint = await endpointDelegate.findFirst({
+      where: { id: endpointId },
+    });
+
+    if (!endpoint) {
+      throw new NotFoundException('Webhook endpoint not found');
+    }
+
+    if (endpoint.status !== 'ACTIVE') {
+      throw new BadRequestException('Webhook endpoint is disabled');
+    }
+
+    const eventTypes = asStringArray(endpoint.eventTypes);
+    if (eventTypes.length > 0 && !eventTypes.includes(dto.eventType)) {
+      throw new BadRequestException(
+        'Webhook endpoint does not accept this event',
+      );
+    }
+
+    const delivery = await deliveryDelegate.create({
+      data: {
+        endpointId,
+        tenantId: nullableString(endpoint.tenantId),
+        eventType: dto.eventType,
+        payloadChecksum: hashWebhookPayload(dto.payload),
+        status: dto.status ?? 'PENDING',
+        retryCount: dto.retryCount ?? 0,
+        responseCode: dto.responseCode ?? null,
+        responseMessageSummary: summarizeProviderResponse(
+          dto.responseMessageSummary,
+        ),
+        lastAttemptAt:
+          dto.status && dto.status !== 'PENDING' ? new Date() : null,
+        deliveredAt: dto.status === 'DELIVERED' ? new Date() : null,
+      },
+    });
+
+    await this.platformAudit(
+      actorUserId,
+      'platform_webhook_delivery_recorded',
+      'webhook_deliveries',
+      String(delivery.id),
+      null,
+      this.toWebhookDeliverySummary(delivery),
+      nullableString(endpoint.tenantId) ?? 'platform',
+    );
+
+    return this.toWebhookDeliverySummary(delivery);
+  }
+
+  async listWebhookDeliveries(endpointId?: string) {
+    const delegate = this.delegate('platformWebhookDelivery');
+    if (!delegate) return [];
+    const deliveries = await delegate.findMany({
+      where: endpointId ? { endpointId } : undefined,
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    return asRecords(deliveries).map((delivery) =>
+      this.toWebhookDeliverySummary(delivery),
+    );
+  }
+
+  signWebhookPayload(payload: unknown, secret: string, timestamp = new Date()) {
+    const timestampSeconds = Math.floor(timestamp.getTime() / 1000);
+    const body = stableJson(payload);
+    const signature = createHmac('sha256', secret)
+      .update(`${timestampSeconds}.${body}`)
+      .digest('hex');
+    return `t=${timestampSeconds},v1=${signature}`;
+  }
+
+  verifyInboundWebhookSignature(input: {
+    provider: string;
+    payload: unknown;
+    signatureHeader: string;
+    secret: string;
+    now?: Date;
+  }) {
+    const provider = input.provider.trim().toLowerCase();
+    if (!APPROVED_INBOUND_WEBHOOK_PROVIDERS.has(provider)) {
+      throw new BadRequestException('Inbound webhook provider is not approved');
+    }
+
+    const parsed = parseWebhookSignature(input.signatureHeader);
+    const nowSeconds = Math.floor((input.now ?? new Date()).getTime() / 1000);
+    if (Math.abs(nowSeconds - parsed.timestamp) > 300) {
+      throw new BadRequestException('Webhook signature has expired');
+    }
+
+    const expected = this.signWebhookPayload(
+      input.payload,
+      input.secret,
+      new Date(parsed.timestamp * 1000),
+    );
+    const expectedSignature = parseWebhookSignature(expected).signature;
+    if (!secureCompareHex(expectedSignature, parsed.signature)) {
+      throw new BadRequestException('Invalid webhook signature');
+    }
+
+    return true;
   }
 
   async getTenantBillingDetail(tenantId: string) {
@@ -2627,6 +2831,43 @@ export class PlatformService {
     };
   }
 
+  private toWebhookEndpointSummary(endpoint: DynamicRecord) {
+    return {
+      id: String(endpoint.id),
+      ownerType: String(endpoint.ownerType),
+      tenantId: nullableString(endpoint.tenantId),
+      url: String(endpoint.url),
+      eventTypes: asStringArray(endpoint.eventTypes),
+      status: String(endpoint.status),
+      createdAt: toDate(endpoint.createdAt).toISOString(),
+      updatedAt: toDate(endpoint.updatedAt).toISOString(),
+    };
+  }
+
+  private toWebhookDeliverySummary(delivery: DynamicRecord) {
+    return {
+      id: String(delivery.id),
+      endpointId: String(delivery.endpointId),
+      tenantId: nullableString(delivery.tenantId),
+      eventType: String(delivery.eventType),
+      payloadChecksum: String(delivery.payloadChecksum),
+      status: String(delivery.status),
+      retryCount: Number(delivery.retryCount ?? 0),
+      responseCode:
+        delivery.responseCode === null || delivery.responseCode === undefined
+          ? null
+          : Number(delivery.responseCode),
+      responseMessageSummary: nullableString(delivery.responseMessageSummary),
+      createdAt: toDate(delivery.createdAt).toISOString(),
+      lastAttemptAt: delivery.lastAttemptAt
+        ? toDate(delivery.lastAttemptAt).toISOString()
+        : null,
+      deliveredAt: delivery.deliveredAt
+        ? toDate(delivery.deliveredAt).toISOString()
+        : null,
+    };
+  }
+
   private sumPayments(payments: DynamicRecord[]) {
     return payments.reduce(
       (sum, payment) => sum.add(decimalValue(payment.amount)),
@@ -2905,6 +3146,82 @@ function safeErrorMessage(error: unknown) {
       '$1$2=********',
     )
     .slice(0, 240);
+}
+
+const APPROVED_INBOUND_WEBHOOK_PROVIDERS = new Set([
+  'schoolos-platform',
+  'stripe',
+  'nepal-payment-gateway',
+  'email-provider',
+]);
+
+function normalizeWebhookEventTypes(eventTypes: string[]) {
+  return Array.from(
+    new Set(
+      eventTypes
+        .map((eventType) => eventType.trim())
+        .filter(Boolean)
+        .sort(),
+    ),
+  );
+}
+
+function hashWebhookSecret(secret: string) {
+  return createHash('sha256').update(secret).digest('hex');
+}
+
+function hashWebhookPayload(payload: unknown) {
+  return createHash('sha256').update(stableJson(payload)).digest('hex');
+}
+
+function stableJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value);
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableJson(item)).join(',')}]`;
+  }
+
+  return `{${Object.keys(value as Record<string, unknown>)
+    .sort()
+    .map(
+      (key) =>
+        `${JSON.stringify(key)}:${stableJson((value as Record<string, unknown>)[key])}`,
+    )
+    .join(',')}}`;
+}
+
+function summarizeProviderResponse(message: string | undefined) {
+  return message?.replace(/[\r\n]+/g, ' ').slice(0, 240) ?? null;
+}
+
+function parseWebhookSignature(header: string) {
+  const parts = Object.fromEntries(
+    header.split(',').map((part) => {
+      const [key, value] = part.split('=');
+      return [key?.trim(), value?.trim()];
+    }),
+  );
+  const timestamp = Number(parts.t);
+  const signature = parts.v1;
+
+  if (!Number.isFinite(timestamp) || !signature) {
+    throw new BadRequestException('Webhook signature is malformed');
+  }
+
+  return { timestamp, signature };
+}
+
+function secureCompareHex(expected: string, actual: string) {
+  const expectedBuffer = Buffer.from(expected, 'hex');
+  const actualBuffer = Buffer.from(actual, 'hex');
+
+  if (expectedBuffer.length !== actualBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(expectedBuffer, actualBuffer);
 }
 
 function asNullableUser(value: unknown) {
