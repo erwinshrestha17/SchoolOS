@@ -40,13 +40,6 @@ export class EntitlementGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const tenantId = request.auth?.tenantId;
 
-    console.log('Guard inputs at top:', {
-      requiredModule,
-      requiredFeature,
-      featureKey,
-      tenantId,
-    });
-
     if (!requiredModule && !requiredFeature && !featureKey) {
       return true;
     }
@@ -78,7 +71,6 @@ export class EntitlementGuard implements CanActivate {
         tenantId,
         requiredModule,
       );
-      console.log('Check module allowed:', allowed);
       if (!allowed) {
         throw new ForbiddenException(
           `The module '${requiredModule}' is not included in your school's subscription plan. Please contact the school administrator to upgrade.`,

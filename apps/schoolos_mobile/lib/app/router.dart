@@ -16,11 +16,18 @@ import '../features/attendance/presentation/screens/teacher_attendance_screen.da
 import '../features/notices/presentation/screens/notice_detail_screen.dart';
 import '../features/notices/presentation/screens/notice_list_screen.dart';
 import '../features/notices/presentation/screens/notification_center_screen.dart';
+import '../features/parent/presentation/screens/parent_activity_screen.dart';
+import '../features/parent/presentation/screens/parent_canteen_screen.dart';
+import '../features/parent/presentation/screens/parent_chat_screen.dart';
 import '../features/parent/presentation/screens/child_profile_screen.dart';
 import '../features/parent/presentation/screens/parent_children_screen.dart';
 import '../features/parent/presentation/screens/parent_fees_screen.dart';
+import '../features/parent/presentation/screens/parent_homework_screen.dart';
 import '../features/parent/presentation/screens/parent_home_screen.dart';
 import '../features/parent/presentation/screens/parent_more_screen.dart';
+import '../features/parent/presentation/screens/parent_report_cards_screen.dart';
+import '../features/parent/presentation/screens/parent_timetable_screen.dart';
+import '../features/parent/presentation/screens/parent_transport_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/splash/splash_screen.dart';
@@ -94,6 +101,34 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.parentFees,
         builder: (context, state) => const ParentFeesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.parentHomework,
+        builder: (context, state) => const ParentHomeworkScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.parentTimetable,
+        builder: (context, state) => const ParentTimetableScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.parentReportCards,
+        builder: (context, state) => const ParentReportCardsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.parentActivity,
+        builder: (context, state) => const ParentActivityScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.parentTransport,
+        builder: (context, state) => const ParentTransportScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.parentCanteen,
+        builder: (context, state) => const ParentCanteenScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.parentChat,
+        builder: (context, state) => const ParentChatScreen(),
       ),
       GoRoute(
         path: AppRoutes.parentMore,
@@ -207,5 +242,12 @@ bool _isParentRoute(String location) {
       location == AppRoutes.parentChild ||
       location == AppRoutes.parentAttendance ||
       location == AppRoutes.parentFees ||
+      location == AppRoutes.parentHomework ||
+      location == AppRoutes.parentTimetable ||
+      location == AppRoutes.parentReportCards ||
+      location == AppRoutes.parentActivity ||
+      location == AppRoutes.parentTransport ||
+      location == AppRoutes.parentCanteen ||
+      location == AppRoutes.parentChat ||
       location == AppRoutes.parentMore;
 }

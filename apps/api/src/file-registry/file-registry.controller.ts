@@ -17,7 +17,14 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { FileRegistryService } from './file-registry.service';
 import { StorageService } from '../storage/storage.service';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 class UploadFileDto {
   @IsString()
@@ -35,6 +42,29 @@ class UploadFileDto {
   @IsString()
   @IsNotEmpty()
   module!: string;
+
+  @IsOptional()
+  @IsString()
+  entityId?: string;
+}
+
+class CreateSignedUploadDto {
+  @IsString()
+  @IsNotEmpty()
+  fileName!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  contentType!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  module!: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(10 * 1024 * 1024)
+  sizeBytes!: number;
 
   @IsOptional()
   @IsString()
@@ -102,16 +132,49 @@ export class FileRegistryController {
       module: dto.module,
       entityId: dto.entityId,
     });
+    const uploaded = await this.fileRegistryService.markUploaded(
+      auth.tenantId,
+      asset.id,
+      auth.userId,
+    );
 
     return {
-      id: asset.id,
-      fileName: asset.originalFilename,
+      id: uploaded.id,
+      fileName: uploaded.originalFilename,
       publicUrl: null,
       protectedUrl: await this.fileRegistryService.getSignedUrl(
         auth.tenantId,
-        asset.id,
+        uploaded.id,
       ),
     };
+  }
+
+  @Post('signed-upload')
+  @Permissions()
+  async createSignedUpload(
+    @CurrentAuth() auth: AuthContext,
+    @Body() dto: CreateSignedUploadDto,
+  ) {
+    this.validateUploadMetadata(dto);
+    this.validateUploadSize(dto.sizeBytes);
+    this.validateModulePermission(dto.module, auth.permissions);
+
+    return this.fileRegistryService.createSignedUpload(auth, {
+      fileName: dto.fileName,
+      contentType: dto.contentType,
+      module: dto.module,
+      entityId: dto.entityId,
+      sizeBytes: dto.sizeBytes,
+    });
+  }
+
+  @Post(':id/complete-upload')
+  @Permissions()
+  async completeSignedUpload(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') id: string,
+  ) {
+    return this.fileRegistryService.completeSignedUpload(auth, id);
   }
 
   @Get(':id/view')
@@ -203,13 +266,26 @@ export class FileRegistryController {
   }
 
   private validateUpload(dto: UploadFileDto) {
+    this.validateUploadMetadata(dto);
+    this.validateUploadSize(Buffer.byteLength(dto.base64Content, 'base64'));
+  }
+
+  private validateUploadMetadata(dto: {
+    fileName: string;
+    contentType: string;
+  }) {
     if (!SAFE_MIME_TYPES.has(dto.contentType)) {
       throw new BadRequestException('Unsupported file type');
     }
     if (DANGEROUS_EXTENSIONS.test(dto.fileName)) {
       throw new BadRequestException('Dangerous file extension rejected');
     }
-    const sizeBytes = Buffer.byteLength(dto.base64Content, 'base64');
+  }
+
+  private validateUploadSize(sizeBytes: number) {
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+      throw new BadRequestException('File size must be greater than zero');
+    }
     if (sizeBytes > MAX_UPLOAD_BYTES) {
       throw new BadRequestException('File exceeds upload size limit');
     }

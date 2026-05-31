@@ -220,6 +220,32 @@ export type PlatformProviderReadinessDetail = {
   }>;
 };
 
+export type PlatformWebhookEndpointSummary = {
+  id: string;
+  ownerType: 'PLATFORM' | 'TENANT';
+  tenantId?: string | null;
+  url: string;
+  eventTypes: string[];
+  status: 'ACTIVE' | 'DISABLED';
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PlatformWebhookDeliverySummary = {
+  id: string;
+  endpointId: string;
+  tenantId?: string | null;
+  eventType: string;
+  payloadChecksum: string;
+  status: 'PENDING' | 'DELIVERED' | 'FAILED' | 'RETRYING';
+  retryCount: number;
+  responseCode?: number | null;
+  responseMessageSummary?: string | null;
+  createdAt: string;
+  lastAttemptAt?: string | null;
+  deliveredAt?: string | null;
+};
+
 export type PlatformQueueSummary = {
   name: string;
   waiting: number;

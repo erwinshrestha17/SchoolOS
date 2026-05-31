@@ -3432,7 +3432,10 @@ function buildIemisHeaders() {
   ];
 }
 
-function buildIemisRow(student: StudentDocumentPayload, iemisSchoolCode: string) {
+function buildIemisRow(
+  student: StudentDocumentPayload,
+  iemisSchoolCode: string,
+) {
   const latestEnrollment = student.enrollments[0] ?? null;
   const primaryGuardianLink =
     student.guardianLinks.find((link) => link.isPrimary) ??
@@ -3443,12 +3446,12 @@ function buildIemisRow(student: StudentDocumentPayload, iemisSchoolCode: string)
   const fatherLink = student.guardianLinks.find(
     (link) =>
       link.relation.toLowerCase() === 'father' ||
-      link.relation.toLowerCase() === 'father/guardian'
+      link.relation.toLowerCase() === 'father/guardian',
   );
   const motherLink = student.guardianLinks.find(
     (link) =>
       link.relation.toLowerCase() === 'mother' ||
-      link.relation.toLowerCase() === 'mother/guardian'
+      link.relation.toLowerCase() === 'mother/guardian',
   );
 
   return {

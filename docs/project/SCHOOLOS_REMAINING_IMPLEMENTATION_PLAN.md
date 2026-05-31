@@ -125,6 +125,9 @@ Implemented:
 - Plans, features, tenant subscriptions, feature overrides, usage limits/counters.
 - SaaS billing records: profiles, invoices, invoice lines, payments.
 - Tenant-scoped platform API key management with generated one-time secrets, SHA-256 hashed storage, masked list responses, revoke flow, and audit records.
+- Platform API key management UI with one-time secret reveal and audited revoke actions on tenant detail.
+- SaaS billing lifecycle automation now generates due renewal invoices, advances free-plan renewals without school finance postings, and records lifecycle audit entries.
+- Webhook endpoint registry and signed delivery-history surfaces are implemented for platform operators.
 - Provider configuration masking.
 - Provider readiness detail API with dry-run validation, masked secrets, disabled-mode warnings, and S3-compatible object-storage readiness checks without paid external calls by default.
 - Env-backed cloud-agnostic storage adapter boundary for local, R2, S3, and MinIO-compatible providers, with fail-closed config checks and R2 alias compatibility.
@@ -134,11 +137,9 @@ Implemented:
 
 Remaining backend:
 
-- SaaS billing lifecycle automation beyond records.
-- Webhook endpoint registry and signed outbound/inbound webhook delivery history.
 - Entitlement enforcement tests against real school APIs.
 - Object-storage readiness verification against an explicit staging provider.
-- File Registry signed read/download/upload API hardening after adapter rollout.
+- File Registry signed read/download/upload API hardening is implemented; staging provider verification remains.
 - M1-M10 module-by-module migration audit to remove any remaining direct file/provider assumptions.
 - Provider real connection checks only where safe, configured, and non-paid.
 
@@ -146,8 +147,7 @@ Remaining frontend:
 
 - Platform tenant-action manual QA.
 - Broader browser coverage for queue/provider failure detail surfaces.
-- Browser coverage for suspend/activate, overrides, billing, providers, and queue retry.
-- API key management UI and browser regression coverage.
+- Browser coverage for suspend/activate, overrides, billing, API keys, webhooks, providers, and queue retry.
 
 ### M1 - Admissions & Student Profiles
 
@@ -338,6 +338,7 @@ Implemented:
 - QR borrower lookup using shared Student QR service.
 - Issued/overdue/lost-damaged/fine/borrower-history/popular reports and CSV export.
 - Book/copy history.
+- Overdue reminder hardening now uses deterministic daily source IDs through the base delivery path, so manual and cron retries dedupe against the same delivery window.
 - Library dashboard, books, copies, issues, overdue, fines, reports routes.
 
 Remaining backend:
@@ -424,7 +425,7 @@ Remaining backend:
 
 - [x] Dedicated bank-reconciliation PDF export.
 - [x] Accounting audit log viewer API/UI support.
-- [ ] Production seed review for default Chart of Accounts and report mappings.
+- [x] Production seed review for default Chart of Accounts and report mappings.
 - [ ] Optional background workers for large tenant report exports.
 
 Remaining frontend:
@@ -442,12 +443,12 @@ Implemented:
 - Delivery failure dashboard API and retry metadata.
 - File Registry notice/chat attachment upload and signed/protected access with guardian ownership tests.
 - Parent-teacher thread/message foundation, chat availability, escalation, abuse report foundations.
+- Communication retention-policy review API and communication-scoped audit trail API.
 - Notices/detail/messages/messaging routes.
 
 Remaining backend:
 
 - Production SMS/FCM/email adapters and signed provider callbacks where provider contracts are approved.
-- Retention and audit policy depth.
 - More guardian ownership tests across all chat/message routes.
 
 Remaining frontend:

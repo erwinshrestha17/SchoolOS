@@ -49,8 +49,16 @@ describe('FinanceService - Hardening', () => {
         update: jest.fn(),
       },
       paymentRefund: { count: jest.fn(), create: jest.fn() },
-      invoice: { findUnique: jest.fn(), update: jest.fn(), findFirst: jest.fn() },
-      cashierClose: { findFirst: jest.fn(), create: jest.fn(), count: jest.fn() },
+      invoice: {
+        findUnique: jest.fn(),
+        update: jest.fn(),
+        findFirst: jest.fn(),
+      },
+      cashierClose: {
+        findFirst: jest.fn(),
+        create: jest.fn(),
+        count: jest.fn(),
+      },
       journalEntry: { findFirst: jest.fn() },
       receipt: { findFirst: jest.fn(), count: jest.fn() },
       fileAsset: { findFirst: jest.fn() },

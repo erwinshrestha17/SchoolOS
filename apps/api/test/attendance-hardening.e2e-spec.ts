@@ -118,8 +118,20 @@ describe('Attendance Hardening (E2E)', () => {
 
     // Setup basic records in mocked Prisma
     prisma.__state.tenants = [
-      { id: tenantId, slug: 'tenant-one', name: 'Tenant One', mode: 'MULTI', isActive: true },
-      { id: otherTenantId, slug: 'tenant-two', name: 'Tenant Two', mode: 'MULTI', isActive: true },
+      {
+        id: tenantId,
+        slug: 'tenant-one',
+        name: 'Tenant One',
+        mode: 'MULTI',
+        isActive: true,
+      },
+      {
+        id: otherTenantId,
+        slug: 'tenant-two',
+        name: 'Tenant Two',
+        mode: 'MULTI',
+        isActive: true,
+      },
     ];
 
     prisma.__state.academicYears = [
@@ -129,7 +141,11 @@ describe('Attendance Hardening (E2E)', () => {
     prisma.__state.classes = [
       { id: 'class-1', tenantId, name: 'Class 1' },
       { id: 'class-2', tenantId, name: 'Class 2' },
-      { id: 'class-other-tenant', tenantId: otherTenantId, name: 'Class Other Tenant' },
+      {
+        id: 'class-other-tenant',
+        tenantId: otherTenantId,
+        name: 'Class Other Tenant',
+      },
     ];
 
     prisma.__state.sections = [
@@ -137,29 +153,104 @@ describe('Attendance Hardening (E2E)', () => {
     ];
 
     prisma.__state.students = [
-      { id: 'student-1', tenantId, classId: 'class-1', sectionId: 'section-1', firstNameEn: 'Student', lastNameEn: 'One', studentSystemId: 'ST-1' },
-      { id: 'student-2', tenantId, classId: 'class-2', sectionId: null, firstNameEn: 'Student', lastNameEn: 'Two', studentSystemId: 'ST-2' },
-      { id: 'student-other-tenant', tenantId: otherTenantId, classId: 'class-other-tenant', sectionId: null, firstNameEn: 'Student', lastNameEn: 'Other', studentSystemId: 'ST-OTHER' },
+      {
+        id: 'student-1',
+        tenantId,
+        classId: 'class-1',
+        sectionId: 'section-1',
+        firstNameEn: 'Student',
+        lastNameEn: 'One',
+        studentSystemId: 'ST-1',
+      },
+      {
+        id: 'student-2',
+        tenantId,
+        classId: 'class-2',
+        sectionId: null,
+        firstNameEn: 'Student',
+        lastNameEn: 'Two',
+        studentSystemId: 'ST-2',
+      },
+      {
+        id: 'student-other-tenant',
+        tenantId: otherTenantId,
+        classId: 'class-other-tenant',
+        sectionId: null,
+        firstNameEn: 'Student',
+        lastNameEn: 'Other',
+        studentSystemId: 'ST-OTHER',
+      },
     ];
 
     prisma.__state.enrollments = [
-      { id: 'enrollment-1', tenantId, academicYearId: 'year-2081', studentId: 'student-1', classId: 'class-1', sectionId: 'section-1', status: EnrollmentStatus.ACTIVE },
-      { id: 'enrollment-2', tenantId, academicYearId: 'year-2081', studentId: 'student-2', classId: 'class-2', sectionId: null, status: EnrollmentStatus.ACTIVE },
+      {
+        id: 'enrollment-1',
+        tenantId,
+        academicYearId: 'year-2081',
+        studentId: 'student-1',
+        classId: 'class-1',
+        sectionId: 'section-1',
+        status: EnrollmentStatus.ACTIVE,
+      },
+      {
+        id: 'enrollment-2',
+        tenantId,
+        academicYearId: 'year-2081',
+        studentId: 'student-2',
+        classId: 'class-2',
+        sectionId: null,
+        status: EnrollmentStatus.ACTIVE,
+      },
     ];
 
     prisma.__state.staff = [
-      { id: 'staff-1', tenantId, userId: 'teacher-1', employeeId: 'EMP-1', firstName: 'Tara', lastName: 'Teacher' },
+      {
+        id: 'staff-1',
+        tenantId,
+        userId: 'teacher-1',
+        employeeId: 'EMP-1',
+        firstName: 'Tara',
+        lastName: 'Teacher',
+      },
     ];
 
     // Parent setup
     prisma.__state.guardians = [
-      { id: 'guardian-1', tenantId, userId: 'parent-1', fullName: 'Guardian One', primaryPhone: '9800000000', studentLinks: [{ studentId: 'student-1' }] },
-      { id: 'guardian-2', tenantId, userId: 'parent-2', fullName: 'Guardian Two', primaryPhone: '9811111111', studentLinks: [{ studentId: 'student-2' }] },
+      {
+        id: 'guardian-1',
+        tenantId,
+        userId: 'parent-1',
+        fullName: 'Guardian One',
+        primaryPhone: '9800000000',
+        studentLinks: [{ studentId: 'student-1' }],
+      },
+      {
+        id: 'guardian-2',
+        tenantId,
+        userId: 'parent-2',
+        fullName: 'Guardian Two',
+        primaryPhone: '9811111111',
+        studentLinks: [{ studentId: 'student-2' }],
+      },
     ];
 
     prisma.__state.studentGuardians = [
-      { id: 'sg-1', tenantId, studentId: 'student-1', guardianId: 'guardian-1', relation: 'Father', isPrimary: true },
-      { id: 'sg-2', tenantId, studentId: 'student-2', guardianId: 'guardian-2', relation: 'Mother', isPrimary: true },
+      {
+        id: 'sg-1',
+        tenantId,
+        studentId: 'student-1',
+        guardianId: 'guardian-1',
+        relation: 'Father',
+        isPrimary: true,
+      },
+      {
+        id: 'sg-2',
+        tenantId,
+        studentId: 'student-2',
+        guardianId: 'guardian-2',
+        relation: 'Mother',
+        isPrimary: true,
+      },
     ];
   });
 
@@ -169,7 +260,6 @@ describe('Attendance Hardening (E2E)', () => {
 
   describe('Attendance Monthly Register Export Scoping & Metadata', () => {
     it('allows admin to export attendance register and verifies retained file registry metadata', async () => {
-
       const result = await attendanceController.exportMonthlyRegister(
         {
           academicYearId: 'year-2081',
@@ -230,7 +320,14 @@ describe('Attendance Hardening (E2E)', () => {
     it('allows teacher to export a register for their assigned class/section', async () => {
       // Setup teacher assignment
       prisma.__state.subjectTeacherAssignments = [
-        { id: 'assign-1', tenantId, staffId: 'staff-1', classId: 'class-1', sectionId: 'section-1', subjectId: 'sub-1' },
+        {
+          id: 'assign-1',
+          tenantId,
+          staffId: 'staff-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          subjectId: 'sub-1',
+        },
       ];
 
       const result = await attendanceController.exportMonthlyRegister(

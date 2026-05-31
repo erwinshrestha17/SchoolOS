@@ -17,6 +17,8 @@ function createController() {
     getNoticeDetailWithReadStatus: jest.fn(),
     markNoticeRead: jest.fn(),
     resendNoticeFailed: jest.fn(),
+    getRetentionPolicyStatus: jest.fn(),
+    listCommunicationAuditTrail: jest.fn(),
     retryDeliveryWithMetadata: jest.fn(),
     createConsentTemplate: jest.fn(),
     listConsentTemplates: jest.fn(),
@@ -93,6 +95,32 @@ describe('M10HardeningController contracts', () => {
       resendDto,
       actor,
     );
+  });
+
+  it('delegates retention policy and communication audit reads', () => {
+    const { controller, m10HardeningService } = createController();
+    const auditQuery = { resource: 'notice', page: 1, limit: 10 };
+    m10HardeningService.getRetentionPolicyStatus.mockReturnValue({
+      mode: 'review_only',
+    });
+    m10HardeningService.listCommunicationAuditTrail.mockReturnValue({
+      items: [{ id: 'audit-1' }],
+      total: 1,
+    });
+
+    expect(controller.getRetentionPolicyStatus(actor)).toEqual({
+      mode: 'review_only',
+    });
+    expect(controller.listCommunicationAuditTrail(auditQuery, actor)).toEqual({
+      items: [{ id: 'audit-1' }],
+      total: 1,
+    });
+    expect(m10HardeningService.getRetentionPolicyStatus).toHaveBeenCalledWith(
+      actor,
+    );
+    expect(
+      m10HardeningService.listCommunicationAuditTrail,
+    ).toHaveBeenCalledWith(auditQuery, actor);
   });
 
   it('delegates consent template lifecycle with versioned template service', () => {

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../app/constants/app_routes.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../shared/widgets/app_card.dart';
-import '../../../../shared/widgets/dashboard_card.dart';
 import '../../../../shared/widgets/quick_action_card.dart';
 import '../../../../shared/widgets/role_shell_scaffold.dart';
 import '../../../../shared/widgets/section_header.dart';
-import '../../../../shared/widgets/status_chip.dart';
 
 class ParentMoreScreen extends StatelessWidget {
   const ParentMoreScreen({super.key});
@@ -38,58 +38,51 @@ class ParentMoreScreen extends StatelessWidget {
                   'Homework',
                   Icons.menu_book_rounded,
                   AppColors.primary,
+                  route: AppRoutes.parentHomework,
                 ),
                 _moduleAction(
                   context,
                   'Timetable',
                   Icons.event_note_rounded,
                   AppColors.studentAccent,
+                  route: AppRoutes.parentTimetable,
                 ),
                 _moduleAction(
                   context,
                   'Report Card',
                   Icons.analytics_rounded,
                   AppColors.teacherAccent,
+                  route: AppRoutes.parentReportCards,
                 ),
                 _moduleAction(
                   context,
                   'Transport',
                   Icons.directions_bus_rounded,
                   AppColors.driverAccent,
+                  route: AppRoutes.parentTransport,
                 ),
                 _moduleAction(
                   context,
                   'Canteen',
                   Icons.restaurant_rounded,
                   AppColors.success,
+                  route: AppRoutes.parentCanteen,
                 ),
                 _moduleAction(
                   context,
                   'Chat',
                   Icons.forum_rounded,
                   AppColors.parentAccent,
+                  route: AppRoutes.parentChat,
                 ),
               ],
             ),
             const SizedBox(height: AppSpacing.xl),
-            const SectionHeader(title: 'Homework today'),
-            const SizedBox(height: AppSpacing.sm),
-            const DashboardCard(
-              title: 'Science',
-              value: 'Plant lifecycle worksheet',
-              icon: Icons.science_rounded,
-              iconColor: AppColors.studentAccent,
-              badge: StatusChip(status: AppStatusType.pending),
-              subtitle: 'Due tomorrow before first period.',
-            ),
-            const SizedBox(height: AppSpacing.md),
-            const DashboardCard(
-              title: 'Mathematics',
-              value: 'Fractions practice',
-              icon: Icons.calculate_rounded,
-              iconColor: AppColors.primary,
-              badge: StatusChip(status: AppStatusType.pending),
-              subtitle: 'Due Friday. Teacher will review in class.',
+            QuickActionCard(
+              title: 'Activity feed',
+              icon: Icons.auto_awesome_rounded,
+              color: AppColors.parentAccent,
+              onTap: () => context.go(AppRoutes.parentActivity),
             ),
             const SizedBox(height: AppSpacing.xl),
             const SectionHeader(title: 'Support'),
@@ -123,13 +116,15 @@ class ParentMoreScreen extends StatelessWidget {
     BuildContext context,
     String title,
     IconData icon,
-    Color color,
-  ) {
+    Color color, {
+    String? route,
+  }) {
     return QuickActionCard(
       title: title,
       icon: icon,
       color: color,
-      onTap: () => _comingSoon(context, title),
+      onTap: () =>
+          route == null ? _comingSoon(context, title) : context.go(route),
     );
   }
 

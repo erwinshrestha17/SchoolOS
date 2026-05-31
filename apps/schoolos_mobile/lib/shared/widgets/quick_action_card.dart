@@ -48,7 +48,7 @@ class QuickActionCard extends StatelessWidget {
               color: isDark ? Colors.white : AppColors.slate800,
             ),
             textAlign: TextAlign.center,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
         ],

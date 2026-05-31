@@ -15,6 +15,7 @@ import {
   ProviderEnvironment,
   SaaSInvoiceStatus,
   SaaSInvoiceLineType,
+  AccountingReportMappingType,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
@@ -118,6 +119,7 @@ async function main() {
   await cleanupLegacyData(tenant.id);
 
   await seedChartAccounts(tenant.id);
+  await seedAccountingReportMappings(tenant.id);
   await seedFeeHeads(tenant.id);
 
   await seedUsersWithRoles(tenant.id);
@@ -376,12 +378,78 @@ async function seedChartAccounts(tenantId: string) {
       update: {
         name: account.name,
         type: account.type,
+        isSystem: true,
+        isActive: true,
       },
       create: {
         tenantId,
         code: account.code,
         name: account.name,
         type: account.type,
+        isSystem: true,
+      },
+    });
+  }
+}
+
+async function seedAccountingReportMappings(tenantId: string) {
+  console.log('Seeding default accounting report mappings...');
+
+  const mappingCodes: Array<{
+    mappingType: AccountingReportMappingType;
+    code: string;
+  }> = [
+    { mappingType: AccountingReportMappingType.CASH, code: '1000' },
+    { mappingType: AccountingReportMappingType.BANK, code: '1010' },
+    { mappingType: AccountingReportMappingType.VAT_OUTPUT, code: '2230' },
+    { mappingType: AccountingReportMappingType.VAT_INPUT, code: '2230' },
+    { mappingType: AccountingReportMappingType.TDS_PAYABLE, code: '2220' },
+    {
+      mappingType: AccountingReportMappingType.PF_EMPLOYEE_PAYABLE,
+      code: '2210',
+    },
+    {
+      mappingType: AccountingReportMappingType.PF_EMPLOYER_PAYABLE,
+      code: '2210',
+    },
+    { mappingType: AccountingReportMappingType.PF_PAYABLE, code: '2210' },
+    {
+      mappingType: AccountingReportMappingType.RETAINED_EARNINGS,
+      code: '3100',
+    },
+  ];
+
+  const accounts = await prisma.chartAccount.findMany({
+    where: {
+      tenantId,
+      code: { in: mappingCodes.map((item) => item.code) },
+    },
+  });
+  const accountByCode = new Map(accounts.map((account) => [account.code, account]));
+
+  for (const item of mappingCodes) {
+    const account = accountByCode.get(item.code);
+    if (!account) {
+      throw new Error(
+        `Default accounting report mapping ${item.mappingType} references missing account ${item.code}.`,
+      );
+    }
+
+    await prisma.accountingReportAccountMapping.upsert({
+      where: {
+        tenantId_mappingType_accountId: {
+          tenantId,
+          mappingType: item.mappingType,
+          accountId: account.id,
+        },
+      },
+      update: {
+        updatedById: null,
+      },
+      create: {
+        tenantId,
+        mappingType: item.mappingType,
+        accountId: account.id,
       },
     });
   }

@@ -1,4 +1,12 @@
-import { Body, Controller, Headers, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+} from '@nestjs/common';
 import { FinanceService } from './finance.service';
 
 // @Public()
@@ -13,6 +21,10 @@ export class PaymentsWebhookController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: Record<string, string>,
   ) {
-    return this.financeService.handleOnlinePaymentWebhook(provider, payload, headers);
+    return this.financeService.handleOnlinePaymentWebhook(
+      provider,
+      payload,
+      headers,
+    );
   }
 }

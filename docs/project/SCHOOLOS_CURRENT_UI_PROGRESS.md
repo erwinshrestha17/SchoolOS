@@ -352,6 +352,8 @@ Completed:
 - [ ] Accounting browser smoke tests (deeper coverage in staging).
 - [ ] QR-specific Library/Canteen manual QA.
 - [ ] Platform tenant-action manual QA.
+- [x] Platform API key management UI.
+- [x] Platform webhook registry/history UI.
 - [x] Payroll PDF/payslip visual polish.
 - [x] Staff self-service `/dashboard/my-profile` finalization (PDF slips).
 - [ ] Staff lifecycle audit logs (Backend implemented; UI depth remains).

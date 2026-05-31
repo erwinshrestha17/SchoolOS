@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '../../../../lib/api';
-import { PlatformTenantDetail, PlatformAuditLog, PlatformSaaSInvoiceSummary, PlatformUsageCounterSummary } from '@schoolos/core';
+import { PlatformTenantDetail, PlatformAuditLog, PlatformSaaSInvoiceSummary, PlatformApiKeyCreated, PlatformApiKeySummary } from '@schoolos/core';
 import { 
   ArrowLeft, 
   Shield, 
@@ -27,7 +27,10 @@ import {
   Plus,
   MoreVertical,
   ChevronRight,
-  Database
+  Database,
+  KeyRound,
+  Copy,
+  Trash2
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -85,6 +88,14 @@ export default function PlatformSchoolDetail() {
   const [onboardingOverride, setOnboardingOverride] = useState<{ key: string; completed: boolean; label: string } | null>(null);
   const [onboardingReason, setOnboardingReason] = useState('');
   const [tenantAuditLogs, setTenantAuditLogs] = useState<PlatformAuditLog[]>([]);
+  const [apiKeys, setApiKeys] = useState<PlatformApiKeySummary[]>([]);
+  const [apiKeysError, setApiKeysError] = useState<string | null>(null);
+  const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
+  const [apiKeyForm, setApiKeyForm] = useState(() => makeDefaultApiKeyForm());
+  const [apiKeySaving, setApiKeySaving] = useState(false);
+  const [createdApiKey, setCreatedApiKey] = useState<PlatformApiKeyCreated | null>(null);
+  const [revokeApiKeyTarget, setRevokeApiKeyTarget] = useState<PlatformApiKeySummary | null>(null);
+  const [revokeApiKeyReason, setRevokeApiKeyReason] = useState('');
   const [auditDialogOpen, setAuditDialogOpen] = useState(false);
   const [auditFilters, setAuditFilters] = useState({
     action: '',
@@ -118,13 +129,22 @@ export default function PlatformSchoolDetail() {
   const loadTenantData = useCallback(async () => {
     setLoading(true);
     try {
-      const [data, invData] = await Promise.all([
+      const [data, invData, keyResult] = await Promise.all([
         api.getPlatformTenantDetail(tenantId),
-        api.listPlatformSaaSInvoices(tenantId)
+        api.listPlatformSaaSInvoices(tenantId),
+        api
+          .listPlatformApiKeys(tenantId)
+          .then((items) => ({ items, error: null }))
+          .catch((error) => ({
+            items: [] as PlatformApiKeySummary[],
+            error: getErrorMessage(error),
+          })),
       ]);
       setTenant(data);
       setInvoices(invData);
       setTenantAuditLogs(data.recentAudit ?? []);
+      setApiKeys(keyResult.items);
+      setApiKeysError(keyResult.error);
     } catch (err) {
       console.error('Failed to load tenant', err);
     } finally {
@@ -365,6 +385,64 @@ export default function PlatformSchoolDetail() {
     }
   };
 
+  const createApiKey = async () => {
+    if (!tenant || apiKeyForm.name.trim().length < 3) return;
+    const scopes = apiKeyForm.scopes
+      .split(',')
+      .map((scope) => scope.trim())
+      .filter(Boolean);
+
+    setApiKeySaving(true);
+    setActionError(null);
+    setMessage(null);
+    try {
+      const created = await api.createPlatformApiKey(tenant.id, {
+        name: apiKeyForm.name.trim(),
+        scopes,
+        ...(apiKeyForm.expiresAt
+          ? { expiresAt: toIsoDate(apiKeyForm.expiresAt) }
+          : {}),
+      });
+      setCreatedApiKey(created);
+      setApiKeyDialogOpen(false);
+      setApiKeyForm(makeDefaultApiKeyForm());
+      setApiKeysError(null);
+      setApiKeys(await api.listPlatformApiKeys(tenant.id));
+      setMessage('API key created. Copy the one-time secret now; it will not be shown again.');
+    } catch (error: any) {
+      setActionError(error.message || 'Failed to create API key');
+    } finally {
+      setApiKeySaving(false);
+    }
+  };
+
+  const revokeApiKey = async () => {
+    if (!tenant || !revokeApiKeyTarget || revokeApiKeyReason.trim().length < 5) return;
+    setApiKeySaving(true);
+    setActionError(null);
+    setMessage(null);
+    try {
+      await api.revokePlatformApiKey(tenant.id, revokeApiKeyTarget.id, {
+        reason: revokeApiKeyReason.trim(),
+      });
+      setRevokeApiKeyTarget(null);
+      setRevokeApiKeyReason('');
+      setCreatedApiKey(null);
+      setApiKeys(await api.listPlatformApiKeys(tenant.id));
+      setMessage('API key revoked.');
+    } catch (error: any) {
+      setActionError(error.message || 'Failed to revoke API key');
+    } finally {
+      setApiKeySaving(false);
+    }
+  };
+
+  const copyCreatedApiKey = async () => {
+    if (!createdApiKey?.secret) return;
+    await navigator.clipboard.writeText(createdApiKey.secret);
+    setMessage('API key secret copied.');
+  };
+
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -482,7 +560,7 @@ export default function PlatformSchoolDetail() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-        <TabsList className="bg-slate-100/50 p-1 rounded-2xl border border-slate-100">
+        <TabsList className="flex h-auto flex-wrap justify-start gap-1 bg-slate-100/50 p-1 rounded-2xl border border-slate-100">
           <TabsTrigger value="overview" className="rounded-xl px-6 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
             Overview
           </TabsTrigger>
@@ -491,6 +569,9 @@ export default function PlatformSchoolDetail() {
           </TabsTrigger>
           <TabsTrigger value="entitlements" className="rounded-xl px-6 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
             Entitlements
+          </TabsTrigger>
+          <TabsTrigger value="api-keys" className="rounded-xl px-6 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            API Keys
           </TabsTrigger>
           <TabsTrigger value="audit" className="rounded-xl px-6 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
             Audit Trail
@@ -990,6 +1071,131 @@ export default function PlatformSchoolDetail() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="api-keys" className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          {createdApiKey && (
+            <Card className="overflow-hidden rounded-3xl border-emerald-100 bg-emerald-50 shadow-sm">
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-xl font-bold text-emerald-950">
+                    <KeyRound size={20} /> One-time API key secret
+                  </CardTitle>
+                  <CardDescription className="text-emerald-800/80">
+                    Store this secret now. SchoolOS only keeps the hashed key and will not reveal it again.
+                  </CardDescription>
+                </div>
+                <Button variant="outline" className="rounded-xl border-emerald-200 bg-white font-bold text-emerald-700" onClick={copyCreatedApiKey}>
+                  <Copy size={16} className="mr-2" /> Copy Secret
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-2xl border border-emerald-100 bg-white p-4 font-mono text-sm font-bold text-slate-900 break-all">
+                  {createdApiKey.secret}
+                </div>
+                <div className="mt-4 grid gap-3 text-xs font-bold text-emerald-900 sm:grid-cols-3">
+                  <span>Name: {createdApiKey.name}</span>
+                  <span>Preview: {createdApiKey.keyPreview}</span>
+                  <span>Scopes: {createdApiKey.scopes.length ? createdApiKey.scopes.join(', ') : 'default'}</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className="rounded-3xl border-slate-100 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-xl font-bold">
+                  <KeyRound className="text-slate-400" size={22} />
+                  Tenant API Keys
+                </CardTitle>
+                <CardDescription>
+                  Tenant-scoped API credentials for approved integrations. Full secrets are shown only at creation time.
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                className="rounded-xl border-slate-200 font-bold"
+                onClick={() => setApiKeyDialogOpen(true)}
+                data-testid="create-platform-api-key-button"
+              >
+                <Plus size={16} className="mr-2" /> New API Key
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {apiKeysError ? (
+                <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm font-bold text-amber-800">
+                  {apiKeysError}
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                  <table className="w-full min-w-[760px] text-left text-sm">
+                    <thead className="border-b border-slate-100 bg-slate-50">
+                      <tr>
+                        <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Name</th>
+                        <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Preview</th>
+                        <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Scopes</th>
+                        <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Last used</th>
+                        <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Status</th>
+                        <th className="px-6 py-4 text-right"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {apiKeys.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-16 text-center text-sm font-bold text-slate-400">
+                            No tenant API keys have been created.
+                          </td>
+                        </tr>
+                      ) : (
+                        apiKeys.map((key) => (
+                          <tr key={key.id} className="transition-colors hover:bg-slate-50/60">
+                            <td className="px-6 py-4">
+                              <p className="font-black text-slate-900">{key.name}</p>
+                              <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                Created {formatDate(key.createdAt)}
+                              </p>
+                            </td>
+                            <td className="px-6 py-4 font-mono text-xs font-bold text-slate-700">{key.keyPreview}</td>
+                            <td className="px-6 py-4">
+                              <div className="flex max-w-xs flex-wrap gap-1.5">
+                                {key.scopes.length === 0 ? (
+                                  <Badge variant="neutral" className="rounded-lg">default</Badge>
+                                ) : (
+                                  key.scopes.map((scope) => (
+                                    <Badge key={scope} variant="neutral" className="rounded-lg bg-slate-50 font-mono text-[10px]">
+                                      {scope}
+                                    </Badge>
+                                  ))
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-xs font-bold text-slate-500">{formatDateTime(key.lastUsedAt)}</td>
+                            <td className="px-6 py-4">
+                              <Badge variant={key.status === 'ACTIVE' ? 'success' : 'neutral'} className="rounded-lg">
+                                {key.status}
+                              </Badge>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="rounded-lg font-bold text-rose-600"
+                                disabled={key.status === 'REVOKED'}
+                                onClick={() => setRevokeApiKeyTarget(key)}
+                              >
+                                <Trash2 size={14} className="mr-2" /> Revoke
+                              </Button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="audit" className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
            <Card className="rounded-3xl border-slate-100 shadow-sm">
              <CardHeader className="flex flex-row items-center justify-between">
@@ -1263,6 +1469,73 @@ export default function PlatformSchoolDetail() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={apiKeyDialogOpen} onOpenChange={setApiKeyDialogOpen}>
+        <DialogContent className="rounded-3xl sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Create Tenant API Key</DialogTitle>
+            <DialogDescription>
+              Generate a scoped key for an approved integration. The secret is shown once after creation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <InputWithLabel
+              label="Key Name"
+              value={apiKeyForm.name}
+              onChange={(value) => setApiKeyForm({ ...apiKeyForm, name: value })}
+            />
+            <InputWithLabel
+              label="Scopes"
+              value={apiKeyForm.scopes}
+              onChange={(value) => setApiKeyForm({ ...apiKeyForm, scopes: value })}
+            />
+            <p className="-mt-2 text-xs font-semibold text-slate-400">
+              Use comma-separated scopes, for example students:read, attendance:read.
+            </p>
+            <InputWithLabel
+              label="Expires At"
+              type="date"
+              value={apiKeyForm.expiresAt}
+              onChange={(value) => setApiKeyForm({ ...apiKeyForm, expiresAt: value })}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl font-bold" onClick={() => setApiKeyDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button className="rounded-xl bg-slate-900 font-bold text-white" disabled={apiKeySaving || apiKeyForm.name.trim().length < 3} onClick={createApiKey}>
+              {apiKeySaving ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Create API Key
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!revokeApiKeyTarget} onOpenChange={(open: boolean) => !open && setRevokeApiKeyTarget(null)}>
+        <DialogContent className="rounded-3xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Revoke API Key</DialogTitle>
+            <DialogDescription>
+              Revoking {revokeApiKeyTarget?.name} immediately disables that integration credential.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            className="my-4 rounded-2xl border-slate-200"
+            placeholder="Audit reason for revoking this key"
+            value={revokeApiKeyReason}
+            onChange={(e) => setRevokeApiKeyReason(e.target.value)}
+          />
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl font-bold" onClick={() => setRevokeApiKeyTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" className="rounded-xl font-bold" disabled={apiKeySaving || revokeApiKeyReason.trim().length < 5} onClick={revokeApiKey}>
+              {apiKeySaving ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Revoke Key
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={auditDialogOpen} onOpenChange={setAuditDialogOpen}>
         <DialogContent className="rounded-3xl sm:max-w-2xl">
           <DialogHeader>
@@ -1493,6 +1766,14 @@ function makeDefaultBillingForm() {
   };
 }
 
+function makeDefaultApiKeyForm() {
+  return {
+    name: '',
+    scopes: 'students:read, attendance:read',
+    expiresAt: '',
+  };
+}
+
 function toIsoDate(value: string) {
   return new Date(`${value}T00:00:00.000Z`).toISOString();
 }
@@ -1526,4 +1807,8 @@ function formatBytes(value: number) {
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   const index = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
   return `${(value / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'Something went wrong';
 }

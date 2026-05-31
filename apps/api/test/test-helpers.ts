@@ -64,6 +64,9 @@ export interface MockState {
   transportStudentAssignments: Record<string, unknown>[];
   transportDriverAssignments: Record<string, unknown>[];
   transportLocationPings: Record<string, unknown>[];
+  canteenStudentEnrollments: Record<string, unknown>[];
+  canteenMealServings: Record<string, unknown>[];
+  canteenWalletTransactions: Record<string, unknown>[];
   guardianConsents: Record<string, unknown>[];
   [key: string]: Record<string, unknown>[];
 }
@@ -307,6 +310,9 @@ export function createPrismaMock() {
     transportStudentAssignments: [] as Record<string, unknown>[],
     transportDriverAssignments: [] as Record<string, unknown>[],
     transportLocationPings: [] as Record<string, unknown>[],
+    canteenStudentEnrollments: [] as Record<string, unknown>[],
+    canteenMealServings: [] as Record<string, unknown>[],
+    canteenWalletTransactions: [] as Record<string, unknown>[],
     guardianConsents: [] as Record<string, unknown>[],
     supportOverrides: [] as Record<string, unknown>[],
   };
@@ -2210,6 +2216,9 @@ export function createPrismaMock() {
     'transportStudentAssignment',
     'transportDriverAssignment',
     'transportLocationPing',
+    'canteenStudentEnrollment',
+    'canteenMealServing',
+    'canteenWalletTransaction',
     'guardianConsent',
     'staffDocument',
     'staffLifecycleEvent',

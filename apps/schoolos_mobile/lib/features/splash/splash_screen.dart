@@ -136,7 +136,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     color: Colors.white,
                     fontSize: 30,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
+                    letterSpacing: 0.0,
                   ),
                 ),
                 const SizedBox(height: 8),

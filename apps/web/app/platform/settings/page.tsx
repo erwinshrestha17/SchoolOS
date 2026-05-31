@@ -22,6 +22,7 @@ import {
   Clock,
   ShieldAlert,
   Search,
+  Webhook,
 } from 'lucide-react';
 import { api } from '../../../lib/api';
 import type {
@@ -32,6 +33,8 @@ import type {
   PlatformQueueSummary,
   PlatformAuditLog,
   PlatformFailedJobSummary,
+  PlatformWebhookDeliverySummary,
+  PlatformWebhookEndpointSummary,
 } from '@schoolos/core';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -67,6 +70,12 @@ export default function PlatformSettings() {
   const [plans, setPlans] = useState<PlatformPlanSummary[]>([]);
   const [auditLogs, setAuditLogs] = useState<PlatformAuditLog[]>([]);
   const [failedJobs, setFailedJobs] = useState<PlatformFailedJobSummary[]>([]);
+  const [webhookEndpoints, setWebhookEndpoints] = useState<
+    PlatformWebhookEndpointSummary[]
+  >([]);
+  const [webhookDeliveries, setWebhookDeliveries] = useState<
+    PlatformWebhookDeliverySummary[]
+  >([]);
 
   const [providersReadiness, setProvidersReadiness] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -121,6 +130,11 @@ export default function PlatformSettings() {
   const [loadingJobDetailId, setLoadingJobDetailId] = useState<string | null>(
     null,
   );
+  const [webhookDialogOpen, setWebhookDialogOpen] = useState(false);
+  const [webhookSaving, setWebhookSaving] = useState(false);
+  const [webhookForm, setWebhookForm] = useState(() =>
+    makeDefaultWebhookForm(),
+  );
 
   const testProvider = async (providerId: string) => {
     setTestingProviderId(providerId);
@@ -164,7 +178,17 @@ export default function PlatformSettings() {
       setError(null);
 
       try {
-        const [pResult, qResult, hResult, plResult, aResult, fjResult, prResult] =
+        const [
+          pResult,
+          qResult,
+          hResult,
+          plResult,
+          aResult,
+          fjResult,
+          prResult,
+          whResult,
+          whdResult,
+        ] =
           await Promise.all([
             api.listPlatformProviders(),
             api.getPlatformQueueHealth(),
@@ -182,6 +206,8 @@ export default function PlatformSettings() {
             }),
             api.listPlatformFailedJobs({ limit: 50 }),
             api.getPlatformProvidersReadiness().catch(() => []),
+            api.listPlatformWebhookEndpoints(),
+            api.listPlatformWebhookDeliveries(),
           ]);
 
         setProviders(asArray<PlatformProviderConfigSummary>(pResult));
@@ -191,6 +217,12 @@ export default function PlatformSettings() {
         setAuditLogs(asArray<PlatformAuditLog>(aResult));
         setFailedJobs(asArray<PlatformFailedJobSummary>(fjResult));
         setProvidersReadiness(asArray<any>(prResult));
+        setWebhookEndpoints(
+          asArray<PlatformWebhookEndpointSummary>(whResult),
+        );
+        setWebhookDeliveries(
+          asArray<PlatformWebhookDeliverySummary>(whdResult),
+        );
       } catch (err: any) {
         setError(err.message ?? 'Failed to load platform data');
       } finally {
@@ -334,6 +366,69 @@ export default function PlatformSettings() {
     }
   };
 
+  const createWebhookEndpoint = async () => {
+    if (
+      webhookForm.signingSecret.trim().length < 16 ||
+      webhookForm.url.trim().length === 0
+    ) {
+      setError('Webhook URL and a signing secret of at least 16 characters are required.');
+      return;
+    }
+
+    if (webhookForm.ownerType === 'TENANT' && !webhookForm.tenantId.trim()) {
+      setError('Tenant-owned webhooks require a tenant ID.');
+      return;
+    }
+
+    setWebhookSaving(true);
+    setError(null);
+    setActionMessage(null);
+    try {
+      await api.createPlatformWebhookEndpoint({
+        ownerType: webhookForm.ownerType,
+        tenantId:
+          webhookForm.ownerType === 'TENANT'
+            ? webhookForm.tenantId.trim()
+            : undefined,
+        url: webhookForm.url.trim(),
+        signingSecret: webhookForm.signingSecret.trim(),
+        eventTypes: splitList(webhookForm.eventTypes),
+      });
+      setWebhookDialogOpen(false);
+      setWebhookForm(makeDefaultWebhookForm());
+      setActionMessage('Webhook endpoint registered.');
+      await load(true);
+    } catch (err: any) {
+      setError(err.message ?? 'Failed to create webhook endpoint');
+    } finally {
+      setWebhookSaving(false);
+    }
+  };
+
+  const toggleWebhookEndpoint = async (
+    endpoint: PlatformWebhookEndpointSummary,
+  ) => {
+    setWebhookSaving(true);
+    setError(null);
+    setActionMessage(null);
+    try {
+      await api.updatePlatformWebhookEndpoint(endpoint.id, {
+        status: endpoint.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE',
+        eventTypes: endpoint.eventTypes,
+      });
+      setActionMessage(
+        endpoint.status === 'ACTIVE'
+          ? 'Webhook endpoint disabled.'
+          : 'Webhook endpoint enabled.',
+      );
+      await load(true);
+    } catch (err: any) {
+      setError(err.message ?? 'Failed to update webhook endpoint');
+    } finally {
+      setWebhookSaving(false);
+    }
+  };
+
   const formatDate = (dateString: string | number | null | undefined) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -349,6 +444,10 @@ export default function PlatformSettings() {
   const safeProviders = asArray<PlatformProviderConfigSummary>(providers);
   const safePlans = asArray<PlatformPlanSummary>(plans);
   const safeAuditLogs = asArray<PlatformAuditLog>(auditLogs);
+  const safeWebhookEndpoints =
+    asArray<PlatformWebhookEndpointSummary>(webhookEndpoints);
+  const safeWebhookDeliveries =
+    asArray<PlatformWebhookDeliverySummary>(webhookDeliveries);
   const failedJobsForInspectingQueue = safeFailedJobs.filter(
     (job) => job.queueName === inspectingQueue,
   );
@@ -463,6 +562,12 @@ export default function PlatformSettings() {
             className="rounded-xl px-6 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm"
           >
             Providers
+          </TabsTrigger>
+          <TabsTrigger
+            value="webhooks"
+            className="rounded-xl px-6 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm"
+          >
+            Webhooks
           </TabsTrigger>
           <TabsTrigger
             value="queues"
@@ -727,6 +832,151 @@ export default function PlatformSettings() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent
+          value="webhooks"
+          className="space-y-8 animate-in fade-in slide-in-from-bottom-2"
+        >
+          <div className="grid gap-8 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+            <Card className="rounded-3xl border-slate-100 shadow-sm">
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-2xl font-black">
+                    <Webhook className="text-cyan-600" size={24} />
+                    Endpoint Registry
+                  </CardTitle>
+                  <CardDescription className="text-base font-medium text-slate-500">
+                    Signed outbound webhooks for platform or tenant integrations.
+                  </CardDescription>
+                </div>
+                <Button
+                  className="rounded-2xl bg-slate-900 font-bold text-white"
+                  onClick={() => setWebhookDialogOpen(true)}
+                  data-testid="platform-webhook-create-button"
+                >
+                  <Plus size={18} className="mr-2" /> New Endpoint
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                  <table className="w-full min-w-[780px] text-left text-sm">
+                    <thead className="border-b border-slate-100 bg-slate-50">
+                      <tr>
+                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Owner</th>
+                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Endpoint</th>
+                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Events</th>
+                        <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Status</th>
+                        <th className="px-5 py-4 text-right"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {safeWebhookEndpoints.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-16 text-center text-sm font-bold text-slate-400">
+                            No webhook endpoints registered.
+                          </td>
+                        </tr>
+                      ) : (
+                        safeWebhookEndpoints.map((endpoint) => (
+                          <tr key={endpoint.id} className="transition-colors hover:bg-slate-50/60">
+                            <td className="px-5 py-4">
+                              <p className="font-black text-slate-900">{endpoint.ownerType}</p>
+                              <p className="mt-1 font-mono text-[10px] font-bold text-slate-400">
+                                {endpoint.tenantId ?? 'platform'}
+                              </p>
+                            </td>
+                            <td className="px-5 py-4">
+                              <p className="max-w-[300px] truncate font-mono text-xs font-bold text-slate-700">{endpoint.url}</p>
+                              <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                Updated {formatDate(endpoint.updatedAt)}
+                              </p>
+                            </td>
+                            <td className="px-5 py-4">
+                              <div className="flex max-w-xs flex-wrap gap-1.5">
+                                {endpoint.eventTypes.map((event) => (
+                                  <Badge key={event} variant="neutral" className="rounded-lg bg-slate-50 font-mono text-[10px]">
+                                    {event}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="px-5 py-4">
+                              <Badge variant={endpoint.status === 'ACTIVE' ? 'success' : 'neutral'} className="rounded-lg">
+                                {endpoint.status}
+                              </Badge>
+                            </td>
+                            <td className="px-5 py-4 text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-xl font-bold"
+                                disabled={webhookSaving}
+                                onClick={() => toggleWebhookEndpoint(endpoint)}
+                              >
+                                {endpoint.status === 'ACTIVE' ? 'Disable' : 'Enable'}
+                              </Button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-3xl border-slate-100 shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-2xl font-black">
+                  <History className="text-slate-400" size={24} />
+                  Delivery History
+                </CardTitle>
+                <CardDescription>
+                  Payloads are represented by checksums and safe response summaries only.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {safeWebhookDeliveries.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm font-bold text-slate-400">
+                    No delivery records yet.
+                  </div>
+                ) : (
+                  safeWebhookDeliveries.slice(0, 12).map((delivery) => (
+                    <div key={delivery.id} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-mono text-xs font-black text-slate-900">{delivery.eventType}</p>
+                          <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                            {formatDate(delivery.createdAt)} · retry {delivery.retryCount}
+                          </p>
+                        </div>
+                        <Badge
+                          variant={
+                            delivery.status === 'DELIVERED'
+                              ? 'success'
+                              : delivery.status === 'FAILED'
+                                ? 'destructive'
+                                : 'warning'
+                          }
+                          className="rounded-lg"
+                        >
+                          {delivery.status}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 grid gap-2 text-[10px] font-bold text-slate-500">
+                        <span className="truncate font-mono">Endpoint: {delivery.endpointId}</span>
+                        <span className="truncate font-mono">Checksum: {delivery.payloadChecksum}</span>
+                        {delivery.responseMessageSummary ? (
+                          <span className="text-slate-600">{delivery.responseMessageSummary}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
@@ -1473,6 +1723,88 @@ export default function PlatformSettings() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={webhookDialogOpen} onOpenChange={setWebhookDialogOpen}>
+        <DialogContent className="rounded-3xl sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black">
+              Register Webhook Endpoint
+            </DialogTitle>
+            <DialogDescription>
+              Signing secrets are hashed by the backend. Delivery history stores checksums and safe response summaries only.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-5 py-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="font-bold">Owner Type</Label>
+                <Select
+                  value={webhookForm.ownerType}
+                  onChange={(e) =>
+                    setWebhookForm({
+                      ...webhookForm,
+                      ownerType: e.target.value as 'PLATFORM' | 'TENANT',
+                    })
+                  }
+                >
+                  <option value="PLATFORM">Platform</option>
+                  <option value="TENANT">Tenant</option>
+                </Select>
+              </div>
+              <FilterInput
+                label="Tenant ID"
+                value={webhookForm.tenantId}
+                onChange={(value) =>
+                  setWebhookForm({ ...webhookForm, tenantId: value })
+                }
+              />
+            </div>
+            <FilterInput
+              label="Endpoint URL"
+              value={webhookForm.url}
+              onChange={(value) =>
+                setWebhookForm({ ...webhookForm, url: value })
+              }
+            />
+            <FilterInput
+              label="Signing Secret"
+              value={webhookForm.signingSecret}
+              onChange={(value) =>
+                setWebhookForm({ ...webhookForm, signingSecret: value })
+              }
+            />
+            <FilterInput
+              label="Event Types"
+              value={webhookForm.eventTypes}
+              onChange={(value) =>
+                setWebhookForm({ ...webhookForm, eventTypes: value })
+              }
+            />
+            <p className="-mt-3 text-xs font-semibold text-slate-400">
+              Enter comma-separated event types, for example tenant.updated, invoice.issued.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="rounded-xl font-bold"
+              onClick={() => setWebhookDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="rounded-xl bg-slate-900 font-bold text-white"
+              disabled={webhookSaving}
+              onClick={createWebhookEndpoint}
+            >
+              {webhookSaving ? (
+                <RefreshCw size={16} className="mr-2 animate-spin" />
+              ) : null}
+              Register Endpoint
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Provider Dialog */}
       <Dialog open={providerDialogOpen} onOpenChange={setProviderDialogOpen}>
         <DialogContent className="rounded-3xl sm:max-w-xl">
@@ -1626,6 +1958,23 @@ function asArray<T>(
   return [];
 }
 
+function makeDefaultWebhookForm() {
+  return {
+    ownerType: 'PLATFORM' as 'PLATFORM' | 'TENANT',
+    tenantId: '',
+    url: '',
+    signingSecret: '',
+    eventTypes: 'tenant.updated, invoice.issued',
+  };
+}
+
+function splitList(value: string) {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function exportSettingsAuditCsv(logs: PlatformAuditLog[]) {
   const headers = [
     'createdAt',
@@ -1657,7 +2006,7 @@ function exportSettingsAuditCsv(logs: PlatformAuditLog[]) {
 function getInitialSettingsTab() {
   if (typeof window === 'undefined') return 'health';
   const tab = new URLSearchParams(window.location.search).get('tab');
-  return ['health', 'providers', 'queues', 'plans', 'audit'].includes(tab ?? '')
+  return ['health', 'providers', 'webhooks', 'queues', 'plans', 'audit'].includes(tab ?? '')
     ? tab!
     : 'health';
 }

@@ -26,6 +26,8 @@ function createController() {
     assignDriver: jest.fn(),
     listStudentAssignments: jest.fn(),
     assignStudent: jest.fn(),
+    getDriverDashboard: jest.fn(),
+    getDriverTripManifest: jest.fn(),
     startTrip: jest.fn(),
     completeTrip: jest.fn(),
     markStudentBoarded: jest.fn(),
@@ -337,6 +339,71 @@ describe('TransportController M8B contracts', () => {
       vehicle: { registrationNumber: 'BA-1-KHA-1234' },
     });
     expect(JSON.stringify(result)).not.toContain('passenger');
+  });
+
+  it('delegates driver-specific trip surface through assignment-safe service methods', () => {
+    const { controller, transportService } = createController();
+    const startDto = {
+      routeId: 'route-1',
+      vehicleId: 'vehicle-1',
+      direction: 'PICKUP',
+    };
+    const markDto = { studentId: 'student-1' };
+    const pingDto = { latitude: 27.7172, longitude: 85.324 };
+    transportService.getDriverDashboard.mockReturnValue({ activeTrips: [] });
+    transportService.listDriverAssignments.mockReturnValue([
+      { id: 'driver-assignment-1' },
+    ]);
+    transportService.listActiveTrips.mockReturnValue([{ id: 'trip-1' }]);
+    transportService.listTripHistory.mockReturnValue([{ id: 'trip-0' }]);
+    transportService.startTrip.mockReturnValue({ id: 'trip-1' });
+    transportService.getDriverTripManifest.mockReturnValue({
+      trip: { id: 'trip-1' },
+      students: [],
+    });
+    transportService.completeTrip.mockReturnValue({ status: 'COMPLETED' });
+    transportService.markStudentBoarded.mockReturnValue({ status: 'BOARDED' });
+    transportService.markStudentDropped.mockReturnValue({ status: 'DROPPED' });
+    transportService.markStudentAbsent.mockReturnValue({ status: 'ABSENT' });
+    transportService.recordLocationPing.mockReturnValue({ tripId: 'trip-1' });
+
+    expect(controller.getDriverDashboard(actor)).toEqual({ activeTrips: [] });
+    expect(controller.listDriverOwnAssignments(actor)).toEqual([
+      { id: 'driver-assignment-1' },
+    ]);
+    expect(controller.listDriverActiveTrips(actor)).toEqual([{ id: 'trip-1' }]);
+    expect(controller.listDriverTripHistory(actor)).toEqual([{ id: 'trip-0' }]);
+    expect(controller.startDriverTrip(startDto as never, actor)).toEqual({
+      id: 'trip-1',
+    });
+    expect(controller.getDriverTripManifest('trip-1', actor)).toEqual({
+      trip: { id: 'trip-1' },
+      students: [],
+    });
+    expect(controller.completeDriverTrip('trip-1', {}, actor)).toEqual({
+      status: 'COMPLETED',
+    });
+    expect(
+      controller.markDriverStudentBoarded('trip-1', markDto, actor),
+    ).toEqual({ status: 'BOARDED' });
+    expect(
+      controller.markDriverStudentDropped('trip-1', markDto, actor),
+    ).toEqual({ status: 'DROPPED' });
+    expect(
+      controller.markDriverStudentAbsent('trip-1', markDto, actor),
+    ).toEqual({ status: 'ABSENT' });
+    expect(
+      controller.recordDriverLocationPing('trip-1', pingDto, actor),
+    ).toEqual({ tripId: 'trip-1' });
+    expect(transportService.getDriverTripManifest).toHaveBeenCalledWith(
+      'trip-1',
+      actor,
+    );
+    expect(transportService.recordLocationPing).toHaveBeenCalledWith(
+      'trip-1',
+      pingDto,
+      actor,
+    );
   });
 
   it('delegates transport reports and CSV export from backend service', () => {

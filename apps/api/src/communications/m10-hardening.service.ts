@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { NotificationStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/auth.types';
@@ -6,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CommunicationsService } from './communications.service';
 import { DeliveryRetryService } from './delivery-retry.service';
 import {
+  CommunicationAuditQueryDto,
   CommunicationPreferenceDto,
   CreateConsentTemplateDto,
   ResendNoticeDto,
@@ -25,6 +30,27 @@ interface NoticeRow {
   createdAt: Date;
   readAt: Date | null;
 }
+
+const COMMUNICATION_AUDIT_RESOURCES = [
+  'notice',
+  'notification_delivery',
+  'guardian_consent',
+  'consent_template',
+  'communication_preference',
+  'parent_teacher_thread',
+  'parent_teacher_message',
+  'chat_escalation',
+  'chat_abuse_report',
+];
+
+const RETENTION_POLICY_DAYS = {
+  notificationDeliveries: 730,
+  noticeReadReceipts: 730,
+  closedChatMessages: 1095,
+  closedChatThreads: 1095,
+  resolvedEscalations: 1095,
+  reviewedAbuseReports: 1825,
+};
 
 @Injectable()
 export class M10HardeningService {
@@ -153,6 +179,187 @@ export class M10HardeningService {
     });
 
     return { success: true, noticeId };
+  }
+
+  async getRetentionPolicyStatus(actor: AuthContext) {
+    const generatedAt = new Date();
+    const cutoffs = {
+      notificationDeliveries: daysAgo(
+        generatedAt,
+        RETENTION_POLICY_DAYS.notificationDeliveries,
+      ),
+      noticeReadReceipts: daysAgo(
+        generatedAt,
+        RETENTION_POLICY_DAYS.noticeReadReceipts,
+      ),
+      closedChatMessages: daysAgo(
+        generatedAt,
+        RETENTION_POLICY_DAYS.closedChatMessages,
+      ),
+      closedChatThreads: daysAgo(
+        generatedAt,
+        RETENTION_POLICY_DAYS.closedChatThreads,
+      ),
+      resolvedEscalations: daysAgo(
+        generatedAt,
+        RETENTION_POLICY_DAYS.resolvedEscalations,
+      ),
+      reviewedAbuseReports: daysAgo(
+        generatedAt,
+        RETENTION_POLICY_DAYS.reviewedAbuseReports,
+      ),
+    };
+
+    const [
+      notificationDeliveries,
+      noticeReadReceipts,
+      closedChatMessages,
+      closedChatThreads,
+      resolvedEscalations,
+      reviewedAbuseReports,
+    ] = await Promise.all([
+      this.prisma.notificationDelivery.count({
+        where: {
+          tenantId: actor.tenantId,
+          createdAt: { lt: cutoffs.notificationDeliveries },
+        },
+      }),
+      this.prisma.noticeReadReceipt.count({
+        where: {
+          tenantId: actor.tenantId,
+          createdAt: { lt: cutoffs.noticeReadReceipts },
+        },
+      }),
+      this.prisma.parentTeacherMessage.count({
+        where: {
+          tenantId: actor.tenantId,
+          createdAt: { lt: cutoffs.closedChatMessages },
+          thread: { status: 'CLOSED' },
+        },
+      }),
+      this.prisma.parentTeacherThread.count({
+        where: {
+          tenantId: actor.tenantId,
+          status: 'CLOSED',
+          updatedAt: { lt: cutoffs.closedChatThreads },
+        },
+      }),
+      this.prisma.chatEscalation.count({
+        where: {
+          tenantId: actor.tenantId,
+          status: 'RESOLVED',
+          resolvedAt: { lt: cutoffs.resolvedEscalations },
+        },
+      }),
+      this.prisma.chatAbuseReport.count({
+        where: {
+          tenantId: actor.tenantId,
+          status: { not: 'OPEN' },
+          reviewedAt: { lt: cutoffs.reviewedAbuseReports },
+        },
+      }),
+    ]);
+
+    return {
+      tenantId: actor.tenantId,
+      generatedAt: generatedAt.toISOString(),
+      mode: 'review_only',
+      policies: [
+        {
+          key: 'notification_deliveries',
+          days: RETENTION_POLICY_DAYS.notificationDeliveries,
+          cutoff: cutoffs.notificationDeliveries.toISOString(),
+          reviewCount: notificationDeliveries,
+        },
+        {
+          key: 'notice_read_receipts',
+          days: RETENTION_POLICY_DAYS.noticeReadReceipts,
+          cutoff: cutoffs.noticeReadReceipts.toISOString(),
+          reviewCount: noticeReadReceipts,
+        },
+        {
+          key: 'closed_chat_messages',
+          days: RETENTION_POLICY_DAYS.closedChatMessages,
+          cutoff: cutoffs.closedChatMessages.toISOString(),
+          reviewCount: closedChatMessages,
+        },
+        {
+          key: 'closed_chat_threads',
+          days: RETENTION_POLICY_DAYS.closedChatThreads,
+          cutoff: cutoffs.closedChatThreads.toISOString(),
+          reviewCount: closedChatThreads,
+        },
+        {
+          key: 'resolved_chat_escalations',
+          days: RETENTION_POLICY_DAYS.resolvedEscalations,
+          cutoff: cutoffs.resolvedEscalations.toISOString(),
+          reviewCount: resolvedEscalations,
+        },
+        {
+          key: 'reviewed_chat_abuse_reports',
+          days: RETENTION_POLICY_DAYS.reviewedAbuseReports,
+          cutoff: cutoffs.reviewedAbuseReports.toISOString(),
+          reviewCount: reviewedAbuseReports,
+        },
+      ],
+    };
+  }
+
+  async listCommunicationAuditTrail(
+    query: CommunicationAuditQueryDto,
+    actor: AuthContext,
+  ) {
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query.limit ?? 25));
+    const resource = query.resource?.trim();
+
+    if (resource && !COMMUNICATION_AUDIT_RESOURCES.includes(resource)) {
+      throw new BadRequestException('Unsupported communication audit resource');
+    }
+
+    const where: Prisma.AuditLogWhereInput = {
+      tenantId: actor.tenantId,
+      resource: resource ?? { in: COMMUNICATION_AUDIT_RESOURCES },
+      ...(query.action ? { action: query.action } : {}),
+      ...(query.userId ? { userId: query.userId } : {}),
+      ...(query.requestId ? { requestId: query.requestId } : {}),
+      ...(query.startDate || query.endDate
+        ? {
+            createdAt: {
+              ...(query.startDate ? { gte: new Date(query.startDate) } : {}),
+              ...(query.endDate ? { lte: new Date(query.endDate) } : {}),
+            },
+          }
+        : {}),
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+
+    return {
+      items: items.map((item) => ({
+        id: item.id,
+        action: item.action,
+        resource: item.resource,
+        resourceId: item.resourceId,
+        userId: item.userId,
+        requestId: item.requestId,
+        before: item.before,
+        after: item.after,
+        createdAt: item.createdAt.toISOString(),
+      })),
+      total,
+      page,
+      limit,
+      hasNextPage: page * limit < total,
+    };
   }
 
   async retryDeliveryWithMetadata(
@@ -436,4 +643,10 @@ export class M10HardeningService {
 
     return guardian;
   }
+}
+
+function daysAgo(now: Date, days: number) {
+  const date = new Date(now);
+  date.setDate(date.getDate() - days);
+  return date;
 }

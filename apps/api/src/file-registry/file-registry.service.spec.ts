@@ -10,6 +10,11 @@ describe('FileRegistryService tenant scoping', () => {
   let storageService: {
     checkReadiness: jest.Mock;
     createSignedReadUrl: jest.Mock;
+    createSignedUploadUrl: jest.Mock;
+  };
+  let usageService: {
+    checkLimit: jest.Mock;
+    incrementUsage: jest.Mock;
   };
 
   const asset = {
@@ -61,6 +66,17 @@ describe('FileRegistryService tenant scoping', () => {
       createSignedReadUrl: jest
         .fn()
         .mockResolvedValue('https://signed-storage.test/file-1'),
+      createSignedUploadUrl: jest.fn().mockResolvedValue({
+        url: 'https://signed-upload.test/file-1',
+        method: 'PUT',
+        objectKey: 'tenant-1/homework/generated.pdf',
+        expiresAt: new Date('2026-05-26T00:05:00.000Z'),
+        headers: { 'content-type': 'application/pdf' },
+      }),
+    };
+    usageService = {
+      checkLimit: jest.fn().mockResolvedValue(undefined),
+      incrementUsage: jest.fn().mockResolvedValue(undefined),
     };
 
     service = new FileRegistryService(
@@ -72,14 +88,11 @@ describe('FileRegistryService tenant scoping', () => {
         storageConfig: {
           provider: 'local',
           signedReadUrlTtlSeconds: 300,
+          signedUploadUrlTtlSeconds: 300,
         },
       } as any,
       storageService as any,
-      {
-        verifyLimit: jest.fn().mockResolvedValue(undefined),
-        checkLimit: jest.fn().mockResolvedValue(undefined),
-        incrementUsage: jest.fn().mockResolvedValue(undefined),
-      } as any,
+      usageService as any,
     );
   });
 
@@ -307,6 +320,87 @@ describe('FileRegistryService tenant scoping', () => {
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'file_download' }),
     );
+  });
+
+  it('creates pending signed upload intents without leaking storage keys', async () => {
+    prisma.fileAsset.create.mockImplementation(async ({ data }: any) => ({
+      ...asset,
+      ...data,
+      id: 'file-upload-1',
+      status: FileStatus.PENDING,
+    }));
+
+    const result = await service.createSignedUpload(
+      {
+        tenantId: 'tenant-1',
+        userId: 'teacher-1',
+        roles: ['teacher'],
+        permissions: ['homework:create'],
+      } as any,
+      {
+        fileName: 'worksheet.pdf',
+        contentType: 'application/pdf',
+        module: 'homework',
+        entityId: 'homework-1',
+        sizeBytes: 512,
+      },
+    );
+
+    const createCall = prisma.fileAsset.create.mock.calls[0][0];
+    expect(createCall.data.objectKey).toMatch(
+      /^tenant-1\/homework\/[a-f0-9-]+\.pdf$/,
+    );
+    expect(usageService.checkLimit).toHaveBeenCalledWith(
+      'tenant-1',
+      'storage.bytes',
+      512,
+    );
+    expect(storageService.createSignedUploadUrl).toHaveBeenCalledWith({
+      objectKey: createCall.data.objectKey,
+      contentType: 'application/pdf',
+      expiresInSeconds: 300,
+    });
+    expect(result).toEqual({
+      id: 'file-upload-1',
+      fileName: 'worksheet.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 512,
+      status: FileStatus.PENDING,
+      upload: {
+        url: 'https://signed-upload.test/file-1',
+        method: 'PUT',
+        headers: { 'content-type': 'application/pdf' },
+        expiresAt: new Date('2026-05-26T00:05:00.000Z'),
+        expiresInSeconds: 300,
+      },
+      publicUrl: null,
+    });
+    expect(result).not.toHaveProperty('objectKey');
+    expect(result).not.toHaveProperty('bucket');
+  });
+
+  it('allows only the uploader or tenant admins to complete signed uploads', async () => {
+    prisma.fileAsset.findUnique.mockResolvedValue({
+      ...asset,
+      status: FileStatus.PENDING,
+      module: 'homework',
+      entityId: 'homework-1',
+      uploadedByUserId: 'uploader-1',
+    });
+
+    await expect(
+      service.completeSignedUpload(
+        {
+          tenantId: 'tenant-1',
+          userId: 'other-user',
+          roles: ['teacher'],
+          permissions: ['homework:create'],
+        } as any,
+        'file-1',
+      ),
+    ).rejects.toThrow('Only the uploader can complete this upload');
+
+    expect(prisma.fileAsset.update).not.toHaveBeenCalled();
   });
 
   it('does not create a signed preview URL for a deleted file', async () => {

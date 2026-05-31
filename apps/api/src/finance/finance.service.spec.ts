@@ -1591,8 +1591,16 @@ function buildService(options: {
       findFirst: jest.fn().mockResolvedValue(null),
     },
     tenant: {
-      findUnique: jest.fn().mockResolvedValue(options.tenant ?? { id: actor.tenantId, name: 'SchoolOS' }),
-      findUniqueOrThrow: jest.fn().mockResolvedValue(options.tenant ?? { id: actor.tenantId, name: 'SchoolOS' }),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue(
+          options.tenant ?? { id: actor.tenantId, name: 'SchoolOS' },
+        ),
+      findUniqueOrThrow: jest
+        .fn()
+        .mockResolvedValue(
+          options.tenant ?? { id: actor.tenantId, name: 'SchoolOS' },
+        ),
     },
     chartAccount: {
       findUniqueOrThrow: jest

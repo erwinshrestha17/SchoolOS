@@ -156,7 +156,10 @@ export class LibraryHardeningService {
       return { skipped: true, sourceId, deliveryCount: existing };
     }
 
-    const result = await this.libraryService.sendOverdueReminders(actor);
+    const result = await this.libraryService.sendOverdueReminders(
+      actor,
+      sourceId,
+    );
 
     await this.auditService.record({
       action: 'send_overdue_reminders',

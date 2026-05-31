@@ -21,6 +21,7 @@ import {
   isParentOnly,
 } from '../common/security/parent-scope';
 import { MAX_SIGNED_URL_TTL_SECONDS } from '../storage/storage.types';
+import { buildObjectKey } from '../storage/storage.utils';
 
 @Injectable()
 export class FileRegistryService {
@@ -129,6 +130,88 @@ export class FileRegistryService {
     });
 
     return this.markUploaded(input.tenantId, asset.id, input.generatedByUserId);
+  }
+
+  async createSignedUpload(
+    auth: AuthContext,
+    input: {
+      fileName: string;
+      contentType: string;
+      module: string;
+      entityId?: string;
+      sizeBytes: number;
+    },
+  ) {
+    const objectKey = buildObjectKey({
+      tenantId: auth.tenantId,
+      prefix: input.module,
+      fileName: input.fileName,
+    });
+    const expiresInSeconds = this.signedUploadUrlTtlSeconds();
+
+    const asset = await this.registerFile({
+      tenantId: auth.tenantId,
+      uploadedByUserId: auth.userId,
+      originalFilename: input.fileName,
+      objectKey,
+      mimeType: input.contentType,
+      sizeBytes: input.sizeBytes,
+      module: input.module,
+      entityId: input.entityId,
+      metadata: {
+        uploadMode: 'signed',
+        expectedSizeBytes: input.sizeBytes,
+      },
+    });
+
+    const upload = await this.storageService.createSignedUploadUrl({
+      objectKey,
+      contentType: input.contentType,
+      expiresInSeconds,
+    });
+
+    return {
+      id: asset.id,
+      fileName: asset.originalFilename,
+      mimeType: asset.mimeType,
+      sizeBytes: Number(asset.sizeBytes),
+      status: asset.status,
+      upload: {
+        url: upload.url,
+        method: upload.method,
+        headers: upload.headers ?? {},
+        expiresAt: upload.expiresAt,
+        expiresInSeconds,
+      },
+      publicUrl: null,
+    };
+  }
+
+  async completeSignedUpload(auth: AuthContext, assetId: string) {
+    const asset = await this.getFileMetadata(auth.tenantId, assetId);
+    if (
+      asset.uploadedByUserId !== auth.userId &&
+      !auth.roles.some((role) => TENANT_FILE_ADMIN_ROLES.includes(role))
+    ) {
+      throw new ForbiddenException(
+        'Only the uploader can complete this upload',
+      );
+    }
+
+    const uploaded = await this.markUploaded(
+      auth.tenantId,
+      assetId,
+      auth.userId,
+    );
+
+    return {
+      id: uploaded.id,
+      fileName: uploaded.originalFilename,
+      mimeType: uploaded.mimeType,
+      sizeBytes: Number(uploaded.sizeBytes),
+      status: uploaded.status,
+      protectedUrl: await this.getSignedUrl(auth.tenantId, uploaded.id),
+    };
   }
 
   async markUploaded(tenantId: string, assetId: string, userId: string) {
@@ -526,6 +609,18 @@ export class FileRegistryService {
     }
 
     return Math.min(config.signedReadUrlTtlSeconds, MAX_SIGNED_URL_TTL_SECONDS);
+  }
+
+  private signedUploadUrlTtlSeconds() {
+    const config = this.configService.storageConfig;
+    if (!config) {
+      return 300;
+    }
+
+    return Math.min(
+      config.signedUploadUrlTtlSeconds ?? 300,
+      MAX_SIGNED_URL_TTL_SECONDS,
+    );
   }
 
   private get apiBaseUrl() {

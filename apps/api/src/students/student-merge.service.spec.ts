@@ -9,7 +9,11 @@ import { UsageService } from '../usage/usage.service';
 import { UsersService } from '../users/users.service';
 import { StudentLifecycleStatus, EnrollmentStatus } from '@prisma/client';
 import { AuthContext } from '../auth/auth.types';
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 
 describe('StudentsService (Duplicate Merge)', () => {
   let service: StudentsService;
@@ -297,7 +301,7 @@ describe('StudentsService (Duplicate Merge)', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('should deny duplicate merge if the source or target student is not in the actor\'s tenant (cross-tenant merge denied)', async () => {
+  it("should deny duplicate merge if the source or target student is not in the actor's tenant (cross-tenant merge denied)", async () => {
     // If the student is not in the actor's tenant, findFirst returns null, and it throws NotFoundException.
     (prisma.student.findFirst as jest.Mock).mockResolvedValue(null);
 

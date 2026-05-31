@@ -14,6 +14,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from '../auth/guards/roles-permissions.guard';
 import {
+  CommunicationAuditQueryDto,
   CommunicationPreferenceDto,
   CreateConsentTemplateDto,
   ResendNoticeDto,
@@ -62,6 +63,21 @@ export class M10HardeningController {
     @CurrentAuth() auth: AuthContext,
   ) {
     return this.m10HardeningService.resendNoticeFailed(noticeId, dto, auth);
+  }
+
+  @Get('communications/retention-policy')
+  @Permissions('communications:read_deliveries')
+  getRetentionPolicyStatus(@CurrentAuth() auth: AuthContext) {
+    return this.m10HardeningService.getRetentionPolicyStatus(auth);
+  }
+
+  @Get('communications/audit')
+  @Permissions('communications:read_deliveries')
+  listCommunicationAuditTrail(
+    @Query() query: CommunicationAuditQueryDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.m10HardeningService.listCommunicationAuditTrail(query, auth);
   }
 
   @Post('notifications/deliveries/:deliveryId/retry')

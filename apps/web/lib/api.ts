@@ -66,6 +66,8 @@ import type {
   PlatformApiKeySummary,
   PlatformProviderConfigSummary,
   PlatformProviderReadinessDetail,
+  PlatformWebhookDeliverySummary,
+  PlatformWebhookEndpointSummary,
   PlatformQueueSummary,
   PlatformHealthSummary,
   PlatformOnboardingChecklist,
@@ -2288,6 +2290,25 @@ export const api = {
   getPlatformProviderReadiness: (id: string) =>
     request<PlatformProviderReadinessDetail>(
       `/platform/providers/${encodeURIComponent(id)}/readiness`,
+    ),
+  listPlatformWebhookEndpoints: () =>
+    request<PlatformWebhookEndpointSummary[]>('/platform/webhook-endpoints'),
+  createPlatformWebhookEndpoint: (body: JsonBody) =>
+    request<PlatformWebhookEndpointSummary>('/platform/webhook-endpoints', {
+      method: 'POST',
+      json: body,
+    }),
+  updatePlatformWebhookEndpoint: (id: string, body: JsonBody) =>
+    request<PlatformWebhookEndpointSummary>(
+      `/platform/webhook-endpoints/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
+  listPlatformWebhookDeliveries: (endpointId?: string) =>
+    request<PlatformWebhookDeliverySummary[]>(
+      `/platform/webhook-deliveries${endpointId ? `?endpointId=${encodeURIComponent(endpointId)}` : ''}`,
     ),
   getPlatformProvidersReadiness: () =>
     request<any[]>('/platform/providers/readiness'),

@@ -27,7 +27,7 @@ class SectionHeader extends StatelessWidget {
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w800,
             color: isDark ? Colors.white : AppColors.slate800,
-            letterSpacing: -0.2,
+            letterSpacing: 0.0,
           ),
         ),
         if (actionLabel != null && onActionPressed != null)

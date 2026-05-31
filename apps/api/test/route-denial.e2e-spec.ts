@@ -8,10 +8,12 @@ import { RolesPermissionsGuard } from '../src/auth/guards/roles-permissions.guar
 import { EntitlementGuard } from '../src/auth/guards/entitlement.guard';
 import { AccountingReportsController } from '../src/accounting/accounting-reports.controller';
 import { AdmissionsController } from '../src/admissions/admissions.controller';
+import { MobileController } from '../src/mobile/mobile.controller';
 import { PlatformGuard } from '../src/auth/guards/platform.guard';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.service';
 import { AuthContext } from '../src/auth/auth.types';
+import { FEATURE_KEYS } from '@schoolos/core';
 import {
   PrismaMock,
   createRequestMock,
@@ -249,6 +251,59 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
     // 4. EntitlementGuard should allow even if plan doesn't have it
     const result = await entitlementGuard.canActivate(context);
     expect(result).toBe(true);
+  });
+
+  it('denies mobile parent APIs when the mobile parent feature is not entitled', async () => {
+    const tenantId = 'tenant-no-mobile';
+    prisma.__state.tenants.push({
+      id: tenantId,
+      slug: 'no-mobile',
+      isActive: true,
+      plan: 'custom-no-mobile',
+    });
+
+    const planId = 'plan-no-mobile';
+    prisma.__state.platformPlans.push({
+      id: planId,
+      key: 'custom-no-mobile',
+      name: 'No Mobile Plan',
+    });
+    prisma.__state.platformPlanFeatures.push({
+      id: 'feature-students-no-mobile',
+      planId,
+      featureKey: 'module.students',
+      enabled: true,
+    });
+    prisma.__state.tenantSubscriptions.push({
+      id: 'sub-no-mobile',
+      tenantId,
+      planId,
+      status: 'ACTIVE',
+      createdAt: new Date(),
+    });
+
+    const actor: AuthContext = {
+      userId: 'parent-user',
+      tenantId,
+      tenantSlug: 'no-mobile',
+      email: 'parent@school.com',
+      roles: ['parent'],
+      permissions: [],
+      authMethod: 'PASSWORD' as any,
+    };
+
+    const request = { auth: actor } as unknown as AuthenticatedRequest;
+    const context = {
+      switchToHttp: () => ({
+        getRequest: () => request,
+      }),
+      getHandler: () => MobileController.prototype.getDashboard,
+      getClass: () => MobileController,
+    } as unknown as ExecutionContext;
+
+    await expect(entitlementGuard.canActivate(context)).rejects.toThrow(
+      FEATURE_KEYS.MOBILE_PARENT_BASIC,
+    );
   });
 
   it('denies student creation if students.count limit is reached', async () => {

@@ -31,7 +31,7 @@ class RoleBadge extends StatelessWidget {
               color: fgColor,
               fontSize: 10,
               fontWeight: FontWeight.w800,
-              letterSpacing: 0.5,
+              letterSpacing: 0.0,
             ),
           ),
         ],

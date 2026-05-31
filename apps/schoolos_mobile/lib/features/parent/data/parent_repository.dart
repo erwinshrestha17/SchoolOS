@@ -19,10 +19,26 @@ class ParentRepository {
 
   Future<ChildProfile> getChildProfile(String childId) async {
     final children = await getGuardianChildren();
+    if (children.isEmpty) {
+      throw StateError('No children are linked to this guardian account.');
+    }
+
     final child = children.firstWhere(
       (item) => item.id == childId,
       orElse: () => children.first,
     );
+
+    return getChildProfileForChild(child);
+  }
+
+  Future<ChildProfile> getChildProfileForChild(GuardianChild child) async {
+    final response = await _client.get('/mobile/students/${child.id}/profile');
+    final data = response.data as Map<String, dynamic>;
+    final profile = data['profile'] as Map<String, dynamic>? ?? const {};
+    final emergencyContact =
+        profile['emergencyContact'] as Map<String, dynamic>?;
+    final medicalSummary =
+        profile['medicalSummary'] as Map<String, dynamic>? ?? const {};
 
     return ChildProfile(
       child: child,
@@ -30,12 +46,15 @@ class ParentRepository {
       guardianSummary: 'Guardian access verified by SchoolOS.',
       canViewGuardianSummary: true,
       attendanceSummary: 'Open attendance for the latest monthly summary.',
-      homeworkSummary: 'Homework sync is pending a parent-safe API slice.',
-      feesSummary: 'Fee summary sync is pending a parent-safe API slice.',
+      homeworkSummary: 'Homework is synced from the school mobile API.',
+      feesSummary: 'Fee summary is synced from the school mobile API.',
       qrLabel:
           'School identity QR will be shown after QR permissions are enabled.',
-      healthWarning: null,
-      canViewHealthWarning: false,
+      healthWarning:
+          medicalSummary['medicalConditions'] as String? ??
+          emergencyContact?['name'] as String?,
+      canViewHealthWarning:
+          medicalSummary['hasMedicalConsent'] as bool? ?? false,
     );
   }
 
@@ -43,55 +62,149 @@ class ParentRepository {
     String childId,
   ) async {
     final children = await getGuardianChildren();
+    if (children.isEmpty) {
+      throw StateError('No children are linked to this guardian account.');
+    }
+
     final child = children.firstWhere(
       (item) => item.id == childId,
       orElse: () => children.first,
     );
-    final attendance = await _client.get(
-      '/attendance/students/$childId/summary',
-    );
-    final notifications = await _client.get('/communications/notifications');
-    final transportData = await _getOptionalMap(
-      '/transport/parent/students/$childId/active-trip',
-    );
 
-    final attendanceData = attendance.data as Map<String, dynamic>;
-    final notificationData = notifications.data as Map<String, dynamic>;
-    final monthSummary =
-        attendanceData['monthSummary'] as Map<String, dynamic>? ?? const {};
+    return getParentDashboardSummaryForChild(child);
+  }
 
-    final attendancePercent =
-        (monthSummary['attendancePercentage'] as num?)?.toStringAsFixed(1) ??
-        '0.0';
-    return ParentDashboardSummary(
-      child: child,
-      attendanceToday: '$attendancePercent% attendance this month',
-      homeworkPending: 0,
-      feesDue: 0,
-      unreadNotices: notificationData['unreadCount'] as int? ?? 0,
-      transportStatus: _formatTransportStatus(transportData),
-      canteenBalance: 0,
-      latestActivity: 'Latest activity sync is pending a parent-safe API slice.',
-      lastUpdated: DateTime.now(),
+  Future<ParentDashboardSummary> getParentDashboardSummaryForChild(
+    GuardianChild child,
+  ) async {
+    final response = await _client.get(
+      '/mobile/me/dashboard',
+      queryParameters: {'studentId': child.id},
+    );
+    final data = response.data as Map<String, dynamic>;
+
+    return ParentDashboardSummary.fromMobileDashboard(data, child);
+  }
+
+  Future<List<ParentHomeworkItem>> getHomeworkForChild(
+    String childId, {
+    int take = 30,
+  }) async {
+    final response = await _client.get(
+      '/mobile/students/$childId/homework',
+      queryParameters: {'take': '$take'},
+    );
+    final data = response.data as Map<String, dynamic>;
+    final items = data['items'] as List<dynamic>? ?? const [];
+
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(ParentHomeworkItem.fromJson)
+        .toList();
+  }
+
+  Future<ParentTimetable> getTimetableForChild(String childId) async {
+    final response = await _client.get('/mobile/students/$childId/timetable');
+    final data = response.data as Map<String, dynamic>;
+    return ParentTimetable.fromJson(data);
+  }
+
+  Future<List<ParentReportCard>> getReportCardsForChild(String childId) async {
+    final response = await _client.get(
+      '/mobile/students/$childId/report-cards',
+    );
+    final data = response.data as Map<String, dynamic>;
+    final items = data['items'] as List<dynamic>? ?? const [];
+
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(ParentReportCard.fromJson)
+        .toList();
+  }
+
+  Future<List<ParentActivityItem>> getActivityFeedForChild(
+    String childId, {
+    int take = 20,
+  }) async {
+    final response = await _client.get(
+      '/mobile/students/$childId/activity-feed',
+      queryParameters: {'take': '$take'},
+    );
+    final data = response.data as Map<String, dynamic>;
+    final items = data['items'] as List<dynamic>? ?? const [];
+
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(ParentActivityItem.fromJson)
+        .toList();
+  }
+
+  Future<ParentTransportInfo> getTransportForChild(String childId) async {
+    final response = await _client.get('/mobile/students/$childId/transport');
+    final data = response.data as Map<String, dynamic>;
+    return ParentTransportInfo.fromJson(data);
+  }
+
+  Future<ParentCanteenInfo> getCanteenForChild(String childId) async {
+    final response = await _client.get('/mobile/students/$childId/canteen');
+    final data = response.data as Map<String, dynamic>;
+    return ParentCanteenInfo.fromJson(data);
+  }
+
+  Future<ParentTeacherThreadPage> getParentTeacherThreads({
+    String? childId,
+  }) async {
+    final response = await _client.get(
+      '/messaging/parent-teacher/threads',
+      queryParameters: {
+        if (childId != null && childId.isNotEmpty) 'studentId': childId,
+        'limit': '25',
+      },
+    );
+    final data = response.data as Map<String, dynamic>;
+    return ParentTeacherThreadPage.fromJson(data);
+  }
+
+  Future<ParentTeacherThread> openParentTeacherThread(String childId) async {
+    final response = await _client.post(
+      '/messaging/parent-teacher/threads',
+      data: {'studentId': childId},
+    );
+    final data = response.data as Map<String, dynamic>;
+    return ParentTeacherThread.fromJson(
+      data['thread'] as Map<String, dynamic>? ?? const {},
     );
   }
 
-  Future<Map<String, dynamic>?> _getOptionalMap(String path) async {
-    try {
-      final response = await _client.get(path);
-      return response.data as Map<String, dynamic>?;
-    } catch (_) {
-      return null;
-    }
+  Future<List<ParentTeacherMessage>> getParentTeacherMessages(
+    String threadId,
+  ) async {
+    final response = await _client.get(
+      '/messaging/parent-teacher/threads/$threadId/messages',
+      queryParameters: {'limit': '50'},
+    );
+    final data = response.data as Map<String, dynamic>;
+    final items = data['items'] as List<dynamic>? ?? const [];
+
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(ParentTeacherMessage.fromJson)
+        .toList();
   }
 
-  String _formatTransportStatus(Map<String, dynamic>? data) {
-    if (data == null || data.isEmpty || data['activeTrip'] == null) {
-      return 'No active trip';
-    }
+  Future<ParentTeacherSendResult> sendParentTeacherMessage({
+    required String threadId,
+    required String message,
+  }) async {
+    final response = await _client.post(
+      '/messaging/parent-teacher/threads/$threadId/messages',
+      data: {'message': message},
+    );
+    final data = response.data as Map<String, dynamic>;
+    return ParentTeacherSendResult.fromJson(data);
+  }
 
-    final trip = data['activeTrip'] as Map<String, dynamic>;
-    final status = trip['status'] as String? ?? 'ACTIVE';
-    return 'Trip ${status.toLowerCase().replaceAll('_', ' ')}';
+  Future<void> markParentTeacherThreadRead(String threadId) async {
+    await _client.patch('/messaging/parent-teacher/threads/$threadId/read');
   }
 }

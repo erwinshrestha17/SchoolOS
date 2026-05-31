@@ -44,8 +44,8 @@ class TokenRefreshInterceptor extends Interceptor {
       );
 
       final responseMap = response.data as Map<String, dynamic>;
-      final unwrappedData = responseMap.containsKey('success') &&
-              responseMap.containsKey('data')
+      final unwrappedData =
+          responseMap.containsKey('success') && responseMap.containsKey('data')
           ? responseMap['data'] as Map<String, dynamic>
           : responseMap;
 

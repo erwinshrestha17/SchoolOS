@@ -13,6 +13,7 @@ import {
   School,
   Settings,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 
 import { Avatar } from '../ui/avatar';
@@ -24,6 +25,7 @@ type HeaderProps = {
 };
 
 export function Header({ onMobileMenuToggle }: HeaderProps) {
+  const router = useRouter();
   const { hasPermissions, session, status, logout } = useSession();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [yearMenuOpen, setYearMenuOpen] = useState(false);
@@ -248,7 +250,10 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                 <button
                   type="button"
                   className="dropdown-item w-full"
-                  onClick={() => setUserMenuOpen(false)}
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    router.push('/dashboard/my-profile');
+                  }}
                   role="menuitem"
                 >
                   <User size={16} className="text-slate-400" />
@@ -258,7 +263,10 @@ export function Header({ onMobileMenuToggle }: HeaderProps) {
                 <button
                   type="button"
                   className="dropdown-item w-full"
-                  onClick={() => setUserMenuOpen(false)}
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    router.push('/dashboard/settings');
+                  }}
                   role="menuitem"
                 >
                   <Settings size={16} className="text-slate-400" />

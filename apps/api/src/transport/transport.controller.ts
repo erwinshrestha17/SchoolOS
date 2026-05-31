@@ -205,6 +205,98 @@ export class TransportController {
     );
   }
 
+  @Get('driver/dashboard')
+  @Permissions('transport:operate')
+  getDriverDashboard(@CurrentAuth() auth: AuthContext) {
+    return this.transportService.getDriverDashboard(auth);
+  }
+
+  @Get('driver/assignments')
+  @Permissions('transport:operate')
+  listDriverOwnAssignments(@CurrentAuth() auth: AuthContext) {
+    return this.transportService.listDriverAssignments(auth, {});
+  }
+
+  @Get('driver/trips/active')
+  @Permissions('transport:operate')
+  listDriverActiveTrips(@CurrentAuth() auth: AuthContext) {
+    return this.transportService.listActiveTrips(auth);
+  }
+
+  @Get('driver/trips/history')
+  @Permissions('transport:operate')
+  listDriverTripHistory(@CurrentAuth() auth: AuthContext) {
+    return this.transportService.listTripHistory(auth, {});
+  }
+
+  @Post('driver/trips')
+  @Permissions('transport:operate')
+  startDriverTrip(
+    @Body() dto: StartTransportTripDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportService.startTrip(dto, auth);
+  }
+
+  @Get('driver/trips/:id/manifest')
+  @Permissions('transport:operate')
+  getDriverTripManifest(
+    @Param('id') tripId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportService.getDriverTripManifest(tripId, auth);
+  }
+
+  @Patch('driver/trips/:id/complete')
+  @Permissions('transport:operate')
+  completeDriverTrip(
+    @Param('id') tripId: string,
+    @Body() dto: CompleteTransportTripDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportService.completeTrip(tripId, dto, auth);
+  }
+
+  @Patch('driver/trips/:id/students/boarded')
+  @Permissions('transport:operate')
+  markDriverStudentBoarded(
+    @Param('id') tripId: string,
+    @Body() dto: MarkTransportStudentStatusDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportService.markStudentBoarded(tripId, dto, auth);
+  }
+
+  @Patch('driver/trips/:id/students/dropped')
+  @Permissions('transport:operate')
+  markDriverStudentDropped(
+    @Param('id') tripId: string,
+    @Body() dto: MarkTransportStudentStatusDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportService.markStudentDropped(tripId, dto, auth);
+  }
+
+  @Patch('driver/trips/:id/students/absent')
+  @Permissions('transport:operate')
+  markDriverStudentAbsent(
+    @Param('id') tripId: string,
+    @Body() dto: MarkTransportStudentStatusDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportService.markStudentAbsent(tripId, dto, auth);
+  }
+
+  @Post('driver/trips/:id/location')
+  @Permissions('transport:operate')
+  recordDriverLocationPing(
+    @Param('id') tripId: string,
+    @Body() dto: TransportLocationPingDto,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.transportService.recordLocationPing(tripId, dto, auth);
+  }
+
   @Post('trips')
   @Permissions('transport:trips:create')
   startTrip(

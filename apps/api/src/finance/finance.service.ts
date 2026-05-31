@@ -29,7 +29,11 @@ import {
   ReconciliationQueryDto,
 } from '../accounting/dto/reconciliation-query.dto';
 import { UsageService } from '../usage/usage.service';
-import { buildSimplePdf, buildReceiptPdf, buildCashierClosePdf } from '../common/pdf/simple-pdf';
+import {
+  buildSimplePdf,
+  buildReceiptPdf,
+  buildCashierClosePdf,
+} from '../common/pdf/simple-pdf';
 import { CommunicationsService } from '../communications/communications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { FileRegistryService } from '../file-registry/file-registry.service';
@@ -3445,8 +3449,10 @@ export class FinanceService {
       totalRefunded: Number(close.totalRefunded),
       netCollected: Number(close.netCollected),
       expectedCashAmount: Number(close.expectedCashAmount ?? 0),
-      actualCashAmount: close.actualCashAmount === null ? null : Number(close.actualCashAmount),
-      varianceAmount: close.varianceAmount === null ? null : Number(close.varianceAmount),
+      actualCashAmount:
+        close.actualCashAmount === null ? null : Number(close.actualCashAmount),
+      varianceAmount:
+        close.varianceAmount === null ? null : Number(close.varianceAmount),
       varianceReason: close.varianceReason,
       paymentCount: close.paymentCount,
       refundCount: close.refundCount,
@@ -3785,10 +3791,15 @@ export class FinanceService {
     };
   }
 
-  async initiateOnlinePayment(dto: InitiateOnlinePaymentDto, actor: AuthContext) {
+  async initiateOnlinePayment(
+    dto: InitiateOnlinePaymentDto,
+    actor: AuthContext,
+  ) {
     const readiness = await this.getPaymentGatewayReadiness(actor);
     if (!readiness.enabled) {
-      throw new BadRequestException('Online payment provider is disabled or not configured.');
+      throw new BadRequestException(
+        'Online payment provider is disabled or not configured.',
+      );
     }
 
     const invoice = await this.prisma.invoice.findFirst({
@@ -3798,7 +3809,10 @@ export class FinanceService {
       throw new NotFoundException('Invoice not found in this tenant');
     }
 
-    if (dto.amount <= 0 || new Prisma.Decimal(dto.amount).gt(invoice.totalAmount)) {
+    if (
+      dto.amount <= 0 ||
+      new Prisma.Decimal(dto.amount).gt(invoice.totalAmount)
+    ) {
       throw new BadRequestException('Invalid payment amount.');
     }
 
@@ -3833,11 +3847,16 @@ export class FinanceService {
     });
 
     if (!activeProvider) {
-      throw new BadRequestException(`Provider ${provider} is disabled or not configured.`);
+      throw new BadRequestException(
+        `Provider ${provider} is disabled or not configured.`,
+      );
     }
 
     const sigHeaderName = `${provider.toLowerCase()}-signature`;
-    const signature = headers[sigHeaderName] || headers[sigHeaderName.toUpperCase()] || headers['signature'];
+    const signature =
+      headers[sigHeaderName] ||
+      headers[sigHeaderName.toUpperCase()] ||
+      headers['signature'];
 
     if (!signature || signature.trim() === '') {
       throw new BadRequestException('Missing signature header.');
@@ -3883,7 +3902,8 @@ export class FinanceService {
     return {
       status: 'verified',
       postedToLedger: false,
-      message: 'Payment verification succeeded but ledger posting is deferred until settlement confirmation rules are met.',
+      message:
+        'Payment verification succeeded but ledger posting is deferred until settlement confirmation rules are met.',
     };
   }
 

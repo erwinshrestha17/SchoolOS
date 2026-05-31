@@ -19,6 +19,7 @@ import {
   School,
   ShieldCheck,
   SlidersHorizontal,
+  Webhook,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -98,6 +99,13 @@ const platformNavGroups: PlatformNavGroup[] = [
         label: 'Providers',
         description: 'SMS, email and storage providers',
         icon: SlidersHorizontal,
+        permissions: ['platform:providers:read'],
+      },
+      {
+        href: '/platform/settings?tab=webhooks',
+        label: 'Webhooks',
+        description: 'Signed endpoint registry and delivery history',
+        icon: Webhook,
         permissions: ['platform:providers:read'],
       },
       {
@@ -381,7 +389,7 @@ function isActivePlatformRoute(
     return false;
   }
 
-  if (pathname === hrefPath || pathname.startsWith(`${hrefPath}/`)) {
+  if (!hrefQuery && (pathname === hrefPath || pathname.startsWith(`${hrefPath}/`))) {
     return true;
   }
 

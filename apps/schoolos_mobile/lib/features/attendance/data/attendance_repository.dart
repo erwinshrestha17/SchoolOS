@@ -12,10 +12,7 @@ class AttendanceRepository {
   ) async {
     final response = await _client.get(
       '/attendance/students/$studentId/summary',
-      queryParameters: {
-        'month': range.start.month,
-        'year': range.start.year,
-      },
+      queryParameters: {'month': range.start.month, 'year': range.start.year},
     );
     final data = response.data as Map<String, dynamic>;
     final monthSummary =
@@ -56,15 +53,12 @@ class AttendanceRepository {
     );
     final items = response.data as List<dynamic>? ?? const [];
 
-    return items
-        .whereType<Map<String, dynamic>>()
-        .map((item) {
-          return AttendanceDay(
-            date: DateTime.tryParse(item['date'] as String? ?? '') ?? first,
-            status: _statusFromApi(item['status'] as String?),
-          );
-        })
-        .toList();
+    return items.whereType<Map<String, dynamic>>().map((item) {
+      return AttendanceDay(
+        date: DateTime.tryParse(item['date'] as String? ?? '') ?? first,
+        status: _statusFromApi(item['status'] as String?),
+      );
+    }).toList();
   }
 
   String _dateOnly(DateTime value) {

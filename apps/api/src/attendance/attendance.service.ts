@@ -3314,7 +3314,9 @@ export class AttendanceService {
         ? guardian.studentLinks.map((link) => link.studentId)
         : [];
       if (!allowedStudentIds.includes(studentId)) {
-        throw new ForbiddenException('Access denied to this student attendance.');
+        throw new ForbiddenException(
+          'Access denied to this student attendance.',
+        );
       }
       return;
     }
@@ -3328,7 +3330,9 @@ export class AttendanceService {
         select: { id: true },
       });
       if (!ownStudent || ownStudent.id !== studentId) {
-        throw new ForbiddenException('Access denied to this student attendance.');
+        throw new ForbiddenException(
+          'Access denied to this student attendance.',
+        );
       }
       return;
     }

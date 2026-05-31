@@ -10,7 +10,7 @@ class AppTypography {
     fontFamily: fontFamily,
     fontSize: 40,
     fontWeight: FontWeight.w800,
-    letterSpacing: -1.0,
+    letterSpacing: 0.0,
     height: 1.2,
   );
 
@@ -18,7 +18,7 @@ class AppTypography {
     fontFamily: fontFamily,
     fontSize: 32,
     fontWeight: FontWeight.w800,
-    letterSpacing: -0.5,
+    letterSpacing: 0.0,
     height: 1.25,
   );
 
@@ -26,7 +26,7 @@ class AppTypography {
     fontFamily: fontFamily,
     fontSize: 26,
     fontWeight: FontWeight.w800,
-    letterSpacing: -0.5,
+    letterSpacing: 0.0,
     height: 1.3,
   );
 
@@ -34,7 +34,7 @@ class AppTypography {
     fontFamily: fontFamily,
     fontSize: 22,
     fontWeight: FontWeight.w700,
-    letterSpacing: -0.2,
+    letterSpacing: 0.0,
     height: 1.35,
   );
 
@@ -50,7 +50,7 @@ class AppTypography {
     fontFamily: fontFamily,
     fontSize: 16,
     fontWeight: FontWeight.w600,
-    letterSpacing: 0.1,
+    letterSpacing: 0.0,
     height: 1.4,
   );
 
@@ -58,7 +58,7 @@ class AppTypography {
     fontFamily: fontFamily,
     fontSize: 14,
     fontWeight: FontWeight.w600,
-    letterSpacing: 0.1,
+    letterSpacing: 0.0,
     height: 1.4,
   );
 
@@ -66,7 +66,7 @@ class AppTypography {
     fontFamily: fontFamily,
     fontSize: 16,
     fontWeight: FontWeight.w400,
-    letterSpacing: 0.2,
+    letterSpacing: 0.0,
     height: 1.5,
   );
 
@@ -74,7 +74,7 @@ class AppTypography {
     fontFamily: fontFamily,
     fontSize: 14,
     fontWeight: FontWeight.w400,
-    letterSpacing: 0.25,
+    letterSpacing: 0.0,
     height: 1.5,
   );
 
@@ -82,7 +82,7 @@ class AppTypography {
     fontFamily: fontFamily,
     fontSize: 12,
     fontWeight: FontWeight.w400,
-    letterSpacing: 0.3,
+    letterSpacing: 0.0,
     height: 1.5,
   );
 
@@ -90,7 +90,7 @@ class AppTypography {
     fontFamily: fontFamily,
     fontSize: 14,
     fontWeight: FontWeight.w600,
-    letterSpacing: 0.4,
+    letterSpacing: 0.0,
     height: 1.4,
   );
 
@@ -98,7 +98,7 @@ class AppTypography {
     fontFamily: fontFamily,
     fontSize: 12,
     fontWeight: FontWeight.w600,
-    letterSpacing: 0.4,
+    letterSpacing: 0.0,
     height: 1.4,
   );
 
@@ -106,7 +106,7 @@ class AppTypography {
     fontFamily: fontFamily,
     fontSize: 10,
     fontWeight: FontWeight.w500,
-    letterSpacing: 0.5,
+    letterSpacing: 0.0,
     height: 1.4,
   );
 }

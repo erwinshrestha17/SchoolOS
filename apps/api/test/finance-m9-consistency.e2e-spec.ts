@@ -343,10 +343,37 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
 
   describe('Cashier close and reconciliation', () => {
     it('finalizes cashier close and verifies finance/accounting consistency', async () => {
+      const openedAt = new Date(Date.now() - 3600000);
+      const closedAt = new Date();
       (prisma.cashierClose.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.cashierClose.create as jest.Mock).mockResolvedValue({
         id: 'close-1',
+        tenantId,
         closeNumber: 'CC-001',
+        closeWindowKey: 'cashier-window-key',
+        openedAt,
+        closedAt,
+        collectorUserId: null,
+        collectorUser: null,
+        paymentMethod: null,
+        grossCollected: new Prisma.Decimal(1000),
+        totalRefunded: new Prisma.Decimal(0),
+        netCollected: new Prisma.Decimal(1000),
+        expectedCashAmount: new Prisma.Decimal(1000),
+        actualCashAmount: new Prisma.Decimal(1000),
+        varianceAmount: new Prisma.Decimal(0),
+        varianceReason: null,
+        denominationBreakdown: null,
+        methodBreakdown: [],
+        paymentCount: 1,
+        refundCount: 0,
+        firstReceiptNumber: 'RCP-001',
+        lastReceiptNumber: 'RCP-001',
+        notes: null,
+        closedById: actor.userId,
+        closedBy: { id: actor.userId, email: actor.email },
+        createdAt: closedAt,
+        updatedAt: closedAt,
       });
 
       jest
@@ -366,8 +393,8 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
           methodBreakdown: [],
           firstReceiptNumber: 'RCP-001',
           lastReceiptNumber: 'RCP-001',
-          openedAt: new Date(Date.now() - 3600000),
-          closedAt: new Date(),
+          openedAt,
+          closedAt,
           collectorUserId: null,
           paymentMethod: null,
           actualCashAmount: null,
@@ -378,8 +405,8 @@ describe('Finance + M9 Accounting Integration (E2E)', () => {
 
       const close = await financeService.finalizeCashierClose(
         {
-          openedAt: new Date(Date.now() - 3600000).toISOString(),
-          closedAt: new Date().toISOString(),
+          openedAt: openedAt.toISOString(),
+          closedAt: closedAt.toISOString(),
           actualCashAmount: 1000,
         },
         actor,

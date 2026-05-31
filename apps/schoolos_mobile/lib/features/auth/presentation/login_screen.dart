@@ -151,7 +151,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       'Welcome to SchoolOS',
                       style: theme.textTheme.headlineLarge?.copyWith(
                         fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
+                        letterSpacing: 0.0,
                         color: isDark ? Colors.white : AppColors.slate900,
                       ),
                     ),

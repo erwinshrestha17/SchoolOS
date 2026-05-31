@@ -434,11 +434,14 @@ export class TransportService {
     actor: AuthContext,
     filters: { routeId?: string; vehicleId?: string },
   ) {
+    const isRestricted = !canOperateAnyTransportTrip(actor);
+
     return this.prisma.transportDriverAssignment.findMany({
       where: {
         tenantId: actor.tenantId,
         ...(filters.routeId ? { routeId: filters.routeId } : {}),
         ...(filters.vehicleId ? { vehicleId: filters.vehicleId } : {}),
+        ...(isRestricted ? { staff: { userId: actor.userId } } : {}),
       },
       include: { vehicle: true, route: true, staff: true },
       orderBy: [{ startsAt: 'desc' }],
@@ -821,7 +824,7 @@ export class TransportService {
   }
 
   listActiveTrips(actor: AuthContext) {
-    return this.listTripRows(actor.tenantId, { status: 'ACTIVE' });
+    return this.listTripRows(actor, { status: 'ACTIVE' });
   }
 
   listTripHistory(
@@ -829,7 +832,6 @@ export class TransportService {
     filters: { routeId?: string; vehicleId?: string },
   ) {
     const isRestricted = !canOperateAnyTransportTrip(actor);
-    const driverStaffId = isRestricted ? actor.userId : undefined; // This is actually userId, need to check if we can filter by driverAssignment.staff.userId
 
     return this.prisma.transportTrip.findMany({
       where: {
@@ -844,6 +846,163 @@ export class TransportService {
       orderBy: [{ startedAt: 'desc' }],
       take: 100,
     });
+  }
+
+  async getDriverDashboard(actor: AuthContext) {
+    const [assignments, activeTrips, recentTrips] = await Promise.all([
+      this.listDriverAssignments(actor, {}),
+      this.listActiveTrips(actor),
+      this.listTripHistory(actor, {}),
+    ]);
+
+    return {
+      assignments: assignments.map((assignment) => ({
+        id: assignment.id,
+        route: assignment.route
+          ? {
+              id: assignment.route.id,
+              name: assignment.route.name,
+              code: assignment.route.code,
+            }
+          : null,
+        vehicle: {
+          id: assignment.vehicle.id,
+          registrationNumber: assignment.vehicle.registrationNumber,
+          model: assignment.vehicle.model,
+          capacity: assignment.vehicle.capacity,
+        },
+        startsAt: assignment.startsAt.toISOString(),
+        endsAt: assignment.endsAt?.toISOString() ?? null,
+      })),
+      activeTrips: activeTrips.map((trip) => this.toTripSummary(trip)),
+      recentTrips: recentTrips
+        .slice(0, 10)
+        .map((trip) => this.toTripSummary(trip)),
+    };
+  }
+
+  async getDriverTripManifest(tripId: string, actor: AuthContext) {
+    const trip = await this.prisma.transportTrip.findFirst({
+      where: { tenantId: actor.tenantId, id: tripId },
+      include: {
+        route: { include: { stops: { orderBy: { sequence: 'asc' } } } },
+        vehicle: true,
+        driverAssignment: {
+          include: {
+            staff: {
+              select: {
+                id: true,
+                userId: true,
+                employeeId: true,
+                firstName: true,
+                lastName: true,
+                photoUrl: true,
+              },
+            },
+          },
+        },
+        studentStatuses: {
+          include: {
+            student: {
+              select: {
+                id: true,
+                studentSystemId: true,
+                firstNameEn: true,
+                lastNameEn: true,
+                photoUrl: true,
+                rollNumber: true,
+                medicalConditions: true,
+                severeAllergies: true,
+                emergencyName: true,
+                emergencyPhone: true,
+              },
+            },
+            stop: true,
+          },
+          orderBy: [{ stop: { sequence: 'asc' } }, { createdAt: 'asc' }],
+        },
+      },
+    });
+
+    if (!trip) {
+      throw new NotFoundException('Trip not found in this tenant');
+    }
+
+    await this.assertDriverCanOperateAssignment(
+      actor,
+      trip.driverAssignmentId,
+      'view this trip manifest',
+    );
+
+    return {
+      trip: {
+        id: trip.id,
+        direction: trip.direction,
+        status: trip.status,
+        startedAt: trip.startedAt.toISOString(),
+        completedAt: trip.completedAt?.toISOString() ?? null,
+        isDelayed: trip.isDelayed,
+        delayMinutes: trip.delayMinutes,
+        delayReason: trip.delayReason,
+      },
+      route: {
+        id: trip.route.id,
+        name: trip.route.name,
+        code: trip.route.code,
+        stops: trip.route.stops.map((stop) => ({
+          id: stop.id,
+          name: stop.name,
+          sequence: stop.sequence,
+          estimatedPickup: stop.estimatedPickup,
+          estimatedDrop: stop.estimatedDrop,
+          latitude: decimalToNumber(stop.latitude),
+          longitude: decimalToNumber(stop.longitude),
+        })),
+      },
+      vehicle: {
+        id: trip.vehicle.id,
+        registrationNumber: trip.vehicle.registrationNumber,
+        model: trip.vehicle.model,
+        capacity: trip.vehicle.capacity,
+      },
+      driver: {
+        assignmentId: trip.driverAssignment.id,
+        staffId: trip.driverAssignment.staff.id,
+        userId: trip.driverAssignment.staff.userId,
+        employeeId: trip.driverAssignment.staff.employeeId,
+        firstName: trip.driverAssignment.staff.firstName,
+        lastName: trip.driverAssignment.staff.lastName,
+        photoUrl: trip.driverAssignment.staff.photoUrl,
+      },
+      students: trip.studentStatuses.map((status) => ({
+        statusId: status.id,
+        status: status.status,
+        boardedAt: status.boardedAt?.toISOString() ?? null,
+        droppedAt: status.droppedAt?.toISOString() ?? null,
+        notes: status.notes,
+        stop: {
+          id: status.stop.id,
+          name: status.stop.name,
+          sequence: status.stop.sequence,
+          estimatedPickup: status.stop.estimatedPickup,
+          estimatedDrop: status.stop.estimatedDrop,
+          latitude: decimalToNumber(status.stop.latitude),
+          longitude: decimalToNumber(status.stop.longitude),
+        },
+        student: {
+          id: status.student.id,
+          studentSystemId: status.student.studentSystemId,
+          firstNameEn: status.student.firstNameEn,
+          lastNameEn: status.student.lastNameEn,
+          photoUrl: status.student.photoUrl,
+          rollNumber: status.student.rollNumber,
+          medicalConditions: status.student.medicalConditions,
+          severeAllergies: status.student.severeAllergies,
+          emergencyName: status.student.emergencyName,
+          emergencyPhone: status.student.emergencyPhone,
+        },
+      })),
+    };
   }
 
   async recordLocationPing(
@@ -936,7 +1095,12 @@ export class TransportService {
   }
 
   async getLatestTripLocation(tripId: string, actor: AuthContext) {
-    await this.getTrip(actor.tenantId, tripId);
+    const trip = await this.getTrip(actor.tenantId, tripId);
+    await this.assertDriverCanOperateAssignment(
+      actor,
+      trip.driverAssignmentId,
+      'view this trip location',
+    );
     const cached = await this.redisService
       .getClient()
       .get(this.latestLocationKey(actor.tenantId, tripId));
@@ -975,9 +1139,23 @@ export class TransportService {
     const subClient = this.redisService.getClient().duplicate();
 
     return new Observable((subscriber) => {
-      subClient.subscribe(channel, (err) => {
-        if (err) subscriber.error(err);
-      });
+      let subscribed = false;
+
+      void this.getTrip(actor.tenantId, tripId)
+        .then((trip) =>
+          this.assertDriverCanOperateAssignment(
+            actor,
+            trip.driverAssignmentId,
+            'stream this trip location',
+          ),
+        )
+        .then(() => {
+          subClient.subscribe(channel, (err) => {
+            if (err) subscriber.error(err);
+            subscribed = !err;
+          });
+        })
+        .catch((err) => subscriber.error(err));
 
       subClient.on('message', (ch, message) => {
         if (ch === channel) {
@@ -986,7 +1164,9 @@ export class TransportService {
       });
 
       return () => {
-        subClient.unsubscribe(channel);
+        if (subscribed) {
+          subClient.unsubscribe(channel);
+        }
         subClient.quit();
       };
     });
@@ -1204,6 +1384,12 @@ export class TransportService {
     if (!trip) {
       throw new NotFoundException('Trip not found');
     }
+
+    await this.assertDriverCanOperateAssignment(
+      actor,
+      trip.driverAssignmentId,
+      'view this trip',
+    );
 
     return trip;
   }
@@ -1477,20 +1663,88 @@ export class TransportService {
   }
 
   private listTripRows(
-    tenantId: string,
+    actor: AuthContext,
     filters: { status?: 'ACTIVE'; routeId?: string; vehicleId?: string },
   ) {
+    const isRestricted = !canOperateAnyTransportTrip(actor);
+
     return this.prisma.transportTrip.findMany({
       where: {
-        tenantId,
+        tenantId: actor.tenantId,
         ...(filters.status ? { status: TransportTripStatus.ACTIVE } : {}),
         ...(filters.routeId ? { routeId: filters.routeId } : {}),
         ...(filters.vehicleId ? { vehicleId: filters.vehicleId } : {}),
+        ...(isRestricted
+          ? { driverAssignment: { staff: { userId: actor.userId } } }
+          : {}),
       },
-      include: { route: true, vehicle: true, driverAssignment: true },
+      include: {
+        route: true,
+        vehicle: true,
+        driverAssignment: {
+          include: {
+            staff: {
+              select: {
+                id: true,
+                userId: true,
+                employeeId: true,
+                firstName: true,
+                lastName: true,
+                photoUrl: true,
+              },
+            },
+          },
+        },
+      },
       orderBy: [{ startedAt: 'desc' }],
       take: 100,
     });
+  }
+
+  private toTripSummary(trip: {
+    id: string;
+    direction: unknown;
+    status: unknown;
+    startedAt: Date;
+    completedAt?: Date | null;
+    isDelayed?: boolean;
+    delayMinutes?: number | null;
+    delayReason?: string | null;
+    route?: { id: string; name: string; code: string } | null;
+    vehicle?: {
+      id: string;
+      registrationNumber: string;
+      model?: string | null;
+      capacity: number;
+    } | null;
+    driverAssignment?: { id: string } | null;
+  }) {
+    return {
+      id: trip.id,
+      direction: trip.direction,
+      status: trip.status,
+      startedAt: trip.startedAt.toISOString(),
+      completedAt: trip.completedAt?.toISOString() ?? null,
+      isDelayed: trip.isDelayed ?? false,
+      delayMinutes: trip.delayMinutes ?? null,
+      delayReason: trip.delayReason ?? null,
+      route: trip.route
+        ? {
+            id: trip.route.id,
+            name: trip.route.name,
+            code: trip.route.code,
+          }
+        : null,
+      vehicle: trip.vehicle
+        ? {
+            id: trip.vehicle.id,
+            registrationNumber: trip.vehicle.registrationNumber,
+            model: trip.vehicle.model ?? null,
+            capacity: trip.vehicle.capacity,
+          }
+        : null,
+      driverAssignmentId: trip.driverAssignment?.id ?? null,
+    };
   }
 
   private async getTrip(tenantId: string, tripId: string) {
@@ -1678,6 +1932,10 @@ function addDays(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
+}
+
+function decimalToNumber(value: Prisma.Decimal | null | undefined) {
+  return value === null || value === undefined ? null : value.toNumber();
 }
 
 function canOperateAnyTransportTrip(actor: AuthContext) {

@@ -21,6 +21,9 @@ describe('FileRegistryController upload safety', () => {
       getFileMetadata: jest.fn(),
       assertFileAccessForAuth: jest.fn(),
       auditAccess: jest.fn(),
+      markUploaded: jest.fn(),
+      createSignedUpload: jest.fn(),
+      completeSignedUpload: jest.fn(),
       createSignedPreviewUrl: jest.fn(),
       createSignedDownloadUrl: jest.fn(),
     };
@@ -103,6 +106,10 @@ describe('FileRegistryController upload safety', () => {
       id: 'file-1',
       originalFilename: 'report.pdf',
     });
+    fileRegistryService.markUploaded.mockResolvedValue({
+      id: 'file-1',
+      originalFilename: 'report.pdf',
+    });
     fileRegistryService.getSignedUrl.mockResolvedValue(
       'http://localhost:4000/api/v1/files/file-1/preview',
     );
@@ -155,6 +162,10 @@ describe('FileRegistryController upload safety', () => {
       checksumSha256: 'checksum-1',
     });
     fileRegistryService.registerFile.mockResolvedValue({
+      id: 'file-notice',
+      originalFilename: 'notice.pdf',
+    });
+    fileRegistryService.markUploaded.mockResolvedValue({
       id: 'file-notice',
       originalFilename: 'notice.pdf',
     });
@@ -267,6 +278,82 @@ describe('FileRegistryController upload safety', () => {
     );
 
     expect(fileRegistryService.createSignedDownloadUrl).toHaveBeenCalledWith(
+      auth,
+      'file-1',
+    );
+  });
+
+  it('creates signed upload intents through the File Registry service', async () => {
+    fileRegistryService.createSignedUpload.mockResolvedValue({
+      id: 'file-1',
+      fileName: 'worksheet.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 512,
+      status: 'PENDING',
+      upload: {
+        url: 'https://signed-upload.test/file-1',
+        method: 'PUT',
+        headers: { 'content-type': 'application/pdf' },
+        expiresAt: new Date('2026-05-26T00:05:00.000Z'),
+        expiresInSeconds: 300,
+      },
+      publicUrl: null,
+    });
+
+    await expect(
+      controller.createSignedUpload(auth, {
+        fileName: 'worksheet.pdf',
+        contentType: 'application/pdf',
+        module: 'homework',
+        sizeBytes: 512,
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: 'file-1',
+        publicUrl: null,
+      }),
+    );
+
+    expect(fileRegistryService.createSignedUpload).toHaveBeenCalledWith(auth, {
+      fileName: 'worksheet.pdf',
+      contentType: 'application/pdf',
+      module: 'homework',
+      entityId: undefined,
+      sizeBytes: 512,
+    });
+  });
+
+  it('rejects signed upload intents that exceed the file limit', async () => {
+    await expect(
+      controller.createSignedUpload(auth, {
+        fileName: 'large.pdf',
+        contentType: 'application/pdf',
+        module: 'homework',
+        sizeBytes: 10 * 1024 * 1024 + 1,
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(fileRegistryService.createSignedUpload).not.toHaveBeenCalled();
+  });
+
+  it('marks signed uploads complete through the File Registry service', async () => {
+    fileRegistryService.completeSignedUpload.mockResolvedValue({
+      id: 'file-1',
+      fileName: 'worksheet.pdf',
+      status: 'UPLOADED',
+      protectedUrl: 'http://localhost:4000/api/v1/files/file-1/preview',
+    });
+
+    await expect(
+      controller.completeSignedUpload(auth, 'file-1'),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: 'file-1',
+        status: 'UPLOADED',
+      }),
+    );
+
+    expect(fileRegistryService.completeSignedUpload).toHaveBeenCalledWith(
       auth,
       'file-1',
     );

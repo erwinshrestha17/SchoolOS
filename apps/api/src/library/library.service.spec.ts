@@ -369,6 +369,23 @@ describe('LibraryService Phase 3A foundation', () => {
       }),
     );
   });
+
+  it('uses caller-provided source ids for overdue reminder deduplication', async () => {
+    const { service, communicationsService } = buildService();
+
+    await service.sendOverdueReminders(
+      actor,
+      'library-overdue-tenant-1-2026-05-31',
+    );
+
+    expect(communicationsService.recordDeliveryRecords).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceType: 'library_overdue',
+        sourceId: 'library-overdue-tenant-1-2026-05-31',
+        studentIds: ['student-1'],
+      }),
+    );
+  });
 });
 
 function buildService(

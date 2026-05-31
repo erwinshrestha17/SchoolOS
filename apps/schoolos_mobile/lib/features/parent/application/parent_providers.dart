@@ -19,6 +19,58 @@ final parentControllerProvider =
       );
     });
 
+final parentHomeworkProvider =
+    FutureProvider.family<List<ParentHomeworkItem>, String>((ref, childId) {
+      return ref.watch(parentRepositoryProvider).getHomeworkForChild(childId);
+    });
+
+final parentTimetableProvider = FutureProvider.family<ParentTimetable, String>((
+  ref,
+  childId,
+) {
+  return ref.watch(parentRepositoryProvider).getTimetableForChild(childId);
+});
+
+final parentReportCardsProvider =
+    FutureProvider.family<List<ParentReportCard>, String>((ref, childId) {
+      return ref
+          .watch(parentRepositoryProvider)
+          .getReportCardsForChild(childId);
+    });
+
+final parentActivityFeedProvider =
+    FutureProvider.family<List<ParentActivityItem>, String>((ref, childId) {
+      return ref
+          .watch(parentRepositoryProvider)
+          .getActivityFeedForChild(childId);
+    });
+
+final parentTransportProvider =
+    FutureProvider.family<ParentTransportInfo, String>((ref, childId) {
+      return ref.watch(parentRepositoryProvider).getTransportForChild(childId);
+    });
+
+final parentCanteenProvider = FutureProvider.family<ParentCanteenInfo, String>((
+  ref,
+  childId,
+) {
+  return ref.watch(parentRepositoryProvider).getCanteenForChild(childId);
+});
+
+final parentTeacherThreadsProvider =
+    FutureProvider.family<ParentTeacherThreadPage, String?>((ref, childId) {
+      return ref
+          .watch(parentRepositoryProvider)
+          .getParentTeacherThreads(childId: childId);
+    });
+
+final parentTeacherMessagesProvider =
+    FutureProvider.family<List<ParentTeacherMessage>, String>((ref, threadId) {
+      return ref
+          .watch(parentRepositoryProvider)
+          .getParentTeacherMessages(threadId);
+    });
+
 class ParentState {
   const ParentState({
     this.status = ParentDataStatus.loading,
@@ -109,12 +161,16 @@ class ParentController extends StateNotifier<ParentState> {
       final selectedChildId = children.any((child) => child.id == savedChildId)
           ? savedChildId!
           : children.first.id;
+      final selectedChild = children.firstWhere(
+        (child) => child.id == selectedChildId,
+        orElse: () => children.first,
+      );
 
       await _preferences.saveSelectedChildId(selectedChildId);
-      final dashboard = await _repository.getParentDashboardSummary(
-        selectedChildId,
+      final dashboard = await _repository.getParentDashboardSummaryForChild(
+        selectedChild,
       );
-      final profile = await _repository.getChildProfile(selectedChildId);
+      final profile = await _repository.getChildProfileForChild(selectedChild);
 
       state = ParentState(
         status: _isOnline ? ParentDataStatus.success : ParentDataStatus.offline,

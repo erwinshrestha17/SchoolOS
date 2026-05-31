@@ -551,7 +551,9 @@ export class ReportsService {
             where: { userId: actor.userId, tenantId: actor.tenantId },
           });
           if (!staff) {
-            throw new ForbiddenException('Staff record not found in this tenant');
+            throw new ForbiddenException(
+              'Staff record not found in this tenant',
+            );
           }
 
           let isAssigned = false;
@@ -567,14 +569,15 @@ export class ReportsService {
           }
 
           if (!isAssigned) {
-            const assignment = await this.prisma.subjectTeacherAssignment.findFirst({
-              where: {
-                staffId: staff.id,
-                classId,
-                ...(sectionId ? { sectionId } : {}),
-                tenantId: actor.tenantId,
-              },
-            });
+            const assignment =
+              await this.prisma.subjectTeacherAssignment.findFirst({
+                where: {
+                  staffId: staff.id,
+                  classId,
+                  ...(sectionId ? { sectionId } : {}),
+                  tenantId: actor.tenantId,
+                },
+              });
             if (assignment) isAssigned = true;
           }
 

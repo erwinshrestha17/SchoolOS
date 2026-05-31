@@ -50,19 +50,30 @@ class DashboardCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: isDark ? AppColors.slate400 : AppColors.slate500,
-                        fontWeight: FontWeight.w600,
+                    Expanded(
+                      child: Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: isDark
+                              ? AppColors.slate400
+                              : AppColors.slate500,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                    currentBadge ?? const SizedBox.shrink(),
+                    if (currentBadge != null) ...[
+                      const SizedBox(width: AppSpacing.sm),
+                      currentBadge,
+                    ],
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: isDark ? Colors.white : AppColors.slate900,
@@ -72,6 +83,8 @@ class DashboardCard extends StatelessWidget {
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     subtitle!,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: isDark ? AppColors.slate400 : AppColors.slate600,
                     ),

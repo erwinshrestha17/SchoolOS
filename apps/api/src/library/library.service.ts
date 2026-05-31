@@ -705,7 +705,7 @@ export class LibraryService {
     return { items, meta: { page, limit: take, total } };
   }
 
-  async sendOverdueReminders(actor: AuthContext) {
+  async sendOverdueReminders(actor: AuthContext, sourceId?: string) {
     const overdueResult = await this.listOverdue(actor, {
       page: '1',
       limit: '100',
@@ -722,7 +722,7 @@ export class LibraryService {
     const delivery = await this.communicationsService.recordDeliveryRecords({
       actor,
       sourceType: 'library_overdue',
-      sourceId: `library-overdue-${Date.now()}`,
+      sourceId: sourceId ?? `library-overdue-${Date.now()}`,
       audienceType: AudienceType.ALL,
       studentIds: Array.from(new Set(studentIds)),
       title: 'Library book overdue',

@@ -923,7 +923,13 @@ export function buildCashierClosePdf(input: {
     sectionLabel('Window Identification', 60, 668),
     text(`Close Number: ${input.closeNumber}`, 60, 654, 9, 'F2'),
     text(`Collector: ${input.collectorName}`, 60, 640, 9, 'F1'),
-    text(`Method Scope: ${input.paymentMethod || 'ALL METHODS'}`, 60, 626, 9, 'F1'),
+    text(
+      `Method Scope: ${input.paymentMethod || 'ALL METHODS'}`,
+      60,
+      626,
+      9,
+      'F1',
+    ),
 
     infoBox(304, 620, 240, 62),
     sectionLabel('Time Boundaries', 316, 668),
@@ -964,7 +970,13 @@ export function buildCashierClosePdf(input: {
     sectionLabel('Activity Details', 60, 482),
     text(`Total Payments Count: ${input.paymentCount}`, 60, 464, 9, 'F1'),
     text(`Total Refunds Count: ${input.refundCount}`, 60, 448, 9, 'F1'),
-    text(`First Receipt: ${input.firstReceiptNumber || '—'}`, 304, 464, 9, 'F1'),
+    text(
+      `First Receipt: ${input.firstReceiptNumber || '—'}`,
+      304,
+      464,
+      9,
+      'F1',
+    ),
     text(`Last Receipt: ${input.lastReceiptNumber || '—'}`, 304, 448, 9, 'F1'),
 
     // Variance Reason & Notes
@@ -973,13 +985,11 @@ export function buildCashierClosePdf(input: {
     text('Variance Reason:', 60, 364, 9, 'F2'),
     ...(input.varianceReason
       ? wrapPdfLine(input.varianceReason, 60, 350, 460, 9)
-      : [text('None recorded', 60, 350, 9, 'F1')]
-    ),
+      : [text('None recorded', 60, 350, 9, 'F1')]),
     text('General Handoff Notes:', 60, 300, 9, 'F2'),
     ...(input.notes
       ? wrapPdfLine(input.notes, 60, 286, 460, 9)
-      : [text('No notes provided', 60, 286, 9, 'F1')]
-    ),
+      : [text('No notes provided', 60, 286, 9, 'F1')]),
 
     '72 138 m 220 138 l S',
     text('Cashier Signature', 108, 122, 9, 'F1'),

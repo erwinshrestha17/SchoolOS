@@ -39,11 +39,13 @@ describe('Transport Security Boundaries', () => {
     prisma = {
       transportTrip: {
         findFirst: jest.fn(),
+        findMany: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
       },
       transportDriverAssignment: {
         findFirst: jest.fn(),
+        findMany: jest.fn(),
       },
       studentGuardian: {
         findFirst: jest.fn(),
@@ -127,6 +129,52 @@ describe('Transport Security Boundaries', () => {
           data: expect.objectContaining({ tenantId, tripId }),
         }),
       );
+    });
+
+    it('scopes active trip lists to the assigned driver', async () => {
+      prisma.transportTrip.findMany.mockResolvedValue([]);
+
+      await service.listActiveTrips(driverActor);
+
+      expect(prisma.transportTrip.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId,
+            status: TransportTripStatus.ACTIVE,
+            driverAssignment: { staff: { userId: driverActor.userId } },
+          }),
+        }),
+      );
+    });
+
+    it('scopes driver assignments to the current driver', async () => {
+      prisma.transportDriverAssignment.findMany.mockResolvedValue([]);
+
+      await service.listDriverAssignments(driverActor, {});
+
+      expect(prisma.transportDriverAssignment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId,
+            staff: { userId: driverActor.userId },
+          }),
+        }),
+      );
+    });
+
+    it('denies driver manifest access for another driver trip', async () => {
+      prisma.transportTrip.findFirst.mockResolvedValue({
+        id: 'trip-2',
+        driverAssignmentId: 'assignment-2',
+      });
+      prisma.transportDriverAssignment.findFirst.mockResolvedValue({
+        id: 'assignment-2',
+        staff: { userId: 'different-driver' },
+      });
+
+      await expect(
+        service.getDriverTripManifest('trip-2', driverActor),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('denies driver from recording location for another driver trip', async () => {
