@@ -199,6 +199,43 @@ export class MobileService {
     };
   }
 
+  async markNotificationRead(notificationId: string, actor: AuthContext) {
+    const studentIds = await this.getAllowedStudentIds(actor);
+    const notification = await this.prisma.notificationDelivery.findFirst({
+      where: {
+        id: notificationId,
+        tenantId: actor.tenantId,
+        OR: [
+          { recipientUserId: actor.userId },
+          ...(studentIds.length > 0 ? [{ studentId: { in: studentIds } }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (!notification) {
+      throw new NotFoundException('Notification not found');
+    }
+
+    await this.prisma.notificationReadReceipt.upsert({
+      where: {
+        tenantId_notificationDeliveryId_userId: {
+          tenantId: actor.tenantId,
+          notificationDeliveryId: notification.id,
+          userId: actor.userId,
+        },
+      },
+      create: {
+        tenantId: actor.tenantId,
+        notificationDeliveryId: notification.id,
+        userId: actor.userId,
+      },
+      update: { readAt: new Date() },
+    });
+
+    return { success: true };
+  }
+
   async getStudentProfile(studentId: string, actor: AuthContext) {
     const student = await this.getAccessibleStudent(studentId, actor);
     return {

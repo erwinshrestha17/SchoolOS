@@ -1395,7 +1395,15 @@ export class AttendanceService {
             },
           },
         },
-        select: { status: true },
+        select: {
+          status: true,
+          remark: true,
+          attendanceSession: {
+            select: {
+              attendanceDate: true,
+            },
+          },
+        },
       }),
       this.prisma.attendanceRecord.findMany({
         where: {
@@ -1445,6 +1453,15 @@ export class AttendanceService {
         totalMarked,
         attendancePercentage: Math.round(percentage * 100) / 100,
       },
+      monthHistory: monthRecords.map((record) => ({
+        date: record.attendanceSession.attendanceDate,
+        status: record.status,
+        label: buildParentAttendanceStatusLabel(
+          record.status,
+          record.attendanceSession.attendanceDate,
+        ),
+        remark: record.remark,
+      })),
       recentHistory: recentHistory.map((record) => ({
         date: record.attendanceSession.attendanceDate,
         status: record.status,

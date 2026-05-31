@@ -104,17 +104,20 @@ Implemented:
 - Platform vs tenant route separation.
 - Super-admin tenant override audit behavior.
 - App-level throttling and production verification scripts.
+- Request/correlation ID propagation through response headers, response envelopes, structured request logs, and audit records.
+- Production secret, cookie, and same-site runtime validation.
+- Dashboard direct-route permission-denied gating before protected module pages load.
+- Dashboard slow-session recovery with retry/sign-in actions when cookie validation or permission loading stalls.
 
 Remaining backend:
 
-- Request/correlation ID logging end-to-end.
 - More denial, override, tenant-isolation, and session/security regression tests.
-- Production cookie/session/secret review.
+- Final production credential review during deployment.
 
 Remaining frontend:
 
-- Consistent permission-denied states across all dashboard/platform routes.
-- Better expired-session and slow-network recovery.
+- Browser coverage for permission-denied states across all dashboard/platform routes.
+- Deeper expired-session and slow-network recovery browser coverage.
 
 ### M0 - Platform Core / SaaS Starter
 
@@ -133,11 +136,11 @@ Implemented:
 - Env-backed cloud-agnostic storage adapter boundary for local, R2, S3, and MinIO-compatible providers, with fail-closed config checks and R2 alias compatibility.
 - Queue health, failed-job detail inspection, sanitized payload visibility, stack/timing detail, retry audit history, and audited retry endpoint.
 - File Registry, report exports/history, health summary, onboarding checklist.
+- Entitlement regression coverage now denies real school module controllers for accounting, mobile parent, library, transport, canteen, and homework when a tenant plan lacks the required feature, even if RBAC permissions are present.
 - Platform dashboard/schools/settings/audit routes.
 
 Remaining backend:
 
-- Entitlement enforcement tests against real school APIs.
 - Object-storage readiness verification against an explicit staging provider.
 - File Registry signed read/download/upload API hardening is implemented; staging provider verification remains.
 - M1-M10 module-by-module migration audit to remove any remaining direct file/provider assumptions.
@@ -189,17 +192,16 @@ Implemented:
 - Teacher-scope and correction/sync tests.
 - Attendance daily and register routes.
 - M2 hardening slice: correction requests now persist previous status and reason-required review metadata, correction lists are paginated, teacher lock-window failures use the school-friendly correction message, parent/student attendance access checks correctly honor guardian-owned children, attendance register exports register generated artifacts through File Registry when available, and the web attendance form has tenant/user/class/date-scoped local draft recovery plus sync/conflict states.
+- Parent mobile attendance now uses the purpose-limited `/mobile/students/:id/attendance-summary` API with month-history data instead of admin-shaped attendance endpoints or hard-coded child fallbacks.
 
 Remaining backend:
 
 - Broader attendance report/export staging verification against real object storage.
-- Parent/mobile attendance summary route polish outside the current admin dashboard.
 - More service-level permission tests for correction approval/rejection, guardian denial, and tenant isolation.
 
 Remaining frontend:
 
 - Correction request/admin review workspace polish.
-- Parent attendance view later.
 - Browser/manual QA for offline reload recovery and reconnect conflict choices.
 
 ### M3 - Fees & Receipts

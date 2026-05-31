@@ -104,9 +104,9 @@ class ParentFeesScreen extends ConsumerWidget {
       if (!context.mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Saved ${download.fileName}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Saved ${download.fileName}')));
     } catch (_) {
       if (!context.mounted) {
         return;

@@ -14,6 +14,8 @@ Current repo reality:
 Academics, Accounting, Homework, Timetable, HR, Payroll, Library, Transport, and Canteen now have admin production-depth coverage for the current modular-monolith scope.
 Platform settings now has provider readiness detail and queue failed-job detail surfaces wired to real APIs.
 M10 notice composition now supports File Registry attachments through real upload APIs, and the delivery retry panel consumes the backend failed-delivery dashboard.
+Dashboard protected routes now have direct URL permission-denied gating and slow-session retry/sign-in recovery.
+Flutter parent attendance now uses the purpose-limited mobile attendance API and selected-child state instead of admin-shaped attendance endpoints.
 Next UI work is browser/staging QA for delivery failures, retry/resend, QR/POS scan speed, transport stale-location clarity, and permission/error states.
 ```
 

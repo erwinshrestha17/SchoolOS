@@ -20,7 +20,7 @@ class NoticesRepository {
   }
 
   Future<void> markNoticeRead(String noticeId) async {
-    await _client.post('/communications/notifications/$noticeId/read');
+    await _client.post('/mobile/me/notifications/$noticeId/read');
   }
 
   Future<List<NotificationItem>> getNotificationCenter() async {
@@ -29,13 +29,13 @@ class NoticesRepository {
   }
 
   Future<int> getUnreadCount() async {
-    final response = await _client.get('/communications/notifications');
+    final response = await _client.get('/mobile/me/notifications');
     final data = response.data as Map<String, dynamic>;
     return data['unreadCount'] as int? ?? 0;
   }
 
   Future<_NotificationCenterPayload> _getCenter() async {
-    final response = await _client.get('/communications/notifications');
+    final response = await _client.get('/mobile/me/notifications');
     final data = response.data as Map<String, dynamic>;
     final items = data['items'] as List<dynamic>? ?? const [];
 

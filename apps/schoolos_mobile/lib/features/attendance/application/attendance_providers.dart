@@ -13,17 +13,13 @@ final parentAttendanceProvider =
     FutureProvider.family<AttendanceViewData, String>((ref, studentId) async {
       final repository = ref.watch(attendanceRepositoryProvider);
       final now = DateTime.now();
-      final summary = await repository.getAttendanceSummary(
+      final snapshot = await repository.getParentAttendanceSnapshot(
         studentId,
-        DateTimeRangeValue(
-          start: DateTime(now.year, now.month),
-          end: DateTime(now.year, now.month + 1, 0),
-        ),
+        now,
       );
-      final days = await repository.getMonthlyAttendance(studentId, now);
       return AttendanceViewData(
-        summary: summary,
-        days: days,
+        summary: snapshot.summary,
+        days: snapshot.days,
         isOffline: !ref.watch(connectivityProvider),
       );
     });

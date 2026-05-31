@@ -6,65 +6,56 @@ class AttendanceRepository {
 
   final ApiClient _client;
 
+  Future<AttendanceSnapshot> getParentAttendanceSnapshot(
+    String studentId,
+    DateTime month,
+  ) async {
+    final response = await _client.get(
+      '/mobile/students/$studentId/attendance-summary',
+      queryParameters: {'month': month.month, 'year': month.year},
+    );
+    final data = response.data as Map<String, dynamic>;
+    final today = _asMap(data['today']);
+    final monthSummary = _asMap(data['monthSummary']);
+    final history = _asList(data['monthHistory']).isNotEmpty
+        ? _asList(data['monthHistory'])
+        : _asList(data['recentHistory']);
+
+    return AttendanceSnapshot(
+      summary: AttendanceSummary(
+        studentId: studentId,
+        studentName: 'Student',
+        todayStatus: _statusFromApi(today?['status'] as String?),
+        todayLabel: today?['label'] as String?,
+        presentCount: _asInt(monthSummary?['present']),
+        absentCount: _asInt(monthSummary?['absent']),
+        lateCount: _asInt(monthSummary?['late']),
+        leaveCount: _asInt(monthSummary?['leave']),
+        lastUpdated: DateTime.now(),
+      ),
+      days: history.whereType<Map<String, dynamic>>().map((item) {
+        return AttendanceDay(
+          date: DateTime.tryParse(item['date'] as String? ?? '') ?? month,
+          status: _statusFromApi(item['status'] as String?),
+        );
+      }).toList(),
+    );
+  }
+
   Future<AttendanceSummary> getAttendanceSummary(
     String studentId,
     DateTimeRangeValue range,
   ) async {
-    final response = await _client.get(
-      '/attendance/students/$studentId/summary',
-      queryParameters: {'month': range.start.month, 'year': range.start.year},
-    );
-    final data = response.data as Map<String, dynamic>;
-    final monthSummary =
-        data['monthSummary'] as Map<String, dynamic>? ?? const {};
-    final present = monthSummary['present'] as int? ?? 0;
-    final absent = monthSummary['absent'] as int? ?? 0;
-    final late = monthSummary['late'] as int? ?? 0;
-    final leave = monthSummary['leave'] as int? ?? 0;
-
-    return AttendanceSummary(
-      studentId: studentId,
-      studentName: 'Student',
-      todayStatus: present > 0
-          ? AttendanceStatus.present
-          : absent > 0
-          ? AttendanceStatus.absent
-          : AttendanceStatus.present,
-      presentCount: present,
-      absentCount: absent,
-      lateCount: late,
-      leaveCount: leave,
-      lastUpdated: DateTime.now(),
-    );
+    final snapshot = await getParentAttendanceSnapshot(studentId, range.start);
+    return snapshot.summary;
   }
 
   Future<List<AttendanceDay>> getMonthlyAttendance(
     String studentId,
     DateTime month,
   ) async {
-    final first = DateTime(month.year, month.month);
-    final last = DateTime(month.year, month.month + 1, 0);
-    final response = await _client.get(
-      '/attendance/students/$studentId/history',
-      queryParameters: {
-        'startDate': _dateOnly(first),
-        'endDate': _dateOnly(last),
-      },
-    );
-    final items = response.data as List<dynamic>? ?? const [];
-
-    return items.whereType<Map<String, dynamic>>().map((item) {
-      return AttendanceDay(
-        date: DateTime.tryParse(item['date'] as String? ?? '') ?? first,
-        status: _statusFromApi(item['status'] as String?),
-      );
-    }).toList();
-  }
-
-  String _dateOnly(DateTime value) {
-    final month = value.month.toString().padLeft(2, '0');
-    final day = value.day.toString().padLeft(2, '0');
-    return '${value.year}-$month-$day';
+    final snapshot = await getParentAttendanceSnapshot(studentId, month);
+    return snapshot.days;
   }
 
   AttendanceStatus _statusFromApi(String? status) {
@@ -84,6 +75,24 @@ class AttendanceRepository {
       default:
         return AttendanceStatus.present;
     }
+  }
+
+  Map<String, dynamic>? _asMap(Object? value) {
+    return value is Map<String, dynamic> ? value : null;
+  }
+
+  List<dynamic> _asList(Object? value) {
+    return value is List<dynamic> ? value : const [];
+  }
+
+  int _asInt(Object? value) {
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+    return 0;
   }
 
   Future<List<TeacherClassSection>> getTeacherAssignedClasses() async {

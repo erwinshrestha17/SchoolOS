@@ -24,6 +24,10 @@ describe('MobileService', () => {
       },
       notificationDelivery: {
         findMany: jest.fn(),
+        findFirst: jest.fn(),
+      },
+      notificationReadReceipt: {
+        upsert: jest.fn(),
       },
       homeworkAssignment: {
         findMany: jest.fn(),
@@ -231,6 +235,50 @@ describe('MobileService', () => {
         isRead: true,
       }),
     ]);
+  });
+
+  it('marks only parent-visible mobile notifications as read', async () => {
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    prisma.notificationDelivery.findFirst.mockResolvedValue({
+      id: 'delivery-1',
+    });
+    prisma.notificationReadReceipt.upsert.mockResolvedValue({
+      notificationDeliveryId: 'delivery-1',
+    });
+
+    await expect(
+      service.markNotificationRead('delivery-1', actor),
+    ).resolves.toEqual({ success: true });
+
+    expect(prisma.notificationDelivery.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'delivery-1',
+        tenantId: 'tenant-1',
+        OR: [
+          { recipientUserId: 'parent-1' },
+          { studentId: { in: ['student-1'] } },
+        ],
+      },
+      select: { id: true },
+    });
+    expect(prisma.notificationReadReceipt.upsert).toHaveBeenCalledWith({
+      where: {
+        tenantId_notificationDeliveryId_userId: {
+          tenantId: 'tenant-1',
+          notificationDeliveryId: 'delivery-1',
+          userId: 'parent-1',
+        },
+      },
+      create: {
+        tenantId: 'tenant-1',
+        notificationDeliveryId: 'delivery-1',
+        userId: 'parent-1',
+      },
+      update: { readAt: expect.any(Date) },
+    });
   });
 
   it('returns homework scoped to the linked child class and section', async () => {

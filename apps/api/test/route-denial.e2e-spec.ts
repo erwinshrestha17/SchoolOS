@@ -8,10 +8,14 @@ import { RolesPermissionsGuard } from '../src/auth/guards/roles-permissions.guar
 import { EntitlementGuard } from '../src/auth/guards/entitlement.guard';
 import { AccountingReportsController } from '../src/accounting/accounting-reports.controller';
 import { AdmissionsController } from '../src/admissions/admissions.controller';
+import { CanteenController } from '../src/canteen/canteen.controller';
+import { HomeworkController } from '../src/homework/homework.controller';
+import { LibraryController } from '../src/library/library.controller';
 import { MobileController } from '../src/mobile/mobile.controller';
 import { PlatformGuard } from '../src/auth/guards/platform.guard';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.service';
+import { TransportController } from '../src/transport/transport.controller';
 import { AuthContext } from '../src/auth/auth.types';
 import { FEATURE_KEYS } from '@schoolos/core';
 import {
@@ -305,6 +309,92 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
       FEATURE_KEYS.MOBILE_PARENT_BASIC,
     );
   });
+
+  it.each([
+    {
+      label: 'library',
+      featureKey: 'module.library',
+      controller: LibraryController,
+      handler: LibraryController.prototype.listBooks,
+      permissions: ['library:books:read'],
+    },
+    {
+      label: 'transport',
+      featureKey: 'module.transport',
+      controller: TransportController,
+      handler: TransportController.prototype.listRoutes,
+      permissions: ['transport:routes:read'],
+    },
+    {
+      label: 'canteen',
+      featureKey: 'module.canteen',
+      controller: CanteenController,
+      handler: CanteenController.prototype.listMenuItems,
+      permissions: ['canteen:menu:read'],
+    },
+    {
+      label: 'homework',
+      featureKey: 'module.homework',
+      controller: HomeworkController,
+      handler: HomeworkController.prototype.listHomework,
+      permissions: ['homework:read'],
+    },
+  ])(
+    'denies $label school APIs when the module is not entitled even with RBAC permissions',
+    async ({ label, featureKey, controller, handler, permissions }) => {
+      const tenantId = `tenant-no-${label}`;
+      prisma.__state.tenants.push({
+        id: tenantId,
+        slug: `no-${label}`,
+        name: `No ${label} School`,
+        isActive: true,
+        plan: `without-${label}`,
+      });
+
+      const planId = `plan-without-${label}`;
+      prisma.__state.platformPlans.push({
+        id: planId,
+        key: `without-${label}`,
+        name: `Without ${label} Plan`,
+      });
+      prisma.__state.platformPlanFeatures.push({
+        id: `feature-students-without-${label}`,
+        planId,
+        featureKey: 'module.students',
+        enabled: true,
+      });
+      prisma.__state.tenantSubscriptions.push({
+        id: `sub-without-${label}`,
+        tenantId,
+        planId,
+        status: 'ACTIVE',
+        createdAt: new Date(),
+      });
+
+      const actor: AuthContext = {
+        userId: `${label}-admin`,
+        tenantId,
+        tenantSlug: `no-${label}`,
+        email: `${label}@school.com`,
+        roles: ['admin'],
+        permissions,
+        authMethod: 'PASSWORD' as any,
+      };
+
+      const request = { auth: actor } as unknown as AuthenticatedRequest;
+      const context = {
+        switchToHttp: () => ({
+          getRequest: () => request,
+        }),
+        getHandler: () => handler,
+        getClass: () => controller,
+      } as unknown as ExecutionContext;
+
+      await expect(entitlementGuard.canActivate(context)).rejects.toThrow(
+        featureKey,
+      );
+    },
+  );
 
   it('denies student creation if students.count limit is reached', async () => {
     // 1. Setup a tenant with a plan that HAS module.students but a limit of 1

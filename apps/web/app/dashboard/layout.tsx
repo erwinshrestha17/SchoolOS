@@ -3,7 +3,7 @@
 import type { PermissionKey } from '@schoolos/core';
 import { ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from '../../components/session-provider';
 import { useEntitlements } from '../../components/entitlements-provider';
 import { DashboardShell } from '../../components/layout/dashboard-shell';
@@ -190,7 +190,8 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { session, status } = useSession();
+  const { session, status, refreshSession } = useSession();
+  const [showSlowSessionHelp, setShowSlowSessionHelp] = useState(false);
   const { entitlements, hasModule, loading: entitlementsLoading } = useEntitlements();
 
   useEffect(() => {
@@ -200,6 +201,19 @@ export default function DashboardLayout({
       );
     }
   }, [pathname, router, status]);
+
+  useEffect(() => {
+    if (status !== 'loading') {
+      setShowSlowSessionHelp(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShowSlowSessionHelp(true);
+    }, 4000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [status]);
 
   if (status === 'loading') {
     return (
@@ -220,6 +234,37 @@ export default function DashboardLayout({
           <p className="mt-5 text-sm text-gray-500">
             Validating your SchoolOS session and loading permissions...
           </p>
+          {showSlowSessionHelp && (
+            <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-amber-950">
+                Session check is taking longer than usual
+              </p>
+              <p className="mt-1 text-sm leading-6 text-amber-800">
+                Retry cookie validation, or return to sign in if this browser
+                session has expired.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="rounded-lg bg-amber-900 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-800"
+                  onClick={() => void refreshSession()}
+                >
+                  Retry session
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-100"
+                  onClick={() =>
+                    router.replace(
+                      `/login?next=${encodeURIComponent(pathname || '/dashboard')}`,
+                    )
+                  }
+                >
+                  Sign in again
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );

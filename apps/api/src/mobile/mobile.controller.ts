@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Param,
+  Post,
   Query,
   StreamableFile,
   UseGuards,
@@ -36,6 +37,14 @@ export class MobileController {
   @Get('me/notifications')
   listNotifications(@CurrentAuth() auth: AuthContext) {
     return this.mobileService.listNotifications(auth);
+  }
+
+  @Post('me/notifications/:id/read')
+  markNotificationRead(
+    @Param('id') notificationId: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    return this.mobileService.markNotificationRead(notificationId, auth);
   }
 
   @Get('students/:id/profile')

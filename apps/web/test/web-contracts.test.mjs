@@ -220,6 +220,16 @@ describe('SchoolOS web production contracts', () => {
     }
   });
 
+  it('offers slow session recovery in the dashboard layout', () => {
+    const layout = read('app/dashboard/layout.tsx');
+
+    assert.match(layout, /showSlowSessionHelp/);
+    assert.match(layout, /setTimeout\(\(\) =>/);
+    assert.match(layout, /Retry session/);
+    assert.match(layout, /void refreshSession\(\)/);
+    assert.match(layout, /Sign in again/);
+  });
+
   it('uses authenticated session metadata and real shell APIs in the header', () => {
     const header = read('components/layout/header.tsx');
 

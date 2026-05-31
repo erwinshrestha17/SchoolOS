@@ -7,6 +7,7 @@ class AttendanceSummary {
     required this.studentId,
     required this.studentName,
     required this.todayStatus,
+    this.todayLabel,
     required this.presentCount,
     required this.absentCount,
     required this.lateCount,
@@ -17,6 +18,7 @@ class AttendanceSummary {
   final String studentId;
   final String studentName;
   final AttendanceStatus todayStatus;
+  final String? todayLabel;
   final int presentCount;
   final int absentCount;
   final int lateCount;
@@ -29,6 +31,13 @@ class AttendanceDay {
 
   final DateTime date;
   final AttendanceStatus status;
+}
+
+class AttendanceSnapshot {
+  const AttendanceSnapshot({required this.summary, required this.days});
+
+  final AttendanceSummary summary;
+  final List<AttendanceDay> days;
 }
 
 class TeacherClassSection {
