@@ -1,3 +1,8 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+
 import '../../../core/network/api_client.dart';
 import '../domain/parent_models.dart';
 
@@ -151,6 +156,39 @@ class ParentRepository {
     return ParentCanteenInfo.fromJson(data);
   }
 
+  Future<ParentReceiptPdfDownload> downloadReceiptPdf({
+    required String childId,
+    required ParentFeeReceipt receipt,
+  }) async {
+    final response = await _client.get<List<int>>(
+      '/mobile/students/$childId/receipts/${Uri.encodeComponent(receipt.receiptNumber)}.pdf',
+      options: Options(
+        responseType: ResponseType.bytes,
+        headers: {Headers.acceptHeader: 'application/pdf'},
+      ),
+    );
+    final bytes = response.data;
+    if (bytes == null || bytes.isEmpty) {
+      throw StateError('Receipt PDF was empty.');
+    }
+
+    final documentsDir = await getApplicationDocumentsDirectory();
+    final receiptDir = Directory('${documentsDir.path}/receipts');
+    if (!receiptDir.existsSync()) {
+      await receiptDir.create(recursive: true);
+    }
+
+    final fileName = '${_safeFileName(receipt.receiptNumber)}.pdf';
+    final file = File('${receiptDir.path}/$fileName');
+    await file.writeAsBytes(bytes, flush: true);
+
+    return ParentReceiptPdfDownload(
+      fileName: fileName,
+      filePath: file.path,
+      receipt: receipt,
+    );
+  }
+
   Future<ParentTeacherThreadPage> getParentTeacherThreads({
     String? childId,
   }) async {
@@ -207,4 +245,9 @@ class ParentRepository {
   Future<void> markParentTeacherThreadRead(String threadId) async {
     await _client.patch('/messaging/parent-teacher/threads/$threadId/read');
   }
+}
+
+String _safeFileName(String value) {
+  final sanitized = value.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '-');
+  return sanitized.isEmpty ? 'receipt' : sanitized;
 }

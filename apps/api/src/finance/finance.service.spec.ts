@@ -612,6 +612,46 @@ describe('finance production controls', () => {
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
   });
 
+  it('returns parent-scoped receipt PDFs only for the requested student', async () => {
+    const payment = buildPayment({
+      paidAt: new Date('2026-04-27T10:00:00.000Z'),
+      studentId: 'student-1',
+      student: {
+        id: 'student-1',
+        firstNameEn: 'Erwin',
+        lastNameEn: 'Shrestha',
+      },
+      invoice: buildInvoice({
+        invoiceNumber: 'INV-2026-00001',
+      }),
+    });
+    const receipt = {
+      receiptNumber: 'REC-2026-00001',
+      pdfUrl: '/api/v1/receipts/REC-2026-00001.pdf',
+      payment,
+    };
+    const { service } = buildService({
+      invoice: null,
+      feeHead: null,
+      receipt,
+    });
+
+    const pdf = await service.getReceiptPdfForStudent(
+      receipt.receiptNumber,
+      'student-1',
+      actor,
+    );
+
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+    await expect(
+      service.getReceiptPdfForStudent(
+        receipt.receiptNumber,
+        'student-other',
+        actor,
+      ),
+    ).rejects.toThrow('Receipt not found for this student');
+  });
+
   it('voids unpaid invoices with an audit trail', async () => {
     const invoice = buildInvoice({ payments: [] });
     const { service, prisma, auditService } = buildService({

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../app/design_system/app_radius.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/platform/file_share_service.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
@@ -65,7 +66,21 @@ class ParentFeesScreen extends ConsumerWidget {
                   )
                 else
                   for (final receipt in state.dashboard!.recentReceipts) ...[
-                    _ReceiptCard(receipt: receipt),
+                    _ReceiptCard(
+                      receipt: receipt,
+                      onDownload: () => _downloadReceipt(
+                        context,
+                        ref,
+                        state.dashboard!.child.id,
+                        receipt,
+                      ),
+                      onShare: () => _shareReceipt(
+                        context,
+                        ref,
+                        state.dashboard!.child.id,
+                        receipt,
+                      ),
+                    ),
                     const SizedBox(height: AppSpacing.md),
                   ],
               ],
@@ -74,6 +89,59 @@ class ParentFeesScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _downloadReceipt(
+    BuildContext context,
+    WidgetRef ref,
+    String childId,
+    ParentFeeReceipt receipt,
+  ) async {
+    try {
+      final download = await ref
+          .read(parentRepositoryProvider)
+          .downloadReceiptPdf(childId: childId, receipt: receipt);
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Saved ${download.fileName}')),
+      );
+    } catch (_) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not download receipt PDF.')),
+      );
+    }
+  }
+
+  Future<void> _shareReceipt(
+    BuildContext context,
+    WidgetRef ref,
+    String childId,
+    ParentFeeReceipt receipt,
+  ) async {
+    try {
+      final download = await ref
+          .read(parentRepositoryProvider)
+          .downloadReceiptPdf(childId: childId, receipt: receipt);
+      await const FileShareService().shareFile(
+        filePath: download.filePath,
+        mimeType: 'application/pdf',
+        subject: download.fileName,
+      );
+    } catch (_) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Receipt was saved, but sharing is unavailable.'),
+        ),
+      );
+    }
   }
 }
 
@@ -319,65 +387,98 @@ class _InvoiceCard extends StatelessWidget {
 }
 
 class _ReceiptCard extends StatelessWidget {
-  const _ReceiptCard({required this.receipt});
+  const _ReceiptCard({
+    required this.receipt,
+    required this.onDownload,
+    required this.onShare,
+  });
 
   final ParentFeeReceipt receipt;
+  final VoidCallback onDownload;
+  final VoidCallback onShare;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return AppCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.sm),
-            decoration: BoxDecoration(
-              color: AppColors.success.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-            ),
-            child: const Icon(Icons.verified_rounded, color: AppColors.success),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                ),
+                child: const Icon(
+                  Icons.verified_rounded,
+                  color: AppColors.success,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      receipt.receiptNumber,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      '${receipt.invoiceNumber} - ${_labelize(receipt.method)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.slate500,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      _date(receipt.issuedAt ?? receipt.paidAt) ??
+                          'Issued date pending',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.slate500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Text(
+                _money(receipt.amount),
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  receipt.receiptNumber,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onDownload,
+                  icon: const Icon(Icons.download_rounded, size: 18),
+                  label: const Text('Download'),
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  '${receipt.invoiceNumber} - ${_labelize(receipt.method)}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.slate500,
-                  ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: onShare,
+                  icon: const Icon(Icons.ios_share_rounded, size: 18),
+                  label: const Text('Share'),
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  _date(receipt.issuedAt ?? receipt.paidAt) ??
-                      'Issued date pending',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppColors.slate500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Text(
-            _money(receipt.amount),
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
+              ),
+            ],
           ),
         ],
       ),

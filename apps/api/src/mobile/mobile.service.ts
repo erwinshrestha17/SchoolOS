@@ -11,6 +11,7 @@ import {
 } from '../common/security/parent-scope';
 import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
+import { FinanceService } from '../finance/finance.service';
 
 interface MobileStudentRow extends Student {
   class: { id: string; name: string };
@@ -34,6 +35,7 @@ export class MobileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly attendanceService: AttendanceService,
+    private readonly financeService: FinanceService,
   ) {}
 
   async listMyStudents(actor: AuthContext) {
@@ -336,6 +338,19 @@ export class MobileService {
       recentInvoices: items.slice(0, 10),
       recentReceipts,
     };
+  }
+
+  async getStudentReceiptPdf(
+    studentId: string,
+    receiptNumber: string,
+    actor: AuthContext,
+  ) {
+    await this.assertStudentAccess(studentId, actor);
+    return this.financeService.getReceiptPdfForStudent(
+      receiptNumber,
+      studentId,
+      actor,
+    );
   }
 
   async getStudentActivityFeed(

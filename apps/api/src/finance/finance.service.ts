@@ -3970,6 +3970,25 @@ export class FinanceService {
 
   async getReceiptPdf(receiptNumber: string, actor: AuthContext) {
     assertFinancePermission(actor, 'receipts:read');
+    return this.getReceiptPdfInternal(receiptNumber, actor);
+  }
+
+  async getReceiptPdfForStudent(
+    receiptNumber: string,
+    studentId: string,
+    actor: AuthContext,
+  ) {
+    return this.getReceiptPdfInternal(receiptNumber, actor, {
+      studentId,
+      notFoundMessage: 'Receipt not found for this student',
+    });
+  }
+
+  private async getReceiptPdfInternal(
+    receiptNumber: string,
+    actor: AuthContext,
+    options: { studentId?: string; notFoundMessage?: string } = {},
+  ) {
     const receipt = await this.prisma.receipt.findFirst({
       where: {
         tenantId: actor.tenantId,
@@ -3999,8 +4018,19 @@ export class FinanceService {
       },
     });
 
-    if (!receipt) {
-      throw new NotFoundException('Receipt not found in this tenant');
+    if (
+      !receipt ||
+      (options.studentId && receipt.payment.studentId !== options.studentId)
+    ) {
+      if (options.studentId) {
+        throw new NotFoundException(
+          options.notFoundMessage ?? 'Receipt not found for this student',
+        );
+      }
+
+      if (!receipt) {
+        throw new NotFoundException('Receipt not found in this tenant');
+      }
     }
 
     const fileName = `Receipt_${receipt.receiptNumber}.pdf`;

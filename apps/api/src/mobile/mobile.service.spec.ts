@@ -6,6 +6,7 @@ import { MobileService } from './mobile.service';
 describe('MobileService', () => {
   let prisma: any;
   let attendanceService: any;
+  let financeService: any;
   let service: MobileService;
   let actor: AuthContext;
 
@@ -31,7 +32,10 @@ describe('MobileService', () => {
     attendanceService = {
       getParentSummary: jest.fn(),
     };
-    service = new MobileService(prisma, attendanceService);
+    financeService = {
+      getReceiptPdfForStudent: jest.fn(),
+    };
+    service = new MobileService(prisma, attendanceService, financeService);
     actor = {
       userId: 'parent-1',
       tenantId: 'tenant-1',
@@ -294,5 +298,28 @@ describe('MobileService', () => {
         attachmentCount: 2,
       }),
     ]);
+  });
+
+  it('streams receipt PDFs only after linked-child access is verified', async () => {
+    const pdf = Buffer.from('%PDF parent receipt');
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    financeService.getReceiptPdfForStudent.mockResolvedValue(pdf);
+
+    const result = await service.getStudentReceiptPdf(
+      'student-1',
+      'REC-001',
+      actor,
+    );
+
+    expect(result).toBe(pdf);
+    expect(financeService.getReceiptPdfForStudent).toHaveBeenCalledWith(
+      'REC-001',
+      'student-1',
+      actor,
+    );
   });
 });

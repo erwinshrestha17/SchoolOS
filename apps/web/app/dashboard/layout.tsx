@@ -1,5 +1,6 @@
 'use client';
 
+import type { PermissionKey } from '@schoolos/core';
 import { ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -7,6 +8,143 @@ import { useSession } from '../../components/session-provider';
 import { useEntitlements } from '../../components/entitlements-provider';
 import { DashboardShell } from '../../components/layout/dashboard-shell';
 import { UpgradePrompt } from '../../components/layout/upgrade-prompt';
+import { PermissionDenied } from '../../components/ui/permission-denied';
+
+type RouteGate = {
+  prefix: string;
+  label: string;
+  permissions: PermissionKey[];
+};
+
+const dashboardRouteGates: RouteGate[] = [
+  {
+    prefix: '/dashboard/students',
+    label: 'Students',
+    permissions: ['students:read', 'students:create'],
+  },
+  {
+    prefix: '/dashboard/admissions',
+    label: 'Admissions',
+    permissions: ['students:read', 'students:create'],
+  },
+  {
+    prefix: '/dashboard/attendance',
+    label: 'Attendance',
+    permissions: ['attendance:read', 'attendance:mark'],
+  },
+  {
+    prefix: '/dashboard/academics',
+    label: 'Academics',
+    permissions: ['academics:read', 'academics:manage'],
+  },
+  {
+    prefix: '/dashboard/homework',
+    label: 'Homework',
+    permissions: ['homework:read'],
+  },
+  {
+    prefix: '/dashboard/timetable',
+    label: 'Timetable',
+    permissions: ['timetable:read'],
+  },
+  {
+    prefix: '/dashboard/fees',
+    label: 'Fees',
+    permissions: [
+      'fees:manage',
+      'fees:bill',
+      'payments:collect',
+      'receipts:read',
+    ],
+  },
+  {
+    prefix: '/dashboard/finance',
+    label: 'Finance',
+    permissions: [
+      'fees:manage',
+      'fees:bill',
+      'payments:collect',
+      'receipts:read',
+    ],
+  },
+  {
+    prefix: '/dashboard/activity',
+    label: 'Activity Feed',
+    permissions: ['activity_feed:read', 'activity_feed:create'],
+  },
+  {
+    prefix: '/dashboard/notices',
+    label: 'Notices',
+    permissions: ['notices:read', 'notices:create'],
+  },
+  {
+    prefix: '/dashboard/messages',
+    label: 'Messages',
+    permissions: ['notices:read', 'messaging:create'],
+  },
+  {
+    prefix: '/dashboard/messaging',
+    label: 'Messaging',
+    permissions: ['notices:read', 'messaging:create'],
+  },
+  {
+    prefix: '/dashboard/hr',
+    label: 'HR',
+    permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
+  },
+  {
+    prefix: '/dashboard/payroll',
+    label: 'Payroll',
+    permissions: ['payroll:read', 'payroll:manage'],
+  },
+  {
+    prefix: '/dashboard/accounting',
+    label: 'Accounting',
+    permissions: [
+      'accounting:read',
+      'accounting:accounts:read',
+      'accounting:reports:read',
+    ],
+  },
+  {
+    prefix: '/dashboard/library',
+    label: 'Library',
+    permissions: ['library:read', 'library:manage'],
+  },
+  {
+    prefix: '/dashboard/transport',
+    label: 'Transport',
+    permissions: [
+      'transport:read',
+      'transport:manage',
+      'transport:operate',
+    ],
+  },
+  {
+    prefix: '/dashboard/canteen',
+    label: 'Canteen',
+    permissions: [
+      'canteen:menu:read',
+      'canteen:plans:read',
+      'canteen:enrollments:read',
+    ],
+  },
+  {
+    prefix: '/dashboard/reports',
+    label: 'Reports',
+    permissions: ['accounting:reports:read', 'library:reports:read'],
+  },
+  {
+    prefix: '/dashboard/settings',
+    label: 'Settings',
+    permissions: [
+      'settings:read',
+      'roles:read',
+      'classes:read',
+      'academic_years:read',
+    ],
+  },
+];
 
 function getRequiredModuleForHref(href: string): string | null {
   if (href.startsWith('/dashboard/students')) return 'students';
@@ -25,6 +163,24 @@ function getRequiredModuleForHref(href: string): string | null {
   if (href.startsWith('/dashboard/activity')) return 'activity';
   if (href.startsWith('/dashboard/messages')) return 'notices';
   return null;
+}
+
+function getRouteGateForHref(href: string): RouteGate | null {
+  return (
+    dashboardRouteGates.find((gate) => href.startsWith(gate.prefix)) ?? null
+  );
+}
+
+function hasAnyPermission(
+  grantedPermissions: PermissionKey[],
+  requiredPermissions: PermissionKey[],
+) {
+  if (requiredPermissions.length === 0) {
+    return true;
+  }
+
+  const granted = new Set(grantedPermissions);
+  return requiredPermissions.some((permission) => granted.has(permission));
 }
 
 export default function DashboardLayout({
@@ -92,6 +248,23 @@ export default function DashboardLayout({
         <UpgradePrompt
           moduleName={requiredModule}
           currentTier={entitlements?.tier}
+        />
+      </DashboardShell>
+    );
+  }
+
+  const routeGate = getRouteGateForHref(pathname || '');
+  if (
+    routeGate &&
+    !hasAnyPermission(session.user.permissions, routeGate.permissions)
+  ) {
+    return (
+      <DashboardShell>
+        <PermissionDenied
+          title={`${routeGate.label} Access Restricted`}
+          description="Your current role cannot open this workspace. Ask a school administrator to add the required permission, or switch to an account with the correct access."
+          resource={routeGate.label}
+          action={routeGate.permissions.join(' or ')}
         />
       </DashboardShell>
     );

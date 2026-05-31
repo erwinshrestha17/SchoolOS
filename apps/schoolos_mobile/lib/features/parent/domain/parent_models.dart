@@ -233,6 +233,18 @@ class ParentFeeReceipt {
   }
 }
 
+class ParentReceiptPdfDownload {
+  const ParentReceiptPdfDownload({
+    required this.fileName,
+    required this.filePath,
+    required this.receipt,
+  });
+
+  final String fileName;
+  final String filePath;
+  final ParentFeeReceipt receipt;
+}
+
 class ParentHomeworkItem {
   const ParentHomeworkItem({
     required this.id,

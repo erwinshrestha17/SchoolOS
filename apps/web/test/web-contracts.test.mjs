@@ -189,6 +189,37 @@ describe('SchoolOS web production contracts', () => {
     assert.match(sidebar, /href: '\/dashboard\/library'[\s\S]*label: 'Library'/);
   });
 
+  it('guards direct dashboard module URLs with role permissions', () => {
+    const layout = read('app/dashboard/layout.tsx');
+    const requiredRoutes = [
+      '/dashboard/students',
+      '/dashboard/admissions',
+      '/dashboard/attendance',
+      '/dashboard/finance',
+      '/dashboard/activity',
+      '/dashboard/notices',
+      '/dashboard/academics',
+      '/dashboard/homework',
+      '/dashboard/timetable',
+      '/dashboard/hr',
+      '/dashboard/payroll',
+      '/dashboard/accounting',
+      '/dashboard/library',
+      '/dashboard/transport',
+      '/dashboard/canteen',
+      '/dashboard/settings',
+    ];
+
+    assert.match(layout, /const dashboardRouteGates/);
+    assert.match(layout, /getRouteGateForHref/);
+    assert.match(layout, /hasAnyPermission\(session\.user\.permissions/);
+    assert.match(layout, /<PermissionDenied/);
+
+    for (const route of requiredRoutes) {
+      assert.match(layout, new RegExp(`prefix: '${route.replaceAll('/', '\\/')}'`));
+    }
+  });
+
   it('uses authenticated session metadata and real shell APIs in the header', () => {
     const header = read('components/layout/header.tsx');
 

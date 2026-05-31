@@ -1,4 +1,11 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  StreamableFile,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -60,6 +67,24 @@ export class MobileController {
     return this.mobileService.getStudentFeesSummary(studentId, auth);
   }
 
+  @Get('students/:id/receipts/:receiptNumber.pdf')
+  async getStudentReceiptPdf(
+    @Param('id') studentId: string,
+    @Param('receiptNumber') receiptNumber: string,
+    @CurrentAuth() auth: AuthContext,
+  ) {
+    const pdf = await this.mobileService.getStudentReceiptPdf(
+      studentId,
+      receiptNumber,
+      auth,
+    );
+
+    return new StreamableFile(pdf, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${safePdfFileName(`${receiptNumber}.pdf`)}"`,
+    });
+  }
+
   @Get('students/:id/activity-feed')
   getStudentActivityFeed(
     @Param('id') studentId: string,
@@ -117,4 +142,8 @@ export class MobileController {
   ) {
     return this.mobileService.getStudentTransport(studentId, auth);
   }
+}
+
+function safePdfFileName(value: string) {
+  return value.replace(/[^a-zA-Z0-9._-]/g, '-');
 }
