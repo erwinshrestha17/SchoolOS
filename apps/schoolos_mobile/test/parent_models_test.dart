@@ -92,7 +92,10 @@ void main() {
       expect(summary.feesDue, 175.25);
       expect(summary.overdueFeesCount, 1);
       expect(summary.recentInvoices.single.invoiceNumber, 'INV-001');
-      expect(summary.recentInvoices.single.receipts.single.receiptNumber, 'REC-001');
+      expect(
+        summary.recentInvoices.single.receipts.single.receiptNumber,
+        'REC-001',
+      );
       expect(summary.recentReceipts.single.amount, 50);
       expect(summary.unreadNotices, 3);
       expect(summary.transportStatus, 'Boarded');

@@ -109,7 +109,8 @@ class _ParentChatContentState extends ConsumerState<_ParentChatContent> {
       error: (_, _) => AppErrorView(
         title: 'Could not load chat',
         message: 'Please try again in a moment.',
-        onRetry: () => ref.invalidate(parentTeacherThreadsProvider(widget.childId)),
+        onRetry: () =>
+            ref.invalidate(parentTeacherThreadsProvider(widget.childId)),
       ),
       data: (page) {
         if (page.items.isEmpty) {
@@ -163,7 +164,12 @@ class _ParentChatContentState extends ConsumerState<_ParentChatContent> {
               }),
               onOpenThread: _openThread,
             ),
-            Expanded(child: _MessagePane(thread: activeThread)),
+            Expanded(
+              child: _MessagePane(
+                thread: activeThread,
+                onMarkThreadRead: _markThreadRead,
+              ),
+            ),
             _Composer(
               controller: _messageController,
               disabled: activeThread.isClosed || _sending,
@@ -238,9 +244,9 @@ class _ParentChatContentState extends ConsumerState<_ParentChatContent> {
       if (!mounted || result.queuedNotice == null) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.queuedNotice!)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result.queuedNotice!)));
     } catch (_) {
       if (!mounted) {
         return;
@@ -257,6 +263,23 @@ class _ParentChatContentState extends ConsumerState<_ParentChatContent> {
         });
       }
     }
+  }
+
+  void _markThreadRead(String threadId) {
+    if (_markedReadThreadIds.contains(threadId)) {
+      return;
+    }
+
+    _markedReadThreadIds.add(threadId);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await ref
+            .read(parentRepositoryProvider)
+            .markParentTeacherThreadRead(threadId);
+      } catch (_) {
+        _markedReadThreadIds.remove(threadId);
+      }
+    });
   }
 }
 
@@ -316,9 +339,7 @@ class _ThreadStrip extends StatelessWidget {
                     : Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(AppRadius.xl),
                 border: Border.all(
-                  color: selected
-                      ? AppColors.parentAccent
-                      : AppColors.slate200,
+                  color: selected ? AppColors.parentAccent : AppColors.slate200,
                   width: selected ? 2 : 1,
                 ),
               ),
@@ -346,9 +367,9 @@ class _ThreadStrip extends StatelessWidget {
                         : '${thread.studentName} - ${thread.classSection}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.slate500,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: AppColors.slate500),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
@@ -368,9 +389,10 @@ class _ThreadStrip extends StatelessWidget {
 }
 
 class _MessagePane extends ConsumerWidget {
-  const _MessagePane({required this.thread});
+  const _MessagePane({required this.thread, required this.onMarkThreadRead});
 
   final ParentTeacherThread thread;
+  final ValueChanged<String> onMarkThreadRead;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -395,7 +417,7 @@ class _MessagePane extends ConsumerWidget {
         onRetry: () => ref.invalidate(parentTeacherMessagesProvider(thread.id)),
       ),
       data: (items) {
-        _markThreadRead(ref, thread.id);
+        onMarkThreadRead(thread.id);
 
         if (items.isEmpty) {
           return ListView(
@@ -435,20 +457,6 @@ class _MessagePane extends ConsumerWidget {
       },
     );
   }
-
-  void _markThreadRead(WidgetRef ref, String threadId) {
-    final state = ref.context.findAncestorStateOfType<_ParentChatContentState>();
-    if (state == null || state._markedReadThreadIds.contains(threadId)) {
-      return;
-    }
-
-    state._markedReadThreadIds.add(threadId);
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await ref.read(parentRepositoryProvider).markParentTeacherThreadRead(
-            threadId,
-          );
-    });
-  }
 }
 
 class _ChatIntroCard extends StatelessWidget {
@@ -467,7 +475,10 @@ class _ChatIntroCard extends StatelessWidget {
               color: AppColors.parentAccent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(AppRadius.lg),
             ),
-            child: const Icon(Icons.school_rounded, color: AppColors.parentAccent),
+            child: const Icon(
+              Icons.school_rounded,
+              color: AppColors.parentAccent,
+            ),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -476,16 +487,16 @@ class _ChatIntroCard extends StatelessWidget {
               children: [
                 Text(
                   thread.teacherName,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   thread.sla,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.slate500,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.slate500),
                 ),
               ],
             ),
@@ -642,7 +653,7 @@ class _ThreadStatusPill extends StatelessWidget {
         color: isClosed
             ? AppColors.slate200
             : AppColors.success.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadius.full),
+        borderRadius: BorderRadius.circular(AppRadius.max),
       ),
       child: Text(
         _labelize(status),

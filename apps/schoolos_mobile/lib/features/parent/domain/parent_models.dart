@@ -629,12 +629,16 @@ class ParentTeacherThread {
       status: json['status'] as String? ?? 'OPEN',
       studentId: json['studentId'] as String? ?? '',
       studentName:
-          _personName(student, firstKey: 'firstNameEn', lastKey: 'lastNameEn') ??
+          _personName(
+            student,
+            firstKey: 'firstNameEn',
+            lastKey: 'lastNameEn',
+          ) ??
           'Student',
-      classSection: [className, sectionName]
-          .whereType<String>()
-          .where((part) => part.isNotEmpty)
-          .join(' - '),
+      classSection: [
+        className,
+        sectionName,
+      ].whereType<String>().where((part) => part.isNotEmpty).join(' - '),
       teacherName:
           _personName(teacher, firstKey: 'firstName', lastKey: 'lastName') ??
           'Class teacher',

@@ -337,10 +337,7 @@ class _ReceiptCard extends StatelessWidget {
               color: AppColors.success.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(AppRadius.lg),
             ),
-            child: const Icon(
-              Icons.verified_rounded,
-              color: AppColors.success,
-            ),
+            child: const Icon(Icons.verified_rounded, color: AppColors.success),
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
@@ -366,7 +363,8 @@ class _ReceiptCard extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  _date(receipt.issuedAt ?? receipt.paidAt) ?? 'Issued date pending',
+                  _date(receipt.issuedAt ?? receipt.paidAt) ??
+                      'Issued date pending',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: AppColors.slate500,
                   ),
