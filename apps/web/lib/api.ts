@@ -11,6 +11,9 @@ export * from './api/communications';
 export * from './api/messaging';
 export * from './api/activity';
 export * from './api/platform';
+export * from './api/canteen';
+export * from './api/library';
+export * from './api/transport';
 
 import { authApi } from './api/auth';
 import { academicsApi } from './api/academics';
@@ -23,6 +26,9 @@ import { communicationsApi } from './api/communications';
 import { messagingApi } from './api/messaging';
 import { activityApi } from './api/activity';
 import { platformApi } from './api/platform';
+import { canteenApi } from './api/canteen';
+import { libraryApi } from './api/library';
+import { transportApi } from './api/transport';
 import { filesApi } from './api/client';
 
 export const api = {
@@ -37,5 +43,9 @@ export const api = {
   ...messagingApi,
   ...activityApi,
   ...platformApi,
+  ...canteenApi,
+  ...libraryApi,
+  ...transportApi,
   ...filesApi,
 };
+

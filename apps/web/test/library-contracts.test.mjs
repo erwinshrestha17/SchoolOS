@@ -34,7 +34,7 @@ describe('Phase 3B Library frontend contracts', () => {
   });
 
   it('adds Library API client methods for the Phase 3A backend endpoints', () => {
-    const libraryApi = read('lib/library-api.ts');
+    const libraryApi = read('lib/api/library.ts');
 
     for (const helper of [
       'listBooks',
@@ -75,7 +75,8 @@ describe('Phase 3B Library frontend contracts', () => {
     }
 
     assert.match(libraryApi, /encodeURIComponent\(fineId\).*post-to-fees/s);
-    assert.match(libraryApi, /credentials:\s*'include'/);
+    const clientApi = read('lib/api/client.ts');
+    assert.match(clientApi, /credentials:\s*'include'/);
     assert.match(libraryApi, /downloadCsv/);
     assert.doesNotMatch(libraryApi, /Authorization:\s*`Bearer/);
   });

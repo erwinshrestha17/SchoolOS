@@ -10,3 +10,7 @@ export * from './communications';
 export * from './messaging';
 export * from './activity';
 export * from './platform';
+export * from './canteen';
+export * from './library';
+export * from './transport';
+

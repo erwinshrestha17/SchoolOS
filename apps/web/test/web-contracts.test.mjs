@@ -1206,7 +1206,7 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('keeps canteen POS receipt preview and PDF reprint wired to real APIs', () => {
-    const canteenClient = read('lib/canteen-api.ts');
+    const canteenClient = read('lib/api/canteen.ts');
     const canteenWorkspace = read('components/canteen/canteen-workspace.tsx');
 
     assert.match(canteenClient, /getPosReceipt/);
@@ -1218,7 +1218,7 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('keeps canteen reports and CSV exports wired to backend report routes', () => {
-    const canteenClient = read('lib/canteen-api.ts');
+    const canteenClient = read('lib/api/canteen.ts');
     const canteenWorkspace = read('components/canteen/canteen-workspace.tsx');
 
     for (const helper of [
@@ -1316,7 +1316,7 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('keeps transport route operations and trip report exports backend-backed', () => {
-    const transportClient = read('lib/transport-api.ts');
+    const transportClient = read('lib/api/transport.ts');
     const transportWorkspace = read('components/transport/transport-workspace.tsx');
 
     for (const helper of [
@@ -1382,7 +1382,7 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('keeps canteen inventory and supplier surfaces wired to real APIs', () => {
-    const canteenClient = read('lib/canteen-api.ts');
+    const canteenClient = read('lib/api/canteen.ts');
     const canteenWorkspace = read('components/canteen/canteen-workspace.tsx');
 
     for (const helper of [
