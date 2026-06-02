@@ -1,22 +1,19 @@
 # SchoolOS Development Rules
 
-This file is the short operating rulebook for coding tasks. Full context lives in:
+This is the short operating rulebook for Codex and coding tasks.
+
+Read these docs for broader context:
 
 ```text
 docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
-```
-
-Also read the current audit before major backend/module work:
-
-```text
 docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
+docs/project/SCHOOLOS_REMAINING_IMPLEMENTATION_PLAN.md
+docs/project/SCHOOLOS_PLATFORM_AND_SETTINGS.md
+docs/project/SCHOOLOS_STORAGE_AND_FILE_REGISTRY.md
+docs/design/SCHOOLOS_UI_UX_GUIDE.md
 ```
 
-For gradual code-file modularization rules, read:
-
-```text
-docs/project/SCHOOLOS_CODE_FILE_MODULARIZATION_PLAN.md
-```
+Do not recreate separate `PROJECT_CONTEXT.md`, `ARCHITECTURE.md`, or code-file modularization docs. Their active rules are consolidated here.
 
 ---
 
@@ -27,47 +24,75 @@ Phase 0: Completed
 Phase 1A: Completed / Pilot-Ready
 Phase 1B: Completed / Pilot-Ready
 M0 Platform Core Foundation Depth: Completed
-Phase 2A M4 Academics backend: Completed / Contract-Protected
-Phase 2D M9 Accounting: Production Candidate Complete
-Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
+M4 Academics backend/admin UI: Completed / Pilot-Ready
+M6 Homework/Timetable: Completed / Pilot-Ready
+M7 HR/Payroll: Completed / Pilot-Ready
+M8A Library, M8B Transport, M8C Canteen: Admin/backend foundations implemented with hardening depth
+M9 Accounting: Completed / Pilot-Ready
+M10 Notices/Communication/Chat: Foundation plus provider/attachment/retry depth implemented
+M11 Intelligence/AI: Roadmap only
 ```
 
 The repo is broad and advanced. Work must focus on stabilization, correctness, scale, permissions, tests, UX/API polish for existing modules, and gradual code-file modularization of touched areas rather than broad new product expansion.
 
-Preferred next work:
+Recommended near-term direction:
 
 ```text
-Repo Verification & Stabilization Sprint
-→ full verification gate
-→ Homework/Timetable schema/service/test alignment
-→ Phase 2A Academics admin UI against completed backend APIs
-→ authenticated Playwright browser smoke tests
-→ controlled pilot staging readiness
-```
-
-Hardening priorities after stabilization:
-
-```text
-1. Phase 2A Academics frontend/admin UI and browser workflow contracts.
-2. M6 Homework/Timetable service/schema/test depth.
-3. M7 HR/Payroll deeper lifecycle/accounting tests.
-4. M8A Library reports/fines/service tests.
-5. M8B Transport parent/driver/live tracking boundaries later.
-6. M8C Canteen inventory/vendor/accounting later.
-7. M10 parent-teacher chat service tests and provider callback depth.
+Strict Phase Gate 0
+→ keep verification, migrations, seed data, smoke tests, and stale docs stable
+→ continue controlled pilot reliability across M0, M10, and Phase 1 core
+→ run staging browser/manual QA for Homework/Timetable, HR/Payroll, Library, Canteen, and Transport
+→ add remaining depth only where pilot evidence shows risk
 ```
 
 Explicitly deferred unless requested:
 
 ```text
 Angular migration
-Deep parent/mobile module expansion beyond the started Flutter companion app
-Driver live-trip workflow beyond the started mobile shell
-Live transport map/WebSocket UI
-Full canteen inventory/vendor workflows
 AI/ML implementation
+Deep parent/mobile expansion beyond the started Flutter companion app
+Driver live-trip workflow beyond the started mobile shell
+Live transport map/WebSocket/SSE UI
 Microservices
+Biometric workflows
 ```
+
+---
+
+## Architecture Rules
+
+- Keep SchoolOS as a **NestJS modular monolith first**.
+- Do not introduce microservices unless scale, team ownership, deployment isolation, or compliance isolation clearly justifies the cost and the owner explicitly requests it.
+- Keep PostgreSQL with Prisma.
+- Keep Redis with BullMQ for queues, background jobs, retries, scheduled operational tasks, heavy exports, PDF/report generation, and future real-time fanout where appropriate.
+- Keep the current Next.js dashboard in `apps/web`.
+- Keep the Flutter companion app in `apps/schoolos_mobile` as a standalone Flutter app outside pnpm workspaces.
+- Do not migrate to Angular yet.
+- Do not rename `tenantId` to `schoolId` without a deliberate migration.
+- Backend-first for data integrity.
+- UI must consume real APIs.
+- Mobile must consume existing SchoolOS APIs with bearer auth, secure refresh-token storage, tenant slug login, and readable mobile error mapping.
+
+---
+
+## Product Planes and Route Boundaries
+
+SchoolOS has three logical planes inside the same modular monolith:
+
+| Plane | Frontend | Backend | Purpose |
+|---|---|---|---|
+| Platform Control Plane | `/platform/*` | `/platform/*` | SchoolOS company/operator administration |
+| Tenant Configuration Plane | `/dashboard/settings/*` | `/settings/*` or `/tenant-settings/*` | One school's settings/configuration |
+| School Operations Plane | `/dashboard/*` | Module APIs such as `/students`, `/attendance`, `/finance`, `/notices`, `/academics`, `/homework`, `/timetable`, `/payroll`, `/accounting`, `/library`, `/transport`, `/canteen` | Daily school workflows |
+
+Rules:
+
+- Platform Control Plane manages SchoolOS SaaS/customer administration.
+- Tenant Configuration Plane manages one school's own settings.
+- School Operations Plane manages day-to-day school workflows.
+- Do not mix SchoolOS SaaS billing with school fee collection.
+- School users must not access `/platform/*` routes.
+- Platform support/tenant override must require an explicit reason and audit log.
 
 ---
 
@@ -76,38 +101,44 @@ Microservices
 - Prefer small, focused changes.
 - Do not rewrite unrelated files.
 - Do not change architecture without explicit instruction.
-- Do not start broad new Phase 3 or Phase 4 scope unless explicitly requested.
-- Treat existing Phase 3 Library/Transport/Canteen admin workspaces as foundations to polish and harden; mobile screens must use purpose-limited APIs and must not reuse admin-shaped data directly.
-- Do not start AI/ML features until reliable production data exists.
-- Use `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md` as the long-term source of truth.
-- Use `docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md` for current repo risk/completion estimates.
-- Use `docs/project/SCHOOLOS_CODE_FILE_MODULARIZATION_PLAN.md` before editing large services, controllers, dashboard workspaces, API clients, hooks, helpers, or future module files.
-- Keep legacy roadmap files as pointers/summaries unless explicitly asked to expand them.
-- After recent verification follow-ups, treat Homework/Timetable compile/schema/test stability as a high-priority gate before new module expansion.
-
----
-
-## Architecture Rules
-
-- Keep NestJS modular monolith.
-- Do not introduce microservices unless explicitly justified and requested.
-- Keep PostgreSQL with Prisma.
-- Keep Redis with BullMQ for queues and background jobs.
-- Keep current Next.js dashboard in `apps/web` for now.
-- Do not migrate to Angular yet.
-- Do not rename `tenantId` to `schoolId`.
-- Keep Platform Control Plane, Tenant Configuration Plane, and School Operations Plane separated by route, permission, and responsibility.
-- Code-file modularization is required as modules grow: split large files into focused files inside the same modular monolith.
-- Code-file modularization is not microservices, not route rewriting, not separate deployment, and not a reason to change public contracts.
+- Do not start broad new Phase 3, Phase 4, M11, mobile, or AI scope unless explicitly requested.
+- Treat Library/Transport/Canteen admin workspaces as foundations to polish and harden one vertical at a time.
+- Mobile screens must use purpose-limited APIs and must not reuse admin-shaped data directly.
+- Keep legacy roadmap/history in git history or consolidated docs; do not recreate duplicate planning files.
+- If a task touches docs, update the smallest active source of truth rather than adding another `.md` file.
 
 ---
 
 ## Code-File Modularization Rules
 
-- When touching a large file, check whether the current change should extract a focused service, component, hook, helper, or API client file.
+Code-file modularization is required as modules grow.
+
+It means:
+
+```text
+- Split huge services/components/controllers/helpers into focused files.
+- Keep the same application/module boundaries.
+- Keep the same public routes and API contracts.
+- Keep the same database behavior unless the feature itself requires a schema change.
+- Keep the same UI/UX unless the task explicitly asks for UX change.
+```
+
+It does **not** mean:
+
+```text
+- Creating microservices.
+- Splitting deployment units.
+- Moving modules into separate apps.
+- Rewriting working features from scratch.
+- Changing tenantId or product-plane boundaries.
+```
+
+When touching a large file:
+
+- Check whether the current change should extract a focused service, component, hook, helper, or API client file.
 - Modularize gradually in the touched area only unless the user explicitly asks for a wider cleanup.
 - Split by business/screen responsibility, not arbitrary line count alone.
-- Keep existing behavior, routes, API contracts, UI/UX, tenant boundaries, and database behavior stable during modularization.
+- Keep behavior, routes, contracts, UI/UX, tenant boundaries, database behavior, and tests stable.
 - It is acceptable to keep the old service/controller/component as a thin facade during a safe migration.
 - Do not create a massive repo-wide modularization PR unless explicitly requested.
 - Future modules after M10/M11 must start with focused files from day one.
@@ -143,7 +174,6 @@ utils/<module>-constants.ts
 
 ## Backend Rules
 
-- Backend-first for data integrity.
 - Controllers should stay thin.
 - Business rules belong in services/domain boundaries.
 - Validate all external input.
@@ -156,13 +186,13 @@ utils/<module>-constants.ts
 - Move slow/retryable/provider/report/PDF jobs to BullMQ where appropriate.
 - Do not bypass service boundaries by writing another module's internal tables directly.
 - Do not bypass `AccountingPostingService` for ledger writes.
+- File/media writes must go through `StorageService`/`FileRegistryService` boundaries.
 
 ---
 
 ## Frontend Rules
 
 - UI must consume real APIs.
-- `apps/schoolos_mobile` must consume the existing SchoolOS API with bearer auth, secure refresh-token storage, tenant slug login, and human-readable mobile error mapping.
 - Do not use fake production data for implemented workflows.
 - Preserve cookie-first browser auth.
 - Do not store raw access/refresh tokens in browser storage.
@@ -172,11 +202,7 @@ utils/<module>-constants.ts
 - Use server-side filtering/pagination; do not fetch all rows and filter in browser for growing datasets.
 - Large dashboard workspaces should become thin shells with tab files, hooks, smaller components, and pure utilities.
 - `apps/web/lib/api/client.ts` should remain the base HTTP client; domain-specific APIs belong in separate files.
-- Route boundaries must stay clear:
-  - `/platform/*` for SchoolOS operators.
-  - `/dashboard/settings/*` for school/tenant settings.
-  - `/dashboard/*` for school operations.
-- Phase 2A Academics admin UI must use the completed backend APIs and should be covered by browser smoke tests.
+- Follow `docs/design/SCHOOLOS_UI_UX_GUIDE.md` for visual/UI rules.
 
 ---
 
@@ -204,6 +230,17 @@ utils/<module>-constants.ts
 - Other modules must not directly write ledger rows; use `AccountingPostingService` or a clear accounting boundary.
 - Reports must come from backend ledger/report services, not frontend calculations.
 - Audit posting, approval, reversal, closing, reopening, bank reconciliation, and exports.
+
+---
+
+## File and Media Rules
+
+- Use private object storage for documents and media.
+- Store object keys and File Registry metadata, not permanent public URLs.
+- Serve downloads/previews through signed URLs or protected API access URLs.
+- Student documents, photos, activity media, homework attachments, receipts, report cards, payslips, and exports must remain tenant-scoped.
+- Modules must use `FileRegistryService` and `StorageService`, not provider SDKs directly.
+- Follow `docs/project/SCHOOLOS_STORAGE_AND_FILE_REGISTRY.md` for storage details.
 
 ---
 
@@ -249,8 +286,6 @@ pnpm build
 pnpm verify:production
 pnpm smoke:phase1
 ```
-
-For the immediate stabilization sprint, run the full gate before marking the repo healthy.
 
 ---
 
