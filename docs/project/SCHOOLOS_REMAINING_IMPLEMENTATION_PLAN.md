@@ -1,6 +1,6 @@
 # SchoolOS Remaining Implementation Plan
 
-**Last updated:** 2026-05-25
+**Last updated:** 2026-06-02
 
 **Status source:** `docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md` and `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md`
 
@@ -25,7 +25,7 @@ M8B Transport: Admin/trip/location foundation plus GPS pressure/cache/retention 
 M8C Canteen: Admin/wallet/POS/inventory foundation plus receipt/wallet-guard depth implemented
 M9 Accounting: Completed / Pilot-Ready
 M10 Communication/Chat: Foundation plus provider/attachment/retry depth implemented
-SchoolOS Flutter mobile app: Started in apps/schoolos_mobile with auth/API connection in progress
+SchoolOS Flutter mobile app: Started in apps/schoolos_mobile with auth/API connection, parent and teacher attendance, notification center read state, and staff self-service API/PDF wiring in progress
 M11 Intelligence/AI: Not started
 ```
 
@@ -86,7 +86,7 @@ Biometric workflows
 | M7 HR & Payroll | Completed / Pilot-Ready | 100% |
 | M8A Library Management | Admin/backend foundation plus controlled fine-to-fees posting, accounting-boundary tests, staff borrowers, and QR lookup implemented | 80-90% |
 | M8B Transport Management | Admin/trip/location foundation plus billing guard, GPS pressure guard, Redis cache/fanout tests, and cleanup bounds implemented | 75-85% |
-| M8C Canteen Management | Admin/wallet/POS/receipt/inventory foundation plus idempotency, negative-balance guards, supplier, stock, and accounting-source hardening implemented | 80-90% |
+| M8C Canteen Management | Admin/wallet/POS/receipt/inventory foundation plus idempotency, negative-balance guards, supplier, stock operation UI/tests, and accounting-source hardening implemented | 87-93% |
 | M9 Accounting & Finance | Completed / Pilot-Ready | 100% |
 | M10 Notices & Communication | Strong Phase 1 + chat foundation with provider modes, attachment access, and failure-dashboard API depth | 90-95% |
 | M11 School Intelligence / AI | Roadmap only | 0% |
@@ -193,16 +193,19 @@ Implemented:
 - Attendance daily and register routes.
 - M2 hardening slice: correction requests now persist previous status and reason-required review metadata, correction lists are paginated, teacher lock-window failures use the school-friendly correction message, parent/student attendance access checks correctly honor guardian-owned children, attendance register exports register generated artifacts through File Registry when available, and the web attendance form has tenant/user/class/date-scoped local draft recovery plus sync/conflict states.
 - Parent mobile attendance now uses the purpose-limited `/mobile/students/:id/attendance-summary` API with month-history data instead of admin-shaped attendance endpoints or hard-coded child fallbacks.
+- Teacher mobile attendance now uses purpose-limited `/mobile/teacher/attendance/classes`, `/mobile/teacher/attendance/roster`, and `/mobile/teacher/attendance/submit` APIs backed by existing teacher-scope attendance validation.
 
 Remaining backend:
 
 - Broader attendance report/export staging verification against real object storage.
 - More service-level permission tests for correction approval/rejection, guardian denial, and tenant isolation.
+- More mobile teacher attendance permission/tenant-isolation tests beyond the focused controller and repository contract coverage.
 
 Remaining frontend:
 
 - Correction request/admin review workspace polish.
 - Browser/manual QA for offline reload recovery and reconnect conflict choices.
+- Mobile teacher attendance device smoke with seeded teacher assignments.
 
 ### M3 - Fees & Receipts
 
@@ -314,6 +317,8 @@ Implemented:
 - Salary structures, payroll runs/lines, payslips.
 - Payroll-to-accounting posting and reversal foundations.
 - HR and payroll dashboard routes.
+- HR staff detail lifecycle Audit tab backed by `/hr/staff/:staffId/history`.
+- Flutter staff self-service profile, attendance, leave, payslip list, and payslip PDF download/share screens use real staff/attendance/payroll APIs.
 
 Remaining backend:
 
@@ -329,7 +334,8 @@ Remaining frontend:
 - [x] Staff self-service PDF payslip access.
 - [x] Payslip PDF and reversal action UI.
 - [x] Payroll reports UI uses real backend totals and no hard-coded payroll/ledger status figures.
-- [ ] Browser smoke execution in staging environment.
+- [x] Staff lifecycle audit log visibility in HR staff detail.
+- [ ] Browser/mobile smoke execution in staging environment.
 
 ### M8A - Library Management
 
@@ -393,20 +399,20 @@ Implemented:
 - Meal-plan enrollments create linked M3 invoices through `FinanceService`, post through the approved M9 `AccountingPostingService` boundary, and block overlapping duplicate active assignments.
 - QR resolve for canteen serving.
 - Suppliers, inventory items, purchase bills, stock movement, wastage, stock ledger.
+- Purchase bills have accounting-boundary and stock-movement tests; wastage and manual stock adjustments have negative-stock guard tests.
 - Daily meal count, item-wise sales, low-balance, student spending, stock ledger reports and CSV exports.
 - Canteen dashboard, menu, plans, enrollments, serving, wallets, POS, controls, reports routes.
-- Admin supplier and inventory item list/create surfaces now use real canteen APIs and show backend stock ledger visibility.
+- Admin supplier and inventory item list/create surfaces now use real canteen APIs, support purchase-bill/wastage/manual stock-adjustment operation posting, and show backend stock ledger visibility.
 
 Remaining backend:
 
 - Meal-plan cancellation/void collection rules after product decides how canteen enrollments should affect already-issued M3 dues.
 - Low-balance notification queue staging verification.
-- Inventory/vendor edge-case tests beyond purchase/wastage/negative-stock/idempotency coverage.
+- Additional inventory/vendor edge-case tests as staging data reveals supplier, batch, expiry, and adjustment-rule gaps.
 
 Remaining frontend:
 
 - QR/student ID scan speed polish beyond current admin POS/serving surfaces.
-- Purchase-bill, wastage, and manual stock-adjustment UI depth beyond current supplier/item list-create and stock-ledger surfaces.
 - Parent wallet/menu/spending views later.
 - Canteen report/export polish and deeper linked-invoice actions beyond the current enrollment invoice indicator and POS receipt preview/PDF actions.
 - Browser smoke execution in seeded staging.
@@ -447,6 +453,7 @@ Implemented:
 - Parent-teacher thread/message foundation, chat availability, escalation, abuse report foundations.
 - Communication retention-policy review API and communication-scoped audit trail API.
 - Notices/detail/messages/messaging routes.
+- Flutter notification center reads from `/mobile/me/notifications`, maps backend source families to mobile categories, and marks delivery read state through the mobile notification read endpoint.
 
 Remaining backend:
 
@@ -458,6 +465,7 @@ Remaining frontend:
 - Parent/mobile chat UI later.
 - Moderation/escalation UI depth.
 - Unread recipient list polish.
+- Mobile notification browser/device smoke in staging.
 
 ### M11 - School Intelligence and AI
 

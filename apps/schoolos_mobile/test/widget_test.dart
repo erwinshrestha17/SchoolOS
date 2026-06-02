@@ -70,10 +70,13 @@ void main() {
     );
 
     expect(find.text('SchoolOS Mobile'), findsOneWidget);
-    expect(find.text('Smarter school operations'), findsOneWidget);
+    expect(
+      find.text('Daily operations, parent engagement, staff self-service'),
+      findsOneWidget,
+    );
 
     // Settle splash screen transition timers and animations to prevent pending timers
-    await tester.pump(const Duration(milliseconds: 2000));
+    await tester.pump(const Duration(milliseconds: 3000));
     await tester.pumpAndSettle();
   });
 

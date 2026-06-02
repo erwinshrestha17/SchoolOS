@@ -5,7 +5,7 @@ This file records the latest web-admin UI/UX implementation progress so large ro
 ## Current UI Sprint
 
 ```text
-Current UI sprint: M5 activity media privacy hardening and parent activity feed foundation are implemented alongside M10 communication/provider/attachment depth and M6/M7/M8A/M8C/M8B backend/admin feature-depth hardening; next UI work is staging/browser QA plus targeted polish where pilot evidence shows risk.
+Current UI sprint: M5 activity media privacy hardening, parent activity feed foundation, M10 communication/provider/attachment depth, Flutter companion parent/staff/teacher API wiring, and Canteen inventory operation UI depth are implemented alongside M6/M7/M8A/M8C/M8B backend/admin feature-depth hardening; next UI work is staging/browser QA plus targeted polish where pilot evidence shows risk.
 ```
 
 Current repo reality:
@@ -16,6 +16,10 @@ Platform settings now has provider readiness detail and queue failed-job detail 
 M10 notice composition now supports File Registry attachments through real upload APIs, and the delivery retry panel consumes the backend failed-delivery dashboard.
 Dashboard protected routes now have direct URL permission-denied gating and slow-session retry/sign-in recovery.
 Flutter parent attendance now uses the purpose-limited mobile attendance API and selected-child state instead of admin-shaped attendance endpoints.
+Flutter teacher attendance now uses purpose-limited mobile teacher class, roster, and submit endpoints that reuse backend teacher-scope attendance validation.
+Flutter notifications now read from `/mobile/me/notifications`, mark notification deliveries read through the mobile read endpoint, and map backend source families into mobile categories.
+Flutter staff self-service now has backend-backed profile, attendance, leave, and payslip screens using `/staff/me`, `/attendance/me/*`, and `/payroll/me/payslips`, plus payslip PDF download/share through the backend payroll PDF endpoint.
+HR staff detail now has a backend-backed lifecycle Audit tab using `/hr/staff/:staffId/history`.
 Next UI work is browser/staging QA for delivery failures, retry/resend, QR/POS scan speed, transport stale-location clarity, and permission/error states.
 ```
 
@@ -27,15 +31,18 @@ Completed:
 
 - Notice composer now uploads a protected File Registry attachment and passes the attachment file id to the real notice API.
 - Delivery retry UI now reads backend failure dashboard data including retry count, retry status, last failure reason, and recipient summary.
+- Flutter notification center now consumes the purpose-limited mobile notification center and marks read state through the backend mobile endpoint.
+- Flutter teacher attendance now loads assigned classes/rosters and submits non-present exceptions through mobile teacher attendance APIs instead of returning an empty mobile roster.
 - M5 activity cards/detail views now show a consent-aware hidden-media state instead of exposing blocked private media.
 - M5 has a parent activity feed foundation backed by the real `/activity-feed/parent` API.
 - M6 homework/timetable backend role depth now fails closed for parent/student homework assignment and submission queries that are not linked to the requested student.
 - M7 payroll backend reports now expose explicit register, PF, TDS, and salary-component summaries instead of thin aliases.
+- Flutter staff self-service now shows synced staff attendance, leave requests, and payslips rather than static staff dashboard placeholders, including mobile payslip PDF download/share actions.
 - M8A Library admin depth now has tests for fine-to-fees/accounting boundary, staff borrowers, and purpose-limited QR lookup.
 - M8C Canteen backend/admin depth now exposes a POS receipt endpoint and prevents wallet reversals/corrections from making balances negative.
 - M8C Canteen meal-plan enrollment now creates linked M3 fee invoices through backend FinanceService/M9 posting boundaries, and the enrollments UI shows the linked invoice marker.
 - M8C POS now has backend-protected receipt preview and PDF reprint actions in the admin canteen workspace.
-- M8C inventory now uses real supplier, inventory item, and stock ledger APIs for admin list/create and visibility surfaces.
+- M8C inventory now uses real supplier, inventory item, purchase bill, wastage, manual stock-adjustment, and stock ledger APIs for admin list/create, operation posting, and visibility surfaces.
 - M8B Transport backend/admin depth now guards GPS ingestion pressure, verifies Redis latest-location/cache fanout, and bounds retention cleanup.
 
 Deferred:
@@ -330,6 +337,7 @@ Completed:
 - Salary structures UI.
 - Payslip management/download UI.
 - Payroll reports shell.
+- Staff detail lifecycle Audit tab.
 - HR and Payroll separated in sidebar.
 - 15+ HR/payroll API helpers added/updated.
 - Core `@schoolos/core` types used.
@@ -358,7 +366,7 @@ Completed:
 - [x] Platform webhook registry/history UI.
 - [x] Payroll PDF/payslip visual polish.
 - [x] Staff self-service `/dashboard/my-profile` finalization (PDF slips).
-- [ ] Staff lifecycle audit logs (Backend implemented; UI depth remains).
+- [x] Staff lifecycle audit logs in HR staff detail.
 - [x] Payroll posting boundary final wiring (payment/reversal actions remain outside the Phase 2 UI).
 - [ ] Trial Balance / Balance Sheet PDF export styling.
 - [x] Homework file attachments after File Registry.
@@ -366,7 +374,8 @@ Completed:
 - [x] Credential-gated Phase 4 Library/Canteen/Transport Playwright smoke coverage.
 - [ ] Library barcode/QR scan polish beyond current admin scan/report surfaces.
 - [ ] Transport live map only after admin real-time readiness is product-approved.
-- [ ] Canteen purchase-bill/wastage/manual-adjustment UI depth and POS/QR speed polish beyond current routes.
+- [x] Canteen purchase-bill/wastage/manual-adjustment UI depth beyond current supplier/item list-create and stock-ledger surfaces.
+- [ ] Canteen POS/QR speed polish beyond current routes.
 - [ ] Canteen meal-plan cancellation/void and collection-link UX after product rules are finalized.
 - Full mobile/PWA later.
 

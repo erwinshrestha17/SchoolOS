@@ -11,6 +11,7 @@ import { AdmissionsController } from '../src/admissions/admissions.controller';
 import { CanteenController } from '../src/canteen/canteen.controller';
 import { HomeworkController } from '../src/homework/homework.controller';
 import { LibraryController } from '../src/library/library.controller';
+import { MobileTeacherAttendanceController } from '../src/mobile/mobile-teacher-attendance.controller';
 import { MobileController } from '../src/mobile/mobile.controller';
 import { PlatformGuard } from '../src/auth/guards/platform.guard';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -311,6 +312,13 @@ describe('Route Denial (Entitlement Hardening) E2E', () => {
   });
 
   it.each([
+    {
+      label: 'attendance',
+      featureKey: 'module.attendance',
+      controller: MobileTeacherAttendanceController,
+      handler: MobileTeacherAttendanceController.prototype.listClasses,
+      permissions: ['attendance:read'],
+    },
     {
       label: 'library',
       featureKey: 'module.library',

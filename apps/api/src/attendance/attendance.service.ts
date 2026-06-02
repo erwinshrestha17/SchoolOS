@@ -68,6 +68,119 @@ export class AttendanceService {
     private readonly fileRegistryService?: FileRegistryService,
   ) {}
 
+  async listTeacherMobileClassSections(actor: AuthContext) {
+    const staff = await this.prisma.staff.findFirst({
+      where: { userId: actor.userId, tenantId: actor.tenantId },
+      select: { id: true },
+    });
+
+    if (!staff) {
+      return { items: [] };
+    }
+
+    const [assignments, classTeacherSections, currentAcademicYear] =
+      await Promise.all([
+        this.prisma.subjectTeacherAssignment.findMany({
+          where: { tenantId: actor.tenantId, staffId: staff.id },
+          include: {
+            academicYear: { select: { id: true, name: true } },
+            class: { select: { id: true, name: true } },
+            section: { select: { id: true, name: true } },
+            subject: { select: { name: true } },
+          },
+          orderBy: [{ class: { level: 'asc' } }, { createdAt: 'asc' }],
+        }),
+        this.prisma.section.findMany({
+          where: { tenantId: actor.tenantId, classTeacherId: staff.id },
+          include: {
+            class: { select: { id: true, name: true, level: true } },
+          },
+          orderBy: [{ class: { level: 'asc' } }, { name: 'asc' }],
+        }),
+        this.prisma.academicYear.findFirst({
+          where: { tenantId: actor.tenantId, isCurrent: true },
+          select: { id: true, name: true },
+        }),
+      ]);
+
+    const items = new Map<
+      string,
+      {
+        id: string;
+        academicYearId: string;
+        academicYearName: string;
+        classId: string;
+        sectionId: string | null;
+        name: string;
+        subjectNames: Set<string>;
+      }
+    >();
+
+    const addItem = (input: {
+      academicYearId: string;
+      academicYearName: string;
+      classId: string;
+      className: string;
+      sectionId: string | null;
+      sectionName?: string | null;
+      subjectName: string;
+    }) => {
+      const key = `${input.academicYearId}:${input.classId}:${input.sectionId ?? 'none'}`;
+      const existing = items.get(key);
+      if (existing) {
+        existing.subjectNames.add(input.subjectName);
+        return;
+      }
+
+      items.set(key, {
+        id: key,
+        academicYearId: input.academicYearId,
+        academicYearName: input.academicYearName,
+        classId: input.classId,
+        sectionId: input.sectionId,
+        name: input.sectionName
+          ? `${input.className} - ${input.sectionName}`
+          : input.className,
+        subjectNames: new Set([input.subjectName]),
+      });
+    };
+
+    assignments.forEach((assignment) => {
+      addItem({
+        academicYearId: assignment.academicYearId,
+        academicYearName: assignment.academicYear.name,
+        classId: assignment.classId,
+        className: assignment.class.name,
+        sectionId: assignment.sectionId ?? null,
+        sectionName: assignment.section?.name,
+        subjectName: assignment.subject.name,
+      });
+    });
+
+    if (currentAcademicYear) {
+      classTeacherSections.forEach((section) => {
+        addItem({
+          academicYearId: currentAcademicYear.id,
+          academicYearName: currentAcademicYear.name,
+          classId: section.classId,
+          className: section.class.name,
+          sectionId: section.id,
+          sectionName: section.name,
+          subjectName: 'Class teacher',
+        });
+      });
+    }
+
+    return {
+      items: Array.from(items.values())
+        .map(({ subjectNames, ...item }) => ({
+          ...item,
+          subject: Array.from(subjectNames).join(', '),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    };
+  }
+
   async listAttendance(actor: AuthContext) {
     const studentScope = await buildStudentScopeFilter(this.prisma, actor);
 

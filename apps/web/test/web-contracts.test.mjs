@@ -86,7 +86,7 @@ describe('SchoolOS web production contracts', () => {
 
   it('exposes client helpers for canonical Phase 1 and Phase 2 workflows', () => {
     const apiClient = read('lib/api.ts');
-    const requiredHelpers = ['checkAdmissionDuplicates', 'bulkImportAdmissions', 'openStudentDocumentPdf', 'getStudentProfile', 'getInvoiceDetail', 'getStudentFeeLedger', 'refundPayment', 'previewCashierClose', 'listCashierCloses', 'finalizeCashierClose', 'getAttendanceRoster', 'syncAttendance', 'reviewAttendanceConflict', 'sendDefaulterReminders', 'openReceiptPdf', 'listLedgerEntries', 'createActivityReaction', 'createDevelopmentalMilestone', 'getGuardianConsentStatus', 'createSubject', 'createExamTerm', 'enterMark', 'generateReportCard', 'createTimetableSlot', 'listTimetablePeriods', 'createTimetablePeriod', 'listRooms', 'createRoom', 'listTimetableVersions', 'createTimetableVersion', 'validateTimetableVersion', 'publishTimetableVersion', 'lockTimetableVersion', 'archiveTimetableVersion', 'listTeacherAvailability', 'createTeacherAvailability', 'listSubstitutions', 'createSubstitution', 'assignSubstitution', 'createHomework', 'assignHomework', 'closeHomework', 'previewHomeworkReminders', 'sendHomeworkReminders', 'listHomeworkAssignmentSubmissions', 'reviewHomeworkSubmissionById', 'requestHomeworkCorrection', 'reviewHomeworkSubmission', 'createStaffContract', 'createPayrollRun', 'postPayrollRun', 'getPayrollPreview', 'listAccountingReports', 'createConversation', 'createMessage', 'markMessageRead', 'listStaffAttendanceSummary', 'listLeaveRequests', 'approveLeaveRequest', 'rejectLeaveRequest', 'listStaffLeaveBalances', 'listPlatformTenants', 'getPlatformTenantDetail', 'updatePlatformTenantStatus', 'getTenantSettings', 'getPublicTenantSettings', 'updateTenantSetting'];
+    const requiredHelpers = ['checkAdmissionDuplicates', 'bulkImportAdmissions', 'openStudentDocumentPdf', 'getStudentProfile', 'getInvoiceDetail', 'getStudentFeeLedger', 'refundPayment', 'previewCashierClose', 'listCashierCloses', 'finalizeCashierClose', 'getAttendanceRoster', 'syncAttendance', 'reviewAttendanceConflict', 'sendDefaulterReminders', 'openReceiptPdf', 'listLedgerEntries', 'createActivityReaction', 'createDevelopmentalMilestone', 'getGuardianConsentStatus', 'createSubject', 'createExamTerm', 'enterMark', 'generateReportCard', 'createTimetableSlot', 'listTimetablePeriods', 'createTimetablePeriod', 'listRooms', 'createRoom', 'listTimetableVersions', 'createTimetableVersion', 'validateTimetableVersion', 'publishTimetableVersion', 'lockTimetableVersion', 'archiveTimetableVersion', 'listTeacherAvailability', 'createTeacherAvailability', 'listSubstitutions', 'createSubstitution', 'assignSubstitution', 'createHomework', 'assignHomework', 'closeHomework', 'previewHomeworkReminders', 'sendHomeworkReminders', 'listHomeworkAssignmentSubmissions', 'reviewHomeworkSubmissionById', 'requestHomeworkCorrection', 'reviewHomeworkSubmission', 'createStaffContract', 'createPayrollRun', 'postPayrollRun', 'getPayrollPreview', 'listAccountingReports', 'createConversation', 'createMessage', 'markMessageRead', 'listStaffHistory', 'listStaffAttendanceSummary', 'listLeaveRequests', 'approveLeaveRequest', 'rejectLeaveRequest', 'listStaffLeaveBalances', 'listPlatformTenants', 'getPlatformTenantDetail', 'updatePlatformTenantStatus', 'getTenantSettings', 'getPublicTenantSettings', 'updateTenantSetting'];
 
     for (const helper of requiredHelpers) {
       assert.match(apiClient, new RegExp(`${helper}:`), `Missing API helper: ${helper}`);
@@ -631,16 +631,19 @@ describe('SchoolOS web production contracts', () => {
     const canteenClient = read('lib/canteen-api.ts');
     const canteenWorkspace = read('components/canteen/canteen-workspace.tsx');
 
-    for (const helper of ['listSuppliers', 'createSupplier', 'listInventoryItems', 'createInventoryItem', 'getStockLedger']) {
+    for (const helper of ['listSuppliers', 'createSupplier', 'listInventoryItems', 'createInventoryItem', 'createPurchaseBill', 'recordWastage', 'adjustStock', 'getStockLedger']) {
       assert.match(canteenClient, new RegExp(`${helper}:`), `Missing canteen helper: ${helper}`);
     }
 
-    for (const endpoint of ['/canteen/suppliers', '/canteen/inventory-items', '/canteen/reports/stock-ledger']) {
+    for (const endpoint of ['/canteen/suppliers', '/canteen/inventory-items', '/canteen/purchase-bills', '/canteen/wastage', '/canteen/stock-adjustment', '/canteen/reports/stock-ledger']) {
       assert.match(canteenClient, new RegExp(endpoint.replaceAll('/', '\\/')));
     }
 
     assert.match(canteenWorkspace, /supplierMutation/);
     assert.match(canteenWorkspace, /inventoryItemMutation/);
+    assert.match(canteenWorkspace, /purchaseBillMutation/);
+    assert.match(canteenWorkspace, /wastageMutation/);
+    assert.match(canteenWorkspace, /stockAdjustmentMutation/);
     assert.match(canteenWorkspace, /Stock ledger/);
     assert.equal(existsSync(join(webRoot, 'app/dashboard/canteen/inventory/page.tsx')), true);
     assert.doesNotMatch(canteenWorkspace, /Inventory Later|Rice \(Premium\)|Cooking Oil/);
@@ -751,6 +754,7 @@ describe('SchoolOS web production contracts', () => {
     const contractList = read('components/hr/contract-list.tsx');
     const leaveList = read('components/hr/leave-request-list.tsx');
     const attendanceSummary = read('components/hr/staff-attendance-summary.tsx');
+    const staffDetail = read('components/hr/staff-detail-workspace.tsx');
     const page = read('app/dashboard/payroll/page.tsx');
 
     assert.match(sidebar, /label: 'HR \/ Staff'/);
@@ -778,6 +782,10 @@ describe('SchoolOS web production contracts', () => {
 
     assert.match(attendanceSummary, /api\.listStaffAttendanceSummary/);
     assert.match(attendanceSummary, /Present|Late|Absent|Leave/);
+
+    assert.match(staffDetail, /api\.listStaffHistory/);
+    assert.match(staffDetail, /Lifecycle Audit/);
+    assert.match(staffDetail, /staff-history/);
 
     const payrollPreview = read('components/hr/payroll-preview.tsx');
     assert.match(payrollPreview, /api\.getPayrollPreview/);

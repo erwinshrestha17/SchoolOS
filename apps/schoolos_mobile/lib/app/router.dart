@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/auth/auth_provider.dart';
+import '../core/auth/mobile_role.dart';
 import '../features/auth/presentation/forgot_password_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/dashboard/presentation/home_redirect_screen.dart';
@@ -31,6 +32,9 @@ import '../features/parent/presentation/screens/parent_transport_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/splash/splash_screen.dart';
+import '../features/staff/presentation/screens/staff_attendance_screen.dart';
+import '../features/staff/presentation/screens/staff_leave_screen.dart';
+import '../features/staff/presentation/screens/staff_payslips_screen.dart';
 import '../shared/widgets/app_empty_state.dart';
 import '../shared/widgets/app_scaffold.dart';
 import 'constants/app_routes.dart';
@@ -159,6 +163,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const StaffDashboard(),
       ),
       GoRoute(
+        path: AppRoutes.staffAttendance,
+        builder: (context, state) => const StaffAttendanceScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.staffLeave,
+        builder: (context, state) => const StaffLeaveScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.staffPayslips,
+        builder: (context, state) => const StaffPayslipsScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.adminHome,
         builder: (context, state) => const AdminDashboard(),
       ),
@@ -183,30 +199,31 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
         // Role-based route guard
         final location = state.matchedLocation;
-        final role = auth.role?.toUpperCase();
+        final role = MobileRole.normalize(
+          auth.role,
+          roles: auth.user?.roles ?? const [],
+        );
 
-        if (_isParentRoute(location) && role != 'PARENT') {
+        if (_isParentRoute(location) && role != MobileRole.parent) {
           return AppRoutes.home;
         }
         if ((location == AppRoutes.studentHome ||
                 location == AppRoutes.studentAttendance) &&
-            role != 'STUDENT') {
+            role != MobileRole.student) {
           return AppRoutes.home;
         }
         if ((location == AppRoutes.teacherHome ||
                 location == AppRoutes.teacherAttendance) &&
-            role != 'TEACHER') {
+            role != MobileRole.teacher) {
           return AppRoutes.home;
         }
-        if (location == AppRoutes.driverHome && role != 'DRIVER') {
+        if (location == AppRoutes.driverHome && role != MobileRole.driver) {
           return AppRoutes.home;
         }
-        if (location == AppRoutes.staffHome && role != 'STAFF') {
+        if (_isStaffRoute(location) && role != MobileRole.staff) {
           return AppRoutes.home;
         }
-        if (location == AppRoutes.adminHome &&
-            role != 'ADMIN' &&
-            role != 'PRINCIPAL') {
+        if (location == AppRoutes.adminHome && role != MobileRole.admin) {
           return AppRoutes.home;
         }
       }
@@ -235,6 +252,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     },
   );
 });
+
+bool _isStaffRoute(String location) {
+  return location == AppRoutes.staffHome ||
+      location == AppRoutes.staffAttendance ||
+      location == AppRoutes.staffLeave ||
+      location == AppRoutes.staffPayslips;
+}
 
 bool _isParentRoute(String location) {
   return location == AppRoutes.parentHome ||

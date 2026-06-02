@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/auth/auth_provider.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_gradient_card.dart';
 import '../../../../shared/widgets/dashboard_card.dart';
@@ -18,6 +19,10 @@ class AdminDashboard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authProvider).user;
+    final displayName = user?.name ?? 'Administrator';
+    final email = user?.email ?? 'admin@schoolos.com';
+
     return RoleShellScaffold(
       role: 'ADMIN',
       selectedIndex: 0,
@@ -27,27 +32,37 @@ class AdminDashboard extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Welcome Header
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Welcome, Principal',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Welcome, $displayName',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Monitoring & Approvals Space',
-                      style: TextStyle(color: AppColors.slate500, fontSize: 13),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        'Monitoring & approvals • $email',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.slate500,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                RoleBadge(role: 'ADMIN'),
+                const SizedBox(width: AppSpacing.sm),
+                const RoleBadge(role: 'ADMIN'),
               ],
             ),
             const SizedBox(height: AppSpacing.xl),
@@ -59,27 +74,27 @@ class AdminDashboard extends ConsumerWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              child: const Row(
+              child: Row(
                 children: [
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Dr. K.P. Shrestha',
-                          style: TextStyle(
+                          displayName,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        SizedBox(height: AppSpacing.xs),
-                        Text(
-                          'Principal • Main Campus',
+                        const SizedBox(height: AppSpacing.xs),
+                        const Text(
+                          'Administrative workspace',
                           style: TextStyle(color: Colors.white70, fontSize: 13),
                         ),
-                        SizedBox(height: AppSpacing.md),
-                        Text(
+                        const SizedBox(height: AppSpacing.md),
+                        const Text(
                           'Active Approvals: 3 Pending Review',
                           style: TextStyle(color: Colors.white60, fontSize: 11),
                         ),
@@ -87,7 +102,7 @@ class AdminDashboard extends ConsumerWidget {
                     ),
                   ),
                   UserAvatar(
-                    name: 'Dr. K.P. Shrestha',
+                    name: displayName,
                     radius: 36,
                     borderColor: Colors.white,
                     borderWidth: 2,

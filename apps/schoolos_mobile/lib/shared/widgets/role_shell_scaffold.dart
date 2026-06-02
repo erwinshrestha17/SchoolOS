@@ -247,24 +247,28 @@ class RoleShellScaffold extends StatelessWidget {
             route: AppRoutes.staffHome,
           ),
           _RoleNavItem(
+            label: 'Attend',
+            icon: Icons.fact_check_outlined,
+            selectedIcon: Icons.fact_check_rounded,
+            route: AppRoutes.staffAttendance,
+          ),
+          _RoleNavItem(
             label: 'Leave',
             icon: Icons.edit_calendar_outlined,
             selectedIcon: Icons.edit_calendar_rounded,
+            route: AppRoutes.staffLeave,
           ),
           _RoleNavItem(
             label: 'Payslip',
             icon: Icons.receipt_long_outlined,
             selectedIcon: Icons.receipt_long_rounded,
+            route: AppRoutes.staffPayslips,
           ),
           _RoleNavItem(
             label: 'Notices',
             icon: Icons.campaign_outlined,
             selectedIcon: Icons.campaign_rounded,
-          ),
-          _RoleNavItem(
-            label: 'More',
-            icon: Icons.grid_view_outlined,
-            selectedIcon: Icons.grid_view_rounded,
+            route: AppRoutes.notices,
           ),
         ];
       default:

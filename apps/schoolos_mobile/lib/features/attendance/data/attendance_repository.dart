@@ -25,7 +25,7 @@ class AttendanceRepository {
       summary: AttendanceSummary(
         studentId: studentId,
         studentName: 'Student',
-        todayStatus: _statusFromApi(today?['status'] as String?),
+        todayStatus: attendanceStatusFromApi(today?['status'] as String?),
         todayLabel: today?['label'] as String?,
         presentCount: _asInt(monthSummary?['present']),
         absentCount: _asInt(monthSummary?['absent']),
@@ -36,7 +36,7 @@ class AttendanceRepository {
       days: history.whereType<Map<String, dynamic>>().map((item) {
         return AttendanceDay(
           date: DateTime.tryParse(item['date'] as String? ?? '') ?? month,
-          status: _statusFromApi(item['status'] as String?),
+          status: attendanceStatusFromApi(item['status'] as String?),
         );
       }).toList(),
     );
@@ -58,25 +58,6 @@ class AttendanceRepository {
     return snapshot.days;
   }
 
-  AttendanceStatus _statusFromApi(String? status) {
-    switch (status) {
-      case 'ABSENT':
-        return AttendanceStatus.absent;
-      case 'LATE':
-        return AttendanceStatus.late;
-      case 'LEAVE':
-      case 'SICK_LEAVE':
-      case 'EXCUSED_LEAVE':
-      case 'UNEXCUSED_LEAVE':
-        return AttendanceStatus.leave;
-      case 'HOLIDAY':
-        return AttendanceStatus.holiday;
-      case 'PRESENT':
-      default:
-        return AttendanceStatus.present;
-    }
-  }
-
   Map<String, dynamic>? _asMap(Object? value) {
     return value is Map<String, dynamic> ? value : null;
   }
@@ -96,26 +77,57 @@ class AttendanceRepository {
   }
 
   Future<List<TeacherClassSection>> getTeacherAssignedClasses() async {
-    // Purpose-limited teacher class APIs are not exposed yet. Keep this empty
-    // instead of reusing admin-shaped class/timetable data in mobile.
-    return const [];
+    final response = await _client.get('/mobile/teacher/attendance/classes');
+    final data = response.data as Map<String, dynamic>;
+    return _asList(data['items'])
+        .whereType<Map<String, dynamic>>()
+        .map(TeacherClassSection.fromJson)
+        .toList();
   }
 
   Future<List<AttendanceStudentEntry>> getClassAttendanceSheet(
-    String classSectionId,
+    TeacherClassSection classSection,
     DateTime date,
   ) async {
-    // Purpose-limited teacher attendance sheet APIs are not exposed yet.
-    return const [];
+    final response = await _client.get(
+      '/mobile/teacher/attendance/roster',
+      queryParameters: {
+        'academicYearId': classSection.academicYearId,
+        'classId': classSection.classId,
+        if (classSection.sectionId != null) 'sectionId': classSection.sectionId,
+        'attendanceDate': _dateOnly(date),
+      },
+    );
+    final data = response.data as Map<String, dynamic>;
+    return _asList(data['students'])
+        .whereType<Map<String, dynamic>>()
+        .map(AttendanceStudentEntry.fromJson)
+        .toList();
   }
 
   Future<AttendanceSyncStatus> submitAttendance(
-    String classSectionId,
+    TeacherClassSection classSection,
     DateTime date,
     List<AttendanceStudentEntry> entries,
   ) async {
-    // Purpose-limited teacher attendance submission APIs are not exposed yet.
-    return AttendanceSyncStatus.failed;
+    await _client.post(
+      '/mobile/teacher/attendance/submit',
+      data: {
+        'academicYearId': classSection.academicYearId,
+        'classId': classSection.classId,
+        if (classSection.sectionId != null) 'sectionId': classSection.sectionId,
+        'attendanceDate': _dateOnly(date),
+        'exceptions': [
+          for (final entry in entries)
+            if (entry.status != AttendanceStatus.present)
+              {
+                'studentId': entry.studentId,
+                'status': _statusToApi(entry.status),
+              },
+        ],
+      },
+    );
+    return AttendanceSyncStatus.synced;
   }
 
   Future<void> saveDraftAttendanceLocally(
@@ -129,6 +141,28 @@ class AttendanceRepository {
     DateTime date,
   ) async {
     return const [];
+  }
+}
+
+String _dateOnly(DateTime value) {
+  final month = value.month.toString().padLeft(2, '0');
+  final day = value.day.toString().padLeft(2, '0');
+  return '${value.year}-$month-$day';
+}
+
+String _statusToApi(AttendanceStatus status) {
+  switch (status) {
+    case AttendanceStatus.absent:
+      return 'ABSENT';
+    case AttendanceStatus.late:
+      return 'LATE';
+    case AttendanceStatus.leave:
+      return 'EXCUSED_LEAVE';
+    case AttendanceStatus.festival:
+    case AttendanceStatus.holiday:
+      return 'HOLIDAY';
+    case AttendanceStatus.present:
+      return 'PRESENT';
   }
 }
 

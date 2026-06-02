@@ -17,7 +17,7 @@ import {
   Banknote
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { api } from '../../lib/api';
+import { api, type StaffLifecycleHistoryEvent } from '../../lib/api';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { cn } from '../../lib/utils';
 import { Badge } from '../ui/badge';
@@ -27,6 +27,10 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
   const staffQuery = useQuery({
     queryKey: ['staff-detail', staffId],
     queryFn: () => api.getStaffDetail(staffId),
+  });
+  const historyQuery = useQuery({
+    queryKey: ['staff-history', staffId],
+    queryFn: () => api.listStaffHistory(staffId),
   });
   const staff = staffQuery.data;
 
@@ -150,6 +154,10 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
             <Calculator size={14} />
             Payroll
           </TabsTrigger>
+          <TabsTrigger value="history" className="gap-2">
+            <History size={14} />
+            Audit
+          </TabsTrigger>
         </TabsList>
 
         <div className="grid lg:grid-cols-[1fr_360px] gap-8 items-start">
@@ -244,6 +252,10 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                 items={staff.payrollLines ?? []} 
                 icon={Calculator}
               />
+            </TabsContent>
+
+            <TabsContent value="history" className="m-0 outline-none">
+              <LifecycleHistoryPanel events={historyQuery.data ?? []} loading={historyQuery.isLoading} error={historyQuery.error} />
             </TabsContent>
           </div>
 
@@ -354,4 +366,70 @@ function HistoryTable({ title, items, icon: Icon }: { title: string; items: any[
       </div>
     </section>
   );
+}
+
+function LifecycleHistoryPanel({ events, loading, error }: { events: StaffLifecycleHistoryEvent[]; loading: boolean; error: Error | null }) {
+  return (
+    <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-6">
+      <h3 className="text-xl font-bold flex items-center gap-3">
+        <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center">
+          <History size={18} />
+        </div>
+        Lifecycle Audit
+      </h3>
+
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="h-20 animate-pulse rounded-2xl bg-slate-50" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-bold text-rose-700">{error.message}</div>
+      ) : events.length > 0 ? (
+        <div className="space-y-3">
+          {events.map((event) => {
+            const actorName = `${event.createdBy?.staff?.firstName ?? ''} ${event.createdBy?.staff?.lastName ?? ''}`.trim() || event.createdBy?.email || 'System';
+
+            return (
+              <div key={event.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <Badge variant="outline" className="font-bold text-[10px] uppercase tracking-widest">
+                      {formatLifecycleEvent(event.eventType)}
+                    </Badge>
+                    <p className="mt-2 text-sm font-bold text-slate-900">{event.reason || event.notes || 'Lifecycle record'}</p>
+                    <p className="mt-1 text-xs font-medium text-slate-500">{actorName}</p>
+                  </div>
+                  <span className="text-xs font-bold text-slate-400">{new Date(event.eventDate).toLocaleDateString()}</span>
+                </div>
+                {event.metadata ? <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-medium text-slate-500">{formatMetadata(event.metadata)}</p> : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="py-12 text-center">
+          <p className="text-sm text-slate-400 font-medium italic">No lifecycle audit records found.</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function formatLifecycleEvent(value: string) {
+  return value
+    .replaceAll('_', ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatMetadata(metadata: Record<string, unknown>) {
+  const entries = Object.entries(metadata).filter(([, value]) => value !== undefined && value !== null && value !== '');
+
+  if (entries.length === 0) {
+    return 'No metadata';
+  }
+
+  return entries.map(([key, value]) => `${formatLifecycleEvent(key)}: ${String(value)}`).join(' • ');
 }

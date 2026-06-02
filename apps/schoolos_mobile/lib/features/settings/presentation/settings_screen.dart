@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/constants/app_routes.dart';
 import '../../../app/design_system/app_spacing.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/connectivity_provider.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_scaffold.dart';
@@ -127,6 +128,36 @@ class SettingsScreen extends ConsumerWidget {
                   trailing: Switch(value: false, onChanged: (value) {}),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+
+          Text(
+            'Account',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: AppColors.slate500,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: ListTile(
+              leading: Icon(
+                Icons.logout_rounded,
+                color: isDark ? AppColors.danger : AppColors.dangerDark,
+              ),
+              title: const Text('Log out'),
+              subtitle: const Text('End this session and return to sign in'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              textColor: isDark ? AppColors.danger : AppColors.dangerDark,
+              iconColor: isDark ? AppColors.danger : AppColors.dangerDark,
+              onTap: () async {
+                await ref.read(authProvider.notifier).logout();
+                if (context.mounted) {
+                  context.go(AppRoutes.login);
+                }
+              },
             ),
           ),
         ],

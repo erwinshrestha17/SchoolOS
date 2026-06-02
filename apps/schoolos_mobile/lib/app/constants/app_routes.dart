@@ -29,6 +29,9 @@ class AppRoutes {
   static const teacherAttendance = '/teacher/attendance';
   static const driverHome = '/driver/home';
   static const staffHome = '/staff/home';
+  static const staffAttendance = '/staff/attendance';
+  static const staffLeave = '/staff/leave';
+  static const staffPayslips = '/staff/payslips';
   static const adminHome = '/admin/home';
 
   static String parentChildDetail(String id) => '/parent/child/$id';

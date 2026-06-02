@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:schoolos_mobile/core/auth/data/auth_repository.dart';
+import 'package:schoolos_mobile/core/auth/models/auth_user.dart';
 import 'package:schoolos_mobile/core/auth/models/login_request.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
 import 'package:schoolos_mobile/core/network/interceptors/token_refresh_interceptor.dart';
@@ -119,6 +120,41 @@ void main() {
       expect(result.id, 'user_id_123');
       expect(result.role, 'PARENT');
       expect(result.tenantId, 'tenant_123');
+    });
+
+    test('maps backend staff and teacher role names to mobile workspaces', () {
+      final staffUser = AuthUser.fromJson({
+        'userId': 'staff-1',
+        'email': 'accountant@schoolos.com',
+        'roles': ['accountant'],
+      });
+      final teacherUser = AuthUser.fromJson({
+        'userId': 'teacher-1',
+        'email': 'subjectteacher@schoolos.com',
+        'roles': ['subject_teacher'],
+      });
+      final principalUser = AuthUser.fromJson({
+        'userId': 'principal-1',
+        'email': 'principal@schoolos.com',
+        'roles': ['principal'],
+      });
+
+      expect(staffUser.role, 'STAFF');
+      expect(teacherUser.role, 'TEACHER');
+      expect(principalUser.role, 'ADMIN');
+    });
+
+    test('reads tenant metadata from nested auth profile responses', () {
+      final user = AuthUser.fromJson({
+        'userId': 'user-1',
+        'email': 'principal@schoolos.com',
+        'roles': ['principal'],
+        'tenant': {'id': 'tenant-1', 'slug': 'default-school'},
+      });
+
+      expect(user.role, 'ADMIN');
+      expect(user.tenantId, 'tenant-1');
+      expect(user.tenantSlug, 'default-school');
     });
 
     test('refreshToken returns TokenPair on successful HTTP request', () async {

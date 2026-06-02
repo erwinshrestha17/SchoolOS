@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../app/constants/app_routes.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/auth/auth_provider.dart';
+import '../../../staff/application/staff_providers.dart';
+import '../../../staff/domain/staff_models.dart';
 import '../../../../shared/widgets/app_gradient_card.dart';
 import '../../../../shared/widgets/dashboard_card.dart';
 import '../../../../shared/widgets/quick_action_card.dart';
@@ -48,6 +53,17 @@ class _StaffDashboardState extends ConsumerState<StaffDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(authProvider).user;
+    final profile = ref.watch(staffProfileProvider).valueOrNull;
+    final attendanceState = ref.watch(staffAttendanceProvider);
+    final leaveRequestsState = ref.watch(staffLeaveRequestsProvider);
+    final payslipsState = ref.watch(staffPayslipsProvider);
+    final displayName = profile?.name ?? user?.name ?? 'Staff Member';
+    final email = user?.email ?? 'staff@schoolos.com';
+    final todayStatus = _attendanceStatus(attendanceState);
+    final pendingLeaves = _pendingLeaveStatus(leaveRequestsState);
+    final latestPayslip = _latestPayslipStatus(payslipsState);
+
     return RoleShellScaffold(
       role: 'STAFF',
       selectedIndex: 0,
@@ -57,27 +73,37 @@ class _StaffDashboardState extends ConsumerState<StaffDashboard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Welcome Header
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Welcome, Hari',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Welcome, $displayName',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Staff Space • Account Section',
-                      style: TextStyle(color: AppColors.slate500, fontSize: 13),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        'Staff Space • $email',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.slate500,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                RoleBadge(role: 'STAFF'),
+                const SizedBox(width: AppSpacing.sm),
+                const RoleBadge(role: 'STAFF'),
               ],
             ),
             const SizedBox(height: AppSpacing.xl),
@@ -95,9 +121,9 @@ class _StaffDashboardState extends ConsumerState<StaffDashboard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Hari Prasad Devkota',
-                          style: TextStyle(
+                        Text(
+                          displayName,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
@@ -105,9 +131,25 @@ class _StaffDashboardState extends ConsumerState<StaffDashboard> {
                         ),
                         const SizedBox(height: AppSpacing.xs),
                         const Text(
-                          'Senior Accountant • School Office',
+                          'Staff services and self-service workspace',
                           style: TextStyle(color: Colors.white70, fontSize: 13),
                         ),
+                        if (profile?.designation != null ||
+                            profile?.department != null) ...[
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            [
+                              profile?.designation,
+                              profile?.department,
+                            ].whereType<String>().join(' • '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white60,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: AppSpacing.md),
                         ElevatedButton.icon(
                           onPressed: _toggleCheckIn,
@@ -138,7 +180,7 @@ class _StaffDashboardState extends ConsumerState<StaffDashboard> {
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   UserAvatar(
-                    name: 'Hari Prasad Devkota',
+                    name: displayName,
                     radius: 36,
                     borderColor: Colors.white,
                     borderWidth: 2,
@@ -154,27 +196,38 @@ class _StaffDashboardState extends ConsumerState<StaffDashboard> {
 
             DashboardCard(
               title: 'Today Check-In',
-              value: _isCheckedIn ? 'Checked In' : 'Not Checked In',
+              value: _isCheckedIn ? 'Checked In' : todayStatus,
               icon: Icons.check_circle_rounded,
-              iconColor: _isCheckedIn ? AppColors.success : AppColors.danger,
+              iconColor: _isCheckedIn ? AppColors.success : AppColors.warning,
               badge: StatusChip(
-                status: _isCheckedIn
+                status: _isCheckedIn || todayStatus == 'Present'
                     ? AppStatusType.approved
                     : AppStatusType.pending,
-                label: _isCheckedIn ? 'Active' : 'Due',
+                label: _isCheckedIn ? 'Active' : todayStatus,
               ),
               subtitle: _isCheckedIn
                   ? 'Checked in today at $_checkInTime'
-                  : 'Please check in when you arrive at school',
+                  : 'Latest synced attendance from SchoolOS backend',
             ),
             const SizedBox(height: AppSpacing.md),
 
             DashboardCard(
-              title: 'Available Leave',
-              value: '12 Days Remaining',
+              title: 'Leave Requests',
+              value: pendingLeaves,
               icon: Icons.date_range_rounded,
               iconColor: AppColors.staffAccent,
-              subtitle: 'Used 6/18 days of annual casual leave',
+              subtitle: 'Open your staff leave history and review status',
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            DashboardCard(
+              title: 'Latest Payslip',
+              value: latestPayslip,
+              icon: Icons.receipt_long_rounded,
+              iconColor: AppColors.success,
+              subtitle: payslipsState.hasError
+                  ? 'Payroll self-service is not available for this account'
+                  : 'Payslips are loaded from payroll self-service APIs',
             ),
             const SizedBox(height: AppSpacing.xl),
 
@@ -194,19 +247,19 @@ class _StaffDashboardState extends ConsumerState<StaffDashboard> {
                   title: 'Payslips',
                   icon: Icons.receipt_long_rounded,
                   color: AppColors.success,
-                  onTap: () {},
+                  onTap: () => context.go(AppRoutes.staffPayslips),
                 ),
                 QuickActionCard(
-                  title: 'Apply Leave',
+                  title: 'Leave',
                   icon: Icons.edit_calendar_rounded,
                   color: AppColors.warning,
-                  onTap: () {},
+                  onTap: () => context.go(AppRoutes.staffLeave),
                 ),
                 QuickActionCard(
-                  title: 'Approvals',
-                  icon: Icons.rate_review_rounded,
+                  title: 'Attendance',
+                  icon: Icons.fact_check_rounded,
                   color: AppColors.primary,
-                  onTap: () {},
+                  onTap: () => context.go(AppRoutes.staffAttendance),
                 ),
               ],
             ),
@@ -215,4 +268,61 @@ class _StaffDashboardState extends ConsumerState<StaffDashboard> {
       ),
     );
   }
+}
+
+String _label(String value) {
+  return value
+      .split('_')
+      .map(
+        (part) => part.isEmpty
+            ? part
+            : '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
+      )
+      .join(' ');
+}
+
+String _attendanceStatus(
+  AsyncValue<List<StaffAttendanceRecord>> attendanceState,
+) {
+  if (attendanceState.isLoading && !attendanceState.hasValue) {
+    return 'Loading';
+  }
+  if (attendanceState.hasError) {
+    return 'Unavailable';
+  }
+  final attendance = attendanceState.valueOrNull;
+  if (attendance == null || attendance.isEmpty) {
+    return 'Not Synced';
+  }
+  return _label(attendance.first.status);
+}
+
+String _pendingLeaveStatus(
+  AsyncValue<List<StaffLeaveRequest>> leaveRequestsState,
+) {
+  if (leaveRequestsState.isLoading && !leaveRequestsState.hasValue) {
+    return 'Loading';
+  }
+  if (leaveRequestsState.hasError) {
+    return 'Unavailable';
+  }
+  final leaveRequests = leaveRequestsState.valueOrNull ?? const [];
+  final pendingLeaves = leaveRequests
+      .where((request) => request.status.toUpperCase() == 'PENDING')
+      .length;
+  return '$pendingLeaves Pending';
+}
+
+String _latestPayslipStatus(AsyncValue<List<StaffPayslip>> payslipsState) {
+  if (payslipsState.isLoading && !payslipsState.hasValue) {
+    return 'Loading';
+  }
+  if (payslipsState.hasError) {
+    return 'Unavailable';
+  }
+  final payslips = payslipsState.valueOrNull;
+  if (payslips == null || payslips.isEmpty) {
+    return 'No payslip yet';
+  }
+  return payslips.first.periodLabel;
 }

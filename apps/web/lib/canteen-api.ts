@@ -326,6 +326,57 @@ export type CanteenInventoryItemPayload = {
   defaultSupplierId?: string;
 };
 
+export type CanteenPurchaseBillItemPayload = {
+  inventoryItemId: string;
+  quantity: number;
+  unitCost: number;
+  expiryDate?: string;
+  batchNumber?: string;
+};
+
+export type CanteenPurchaseBillPayload = {
+  supplierId: string;
+  billNumber: string;
+  billDate: string;
+  taxAmount?: number;
+  discountAmount?: number;
+  notes?: string;
+  items: CanteenPurchaseBillItemPayload[];
+};
+
+export type CanteenPurchaseBill = {
+  id: string;
+  tenantId?: string;
+  supplierId: string;
+  billNumber: string;
+  billDate: string;
+  totalAmount: string | number;
+  taxAmount: string | number;
+  discountAmount: string | number;
+  netAmount: string | number;
+  notes?: string | null;
+  items?: Array<
+    CanteenPurchaseBillItemPayload & {
+      id?: string;
+      lineTotal?: string | number;
+    }
+  >;
+};
+
+export type CanteenWastagePayload = {
+  inventoryItemId: string;
+  quantity: number;
+  reason: string;
+  wastageDate: string;
+  notes?: string;
+};
+
+export type CanteenStockAdjustmentPayload = {
+  inventoryItemId: string;
+  quantity: number;
+  reason: string;
+};
+
 export type DailyMealCountReport = {
   mealType: string;
   status: CanteenMealServingStatus;
@@ -532,6 +583,21 @@ export const canteenApi = {
   listInventoryItems: (params?: { category?: string | null; page?: number; limit?: number }) => request<CanteenPaginatedResult<CanteenInventoryItem>>(withQuery('/canteen/inventory-items', params ?? {})),
   createInventoryItem: (body: CanteenInventoryItemPayload) =>
     request<CanteenInventoryItem>('/canteen/inventory-items', {
+      method: 'POST',
+      json: body,
+    }),
+  createPurchaseBill: (body: CanteenPurchaseBillPayload) =>
+    request<CanteenPurchaseBill>('/canteen/purchase-bills', {
+      method: 'POST',
+      json: body,
+    }),
+  recordWastage: (body: CanteenWastagePayload) =>
+    request<unknown>('/canteen/wastage', {
+      method: 'POST',
+      json: body,
+    }),
+  adjustStock: (body: CanteenStockAdjustmentPayload) =>
+    request<CanteenStockLedgerRow>('/canteen/stock-adjustment', {
       method: 'POST',
       json: body,
     }),

@@ -1,3 +1,5 @@
+import '../mobile_role.dart';
+
 class AuthUser {
   const AuthUser({
     required this.id,
@@ -34,6 +36,9 @@ class AuthUser {
     final student = json['student'] is Map<String, dynamic>
         ? json['student'] as Map<String, dynamic>
         : null;
+    final tenant = json['tenant'] is Map<String, dynamic>
+        ? json['tenant'] as Map<String, dynamic>
+        : null;
     final email = json['email'] as String? ?? '';
     final firstName =
         json['firstName'] as String? ??
@@ -63,13 +68,15 @@ class AuthUser {
           ? emailName
           : 'SchoolOS User',
       email: email,
-      role:
-          json['role'] as String? ??
-          (roles.isNotEmpty ? roles.first.toUpperCase() : null) ??
-          'STUDENT',
-      tenantId: json['tenantId'] as String? ?? json['tenant_id'] as String?,
+      role: MobileRole.normalize(json['role'] as String?, roles: roles),
+      tenantId:
+          json['tenantId'] as String? ??
+          json['tenant_id'] as String? ??
+          tenant?['id'] as String?,
       tenantSlug:
-          json['tenantSlug'] as String? ?? json['tenant_slug'] as String?,
+          json['tenantSlug'] as String? ??
+          json['tenant_slug'] as String? ??
+          tenant?['slug'] as String?,
       roles: roles,
       permissions: permissions,
       avatarUrl: json['avatarUrl'] as String? ?? json['avatar_url'] as String?,

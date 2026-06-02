@@ -244,7 +244,7 @@ describe('CanteenService Phase 3C hardening', () => {
     const pdf = await service.getPosReceiptPdf('sale-1', actor);
 
     expect(Buffer.isBuffer(pdf)).toBe(true);
-    expect(pdf.slice(0, 5).toString()).toBe('%PDF-');
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'reprint_receipt',
@@ -278,6 +278,114 @@ describe('CanteenService Phase 3C hardening', () => {
     ).rejects.toThrow(ConflictException);
 
     expect(tx.canteenWallet.update).not.toHaveBeenCalled();
+  });
+
+  it('posts purchase bills through accounting and records stock movement', async () => {
+    const { service, tx, accountingPostingService } = buildService();
+
+    const result = await service.createPurchaseBill(
+      {
+        supplierId: 'supplier-1',
+        billNumber: 'PB-001',
+        billDate: '2026-05-10',
+        taxAmount: 10,
+        discountAmount: 5,
+        notes: 'restock',
+        items: [{ inventoryItemId: 'stock-1', quantity: 4, unitCost: 25 }],
+      },
+      actor,
+    );
+
+    expect(result).toEqual(expect.objectContaining({ id: 'purchase-1' }));
+    expect(accountingPostingService.postCanteenPurchase).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: actor.tenantId,
+        purchaseBillId: 'purchase-1',
+        supplierId: 'supplier-1',
+        amount: new Prisma.Decimal(100),
+        taxAmount: new Prisma.Decimal(10),
+        discountAmount: new Prisma.Decimal(5),
+        netAmount: new Prisma.Decimal(105),
+      }),
+      actor,
+      tx,
+    );
+    expect(tx.canteenInventoryItem.update).toHaveBeenCalledWith({
+      where: { id: 'stock-1' },
+      data: {
+        currentStock: { increment: new Prisma.Decimal(4) },
+        unitCost: new Prisma.Decimal(25),
+      },
+    });
+    expect(tx.canteenStockMovement.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: actor.tenantId,
+        inventoryItemId: 'stock-1',
+        type: 'IN',
+        quantity: new Prisma.Decimal(4),
+        balanceAfter: new Prisma.Decimal(14),
+        referenceType: 'PURCHASE',
+        referenceId: 'purchase-1',
+      }),
+    });
+  });
+
+  it('rejects purchase bills when the supplier is outside the active tenant scope', async () => {
+    const { service, tx, accountingPostingService } = buildService({
+      supplier: null,
+    });
+
+    await expect(
+      service.createPurchaseBill(
+        {
+          supplierId: 'supplier-cross-tenant',
+          billNumber: 'PB-002',
+          billDate: '2026-05-10',
+          items: [{ inventoryItemId: 'stock-1', quantity: 4, unitCost: 25 }],
+        },
+        actor,
+      ),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(tx.canteenPurchaseBill.create).not.toHaveBeenCalled();
+    expect(accountingPostingService.postCanteenPurchase).not.toHaveBeenCalled();
+  });
+
+  it('prevents wastage and manual stock adjustments from making stock negative', async () => {
+    const { service, tx } = buildService({
+      inventoryItem: {
+        id: 'stock-1',
+        tenantId: actor.tenantId,
+        currentStock: new Prisma.Decimal(2),
+        unitCost: new Prisma.Decimal(25),
+      },
+    });
+
+    await expect(
+      service.recordWastage(
+        {
+          inventoryItemId: 'stock-1',
+          quantity: 3,
+          reason: 'Expired',
+          wastageDate: '2026-05-12',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    await expect(
+      service.manualStockAdjustment(
+        {
+          inventoryItemId: 'stock-1',
+          quantity: -3,
+          reason: 'Audit correction',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(ConflictException);
+
+    expect(tx.canteenWastage.create).not.toHaveBeenCalled();
+    expect(tx.canteenStockMovement.create).not.toHaveBeenCalled();
   });
 
   it('prevents inactive menu items from being sold', async () => {
@@ -373,6 +481,8 @@ function buildService(
     posSale?: unknown;
     receiptSale?: unknown;
     duplicateEnrollment?: unknown;
+    supplier?: unknown;
+    inventoryItem?: unknown;
   } = {},
 ) {
   const student =
@@ -411,6 +521,32 @@ function buildService(
     paymentMethod: CanteenPaymentMethod.WALLET,
     status: CanteenPosSaleStatus.DRAFT,
     totalAmount: new Prisma.Decimal(100),
+  };
+  const supplier =
+    options.supplier === undefined
+      ? { id: 'supplier-1', tenantId: actor.tenantId, isActive: true }
+      : options.supplier;
+  const inventoryItem =
+    options.inventoryItem === undefined
+      ? {
+          id: 'stock-1',
+          tenantId: actor.tenantId,
+          currentStock: new Prisma.Decimal(10),
+          unitCost: new Prisma.Decimal(20),
+        }
+      : options.inventoryItem;
+  const purchaseBill = {
+    id: 'purchase-1',
+    tenantId: actor.tenantId,
+    supplierId: 'supplier-1',
+    billNumber: 'PB-001',
+    billDate: new Date('2026-05-10T00:00:00.000Z'),
+    totalAmount: new Prisma.Decimal(100),
+    taxAmount: new Prisma.Decimal(10),
+    discountAmount: new Prisma.Decimal(5),
+    netAmount: new Prisma.Decimal(105),
+    notes: 'restock',
+    items: [],
   };
 
   const tx = {
@@ -505,6 +641,28 @@ function buildService(
         medicalConditions: null,
       }),
     },
+    canteenSupplier: {
+      findFirst: jest.fn().mockResolvedValue(supplier),
+    },
+    canteenInventoryItem: {
+      findFirst: jest.fn().mockResolvedValue(inventoryItem),
+      findFirstOrThrow: jest.fn().mockResolvedValue(inventoryItem),
+      findUniqueOrThrow: jest.fn().mockResolvedValue(inventoryItem),
+      update: jest.fn().mockResolvedValue({
+        ...(inventoryItem as Record<string, unknown>),
+        currentStock: new Prisma.Decimal(14),
+      }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    canteenPurchaseBill: {
+      create: jest.fn().mockResolvedValue(purchaseBill),
+    },
+    canteenWastage: {
+      create: jest.fn().mockResolvedValue({ id: 'wastage-1' }),
+    },
+    canteenStockMovement: {
+      create: jest.fn().mockResolvedValue({ id: 'movement-1' }),
+    },
   };
 
   const prisma = {
@@ -543,6 +701,7 @@ function buildService(
     postCanteenTopUp: jest.fn().mockResolvedValue({ id: 'acc-topup' }),
     postCanteenSale: jest.fn().mockResolvedValue({ id: 'acc-sale' }),
     postCanteenReversal: jest.fn().mockResolvedValue({ id: 'acc-reversal' }),
+    postCanteenPurchase: jest.fn().mockResolvedValue({ id: 'acc-purchase' }),
   };
 
   const financeService = {

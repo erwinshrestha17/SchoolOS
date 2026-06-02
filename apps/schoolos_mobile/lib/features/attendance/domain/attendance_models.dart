@@ -43,13 +43,35 @@ class AttendanceSnapshot {
 class TeacherClassSection {
   const TeacherClassSection({
     required this.id,
+    required this.academicYearId,
+    required this.classId,
+    this.sectionId,
     required this.name,
     required this.subject,
   });
 
   final String id;
+  final String academicYearId;
+  final String classId;
+  final String? sectionId;
   final String name;
   final String subject;
+
+  factory TeacherClassSection.fromJson(Map<String, dynamic> json) {
+    final academicYearId = json['academicYearId'] as String? ?? '';
+    final classId = json['classId'] as String? ?? '';
+    final sectionId = json['sectionId'] as String?;
+    return TeacherClassSection(
+      id:
+          json['id'] as String? ??
+          '$academicYearId:$classId:${sectionId ?? 'none'}',
+      academicYearId: academicYearId,
+      classId: classId,
+      sectionId: sectionId,
+      name: json['name'] as String? ?? 'Class section',
+      subject: json['subject'] as String? ?? 'Attendance',
+    );
+  }
 }
 
 class AttendanceStudentEntry {
@@ -65,6 +87,19 @@ class AttendanceStudentEntry {
   final String rollNumber;
   final AttendanceStatus status;
 
+  factory AttendanceStudentEntry.fromJson(Map<String, dynamic> json) {
+    final rollNumber = json['rollNumber'];
+    return AttendanceStudentEntry(
+      studentId: json['studentId'] as String? ?? json['id'] as String? ?? '',
+      studentName:
+          json['studentName'] as String? ??
+          json['fullNameEn'] as String? ??
+          'Student',
+      rollNumber: rollNumber == null ? '-' : '$rollNumber',
+      status: attendanceStatusFromApi(json['status'] as String?),
+    );
+  }
+
   AttendanceStudentEntry copyWith({AttendanceStatus? status}) {
     return AttendanceStudentEntry(
       studentId: studentId,
@@ -72,5 +107,24 @@ class AttendanceStudentEntry {
       rollNumber: rollNumber,
       status: status ?? this.status,
     );
+  }
+}
+
+AttendanceStatus attendanceStatusFromApi(String? status) {
+  switch (status) {
+    case 'ABSENT':
+      return AttendanceStatus.absent;
+    case 'LATE':
+      return AttendanceStatus.late;
+    case 'LEAVE':
+    case 'SICK_LEAVE':
+    case 'EXCUSED_LEAVE':
+    case 'UNEXCUSED_LEAVE':
+      return AttendanceStatus.leave;
+    case 'HOLIDAY':
+      return AttendanceStatus.holiday;
+    case 'PRESENT':
+    default:
+      return AttendanceStatus.present;
   }
 }

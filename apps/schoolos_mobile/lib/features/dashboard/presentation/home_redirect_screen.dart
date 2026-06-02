@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/constants/app_routes.dart';
 import '../../../core/auth/auth_provider.dart';
+import '../../../core/auth/mobile_role.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_scaffold.dart';
 
@@ -31,25 +32,27 @@ class _HomeRedirectScreenState extends ConsumerState<HomeRedirectScreen> {
     if (auth.status == AuthStatus.unauthenticated) {
       context.go(AppRoutes.login);
     } else if (auth.status == AuthStatus.authenticated) {
-      final role = auth.role?.toUpperCase();
+      final role = MobileRole.normalize(
+        auth.role,
+        roles: auth.user?.roles ?? const [],
+      );
       switch (role) {
-        case 'PARENT':
+        case MobileRole.parent:
           context.go(AppRoutes.parentHome);
           break;
-        case 'STUDENT':
+        case MobileRole.student:
           context.go(AppRoutes.studentHome);
           break;
-        case 'TEACHER':
+        case MobileRole.teacher:
           context.go(AppRoutes.teacherHome);
           break;
-        case 'DRIVER':
+        case MobileRole.driver:
           context.go(AppRoutes.driverHome);
           break;
-        case 'STAFF':
+        case MobileRole.staff:
           context.go(AppRoutes.staffHome);
           break;
-        case 'ADMIN':
-        case 'PRINCIPAL':
+        case MobileRole.admin:
           context.go(AppRoutes.adminHome);
           break;
         default:

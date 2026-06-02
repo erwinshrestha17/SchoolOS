@@ -85,18 +85,30 @@ class NotificationItem {
 }
 
 NoticeCategory _categoryFromSource(String? sourceType) {
-  switch (sourceType) {
-    case 'homework':
-      return NoticeCategory.homework;
-    case 'fee':
-    case 'fees':
-      return NoticeCategory.fee;
-    case 'transport':
-      return NoticeCategory.transport;
-    case 'attendance':
-      return NoticeCategory.academic;
-    case 'notice':
-    default:
-      return NoticeCategory.important;
+  final source = (sourceType ?? '').trim().toLowerCase();
+  if (source.isEmpty || source == 'notice' || source == 'event') {
+    return NoticeCategory.important;
   }
+  if (source.contains('emergency')) {
+    return NoticeCategory.emergency;
+  }
+  if (source.startsWith('homework')) {
+    return NoticeCategory.homework;
+  }
+  if (source.startsWith('fee') || source.contains('payment')) {
+    return NoticeCategory.fee;
+  }
+  if (source.startsWith('transport') || source.contains('trip')) {
+    return NoticeCategory.transport;
+  }
+  if (source.startsWith('attendance') ||
+      source.contains('report_card') ||
+      source.contains('exam') ||
+      source.contains('timetable')) {
+    return NoticeCategory.academic;
+  }
+  if (source.contains('approval') || source.contains('consent')) {
+    return NoticeCategory.approval;
+  }
+  return NoticeCategory.important;
 }

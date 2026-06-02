@@ -49,11 +49,16 @@ class NotificationCenterScreen extends ConsumerWidget {
           }
 
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(notificationCenterProvider),
+            onRefresh: () async {
+              ref.invalidate(notificationCenterProvider);
+              await ref.read(notificationCenterProvider.future);
+            },
             child: ListView.separated(
               padding: const EdgeInsets.all(AppSpacing.lg),
-              itemBuilder: (context, index) =>
-                  _NotificationTile(item: items[index]),
+              itemBuilder: (context, index) => _NotificationTile(
+                item: items[index],
+                onTap: () => _markRead(context, ref, items[index]),
+              ),
               separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
               itemCount: items.length,
             ),
@@ -62,12 +67,35 @@ class NotificationCenterScreen extends ConsumerWidget {
       ),
     );
   }
+
+  Future<void> _markRead(
+    BuildContext context,
+    WidgetRef ref,
+    NotificationItem item,
+  ) async {
+    if (item.isRead) {
+      return;
+    }
+
+    try {
+      await ref.read(noticesRepositoryProvider).markNoticeRead(item.id);
+      ref.invalidate(notificationCenterProvider);
+    } catch (_) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not mark notification as read.')),
+      );
+    }
+  }
 }
 
 class _NotificationTile extends StatelessWidget {
-  const _NotificationTile({required this.item});
+  const _NotificationTile({required this.item, required this.onTap});
 
   final NotificationItem item;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -75,6 +103,7 @@ class _NotificationTile extends StatelessWidget {
 
     return AppCard(
       hasShadow: !item.isRead,
+      onTap: onTap,
       child: Row(
         children: [
           Container(

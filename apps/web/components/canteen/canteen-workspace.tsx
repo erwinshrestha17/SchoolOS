@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { AlertTriangle, Ban, Package, QrCode, Soup, Utensils, Wallet } from 'lucide-react';
 import type { StudentProfile } from '@schoolos/core';
 import { api } from '../../lib/api';
-import { canteenApi, type CanteenEnrollmentPayload, type CanteenInventoryItemPayload, type CanteenMealPlanPayload, type CanteenMealServingPayload, type CanteenMenuItemPayload, type CanteenPaymentMethod, type CanteenPosReceipt, type CanteenPosSalePayload, type CanteenSpendingControlPayload, type CanteenSupplierPayload, type CanteenTopUpPayload } from '../../lib/canteen-api';
+import { canteenApi, type CanteenEnrollmentPayload, type CanteenInventoryItemPayload, type CanteenMealPlanPayload, type CanteenMealServingPayload, type CanteenMenuItemPayload, type CanteenPaymentMethod, type CanteenPosReceipt, type CanteenPosSalePayload, type CanteenPurchaseBillPayload, type CanteenSpendingControlPayload, type CanteenStockAdjustmentPayload, type CanteenSupplierPayload, type CanteenTopUpPayload, type CanteenWastagePayload } from '../../lib/canteen-api';
 import { EmptyState } from '../ui/empty-state';
 import { LoadingState } from '../ui/loading-state';
 import { PageHeader } from '../ui/page-header';
@@ -103,6 +103,35 @@ const emptyInventoryItemForm: CanteenInventoryItemPayload = {
   unitCost: 0,
   defaultSupplierId: '',
 };
+const emptyPurchaseBillForm: CanteenPurchaseBillPayload = {
+  supplierId: '',
+  billNumber: '',
+  billDate: today,
+  taxAmount: 0,
+  discountAmount: 0,
+  notes: '',
+  items: [
+    {
+      inventoryItemId: '',
+      quantity: 1,
+      unitCost: 0,
+      expiryDate: '',
+      batchNumber: '',
+    },
+  ],
+};
+const emptyWastageForm: CanteenWastagePayload = {
+  inventoryItemId: '',
+  quantity: 1,
+  reason: '',
+  wastageDate: today,
+  notes: '',
+};
+const emptyStockAdjustmentForm: CanteenStockAdjustmentPayload = {
+  inventoryItemId: '',
+  quantity: 1,
+  reason: '',
+};
 
 const moneyFormatter = new Intl.NumberFormat('en-NP', {
   style: 'currency',
@@ -122,6 +151,9 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
   const [controlForm, setControlForm] = useState<CanteenSpendingControlPayload>(emptyControlForm);
   const [supplierForm, setSupplierForm] = useState<CanteenSupplierPayload>(emptySupplierForm);
   const [inventoryItemForm, setInventoryItemForm] = useState<CanteenInventoryItemPayload>(emptyInventoryItemForm);
+  const [purchaseBillForm, setPurchaseBillForm] = useState<CanteenPurchaseBillPayload>(emptyPurchaseBillForm);
+  const [wastageForm, setWastageForm] = useState<CanteenWastagePayload>(emptyWastageForm);
+  const [stockAdjustmentForm, setStockAdjustmentForm] = useState<CanteenStockAdjustmentPayload>(emptyStockAdjustmentForm);
   const [reportDate, setReportDate] = useState(today);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmingSaleId, setConfirmingSaleId] = useState<string | null>(null);
@@ -209,7 +241,9 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
       queryKey: ['canteen-wallet-transactions'],
     });
     void queryClient.invalidateQueries({ queryKey: ['canteen-suppliers'] });
-    void queryClient.invalidateQueries({ queryKey: ['canteen-inventory-items'] });
+    void queryClient.invalidateQueries({
+      queryKey: ['canteen-inventory-items'],
+    });
     void queryClient.invalidateQueries({ queryKey: ['canteen-stock-ledger'] });
   };
 
@@ -320,6 +354,30 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
     onSuccess: () => {
       setInventoryItemForm(emptyInventoryItemForm);
       setNotice('Inventory item saved.');
+      invalidateCanteen();
+    },
+  });
+  const purchaseBillMutation = useMutation({
+    mutationFn: canteenApi.createPurchaseBill,
+    onSuccess: (bill) => {
+      setPurchaseBillForm(emptyPurchaseBillForm);
+      setNotice(`Purchase bill ${bill.billNumber} posted.`);
+      invalidateCanteen();
+    },
+  });
+  const wastageMutation = useMutation({
+    mutationFn: canteenApi.recordWastage,
+    onSuccess: () => {
+      setWastageForm(emptyWastageForm);
+      setNotice('Wastage recorded.');
+      invalidateCanteen();
+    },
+  });
+  const stockAdjustmentMutation = useMutation({
+    mutationFn: canteenApi.adjustStock,
+    onSuccess: () => {
+      setStockAdjustmentForm(emptyStockAdjustmentForm);
+      setNotice('Stock adjustment recorded.');
       invalidateCanteen();
     },
   });
@@ -750,39 +808,239 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
 
       {activeTab === 'inventory' && (
         <TwoColumn>
-          <Panel title="Inventory status" description="Track stocked items, supplier linkage, reorder levels, and stock ledger activity.">
-            <InfoCard lines={['Inventory rows come from the backend supplier and inventory endpoints.', 'Purchase bills, wastage, and manual stock corrections remain backend-owned and are reflected in the stock ledger.', 'This screen only creates catalog and supplier records; financial posting stays outside the browser.']} />
-            {inventoryItemsQuery.isLoading ? <LoadingState label="Loading inventory..." /> : null}
-            <div className="mt-4 space-y-3">
-              {inventoryItems.map((item) => {
-                const supplier = suppliers.find((candidate) => candidate.id === item.defaultSupplierId);
-                const stockIsLow = Number(item.currentStock) <= Number(item.minStockLevel);
+          <div className="space-y-6">
+            <Panel title="Inventory status" description="Track stocked items, supplier linkage, reorder levels, and stock ledger activity.">
+              <InfoCard lines={['Inventory rows come from the backend supplier and inventory endpoints.', 'Purchase bills, wastage, and manual stock corrections remain backend-owned and are reflected in the stock ledger.', 'Financial posting for purchase bills stays behind the approved backend accounting boundary.']} />
+              {inventoryItemsQuery.isLoading ? <LoadingState label="Loading inventory..." /> : null}
+              <div className="mt-4 space-y-3">
+                {inventoryItems.map((item) => {
+                  const supplier = suppliers.find((candidate) => candidate.id === item.defaultSupplierId);
+                  const stockIsLow = Number(item.currentStock) <= Number(item.minStockLevel);
 
-                return (
-                  <RecordCard
-                    key={item.id}
-                    title={item.name}
-                    subtitle={`${item.sku ? `${item.sku} • ` : ''}${item.category} • Stock ${formatQuantity(item.currentStock, item.unit)} • Min ${formatQuantity(item.minStockLevel, item.unit)} • Cost ${money(item.unitCost)}${supplier ? ` • ${supplier.name}` : ''}`}
-                    badge={<StatusBadge status={stockIsLow ? 'LOW' : 'ACTIVE'} label={stockIsLow ? 'Low Stock' : 'In Stock'} tone={stockIsLow ? 'pending' : 'approved'} />}
-                  />
-                );
-              })}
-              {!inventoryItemsQuery.isLoading && inventoryItems.length === 0 ? <EmptyState title="No inventory items" description="Create the first stock item for purchase bills, wastage, and stock movement reports." /> : null}
-            </div>
-
-            <div className="mt-6">
-              <h3 className="text-sm font-black uppercase tracking-wide text-slate-500">Recent stock ledger</h3>
-              <div className="mt-3 space-y-2">
-                {stockLedgerQuery.isLoading ? <LoadingState label="Loading stock ledger..." /> : null}
-                {stockLedgerRows.slice(0, 5).map((row) => (
-                  <p key={row.id ?? `${row.inventoryItemId}-${row.movementDate}`} className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                    {row.inventoryItem?.name ?? row.inventoryItemId?.slice?.(0, 8) ?? 'Stock item'} • {row.type ?? 'MOVEMENT'} • {formatQuantity(row.quantity ?? 0, row.inventoryItem?.unit ?? '')} • balance {formatQuantity(row.balanceAfter ?? 0, row.inventoryItem?.unit ?? '')}
-                  </p>
-                ))}
-                {!stockLedgerQuery.isLoading && stockLedgerRows.length === 0 ? <EmptyState title="No stock movement" description="Purchase bills, wastage, and manual adjustments will appear here." /> : null}
+                  return <RecordCard key={item.id} title={item.name} subtitle={`${item.sku ? `${item.sku} • ` : ''}${item.category} • Stock ${formatQuantity(item.currentStock, item.unit)} • Min ${formatQuantity(item.minStockLevel, item.unit)} • Cost ${money(item.unitCost)}${supplier ? ` • ${supplier.name}` : ''}`} badge={<StatusBadge status={stockIsLow ? 'LOW' : 'ACTIVE'} label={stockIsLow ? 'Low Stock' : 'In Stock'} tone={stockIsLow ? 'pending' : 'approved'} />} />;
+                })}
+                {!inventoryItemsQuery.isLoading && inventoryItems.length === 0 ? <EmptyState title="No inventory items" description="Create the first stock item for purchase bills, wastage, and stock movement reports." /> : null}
               </div>
-            </div>
-          </Panel>
+
+              <div className="mt-6">
+                <h3 className="text-sm font-black uppercase tracking-wide text-slate-500">Recent stock ledger</h3>
+                <div className="mt-3 space-y-2">
+                  {stockLedgerQuery.isLoading ? <LoadingState label="Loading stock ledger..." /> : null}
+                  {stockLedgerRows.slice(0, 5).map((row) => (
+                    <p key={row.id ?? `${row.inventoryItemId}-${row.movementDate}`} className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                      {row.inventoryItem?.name ?? row.inventoryItemId?.slice?.(0, 8) ?? 'Stock item'} • {row.type ?? 'MOVEMENT'} • {formatQuantity(row.quantity ?? 0, row.inventoryItem?.unit ?? '')} • balance {formatQuantity(row.balanceAfter ?? 0, row.inventoryItem?.unit ?? '')}
+                    </p>
+                  ))}
+                  {!stockLedgerQuery.isLoading && stockLedgerRows.length === 0 ? <EmptyState title="No stock movement" description="Purchase bills, wastage, and manual adjustments will appear here." /> : null}
+                </div>
+              </div>
+            </Panel>
+
+            <Panel title="Stock operations" description="Post purchase bills, record wastage, and make audited manual stock corrections.">
+              <form
+                className="space-y-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  purchaseBillMutation.mutate(cleanPurchaseBillPayload(purchaseBillForm));
+                }}
+              >
+                <h3 className="text-sm font-black uppercase tracking-wide text-slate-500">Purchase bill</h3>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <SelectInput
+                    label="Supplier"
+                    value={purchaseBillForm.supplierId}
+                    onChange={(supplierId) => setPurchaseBillForm({ ...purchaseBillForm, supplierId })}
+                    required
+                    options={suppliers.map((supplier) => ({
+                      label: supplier.name,
+                      value: supplier.id,
+                    }))}
+                  />
+                  <TextInput label="Bill number" value={purchaseBillForm.billNumber} onChange={(billNumber) => setPurchaseBillForm({ ...purchaseBillForm, billNumber })} required />
+                  <TextInput label="Bill date" type="date" value={purchaseBillForm.billDate} onChange={(billDate) => setPurchaseBillForm({ ...purchaseBillForm, billDate })} required />
+                  <SelectInput
+                    label="Stock item"
+                    value={purchaseBillForm.items[0]?.inventoryItemId ?? ''}
+                    onChange={(inventoryItemId) =>
+                      setPurchaseBillForm(
+                        updateFirstPurchaseBillItem(purchaseBillForm, {
+                          inventoryItemId,
+                        }),
+                      )
+                    }
+                    required
+                    options={inventoryItems.map((item) => ({
+                      label: item.name,
+                      value: item.id,
+                    }))}
+                  />
+                  <TextInput
+                    label="Quantity"
+                    type="number"
+                    value={String(purchaseBillForm.items[0]?.quantity ?? 1)}
+                    onChange={(quantity) =>
+                      setPurchaseBillForm(
+                        updateFirstPurchaseBillItem(purchaseBillForm, {
+                          quantity: Number(quantity) || 0,
+                        }),
+                      )
+                    }
+                    required
+                  />
+                  <TextInput
+                    label="Unit cost (NPR)"
+                    type="number"
+                    value={String(purchaseBillForm.items[0]?.unitCost ?? 0)}
+                    onChange={(unitCost) =>
+                      setPurchaseBillForm(
+                        updateFirstPurchaseBillItem(purchaseBillForm, {
+                          unitCost: Number(unitCost) || 0,
+                        }),
+                      )
+                    }
+                    required
+                  />
+                  <TextInput
+                    label="Batch number"
+                    value={purchaseBillForm.items[0]?.batchNumber ?? ''}
+                    onChange={(batchNumber) =>
+                      setPurchaseBillForm(
+                        updateFirstPurchaseBillItem(purchaseBillForm, {
+                          batchNumber,
+                        }),
+                      )
+                    }
+                  />
+                  <TextInput
+                    label="Expiry date"
+                    type="date"
+                    value={purchaseBillForm.items[0]?.expiryDate ?? ''}
+                    onChange={(expiryDate) =>
+                      setPurchaseBillForm(
+                        updateFirstPurchaseBillItem(purchaseBillForm, {
+                          expiryDate,
+                        }),
+                      )
+                    }
+                  />
+                  <TextInput
+                    label="Tax (NPR)"
+                    type="number"
+                    value={String(purchaseBillForm.taxAmount ?? 0)}
+                    onChange={(taxAmount) =>
+                      setPurchaseBillForm({
+                        ...purchaseBillForm,
+                        taxAmount: Number(taxAmount) || 0,
+                      })
+                    }
+                  />
+                  <TextInput
+                    label="Discount (NPR)"
+                    type="number"
+                    value={String(purchaseBillForm.discountAmount ?? 0)}
+                    onChange={(discountAmount) =>
+                      setPurchaseBillForm({
+                        ...purchaseBillForm,
+                        discountAmount: Number(discountAmount) || 0,
+                      })
+                    }
+                  />
+                </div>
+                <TextInput label="Notes" value={purchaseBillForm.notes ?? ''} onChange={(notes) => setPurchaseBillForm({ ...purchaseBillForm, notes })} />
+                <button type="submit" className="btn-primary w-full" disabled={purchaseBillMutation.isPending || suppliers.length === 0 || inventoryItems.length === 0}>
+                  {purchaseBillMutation.isPending ? 'Posting purchase...' : 'Post purchase bill'}
+                </button>
+                {purchaseBillMutation.error ? <InlineError message={(purchaseBillMutation.error as Error).message} /> : null}
+              </form>
+
+              <div className="my-5 border-t border-slate-100" />
+
+              <form
+                className="space-y-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  wastageMutation.mutate(cleanWastagePayload(wastageForm));
+                }}
+              >
+                <h3 className="text-sm font-black uppercase tracking-wide text-slate-500">Wastage</h3>
+                <SelectInput
+                  label="Stock item"
+                  value={wastageForm.inventoryItemId}
+                  onChange={(inventoryItemId) => setWastageForm({ ...wastageForm, inventoryItemId })}
+                  required
+                  options={inventoryItems.map((item) => ({
+                    label: item.name,
+                    value: item.id,
+                  }))}
+                />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <TextInput
+                    label="Quantity"
+                    type="number"
+                    value={String(wastageForm.quantity)}
+                    onChange={(quantity) =>
+                      setWastageForm({
+                        ...wastageForm,
+                        quantity: Number(quantity) || 0,
+                      })
+                    }
+                    required
+                  />
+                  <TextInput label="Wastage date" type="date" value={wastageForm.wastageDate} onChange={(wastageDate) => setWastageForm({ ...wastageForm, wastageDate })} required />
+                </div>
+                <TextInput label="Reason" value={wastageForm.reason} onChange={(reason) => setWastageForm({ ...wastageForm, reason })} required />
+                <TextInput label="Notes" value={wastageForm.notes ?? ''} onChange={(notes) => setWastageForm({ ...wastageForm, notes })} />
+                <button type="submit" className="btn-secondary w-full" disabled={wastageMutation.isPending || inventoryItems.length === 0}>
+                  {wastageMutation.isPending ? 'Recording wastage...' : 'Record wastage'}
+                </button>
+                {wastageMutation.error ? <InlineError message={(wastageMutation.error as Error).message} /> : null}
+              </form>
+
+              <div className="my-5 border-t border-slate-100" />
+
+              <form
+                className="space-y-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  stockAdjustmentMutation.mutate(cleanStockAdjustmentPayload(stockAdjustmentForm));
+                }}
+              >
+                <h3 className="text-sm font-black uppercase tracking-wide text-slate-500">Manual adjustment</h3>
+                <SelectInput
+                  label="Stock item"
+                  value={stockAdjustmentForm.inventoryItemId}
+                  onChange={(inventoryItemId) =>
+                    setStockAdjustmentForm({
+                      ...stockAdjustmentForm,
+                      inventoryItemId,
+                    })
+                  }
+                  required
+                  options={inventoryItems.map((item) => ({
+                    label: item.name,
+                    value: item.id,
+                  }))}
+                />
+                <TextInput
+                  label="Quantity change"
+                  type="number"
+                  value={String(stockAdjustmentForm.quantity)}
+                  onChange={(quantity) =>
+                    setStockAdjustmentForm({
+                      ...stockAdjustmentForm,
+                      quantity: Number(quantity) || 0,
+                    })
+                  }
+                  required
+                />
+                <TextInput label="Reason" value={stockAdjustmentForm.reason} onChange={(reason) => setStockAdjustmentForm({ ...stockAdjustmentForm, reason })} required />
+                <button type="submit" className="btn-secondary w-full" disabled={stockAdjustmentMutation.isPending || inventoryItems.length === 0}>
+                  {stockAdjustmentMutation.isPending ? 'Saving adjustment...' : 'Save stock adjustment'}
+                </button>
+                {stockAdjustmentMutation.error ? <InlineError message={(stockAdjustmentMutation.error as Error).message} /> : null}
+              </form>
+            </Panel>
+          </div>
           <Panel title="Suppliers and stock items" description="Create vendor records and inventory catalog entries through real canteen APIs.">
             <form
               className="space-y-3"
@@ -825,9 +1083,42 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
                   { label: 'Packets', value: 'packet' },
                 ]}
               />
-              <TextInput label="Minimum stock" type="number" value={String(inventoryItemForm.minStockLevel ?? 0)} onChange={(minStockLevel) => setInventoryItemForm({ ...inventoryItemForm, minStockLevel: Number(minStockLevel) || 0 })} />
-              <TextInput label="Unit cost (NPR)" type="number" value={String(inventoryItemForm.unitCost ?? 0)} onChange={(unitCost) => setInventoryItemForm({ ...inventoryItemForm, unitCost: Number(unitCost) || 0 })} />
-              <SelectInput label="Default supplier" value={inventoryItemForm.defaultSupplierId ?? ''} onChange={(defaultSupplierId) => setInventoryItemForm({ ...inventoryItemForm, defaultSupplierId })} options={suppliers.map((supplier) => ({ label: supplier.name, value: supplier.id }))} />
+              <TextInput
+                label="Minimum stock"
+                type="number"
+                value={String(inventoryItemForm.minStockLevel ?? 0)}
+                onChange={(minStockLevel) =>
+                  setInventoryItemForm({
+                    ...inventoryItemForm,
+                    minStockLevel: Number(minStockLevel) || 0,
+                  })
+                }
+              />
+              <TextInput
+                label="Unit cost (NPR)"
+                type="number"
+                value={String(inventoryItemForm.unitCost ?? 0)}
+                onChange={(unitCost) =>
+                  setInventoryItemForm({
+                    ...inventoryItemForm,
+                    unitCost: Number(unitCost) || 0,
+                  })
+                }
+              />
+              <SelectInput
+                label="Default supplier"
+                value={inventoryItemForm.defaultSupplierId ?? ''}
+                onChange={(defaultSupplierId) =>
+                  setInventoryItemForm({
+                    ...inventoryItemForm,
+                    defaultSupplierId,
+                  })
+                }
+                options={suppliers.map((supplier) => ({
+                  label: supplier.name,
+                  value: supplier.id,
+                }))}
+              />
               <button type="submit" className="btn-primary w-full" disabled={inventoryItemMutation.isPending}>
                 {inventoryItemMutation.isPending ? 'Saving item...' : 'Save stock item'}
               </button>
@@ -1374,5 +1665,50 @@ function cleanInventoryItemPayload(form: CanteenInventoryItemPayload): CanteenIn
     minStockLevel: Number(form.minStockLevel ?? 0),
     unitCost: Number(form.unitCost ?? 0),
     defaultSupplierId: form.defaultSupplierId || undefined,
+  };
+}
+function updateFirstPurchaseBillItem(form: CanteenPurchaseBillPayload, patch: Partial<CanteenPurchaseBillPayload['items'][number]>): CanteenPurchaseBillPayload {
+  const current = form.items[0] ?? emptyPurchaseBillForm.items[0];
+
+  return {
+    ...form,
+    items: [{ ...current, ...patch }],
+  };
+}
+function cleanPurchaseBillPayload(form: CanteenPurchaseBillPayload): CanteenPurchaseBillPayload {
+  const item = form.items[0] ?? emptyPurchaseBillForm.items[0];
+
+  return {
+    supplierId: form.supplierId,
+    billNumber: form.billNumber.trim(),
+    billDate: form.billDate,
+    taxAmount: Number(form.taxAmount ?? 0),
+    discountAmount: Number(form.discountAmount ?? 0),
+    notes: form.notes?.trim() || undefined,
+    items: [
+      {
+        inventoryItemId: item.inventoryItemId,
+        quantity: Number(item.quantity ?? 0),
+        unitCost: Number(item.unitCost ?? 0),
+        expiryDate: item.expiryDate || undefined,
+        batchNumber: item.batchNumber?.trim() || undefined,
+      },
+    ],
+  };
+}
+function cleanWastagePayload(form: CanteenWastagePayload): CanteenWastagePayload {
+  return {
+    inventoryItemId: form.inventoryItemId,
+    quantity: Number(form.quantity ?? 0),
+    reason: form.reason.trim(),
+    wastageDate: form.wastageDate,
+    notes: form.notes?.trim() || undefined,
+  };
+}
+function cleanStockAdjustmentPayload(form: CanteenStockAdjustmentPayload): CanteenStockAdjustmentPayload {
+  return {
+    inventoryItemId: form.inventoryItemId,
+    quantity: Number(form.quantity ?? 0),
+    reason: form.reason.trim(),
   };
 }

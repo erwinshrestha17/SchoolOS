@@ -145,9 +145,13 @@ class TeacherAttendanceController
         selectedClassId,
         date,
       );
+      final selectedClass = classes.firstWhere(
+        (item) => item.id == selectedClassId,
+        orElse: () => classes.first,
+      );
       final sheet = draft.isNotEmpty
           ? draft
-          : await _repository.getClassAttendanceSheet(selectedClassId, date);
+          : await _repository.getClassAttendanceSheet(selectedClass, date);
 
       state = state.copyWith(
         isLoading: false,
@@ -231,8 +235,12 @@ class TeacherAttendanceController
 
     state = state.copyWith(message: 'Submitting attendance...');
     try {
+      final selectedClass = state.selectedClass;
+      if (selectedClass == null) {
+        return;
+      }
       final status = await _repository.submitAttendance(
-        classId,
+        selectedClass,
         date,
         state.entries,
       );

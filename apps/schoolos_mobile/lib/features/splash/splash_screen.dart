@@ -56,7 +56,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
       return;
     }
-    await Future<void>.delayed(const Duration(milliseconds: 1500));
+    await Future<void>.delayed(const Duration(milliseconds: 2500));
     if (!mounted) return;
     _timerElapsed = true;
     _checkNavigation();
@@ -141,7 +141,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Smarter school operations',
+                  'Daily operations, parent engagement, staff self-service',
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.78),
                     fontSize: 14,

@@ -93,6 +93,101 @@ describe('attendance production hardening', () => {
     );
   });
 
+  it('returns no mobile teacher classes when the signed-in user is not tenant staff', async () => {
+    const { service, prisma } = buildService({
+      staffFindFirst: null,
+      teacherAssignments: [
+        {
+          id: 'assign-hidden',
+          academicYearId: 'ay-other',
+          classId: 'class-other',
+          sectionId: 'section-other',
+        },
+      ],
+      classTeacherSections: [
+        {
+          id: 'section-other',
+          classId: 'class-other',
+        },
+      ],
+    });
+
+    await expect(
+      service.listTeacherMobileClassSections(teacherActor),
+    ).resolves.toEqual({ items: [] });
+
+    expect(prisma.staff.findFirst).toHaveBeenCalledWith({
+      where: { userId: teacherActor.userId, tenantId: teacherActor.tenantId },
+      select: { id: true },
+    });
+    expect(prisma.subjectTeacherAssignment.findMany).not.toHaveBeenCalled();
+    expect(prisma.section.findMany).not.toHaveBeenCalled();
+  });
+
+  it('lists deduped tenant-scoped mobile teacher classes from subject and class-teacher assignments', async () => {
+    const { service, prisma } = buildService({
+      staffFindFirst: { id: 'staff-1' },
+      academicYear: { id: 'ay-current', name: '2082' },
+      teacherAssignments: [
+        {
+          id: 'assign-1',
+          academicYearId: 'ay-current',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          academicYear: { id: 'ay-current', name: '2082' },
+          class: { id: 'class-1', name: 'Grade 3' },
+          section: { id: 'section-1', name: 'A' },
+          subject: { name: 'Math' },
+        },
+        {
+          id: 'assign-2',
+          academicYearId: 'ay-current',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          academicYear: { id: 'ay-current', name: '2082' },
+          class: { id: 'class-1', name: 'Grade 3' },
+          section: { id: 'section-1', name: 'A' },
+          subject: { name: 'Science' },
+        },
+      ],
+      classTeacherSections: [
+        {
+          id: 'section-1',
+          classId: 'class-1',
+          name: 'A',
+          class: { id: 'class-1', name: 'Grade 3', level: 3 },
+        },
+      ],
+    });
+
+    await expect(
+      service.listTeacherMobileClassSections(teacherActor),
+    ).resolves.toEqual({
+      items: [
+        {
+          id: 'ay-current:class-1:section-1',
+          academicYearId: 'ay-current',
+          academicYearName: '2082',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          name: 'Grade 3 - A',
+          subject: 'Math, Science, Class teacher',
+        },
+      ],
+    });
+
+    expect(prisma.subjectTeacherAssignment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tenantId: teacherActor.tenantId, staffId: 'staff-1' },
+      }),
+    );
+    expect(prisma.section.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tenantId: teacherActor.tenantId, classTeacherId: 'staff-1' },
+      }),
+    );
+  });
+
   it('rejects section and class mismatches before attendance writes', async () => {
     const { service, prisma } = buildService({
       academicYear: { id: 'ay-1' },
@@ -793,6 +888,9 @@ function buildService(options: {
   staffAttendanceRows?: unknown[];
   approvedLeaveRequests?: unknown[];
   studentFindFirst?: unknown;
+  staffFindFirst?: unknown;
+  teacherAssignments?: unknown[];
+  classTeacherSections?: unknown[];
 }) {
   const tx = {
     attendanceConflict: {
@@ -837,6 +935,7 @@ function buildService(options: {
     },
     section: {
       findFirst: jest.fn().mockResolvedValue(options.section ?? null),
+      findMany: jest.fn().mockResolvedValue(options.classTeacherSections ?? []),
     },
     schoolCalendarDay: {
       findFirst: jest.fn().mockResolvedValue(options.calendarDay ?? null),
@@ -899,7 +998,11 @@ function buildService(options: {
         .mockResolvedValue({ id: 'staff-1', userId: 'user-1' }),
       findFirst: jest
         .fn()
-        .mockResolvedValue({ id: 'staff-1', userId: 'user-1' }),
+        .mockResolvedValue(
+          options.staffFindFirst === undefined
+            ? { id: 'staff-1', userId: 'user-1' }
+            : options.staffFindFirst,
+        ),
     },
     staffAttendance: {
       upsert: jest.fn().mockResolvedValue({}),
@@ -913,7 +1016,7 @@ function buildService(options: {
     },
     subjectTeacherAssignment: {
       findFirst: jest.fn().mockResolvedValue({ id: 'assign-1' }),
-      findMany: jest.fn().mockResolvedValue([{ id: 'assign-1' }]),
+      findMany: jest.fn().mockResolvedValue(options.teacherAssignments ?? []),
     },
     $transaction: jest.fn().mockImplementation(async (input: unknown) => {
       if (Array.isArray(input)) {

@@ -201,6 +201,25 @@ export type PlatformAuditLogFilters = {
   endDate?: string;
 };
 
+export type StaffLifecycleHistoryEvent = {
+  id: string;
+  staffId: string;
+  eventType: string;
+  eventDate: string;
+  reason?: string | null;
+  notes?: string | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt?: string;
+  createdBy?: {
+    id: string;
+    email: string;
+    staff?: {
+      firstName?: string | null;
+      lastName?: string | null;
+    } | null;
+  } | null;
+};
+
 async function request<T>(path: string, init?: RequestOptions) {
   const requestId = createRequestId();
   const headers: Record<string, string> = {
@@ -618,6 +637,10 @@ export const api = {
   listStaff: () => request<StaffSummary[]>('/staff'),
   getStaffDetail: (staffId: string) =>
     request<StaffDetail>(`/hr/staff/${encodeURIComponent(staffId)}`),
+  listStaffHistory: (staffId: string) =>
+    request<StaffLifecycleHistoryEvent[]>(
+      `/hr/staff/${encodeURIComponent(staffId)}/history`,
+    ),
   updateStaffDetail: (staffId: string, body: JsonBody) =>
     request<StaffDetail>(`/hr/staff/${encodeURIComponent(staffId)}`, {
       method: 'PATCH',

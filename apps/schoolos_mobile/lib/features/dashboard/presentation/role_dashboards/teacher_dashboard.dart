@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/constants/app_routes.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/auth/auth_provider.dart';
 import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_gradient_card.dart';
 import '../../../../shared/widgets/dashboard_card.dart';
@@ -20,6 +21,10 @@ class TeacherDashboard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authProvider).user;
+    final displayName = user?.name ?? 'Teacher';
+    final email = user?.email ?? 'teacher@schoolos.com';
+
     return RoleShellScaffold(
       role: 'TEACHER',
       selectedIndex: 0,
@@ -29,27 +34,37 @@ class TeacherDashboard extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Welcome Header
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Welcome, Mrs. Sharma',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Welcome, $displayName',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Teacher Space • Mathematics Dept.',
-                      style: TextStyle(color: AppColors.slate500, fontSize: 13),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        'Teacher Space • $email',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.slate500,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                RoleBadge(role: 'TEACHER'),
+                const SizedBox(width: AppSpacing.sm),
+                const RoleBadge(role: 'TEACHER'),
               ],
             ),
             const SizedBox(height: AppSpacing.xl),
@@ -61,27 +76,27 @@ class TeacherDashboard extends ConsumerWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              child: const Row(
+              child: Row(
                 children: [
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Sunita Sharma',
-                          style: TextStyle(
+                          displayName,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        SizedBox(height: AppSpacing.xs),
-                        Text(
-                          'Class Teacher of Grade 4 - Lotus',
+                        const SizedBox(height: AppSpacing.xs),
+                        const Text(
+                          'Class teacher and classroom operations',
                           style: TextStyle(color: Colors.white70, fontSize: 13),
                         ),
-                        SizedBox(height: AppSpacing.md),
-                        Text(
+                        const SizedBox(height: AppSpacing.md),
+                        const Text(
                           'Today\'s Teaching Hours: 4 Periods',
                           style: TextStyle(color: Colors.white60, fontSize: 11),
                         ),
@@ -89,7 +104,7 @@ class TeacherDashboard extends ConsumerWidget {
                     ),
                   ),
                   UserAvatar(
-                    name: 'Sunita Sharma',
+                    name: displayName,
                     radius: 36,
                     borderColor: Colors.white,
                     borderWidth: 2,
