@@ -12,6 +12,12 @@ Also read the current audit before major backend/module work:
 docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md
 ```
 
+For gradual code-file modularization rules, read:
+
+```text
+docs/project/SCHOOLOS_CODE_FILE_MODULARIZATION_PLAN.md
+```
+
 ---
 
 ## Current Stage
@@ -26,7 +32,7 @@ Phase 2D M9 Accounting: Production Candidate Complete
 Current stage: Phase 2A backend complete + Phase 2 foundations + M9 production-candidate completion + Phase 3 operations admin foundations
 ```
 
-The repo is broad and advanced. Work must focus on stabilization, correctness, scale, permissions, tests, and UX/API polish for existing modules rather than broad new product expansion.
+The repo is broad and advanced. Work must focus on stabilization, correctness, scale, permissions, tests, UX/API polish for existing modules, and gradual code-file modularization of touched areas rather than broad new product expansion.
 
 Preferred next work:
 
@@ -75,6 +81,7 @@ Microservices
 - Do not start AI/ML features until reliable production data exists.
 - Use `docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md` as the long-term source of truth.
 - Use `docs/project/SCHOOLOS_CURRENT_REPO_ANALYSIS.md` for current repo risk/completion estimates.
+- Use `docs/project/SCHOOLOS_CODE_FILE_MODULARIZATION_PLAN.md` before editing large services, controllers, dashboard workspaces, API clients, hooks, helpers, or future module files.
 - Keep legacy roadmap files as pointers/summaries unless explicitly asked to expand them.
 - After recent verification follow-ups, treat Homework/Timetable compile/schema/test stability as a high-priority gate before new module expansion.
 
@@ -90,6 +97,47 @@ Microservices
 - Do not migrate to Angular yet.
 - Do not rename `tenantId` to `schoolId`.
 - Keep Platform Control Plane, Tenant Configuration Plane, and School Operations Plane separated by route, permission, and responsibility.
+- Code-file modularization is required as modules grow: split large files into focused files inside the same modular monolith.
+- Code-file modularization is not microservices, not route rewriting, not separate deployment, and not a reason to change public contracts.
+
+---
+
+## Code-File Modularization Rules
+
+- When touching a large file, check whether the current change should extract a focused service, component, hook, helper, or API client file.
+- Modularize gradually in the touched area only unless the user explicitly asks for a wider cleanup.
+- Split by business/screen responsibility, not arbitrary line count alone.
+- Keep existing behavior, routes, API contracts, UI/UX, tenant boundaries, and database behavior stable during modularization.
+- It is acceptable to keep the old service/controller/component as a thin facade during a safe migration.
+- Do not create a massive repo-wide modularization PR unless explicitly requested.
+- Future modules after M10/M11 must start with focused files from day one.
+
+Backend split preference:
+
+```text
+services/<subfeature>-query.service.ts
+services/<subfeature>-command.service.ts
+services/<subfeature>-workflow.service.ts
+reports/<module>-reports.service.ts
+reports/<module>-exports.service.ts
+helpers/<module>-formatters.ts
+helpers/<module>-validators.ts
+jobs/<module>.processor.ts
+jobs/<module>.cron.ts
+```
+
+Frontend split preference:
+
+```text
+<module>-workspace.tsx       # thin shell only
+tabs/<module>-*-tab.tsx
+components/<module>-*.tsx
+hooks/use-<module>-queries.ts
+hooks/use-<module>-mutations.ts
+hooks/use-<module>-forms.ts
+utils/<module>-formatters.ts
+utils/<module>-constants.ts
+```
 
 ---
 
@@ -122,6 +170,8 @@ Microservices
 - Parse API errors into readable messages.
 - Keep Nepal school staff workflows fast and practical.
 - Use server-side filtering/pagination; do not fetch all rows and filter in browser for growing datasets.
+- Large dashboard workspaces should become thin shells with tab files, hooks, smaller components, and pure utilities.
+- `apps/web/lib/api/client.ts` should remain the base HTTP client; domain-specific APIs belong in separate files.
 - Route boundaries must stay clear:
   - `/platform/*` for SchoolOS operators.
   - `/dashboard/settings/*` for school/tenant settings.
@@ -176,6 +226,7 @@ Before implementing a feature, answer:
 12. What tests prove tenant isolation and permissions?
 13. If pricing/tiered access is involved, which feature key, entitlement, and usage limit controls access?
 14. If intelligence/AI is involved, is the output explainable and human-reviewed?
+15. Is the touched code already too large, and should this task include a small file-level modularization step?
 ```
 
 Feature is not production-ready until these are answered.
@@ -211,6 +262,7 @@ Return:
 - Files changed
 - Backend/API/frontend ownership decisions
 - Scalability decisions
+- File-level modularization decisions, if any
 - Tests run
 - Verification results
 - Remaining gaps
