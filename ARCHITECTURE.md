@@ -8,6 +8,12 @@ docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
 
 Read this file for stable architecture rules, then use the master memory and current repo analysis for module scope, phase structure, platform core, scalability, and current repo status.
 
+For code-file modularization guidance, also read:
+
+```text
+docs/project/SCHOOLOS_CODE_FILE_MODULARIZATION_PLAN.md
+```
+
 ---
 
 ## Architecture Style
@@ -21,6 +27,14 @@ Reasons:
 - Microservices would add distributed transaction and deployment complexity too early.
 
 Microservices should only be considered later if scale, team ownership, deployment isolation, or compliance isolation clearly justify the cost.
+
+Important distinction:
+
+```text
+Code-file modularization is required as the repo grows.
+Code-file modularization means splitting huge services, controllers, components, hooks, helpers, and API clients into focused files inside the existing modular monolith.
+It does not mean microservices, separate deployments, route rewrites, tenantId renames, or product-plane separation into different apps.
+```
 
 ---
 
@@ -43,6 +57,7 @@ Rules:
 - Do not migrate to Angular yet.
 - Do not rename `tenantId` to `schoolId` without a deliberate migration.
 - Do not introduce microservices only to separate product planes or modules.
+- Do modularize large code files gradually by business/screen responsibility when working on M0-M10 and future modules.
 
 ---
 
@@ -73,7 +88,7 @@ Important architecture implication:
 
 ```text
 The repo is now broad. The next architecture priority is not module expansion.
-The next priority is verification, stabilization, service/schema alignment, tenant isolation tests, authenticated browser smoke tests, and one-vertical-at-a-time hardening.
+The next priority is verification, stabilization, service/schema alignment, tenant isolation tests, authenticated browser smoke tests, one-vertical-at-a-time hardening, and opportunistic code-file modularization in touched areas.
 ```
 
 ---
@@ -147,6 +162,18 @@ Suggested frontend namespaces inside `apps/web`:
 - Keep platform modules under M0 Platform Core or equivalent platform-oriented modules.
 - Keep tenant/school modules under their domain modules: M1 through M11.
 - Other modules must not directly write accounting ledger rows; they must use `AccountingPostingService` or a clear accounting boundary.
+- When a service/controller grows too large, split it into focused files by subfeature, such as query service, command service, workflow service, reports service, exports service, jobs, and pure helpers.
+- Keep existing public routes stable during file-level modularization unless a route change is explicitly requested.
+
+---
+
+## Frontend Architecture Rules
+
+- Keep large dashboard workspaces as thin shells where possible.
+- Split large workspace files into tab components, smaller UI components, hooks, and pure utilities.
+- Keep existing UI/UX stable during file-level modularization unless a redesign is explicitly requested.
+- Keep domain API clients separated from the base HTTP client.
+- Do not let `apps/web/lib/api/client.ts` become a dumping ground for module-specific API methods.
 
 ---
 
@@ -218,66 +245,3 @@ Transport live-tracking is built for high-concurrency GPS ingestion without comp
 4. **Tenant Isolation**: All location data is strictly scoped by `tenantId` and `tripId`. Drivers can only ping their assigned trips; parents can only view their assigned child's trip location.
 
 ---
-
-## M9 Accounting Architecture
-
-M9 Accounting is production-candidate complete and remains inside the modular monolith.
-
-Strict rules:
-
-1. Confirmed ledger entries are immutable.
-2. Use reversal/correction/adjustment entries instead of silent edits.
-3. Enforce double-entry: total debit must equal total credit.
-4. Enforce fiscal period states: OPEN, LOCKED, CLOSED.
-5. Every journal must link to a source document.
-6. Other modules must post through `AccountingPostingService` or a clear accounting boundary.
-7. Use Decimal/numeric for all money.
-8. Journal, voucher, and receipt numbers must be unique per tenant and fiscal year.
-9. Reports must come from backend ledger data, not frontend calculations.
-10. Audit posting, approval, reversal, closing, reopening, bank reconciliation, and exports.
-
-Do not move Accounting into a microservice yet.
-
----
-
-## M11 Intelligence / AI Architecture
-
-M11 is Phase 4 roadmap-only for now.
-
-Rules:
-
-- Do not implement AI/ML until reliable production data exists.
-- Start with explainable rule-based analytics, not model-first AI.
-- Do not allow AI to automatically punish students, block fees, suspend access, make payroll decisions, or publicly rank teachers.
-- Every sensitive insight must be tenant-scoped, permission-guarded, and audited.
-- Cross-school analytics require anonymization, aggregation, explicit opt-in, and platform audit.
-
----
-
-## Verification Commands
-
-Run relevant checks after meaningful changes:
-
-```bash
-pnpm db:generate
-pnpm db:validate
-pnpm verify:openapi
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm test:e2e
-pnpm build
-pnpm verify:production
-pnpm smoke:phase1
-```
-
-Current recommended next architecture sprint:
-
-```text
-Repo Verification & Stabilization Sprint
-→ full verification gate
-→ Homework/Timetable schema/service/test alignment
-→ Phase 2A Academics admin UI against real APIs
-→ authenticated Playwright browser smoke
-→ controlled pilot staging readiness
-```
