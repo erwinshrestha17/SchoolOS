@@ -1,0 +1,140 @@
+model ActivityPost {
+  id               String             @id @default(uuid())
+  tenantId         String
+  classId          String
+  sectionId        String?
+  createdById      String?
+  title            String
+  caption          String
+  category         ActivityCategory   @default(GENERAL)
+  audienceType     AudienceType       @default(CLASS)
+  status           ActivityPostStatus @default(PENDING_APPROVAL)
+  moderationReason String?
+  moderatedAt      DateTime?
+  moderatedById    String?
+  editedAt         DateTime?
+  editedById       String?
+  softDeletedAt    DateTime?
+  deletedById      String?
+  publishedAt      DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  class       Class                  @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section     Section?               @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  createdBy   User?                  @relation("CreatedActivityPosts", fields: [createdById], references: [id], onDelete: SetNull)
+  moderatedBy User?                  @relation("ModeratedActivityPosts", fields: [moderatedById], references: [id], onDelete: SetNull)
+  editedBy    User?                  @relation("EditedActivityPosts", fields: [editedById], references: [id], onDelete: SetNull)
+  deletedBy   User?                  @relation("DeletedActivityPosts", fields: [deletedById], references: [id], onDelete: SetNull)
+  attachments ActivityAttachment[]
+  studentTags ActivityPostStudent[]
+  deliveries  NotificationDelivery[]
+  reactions   ActivityReaction[]
+
+  @@index([tenantId, classId, sectionId, publishedAt])
+  @@index([tenantId, status])
+}
+
+model ActivityAttachment {
+  id                 String          @id @default(uuid())
+  tenantId           String
+  activityPostId     String
+  fileName           String
+  contentType        String
+  sizeBytes          Int
+  provider           StorageProvider @default(LOCAL)
+  objectKey          String
+  publicUrl          String?
+  fileAssetId        String?
+  sortOrder          Int             @default(0)
+  processingStatus   String?         @default("PENDING")
+  optimizedObjectKey String?
+  optimizedSizeBytes Int?
+  createdAt          DateTime        @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  activityPost ActivityPost @relation(fields: [activityPostId], references: [id], onDelete: Cascade)
+  fileAsset    FileAsset?   @relation(fields: [fileAssetId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, activityPostId])
+  @@index([fileAssetId])
+}
+
+model ActivityPostStudent {
+  id             String   @id @default(uuid())
+  tenantId       String
+  activityPostId String
+  studentId      String
+  createdAt      DateTime @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  activityPost ActivityPost @relation(fields: [activityPostId], references: [id], onDelete: Cascade)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([activityPostId, studentId])
+}
+
+model ActivityReaction {
+  id             String               @id @default(uuid())
+  tenantId       String
+  activityPostId String
+  guardianId     String?
+  studentId      String?
+  reaction       ActivityReactionType
+  createdAt      DateTime             @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  activityPost ActivityPost @relation(fields: [activityPostId], references: [id], onDelete: Cascade)
+  guardian     Guardian?    @relation(fields: [guardianId], references: [id], onDelete: SetNull)
+  student      Student?     @relation(fields: [studentId], references: [id], onDelete: SetNull)
+
+  @@unique([activityPostId, guardianId, reaction])
+  @@unique([activityPostId, studentId, reaction])
+  @@index([tenantId, activityPostId])
+}
+
+model DevelopmentalMilestone {
+  id              String                       @id @default(uuid())
+  tenantId        String
+  classId         String
+  sectionId       String?
+  studentId       String
+  domain          String
+  milestone       String
+  status          DevelopmentalMilestoneStatus
+  observationNote String?
+  photoObjectKey  String?
+  photoUrl        String?
+  observedAt      DateTime
+  createdById     String?
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  class   Class    @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section Section? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  student Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, studentId, observedAt])
+  @@index([tenantId, classId, sectionId])
+}
+
+model MoodLog {
+  id        String    @id @default(uuid())
+  tenantId  String
+  classId   String
+  sectionId String?
+  studentId String?
+  mood      MoodValue
+  note      String?
+  logDate   DateTime
+  createdAt DateTime  @default(now())
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  class   Class    @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section Section? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  student Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, classId, sectionId, logDate])
+}

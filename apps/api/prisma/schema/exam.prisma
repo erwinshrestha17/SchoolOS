@@ -1,0 +1,258 @@
+model ExamTerm {
+  id             String         @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  name           String
+  startsOn       DateTime
+  endsOn         DateTime
+  weightPercent  Decimal        @default(100) @db.Decimal(5, 2)
+  status         ExamTermStatus @default(ACTIVE)
+  isLocked       Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  tenant           Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear     AcademicYear          @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  components       AssessmentComponent[]
+  markEntries      MarkEntry[]
+  reportCards      ReportCard[]
+  timetableSlots   ExamTimetableSlot[]
+  markLockRequests MarkLockRequest[]
+
+  @@unique([tenantId, academicYearId, name])
+}
+
+model AssessmentComponent {
+  id            String         @id @default(uuid())
+  tenantId      String
+  examTermId    String
+  subjectId     String
+  name          String
+  type          AssessmentType @default(TERMINAL)
+  maxMarks      Decimal        @db.Decimal(8, 2)
+  weightPercent Decimal        @default(100) @db.Decimal(5, 2)
+  passMarks     Decimal?       @db.Decimal(8, 2)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  examTerm    ExamTerm    @relation(fields: [examTermId], references: [id], onDelete: Cascade)
+  subject     Subject     @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  markEntries MarkEntry[]
+
+  @@unique([tenantId, examTermId, subjectId, name])
+}
+
+model MarkEntry {
+  id                    String          @id @default(uuid())
+  tenantId              String
+  examTermId            String
+  assessmentComponentId String
+  subjectId             String
+  studentId             String
+  enteredById           String?
+  marksObtained         Decimal         @db.Decimal(8, 2)
+  status                MarkEntryStatus @default(SUBMITTED)
+  remarks               String?
+  isLocked              Boolean         @default(false)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  examTerm            ExamTerm            @relation(fields: [examTermId], references: [id], onDelete: Cascade)
+  assessmentComponent AssessmentComponent @relation(fields: [assessmentComponentId], references: [id], onDelete: Cascade)
+  subject             Subject             @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  student             Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  enteredBy           User?               @relation("EnteredMarks", fields: [enteredById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, assessmentComponentId, studentId])
+  @@index([tenantId, examTermId, studentId])
+}
+
+model CasRecord {
+  id             String   @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  subjectId      String?
+  studentId      String
+  classId        String
+  sectionId      String?
+  category       String
+  score          Decimal  @db.Decimal(8, 2)
+  maxScore       Decimal  @db.Decimal(8, 2)
+  observedOn     DateTime
+  note           String?
+  createdAt      DateTime @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  subject      Subject?     @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, academicYearId])
+  @@index([tenantId, classId, sectionId])
+  @@index([tenantId, subjectId])
+  @@index([tenantId, studentId])
+  @@index([tenantId, observedOn])
+}
+
+model ReportCard {
+  id             String          @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  examTermId     String
+  studentId      String
+  classId        String
+  sectionId      String?
+  totalMarks     Decimal         @db.Decimal(10, 2)
+  maxMarks       Decimal         @db.Decimal(10, 2)
+  percentage     Decimal         @db.Decimal(5, 2)
+  grade          String
+  gpa            Decimal         @db.Decimal(3, 2)
+  remarks        String?
+  status         GradeLockStatus @default(DRAFT)
+  lockedAt       DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  publishedAt    DateTime?
+  publishedById  String?
+  unpublishedAt  DateTime?
+  publishStatus  String?         @default("UNPUBLISHED")
+  version        Int             @default(1)
+  isCurrent      Boolean         @default(true)
+  fileId         String?
+
+  tenant            Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear      AcademicYear                  @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  examTerm          ExamTerm                      @relation(fields: [examTermId], references: [id], onDelete: Cascade)
+  student           Student                       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class             Class                         @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section           Section?                      @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  publishedBy       User?                         @relation("PublishedReportCards", fields: [publishedById], references: [id], onDelete: SetNull)
+  file              FileAsset?                    @relation("ReportCardFile", fields: [fileId], references: [id], onDelete: SetNull)
+  history           ReportCardHistory[]
+  correctionRequests ReportCardCorrectionRequest[]
+
+  @@unique([tenantId, academicYearId, examTermId, studentId])
+  @@index([tenantId, classId, sectionId])
+}
+
+model ReportCardHistory {
+  id             String   @id @default(uuid())
+  reportCardId   String
+  tenantId       String
+  academicYearId String
+  examTermId     String
+  studentId      String
+  classId        String
+  sectionId      String?
+  totalMarks     Decimal  @db.Decimal(10, 2)
+  maxMarks       Decimal  @db.Decimal(10, 2)
+  percentage     Decimal  @db.Decimal(5, 2)
+  grade          String
+  gpa            Decimal  @db.Decimal(3, 2)
+  remarks        String?
+  version        Int
+  fileId         String?
+  createdAt      DateTime @default(now())
+  archivedAt     DateTime @default(now())
+
+  reportCard   ReportCard @relation(fields: [reportCardId], references: [id], onDelete: Cascade)
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  file         FileAsset?   @relation("ReportCardHistoryFile", fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, reportCardId])
+}
+
+model ReportCardCorrectionRequest {
+  id            String    @id @default(uuid())
+  tenantId      String
+  reportCardId  String
+  requestedById String
+  reviewedById  String?
+  status        String    @default("PENDING")
+  reason        String
+  reviewNote    String?
+  createdAt     DateTime  @default(now())
+  reviewedAt    DateTime?
+
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  reportCard  ReportCard @relation(fields: [reportCardId], references: [id], onDelete: Cascade)
+  requestedBy User       @relation("RequestedReportCardCorrection", fields: [requestedById], references: [id])
+  reviewedBy  User?      @relation("ReviewedReportCardCorrection", fields: [reviewedById], references: [id])
+
+  @@index([tenantId, reportCardId, status])
+}
+
+model ExamTimetableSlot {
+  id             String    @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  examTermId     String
+  subjectId      String
+  classId        String
+  sectionId      String?
+  startsAt       DateTime
+  endsAt         DateTime
+  room           String?
+  publishedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  examTerm     ExamTerm     @relation(fields: [examTermId], references: [id], onDelete: Cascade)
+  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, examTermId, classId, sectionId])
+}
+
+model MarkLockRequest {
+  id            String    @id @default(uuid())
+  tenantId      String
+  examTermId    String
+  requestedById String?
+  reviewedById  String?
+  status        String    @default("PENDING")
+  reason        String
+  reviewNote    String?
+  createdAt     DateTime  @default(now())
+  reviewedAt    DateTime?
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  examTerm    ExamTerm @relation(fields: [examTermId], references: [id], onDelete: Cascade)
+  requestedBy User?    @relation("RequestedMarkLock", fields: [requestedById], references: [id], onDelete: SetNull)
+  reviewedBy  User?    @relation("ReviewedMarkLock", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, examTermId, status])
+}
+
+model PromotionRecord {
+  id             String   @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  studentId      String
+  fromClassId    String
+  fromSectionId  String?
+  toClassId      String?
+  toSectionId    String?
+  status         String   @default("READY")
+  remarks        String?
+  createdAt      DateTime @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fromClass    Class        @relation("PromotionFromClass", fields: [fromClassId], references: [id], onDelete: Restrict)
+  fromSection  Section?     @relation("PromotionFromSection", fields: [fromSectionId], references: [id], onDelete: SetNull)
+  toClass      Class?       @relation("PromotionToClass", fields: [toClassId], references: [id], onDelete: SetNull)
+  toSection    Section?     @relation("PromotionToSection", fields: [toSectionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, academicYearId, studentId])
+}

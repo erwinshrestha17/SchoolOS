@@ -1,0 +1,238 @@
+model AttendanceSession {
+  id             String                   @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  classId        String
+  sectionId      String?
+  attendanceDate DateTime
+  submittedById  String?
+  submittedAt    DateTime?
+  lockAt         DateTime
+  conflictStatus AttendanceConflictStatus @default(NONE)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  tenant             Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear       AcademicYear                  @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class              Class                         @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section            Section?                      @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  submittedBy        User?                         @relation("SubmittedAttendanceSessions", fields: [submittedById], references: [id], onDelete: SetNull)
+  records            AttendanceRecord[]
+  conflicts          AttendanceConflict[]
+  correctionRequests AttendanceCorrectionRequest[]
+
+  @@unique([tenantId, attendanceDate, classId, sectionId])
+}
+
+model AttendanceRecord {
+  id                  String           @id @default(uuid())
+  tenantId            String
+  attendanceSessionId String
+  studentId           String
+  status              AttendanceStatus @default(PRESENT)
+  remark              String?
+  lateAt              DateTime?
+  createdAt           DateTime         @default(now())
+
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  attendanceSession AttendanceSession @relation(fields: [attendanceSessionId], references: [id], onDelete: Cascade)
+  student           Student           @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  correctionRequests AttendanceCorrectionRequest[]
+
+  @@unique([attendanceSessionId, studentId])
+}
+
+model AttendanceCorrectionRequest {
+  id                  String                     @id @default(uuid())
+  tenantId            String
+  attendanceRecordId  String?
+  attendanceSessionId String?
+  studentId           String
+  attendanceDate      DateTime
+  requestedStatus     AttendanceStatus
+  previousStatus      AttendanceStatus?
+  reason              String
+  status              AttendanceCorrectionStatus @default(PENDING)
+  requestedById       String
+  requestedAt         DateTime                   @default(now())
+  reviewedById        String?
+  reviewedAt          DateTime?
+  reviewNote          String?
+  reviewReason        String?
+  metadata            Json?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  record      AttendanceRecord?  @relation(fields: [attendanceRecordId], references: [id], onDelete: SetNull)
+  session     AttendanceSession? @relation(fields: [attendanceSessionId], references: [id], onDelete: SetNull)
+  student     Student            @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  requestedBy User               @relation("RequestedAttendanceCorrections", fields: [requestedById], references: [id], onDelete: Restrict)
+  reviewedBy  User?              @relation("ReviewedAttendanceCorrections", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([tenantId, studentId, attendanceDate])
+  @@index([tenantId, attendanceDate, status])
+  @@index([tenantId, attendanceSessionId, status])
+  @@index([tenantId, requestedById, requestedAt])
+}
+
+model StaffAttendance {
+  id             String           @id @default(uuid())
+  tenantId       String
+  staffId        String
+  attendanceDate DateTime
+  status         AttendanceStatus @default(PRESENT)
+  leaveType      String?
+  note           String?
+  checkInAt      DateTime?
+  approvedById   String?
+  createdAt      DateTime         @default(now())
+
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff      Staff  @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  approvedBy User?  @relation("ApprovedStaffAttendance", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, staffId, attendanceDate])
+}
+
+model SchoolCalendarDay {
+  id           String   @id @default(uuid())
+  tenantId     String
+  calendarDate DateTime
+  isWorkingDay Boolean  @default(true)
+  label        String?
+  holidayType  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, calendarDate])
+  @@index([tenantId, isWorkingDay])
+}
+
+model StaffLeaveBalance {
+  id        String   @id @default(uuid())
+  tenantId  String
+  staffId   String
+  leaveType String
+  year      Int
+  opening   Decimal  @default(0) @db.Decimal(8, 2)
+  accrued   Decimal  @default(0) @db.Decimal(8, 2)
+  allocated Decimal  @default(0) @db.Decimal(8, 2)
+  used      Decimal  @default(0) @db.Decimal(8, 2)
+  carried   Decimal  @default(0) @db.Decimal(8, 2)
+  adjusted  Decimal  @default(0) @db.Decimal(8, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, staffId, leaveType, year])
+  @@index([tenantId, staffId])
+}
+
+model StaffLeaveRequest {
+  id           String             @id @default(uuid())
+  tenantId     String
+  staffId      String
+  leaveType    String
+  isPaid       Boolean            @default(true)
+  startsOn     DateTime
+  endsOn       DateTime
+  days         Decimal            @db.Decimal(8, 2)
+  reason       String
+  status       LeaveRequestStatus @default(PENDING)
+  reviewedById String?
+  reviewedAt   DateTime?
+  reviewNote   String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff      Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  reviewedBy User?  @relation("ReviewedStaffLeaveRequests", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, staffId, status])
+  @@index([tenantId, startsOn, endsOn])
+}
+
+model AttendanceConflict {
+  id                  String                      @id @default(uuid())
+  tenantId            String
+  attendanceSessionId String
+  submittedById       String?
+  status              AttendanceConflictStatus    @default(FLAGGED)
+  decision            AttendanceConflictDecision?
+  previousPayload     Json
+  incomingPayload     Json
+  resolutionNote      String?
+  reviewedById        String?
+  reviewedAt          DateTime?
+  createdAt           DateTime                    @default(now())
+
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  attendanceSession AttendanceSession @relation(fields: [attendanceSessionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, attendanceSessionId])
+}
+
+model AttendanceSyncSubmission {
+  id                  String                         @id @default(uuid())
+  tenantId            String
+  clientSubmissionId  String
+  attendanceSessionId String?
+  conflictId          String?
+  academicYearId      String
+  classId             String
+  sectionId           String?
+  attendanceDate      DateTime
+  deviceId            String?
+  deviceLabel         String?
+  deviceTimestamp     DateTime?
+  sessionFingerprint  String?
+  syncStatus          AttendanceSyncStatus           @default(ACCEPTED)
+  syncAttemptCount    Int                            @default(1)
+  serverReceivedAt    DateTime                       @default(now())
+  rejectionReason     AttendanceSyncRejectionReason?
+  submittedById       String?
+  payload             Json
+  createdAt           DateTime                       @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, clientSubmissionId])
+  @@index([tenantId, syncStatus, attendanceDate])
+  @@index([tenantId, academicYearId, classId, sectionId, attendanceDate])
+}
+
+model AttendanceDraft {
+  id             String   @id @default(uuid())
+  tenantId       String
+  userId         String
+  academicYearId String
+  classId        String
+  sectionId      String?
+  attendanceDate DateTime
+  payload        Json
+  serverVersion  Int      @default(1)
+  payloadHash    String?
+  lastSavedAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  expiresAt      DateTime?
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, userId, classId, sectionId, attendanceDate])
+  @@index([tenantId, userId, lastSavedAt])
+  @@index([tenantId, academicYearId, classId, sectionId, attendanceDate])
+  @@index([tenantId, expiresAt])
+}

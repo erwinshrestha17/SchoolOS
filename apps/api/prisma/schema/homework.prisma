@@ -1,0 +1,115 @@
+model HomeworkReminderBatch {
+  id             String    @id @default(uuid())
+  tenantId       String
+  homeworkId     String
+  createdById    String
+  targetCount    Int       @default(0)
+  deliveryCount  Int       @default(0)
+  skippedCount   Int       @default(0)
+  dueSoonCount   Int       @default(0)
+  overdueCount   Int       @default(0)
+  createdAt      DateTime  @default(now())
+  reminderType   String    @default("HOMEWORK_DUE_SOON")
+  status         String    @default("COMPLETED")
+  idempotencyKey String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  failedReason   String?
+
+  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  homework HomeworkAssignment @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, homeworkId, createdAt])
+  @@index([tenantId, reminderType, createdAt])
+  @@index([tenantId, status, createdAt])
+}
+
+model HomeworkAssignment {
+  id                 String                   @id @default(uuid())
+  tenantId           String
+  academicYearId     String
+  classId            String
+  sectionId          String?
+  subjectId          String
+  assignedByStaffId  String?
+  title              String
+  description        String?
+  instructions       String
+  assignedDate       DateTime                 @default(now())
+  dueDate            DateTime
+  dueAt              DateTime
+  status             HomeworkAssignmentStatus @default(DRAFT)
+  submissionRequired Boolean                  @default(true)
+  attachmentMetadata Json?
+  maxScore           Decimal?                 @db.Decimal(8, 2)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  tenant          Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear    AcademicYear            @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class           Class                   @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section         Section?                @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subject         Subject                 @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  assignedByStaff Staff?                  @relation(fields: [assignedByStaffId], references: [id], onDelete: SetNull)
+  submissions     HomeworkSubmission[]
+  reminderBatches HomeworkReminderBatch[]
+  attachments     HomeworkAttachment[]
+
+  @@index([tenantId, academicYearId, classId, sectionId, status])
+  @@index([tenantId, status, dueDate])
+  @@index([tenantId, classId, sectionId])
+  @@index([tenantId, subjectId, assignedByStaffId, status])
+  @@index([tenantId, dueDate, status])
+  @@index([tenantId, classId, sectionId, dueDate])
+}
+
+model HomeworkSubmission {
+  id                 String                   @id @default(uuid())
+  tenantId           String
+  homeworkId         String
+  studentId          String
+  status             HomeworkSubmissionStatus @default(NOT_SUBMITTED)
+  studentRemarks     String?
+  submittedAt        DateTime?
+  submissionText     String?
+  submissionContent  String?
+  score              Decimal?                 @db.Decimal(8, 2)
+  feedback           String?
+  teacherRemarks     String?
+  correctionRemarks  String?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  returnedAt         DateTime?
+  attachmentMetadata Json?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  homework    HomeworkAssignment   @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  student     Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  attachments HomeworkAttachment[]
+
+  @@unique([tenantId, homeworkId, studentId])
+  @@index([tenantId, homeworkId, status])
+  @@index([tenantId, studentId, status])
+  @@index([tenantId, studentId])
+}
+
+model HomeworkAttachment {
+  id           String   @id @default(uuid())
+  tenantId     String
+  submissionId String?
+  assignmentId String?
+  fileAssetId  String
+  createdAt    DateTime @default(now())
+
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  submission HomeworkSubmission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  assignment HomeworkAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  fileAsset  FileAsset           @relation(fields: [fileAssetId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, submissionId])
+  @@index([tenantId, assignmentId])
+  @@index([tenantId, fileAssetId])
+}

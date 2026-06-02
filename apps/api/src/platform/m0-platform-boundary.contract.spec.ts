@@ -242,7 +242,7 @@ describe('M0 Platform/School boundary – route denial contracts', () => {
     });
 
     it('frontend platform API calls use /platform/ prefix consistently', () => {
-      const api = read('../web/lib/api.ts');
+      const api = read('../web/lib/api/platform.ts');
 
       // All platform API methods must use /platform/ prefix
       const platformMethods = [

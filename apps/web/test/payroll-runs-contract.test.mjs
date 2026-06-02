@@ -10,6 +10,10 @@ function read(relativePath) {
   return readFileSync(join(webRoot, relativePath), 'utf8');
 }
 
+function readMany(relativePaths) {
+  return relativePaths.map((relativePath) => read(relativePath)).join('\n');
+}
+
 describe('Payroll Runs UI contracts', () => {
   it('renders Payroll Runs from the HR workspace instead of the preview-only tab', () => {
     const workspace = read('components/hr/hr-workspace.tsx');
@@ -23,7 +27,10 @@ describe('Payroll Runs UI contracts', () => {
   });
 
   it('uses only preview, create, approve, post, list, and approved salary-slip PDF helpers', () => {
-    const apiClient = read('lib/api.ts');
+    const apiClient = readMany([
+      'lib/api/payroll.ts',
+      'lib/api/client.ts',
+    ]);
     const payrollRuns = read('components/hr/payroll-runs.tsx');
 
     for (const helper of [
@@ -52,7 +59,10 @@ describe('Payroll Runs UI contracts', () => {
   });
 
   it('keeps Payroll Runs UI inside the Phase 2 posting boundary without disbursement or reversals', () => {
-    const apiClient = read('lib/api.ts');
+    const apiClient = readMany([
+      'lib/api/payroll.ts',
+      'lib/api/client.ts',
+    ]);
     const payrollRuns = read('components/hr/payroll-runs.tsx');
 
     assert.match(payrollRuns, /Approval locks payroll calculations/i);
@@ -76,7 +86,10 @@ describe('Payroll Runs UI contracts', () => {
   });
 
   it('keeps Payroll Runs permission-aware and avoids internal tenant or journal identifier leakage', () => {
-    const apiClient = read('lib/api.ts');
+    const apiClient = readMany([
+      'lib/api/payroll.ts',
+      'lib/api/client.ts',
+    ]);
     const payrollRuns = read('components/hr/payroll-runs.tsx');
 
     assert.match(payrollRuns, /hasPermissions\(\['payroll:manage'\]\)/);

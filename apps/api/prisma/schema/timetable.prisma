@@ -1,0 +1,169 @@
+model TimetablePeriod {
+  id             String   @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  name           String
+  dayOfWeek      Int?
+  startsAt       String
+  endsAt         String
+  sortOrder      Int      @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant       Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear    @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  slots        TimetableSlot[]
+
+  @@unique([tenantId, academicYearId, name])
+  @@index([tenantId, academicYearId, dayOfWeek, sortOrder])
+}
+
+model Room {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  code      String?
+  capacity  Int?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  slots  TimetableSlot[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+}
+
+model TimetableVersion {
+  id             String                 @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  classId        String?
+  sectionId      String?
+  versionName    String
+  effectiveFrom  DateTime
+  effectiveTo    DateTime?
+  status         TimetableVersionStatus @default(DRAFT)
+  publishedAt    DateTime?
+  publishedById  String?
+  lockedAt       DateTime?
+  lockedById     String?
+  archivedAt     DateTime?
+  archivedById   String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  tenant       Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear    @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class        Class?          @relation(fields: [classId], references: [id], onDelete: SetNull)
+  section      Section?        @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  slots        TimetableSlot[]
+
+  @@index([tenantId, academicYearId, classId, sectionId, status])
+  @@index([tenantId, status, effectiveFrom, effectiveTo])
+}
+
+model TimetableSlot {
+  id             String   @id @default(uuid())
+  tenantId       String
+  versionId      String?
+  academicYearId String
+  classId        String
+  sectionId      String?
+  subjectId      String
+  staffId        String
+  periodId       String?
+  roomId         String?
+  dayOfWeek      Int
+  startsAt       String
+  endsAt         String
+  room           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  version       TimetableVersion?       @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  academicYear  AcademicYear            @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class         Class                   @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section       Section?                @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subject       Subject                 @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  staff         Staff                   @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  period        TimetablePeriod?        @relation(fields: [periodId], references: [id], onDelete: SetNull)
+  roomRef       Room?                   @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  substitutions TimetableSubstitution[]
+
+  @@index([tenantId, academicYearId, classId, sectionId, dayOfWeek])
+  @@index([tenantId, staffId, dayOfWeek])
+  @@index([tenantId, roomId, dayOfWeek])
+  @@index([tenantId, classId, sectionId])
+  @@index([tenantId, versionId, dayOfWeek, startsAt])
+  @@index([tenantId, versionId])
+}
+
+model TeacherAvailability {
+  id             String                  @id @default(uuid())
+  tenantId       String
+  academicYearId String?
+  staffId        String
+  dayOfWeek      Int
+  startsAt       String
+  endsAt         String
+  type           TeacherAvailabilityType @default(AVAILABLE)
+  note           String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, staffId, dayOfWeek])
+  @@index([tenantId, academicYearId, staffId])
+  @@index([tenantId, staffId, academicYearId, dayOfWeek, startsAt, endsAt])
+}
+
+model TeacherWorkloadLimit {
+  id                String   @id @default(uuid())
+  tenantId          String
+  academicYearId    String?
+  staffId           String
+  maxPeriodsPerDay  Int?
+  maxPeriodsPerWeek Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, academicYearId, staffId])
+  @@index([tenantId, staffId])
+}
+
+model TimetableSubstitution {
+  id                  String                      @id @default(uuid())
+  tenantId            String
+  timetableSlotId     String
+  absentTeacherId     String
+  substituteTeacherId String?
+  date                DateTime
+  reason              String
+  status              TimetableSubstitutionStatus @default(DRAFT)
+  createdById         String
+  approvedById        String?
+  assignedAt          DateTime?
+  cancelledAt         DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  timetableSlot     TimetableSlot @relation(fields: [timetableSlotId], references: [id], onDelete: Restrict)
+  absentTeacher     Staff         @relation("AbsentTeacherSubstitutions", fields: [absentTeacherId], references: [id], onDelete: Restrict)
+  substituteTeacher Staff?        @relation("SubstituteTeacherSubstitutions", fields: [substituteTeacherId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, date, status])
+  @@index([tenantId, absentTeacherId, date])
+  @@index([tenantId, substituteTeacherId, date])
+  @@index([tenantId, timetableSlotId, date])
+}

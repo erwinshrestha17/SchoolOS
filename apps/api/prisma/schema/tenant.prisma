@@ -1,0 +1,261 @@
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  mode      Mode     @default(SINGLE)
+  plan      String   @default("free")
+  panNumber String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  users                         User[]
+  roles                         Role[]
+  classes                       Class[]
+  students                      Student[]
+  subjects                      Subject[]
+  staff                         Staff[]
+  academicYears                 AcademicYear[]
+  sections                      Section[]
+  guardians                     Guardian[]
+  studentGuardians              StudentGuardian[]
+  enrollments                   Enrollment[]
+  attendanceSessions            AttendanceSession[]
+  attendanceRecords             AttendanceRecord[]
+  staffAttendance               StaffAttendance[]
+  feeHeads                      FeeHead[]
+  feePlans                      FeePlan[]
+  feePlanItems                  FeePlanItem[]
+  studentFeeAssignments         StudentFeeAssignment[]
+  invoices                      Invoice[]
+  invoiceLines                  InvoiceLine[]
+  payments                      Payment[]
+  paymentRefunds                PaymentRefund[]
+  cashierCloses                 CashierClose[]
+  receipts                      Receipt[]
+  receiptReprintHistory         ReceiptReprintHistory[]
+  chartAccounts                 ChartAccount[]
+  journalEntries                JournalEntry[]
+  journalLines                  JournalLine[]
+  notices                       Notice[]
+  events                        Event[]
+  studentDocuments              StudentDocument[]
+  siblingGroups                 SiblingGroup[]
+  siblingGroupMembers           SiblingGroupMember[]
+  attendanceConflicts           AttendanceConflict[]
+  feeBillingRuns                FeeBillingRun[]
+  feeDueSchedules               FeeDueSchedule[]
+  discountRules                 DiscountRule[]
+  feeWaivers                    FeeWaiver[]
+  activityPosts                 ActivityPost[]
+  activityAttachments           ActivityAttachment[]
+  activityPostStudents          ActivityPostStudent[]
+  activityReactions             ActivityReaction[]
+  developmentalMilestones       DevelopmentalMilestone[]
+  moodLogs                      MoodLog[]
+  notificationDeliveries        NotificationDelivery[]
+  notificationReadReceipts      NotificationReadReceipt[]
+  guardianConsents              GuardianConsent[]
+  guardianIdentityVerifications GuardianIdentityVerification[]
+  generatedStudentDocuments     GeneratedStudentDocument[]
+  lifecycleTransitions          StudentLifecycleTransition[]
+  attendanceSyncSubmissions     AttendanceSyncSubmission[]
+  teacherAssignments            SubjectTeacherAssignment[]
+  examTerms                     ExamTerm[]
+  examTimetableSlots            ExamTimetableSlot[]
+  markLockRequests              MarkLockRequest[]
+  assessmentComponents          AssessmentComponent[]
+  markEntries                   MarkEntry[]
+  casRecords                    CasRecord[]
+  reportCards                   ReportCard[]
+  reportCardHistories           ReportCardHistory[]
+  reportCardCorrectionRequests  ReportCardCorrectionRequest[]
+  promotionRecords              PromotionRecord[]
+  attendanceDrafts              AttendanceDraft[]
+  timetableSlots                TimetableSlot[]
+  timetablePeriods              TimetablePeriod[]
+  timetableRooms                Room[]
+  timetableVersions             TimetableVersion[]
+  teacherAvailabilities         TeacherAvailability[]
+  teacherWorkloadLimits         TeacherWorkloadLimit[]
+  timetableSubstitutions        TimetableSubstitution[]
+  subjectWeeklyRequirements     SubjectWeeklyRequirement[]
+  homeworkAssignments           HomeworkAssignment[]
+  homeworkSubmissions           HomeworkSubmission[]
+  homeworkAttachments           HomeworkAttachment[]
+  homeworkReminderBatches       HomeworkReminderBatch[]
+  staffContracts                StaffContract[]
+  staffQualifications           StaffQualification[]
+  staffExperienceRecords        StaffExperienceRecord[]
+  payrollRuns                   PayrollRun[]
+  payrollLines                  PayrollLine[]
+  payslips                      Payslip[]
+  salaryStructures              SalaryStructure[]
+  salaryComponents              SalaryComponent[]
+  accountingPeriods             AccountingPeriod[]
+  fiscalYears                   FiscalYear[]
+  fiscalPeriods                 FiscalPeriod[]
+  conversations                 Conversation[]
+  conversationParticipants      ConversationParticipant[]
+  messages                      Message[]
+  messageReadReceipts           MessageReadReceipt[]
+  libraryBooks                  LibraryBook[]
+  libraryCopies                 LibraryCopy[]
+  libraryIssues                 LibraryIssue[]
+  libraryFines                  LibraryFine[]
+  librarySetting                LibrarySetting?
+  transportRoutes               TransportRoute[]
+  transportStops                TransportStop[]
+  transportVehicles             TransportVehicle[]
+  transportDriverAssignments    TransportDriverAssignment[]
+  transportEnrollments          TransportEnrollment[]
+  transportLogs                 TransportLog[]
+  transportStudentAssignments   TransportStudentAssignment[]
+  transportTrips                TransportTrip[]
+  transportTripStudentStatuses  TransportTripStudentStatus[]
+  transportLocationPings        TransportLocationPing[]
+  canteenMenuItems              CanteenMenuItem[]
+  canteenMealPlans              CanteenMealPlan[]
+  canteenStudentEnrollments     CanteenStudentEnrollment[]
+  canteenMealServings           CanteenMealServing[]
+  canteenWallets                CanteenWallet[]
+  canteenWalletTransactions     CanteenWalletTransaction[]
+  canteenPosSales               CanteenPosSale[]
+  canteenPosSaleItems           CanteenPosSaleItem[]
+  canteenSpendingControls       CanteenSpendingControl[]
+  canteenSuppliers              CanteenSupplier[]
+  canteenInventoryItems         CanteenInventoryItem[]
+  canteenPurchaseBills          CanteenPurchaseBill[]
+  canteenPurchaseBillItems      CanteenPurchaseBillItem[]
+  canteenStockMovements         CanteenStockMovement[]
+  canteenWastageRecords         CanteenWastage[]
+  schoolCalendarDays            SchoolCalendarDay[]
+  staffLeaveBalances            StaffLeaveBalance[]
+  staffLeaveRequests            StaffLeaveRequest[]
+  syllabusTopics                SyllabusTopic[]
+  settings                      TenantSetting[]
+  fileAssets                    FileAsset[]
+  subscriptions                 TenantSubscription[]
+  featureOverrides              TenantFeatureOverride[]
+  platformWebhookEndpoints      PlatformWebhookEndpoint[]
+  platformWebhookDeliveries     PlatformWebhookDelivery[]
+  usageCounters                 UsageCounter[]
+  billingProfile                TenantBillingProfile?
+  saasInvoices                  SaaSInvoice[]
+  saasPayments                  SaaSPayment[]
+  platformApiKeys               PlatformApiKey[]
+  reportExports                 ReportExport[]
+  onboardingOverrides           TenantOnboardingChecklistOverride[]
+  studentMergeHistory           StudentMergeHistory[]
+  studentIdentities             StudentIdentity[]
+  studentDocumentHistory        StudentDocumentHistory[]
+  attendanceCorrectionRequests  AttendanceCorrectionRequest[]
+  accountingReportMappings      AccountingReportAccountMapping[]
+  bankStatements                BankStatement[]
+  studentQrCredentials          StudentQrCredential[]
+  staffDocuments                StaffDocument[]
+  staffLifecycleEvents          StaffLifecycleEvent[]
+  supportOverrides              SupportOverride[]
+}
+
+model TenantSetting {
+  id        String   @id @default(uuid())
+  tenantId  String
+  key       String
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+}
+
+model FileAsset {
+  id               String          @id @default(uuid())
+  tenantId         String
+  uploadedByUserId String?
+  originalFilename String
+  objectKey        String          @unique
+  mimeType         String
+  sizeBytes        BigInt
+  module           String?
+  entityId         String?
+  storageProvider  StorageProvider @default(LOCAL)
+  bucket           String?
+  checksumSha256   String?
+  ownerType        String?
+  ownerId          String?
+  visibility       FileVisibility  @default(PRIVATE)
+  status           FileStatus      @default(UPLOADED)
+  metadata         Json?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  softDeletedAt    DateTime?
+  deletedAt        DateTime?
+
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  uploadedBy          User?                @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  activityAttachments ActivityAttachment[]
+  homeworkAttachments HomeworkAttachment[]
+  studentPhoto        Student?             @relation("StudentPhoto")
+  studentDocuments    StudentDocument[]    @relation("DocumentFile")
+  reportCards         ReportCard[]         @relation("ReportCardFile")
+  reportCardHistories ReportCardHistory[]  @relation("ReportCardHistoryFile")
+
+  @@index([tenantId, module, entityId])
+  @@index([tenantId, ownerType, ownerId])
+  @@index([tenantId, storageProvider])
+  @@index([tenantId, visibility])
+}
+
+model ProviderConfig {
+  id               String              @id @default(uuid())
+  type             ProviderType
+  name             String
+  enabled          Boolean             @default(false)
+  environment      ProviderEnvironment @default(TEST)
+  configEncrypted  Json
+  secretKeys       String[]            @default([])
+  lastValidatedAt  DateTime?
+  validationStatus String?
+  updatedBy        String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@unique([type, name, environment])
+  @@index([type, enabled])
+}
+
+model SupportOverride {
+  id             String    @id @default(uuid())
+  platformUserId String
+  tenantId       String
+  reason         String
+  startsAt       DateTime  @default(now())
+  expiresAt      DateTime
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  platformUser User   @relation("UserSupportOverrides", fields: [platformUserId], references: [id])
+  tenant       Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([platformUserId, isActive])
+  @@index([tenantId, isActive])
+  @@index([expiresAt])
+}
+
+model TenantOnboardingChecklistOverride {
+  id        String   @id @default(uuid())
+  tenantId  String
+  itemKey   String
+  completed Boolean
+  reason    String
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, itemKey])
+}

@@ -10,6 +10,10 @@ function read(relativePath) {
   return readFileSync(join(webRoot, relativePath), 'utf8');
 }
 
+function readMany(relativePaths) {
+  return relativePaths.map((relativePath) => read(relativePath)).join('\n');
+}
+
 describe('Platform tenant subscription change workflow contracts', () => {
   it('wires the tenant detail Change Plan action to the change-plan route', () => {
     const detailPage = read('app/platform/schools/[tenantId]/page.tsx');
@@ -70,7 +74,10 @@ describe('Platform tenant subscription change workflow contracts', () => {
   });
 
   it('exposes typed API helpers for platform subscription assignment', () => {
-    const apiClient = read('lib/api.ts');
+    const apiClient = readMany([
+      'lib/api/platform.ts',
+      'lib/api/client.ts',
+    ]);
 
     assert.match(apiClient, /AssignPlatformTenantSubscriptionPayload/);
     assert.match(apiClient, /assignPlatformTenantSubscription:/);
@@ -128,7 +135,10 @@ describe('Platform tenant subscription change workflow contracts', () => {
   it('wires platform settings provider, queue, audit, and tab deep-link workflows', () => {
     const settings = read('app/platform/settings/page.tsx');
     const shell = read('components/layout/platform-shell.tsx');
-    const apiClient = read('lib/api.ts');
+    const apiClient = readMany([
+      'lib/api/platform.ts',
+      'lib/api/client.ts',
+    ]);
 
     for (const expected of [
       'Edit Provider',

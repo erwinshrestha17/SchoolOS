@@ -94,7 +94,7 @@ describe('SchoolOS Settings Page Contracts', () => {
 
   it('wires school logo branding to private File Registry APIs', () => {
     const page = read('app/dashboard/settings/page.tsx');
-    const apiClient = read('lib/api.ts');
+    const apiClient = read('lib/api/platform.ts');
 
     assert.match(page, /data-testid="school-logo-upload-panel"/);
     assert.match(page, /TENANT_LOGO_MAX_BYTES = 1024 \* 1024/);

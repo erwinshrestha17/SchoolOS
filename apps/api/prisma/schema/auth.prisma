@@ -1,0 +1,180 @@
+model User {
+  id               String      @id @default(uuid())
+  tenantId         String
+  tenant           Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  email            String?
+  phone            String?
+  passwordHash     String?
+  authMethod       AuthMethod  @default(PASSWORD)
+  status           UserStatus  @default(PENDING)
+  lastLoginAt      DateTime?
+  failedLoginCount Int         @default(0)
+  lockedUntil      DateTime?
+  createdAt        DateTime    @default(now())
+  fileAssets       FileAsset[]
+
+  userRoles                   UserRole[]
+  refreshTokens               RefreshToken[]
+  notificationReadReceipts    NotificationReadReceipt[]
+  otpCodes                    OtpCode[]
+  auditLogs                   AuditLog[]
+  student                     Student?                     @relation("StudentUser")
+  staff                       Staff?                       @relation("StaffUser")
+  guardian                    Guardian?                    @relation("GuardianUser")
+  submittedAttendanceSessions AttendanceSession[]          @relation("SubmittedAttendanceSessions")
+  approvedStaffAttendance     StaffAttendance[]            @relation("ApprovedStaffAttendance")
+  collectedPayments           Payment[]                    @relation("CollectedPayments")
+  cashierCloseCollectorScopes CashierClose[]               @relation("CashierCloseCollector")
+  closedCashierCloses         CashierClose[]               @relation("ClosedCashierCloses")
+  createdPaymentRefunds       PaymentRefund[]              @relation("CreatedPaymentRefunds")
+  journalEntries              JournalEntry[]               @relation("CreatedJournalEntries")
+  createdNotices              Notice[]                     @relation("CreatedNotices")
+  createdEvents               Event[]                      @relation("CreatedEvents")
+  approvedWaivers             FeeWaiver[]                  @relation("ApprovedFeeWaivers")
+  createdActivityPosts           ActivityPost[]               @relation("CreatedActivityPosts")
+  moderatedActivityPosts         ActivityPost[]               @relation("ModeratedActivityPosts")
+  editedActivityPosts            ActivityPost[]               @relation("EditedActivityPosts")
+  deletedActivityPosts           ActivityPost[]               @relation("DeletedActivityPosts")
+  notificationDeliveries      NotificationDelivery[]       @relation("NotificationActor")
+  enteredMarks                MarkEntry[]                  @relation("EnteredMarks")
+  reviewedStaffLeaveRequests  StaffLeaveRequest[]          @relation("ReviewedStaffLeaveRequests")
+    requestedMarkLockRequests      MarkLockRequest[]             @relation("RequestedMarkLock")
+    reviewedMarkLockRequests       MarkLockRequest[]             @relation("ReviewedMarkLock")
+    publishedReportCards           ReportCard[]                  @relation("PublishedReportCards")
+    requestedReportCardCorrections ReportCardCorrectionRequest[] @relation("RequestedReportCardCorrection")
+    reviewedReportCardCorrections  ReportCardCorrectionRequest[] @relation("ReviewedReportCardCorrection")
+  transportTripsCreated       TransportTrip[]              @relation("TransportTripCreatedBy")
+  transportTripsCompleted     TransportTrip[]              @relation("TransportTripCompletedBy")
+  transportStatusesMarked     TransportTripStudentStatus[] @relation("TransportTripStatusMarkedBy")
+  canteenMealServingsServed   CanteenMealServing[]         @relation("CanteenMealServedBy")
+  canteenWalletTransactions   CanteenWalletTransaction[]   @relation("CanteenWalletTransactionCreatedBy")
+  canteenPosSalesCreated      CanteenPosSale[]             @relation("CanteenPosSaleCreatedBy")
+  canteenMealOverridden       CanteenMealServing[]         @relation("CanteenMealOverriddenBy")
+  canteenPurchaseBills        CanteenPurchaseBill[]        @relation("CanteenPurchaseBillCreatedBy")
+  canteenStockMovements       CanteenStockMovement[]       @relation("CanteenStockMovementCreatedBy")
+  canteenWastageRecords       CanteenWastage[]             @relation("CanteenWastageCreatedBy")
+  reversedPayrollRuns         PayrollRun[]                 @relation("ReversedPayrollRuns")
+  reprintedReceipts           ReceiptReprintHistory[]      @relation("ReceiptReprinter")
+  reversedPayments            Payment[]                    @relation("ReversedPayments")
+  mergedStudents              StudentMergeHistory[]        @relation("MergedBy")
+
+  requestedAttendanceCorrections AttendanceCorrectionRequest[]    @relation("RequestedAttendanceCorrections")
+  reviewedAttendanceCorrections  AttendanceCorrectionRequest[]    @relation("ReviewedAttendanceCorrections")
+  createdAccountMappings         AccountingReportAccountMapping[] @relation("CreatedAccountMappings")
+  updatedAccountMappings         AccountingReportAccountMapping[] @relation("UpdatedAccountMappings")
+  reconciledBankStatements       BankStatement[]                  @relation("ReconciledBankStatements")
+  verifiedStaffDocuments         StaffDocument[]                  @relation("VerifiedStaffDocuments")
+  createdStaffLifecycleEvents    StaffLifecycleEvent[]            @relation("CreatedStaffLifecycleEvents")
+  attendanceDrafts               AttendanceDraft[]
+  supportOverrides               SupportOverride[]                @relation("UserSupportOverrides")
+
+  @@unique([tenantId, email])
+  @@unique([tenantId, phone])
+}
+
+model Role {
+  id          String  @id @default(uuid())
+  tenantId    String
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  name        String
+  description String?
+  isSystem    Boolean @default(false)
+
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@unique([tenantId, name])
+}
+
+model Permission {
+  id          String  @id @default(uuid())
+  resource    String
+  action      String
+  description String?
+
+  rolePermissions RolePermission[]
+
+  @@unique([resource, action])
+}
+
+model UserRole {
+  id           String   @id @default(uuid())
+  userId       String
+  roleId       String
+  tenantId     String
+  scopeId      String?
+  assignedById String?
+  assignedAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId, scopeId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model RefreshToken {
+  id                String    @id @default(uuid())
+  userId            String
+  tokenHash         String    @unique
+  deviceId          String?
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  familyId          String?
+  parentTokenId     String?
+  replacedByTokenId String?
+  hashVersion       Int       @default(1)
+  revokedReason     String?
+  userAgent         String?
+  ipAddress         String?
+  lastUsedAt        DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+}
+
+model OtpCode {
+  id        String     @id @default(uuid())
+  userId    String
+  codeHash  String
+  purpose   OtpPurpose
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  tenantId   String
+  action     String
+  resource   String
+  resourceId String?
+  before     Json?
+  after      Json?
+  ipAddress  String?
+  userAgent  String?
+  requestId  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, action, createdAt])
+  @@index([tenantId, action, createdAt])
+  @@index([resource, resourceId])
+  @@index([createdAt])
+  @@index([requestId])
+}

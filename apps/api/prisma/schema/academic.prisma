@@ -1,0 +1,197 @@
+model AcademicYear {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  startsOn  DateTime
+  endsOn    DateTime
+  isCurrent Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant                    Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  enrollments               Enrollment[]
+  attendanceSessions        AttendanceSession[]
+  feePlans                  FeePlan[]
+  studentFeeAssignments     StudentFeeAssignment[]
+  invoices                  Invoice[]
+  feeBillingRuns            FeeBillingRun[]
+  feeDueSchedules           FeeDueSchedule[]
+  teacherAssignments        SubjectTeacherAssignment[]
+  examTerms                 ExamTerm[]
+  casRecords                CasRecord[]
+  reportCards               ReportCard[]
+  reportCardHistories       ReportCardHistory[]
+  examTimetableSlots        ExamTimetableSlot[]
+  promotionRecords          PromotionRecord[]
+  timetableSlots            TimetableSlot[]
+  timetablePeriods          TimetablePeriod[]
+  timetableVersions         TimetableVersion[]
+  homeworkAssignments       HomeworkAssignment[]
+  subjectWeeklyRequirements SubjectWeeklyRequirement[]
+  conversations             Conversation[]
+  attendanceDrafts          AttendanceDraft[]
+
+  @@unique([tenantId, name])
+}
+
+model Class {
+  id       String @id @default(uuid())
+  tenantId String
+  name     String
+  level    Int
+
+  tenant                    Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  students                  Student[]
+  subjects                  Subject[]
+  sections                  Section[]
+  enrollments               Enrollment[]
+  attendanceSessions        AttendanceSession[]
+  feePlans                  FeePlan[]
+  notices                   Notice[]
+  events                    Event[]
+  discountRules             DiscountRule[]
+  activityPosts             ActivityPost[]
+  moodLogs                  MoodLog[]
+  developmentalMilestones   DevelopmentalMilestone[]
+  teacherAssignments        SubjectTeacherAssignment[]
+  casRecords                CasRecord[]
+  reportCards               ReportCard[]
+  promotionRecordsFrom      PromotionRecord[]          @relation("PromotionFromClass")
+  promotionRecordsTo        PromotionRecord[]          @relation("PromotionToClass")
+  timetableSlots            TimetableSlot[]
+  timetableVersions         TimetableVersion[]
+  homeworkAssignments       HomeworkAssignment[]
+  subjectWeeklyRequirements SubjectWeeklyRequirement[]
+  conversations             Conversation[]
+  examTimetableSlots        ExamTimetableSlot[]
+  attendanceDrafts          AttendanceDraft[]
+
+  @@unique([tenantId, name])
+}
+
+model Section {
+  id             String   @id @default(uuid())
+  tenantId       String
+  classId        String
+  name           String
+  capacity       Int?
+  classTeacherId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant                    Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  class                     Class                      @relation(fields: [classId], references: [id], onDelete: Restrict)
+  classTeacher              Staff?                     @relation("ClassTeacherSections", fields: [classTeacherId], references: [id], onDelete: SetNull)
+  students                  Student[]
+  enrollments               Enrollment[]
+  attendanceSessions        AttendanceSession[]
+  notices                   Notice[]
+  events                    Event[]
+  activityPosts             ActivityPost[]
+  moodLogs                  MoodLog[]
+  developmentalMilestones   DevelopmentalMilestone[]
+  teacherAssignments        SubjectTeacherAssignment[]
+  casRecords                CasRecord[]
+  reportCards               ReportCard[]
+  promotionRecordsFrom      PromotionRecord[]          @relation("PromotionFromSection")
+  promotionRecordsTo        PromotionRecord[]          @relation("PromotionToSection")
+  timetableSlots            TimetableSlot[]
+  timetableVersions         TimetableVersion[]
+  homeworkAssignments       HomeworkAssignment[]
+  subjectWeeklyRequirements SubjectWeeklyRequirement[]
+  conversations             Conversation[]
+  examTimetableSlots        ExamTimetableSlot[]
+  attendanceDrafts          AttendanceDraft[]
+
+  @@unique([tenantId, classId, name])
+}
+
+model Subject {
+  id             String  @id @default(uuid())
+  tenantId       String
+  classId        String
+  name           String
+  code           String
+  type           String
+  hasPractical   Boolean @default(false)
+  theoryMarks    Float?
+  practicalMarks Float?
+  passMarks      Float?
+
+  tenant                    Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  class                     Class                      @relation(fields: [classId], references: [id], onDelete: Restrict)
+  teacherAssignments        SubjectTeacherAssignment[]
+  assessmentComponents      AssessmentComponent[]
+  markEntries               MarkEntry[]
+  casRecords                CasRecord[]
+  timetableSlots            TimetableSlot[]
+  homeworkAssignments       HomeworkAssignment[]
+  subjectWeeklyRequirements SubjectWeeklyRequirement[]
+  examTimetableSlots        ExamTimetableSlot[]
+  syllabusTopics            SyllabusTopic[]
+
+  @@unique([tenantId, classId, code])
+}
+
+model SubjectTeacherAssignment {
+  id             String   @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  subjectId      String
+  staffId        String
+  classId        String
+  sectionId      String?
+  createdAt      DateTime @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  staff        Staff        @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, academicYearId, subjectId, staffId, sectionId])
+  @@index([tenantId, classId, sectionId])
+}
+
+model SubjectWeeklyRequirement {
+  id                     String   @id @default(uuid())
+  tenantId               String
+  academicYearId         String
+  classId                String
+  sectionId              String?
+  subjectId              String
+  requiredPeriodsPerWeek Int
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, academicYearId, classId, sectionId, subjectId])
+  @@index([tenantId, academicYearId, classId, sectionId])
+  @@index([tenantId, subjectId])
+}
+
+model SyllabusTopic {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  subjectId          String
+  title              String
+  description        String?
+  orderIndex         Int       @default(0)
+  isCompleted        Boolean   @default(false)
+  completedAt        DateTime?
+  completedByStaffId String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  tenant           Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  subject          Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  completedByStaff Staff?  @relation(fields: [completedByStaffId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, subjectId])
+}

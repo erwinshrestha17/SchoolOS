@@ -1,0 +1,390 @@
+model Student {
+  id                        String                 @id @default(uuid())
+  tenantId                  String
+  userId                    String?                @unique
+  studentSystemId           String
+  firstNameEn               String
+  lastNameEn                String
+  firstNameNp               String?
+  lastNameNp                String?
+  dateOfBirth               DateTime
+  gender                    Gender
+  bloodGroup                String?
+  nationality               String                 @default("Nepali")
+  religion                  String?
+  ethnicity                 String?
+  motherTongue              String?
+  disabilityFlag            String?
+  nationalStudentId         String?
+  birthCertNumber           String?
+  citizenshipNo             String?
+  photoUrl                  String?
+  photoFileId               String?                @unique
+  admissionDate             DateTime
+  admissionNumber           String?
+  previousSchool            String?
+  transferCertUrl           String?
+  lifecycleStatus           StudentLifecycleStatus @default(ACTIVE)
+  exitReason                String?
+  exitedAt                  DateTime?
+  destinationSchool         String?
+  conductRemark             String?
+  feeClearanceWaivedAt      DateTime?
+  feeClearanceWaivedById    String?
+  mediumOfInstruct          String                 @default("English")
+  classId                   String
+  sectionId                 String?
+  section                   String?
+  rollNumber                Int?
+  medicalConditions         String?
+  severeAllergies           String?
+  medications               String?
+  specialNeeds              String?
+  emergencyName             String?
+  emergencyPhone            String?
+  doctorName                String?
+  doctorPhone               String?
+  qrCode                    String?                @unique
+  studentIdentityCode       String?                @unique
+  privacyConsentAt          DateTime?
+  dataProcessingConsentedAt DateTime?
+  medicalConsentAt          DateTime?
+  photoUsageConsentAt       DateTime?
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
+
+  tenant                       Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user                         User?                         @relation("StudentUser", fields: [userId], references: [id], onDelete: SetNull)
+  class                        Class                         @relation(fields: [classId], references: [id], onDelete: Restrict)
+  sectionRef                   Section?                      @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  guardianLinks                StudentGuardian[]
+  enrollments                  Enrollment[]
+  attendanceRecords            AttendanceRecord[]
+  studentFeeAssignments        StudentFeeAssignment[]
+  invoices                     Invoice[]
+  payments                     Payment[]
+  documents                    StudentDocument[]
+  generatedDocuments           GeneratedStudentDocument[]
+  lifecycleTransitions         StudentLifecycleTransition[]
+  mergeHistorySource           StudentMergeHistory[]         @relation("SourceStudentMerge")
+  mergeHistoryTarget           StudentMergeHistory[]         @relation("TargetStudentMerge")
+  identities                   StudentIdentity[]
+  photoFile                    FileAsset?                    @relation("StudentPhoto", fields: [photoFileId], references: [id])
+  siblingMemberships           SiblingGroupMember[]
+  activityTags                 ActivityPostStudent[]
+  activityReactions            ActivityReaction[]
+  developmentalMilestones      DevelopmentalMilestone[]
+  moodLogs                     MoodLog[]
+  feeWaivers                   FeeWaiver[]
+  notificationDeliveries       NotificationDelivery[]
+  markEntries                  MarkEntry[]
+  casRecords                   CasRecord[]
+  reportCards                  ReportCard[]
+  reportCardHistories          ReportCardHistory[]
+  promotionRecords             PromotionRecord[]
+  homeworkSubmissions          HomeworkSubmission[]
+  conversations                Conversation[]
+  conversationParticipants     ConversationParticipant[]
+  libraryIssues                LibraryIssue[]
+  transportEnrollments         TransportEnrollment[]
+  transportLogs                TransportLog[]
+  transportAssignments         TransportStudentAssignment[]
+  transportTripStatuses        TransportTripStudentStatus[]
+  canteenEnrollments           CanteenStudentEnrollment[]
+  canteenMealServings          CanteenMealServing[]
+  canteenWallets               CanteenWallet[]
+  canteenWalletTransactions    CanteenWalletTransaction[]
+  canteenPosSales              CanteenPosSale[]
+  canteenSpendingControls      CanteenSpendingControl[]
+  attendanceCorrectionRequests AttendanceCorrectionRequest[]
+  qrCredentials                StudentQrCredential[]
+
+  @@unique([tenantId, studentSystemId])
+  @@index([tenantId, classId, sectionId])
+  @@index([tenantId, admissionNumber])
+  @@index([tenantId, lifecycleStatus])
+}
+
+model Guardian {
+  id               String    @id @default(uuid())
+  tenantId         String
+  userId           String?   @unique
+  fullName         String
+  relation         String
+  primaryPhone     String
+  secondaryPhone   String?
+  email            String?
+  occupation       String?
+  homeAddress      String?
+  wardNumber       String?
+  receivesAlerts   Boolean   @default(false)
+  privacyConsentAt DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  tenant                   Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user                     User?                          @relation("GuardianUser", fields: [userId], references: [id], onDelete: SetNull)
+  studentLinks             StudentGuardian[]
+  consents                 GuardianConsent[]
+  notificationDeliveries   NotificationDelivery[]
+  activityReactions        ActivityReaction[]
+  conversations            Conversation[]
+  conversationParticipants ConversationParticipant[]
+  messages                 Message[]
+  messageReadReceipts      MessageReadReceipt[]
+  identityVerifications    GuardianIdentityVerification[]
+
+  @@unique([tenantId, primaryPhone])
+  @@index([tenantId, email])
+}
+
+model GuardianIdentityVerification {
+  id                 String                             @id @default(uuid())
+  tenantId           String
+  guardianId         String
+  status             GuardianIdentityVerificationStatus @default(PENDING)
+  documentType       String
+  documentNumber     String?
+  evidenceDocumentId String?
+  notes              String?
+  submittedById      String?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  reviewNote         String?
+  createdAt          DateTime                           @default(now())
+  updatedAt          DateTime                           @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  guardian Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, guardianId, status])
+  @@index([tenantId, status, createdAt])
+}
+
+model StudentGuardian {
+  id             String   @id @default(uuid())
+  tenantId       String
+  studentId      String
+  guardianId     String
+  relation       String
+  isPrimary      Boolean  @default(false)
+  appLoginLinked Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student  Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  guardian Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, guardianId])
+}
+
+model Enrollment {
+  id                  String           @id @default(uuid())
+  tenantId            String
+  studentId           String
+  academicYearId      String
+  classId             String
+  sectionId           String?
+  rollNumber          Int?
+  admissionNumber     String?
+  admissionDate       DateTime
+  mediumOfInstruction String
+  status              EnrollmentStatus @default(ACTIVE)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section      Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  invoices     Invoice[]
+
+  @@unique([tenantId, academicYearId, studentId])
+  @@index([tenantId, admissionNumber])
+}
+
+model StudentDocument {
+  id           String                @id @default(uuid())
+  tenantId     String
+  studentId    String
+  fileId       String?
+  kind         StudentDocumentKind
+  status       StudentDocumentStatus @default(ACTIVE)
+  title        String
+  fileName     String
+  contentType  String
+  sizeBytes    Int
+  provider     StorageProvider       @default(LOCAL)
+  objectKey    String
+  publicUrl    String?
+  signedUrl    String?
+  notes        String?
+  expiryDate   DateTime?
+  verifiedAt   DateTime?
+  verifiedById String?
+  uploadedById String?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @default(now()) @updatedAt
+
+  tenant  Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student Student                  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  file    FileAsset?               @relation("DocumentFile", fields: [fileId], references: [id])
+  history StudentDocumentHistory[]
+
+  @@index([tenantId, studentId])
+  @@index([tenantId, fileId])
+}
+
+model StudentMergeHistory {
+  id              String   @id @default(uuid())
+  tenantId        String
+  sourceStudentId String
+  targetStudentId String
+  mergedById      String?
+  mergedAt        DateTime @default(now())
+  reason          String?
+  metadata        Json?
+
+  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  sourceStudent Student @relation("SourceStudentMerge", fields: [sourceStudentId], references: [id], onDelete: Cascade)
+  targetStudent Student @relation("TargetStudentMerge", fields: [targetStudentId], references: [id], onDelete: Cascade)
+  mergedBy      User?   @relation("MergedBy", fields: [mergedById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, sourceStudentId])
+  @@index([tenantId, targetStudentId])
+}
+
+model StudentIdentity {
+  id           String    @id @default(uuid())
+  tenantId     String
+  studentId    String
+  identityCode String    @unique
+  status       String    @default("ACTIVE") // ACTIVE, REVOKED
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  revokedAt    DateTime?
+  revokedById  String?
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, studentId])
+  @@index([tenantId, identityCode])
+}
+
+model StudentQrCredential {
+  id            String          @id @default(cuid())
+  tenantId      String
+  studentId     String
+  tokenHash     String
+  status        StudentQrStatus @default(ACTIVE)
+  createdById   String?
+  updatedById   String?
+  expiresAt     DateTime?
+  createdAt     DateTime        @default(now())
+  rotatedAt     DateTime?
+  revokedAt     DateTime?
+  rotateReason  String?
+  revokeReason  String?
+  lastScannedAt DateTime?
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([tokenHash])
+  @@index([tenantId, studentId])
+  @@index([tenantId, studentId, status])
+  @@index([tenantId, status])
+}
+
+model StudentDocumentHistory {
+  id            String   @id @default(uuid())
+  tenantId      String
+  documentId    String?
+  action        String // UPLOAD, DELETE, VIEW, MOVE_MERGE
+  documentTitle String?
+  documentKind  String?
+  performedBy   String
+  reason        String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  document StudentDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+}
+
+model GeneratedStudentDocument {
+  id                String    @id @default(uuid())
+  tenantId          String
+  studentId         String
+  kind              String
+  title             String
+  fileName          String
+  contentType       String    @default("application/pdf")
+  sizeBytes         Int
+  pdfUrl            String
+  generatedById     String?
+  storageObjectKey  String?
+  checksumSha256    String?
+  signedAt          DateTime?
+  signatureMetadata Json?
+  version           Int       @default(1)
+  retentionUntil    DateTime?
+  revokedAt         DateTime?
+  revokedById       String?
+  generatedAt       DateTime  @default(now())
+  metadata          Json?
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, studentId, kind])
+}
+
+model StudentLifecycleTransition {
+  id                 String                  @id @default(uuid())
+  tenantId           String
+  studentId          String
+  fromStatus         StudentLifecycleStatus?
+  toStatus           StudentLifecycleStatus
+  reason             String
+  changedById        String?
+  changedAt          DateTime                @default(now())
+  feeClearanceWaived Boolean                 @default(false)
+  metadata           Json?
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, studentId, changedAt])
+}
+
+model SiblingGroup {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant  Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  members SiblingGroupMember[]
+
+  @@unique([tenantId, name])
+}
+
+model SiblingGroupMember {
+  id             String   @id @default(uuid())
+  tenantId       String
+  siblingGroupId String
+  studentId      String
+  relationship   String?
+  createdAt      DateTime @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  siblingGroup SiblingGroup @relation(fields: [siblingGroupId], references: [id], onDelete: Cascade)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([siblingGroupId, studentId])
+}

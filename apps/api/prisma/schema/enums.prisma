@@ -1,0 +1,767 @@
+enum Mode {
+  SINGLE
+  MULTI
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum AuthMethod {
+  PASSWORD
+  OTP
+  BOTH
+}
+
+enum OtpPurpose {
+  LOGIN
+  RESET
+  VERIFY
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ContractType {
+  PERMANENT
+  TEMPORARY
+  PART_TIME
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PROMOTED
+  TRANSFERRED
+  EXITED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  LEAVE
+  ON_LEAVE
+  HOLIDAY
+  SICK_LEAVE
+  EXCUSED_LEAVE
+  UNEXCUSED_LEAVE
+}
+
+enum FeeFrequency {
+  ONE_TIME
+  MONTHLY
+  TERM
+  ANNUAL
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIAL
+  PAID
+  VOID
+}
+
+enum PaymentStatus {
+  SUCCESS
+  REVERSED
+  FAILED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK
+  CHEQUE
+  TRANSFER
+  MOBILE
+}
+
+enum JournalSourceType {
+  MANUAL
+  INVOICE
+  FEE_PAYMENT
+  PAYMENT_REFUND
+  PAYROLL
+  PAYROLL_RUN
+  PAYROLL_DISBURSEMENT
+  CLOSING
+  ADJUSTMENT
+  REVERSAL
+  CORRECTION
+  OPENING_BALANCE
+  EXPENSE_VOUCHER
+  PAYMENT_VOUCHER
+  RECEIPT_VOUCHER
+  CONTRA_VOUCHER
+  CLOSING_ENTRY
+}
+
+enum JournalLineSide {
+  DEBIT
+  CREDIT
+}
+
+enum ChartAccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  INCOME
+  EXPENSE
+}
+
+enum AccountingReportMappingType {
+  CASH
+  BANK
+  VAT_OUTPUT
+  VAT_INPUT
+  TDS_PAYABLE
+  PF_EMPLOYEE_PAYABLE
+  PF_EMPLOYER_PAYABLE
+  PF_PAYABLE
+  RETAINED_EARNINGS
+}
+
+enum JournalEntryStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  POSTED
+  REJECTED
+  CANCELLED
+  REVERSED
+}
+
+enum StaffStatus {
+  ACTIVE
+  ON_LEAVE
+  SUSPENDED
+  TERMINATED
+  RESIGNED
+  INACTIVE
+}
+
+enum StaffEmploymentType {
+  PERMANENT
+  TEMPORARY
+  PART_TIME
+  CONTRACT
+  INTERN
+}
+
+enum LeaveType {
+  SICK
+  CASUAL
+  EARNED
+  MATERNITY
+  PATERNITY
+  UNPAID
+  OTHER
+}
+
+enum LeaveRequestStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum SalaryStructureStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum SalaryComponentType {
+  EARNING
+  DEDUCTION
+  EMPLOYER_CONTRIBUTION
+}
+
+enum PayrollPaymentStatus {
+  UNPAID
+  PAID
+}
+
+enum NoticePriority {
+  NORMAL
+  URGENT
+  EMERGENCY
+}
+
+enum AudienceType {
+  ALL
+  CLASS
+  SECTION
+  ROLE
+  STUDENT
+}
+
+enum EventType {
+  GENERAL
+  EXAM
+  MEETING
+  HOLIDAY
+}
+
+enum StorageProvider {
+  LOCAL
+  S3
+  R2
+  MINIO
+  GCP
+}
+
+enum FileVisibility {
+  PRIVATE
+  TENANT
+  OWNER
+}
+
+enum StudentDocumentKind {
+  BIRTH_CERTIFICATE
+  TRANSFER_CERTIFICATE
+  CITIZENSHIP_DOC
+  PREVIOUS_REPORT_CARD
+  MEDICAL_RECORD
+  PHOTO
+  ID_CARD
+  ENROLLMENT_CONFIRMATION
+  OTHER
+}
+
+enum StaffDocumentKind {
+  ID_CARD
+  CITIZENSHIP
+  CONTRACT
+  ACADEMIC_CERTIFICATE
+  PAN_CARD
+  OFFER_LETTER
+  OTHER
+}
+
+enum StaffLifecycleEventType {
+  HIRED
+  PROMOTED
+  TRANSFERRED
+  ON_LEAVE
+  RETURNED
+  TERMINATED
+  RESIGNED
+  STATUS_CHANGE
+  CONTRACT_RENEWAL
+}
+
+enum AttendanceConflictStatus {
+  NONE
+  FLAGGED
+  REVIEWED
+}
+
+enum AttendanceConflictDecision {
+  REVIEWED_WITHOUT_CHANGE
+  REVIEWED_AND_OVERRIDDEN
+  REJECTED_RESUBMISSION
+}
+
+enum BillingRunStatus {
+  DRAFT
+  GENERATED
+  VOID
+}
+
+enum DiscountType {
+  SIBLING
+  SCHOLARSHIP
+  STAFF_CHILD
+  MANUAL
+}
+
+enum WaiverStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ActivityCategory {
+  LEARNING
+  OUTDOOR_PLAY
+  ART_AND_CRAFT
+  CELEBRATION
+  SPORTS
+  GENERAL
+}
+
+enum MoodValue {
+  CALM
+  ENGAGED
+  EXCITED
+  UNSETTLED
+  TIRED
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum NotificationStatus {
+  QUEUED
+  RETRY_PENDING
+  SENT
+  DELIVERED
+  FAILED
+  CANCELLED
+  SKIPPED
+}
+
+enum ConsentType {
+  PRIVACY
+  DATA_PROCESSING
+  MEDICAL
+  PHOTO_USAGE
+  MESSAGING
+}
+
+enum AttendanceSyncStatus {
+  SYNCED
+  CONFLICTED
+  REJECTED
+  DUPLICATE
+  ACCEPTED
+}
+
+enum AttendanceSyncRejectionReason {
+  LOCKED_SESSION
+  VALIDATION_ERROR
+  ROSTER_MISMATCH
+  REFERENCE_NOT_FOUND
+  UNKNOWN
+  ALREADY_MARKED
+  HOLIDAY
+  CROSS_TENANT
+  STALE_DRAFT
+  UNASSIGNED_TEACHER
+}
+
+enum AttendanceCorrectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ActivityReactionType {
+  HEART
+  CLAP
+  STAR
+}
+
+enum DevelopmentalMilestoneStatus {
+  EMERGING
+  PROGRESSING
+  ACHIEVED
+  NEEDS_SUPPORT
+}
+
+enum ExamTermStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum AssessmentType {
+  THEORY
+  PRACTICAL
+  CAS
+  PROJECT
+  INTERNAL
+  TERMINAL
+}
+
+enum GradeLockStatus {
+  DRAFT
+  LOCKED
+}
+
+enum HomeworkAssignmentStatus {
+  DRAFT
+  ASSIGNED
+  CLOSED
+  CANCELLED
+}
+
+enum HomeworkSubmissionStatus {
+  NOT_SUBMITTED
+  SUBMITTED
+  LATE
+  REVIEWED
+  NEEDS_CORRECTION
+  EXCUSED
+}
+
+enum TimetableVersionStatus {
+  DRAFT
+  PUBLISHED
+  LOCKED
+  ARCHIVED
+}
+
+enum TeacherAvailabilityType {
+  AVAILABLE
+  UNAVAILABLE
+}
+
+enum TimetableSubstitutionStatus {
+  DRAFT
+  ASSIGNED
+  CANCELLED
+  COMPLETED
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  GENERATED
+  UNDER_REVIEW
+  REVIEWED
+  APPROVED
+  POSTED
+  PAID
+  CANCELLED
+  VOID
+}
+
+enum PayrollLineStatus {
+  DRAFT
+  APPROVED
+  POSTED
+}
+
+enum PayslipStatus {
+  DRAFT
+  ISSUED
+}
+
+enum AccountingPeriodStatus {
+  OPEN
+  LOCKED
+  CLOSED
+}
+
+enum FiscalYearStatus {
+  OPEN
+  CLOSED
+}
+
+enum StudentLifecycleStatus {
+  ACTIVE
+  TRANSFERRED
+  EXITED
+  ALUMNI
+  ARCHIVED
+  MERGED
+  DELETED
+}
+
+enum StudentDocumentStatus {
+  ACTIVE
+  ARCHIVED
+  REPLACED
+  REJECTED
+  VERIFIED
+}
+
+enum GuardianIdentityVerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  REVOKED
+}
+
+enum ConversationType {
+  DIRECT
+  CLASS
+  SECTION
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+enum ParentTeacherThreadStatus {
+  OPEN
+  CLOSED
+  ESCALATED
+}
+
+enum ParentTeacherSenderRole {
+  PARENT
+  TEACHER
+  ADMIN
+}
+
+enum ParentTeacherMessagePriority {
+  NORMAL
+  IMPORTANT
+  EMERGENCY
+}
+
+enum ChatAvailabilityAppliesToRole {
+  TEACHER
+  PARENT
+  BOTH
+}
+
+enum ChatEscalationStatus {
+  OPEN
+  RESOLVED
+}
+
+enum ChatAbuseReportStatus {
+  OPEN
+  REVIEWED
+  DISMISSED
+  ACTION_TAKEN
+}
+
+enum LibraryCopyStatus {
+  AVAILABLE
+  ISSUED
+  LOST
+  DAMAGED
+  RESERVED
+  ARCHIVED
+}
+
+enum LibraryIssueStatus {
+  ISSUED
+  RETURNED
+  OVERDUE
+  LOST
+}
+
+enum LibraryFineStatus {
+  PENDING
+  POSTED_TO_FEES
+  PAID
+  PARTIALLY_PAID
+  WAIVED
+}
+
+enum TransportVehicleStatus {
+  ACTIVE
+  MAINTENANCE
+  RETIRED
+}
+
+enum TransportEnrollmentStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+enum TransportBoardingStatus {
+  BOARDED
+  DROPPED
+  MISSED
+}
+
+enum TransportTripStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum TransportTripDirection {
+  PICKUP
+  DROP
+}
+
+enum TransportStudentTripStatus {
+  PENDING
+  BOARDED
+  DROPPED
+  ABSENT
+}
+
+enum CanteenMenuItemStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum CanteenMealPlanStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum CanteenEnrollmentStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+  ENDED
+}
+
+enum CanteenMealServingStatus {
+  SERVED
+  NOT_TAKEN
+  ABSENT
+  CANCELLED
+}
+
+enum CanteenWalletTransactionType {
+  TOP_UP
+  DEDUCTION
+  REFUND
+  ADJUSTMENT
+}
+
+enum CanteenWalletTransactionSource {
+  MANUAL
+  POS_SALE
+  MEAL_PURCHASE
+  FEE_INTEGRATION
+  ACCOUNTING_ADJUSTMENT
+  CORRECTION
+}
+
+enum CanteenPosSaleStatus {
+  DRAFT
+  COMPLETED
+  CANCELLED
+}
+
+enum CanteenPaymentMethod {
+  CASH
+  WALLET
+  STAFF_CREDIT
+}
+
+enum FileStatus {
+  PENDING
+  UPLOADED
+  FAILED
+  DELETED
+}
+
+enum ActivityPostStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+enum PlatformPlanStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum TenantSubscriptionStatus {
+  TRIAL
+  ACTIVE
+  OVERDUE
+  GRACE
+  SUSPENDED
+  EXPIRED
+  CANCELLED
+}
+
+enum PlatformWebhookEndpointStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum PlatformWebhookDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+  RETRYING
+}
+
+enum UsagePeriod {
+  DAILY
+  MONTHLY
+  ANNUAL
+  LIFETIME
+}
+
+enum SaaSInvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  PARTIAL
+  OVERDUE
+  CANCELLED
+}
+
+enum SaaSInvoiceLineType {
+  SUBSCRIPTION
+  SETUP_FEE
+  TRAINING_FEE
+  SMS_BUNDLE
+  STORAGE_ADDON
+  CUSTOM_SUPPORT
+  OTHER
+}
+
+enum SaaSPaymentMethod {
+  CASH
+  BANK_TRANSFER
+  ESEWA
+  KHALTI
+  CHEQUE
+  OTHER
+}
+
+enum PlatformApiKeyStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum ProviderType {
+  SMS
+  EMAIL
+  FCM
+  OBJECT_STORAGE
+  PAYMENT_GATEWAY
+  AI_PROVIDER
+}
+
+enum ProviderEnvironment {
+  TEST
+  PRODUCTION
+}
+
+enum ReportExportStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum StudentQrStatus {
+  ACTIVE
+  ROTATED
+  REVOKED
+}
+
+enum MarkEntryStatus {
+  PRESENT
+  ABSENT
+  EXCUSED
+  MISSING
+  WITHHELD
+  SUBMITTED
+}

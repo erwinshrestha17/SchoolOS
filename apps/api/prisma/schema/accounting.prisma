@@ -1,0 +1,236 @@
+model ChartAccount {
+  id           String           @id @default(uuid())
+  tenantId     String
+  fiscalYearId String?
+  code         String
+  name         String
+  type         ChartAccountType
+  isSystem     Boolean          @default(true)
+  isActive     Boolean          @default(true)
+  archivedAt   DateTime?
+  parentId     String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  tenant                   Tenant                           @relation(fields: [tenantId], references: [id])
+  fiscalYear               FiscalYear?                      @relation(fields: [fiscalYearId], references: [id], onDelete: SetNull)
+  parent                   ChartAccount?                    @relation("ChartAccountTree", fields: [parentId], references: [id])
+  children                 ChartAccount[]                   @relation("ChartAccountTree")
+  journalLines             JournalLine[]
+  accountingReportMappings AccountingReportAccountMapping[]
+  bankStatements           BankStatement[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, fiscalYearId])
+}
+
+model JournalEntry {
+  id             String             @id @default(uuid())
+  tenantId       String
+  fiscalYearId   String?
+  fiscalPeriodId String?
+  entryNumber    String?
+  entryDate      DateTime
+  narration      String
+  status         JournalEntryStatus @default(DRAFT)
+  sourceModule   String?
+  sourceType     JournalSourceType
+  sourceId       String?
+  postingType    String?
+  reversalOfId   String?
+  correctionOfId String?
+  createdById    String?
+
+  submittedAt    DateTime?
+  submittedById  String?
+  submissionNote String?
+
+  approvedAt   DateTime?
+  approvedById String?
+  approvalNote String?
+
+  rejectedAt      DateTime?
+  rejectedById    String?
+  rejectionReason String?
+
+  cancelledAt        DateTime?
+  cancelledById      String?
+  cancellationReason String?
+
+  postedAt   DateTime?
+  postedById String?
+
+  reversedById     String?
+  reversedAt       DateTime?
+  reversalReason   String?
+  correctionReason String?
+  createdAt        DateTime  @default(now())
+
+  tenant       Tenant         @relation(fields: [tenantId], references: [id])
+  fiscalYear   FiscalYear?    @relation(fields: [fiscalYearId], references: [id], onDelete: SetNull)
+  fiscalPeriod FiscalPeriod?  @relation(fields: [fiscalPeriodId], references: [id], onDelete: SetNull)
+  createdBy    User?          @relation("CreatedJournalEntries", fields: [createdById], references: [id])
+  reversalOf   JournalEntry?  @relation("JournalEntryReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversals    JournalEntry[] @relation("JournalEntryReversal")
+  correctionOf JournalEntry?  @relation("JournalEntryCorrection", fields: [correctionOfId], references: [id], onDelete: Restrict)
+  corrections  JournalEntry[] @relation("JournalEntryCorrection")
+  lines        JournalLine[]
+
+  @@unique([tenantId, fiscalYearId, entryNumber])
+  @@unique([tenantId, sourceModule, sourceType, sourceId, postingType])
+  @@index([tenantId, status, entryDate])
+  @@index([tenantId, status, postedAt])
+  @@index([tenantId, status, submittedAt])
+  @@index([tenantId, reversalOfId])
+  @@index([tenantId, fiscalYearId, fiscalPeriodId, postedAt])
+  @@index([tenantId, fiscalYearId, fiscalPeriodId, status])
+  @@index([tenantId, fiscalYearId])
+  @@index([tenantId, fiscalPeriodId])
+}
+
+model JournalLine {
+  id             String          @id @default(uuid())
+  tenantId       String
+  journalEntryId String
+  chartAccountId String
+  side           JournalLineSide
+  debit          Decimal         @default(0) @db.Decimal(12, 2)
+  credit         Decimal         @default(0) @db.Decimal(12, 2)
+  amount         Decimal         @db.Decimal(12, 2)
+  lineNumber     Int             @default(1)
+  description    String?
+  createdAt      DateTime        @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id])
+  chartAccount ChartAccount @relation(fields: [chartAccountId], references: [id])
+
+  @@index([tenantId, journalEntryId])
+  @@index([tenantId, chartAccountId])
+}
+
+model FiscalYear {
+  id           String           @id @default(uuid())
+  tenantId     String
+  name         String
+  startDate    DateTime
+  endDate      DateTime
+  status       FiscalYearStatus @default(OPEN)
+  closedAt     DateTime?
+  closedById   String?
+  closeReason  String?
+  reopenedAt   DateTime?
+  reopenedById String?
+  reopenReason String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  periods        FiscalPeriod[]
+  accounts       ChartAccount[]
+  journalEntries JournalEntry[]
+  payrollRuns    PayrollRun[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, startDate, endDate])
+  @@index([tenantId, status])
+}
+
+model FiscalPeriod {
+  id           String                 @id @default(uuid())
+  tenantId     String
+  fiscalYearId String
+  label        String
+  periodNumber Int
+  startDate    DateTime
+  endDate      DateTime
+  status       AccountingPeriodStatus @default(OPEN)
+  lockedAt     DateTime?
+  lockedById   String?
+  lockReason   String?
+  unlockedAt   DateTime?
+  unlockedById String?
+  unlockReason String?
+  closedAt     DateTime?
+  closedById   String?
+  closeReason  String?
+  reopenedAt   DateTime?
+  reopenedById String?
+  reopenReason String?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  fiscalYear     FiscalYear     @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+  journalEntries JournalEntry[]
+
+  @@unique([tenantId, fiscalYearId, periodNumber])
+  @@unique([tenantId, fiscalYearId, label])
+  @@index([tenantId, startDate, endDate])
+  @@index([tenantId, status])
+  @@index([tenantId, fiscalYearId, status])
+  @@index([tenantId, status, startDate, endDate])
+}
+
+model AccountingPeriod {
+  id                  String                 @id @default(uuid())
+  tenantId            String
+  name                String
+  startsOn            DateTime
+  endsOn              DateTime
+  status              AccountingPeriodStatus @default(OPEN)
+  closeJournalEntryId String?
+  closedAt            DateTime?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, name])
+  @@index([tenantId, status])
+}
+
+model AccountingReportAccountMapping {
+  id          String                      @id @default(uuid())
+  tenantId    String
+  mappingType AccountingReportMappingType
+  accountId   String
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+  createdById String?
+  updatedById String?
+
+  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  account   ChartAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdBy User?        @relation("CreatedAccountMappings", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User?        @relation("UpdatedAccountMappings", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, mappingType, accountId])
+  @@index([tenantId, mappingType])
+  @@index([tenantId, accountId])
+}
+
+model BankStatement {
+  id             String    @id @default(uuid())
+  tenantId       String
+  accountId      String
+  statementDate  DateTime
+  description    String
+  reference      String?
+  debitAmount    Decimal   @default(0) @db.Decimal(12, 2)
+  creditAmount   Decimal   @default(0) @db.Decimal(12, 2)
+  isReconciled   Boolean   @default(false)
+  reconciledAt   DateTime?
+  reconciledById String?
+  journalLineId  String?
+  importBatchId  String?
+  createdAt      DateTime  @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  chartAccount ChartAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  reconciledBy User?        @relation("ReconciledBankStatements", fields: [reconciledById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, accountId, isReconciled])
+  @@index([tenantId, importBatchId])
+  @@index([tenantId, accountId, statementDate])
+}

@@ -1,0 +1,263 @@
+model TransportRoute {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  code      String
+  vehicleId String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant             Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  vehicle            TransportVehicle?            @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  stops              TransportStop[]
+  enrollments        TransportEnrollment[]
+  logs               TransportLog[]
+  driverAssignments  TransportDriverAssignment[]
+  studentAssignments TransportStudentAssignment[]
+  trips              TransportTrip[]
+
+  @@unique([tenantId, code])
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@index([tenantId, code])
+  @@index([tenantId, name])
+}
+
+model TransportStop {
+  id              String   @id @default(uuid())
+  tenantId        String
+  routeId         String
+  name            String
+  sequence        Int
+  estimatedPickup String?
+  estimatedDrop   String?
+  latitude        Decimal? @db.Decimal(10, 7)
+  longitude       Decimal? @db.Decimal(10, 7)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant              Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  route               TransportRoute               @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  enrollments         TransportEnrollment[]
+  logs                TransportLog[]
+  studentAssignments  TransportStudentAssignment[]
+  tripStudentStatuses TransportTripStudentStatus[]
+
+  @@unique([tenantId, routeId, sequence])
+  @@index([tenantId, routeId])
+}
+
+model TransportVehicle {
+  id                    String                 @id @default(uuid())
+  tenantId              String
+  registrationNumber    String
+  capacity              Int
+  status                TransportVehicleStatus @default(ACTIVE)
+  fitnessCertificateExp DateTime?
+  insuranceExpiry       DateTime?
+  registrationExpiry    DateTime?
+  pollutionExpiry       DateTime?
+  model                 String?
+  documentExpiry        DateTime?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  tenant        Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  assignments   TransportDriverAssignment[]
+  logs          TransportLog[]
+  routes        TransportRoute[]
+  trips         TransportTrip[]
+  locationPings TransportLocationPing[]
+
+  @@unique([tenantId, registrationNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, registrationNumber])
+  @@index([tenantId, insuranceExpiry])
+  @@index([tenantId, fitnessCertificateExp])
+}
+
+model TransportDriverAssignment {
+  id             String    @id @default(uuid())
+  tenantId       String
+  vehicleId      String
+  routeId        String?
+  staffId        String
+  licenseNumber  String?
+  licenseExpires DateTime?
+  startsAt       DateTime
+  endsAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  vehicle       TransportVehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  route         TransportRoute?         @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  staff         Staff                   @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  trips         TransportTrip[]
+  locationPings TransportLocationPing[]
+
+  @@index([tenantId, vehicleId, startsAt])
+  @@index([tenantId, staffId])
+  @@index([tenantId, vehicleId])
+  @@index([tenantId, routeId])
+}
+
+model TransportEnrollment {
+  id              String                    @id @default(uuid())
+  tenantId        String
+  studentId       String
+  routeId         String
+  stopId          String
+  feeAmount       Decimal                   @default(0) @db.Decimal(12, 2)
+  status          TransportEnrollmentStatus @default(ACTIVE)
+  startedAt       DateTime                  @default(now())
+  endedAt         DateTime?
+  feeAssignmentId String?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  tenant        Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student       Student               @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  route         TransportRoute        @relation(fields: [routeId], references: [id], onDelete: Restrict)
+  stop          TransportStop         @relation(fields: [stopId], references: [id], onDelete: Restrict)
+  feeAssignment StudentFeeAssignment? @relation(fields: [feeAssignmentId], references: [id], onDelete: SetNull)
+  logs          TransportLog[]
+
+  @@index([tenantId, routeId, stopId, status])
+  @@index([tenantId, studentId, status])
+}
+
+model TransportLog {
+  id           String                  @id @default(uuid())
+  tenantId     String
+  routeId      String
+  stopId       String?
+  vehicleId    String?
+  enrollmentId String?
+  studentId    String?
+  status       TransportBoardingStatus
+  occurredAt   DateTime                @default(now())
+  note         String?
+  createdById  String?
+  createdAt    DateTime                @default(now())
+
+  tenant     Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  route      TransportRoute       @relation(fields: [routeId], references: [id], onDelete: Restrict)
+  stop       TransportStop?       @relation(fields: [stopId], references: [id], onDelete: SetNull)
+  vehicle    TransportVehicle?    @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  enrollment TransportEnrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  student    Student?             @relation(fields: [studentId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, routeId, occurredAt])
+  @@index([tenantId, studentId, occurredAt])
+}
+
+model TransportStudentAssignment {
+  id              String                    @id @default(uuid())
+  tenantId        String
+  studentId       String
+  routeId         String
+  stopId          String
+  pickupDirection TransportTripDirection    @default(PICKUP)
+  status          TransportEnrollmentStatus @default(ACTIVE)
+  startedAt       DateTime                  @default(now())
+  endedAt         DateTime?
+  notes           String?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  tenant       Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student      Student                      @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  route        TransportRoute               @relation(fields: [routeId], references: [id], onDelete: Restrict)
+  stop         TransportStop                @relation(fields: [stopId], references: [id], onDelete: Restrict)
+  tripStatuses TransportTripStudentStatus[]
+
+  @@index([tenantId, studentId])
+  @@index([tenantId, routeId])
+  @@index([tenantId, stopId])
+}
+
+model TransportTrip {
+  id                 String                 @id @default(uuid())
+  tenantId           String
+  routeId            String
+  vehicleId          String
+  driverAssignmentId String
+  direction          TransportTripDirection
+  status             TransportTripStatus    @default(ACTIVE)
+  startedAt          DateTime               @default(now())
+  completedAt        DateTime?
+  isDelayed          Boolean                @default(false)
+  delayMinutes       Int?
+  delayReason        String?
+  notes              String?
+  createdById        String?
+  completedById      String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  tenant           Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  route            TransportRoute               @relation(fields: [routeId], references: [id], onDelete: Restrict)
+  vehicle          TransportVehicle             @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  driverAssignment TransportDriverAssignment    @relation(fields: [driverAssignmentId], references: [id], onDelete: Restrict)
+  createdBy        User?                        @relation("TransportTripCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  completedBy      User?                        @relation("TransportTripCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  studentStatuses  TransportTripStudentStatus[]
+  locationPings    TransportLocationPing[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, routeId, createdAt])
+  @@index([tenantId, vehicleId, createdAt])
+  @@index([tenantId, driverAssignmentId, createdAt])
+  @@index([tenantId, startedAt])
+}
+
+model TransportTripStudentStatus {
+  id                  String                     @id @default(uuid())
+  tenantId            String
+  tripId              String
+  studentAssignmentId String
+  studentId           String
+  stopId              String
+  status              TransportStudentTripStatus @default(PENDING)
+  boardedAt           DateTime?
+  droppedAt           DateTime?
+  markedById          String?
+  notes               String?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  tenant            Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  trip              TransportTrip              @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  studentAssignment TransportStudentAssignment @relation(fields: [studentAssignmentId], references: [id], onDelete: Restrict)
+  student           Student                    @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  stop              TransportStop              @relation(fields: [stopId], references: [id], onDelete: Restrict)
+  markedBy          User?                      @relation("TransportTripStatusMarkedBy", fields: [markedById], references: [id], onDelete: SetNull)
+
+  @@unique([tripId, studentId])
+  @@index([tenantId, tripId])
+  @@index([tenantId, studentId])
+}
+
+model TransportLocationPing {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  tripId             String
+  vehicleId          String
+  driverAssignmentId String?
+  latitude           Decimal  @db.Decimal(10, 7)
+  longitude          Decimal  @db.Decimal(10, 7)
+  speedKph           Decimal? @db.Decimal(8, 2)
+  heading            Decimal? @db.Decimal(8, 2)
+  recordedAt         DateTime @default(now())
+  createdAt          DateTime @default(now())
+
+  tenant           Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  trip             TransportTrip              @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  vehicle          TransportVehicle           @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  driverAssignment TransportDriverAssignment? @relation(fields: [driverAssignmentId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, tripId, recordedAt])
+  @@index([tenantId, vehicleId, recordedAt])
+}

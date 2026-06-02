@@ -48,7 +48,7 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('defaults frontend API traffic to the Nest API on port 4000', () => {
-    const apiClient = read('lib/api.ts');
+    const apiClient = read('lib/api/client.ts');
 
     assert.match(apiClient, /http:\/\/localhost:4000\/api\/v1/);
     assert.doesNotMatch(apiClient, /http:\/\/localhost:3000\/api\/v1/);
@@ -154,7 +154,20 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('exposes client helpers for canonical Phase 1 and Phase 2 workflows', () => {
-    const apiClient = read('lib/api.ts');
+    const apiClient = readMany([
+      'lib/api/client.ts',
+      'lib/api/auth.ts',
+      'lib/api/academics.ts',
+      'lib/api/students.ts',
+      'lib/api/attendance.ts',
+      'lib/api/finance.ts',
+      'lib/api/accounting.ts',
+      'lib/api/payroll.ts',
+      'lib/api/communications.ts',
+      'lib/api/messaging.ts',
+      'lib/api/activity.ts',
+      'lib/api/platform.ts',
+    ]);
     const requiredHelpers = [
       'checkAdmissionDuplicates',
       'bulkImportAdmissions',
@@ -379,7 +392,7 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('parses API JSON error messages before surfacing them to forms', () => {
-    const apiClient = read('lib/api.ts');
+    const apiClient = read('lib/api/client.ts');
 
     assert.match(apiClient, /parseApiErrorMessage/);
     assert.match(apiClient, /JSON\.parse\(text\)/);
@@ -391,7 +404,7 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('uses cookie credentials instead of bearer tokens for browser API calls', () => {
-    const apiClient = read('lib/api.ts');
+    const apiClient = read('lib/api/client.ts');
 
     assert.match(apiClient, /credentials:\s*'include'/);
     assert.doesNotMatch(apiClient, /Authorization:\s*`Bearer/);
@@ -716,7 +729,7 @@ describe('SchoolOS web production contracts', () => {
       'components/students/profile/student-edit-card.tsx',
       'components/students/profile/tabs/guardians-tab.tsx',
     ]);
-    const apiClient = read('lib/api.ts');
+    const apiClient = read('lib/api/students.ts');
 
     assert.match(apiClient, /updateStudent:/);
     assert.match(apiClient, /method: 'PATCH'/);
@@ -739,7 +752,7 @@ describe('SchoolOS web production contracts', () => {
       'components/students/profile/lifecycle-panel.tsx',
       'components/students/profile/tabs/documents-tab.tsx',
     ]);
-    const apiClient = read('lib/api.ts');
+    const apiClient = read('lib/api/students.ts');
 
     for (const helper of [
       'getStudentFeeClearance',
@@ -770,7 +783,7 @@ describe('SchoolOS web production contracts', () => {
       'components/students/student-detail-page.tsx',
       'components/students/profile/tabs/documents-tab.tsx',
     ]);
-    const apiClient = read('lib/api.ts');
+    const apiClient = readMany(['lib/api/students.ts', 'lib/api/client.ts']);
 
     assert.match(detailPage, /System Generated Docs/);
     assert.match(detailPage, /Uploaded Documents/);
@@ -795,7 +808,7 @@ describe('SchoolOS web production contracts', () => {
 
   it('keeps student photo upload private, bounded, and app-controlled', () => {
     const studentEditCard = read('components/students/profile/student-edit-card.tsx');
-    const apiClient = read('lib/api.ts');
+    const apiClient = read('lib/api/students.ts');
 
     assert.match(apiClient, /uploadStudentPhoto:/);
     assert.match(apiClient, /removeStudentPhoto:/);
@@ -811,7 +824,7 @@ describe('SchoolOS web production contracts', () => {
   });
 
   it('validates PDF responses before opening blob tabs', () => {
-    const apiClient = read('lib/api.ts');
+    const apiClient = readMany(['lib/api/client.ts', 'lib/api/students.ts', 'lib/api/finance.ts']);
 
     assert.match(apiClient, /async function openPdfBlob/);
     assert.match(apiClient, /response\.ok/);

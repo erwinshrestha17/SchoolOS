@@ -1,0 +1,183 @@
+model Conversation {
+  id             String           @id @default(uuid())
+  tenantId       String
+  type           ConversationType @default(DIRECT)
+  title          String?
+  classId        String?
+  sectionId      String?
+  studentId      String?
+  guardianId     String?
+  academicYearId String?
+  createdById    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  tenant       Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  class        Class?                    @relation(fields: [classId], references: [id], onDelete: SetNull)
+  section      Section?                  @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  student      Student?                  @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  guardian     Guardian?                 @relation(fields: [guardianId], references: [id], onDelete: SetNull)
+  participants ConversationParticipant[]
+  messages     Message[]
+  academicYear AcademicYear?             @relation(fields: [academicYearId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, type, classId, sectionId])
+  @@index([tenantId, studentId, academicYearId])
+}
+
+model ConversationParticipant {
+  id             String    @id @default(uuid())
+  tenantId       String
+  conversationId String
+  userId         String?
+  guardianId     String?
+  staffId        String?
+  studentId      String?
+  role           String
+  lastReadAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  guardian     Guardian?    @relation(fields: [guardianId], references: [id], onDelete: SetNull)
+  staff        Staff?       @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  student      Student?     @relation(fields: [studentId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, conversationId])
+  @@index([tenantId, conversationId, createdAt])
+}
+
+model Message {
+  id               String        @id @default(uuid())
+  tenantId         String
+  conversationId   String
+  senderUserId     String?
+  senderStaffId    String?
+  senderGuardianId String?
+  body             String
+  attachmentUrl    String?
+  status           MessageStatus @default(SENT)
+  createdAt        DateTime      @default(now())
+
+  tenant         Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  conversation   Conversation         @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderStaff    Staff?               @relation(fields: [senderStaffId], references: [id], onDelete: SetNull)
+  senderGuardian Guardian?            @relation(fields: [senderGuardianId], references: [id], onDelete: SetNull)
+  readReceipts   MessageReadReceipt[]
+
+  @@index([tenantId, conversationId, createdAt])
+}
+
+model MessageReadReceipt {
+  id           String   @id @default(uuid())
+  tenantId     String
+  messageId    String
+  readerUserId String?
+  guardianId   String?
+  readAt       DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  message  Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  guardian Guardian? @relation(fields: [guardianId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, messageId])
+}
+
+model ParentTeacherThread {
+  id             String                    @id @default(uuid())
+  tenantId       String
+  academicYearId String
+  studentId      String
+  guardianId     String
+  classTeacherId String
+  status         ParentTeacherThreadStatus @default(OPEN)
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  closedAt       DateTime?
+  closedByUserId String?
+  closeReason    String?
+
+  messages     ParentTeacherMessage[]
+  escalations  ChatEscalation[]
+  abuseReports ChatAbuseReport[]
+
+  @@index([tenantId, studentId, academicYearId])
+  @@index([tenantId, guardianId])
+  @@index([tenantId, classTeacherId])
+  @@index([tenantId, status, updatedAt])
+}
+
+model ParentTeacherMessage {
+  id           String                       @id @default(uuid())
+  tenantId     String
+  threadId     String
+  senderUserId String
+  senderRole   ParentTeacherSenderRole
+  message      String
+  priority     ParentTeacherMessagePriority @default(NORMAL)
+  status       MessageStatus                @default(SENT)
+  sentAt       DateTime                     @default(now())
+  deliveredAt  DateTime?
+  readAt       DateTime?
+  createdAt    DateTime                     @default(now())
+  updatedAt    DateTime                     @updatedAt
+
+  thread       ParentTeacherThread @relation(fields: [threadId], references: [id], onDelete: Restrict)
+  abuseReports ChatAbuseReport[]
+
+  @@index([tenantId, threadId, createdAt])
+  @@index([tenantId, status, updatedAt])
+}
+
+model ChatAvailabilityRule {
+  id            String                        @id @default(uuid())
+  tenantId      String
+  dayOfWeek     Int
+  enabled       Boolean                       @default(true)
+  startTime     String
+  endTime       String
+  appliesToRole ChatAvailabilityAppliesToRole @default(BOTH)
+  createdAt     DateTime                      @default(now())
+  updatedAt     DateTime                      @updatedAt
+
+  @@unique([tenantId, dayOfWeek, appliesToRole])
+  @@index([tenantId, dayOfWeek])
+}
+
+model ChatEscalation {
+  id                String               @id @default(uuid())
+  tenantId          String
+  threadId          String
+  escalatedByUserId String
+  escalatedToUserId String?
+  reason            String
+  status            ChatEscalationStatus @default(OPEN)
+  createdAt         DateTime             @default(now())
+  resolvedAt        DateTime?
+  resolvedByUserId  String?
+
+  thread ParentTeacherThread @relation(fields: [threadId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, threadId, createdAt])
+  @@index([tenantId, status, createdAt])
+}
+
+model ChatAbuseReport {
+  id               String                @id @default(uuid())
+  tenantId         String
+  threadId         String
+  messageId        String?
+  reportedByUserId String
+  reason           String
+  status           ChatAbuseReportStatus @default(OPEN)
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  createdAt        DateTime              @default(now())
+
+  thread  ParentTeacherThread   @relation(fields: [threadId], references: [id], onDelete: Restrict)
+  message ParentTeacherMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, threadId, createdAt])
+  @@index([tenantId, status, createdAt])
+}

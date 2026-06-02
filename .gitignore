@@ -48,3 +48,23 @@ apps/schoolos_mobile/**/*.iml
 *.log
 pnpm-debug.log*
 .pnpm-home/
+
+# Stale / Debug / Output files
+/test_file.txt
+/test_output.log
+/test_output.txt
+/tsc_output.txt
+/verify-production.log
+/update-library-api.ts
+/output/
+/scratch/
+/temp-home/
+/Library/
+
+# Apps debug files
+apps/api/eslint_errors*.txt
+apps/api/test-output*.txt
+apps/api/tsc-output*.txt
+
+apps/web/typecheck_errors*.txt
+apps/web/typecheck_output*.txt
