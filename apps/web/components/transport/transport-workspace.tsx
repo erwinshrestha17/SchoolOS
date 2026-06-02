@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { AlertTriangle, Bus, MapPin, Navigation, ShieldCheck, Users } from 'lucide-react';
+import { AlertTriangle, Bus, Download, MapPin, Navigation, ShieldCheck, Users } from 'lucide-react';
 import type { StudentProfile } from '@schoolos/core';
 import { api } from '../../lib/api';
 import {
@@ -13,9 +13,12 @@ import {
   type TransportRoutePayload,
   type TransportStopPayload,
   type TransportStudentAssignmentPayload,
+  type TransportStudentAssignment,
   type TransportTrip,
   type TransportTripPayload,
   type TransportVehiclePayload,
+  type TransportRoute,
+  type TransportStop,
 } from '../../lib/transport-api';
 import { EmptyState } from '../ui/empty-state';
 import { LoadingState } from '../ui/loading-state';
@@ -127,6 +130,9 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
     delayReason?: string;
   } | null>(null);
   const [viewingTripId, setViewingTripId] = useState<string | null>(null);
+  const [reportRouteId, setReportRouteId] = useState('');
+  const [reportVehicleId, setReportVehicleId] = useState('');
+  const [reportDriverAssignmentId, setReportDriverAssignmentId] = useState('');
 
   const queryClient = useQueryClient();
   const routesQuery = useQuery({ queryKey: ['transport-routes'], queryFn: () => transportApi.listRoutes() });
@@ -138,8 +144,18 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
   const tripsQuery = useQuery({ queryKey: ['transport-trips'], queryFn: () => transportApi.listTrips() });
   const reportsQuery = useQuery({ queryKey: ['transport-reports'], queryFn: () => transportApi.getReports() });
   const tripHistoryReportQuery = useQuery({ 
-    queryKey: ['transport-report-trips'], 
-    queryFn: () => transportApi.getTripHistoryReport(),
+    queryKey: [
+      'transport-report-trips',
+      reportRouteId,
+      reportVehicleId,
+      reportDriverAssignmentId,
+    ],
+    queryFn: () =>
+      transportApi.getTripHistoryReport({
+        routeId: reportRouteId,
+        vehicleId: reportVehicleId,
+        driverAssignmentId: reportDriverAssignmentId,
+      }),
     enabled: activeTab === 'reports'
   });
   const boardingReportQuery = useQuery({ 
@@ -296,6 +312,10 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
       invalidateTransport();
     },
   });
+  const tripHistoryCsvMutation = useMutation({
+    mutationFn: transportApi.downloadTripHistoryCsv,
+    onSuccess: () => setNotice('Trip history CSV downloaded.'),
+  });
   const tripDetailsQuery = useQuery({
     queryKey: ['transport-trip-details', viewingTripId],
     queryFn: () => transportApi.getTripDetails(viewingTripId!),
@@ -413,6 +433,13 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
                   </ul>
                 </section>
               )}
+
+              <RouteOperationsPanel
+                routes={routes}
+                stops={stops}
+                studentAssignments={studentAssignments}
+                activeTrips={activeTrips}
+              />
 
               <TripList 
                 trips={activeTrips} 
@@ -685,6 +712,57 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
 
       {activeTab === 'reports' && (
         <div className="space-y-6">
+          <Panel title="Report filters" description="Filter backend report rows and download the audited full trip-history CSV export.">
+            <div className="grid gap-4 lg:grid-cols-3">
+              <SelectInput
+                label="Route"
+                value={reportRouteId}
+                onChange={setReportRouteId}
+                options={routes.map((route) => ({ label: route.name, value: route.id }))}
+              />
+              <SelectInput
+                label="Vehicle"
+                value={reportVehicleId}
+                onChange={setReportVehicleId}
+                options={vehicles.map((vehicle) => ({ label: vehicle.registrationNumber, value: vehicle.id }))}
+              />
+              <SelectInput
+                label="Driver assignment"
+                value={reportDriverAssignmentId}
+                onChange={setReportDriverAssignmentId}
+                options={driverAssignments.map((assignment) => ({
+                  label: `${assignment.staff?.firstName ?? ''} ${assignment.staff?.lastName ?? ''}`.trim() || assignment.staffId,
+                  value: assignment.id,
+                }))}
+              />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                className="btn-secondary inline-flex items-center gap-2"
+                disabled={tripHistoryCsvMutation.isPending}
+                onClick={() => tripHistoryCsvMutation.mutate()}
+                data-testid="transport-trip-history-csv-export"
+              >
+                <Download className="h-4 w-4" />
+                {tripHistoryCsvMutation.isPending ? 'Exporting...' : 'Export full trip CSV'}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setReportRouteId('');
+                  setReportVehicleId('');
+                  setReportDriverAssignmentId('');
+                }}
+              >
+                Clear filters
+              </button>
+            </div>
+            {tripHistoryCsvMutation.error ? (
+              <Notice tone="error" message={tripHistoryCsvMutation.error.message} />
+            ) : null}
+          </Panel>
           <TwoColumn>
             <Panel title="Trip History Report" description="Comprehensive history of all transport trips.">
                {tripHistoryReportQuery.isLoading ? <LoadingState label="Loading report..." /> : null}
@@ -720,7 +798,7 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
                </div>
             </Panel>
           </TwoColumn>
-          <InfoCard title="Export Controls" lines={['PDF and CSV exports use server-side generation to ensure data integrity.', 'Reporting data is restricted to authorized transport administrators only.']} />
+          <InfoCard title="Reporting boundary" lines={['Trip-history CSV export uses server-side generation and audit logging.', 'Reporting data is restricted to authorized transport administrators only.']} />
         </div>
       )}
 
@@ -980,6 +1058,77 @@ function InfoCard({ title, lines }: { title: string; lines: string[] }) {
         {lines.map((line) => <li key={line}>{line}</li>)}
       </ul>
     </section>
+  );
+}
+
+function RouteOperationsPanel({
+  routes,
+  stops,
+  studentAssignments,
+  activeTrips,
+}: {
+  routes: TransportRoute[];
+  stops: TransportStop[];
+  studentAssignments: TransportStudentAssignment[];
+  activeTrips: TransportTrip[];
+}) {
+  if (routes.length === 0) {
+    return <EmptyState title="No route dashboard" description="Create transport routes before route operations can be summarized." />;
+  }
+
+  return (
+    <Panel title="Route Operations" description="Route-level stops, assigned students, active trips, and delay pressure." >
+      <div className="space-y-3" data-testid="transport-route-dashboard-panel">
+        {routes.slice(0, 6).map((route) => {
+          const routeStops = route.stops ?? stops.filter((stop) => stop.routeId === route.id);
+          const routeAssignments = studentAssignments.filter(
+            (assignment) => assignment.routeId === route.id && assignment.status === 'ACTIVE',
+          );
+          const routeTrips = activeTrips.filter((trip) => trip.routeId === route.id);
+          const delayedTrips = routeTrips.filter((trip) => trip.isDelayed).length;
+
+          return (
+            <div key={route.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-bold text-slate-900">{route.name}</h3>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">
+                    {route.code} - {route.vehicle?.registrationNumber ?? 'No vehicle linked'}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <TransportStatusBadge status={route.isActive ? 'ACTIVE' : 'INACTIVE'} />
+                  {delayedTrips > 0 ? <TransportStatusBadge status="DELAYED" /> : null}
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                <RouteMetric label="Stops" value={routeStops.length} />
+                <RouteMetric label="Students" value={routeAssignments.length} />
+                <RouteMetric label="Active trips" value={routeTrips.length} />
+                <RouteMetric label="Delayed" value={delayedTrips} warning={delayedTrips > 0} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
+function RouteMetric({
+  label,
+  value,
+  warning = false,
+}: {
+  label: string;
+  value: number;
+  warning?: boolean;
+}) {
+  return (
+    <div className={cn('rounded-xl border px-3 py-2', warning ? 'border-red-100 bg-red-50 text-red-700' : 'border-white bg-white text-slate-600')}>
+      <p className="text-[10px] font-bold uppercase tracking-wide">{label}</p>
+      <p className="mt-1 text-lg font-black text-slate-900">{value}</p>
+    </div>
   );
 }
 

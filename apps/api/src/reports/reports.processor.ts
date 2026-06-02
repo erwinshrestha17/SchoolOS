@@ -4,6 +4,7 @@ import { Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportsService } from './reports.service';
 import { AuthContext } from '../auth/auth.types';
+import type { ReportFormat } from '@schoolos/core';
 
 @Processor('reports')
 export class ReportsProcessor extends WorkerHost {
@@ -22,7 +23,7 @@ export class ReportsProcessor extends WorkerHost {
         exportId: string;
         reportKey: string;
         filters: Record<string, unknown>;
-        format: string;
+        format: ReportFormat;
         actor: AuthContext;
       },
       void
@@ -37,24 +38,12 @@ export class ReportsProcessor extends WorkerHost {
         data: { status: 'RUNNING' },
       });
 
-      const executor = this.reportsService.registry.get(reportKey);
-      if (!executor) throw new Error('Report executor not found');
-
-      const data = await executor.execute(actor, filters, format);
-
-      // In a real implementation, we would generate a file (CSV/PDF) and upload to R2/S3
-      // For this hardening, we mark as COMPLETED and store summary or just simulate
-
-      this.logger.log(
-        `Successfully generated ${data.length} rows for report ${reportKey}`,
-      );
-
-      await this.prisma.reportExport.update({
-        where: { id: exportId },
-        data: {
-          status: 'COMPLETED',
-          completedAt: new Date(),
-        },
+      await this.reportsService.completeQueuedExport({
+        exportId,
+        reportKey,
+        filters,
+        format,
+        actor,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

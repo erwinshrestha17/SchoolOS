@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { AlertTriangle, Ban, Package, QrCode, Soup, Utensils, Wallet } from 'lucide-react';
+import { AlertTriangle, Ban, Download, Package, QrCode, Soup, Utensils, Wallet } from 'lucide-react';
 import type { StudentProfile } from '@schoolos/core';
 import { api } from '../../lib/api';
 import { canteenApi, type CanteenEnrollmentPayload, type CanteenInventoryItemPayload, type CanteenMealPlanPayload, type CanteenMealServingPayload, type CanteenMenuItemPayload, type CanteenPaymentMethod, type CanteenPosReceipt, type CanteenPosSalePayload, type CanteenPurchaseBillPayload, type CanteenSpendingControlPayload, type CanteenStockAdjustmentPayload, type CanteenSupplierPayload, type CanteenTopUpPayload, type CanteenWastagePayload } from '../../lib/canteen-api';
@@ -168,6 +168,8 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
   const [wastageForm, setWastageForm] = useState<CanteenWastagePayload>(emptyWastageForm);
   const [stockAdjustmentForm, setStockAdjustmentForm] = useState<CanteenStockAdjustmentPayload>(emptyStockAdjustmentForm);
   const [reportDate, setReportDate] = useState(today);
+  const [reportFrom, setReportFrom] = useState('');
+  const [reportTo, setReportTo] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmingSaleId, setConfirmingSaleId] = useState<string | null>(null);
   const [confirmingEnrollmentId, setConfirmingEnrollmentId] = useState<string | null>(null);
@@ -205,12 +207,14 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
     queryFn: () => canteenApi.getDailyMealCountReport({ date: reportDate }),
   });
   const itemSalesQuery = useQuery({
-    queryKey: ['canteen-item-sales'],
-    queryFn: () => canteenApi.getItemWiseSalesReport(),
+    queryKey: ['canteen-item-sales', reportFrom, reportTo],
+    queryFn: () =>
+      canteenApi.getItemWiseSalesReport({ from: reportFrom, to: reportTo }),
   });
   const spendingSummaryQuery = useQuery({
-    queryKey: ['canteen-spending-summary'],
-    queryFn: () => canteenApi.getStudentSpendingSummary(),
+    queryKey: ['canteen-spending-summary', reportFrom, reportTo],
+    queryFn: () =>
+      canteenApi.getStudentSpendingSummary({ from: reportFrom, to: reportTo }),
   });
   const suppliersQuery = useQuery({
     queryKey: ['canteen-suppliers'],
@@ -221,8 +225,8 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
     queryFn: () => canteenApi.listInventoryItems({ limit: 50 }),
   });
   const stockLedgerQuery = useQuery({
-    queryKey: ['canteen-stock-ledger'],
-    queryFn: () => canteenApi.getStockLedger(),
+    queryKey: ['canteen-stock-ledger', reportFrom, reportTo],
+    queryFn: () => canteenApi.getStockLedger({ from: reportFrom, to: reportTo }),
   });
   const studentsQuery = useQuery({
     queryKey: ['students'],
@@ -348,6 +352,15 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
   const receiptPdfMutation = useMutation({
     mutationFn: canteenApi.openPosReceiptPdf,
     onSuccess: () => setNotice('Receipt PDF opened.'),
+  });
+  const dailyMealCsvMutation = useMutation({
+    mutationFn: () => canteenApi.downloadDailyMealCountCsv({ date: reportDate }),
+    onSuccess: () => setNotice('Daily meal count CSV downloaded.'),
+  });
+  const itemSalesCsvMutation = useMutation({
+    mutationFn: () =>
+      canteenApi.downloadItemWiseSalesCsv({ from: reportFrom, to: reportTo }),
+    onSuccess: () => setNotice('Item-wise sales CSV downloaded.'),
   });
   const controlMutation = useMutation({
     mutationFn: canteenApi.upsertSpendingControl,
@@ -575,10 +588,22 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
                   subtitle={`${enrollment.mealPlan?.name ?? enrollment.mealPlanId} • starts ${enrollment.startsOn?.slice(0, 10)}${enrollment.feeInvoiceId ? ` • fee invoice linked ${enrollment.feeInvoiceId.slice(0, 8)}` : ''}`}
                   badge={<CanteenStatusBadge status={enrollment.status} />}
                   action={
-                    enrollment.status === 'ACTIVE' ? (
-                      <button type="button" className="btn-secondary text-red-600" onClick={() => setConfirmingEnrollmentId(enrollment.id)}>
-                        Cancel
-                      </button>
+                    enrollment.status === 'ACTIVE' || enrollment.feeInvoiceId ? (
+                      <div className="flex flex-wrap gap-2">
+                        {enrollment.feeInvoiceId ? (
+                          <Link
+                            href={`/dashboard/finance?invoiceId=${encodeURIComponent(enrollment.feeInvoiceId)}`}
+                            className="btn-secondary"
+                          >
+                            Open invoice
+                          </Link>
+                        ) : null}
+                        {enrollment.status === 'ACTIVE' ? (
+                          <button type="button" className="btn-secondary text-red-600" onClick={() => setConfirmingEnrollmentId(enrollment.id)}>
+                            Cancel
+                          </button>
+                        ) : null}
+                      </div>
                     ) : undefined
                   }
                 />
@@ -1280,18 +1305,64 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
 
       {activeTab === 'reports' && (
         <div className="space-y-6">
-          <Panel title="Report filters" description="Reports are backend-generated; frontend displays returned totals.">
-            <TextInput label="Report date" type="date" value={reportDate} onChange={setReportDate} />
+          <Panel title="Report filters" description="Reports are backend-generated; frontend displays returned totals and downloads audited CSV exports.">
+            <div className="grid gap-4 lg:grid-cols-3">
+              <TextInput label="Daily meal date" type="date" value={reportDate} onChange={setReportDate} />
+              <TextInput label="Report range from" type="date" value={reportFrom} onChange={setReportFrom} />
+              <TextInput label="Report range to" type="date" value={reportTo} onChange={setReportTo} />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                className="btn-secondary inline-flex items-center gap-2"
+                disabled={dailyMealCsvMutation.isPending}
+                onClick={() => dailyMealCsvMutation.mutate()}
+                data-testid="canteen-daily-meal-csv-export"
+              >
+                <Download className="h-4 w-4" />
+                {dailyMealCsvMutation.isPending ? 'Exporting...' : 'Export daily meal CSV'}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary inline-flex items-center gap-2"
+                disabled={itemSalesCsvMutation.isPending}
+                onClick={() => itemSalesCsvMutation.mutate()}
+                data-testid="canteen-item-sales-csv-export"
+              >
+                <Download className="h-4 w-4" />
+                {itemSalesCsvMutation.isPending ? 'Exporting...' : 'Export item sales CSV'}
+              </button>
+            </div>
+            {dailyMealCsvMutation.error ? <InlineError message={dailyMealCsvMutation.error.message} /> : null}
+            {itemSalesCsvMutation.error ? <InlineError message={itemSalesCsvMutation.error.message} /> : null}
           </Panel>
           <div className="grid gap-6 xl:grid-cols-3">
             <ReportPanel title="Daily meal count" loading={mealCountQuery.isLoading} rows={(mealCountQuery.data ?? []).map((row) => `${row.mealType} • ${row.status}: ${row._count._all}`)} />
             <ReportPanel title="Item-wise sales" loading={itemSalesQuery.isLoading} rows={(itemSalesQuery.data ?? []).map((row) => `${row.itemName}: ${row._sum.quantity ?? 0} sold • ${money(row._sum.lineTotal ?? 0)}`)} />
             <ReportPanel title="Student spending" loading={spendingSummaryQuery.isLoading} rows={(spendingSummaryQuery.data ?? []).map((row) => `${row.studentId.slice(0, 8)}: ${money(row._sum.totalAmount ?? 0)} • ${row._count._all} sales`)} />
           </div>
+          <LowBalanceList wallets={lowBalanceWallets} />
           <Panel title="Stock ledger" description="Recent stock movement report from the backend.">
-            <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm text-slate-600">
-              <Package className="h-5 w-5 text-slate-500" />
-              <span>{stockLedgerRows.length ? `${stockLedgerRows.length} stock movement rows loaded.` : 'No stock movement rows returned for the current tenant.'}</span>
+            {stockLedgerQuery.isLoading ? <LoadingState label="Loading stock ledger..." /> : null}
+            {!stockLedgerQuery.isLoading && stockLedgerRows.length === 0 ? (
+              <EmptyState title="No stock movement" description="No stock movement rows returned for the selected range." />
+            ) : null}
+            <div className="space-y-2">
+              {stockLedgerRows.slice(0, 10).map((row, index) => (
+                <div key={row.id ?? `${row.inventoryItemId}-${row.movementDate}-${index}`} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-sm">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Package className="h-5 w-5 shrink-0 text-slate-500" />
+                    <div className="min-w-0">
+                      <p className="truncate font-bold text-slate-900">{row.inventoryItem?.name ?? row.inventoryItemId ?? 'Inventory item'}</p>
+                      <p className="text-xs text-slate-500">{row.type ?? 'Movement'} - {row.reason ?? row.referenceType ?? 'No reason recorded'}</p>
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right text-xs font-semibold text-slate-500">
+                    <p>{Number(row.quantity ?? 0).toLocaleString()} {row.inventoryItem?.unit ?? ''}</p>
+                    <p>Balance {Number(row.balanceAfter ?? 0).toLocaleString()}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </Panel>
         </div>
@@ -1519,7 +1590,7 @@ function LowBalanceList({
 }) {
   if (wallets.length === 0) return <EmptyState title="No low balance wallets" description="Low balance wallet report returned no students." />;
   return (
-    <Panel title="Wallet Low" description="Students returned by the backend low-balance wallet report.">
+    <Panel title="Low-balance wallets" description="Students returned by the backend low-balance wallet report.">
       <div className="space-y-3">
         {wallets.map((wallet) => (
           <RecordCard key={wallet.id} title={studentLabel(wallet.student) || wallet.studentId} subtitle={`Balance ${money(wallet.balance)} • threshold ${money(wallet.lowBalanceThreshold)}`} badge={<CanteenStatusBadge status="WALLET_LOW" />} />

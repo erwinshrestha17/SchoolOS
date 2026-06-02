@@ -191,11 +191,13 @@ class RoleShellScaffold extends StatelessWidget {
             label: 'Homework',
             icon: Icons.assignment_outlined,
             selectedIcon: Icons.assignment_rounded,
+            route: AppRoutes.studentHomework,
           ),
           _RoleNavItem(
             label: 'Timetable',
             icon: Icons.event_note_outlined,
             selectedIcon: Icons.event_note_rounded,
+            route: AppRoutes.studentTimetable,
           ),
           _RoleNavItem(
             label: 'Notices',

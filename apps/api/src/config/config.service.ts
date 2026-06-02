@@ -11,8 +11,10 @@ import {
   PASSWORD_RESET_TTL_MINUTES,
   REFRESH_TOKEN_TTL_DAYS,
 } from '../auth/auth.constants';
-import { normalizeStorageConfig } from '../storage/storage.config';
-import type { SchoolOSStorageConfig } from '../storage/storage.config';
+import {
+  normalizeStorageConfig,
+  type SchoolOSStorageConfig,
+} from '../storage/storage.config';
 import type { SchoolOSStorageProvider } from '../storage/storage.types';
 
 @Injectable()
@@ -366,13 +368,25 @@ export class ConfigService {
     );
 
     if (process.env.JWT_ISSUER === 'schoolos' || !process.env.JWT_ISSUER) {
-      errors.push('JWT_ISSUER is required in production and must not be default');
+      errors.push(
+        'JWT_ISSUER is required in production and must not be default',
+      );
     }
-    if (process.env.JWT_AUDIENCE_WEB === 'schoolos-web' || !process.env.JWT_AUDIENCE_WEB) {
-      errors.push('JWT_AUDIENCE_WEB is required in production and must not be default');
+    if (
+      process.env.JWT_AUDIENCE_WEB === 'schoolos-web' ||
+      !process.env.JWT_AUDIENCE_WEB
+    ) {
+      errors.push(
+        'JWT_AUDIENCE_WEB is required in production and must not be default',
+      );
     }
-    if (process.env.JWT_AUDIENCE_MOBILE === 'schoolos-mobile' || !process.env.JWT_AUDIENCE_MOBILE) {
-      errors.push('JWT_AUDIENCE_MOBILE is required in production and must not be default');
+    if (
+      process.env.JWT_AUDIENCE_MOBILE === 'schoolos-mobile' ||
+      !process.env.JWT_AUDIENCE_MOBILE
+    ) {
+      errors.push(
+        'JWT_AUDIENCE_MOBILE is required in production and must not be default',
+      );
     }
 
     if (!process.env.FRONTEND_ORIGIN && !process.env.FRONTEND_ORIGINS?.trim()) {
@@ -383,7 +397,9 @@ export class ConfigService {
 
     for (const origin of this.frontendOrigins) {
       if (origin === '*') {
-        errors.push('Wildcard (*) CORS origin is not allowed in production when credentials are enabled');
+        errors.push(
+          'Wildcard (*) CORS origin is not allowed in production when credentials are enabled',
+        );
       }
       try {
         const parsedOrigin = new URL(origin);
@@ -421,7 +437,7 @@ export class ConfigService {
 
   private validateStorageEnv() {
     try {
-      this.storageConfig;
+      normalizeStorageConfig(process.env);
       return [];
     } catch (error) {
       return [

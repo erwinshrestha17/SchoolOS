@@ -44,22 +44,41 @@ class ParentRepository {
         profile['emergencyContact'] as Map<String, dynamic>?;
     final medicalSummary =
         profile['medicalSummary'] as Map<String, dynamic>? ?? const {};
+    final privacy = profile['privacy'] as Map<String, dynamic>? ?? const {};
+    final studentSystemId = profile['studentSystemId'] as String?;
+    final admissionNumber = profile['admissionNumber'] as String?;
+    final healthNote = _joinNonEmpty([
+      medicalSummary['medicalConditions'] as String?,
+      medicalSummary['severeAllergies'] as String?,
+      medicalSummary['specialNeeds'] as String?,
+    ]);
 
     return ChildProfile(
       child: child,
-      classTeacher: 'Class teacher will appear after timetable sync.',
-      guardianSummary: 'Guardian access verified by SchoolOS.',
+      classTeacher: 'Open timetable for teacher names by period.',
+      guardianSummary:
+          '${child.relationship} access verified for ${child.name}.',
       canViewGuardianSummary: true,
       attendanceSummary: 'Open attendance for the latest monthly summary.',
       homeworkSummary: 'Homework is synced from the school mobile API.',
       feesSummary: 'Fee summary is synced from the school mobile API.',
-      qrLabel:
-          'School identity QR will be shown after QR permissions are enabled.',
-      healthWarning:
-          medicalSummary['medicalConditions'] as String? ??
-          emergencyContact?['name'] as String?,
+      qrLabel: studentSystemId != null && studentSystemId.isNotEmpty
+          ? 'Student ID $studentSystemId is verified for guardian access.'
+          : 'Student identity is verified for guardian access.',
+      studentSystemId: studentSystemId,
+      admissionNumber: admissionNumber,
+      admissionDate: profile['admissionDate'] as String?,
+      dateOfBirth: profile['dateOfBirth'] as String?,
+      gender: profile['gender'] as String?,
+      bloodGroup: profile['bloodGroup'] as String?,
+      nationality: profile['nationality'] as String?,
+      lifecycleStatus: profile['lifecycleStatus'] as String?,
+      photoUsageConsent: privacy['photoUsageConsent'] as bool? ?? false,
+      dataProcessingConsent: privacy['dataProcessingConsent'] as bool? ?? false,
+      healthWarning: healthNote ?? emergencyContact?['name'] as String?,
       canViewHealthWarning:
-          medicalSummary['hasMedicalConsent'] as bool? ?? false,
+          (medicalSummary['hasMedicalConsent'] as bool? ?? false) &&
+          healthNote != null,
     );
   }
 
@@ -250,4 +269,18 @@ class ParentRepository {
 String _safeFileName(String value) {
   final sanitized = value.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '-');
   return sanitized.isEmpty ? 'receipt' : sanitized;
+}
+
+String? _joinNonEmpty(List<String?> values) {
+  final filtered = values
+      .whereType<String>()
+      .map((value) => value.trim())
+      .where((value) => value.isNotEmpty)
+      .toList();
+
+  if (filtered.isEmpty) {
+    return null;
+  }
+
+  return filtered.join(' / ');
 }

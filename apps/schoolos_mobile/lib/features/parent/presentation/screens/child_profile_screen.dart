@@ -150,6 +150,49 @@ class _ProfileContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.xl),
+        const SectionHeader(title: 'School record'),
+        const SizedBox(height: AppSpacing.sm),
+        AppCard(
+          child: Column(
+            children: [
+              _ProfileRow(
+                label: 'Student ID',
+                value: _orDash(currentProfile.studentSystemId),
+              ),
+              const Divider(),
+              _ProfileRow(
+                label: 'Admission no.',
+                value: _orDash(currentProfile.admissionNumber),
+              ),
+              const Divider(),
+              _ProfileRow(
+                label: 'Admission date',
+                value: _formatDate(currentProfile.admissionDate),
+              ),
+              const Divider(),
+              _ProfileRow(
+                label: 'Date of birth',
+                value: _formatDate(currentProfile.dateOfBirth),
+              ),
+              const Divider(),
+              _ProfileRow(
+                label: 'Gender',
+                value: _labelize(_orDash(currentProfile.gender)),
+              ),
+              const Divider(),
+              _ProfileRow(
+                label: 'Blood group',
+                value: _orDash(currentProfile.bloodGroup),
+              ),
+              const Divider(),
+              _ProfileRow(
+                label: 'Lifecycle',
+                value: _labelize(_orDash(currentProfile.lifecycleStatus)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
         const SectionHeader(title: 'Summary'),
         const SizedBox(height: AppSpacing.sm),
         DashboardCard(
@@ -198,12 +241,75 @@ class _ProfileContent extends StatelessWidget {
                   value: currentProfile.healthWarning!,
                 ),
               ],
+              const Divider(),
+              _ProfileRow(
+                label: 'Photo consent',
+                value: currentProfile.photoUsageConsent
+                    ? 'Granted'
+                    : 'Not granted',
+              ),
+              const Divider(),
+              _ProfileRow(
+                label: 'Data consent',
+                value: currentProfile.dataProcessingConsent
+                    ? 'Granted'
+                    : 'Not granted',
+              ),
             ],
           ),
         ),
       ],
     );
   }
+}
+
+String _orDash(String? value) {
+  final trimmed = value?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return '-';
+  }
+  return trimmed;
+}
+
+String _formatDate(String? value) {
+  final parsed = DateTime.tryParse(value ?? '');
+  if (parsed == null) {
+    return '-';
+  }
+  return '${_month(parsed.month)} ${parsed.day}, ${parsed.year}';
+}
+
+String _labelize(String value) {
+  if (value == '-') {
+    return value;
+  }
+
+  return value
+      .split('_')
+      .where((part) => part.isNotEmpty)
+      .map((part) => part[0].toUpperCase() + part.substring(1).toLowerCase())
+      .join(' ');
+}
+
+String _month(int month) {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  if (month < 1 || month > 12) {
+    return 'Date';
+  }
+  return months[month - 1];
 }
 
 class _ProfileRow extends StatelessWidget {

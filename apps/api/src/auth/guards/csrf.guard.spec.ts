@@ -46,9 +46,9 @@ describe('CsrfGuard', () => {
   it('requires the development CSRF cookie and matching header for browser mutations', () => {
     const guard = createGuard({ isProduction: false });
 
-    expect(() =>
-      guard.canActivate(createContext({ method: 'POST' })),
-    ).toThrow(new ForbiddenException('CSRF cookie missing'));
+    expect(() => guard.canActivate(createContext({ method: 'POST' }))).toThrow(
+      new ForbiddenException('CSRF cookie missing'),
+    );
 
     const token = generateCsrfToken(jwtSecret);
     expect(() =>

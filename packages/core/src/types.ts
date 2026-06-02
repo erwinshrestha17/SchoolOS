@@ -577,6 +577,12 @@ export type CashierCloseSummary = {
   firstReceiptNumber: string | null;
   lastReceiptNumber: string | null;
   notes?: string | null;
+  closePdfFile?: {
+    fileAssetId: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+  } | null;
   closedBy?: {
     id: string;
     email: string | null;
@@ -1208,6 +1214,48 @@ export type AttendanceConflictReviewResult = {
   affectedSyncSubmissionCount: number;
 };
 
+export type AttendanceCorrectionStatus =
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'CANCELLED';
+
+export type AttendanceCorrectionRequest = {
+  id: string;
+  tenantId?: string;
+  attendanceRecordId: string | null;
+  attendanceSessionId: string | null;
+  studentId: string;
+  attendanceDate: string;
+  requestedStatus: string;
+  previousStatus: string | null;
+  reason: string;
+  status: AttendanceCorrectionStatus;
+  requestedById: string;
+  requestedAt: string;
+  reviewedById: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
+  reviewReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  student?: {
+    id: string;
+    studentSystemId: string;
+    firstNameEn: string | null;
+    lastNameEn: string | null;
+    rollNumber?: string | null;
+  } | null;
+  requestedBy?: {
+    id: string;
+    email: string | null;
+  } | null;
+  reviewedBy?: {
+    id: string;
+    email: string | null;
+  } | null;
+};
+
 export type StaffLeaveRequestSummary = {
   id: string;
   staffId: string;
@@ -1447,6 +1495,12 @@ export type ActivityAttachment = {
   accessBlockedReason?: string | null;
   processingStatus?: string | null;
   sortOrder: number;
+};
+
+export type ActivityGalleryItem = ActivityAttachment & {
+  postId: string;
+  postTitle: string;
+  createdAt: string;
 };
 
 export type ActivityPost = {

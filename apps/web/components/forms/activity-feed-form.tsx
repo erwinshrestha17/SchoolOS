@@ -1,6 +1,7 @@
 'use client';
 
 import type {
+  ActivityGalleryItem,
   ActivityPost,
   ActivityReaction,
   DevelopmentalMilestone,
@@ -15,33 +16,25 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { filesToBase64Payloads } from '../../lib/files';
 import { cn } from '../../lib/utils';
-import { 
-  StatCard 
-} from '../ui/stat-card';
-import { 
-  Tabs, 
-  TabsList, 
-  TabsTrigger, 
-  TabsContent 
-} from '../ui/tabs';
+import { StatCard } from '../ui/stat-card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { Badge } from '../ui/badge';
 import { EmptyState } from '../ui/empty-state';
 import { LoadingState } from '../ui/loading-state';
-import { 
-  FormField, 
-  Input, 
-  Select, 
-  TextArea 
-} from '../ui/form-field';
-import { 
-  Heart, 
-  Sparkles, 
-  Star, 
-  Camera, 
-  History, 
-  Target, 
-  Truck, 
-  Smile 
+import { FormField, Input, Select, TextArea } from '../ui/form-field';
+import {
+  Heart,
+  Download,
+  Eye,
+  Filter,
+  Images,
+  Sparkles,
+  Star,
+  Camera,
+  History,
+  Target,
+  Truck,
+  Smile,
 } from 'lucide-react';
 
 const today = new Date().toISOString().slice(0, 10);
@@ -50,6 +43,7 @@ const maxImageBytes = 10 * 1024 * 1024;
 const activitySections = [
   'Create Post',
   'Feed Preview',
+  'Media Gallery',
   'Mood Logs',
   'Milestones',
   'Delivery Records',
@@ -65,27 +59,38 @@ const activitySectionMeta: Record<
 > = {
   'Create Post': {
     title: 'Activity Feed',
-    description: 'Capture classroom moments, tag students, and notify guardians with private media.',
+    description:
+      'Capture classroom moments, tag students, and notify guardians with private media.',
     icon: Camera,
   },
   'Feed Preview': {
     title: 'Feed Preview',
-    description: 'Review recently published classroom posts, attachments, tags, and reactions.',
+    description:
+      'Review recently published classroom posts, attachments, tags, and reactions.',
     icon: History,
+  },
+  'Media Gallery': {
+    title: 'Media Gallery',
+    description:
+      'Browse activity media by class, section, student, and category.',
+    icon: Images,
   },
   'Mood Logs': {
     title: 'Mood Logs',
-    description: 'Record daily emotional context for whole classes, sections, or individual children.',
+    description:
+      'Record daily emotional context for whole classes, sections, or individual children.',
     icon: Smile,
   },
   Milestones: {
     title: 'Montessori / ECE Milestones',
-    description: 'Track Montessori and ECE observations with clear child-level progress evidence.',
+    description:
+      'Track Montessori and ECE observations with clear child-level progress evidence.',
     icon: Target,
   },
   'Delivery Records': {
     title: 'Delivery Records',
-    description: 'Audit guardian notification delivery records generated from activity posts.',
+    description:
+      'Audit guardian notification delivery records generated from activity posts.',
     icon: Truck,
   },
 };
@@ -99,7 +104,12 @@ const activityCategories = [
   'GENERAL',
 ] as const;
 
-const milestoneStatuses = ['EMERGING', 'PROGRESSING', 'ACHIEVED', 'NEEDS_SUPPORT'] as const;
+const milestoneStatuses = [
+  'EMERGING',
+  'PROGRESSING',
+  'ACHIEVED',
+  'NEEDS_SUPPORT',
+] as const;
 const deliveryStatuses = ['QUEUED', 'SENT', 'FAILED', 'SKIPPED'] as const;
 
 type ActivitySection = (typeof activitySections)[number];
@@ -122,6 +132,13 @@ type CreatePostState = {
   studentIds: string[];
 };
 
+type GalleryFiltersState = {
+  classId: string;
+  sectionId: string;
+  studentId: string;
+  category: ActivityCategory | '';
+};
+
 type MoodLogState = {
   classId: string;
   sectionId: string;
@@ -139,7 +156,6 @@ type MilestoneState = {
   milestone: string;
   status: MilestoneStatus;
   observationNote: string;
-  photoObjectKey: string;
   observedAt: string;
 };
 
@@ -158,7 +174,8 @@ type ReactionMutation = ReturnType<
 
 export function ActivityFeedForm() {
   const queryClient = useQueryClient();
-  const [activeSection, setActiveSection] = useState<ActivitySection>('Create Post');
+  const [activeSection, setActiveSection] =
+    useState<ActivitySection>('Create Post');
   const [post, setPost] = useState<CreatePostState>({
     classId: '',
     sectionId: '',
@@ -170,6 +187,12 @@ export function ActivityFeedForm() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [fileWarning, setFileWarning] = useState<string | null>(null);
   const [postSuccess, setPostSuccess] = useState<string | null>(null);
+  const [galleryFilters, setGalleryFilters] = useState<GalleryFiltersState>({
+    classId: '',
+    sectionId: '',
+    studentId: '',
+    category: '',
+  });
   const [moodLog, setMoodLog] = useState<MoodLogState>({
     classId: '',
     sectionId: '',
@@ -186,7 +209,6 @@ export function ActivityFeedForm() {
     milestone: 'Uses classroom materials independently',
     status: 'PROGRESSING',
     observationNote: '',
-    photoObjectKey: '',
     observedAt: today,
   });
   const [milestoneFilters, setMilestoneFilters] = useState({
@@ -202,10 +224,25 @@ export function ActivityFeedForm() {
     queryKey: ['sections'],
     queryFn: api.listSections,
   });
-  const studentsQuery = useQuery({ queryKey: ['students'], queryFn: () => api.listStudents({ limit: 1000 }) });
+  const studentsQuery = useQuery({
+    queryKey: ['students'],
+    queryFn: () => api.listStudents({ limit: 1000 }),
+  });
   const postsQuery = useQuery({
     queryKey: ['activity-posts'],
     queryFn: api.listActivityPosts,
+  });
+  const galleryQuery = useQuery({
+    queryKey: ['activity-gallery', galleryFilters],
+    queryFn: () =>
+      api.listActivityGallery({
+        classId: galleryFilters.classId || null,
+        sectionId: galleryFilters.sectionId || null,
+        studentId: galleryFilters.studentId || null,
+        category: galleryFilters.category || null,
+        limit: 60,
+        offset: 0,
+      }),
   });
   const moodLogsQuery = useQuery({
     queryKey: ['mood-logs'],
@@ -228,9 +265,15 @@ export function ActivityFeedForm() {
     const firstClass = classesQuery.data?.[0];
 
     if (firstClass) {
-      setPost((current) => (current.classId ? current : { ...current, classId: firstClass.id }));
-      setMoodLog((current) => (current.classId ? current : { ...current, classId: firstClass.id }));
-      setMilestone((current) => (current.classId ? current : { ...current, classId: firstClass.id }));
+      setPost((current) =>
+        current.classId ? current : { ...current, classId: firstClass.id },
+      );
+      setMoodLog((current) =>
+        current.classId ? current : { ...current, classId: firstClass.id },
+      );
+      setMilestone((current) =>
+        current.classId ? current : { ...current, classId: firstClass.id },
+      );
     }
   }, [classesQuery.data]);
 
@@ -238,10 +281,21 @@ export function ActivityFeedForm() {
   const sections = (sectionsQuery.data ?? []) as SectionSummaryForUi[];
   const students = studentsQuery.data?.items ?? [];
   const postSections = filterSectionsForClass(sections, post.classId);
+  const gallerySections = filterSectionsForClass(
+    sections,
+    galleryFilters.classId,
+  );
   const moodSections = filterSectionsForClass(sections, moodLog.classId);
   const milestoneSections = filterSectionsForClass(sections, milestone.classId);
   const classStudents = filterStudentsForClass(students, post.classId);
-  const visiblePostStudents = filterStudentsForSectionWherePossible(classStudents, post.sectionId);
+  const visiblePostStudents = filterStudentsForSectionWherePossible(
+    classStudents,
+    post.sectionId,
+  );
+  const galleryStudents = filterStudentsForSectionWherePossible(
+    filterStudentsForClass(students, galleryFilters.classId),
+    galleryFilters.sectionId,
+  );
   const moodStudents = filterStudentsForSectionWherePossible(
     filterStudentsForClass(students, moodLog.classId),
     moodLog.sectionId,
@@ -261,7 +315,10 @@ export function ActivityFeedForm() {
     mutationFn: api.createActivityPost,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['activity-posts'] });
-      void queryClient.invalidateQueries({ queryKey: ['notification-deliveries'] });
+      void queryClient.invalidateQueries({ queryKey: ['activity-gallery'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['notification-deliveries'],
+      });
       setSelectedFiles([]);
       setFileWarning(null);
       setPostSuccess('Activity posted. Guardian notifications queued.');
@@ -271,7 +328,8 @@ export function ActivityFeedForm() {
   });
   const moodMutation = useMutation({
     mutationFn: api.createMoodLog,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['mood-logs'] }),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ['mood-logs'] }),
   });
   const reactionMutation = useMutation({
     mutationFn: ({
@@ -290,16 +348,22 @@ export function ActivityFeedForm() {
         guardianId,
         studentId,
       }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['activity-posts'] }),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ['activity-posts'] }),
   });
   const milestoneMutation = useMutation({
     mutationFn: api.createDevelopmentalMilestone,
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['developmental-milestones'] }),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({
+        queryKey: ['developmental-milestones'],
+      }),
   });
 
   function updateFiles(files: FileList | null) {
     const nextFiles = Array.from(files ?? []);
-    const firstNonImage = nextFiles.find((file) => !file.type.startsWith('image/'));
+    const firstNonImage = nextFiles.find(
+      (file) => !file.type.startsWith('image/'),
+    );
     const firstLargeImage = nextFiles.find((file) => file.size > maxImageBytes);
 
     setSelectedFiles(nextFiles);
@@ -355,7 +419,12 @@ export function ActivityFeedForm() {
       title: post.title.trim(),
       caption: post.caption.trim(),
       sectionId: post.sectionId || null,
-      audienceType: post.studentIds.length > 0 ? 'ALL' : post.sectionId ? 'SECTION' : 'CLASS',
+      audienceType:
+        post.studentIds.length > 0
+          ? 'ALL'
+          : post.sectionId
+            ? 'SECTION'
+            : 'CLASS',
       attachments,
     });
   }
@@ -370,6 +439,7 @@ export function ActivityFeedForm() {
   }
 
   const posts = postsQuery.data ?? [];
+  const galleryItems = galleryQuery.data ?? [];
   const moodLogs = moodLogsQuery.data ?? [];
   const milestones = milestonesQuery.data ?? [];
   const activeMeta = activitySectionMeta[activeSection];
@@ -395,10 +465,15 @@ export function ActivityFeedForm() {
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3 lg:w-[600px]">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:w-[720px]">
             <StatCard
               title="Posts"
               value={posts.length}
+              className="bg-white/5 border-white/10"
+            />
+            <StatCard
+              title="Media"
+              value={galleryItems.length}
               className="bg-white/5 border-white/10"
             />
             <StatCard
@@ -415,15 +490,15 @@ export function ActivityFeedForm() {
         </div>
       </section>
 
-      <Tabs 
-        value={activeSection} 
-        onValueChange={(val) => setActiveSection(val as ActivitySection)} 
+      <Tabs
+        value={activeSection}
+        onValueChange={(val) => setActiveSection(val as ActivitySection)}
         className="space-y-8"
       >
-        <TabsList className="bg-slate-100 p-1.5 rounded-[1.5rem] inline-flex h-auto">
+        <TabsList className="flex h-auto flex-wrap gap-1.5 rounded-[1.5rem] bg-slate-100 p-1.5">
           {activitySections.map((section) => (
-            <TabsTrigger 
-              key={section} 
+            <TabsTrigger
+              key={section}
               value={section}
               className="rounded-[1.2rem] px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 font-black uppercase tracking-widest text-[10px]"
             >
@@ -444,7 +519,9 @@ export function ActivityFeedForm() {
             selectedFiles={selectedFiles}
             fileWarning={fileWarning}
             postSuccess={postSuccess}
-            mutationError={postMutation.isError ? postMutation.error.message : null}
+            mutationError={
+              postMutation.isError ? postMutation.error.message : null
+            }
             isPending={postMutation.isPending}
             updateFiles={updateFiles}
             toggleStudent={toggleStudent}
@@ -461,6 +538,18 @@ export function ActivityFeedForm() {
           />
         </TabsContent>
 
+        <TabsContent value="Media Gallery">
+          <MediaGallerySection
+            items={galleryItems}
+            isLoading={galleryQuery.isLoading}
+            filters={galleryFilters}
+            setFilters={setGalleryFilters}
+            classes={classes}
+            sections={gallerySections}
+            students={galleryStudents}
+          />
+        </TabsContent>
+
         <TabsContent value="Mood Logs">
           <MoodLogsSection
             classes={classes}
@@ -470,7 +559,9 @@ export function ActivityFeedForm() {
             students={moodStudents}
             logs={moodLogs}
             logsLoading={moodLogsQuery.isLoading}
-            mutationError={moodMutation.isError ? moodMutation.error.message : null}
+            mutationError={
+              moodMutation.isError ? moodMutation.error.message : null
+            }
             isPending={moodMutation.isPending}
             saveMoodLog={() =>
               moodMutation.mutate({
@@ -495,14 +586,15 @@ export function ActivityFeedForm() {
             setFilters={setMilestoneFilters}
             milestones={milestones}
             milestonesLoading={milestonesQuery.isLoading}
-            mutationError={milestoneMutation.isError ? milestoneMutation.error.message : null}
+            mutationError={
+              milestoneMutation.isError ? milestoneMutation.error.message : null
+            }
             isPending={milestoneMutation.isPending}
             saveMilestone={() =>
               milestoneMutation.mutate({
                 ...milestone,
                 sectionId: milestone.sectionId || null,
                 observationNote: milestone.observationNote || null,
-                photoObjectKey: milestone.photoObjectKey || null,
                 observedAt: new Date(milestone.observedAt).toISOString(),
               })
             }
@@ -565,12 +657,18 @@ function CreatePostSection({
         <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-8">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">Create classroom moment</h2>
+              <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">
+                Create classroom moment
+              </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Guardians will be notified through SchoolOS notifications after publish.
+                Guardians will be notified through SchoolOS notifications after
+                publish.
               </p>
             </div>
-            <Badge variant="outline" className="font-black uppercase tracking-widest text-[10px]">
+            <Badge
+              variant="outline"
+              className="font-black uppercase tracking-widest text-[10px]"
+            >
               AI captions later
             </Badge>
           </div>
@@ -621,12 +719,18 @@ function CreatePostSection({
           <div className="bg-slate-50 p-6 rounded-[1.5rem] border border-slate-100 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-black text-slate-900 uppercase tracking-widest text-[11px]">Tagged Students</p>
+                <p className="text-sm font-black text-slate-900 uppercase tracking-widest text-[11px]">
+                  Tagged Students
+                </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  Choose specific children to notify their guardians exclusively.
+                  Choose specific children to notify their guardians
+                  exclusively.
                 </p>
               </div>
-              <Badge variant="secondary" className="font-black uppercase tracking-widest text-[10px]">
+              <Badge
+                variant="secondary"
+                className="font-black uppercase tracking-widest text-[10px]"
+              >
                 {post.studentIds.length} Selected
               </Badge>
             </div>
@@ -641,10 +745,10 @@ function CreatePostSection({
                       key={student.id}
                       type="button"
                       className={cn(
-                        "h-9 px-4 rounded-full text-[11px] font-black uppercase tracking-widest transition-all",
+                        'h-9 px-4 rounded-full text-[11px] font-black uppercase tracking-widest transition-all',
                         selected
-                          ? "bg-slate-900 text-white shadow-md shadow-slate-200"
-                          : "bg-white border border-slate-200 text-slate-600 hover:border-slate-300"
+                          ? 'bg-slate-900 text-white shadow-md shadow-slate-200'
+                          : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300',
                       )}
                       onClick={() => toggleStudent(student.id)}
                     >
@@ -653,9 +757,9 @@ function CreatePostSection({
                   );
                 })
               ) : (
-                <EmptyState 
-                  title="No students" 
-                  description="No students found for this class/section." 
+                <EmptyState
+                  title="No students"
+                  description="No students found for this class/section."
                   className="bg-white"
                 />
               )}
@@ -685,7 +789,10 @@ function CreatePostSection({
               <Input
                 value={post.title}
                 onChange={(event) =>
-                  setPost((current) => ({ ...current, title: event.target.value }))
+                  setPost((current) => ({
+                    ...current,
+                    title: event.target.value,
+                  }))
                 }
                 placeholder="Post title"
               />
@@ -697,7 +804,10 @@ function CreatePostSection({
               rows={4}
               value={post.caption}
               onChange={(event) =>
-                setPost((current) => ({ ...current, caption: event.target.value }))
+                setPost((current) => ({
+                  ...current,
+                  caption: event.target.value,
+                }))
               }
               placeholder="What happened in class today?"
             />
@@ -717,10 +827,12 @@ function CreatePostSection({
                   Attach 1 to 5 images. Private media stay encrypted.
                 </p>
                 <p className="text-[10px] text-slate-500 uppercase tracking-widest font-medium">
-                  Secure previews use signed access; permanent public URLs are not shown.
+                  {
+                    'Secure previews use signed access; permanent public URLs are not shown.'
+                  }
                 </p>
               </div>
-              
+
               {selectedFiles.length > 0 && (
                 <div className="grid gap-2">
                   {selectedFiles.map((file) => (
@@ -728,8 +840,13 @@ function CreatePostSection({
                       key={`${file.name}-${file.size}`}
                       className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50"
                     >
-                      <span className="text-xs font-black text-slate-900 uppercase tracking-tight">{file.name}</span>
-                      <Badge variant="outline" className="text-[10px] font-black uppercase">
+                      <span className="text-xs font-black text-slate-900 uppercase tracking-tight">
+                        {file.name}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-black uppercase"
+                      >
                         {formatFileSize(file.size)}
                       </Badge>
                     </div>
@@ -740,9 +857,15 @@ function CreatePostSection({
           </FormField>
 
           <div className="space-y-4 pt-4">
-            {fileWarning && <InlineMessage tone="error" message={fileWarning} />}
-            {mutationError && <InlineMessage tone="error" message={mutationError} />}
-            {postSuccess && <InlineMessage tone="success" message={postSuccess} />}
+            {fileWarning && (
+              <InlineMessage tone="error" message={fileWarning} />
+            )}
+            {mutationError && (
+              <InlineMessage tone="error" message={mutationError} />
+            )}
+            {postSuccess && (
+              <InlineMessage tone="success" message={postSuccess} />
+            )}
 
             <button
               type="button"
@@ -766,8 +889,14 @@ function CreatePostSection({
       <div className="space-y-6">
         <ReviewPanel
           audienceLabel={audienceLabel}
-          selectedClassName={classes.find((item) => item.id === post.classId)?.name ?? 'Not selected'}
-          selectedSectionName={sections.find((item) => item.id === post.sectionId)?.name ?? 'Whole class'}
+          selectedClassName={
+            classes.find((item) => item.id === post.classId)?.name ??
+            'Not selected'
+          }
+          selectedSectionName={
+            sections.find((item) => item.id === post.sectionId)?.name ??
+            'Whole class'
+          }
           selectedStudents={selectedStudents}
           photoCount={selectedFiles.length}
           category={post.category}
@@ -795,19 +924,31 @@ function ReviewPanel({
   return (
     <div className="bg-slate-900 p-8 rounded-[2rem] text-white space-y-6 sticky top-28 shadow-2xl">
       <div>
-        <h3 className="text-lg font-black uppercase italic tracking-widest text-emerald-400">Review Summary</h3>
-        <p className="text-xs text-slate-400 mt-1 uppercase tracking-[0.1em] font-bold">Verify before publishing</p>
+        <h3 className="text-lg font-black uppercase italic tracking-widest text-emerald-400">
+          Review Summary
+        </h3>
+        <p className="text-xs text-slate-400 mt-1 uppercase tracking-[0.1em] font-bold">
+          Verify before publishing
+        </p>
       </div>
 
       <div className="space-y-4">
         <Fact label="Audience" value={audienceLabel} />
-        <Fact label="Class / Section" value={`${selectedClassName} / ${selectedSectionName}`} />
+        <Fact
+          label="Class / Section"
+          value={`${selectedClassName} / ${selectedSectionName}`}
+        />
         <Fact label="Category" value={formatEnumLabel(category)} />
-        <Fact label="Photos" value={`${photoCount} image${photoCount === 1 ? '' : 's'}`} />
+        <Fact
+          label="Photos"
+          value={`${photoCount} image${photoCount === 1 ? '' : 's'}`}
+        />
       </div>
 
       <div className="p-5 rounded-2xl bg-white/5 border border-white/10">
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Tagged Students</p>
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
+          Tagged Students
+        </p>
         <p className="text-xs leading-relaxed font-medium">
           {selectedStudents.length > 0
             ? selectedStudents.map(studentDisplayName).join(', ')
@@ -843,22 +984,29 @@ function FeedPreviewSection({
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">Recent classroom moments</h2>
-        <Badge variant="secondary" className="font-black uppercase tracking-widest text-[10px]">
+        <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">
+          Recent classroom moments
+        </h2>
+        <Badge
+          variant="secondary"
+          className="font-black uppercase tracking-widest text-[10px]"
+        >
           {posts.length} Posts
         </Badge>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
         {posts.length > 0 ? (
-          posts.slice(0, 12).map((post) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              students={students}
-              reactionMutation={reactionMutation}
-            />
-          ))
+          posts
+            .slice(0, 12)
+            .map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                students={students}
+                reactionMutation={reactionMutation}
+              />
+            ))
         ) : (
           <div className="lg:col-span-2 xl:col-span-3">
             <EmptyState
@@ -872,6 +1020,291 @@ function FeedPreviewSection({
   );
 }
 
+function MediaGallerySection({
+  items,
+  isLoading,
+  filters,
+  setFilters,
+  classes,
+  sections,
+  students,
+}: {
+  items: ActivityGalleryItem[];
+  isLoading: boolean;
+  filters: GalleryFiltersState;
+  setFilters: Dispatch<SetStateAction<GalleryFiltersState>>;
+  classes: Array<{ id: string; name: string }>;
+  sections: SectionSummaryForUi[];
+  students: StudentProfile[];
+}) {
+  const [loadingAttachmentId, setLoadingAttachmentId] = useState<string | null>(
+    null,
+  );
+  const [errorAttachmentId, setErrorAttachmentId] = useState<string | null>(
+    null,
+  );
+  const hasActiveFilters = Boolean(
+    filters.classId ||
+    filters.sectionId ||
+    filters.studentId ||
+    filters.category,
+  );
+
+  const handlePreview = async (attachmentId: string) => {
+    try {
+      setLoadingAttachmentId(attachmentId);
+      setErrorAttachmentId(null);
+      await api.previewActivityAttachment(attachmentId);
+    } catch {
+      setErrorAttachmentId(attachmentId);
+    } finally {
+      setLoadingAttachmentId(null);
+    }
+  };
+
+  const handleDownload = async (attachmentId: string, fileName: string) => {
+    try {
+      setLoadingAttachmentId(attachmentId);
+      setErrorAttachmentId(null);
+      await api.downloadActivityAttachment(attachmentId, fileName);
+    } catch {
+      setErrorAttachmentId(attachmentId);
+    } finally {
+      setLoadingAttachmentId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+              <Filter className="h-4 w-4" />
+            </span>
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-widest text-slate-900">
+                Teacher media gallery
+              </h2>
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                {items.length} media item{items.length === 1 ? '' : 's'} on this
+                view
+              </p>
+            </div>
+          </div>
+
+          {hasActiveFilters ? (
+            <button
+              type="button"
+              className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-widest text-slate-600 transition-colors hover:bg-slate-50"
+              onClick={() =>
+                setFilters({
+                  classId: '',
+                  sectionId: '',
+                  studentId: '',
+                  category: '',
+                })
+              }
+            >
+              Clear filters
+            </button>
+          ) : null}
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <FormField label="Class">
+            <Select
+              value={filters.classId}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  classId: event.target.value,
+                  sectionId: '',
+                  studentId: '',
+                }))
+              }
+            >
+              <option value="">All classes</option>
+              {classes.map((classroom) => (
+                <option key={classroom.id} value={classroom.id}>
+                  {classroom.name}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+
+          <FormField label="Section">
+            <Select
+              value={filters.sectionId}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  sectionId: event.target.value,
+                  studentId: '',
+                }))
+              }
+            >
+              <option value="">All sections</option>
+              {sections.map((section) => (
+                <option key={section.id} value={section.id}>
+                  {section.name}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+
+          <FormField label="Student">
+            <Select
+              value={filters.studentId}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  studentId: event.target.value,
+                }))
+              }
+            >
+              <option value="">All students</option>
+              {students.map((student) => (
+                <option key={student.id} value={student.id}>
+                  {studentDisplayName(student)}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+
+          <FormField label="Category">
+            <Select
+              value={filters.category}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  category: event.target.value as ActivityCategory | '',
+                }))
+              }
+            >
+              <option value="">All categories</option>
+              {activityCategories.map((category) => (
+                <option key={category} value={category}>
+                  {formatEnumLabel(category)}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+        </div>
+      </section>
+
+      {isLoading ? (
+        <LoadingState />
+      ) : items.length > 0 ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {items.map((item) => {
+            const isBusy = loadingAttachmentId === item.id;
+            const hasError = errorAttachmentId === item.id;
+
+            return (
+              <article
+                key={item.id}
+                className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+              >
+                <div className="relative aspect-[4/3] bg-slate-100">
+                  {item.previewUrl ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={item.previewUrl}
+                        alt={item.fileName}
+                        className="h-full w-full object-cover"
+                      />
+                      {item.processingStatus ? (
+                        <span className="absolute left-3 top-3 rounded-md bg-white/90 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-slate-700 shadow-sm">
+                          {formatEnumLabel(item.processingStatus)}
+                        </span>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="flex h-full flex-col items-center justify-center p-4 text-center">
+                      <Camera className="mb-2 h-6 w-6 text-slate-300" />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        {item.accessBlockedReason
+                          ? 'Media hidden'
+                          : 'Private media'}
+                      </p>
+                      {item.accessBlockedReason ? (
+                        <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-500">
+                          Photo consent is not available for this media.
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3 p-4">
+                  <div>
+                    <Link
+                      href={`/dashboard/activity/${item.postId}`}
+                      className="line-clamp-2 text-sm font-black uppercase leading-snug tracking-tight text-slate-900 hover:text-emerald-700"
+                    >
+                      {item.postTitle}
+                    </Link>
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                      {formatDateTime(item.createdAt)}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
+                    <span className="min-w-0 truncate text-[11px] font-bold text-slate-600">
+                      {item.fileName}
+                    </span>
+                    <span className="shrink-0 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      {formatFileSize(item.sizeBytes)}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-widest text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                      disabled={!item.previewUrl || isBusy}
+                      onClick={() => void handlePreview(item.id)}
+                      aria-label={`Preview ${item.fileName}`}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      Preview
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-slate-800 disabled:opacity-50"
+                      disabled={!item.previewUrl || isBusy}
+                      onClick={() =>
+                        void handleDownload(item.id, item.fileName)
+                      }
+                      aria-label={`Save ${item.fileName}`}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Save
+                    </button>
+                  </div>
+
+                  {hasError ? (
+                    <p className="rounded-md border border-red-100 bg-red-50 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-red-700">
+                      Could not open private media.
+                    </p>
+                  ) : null}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <EmptyState
+          title="No media found"
+          description="No activity media matches the selected filters."
+        />
+      )}
+    </div>
+  );
+}
+
 function PostCard({
   post,
   students,
@@ -881,8 +1314,12 @@ function PostCard({
   students: StudentProfile[];
   reactionMutation: ReactionMutation;
 }) {
-  const [loadingAttachmentId, setLoadingAttachmentId] = useState<string | null>(null);
-  const [errorAttachmentId, setErrorAttachmentId] = useState<string | null>(null);
+  const [loadingAttachmentId, setLoadingAttachmentId] = useState<string | null>(
+    null,
+  );
+  const [errorAttachmentId, setErrorAttachmentId] = useState<string | null>(
+    null,
+  );
 
   const handlePreview = async (attachmentId: string) => {
     try {
@@ -916,13 +1353,18 @@ function PostCard({
       <div className="p-6 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
-            <h3 className="font-black text-slate-900 uppercase tracking-tight leading-tight">{post.title}</h3>
+            <h3 className="font-black text-slate-900 uppercase tracking-tight leading-tight">
+              {post.title}
+            </h3>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
               {post.publishedAt ? formatDateTime(post.publishedAt) : 'Draft'}
             </p>
           </div>
           <div className="flex flex-col items-end gap-1.5">
-            <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest">
+            <Badge
+              variant="outline"
+              className="text-[9px] font-black uppercase tracking-widest"
+            >
               {formatEnumLabel(post.category)}
             </Badge>
           </div>
@@ -955,7 +1397,9 @@ function PostCard({
                       Preview
                     </button>
                     <button
-                      onClick={() => handleDownload(attachment.id, attachment.fileName)}
+                      onClick={() =>
+                        handleDownload(attachment.id, attachment.fileName)
+                      }
                       disabled={loadingAttachmentId === attachment.id}
                       className="h-9 px-4 rounded-full bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-transform"
                     >
@@ -973,7 +1417,8 @@ function PostCard({
                   </p>
                   {attachment.accessBlockedReason ? (
                     <p className="mt-2 max-w-[14rem] text-xs font-semibold leading-relaxed text-slate-500">
-                      Some media is hidden because of student photo consent settings.
+                      Some media is hidden because of student photo consent
+                      settings.
                     </p>
                   ) : null}
                 </div>
@@ -984,14 +1429,18 @@ function PostCard({
 
         {post.studentTags.length > 0 && (
           <div className="pt-4 border-t border-slate-100">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Tagged</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+              Tagged
+            </p>
             <div className="flex flex-wrap gap-1.5">
               {post.studentTags.map((tag) => (
-                <span 
+                <span
                   key={tag.studentId}
                   className="px-2 py-1 rounded-md bg-slate-50 text-slate-600 text-[9px] font-black uppercase tracking-widest border border-slate-100"
                 >
-                  {tag.student ? `${tag.student.firstNameEn} ${tag.student.lastNameEn}` : 'Student'}
+                  {tag.student
+                    ? `${tag.student.firstNameEn} ${tag.student.lastNameEn}`
+                    : 'Student'}
                 </span>
               ))}
             </div>
@@ -1000,8 +1449,15 @@ function PostCard({
 
         <div className="pt-4 flex items-center gap-2">
           {(['HEART', 'CLAP', 'STAR'] as const).map((reaction) => {
-            const count = post.reactions?.filter((entry) => entry.reaction === reaction).length ?? 0;
-            const Icon = reaction === 'HEART' ? Heart : reaction === 'CLAP' ? Sparkles : Star;
+            const count =
+              post.reactions?.filter((entry) => entry.reaction === reaction)
+                .length ?? 0;
+            const Icon =
+              reaction === 'HEART'
+                ? Heart
+                : reaction === 'CLAP'
+                  ? Sparkles
+                  : Star;
 
             return (
               <button
@@ -1018,8 +1474,17 @@ function PostCard({
                   })
                 }
               >
-                <Icon className={cn("h-3.5 w-3.5", count > 0 ? "text-emerald-500 fill-emerald-500" : "text-slate-400")} />
-                <span className="text-[11px] font-black text-slate-900">{count}</span>
+                <Icon
+                  className={cn(
+                    'h-3.5 w-3.5',
+                    count > 0
+                      ? 'text-emerald-500 fill-emerald-500'
+                      : 'text-slate-400',
+                  )}
+                />
+                <span className="text-[11px] font-black text-slate-900">
+                  {count}
+                </span>
               </button>
             );
           })}
@@ -1062,9 +1527,12 @@ function MoodLogsSection({
     <div className="grid gap-8 xl:grid-cols-2">
       <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-8">
         <div>
-          <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">Daily Mood Log</h2>
+          <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">
+            Daily Mood Log
+          </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Record emotional context for whole-class or child-specific observations.
+            Record emotional context for whole-class or child-specific
+            observations.
           </p>
         </div>
 
@@ -1095,7 +1563,11 @@ function MoodLogsSection({
               <Select
                 value={moodLog.sectionId}
                 onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-                  setMoodLog((current) => ({ ...current, sectionId: event.target.value, studentId: '' }))
+                  setMoodLog((current) => ({
+                    ...current,
+                    sectionId: event.target.value,
+                    studentId: '',
+                  }))
                 }
               >
                 <option value="">Whole class</option>
@@ -1111,7 +1583,12 @@ function MoodLogsSection({
           <FormField label="Student (Optional)">
             <Select
               value={moodLog.studentId}
-              onChange={(event: React.ChangeEvent<HTMLSelectElement>) => setMoodLog((current) => ({ ...current, studentId: event.target.value }))}
+              onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+                setMoodLog((current) => ({
+                  ...current,
+                  studentId: event.target.value,
+                }))
+              }
             >
               <option value="">Whole-class mood</option>
               {students.map((student) => (
@@ -1126,7 +1603,12 @@ function MoodLogsSection({
             <FormField label="Mood">
               <Select
                 value={moodLog.mood}
-                onChange={(event: React.ChangeEvent<HTMLSelectElement>) => setMoodLog((current) => ({ ...current, mood: event.target.value }))}
+                onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+                  setMoodLog((current) => ({
+                    ...current,
+                    mood: event.target.value,
+                  }))
+                }
               >
                 <option value="CALM">Calm</option>
                 <option value="ENGAGED">Engaged</option>
@@ -1139,7 +1621,12 @@ function MoodLogsSection({
               <Input
                 type="date"
                 value={moodLog.logDate}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) => setMoodLog((current) => ({ ...current, logDate: event.target.value }))}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                  setMoodLog((current) => ({
+                    ...current,
+                    logDate: event.target.value,
+                  }))
+                }
               />
             </FormField>
           </div>
@@ -1148,13 +1635,20 @@ function MoodLogsSection({
             <TextArea
               rows={4}
               value={moodLog.note}
-              onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setMoodLog((current) => ({ ...current, logNote: event.target.value }))}
+              onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) =>
+                setMoodLog((current) => ({
+                  ...current,
+                  logNote: event.target.value,
+                }))
+              }
               placeholder="Optional teacher observation..."
             />
           </FormField>
 
           <div className="space-y-4">
-            {mutationError && <InlineMessage tone="error" message={mutationError} />}
+            {mutationError && (
+              <InlineMessage tone="error" message={mutationError} />
+            )}
             <button
               type="button"
               className="w-full h-14 rounded-2xl bg-emerald-600 text-white font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-emerald-100 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0"
@@ -1171,7 +1665,10 @@ function MoodLogsSection({
         {logs.length > 0 ? (
           <div className="grid gap-4">
             {logs.slice(0, 8).map((item) => (
-              <div key={item.id} className="p-5 rounded-[1.5rem] bg-white border border-slate-100 shadow-sm flex items-center justify-between">
+              <div
+                key={item.id}
+                className="p-5 rounded-[1.5rem] bg-white border border-slate-100 shadow-sm flex items-center justify-between"
+              >
                 <div className="space-y-1">
                   <p className="font-black text-slate-900 uppercase tracking-tight leading-tight">
                     {formatEnumLabel(item.mood)}
@@ -1191,7 +1688,10 @@ function MoodLogsSection({
             ))}
           </div>
         ) : (
-          <EmptyState title="No mood logs" description="Mood history will appear here once recorded." />
+          <EmptyState
+            title="No mood logs"
+            description="Mood history will appear here once recorded."
+          />
         )}
       </HistoryCard>
     </div>
@@ -1231,7 +1731,9 @@ function MilestonesSection({
     <div className="grid gap-8 xl:grid-cols-2">
       <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-8">
         <div>
-          <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">ECE Milestones</h2>
+          <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">
+            ECE Milestones
+          </h2>
           <p className="mt-1 text-sm text-slate-500">
             Track developmental observations without exposing public photo URLs.
           </p>
@@ -1285,7 +1787,10 @@ function MilestonesSection({
             <Select
               value={milestone.studentId}
               onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-                setMilestone((current) => ({ ...current, studentId: event.target.value }))
+                setMilestone((current) => ({
+                  ...current,
+                  studentId: event.target.value,
+                }))
               }
             >
               <option value="">Select child</option>
@@ -1302,7 +1807,10 @@ function MilestonesSection({
               <Input
                 value={milestone.domain}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                  setMilestone((current) => ({ ...current, domain: event.target.value }))
+                  setMilestone((current) => ({
+                    ...current,
+                    domain: event.target.value,
+                  }))
                 }
                 placeholder="e.g. Cognitive"
               />
@@ -1330,7 +1838,10 @@ function MilestonesSection({
             <Input
               value={milestone.milestone}
               onChange={(event) =>
-                setMilestone((current) => ({ ...current, milestone: event.target.value }))
+                setMilestone((current) => ({
+                  ...current,
+                  milestone: event.target.value,
+                }))
               }
               placeholder="e.g. Recognizing primary colors"
             />
@@ -1341,35 +1852,32 @@ function MilestonesSection({
               rows={3}
               value={milestone.observationNote}
               onChange={(event) =>
-                setMilestone((current) => ({ ...current, observationNote: event.target.value }))
+                setMilestone((current) => ({
+                  ...current,
+                  observationNote: event.target.value,
+                }))
               }
               placeholder="Detail your observation..."
             />
           </FormField>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            <FormField label="Photo Reference (Optional)">
-              <Input
-                value={milestone.photoObjectKey}
-                onChange={(event) =>
-                  setMilestone((current) => ({ ...current, photoObjectKey: event.target.value }))
-                }
-                placeholder="Private object key"
-              />
-            </FormField>
-            <FormField label="Observed At">
-              <Input
-                type="date"
-                value={milestone.observedAt}
-                onChange={(event) =>
-                  setMilestone((current) => ({ ...current, observedAt: event.target.value }))
-                }
-              />
-            </FormField>
-          </div>
+          <FormField label="Observed At">
+            <Input
+              type="date"
+              value={milestone.observedAt}
+              onChange={(event) =>
+                setMilestone((current) => ({
+                  ...current,
+                  observedAt: event.target.value,
+                }))
+              }
+            />
+          </FormField>
 
           <div className="space-y-4">
-            {mutationError && <InlineMessage tone="error" message={mutationError} />}
+            {mutationError && (
+              <InlineMessage tone="error" message={mutationError} />
+            )}
             <button
               type="button"
               className="w-full h-14 rounded-2xl bg-indigo-600 text-white font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-indigo-100 hover:-translate-y-1 transition-all disabled:opacity-50 disabled:translate-y-0"
@@ -1415,10 +1923,18 @@ function MilestonesSection({
         {milestones.length > 0 ? (
           <div className="grid gap-4">
             {milestones.slice(0, 8).map((item) => (
-              <div key={item.id} className="p-5 rounded-[1.5rem] bg-white border border-slate-100 shadow-sm space-y-2">
+              <div
+                key={item.id}
+                className="p-5 rounded-[1.5rem] bg-white border border-slate-100 shadow-sm space-y-2"
+              >
                 <div className="flex items-center justify-between">
-                  <h4 className="font-black text-slate-900 uppercase tracking-tight">{item.milestone}</h4>
-                  <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest">
+                  <h4 className="font-black text-slate-900 uppercase tracking-tight">
+                    {item.milestone}
+                  </h4>
+                  <Badge
+                    variant="outline"
+                    className="text-[9px] font-black uppercase tracking-widest"
+                  >
                     {formatEnumLabel(item.status)}
                   </Badge>
                 </div>
@@ -1434,7 +1950,10 @@ function MilestonesSection({
             ))}
           </div>
         ) : (
-          <EmptyState title="No milestones" description="No developmental observations found for these filters." />
+          <EmptyState
+            title="No milestones"
+            description="No developmental observations found for these filters."
+          />
         )}
       </HistoryCard>
     </div>
@@ -1453,18 +1972,28 @@ function DeliveryRecordsSection({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">Activity Delivery Records</h2>
-        <p className="mt-1 text-sm text-slate-500">Audit trail for guardian notification delivery status.</p>
+        <h2 className="text-xl font-black text-slate-900 uppercase italic tracking-tight">
+          Activity Delivery Records
+        </h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Audit trail for guardian notification delivery status.
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         {deliveries.length > 0 ? (
           deliveries.slice(0, 20).map((delivery) => (
-            <div key={delivery.id} className="p-5 rounded-[1.5rem] bg-white border border-slate-200 shadow-sm flex items-start justify-between gap-4">
+            <div
+              key={delivery.id}
+              className="p-5 rounded-[1.5rem] bg-white border border-slate-200 shadow-sm flex items-start justify-between gap-4"
+            >
               <div className="space-y-2">
-                <p className="font-black text-slate-900 uppercase tracking-tight leading-tight">{delivery.title}</p>
+                <p className="font-black text-slate-900 uppercase tracking-tight leading-tight">
+                  {delivery.title}
+                </p>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  {delivery.channel} · {delivery.destination || 'Direct'} · {formatDateTime(delivery.createdAt)}
+                  {delivery.channel} · {delivery.destination || 'Direct'} ·{' '}
+                  {formatDateTime(delivery.createdAt)}
                 </p>
               </div>
               <StatusBadge status={delivery.status} />
@@ -1495,8 +2024,12 @@ function HistoryCard({
   return (
     <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-200 shadow-inner">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">{title}</h3>
-        {isLoading && <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />}
+        <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">
+          {title}
+        </h3>
+        {isLoading && (
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />
+        )}
       </div>
       {children}
     </div>
@@ -1506,7 +2039,9 @@ function HistoryCard({
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between py-1 border-b border-white/5 last:border-0">
-      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</span>
+      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+        {label}
+      </span>
       <span className="text-[11px] font-bold text-slate-200">{value}</span>
     </div>
   );
@@ -1518,26 +2053,37 @@ function StatusBadge({ status }: { status: string }) {
   const isSkipped = status === 'SKIPPED';
 
   return (
-    <span className={cn(
-      "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest",
-      isSent ? "bg-emerald-100 text-emerald-700" :
-      isFailed ? "bg-red-100 text-red-700" :
-      isSkipped ? "bg-slate-100 text-slate-600" :
-      "bg-amber-100 text-amber-700"
-    )}>
+    <span
+      className={cn(
+        'px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest',
+        isSent
+          ? 'bg-emerald-100 text-emerald-700'
+          : isFailed
+            ? 'bg-red-100 text-red-700'
+            : isSkipped
+              ? 'bg-slate-100 text-slate-600'
+              : 'bg-amber-100 text-amber-700',
+      )}
+    >
       {status}
     </span>
   );
 }
 
-function InlineMessage({ tone, message }: { tone: 'success' | 'error'; message: string }) {
+function InlineMessage({
+  tone,
+  message,
+}: {
+  tone: 'success' | 'error';
+  message: string;
+}) {
   return (
     <p
       className={cn(
-        "rounded-2xl border px-5 py-4 text-[11px] font-black uppercase tracking-widest leading-relaxed",
+        'rounded-2xl border px-5 py-4 text-[11px] font-black uppercase tracking-widest leading-relaxed',
         tone === 'success'
           ? 'border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm shadow-emerald-100'
-          : 'border-red-200 bg-red-50 text-red-700 shadow-sm shadow-red-100'
+          : 'border-red-200 bg-red-50 text-red-700 shadow-sm shadow-red-100',
       )}
     >
       {message}
@@ -1545,7 +2091,10 @@ function InlineMessage({ tone, message }: { tone: 'success' | 'error'; message: 
   );
 }
 
-function filterSectionsForClass(sections: SectionSummaryForUi[], classId: string) {
+function filterSectionsForClass(
+  sections: SectionSummaryForUi[],
+  classId: string,
+) {
   return sections.filter((section) => {
     const sectionClassId = section.classId ?? section.class?.id;
     return !classId || sectionClassId === classId;
@@ -1553,10 +2102,15 @@ function filterSectionsForClass(sections: SectionSummaryForUi[], classId: string
 }
 
 function filterStudentsForClass(students: StudentProfile[], classId: string) {
-  return students.filter((student) => !classId || student.class?.id === classId);
+  return students.filter(
+    (student) => !classId || student.class?.id === classId,
+  );
 }
 
-function filterStudentsForSectionWherePossible(students: StudentProfile[], sectionId: string) {
+function filterStudentsForSectionWherePossible(
+  students: StudentProfile[],
+  sectionId: string,
+) {
   if (!sectionId) {
     return students;
   }
@@ -1577,8 +2131,13 @@ function filterStudentsForSectionWherePossible(students: StudentProfile[], secti
   });
 }
 
-function findReactionActor(students: StudentProfile[], taggedStudentIds: string[]) {
-  const taggedStudent = students.find((student) => taggedStudentIds.includes(student.id));
+function findReactionActor(
+  students: StudentProfile[],
+  taggedStudentIds: string[],
+) {
+  const taggedStudent = students.find((student) =>
+    taggedStudentIds.includes(student.id),
+  );
   const fallbackStudent = taggedStudent ?? students[0];
   const guardianId = fallbackStudent?.guardians?.[0]?.id;
 

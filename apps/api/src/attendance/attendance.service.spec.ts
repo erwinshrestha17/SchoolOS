@@ -671,7 +671,11 @@ describe('attendance production hardening', () => {
       permissions: ['attendance:read'],
     };
     const { service, prisma } = buildService({
-      studentFindFirst: { id: 'student-2', classId: 'class-1', sectionId: null },
+      studentFindFirst: {
+        id: 'student-2',
+        classId: 'class-1',
+        sectionId: null,
+      },
       guardianFindFirst: {
         id: 'guardian-1',
         studentLinks: [{ studentId: 'student-1' }],

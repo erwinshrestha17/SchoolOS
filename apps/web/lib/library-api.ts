@@ -27,6 +27,12 @@ export type LibraryCopyStatus =
   | 'RESERVED';
 
 export type LibraryIssueStatus = 'ISSUED' | 'RETURNED' | 'OVERDUE' | 'LOST';
+export type LibraryFineStatus =
+  | 'PENDING'
+  | 'POSTED_TO_FEES'
+  | 'PAID'
+  | 'PARTIALLY_PAID'
+  | 'WAIVED';
 
 export type LibraryPaginationMeta = {
   page: number;
@@ -83,6 +89,11 @@ export type LibraryIssue = {
   status: LibraryIssueStatus;
   fineAmount?: string | number | null;
   invoiceId?: string | null;
+  invoice?: {
+    id: string;
+    invoiceNumber: string;
+    status: string;
+  } | null;
   notes?: string | null;
   createdAt?: string;
   updatedAt?: string;
@@ -107,13 +118,29 @@ export type LibraryFine = {
   issueId: string;
   amount: string | number;
   waivedAmount: string | number;
-  status: 'PENDING' | 'WAIVED' | 'PAID';
+  status: LibraryFineStatus;
+  feeInvoiceId?: string | null;
+  feePostedAt?: string | null;
   waiverReason?: string | null;
   correctionReason?: string | null;
   notes?: string | null;
+  alreadyPosted?: boolean;
   createdAt: string;
   updatedAt: string;
   issue?: LibraryIssue;
+};
+
+export type LibraryPopularBookReportItem = {
+  book?: LibraryBook | null;
+  issueCount: number;
+};
+
+export type LibraryFineSummaryReport = {
+  items: LibraryIssue[];
+  summary: {
+    totalIssuesWithFine: number;
+    totalFine: string | number;
+  };
 };
 
 export type LibraryBookPayload = {
@@ -151,11 +178,15 @@ export type LibraryFinePayload = {
 };
 
 export type UpdateLibraryFinePayload = {
-  status?: 'PENDING' | 'WAIVED' | 'PAID';
+  status?: LibraryFineStatus;
   waivedAmount?: number;
   waiverReason?: string;
   correctionReason?: string;
   notes?: string;
+};
+
+export type PostLibraryFineToFeesPayload = {
+  reason: string;
 };
 
 export type ReturnLibraryIssuePayload = {
@@ -212,6 +243,39 @@ async function request<T>(path: string, init?: RequestOptions): Promise<T> {
 
   const payload = (await response.json()) as ApiResponse<T>;
   return payload.data;
+}
+
+async function downloadCsv(
+  path: string,
+  fileName: string,
+  retryOnUnauthorized = true,
+) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: 'include',
+  });
+
+  if (
+    response.status === 401 &&
+    retryOnUnauthorized &&
+    (await refreshAccessCookie())
+  ) {
+    return downloadCsv(path, fileName, false);
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(parseApiErrorMessage(text) || 'Export failed');
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
 }
 
 function parseApiErrorMessage(text: string) {
@@ -313,7 +377,10 @@ export const libraryApi = {
       method: 'PATCH',
       json: body,
     }),
-  listOverdue: () => request<LibraryIssue[]>('/library/overdue'),
+  listOverdue: (params?: { page?: string; limit?: string }) =>
+    request<LibraryPaginatedResult<LibraryIssue>>(
+      withQuery('/library/overdue', params ?? {}),
+    ),
   listFines: (params?: { page?: string; limit?: string }) =>
     request<LibraryPaginatedResult<LibraryFine>>(
       withQuery('/library/fines', params ?? {}),
@@ -323,12 +390,39 @@ export const libraryApi = {
       method: 'PATCH',
       json: body,
     }),
+  postFineToFees: (fineId: string, body: PostLibraryFineToFeesPayload) =>
+    request<LibraryFine>(
+      `/library/fines/${encodeURIComponent(fineId)}/post-to-fees`,
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
+  getIssuedBooksReport: (params?: { page?: string; limit?: string }) =>
+    request<LibraryPaginatedResult<LibraryIssue>>(
+      withQuery('/library/reports/issued', params ?? {}),
+    ),
+  getOverdueBooksReport: () =>
+    request<LibraryPaginatedResult<LibraryIssue>>('/library/reports/overdue'),
   getPopularBooks: (params?: { page?: string; limit?: string }) =>
-    request<LibraryPaginatedResult<{ book: LibraryBook; issueCount: number }>>(
+    request<LibraryPaginatedResult<LibraryPopularBookReportItem>>(
       withQuery('/library/reports/popular', params ?? {}),
     ),
   getLostDamagedReport: () =>
     request<LibraryPaginatedResult<LibraryCopy>>('/library/reports/lost-damaged'),
+  getFineSummary: () =>
+    request<LibraryFineSummaryReport>('/library/reports/fines'),
+  getBorrowerHistory: (params?: {
+    studentId?: string | null;
+    staffId?: string | null;
+    page?: string | null;
+    limit?: string | null;
+  }) =>
+    request<LibraryPaginatedResult<LibraryIssue>>(
+      withQuery('/library/reports/borrower-history', params ?? {}),
+    ),
+  downloadIssuedBooksCsv: () =>
+    downloadCsv('/library/reports/issued.csv', 'library-issued-books.csv'),
   getBookHistory: (bookId: string) =>
     request<{ book: LibraryBook; history: LibraryIssue[] }>(
       `/library/books/${encodeURIComponent(bookId)}/history`,

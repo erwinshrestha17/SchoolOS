@@ -48,6 +48,16 @@ class ChildProfile {
     required this.homeworkSummary,
     required this.feesSummary,
     required this.qrLabel,
+    this.studentSystemId,
+    this.admissionNumber,
+    this.admissionDate,
+    this.dateOfBirth,
+    this.gender,
+    this.bloodGroup,
+    this.nationality,
+    this.lifecycleStatus,
+    this.photoUsageConsent = false,
+    this.dataProcessingConsent = false,
     this.healthWarning,
     this.canViewHealthWarning = false,
   });
@@ -60,6 +70,16 @@ class ChildProfile {
   final String homeworkSummary;
   final String feesSummary;
   final String qrLabel;
+  final String? studentSystemId;
+  final String? admissionNumber;
+  final String? admissionDate;
+  final String? dateOfBirth;
+  final String? gender;
+  final String? bloodGroup;
+  final String? nationality;
+  final String? lifecycleStatus;
+  final bool photoUsageConsent;
+  final bool dataProcessingConsent;
   final String? healthWarning;
   final bool canViewHealthWarning;
 }
@@ -431,26 +451,53 @@ class ParentActivityItem {
 class ParentTransportInfo {
   const ParentTransportInfo({
     this.routeName,
+    this.routeCode,
     this.stopName,
+    this.stopSequence,
     this.vehicleLabel,
+    this.vehicleModel,
+    this.vehicleCapacity,
     this.tripStatus,
+    this.tripDirection,
     this.studentStatus,
     this.latestLocationAt,
+    this.latitude,
+    this.longitude,
+    this.speedKph,
     this.isDelayed = false,
     this.delayMinutes = 0,
+    this.delayReason,
+    this.assignmentStatus,
+    this.enrollmentStatus,
+    this.pickupDirection,
+    this.feeAmount,
   });
 
   final String? routeName;
+  final String? routeCode;
   final String? stopName;
+  final int? stopSequence;
   final String? vehicleLabel;
+  final String? vehicleModel;
+  final int? vehicleCapacity;
   final String? tripStatus;
+  final String? tripDirection;
   final String? studentStatus;
   final String? latestLocationAt;
+  final num? latitude;
+  final num? longitude;
+  final num? speedKph;
   final bool isDelayed;
   final int delayMinutes;
+  final String? delayReason;
+  final String? assignmentStatus;
+  final String? enrollmentStatus;
+  final String? pickupDirection;
+  final num? feeAmount;
 
   bool get hasActiveTrip => tripStatus != null;
-  bool get hasRoute => routeName != null;
+  bool get hasRoute => routeName != null || routeCode != null;
+  bool get hasLatestLocation => latestLocationAt != null;
 
   factory ParentTransportInfo.fromJson(Map<String, dynamic> json) {
     final activeTrip = _asMap(json['activeTrip']);
@@ -469,15 +516,28 @@ class ParentTransportInfo {
 
     return ParentTransportInfo(
       routeName: route?['name'] as String?,
+      routeCode: route?['code'] as String?,
       stopName: stop?['name'] as String?,
+      stopSequence: _asNullableInt(stop?['sequence']),
       vehicleLabel:
           vehicle?['registrationNumber'] as String? ??
           vehicle?['model'] as String?,
+      vehicleModel: vehicle?['model'] as String?,
+      vehicleCapacity: _asNullableInt(vehicle?['capacity']),
       tripStatus: activeTrip?['status'] as String?,
+      tripDirection: activeTrip?['direction'] as String?,
       studentStatus: activeTrip?['studentStatus'] as String?,
       latestLocationAt: latestLocation?['recordedAt'] as String?,
+      latitude: _asNullableNum(latestLocation?['latitude']),
+      longitude: _asNullableNum(latestLocation?['longitude']),
+      speedKph: _asNullableNum(latestLocation?['speedKph']),
       isDelayed: activeTrip?['isDelayed'] as bool? ?? false,
       delayMinutes: _asInt(activeTrip?['delayMinutes']),
+      delayReason: activeTrip?['delayReason'] as String?,
+      assignmentStatus: assignment?['status'] as String?,
+      enrollmentStatus: enrollment?['status'] as String?,
+      pickupDirection: assignment?['pickupDirection'] as String?,
+      feeAmount: _asNullableNum(enrollment?['feeAmount']),
     );
   }
 }
@@ -751,6 +811,13 @@ int _asInt(Object? value) {
   return 0;
 }
 
+int? _asNullableInt(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  return _asInt(value);
+}
+
 num _asNum(Object? value) {
   if (value is num) {
     return value;
@@ -759,6 +826,13 @@ num _asNum(Object? value) {
     return num.tryParse(value) ?? 0;
   }
   return 0;
+}
+
+num? _asNullableNum(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  return _asNum(value);
 }
 
 String _formatAttendancePercent(Map<String, dynamic>? attendance) {

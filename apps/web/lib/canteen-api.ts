@@ -473,6 +473,31 @@ async function openPdfBlob(response: Response) {
   window.open(URL.createObjectURL(blob), '_blank', 'noopener,noreferrer');
 }
 
+async function downloadCsv(path: string, fileName: string, retryOnUnauthorized = true) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: 'include',
+  });
+
+  if (response.status === 401 && retryOnUnauthorized && (await refreshAccessCookie())) {
+    return downloadCsv(path, fileName, false);
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(parseApiErrorMessage(text) || 'Export failed');
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(anchor);
+}
+
 function parseApiErrorMessage(text: string) {
   if (!text) return '';
 
@@ -602,7 +627,17 @@ export const canteenApi = {
       json: body,
     }),
   getDailyMealCountReport: (params?: { date?: string | null }) => request<DailyMealCountReport[]>(withQuery('/canteen/reports/daily-meal-count', params ?? {})),
+  downloadDailyMealCountCsv: (params?: { date?: string | null }) =>
+    downloadCsv(
+      withQuery('/canteen/reports/daily-meal-count.csv', params ?? {}),
+      'canteen-daily-meal-count.csv',
+    ),
   getItemWiseSalesReport: (params?: { from?: string | null; to?: string | null }) => request<ItemWiseSalesReport[]>(withQuery('/canteen/reports/item-wise-sales', params ?? {})),
+  downloadItemWiseSalesCsv: (params?: { from?: string | null; to?: string | null }) =>
+    downloadCsv(
+      withQuery('/canteen/reports/item-wise-sales.csv', params ?? {}),
+      'canteen-item-wise-sales.csv',
+    ),
   getLowBalanceWallets: (params?: { threshold?: number | null }) => request<CanteenWallet[]>(withQuery('/canteen/reports/low-balance-wallets', params ?? {})),
   getStudentSpendingSummary: (params?: { studentId?: string | null; from?: string | null; to?: string | null }) => request<StudentSpendingSummary[]>(withQuery('/canteen/reports/student-spending-summary', params ?? {})),
   getStockLedger: (params?: { inventoryItemId?: string | null; from?: string | null; to?: string | null }) => request<CanteenStockLedgerRow[]>(withQuery('/canteen/reports/stock-ledger', params ?? {})),

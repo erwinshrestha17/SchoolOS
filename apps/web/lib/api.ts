@@ -5,11 +5,14 @@ import type {
   AdmissionSummary,
   AccountingPeriodSummary,
   AccountingReport,
+  ActivityGalleryItem,
   ActivityPost,
   ActivityReaction,
   AssessmentComponentSummary,
   AttendanceAnalytics,
   AttendanceConflict,
+  AttendanceConflictReviewResult,
+  AttendanceCorrectionRequest,
   AttendanceOperationalSummary,
   AttendanceSyncSubmission,
   AuthSession,
@@ -164,6 +167,36 @@ export type AuthChallengeResponse = {
   delivery: string;
 };
 
+export type TenantLogoAccess = {
+  fileAssetId: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  url: string;
+  expiresInSeconds: number;
+};
+
+export type TenantLogoUploadResult = Omit<
+  TenantLogoAccess,
+  'url' | 'expiresInSeconds'
+> & {
+  previewUrl: string;
+  downloadUrl: string;
+};
+
+export type HomeworkAttachmentAccess = {
+  attachmentId: string;
+  homeworkId: string;
+  submissionId: string | null;
+  assignmentId: string | null;
+  fileAssetId: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  url: string;
+  expiresInSeconds: number;
+};
+
 type RequestOptions = RequestInit & {
   auth?: boolean;
   json?: JsonBody;
@@ -233,13 +266,14 @@ async function request<T>(path: string, init?: RequestOptions) {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Request-Id': requestId,
-    ...(init?.headers as Record<string, string> ?? {}),
+    ...((init?.headers as Record<string, string>) ?? {}),
   };
 
   const method = init?.method?.toUpperCase() ?? 'GET';
   const unsafeMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
   if (unsafeMethods.includes(method)) {
-    const csrfToken = getCookie('__Host-schoolos_csrf') ?? getCookie('schoolos_csrf');
+    const csrfToken =
+      getCookie('__Host-schoolos_csrf') ?? getCookie('schoolos_csrf');
     if (csrfToken) {
       headers['X-CSRF-Token'] = csrfToken;
     }
@@ -391,7 +425,8 @@ async function downloadReport(reportKey: string, payload: ReportExportRequest) {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  const csrfToken = getCookie('__Host-schoolos_csrf') ?? getCookie('schoolos_csrf');
+  const csrfToken =
+    getCookie('__Host-schoolos_csrf') ?? getCookie('schoolos_csrf');
   if (csrfToken) {
     headers['X-CSRF-Token'] = csrfToken;
   }
@@ -489,7 +524,7 @@ function withQuery(path: string, params: Record<string, any>) {
 export function isAuthSession(
   value: AuthSession | AuthChallengeResponse,
 ): value is AuthSession {
-  return 'accessToken' in value;
+  return 'user' in value;
 }
 
 export const api = {
@@ -512,12 +547,13 @@ export const api = {
       auth: false,
     }),
   getProfile: () => request('/auth/me'),
-  getEntitlements: () => request<{
-    tier: string | null;
-    modules: string[];
-    features: string[];
-    addOns: string[];
-  }>('/me/entitlements'),
+  getEntitlements: () =>
+    request<{
+      tier: string | null;
+      modules: string[];
+      features: string[];
+      addOns: string[];
+    }>('/me/entitlements'),
   registerTenant: (body: JsonBody) =>
     request('/tenants/register', { method: 'POST', json: body, auth: false }),
   listAcademicYears: () => request<AcademicYearSummary[]>('/academic-years'),
@@ -695,10 +731,13 @@ export const api = {
       json: body,
     }),
   updateExamTerm: (id: string, body: JsonBody) =>
-    request<ExamTermSummary>(`/academics/exam-terms/${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      json: body,
-    }),
+    request<ExamTermSummary>(
+      `/academics/exam-terms/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
   deleteExamTerm: (id: string) =>
     request<{ deleted: true; examTermId: string }>(
       `/academics/exam-terms/${encodeURIComponent(id)}`,
@@ -749,7 +788,10 @@ export const api = {
       }),
     ).then((result) => (Array.isArray(result) ? result : result.items)),
   createCasRecord: (body: JsonBody) =>
-    request<CasRecordSummary>('/academics/cas-records', { method: 'POST', json: body }),
+    request<CasRecordSummary>('/academics/cas-records', {
+      method: 'POST',
+      json: body,
+    }),
   listReportCards: (params?: {
     academicYearId?: string;
     examTermId?: string;
@@ -934,11 +976,7 @@ export const api = {
       url: string;
     }>(`/files/${encodeURIComponent(id)}/view`),
 
-  uploadStudentPhoto: async (
-    studentId: string,
-    file: File,
-    note?: string,
-  ) => {
+  uploadStudentPhoto: async (studentId: string, file: File, note?: string) => {
     const base64Content = await readFileAsBase64(file);
 
     return request<{
@@ -996,16 +1034,25 @@ export const api = {
     request<{ url: string }>(`/student-documents/${id}/download`),
   deleteStudentDocument: (id: string) =>
     request(`/student-documents/${id}`, { method: 'DELETE' }),
-  verifyStudentDocument: (documentId: string, body: { status: 'VERIFIED' | 'REJECTED'; notes: string }) =>
-    request<{ success: boolean }>(`/student-documents/${encodeURIComponent(documentId)}/verify`, {
-      method: 'POST',
-      json: body,
-    }),
+  verifyStudentDocument: (
+    documentId: string,
+    body: { status: 'VERIFIED' | 'REJECTED'; notes: string },
+  ) =>
+    request<{ success: boolean }>(
+      `/student-documents/${encodeURIComponent(documentId)}/verify`,
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
   archiveStudentDocument: (documentId: string, body: { reason: string }) =>
-    request<{ success: boolean }>(`/student-documents/${encodeURIComponent(documentId)}/archive`, {
-      method: 'POST',
-      json: body,
-    }),
+    request<{ success: boolean }>(
+      `/student-documents/${encodeURIComponent(documentId)}/archive`,
+      {
+        method: 'POST',
+        json: body,
+      },
+    ),
   openStudentDocumentPdf: async (
     studentId: string,
     kind: string,
@@ -1128,6 +1175,16 @@ export const api = {
   },
   listAttendanceConflicts: () =>
     request<AttendanceConflict[]>('/attendance/conflicts'),
+  listAttendanceCorrections: (params?: {
+    status?: string | null;
+    studentId?: string | null;
+    requestedById?: string | null;
+    page?: number | null;
+    limit?: number | null;
+  }) =>
+    request<PaginatedResponse<AttendanceCorrectionRequest>>(
+      withQuery('/attendance/corrections', params ?? {}),
+    ),
   submitAttendance: (body: JsonBody) =>
     request('/attendance/sessions', { method: 'POST', json: body }),
   syncAttendance: (body: JsonBody) =>
@@ -1138,10 +1195,29 @@ export const api = {
   saveAttendanceDraft: (body: JsonBody) =>
     request('/attendance/drafts', { method: 'POST', json: body }),
   reviewAttendanceConflict: (id: string, body: JsonBody) =>
-    request<AttendanceConflict>(`/attendance/conflicts/${id}/review`, {
-      method: 'PATCH',
-      json: body,
-    }),
+    request<AttendanceConflictReviewResult>(
+      `/attendance/conflicts/${id}/review`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
+  approveAttendanceCorrection: (id: string, body: JsonBody) =>
+    request<AttendanceCorrectionRequest>(
+      `/attendance/corrections/${encodeURIComponent(id)}/approve`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
+  rejectAttendanceCorrection: (id: string, body: JsonBody) =>
+    request<AttendanceCorrectionRequest>(
+      `/attendance/corrections/${encodeURIComponent(id)}/reject`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
   listFeeHeads: () => request<FeeHeadSummary[]>('/fees/heads'),
   listFeePlans: () => request<FeePlanSummary[]>('/fees/plans'),
   listInvoices: () => request<InvoiceSummary[]>('/fees/invoices'),
@@ -1526,6 +1602,14 @@ export const api = {
       method: 'POST',
       json: {},
     }),
+  getHomeworkAttachmentPreviewUrl: (attachmentId: string) =>
+    request<HomeworkAttachmentAccess>(
+      `/homework/attachments/${encodeURIComponent(attachmentId)}/preview-url`,
+    ),
+  getHomeworkAttachmentDownloadUrl: (attachmentId: string) =>
+    request<HomeworkAttachmentAccess>(
+      `/homework/attachments/${encodeURIComponent(attachmentId)}/download-url`,
+    ),
   listHomeworkSubmissions: () =>
     request<HomeworkSubmissionSummary[]>('/homework/submissions'),
   listHomeworkAssignmentSubmissions: (homeworkId: string) =>
@@ -2034,14 +2118,23 @@ export const api = {
       { method: 'PATCH', json: body },
     ),
   listActivityPosts: () => request<ActivityPost[]>('/activity-feed/posts'),
+  listActivityGallery: (params?: {
+    studentId?: string | null;
+    classId?: string | null;
+    sectionId?: string | null;
+    category?: string | null;
+    limit?: number | null;
+    offset?: number | null;
+  }) =>
+    request<ActivityGalleryItem[]>(
+      withQuery('/activity-feed/gallery', params ?? {}),
+    ),
   listParentActivityPosts: (params?: {
     studentId?: string | null;
     category?: string | null;
     month?: string | null;
   }) =>
-    request<ActivityPost[]>(
-      withQuery('/activity-feed/parent', params ?? {}),
-    ),
+    request<ActivityPost[]>(withQuery('/activity-feed/parent', params ?? {})),
   getActivityPost: (postId: string) =>
     request<ActivityPost>(`/activity-feed/posts/${encodeURIComponent(postId)}`),
   updateActivityPost: (postId: string, body: JsonBody) =>
@@ -2203,18 +2296,24 @@ export const api = {
         limit: params?.limit?.toString(),
       }),
     ),
-  enterPlatformSupportOverride: async (body: PlatformSupportOverridePayload) => {
-    const res = await request<{ success: true; overrideId: string; expiresAt: string }>(
-      '/platform/support/override/enter',
-      { method: 'POST', json: body },
-    );
+  enterPlatformSupportOverride: async (
+    body: PlatformSupportOverridePayload,
+  ) => {
+    const res = await request<{
+      success: true;
+      overrideId: string;
+      expiresAt: string;
+    }>('/platform/support/override/enter', { method: 'POST', json: body });
     setSupportOverride(body.tenantId, body.reason);
     return res;
   },
   exitPlatformSupportOverride: async () => {
-    const res = await request<{ success: true }>('/platform/support/override/exit', {
-      method: 'POST',
-    });
+    const res = await request<{ success: true }>(
+      '/platform/support/override/exit',
+      {
+        method: 'POST',
+      },
+    );
     clearSupportOverride();
     return res;
   },
@@ -2415,6 +2514,27 @@ export const api = {
       method: 'PATCH',
       json: { value },
     }),
+  uploadSchoolLogo: async (file: File, note?: string) => {
+    const base64Content = await readFileAsBase64(file);
+
+    return request<TenantLogoUploadResult>('/settings/branding/logo', {
+      method: 'POST',
+      json: {
+        fileName: file.name,
+        mimeType: file.type,
+        base64Content,
+        ...(note ? { note } : {}),
+      },
+    });
+  },
+  getSchoolLogoPreview: () =>
+    request<TenantLogoAccess>('/settings/branding/logo/preview'),
+  getSchoolLogoDownload: () =>
+    request<TenantLogoAccess>('/settings/branding/logo/download'),
+  removeSchoolLogo: () =>
+    request<{ success: true; removed: boolean }>('/settings/branding/logo', {
+      method: 'DELETE',
+    }),
   listReports: () => request<ReportDefinition[]>('/reports'),
   exportReport: (reportKey: string, payload: ReportExportRequest) =>
     downloadReport(reportKey, payload),
@@ -2542,10 +2662,13 @@ export const api = {
       Array.isArray(result) ? result : result.items,
     ),
   updateCasRecord: (id: string, body: JsonBody) =>
-    request<CasRecordSummary>(`/academics/cas-records/${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      json: body,
-    }),
+    request<CasRecordSummary>(
+      `/academics/cas-records/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        json: body,
+      },
+    ),
   deleteCasRecord: (id: string) =>
     request<{ deleted: true; casRecordId: string }>(
       `/academics/cas-records/${encodeURIComponent(id)}`,

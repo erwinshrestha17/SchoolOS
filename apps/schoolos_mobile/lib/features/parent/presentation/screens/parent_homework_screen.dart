@@ -17,26 +17,40 @@ import '../../domain/parent_models.dart';
 import '../widgets/parent_state_view.dart';
 
 class ParentHomeworkScreen extends ConsumerWidget {
-  const ParentHomeworkScreen({super.key});
+  const ParentHomeworkScreen({
+    super.key,
+    this.role = 'PARENT',
+    this.selectedIndex = 4,
+    this.title = 'Homework',
+  });
+
+  final String role;
+  final int selectedIndex;
+  final String title;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(parentControllerProvider);
     final controller = ref.read(parentControllerProvider.notifier);
     final childId = state.selectedChildId;
+    final isStudent = role.toUpperCase() == 'STUDENT';
 
     return RoleShellScaffold(
-      role: 'PARENT',
-      selectedIndex: 4,
-      title: 'Homework',
+      role: role,
+      selectedIndex: selectedIndex,
+      title: title,
       body: ParentStateView(
         status: state.status,
         message: state.message,
         onRetry: controller.load,
         child: childId == null
-            ? const AppEmptyState(
-                title: 'No child selected',
-                message: 'Select a child before viewing homework.',
+            ? AppEmptyState(
+                title: isStudent
+                    ? 'No student profile linked'
+                    : 'No child selected',
+                message: isStudent
+                    ? 'Ask the school office to link this login to a student profile.'
+                    : 'Select a child before viewing homework.',
                 icon: Icons.menu_book_rounded,
               )
             : _HomeworkList(childId: childId),

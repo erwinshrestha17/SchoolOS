@@ -147,6 +147,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const StudentAttendanceScreen(),
       ),
       GoRoute(
+        path: AppRoutes.studentHomework,
+        builder: (context, state) => const ParentHomeworkScreen(
+          role: 'STUDENT',
+          selectedIndex: 1,
+          title: 'Homework',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.studentTimetable,
+        builder: (context, state) => const ParentTimetableScreen(
+          role: 'STUDENT',
+          selectedIndex: 2,
+          title: 'Timetable',
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.teacherHome,
         builder: (context, state) => const TeacherDashboard(),
       ),
@@ -208,7 +224,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return AppRoutes.home;
         }
         if ((location == AppRoutes.studentHome ||
-                location == AppRoutes.studentAttendance) &&
+                location == AppRoutes.studentAttendance ||
+                location == AppRoutes.studentHomework ||
+                location == AppRoutes.studentTimetable) &&
             role != MobileRole.student) {
           return AppRoutes.home;
         }

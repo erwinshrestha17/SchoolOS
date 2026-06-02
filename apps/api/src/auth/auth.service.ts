@@ -5,6 +5,7 @@ import {
   type Tenant,
   type User,
 } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ForbiddenException,
@@ -16,7 +17,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import type { Response } from 'express';
+import type { CookieOptions, Response } from 'express';
 import { AuditService } from '../audit/audit.service';
 import { ConfigService } from '../config/config.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -347,8 +348,7 @@ export class AuthService {
       }
 
       const rawToken =
-        dto.refreshToken ??
-        parseCookie(cookieHeader, cookieName);
+        dto.refreshToken ?? parseCookie(cookieHeader, cookieName);
 
       if (!rawToken) {
         throw new UnauthorizedException('Refresh token is invalid');
@@ -378,7 +378,7 @@ export class AuthService {
       if (existingSession.revokedAt) {
         // Suspicious refresh token reuse! Revoke all sessions in the family.
         const familyId = existingSession.familyId ?? existingSession.id;
-        await this.revokeRefreshTokenFamily(familyId, existingSession.userId);
+        await this.revokeRefreshTokenFamily(familyId);
 
         await this.auditService.record({
           action: 'suspicious_refresh_token_reuse',
@@ -423,7 +423,7 @@ export class AuthService {
 
       const userAgent = requestMeta?.userAgent?.toLowerCase();
       const isMobile = userAgent
-        ? (userAgent.includes('dart') || userAgent.includes('flutter'))
+        ? userAgent.includes('dart') || userAgent.includes('flutter')
         : undefined;
 
       const session = await this.issueSession(authContext, requestMeta, {
@@ -442,7 +442,10 @@ export class AuthService {
 
       this.attachRefreshCookie(response, session.refreshToken);
       this.attachAccessCookie(response, session.accessToken);
-      this.attachCsrfCookie(response, generateCsrfToken(this.configService.jwtSecret));
+      this.attachCsrfCookie(
+        response,
+        generateCsrfToken(this.configService.jwtSecret),
+      );
 
       await this.auditService.record({
         action: 'refresh',
@@ -478,9 +481,7 @@ export class AuthService {
     requestMeta?: RequestMeta,
   ) {
     const cookieName = this.getRefreshCookieName();
-    const rawToken =
-      dto.refreshToken ??
-      parseCookie(cookieHeader, cookieName);
+    const rawToken = dto.refreshToken ?? parseCookie(cookieHeader, cookieName);
 
     if (rawToken) {
       const hashV2 = hmacToken(rawToken, this.configService.tokenHashPepper);
@@ -504,7 +505,12 @@ export class AuthService {
     const session = rawToken
       ? await this.prisma.refreshToken.findFirst({
           where: {
-            tokenHash: { in: [hashToken(rawToken), hmacToken(rawToken, this.configService.tokenHashPepper)] },
+            tokenHash: {
+              in: [
+                hashToken(rawToken),
+                hmacToken(rawToken, this.configService.tokenHashPepper),
+              ],
+            },
           },
           include: { user: true },
         })
@@ -612,7 +618,10 @@ export class AuthService {
     const session = await this.issueSession(authContext, requestMeta);
     this.attachRefreshCookie(response, session.refreshToken);
     this.attachAccessCookie(response, session.accessToken);
-    this.attachCsrfCookie(response, generateCsrfToken(this.configService.jwtSecret));
+    this.attachCsrfCookie(
+      response,
+      generateCsrfToken(this.configService.jwtSecret),
+    );
 
     await this.auditService.record({
       action: audit?.action ?? 'login',
@@ -627,7 +636,7 @@ export class AuthService {
 
     const userAgent = requestMeta?.userAgent?.toLowerCase();
     const isMobile = userAgent
-      ? (userAgent.includes('dart') || userAgent.includes('flutter'))
+      ? userAgent.includes('dart') || userAgent.includes('flutter')
       : undefined;
 
     return this.buildAuthSession(
@@ -959,9 +968,13 @@ export class AuthService {
     requestMeta?: RequestMeta,
     parentSession?: { id: string; familyId: string | null },
   ) {
-    const isMobile = (requestMeta?.userAgent as string | undefined)?.toLowerCase().includes('dart') ||
-                     (requestMeta?.userAgent as string | undefined)?.toLowerCase().includes('flutter');
-    const audience = isMobile ? this.configService.jwtAudienceMobile : this.configService.jwtAudienceWeb;
+    const userAgent = requestMeta?.userAgent?.toLowerCase();
+    const isMobile = ['dart', 'flutter'].some(
+      (pattern) => userAgent?.includes(pattern) ?? false,
+    );
+    const audience = isMobile
+      ? this.configService.jwtAudienceMobile
+      : this.configService.jwtAudienceWeb;
 
     const payload: JwtAccessPayload = {
       sub: authContext.userId,
@@ -976,14 +989,17 @@ export class AuthService {
       secret: this.configService.jwtSecret,
       expiresIn: this.configService.accessTokenTtl as never,
       issuer: this.configService.jwtIssuer,
-      audience: audience,
+      audience,
       algorithm: 'HS256',
-      jwtid: require('crypto').randomUUID(),
+      jwtid: randomUUID(),
     });
     const refreshToken = generateRefreshToken();
-    const tokenHash = hmacToken(refreshToken, this.configService.tokenHashPepper);
+    const tokenHash = hmacToken(
+      refreshToken,
+      this.configService.tokenHashPepper,
+    );
 
-    const tokenId = require('crypto').randomUUID();
+    const tokenId = randomUUID();
     const familyId = parentSession?.familyId ?? tokenId;
 
     await this.prisma.refreshToken.create({
@@ -1011,19 +1027,24 @@ export class AuthService {
     refreshToken?: string,
     isMobile?: boolean,
   ) {
-    const decoded =
+    const decoded: unknown =
       typeof this.jwtService.decode === 'function'
         ? (this.jwtService.decode(accessToken) ?? null)
         : null;
+    const decodedExp =
+      decoded && typeof decoded === 'object' && 'exp' in decoded
+        ? (decoded as { exp?: unknown }).exp
+        : undefined;
 
     const hideTokens = isMobile === false;
 
     return {
       accessToken: hideTokens ? undefined : accessToken,
       refreshToken: hideTokens ? undefined : refreshToken,
-      accessTokenExpiresAt: decoded?.exp
-        ? new Date(decoded.exp * 1000).toISOString()
-        : null,
+      accessTokenExpiresAt:
+        typeof decodedExp === 'number'
+          ? new Date(decodedExp * 1000).toISOString()
+          : null,
       tenant: {
         id: tenant.id,
         name: tenant.name,
@@ -1060,7 +1081,7 @@ export class AuthService {
 
   private attachRefreshCookie(response: Response, refreshToken: string) {
     const cookieName = this.getRefreshCookieName();
-    const options: any = {
+    const options: CookieOptions = {
       httpOnly: true,
       sameSite: this.configService.cookieSameSite,
       secure: this.configService.isProduction,
@@ -1077,7 +1098,7 @@ export class AuthService {
 
   private attachAccessCookie(response: Response, accessToken: string) {
     const cookieName = this.getAccessCookieName();
-    const options: any = {
+    const options: CookieOptions = {
       httpOnly: true,
       sameSite: this.configService.cookieSameSite,
       secure: this.configService.isProduction,
@@ -1097,7 +1118,7 @@ export class AuthService {
       ? '__Host-schoolos_csrf'
       : 'schoolos_csrf';
 
-    const options: any = {
+    const options: CookieOptions = {
       httpOnly: false, // Must be readable by Javascript/Next.js client!
       sameSite: this.configService.cookieSameSite,
       secure: this.configService.isProduction,
@@ -1111,7 +1132,7 @@ export class AuthService {
 
   private clearRefreshCookie(response: Response) {
     const cookieName = this.getRefreshCookieName();
-    const options: any = {
+    const options: CookieOptions = {
       httpOnly: true,
       sameSite: this.configService.cookieSameSite,
       secure: this.configService.isProduction,
@@ -1125,7 +1146,7 @@ export class AuthService {
 
   private clearAccessCookie(response: Response) {
     const cookieName = this.getAccessCookieName();
-    const options: any = {
+    const options: CookieOptions = {
       httpOnly: true,
       sameSite: this.configService.cookieSameSite,
       secure: this.configService.isProduction,
@@ -1137,7 +1158,7 @@ export class AuthService {
     response.clearCookie(cookieName, options);
   }
 
-  private async revokeRefreshTokenFamily(familyId: string, userId: string) {
+  private async revokeRefreshTokenFamily(familyId: string) {
     await this.prisma.refreshToken.updateMany({
       where: {
         familyId,

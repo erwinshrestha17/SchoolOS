@@ -10,6 +10,7 @@ import type {
   ReportDefinition,
   ReportExportRequest,
   ReportExportResult,
+  ReportFormat,
 } from '@schoolos/core';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -34,6 +35,12 @@ export interface ReportExecutor {
     filters: Record<string, unknown>,
     format: string,
   ) => Promise<Array<Record<string, unknown>>>;
+}
+
+interface ReportExportArtifact {
+  content: Buffer;
+  contentType: string;
+  fileName: string;
 }
 
 @Injectable()
@@ -1960,56 +1967,15 @@ export class ReportsService {
         };
       }
 
-      let logoBuffer: Buffer | null = null;
-      let logoDimensions: { width: number; height: number } | null = null;
-
-      if (request.format === 'pdf') {
-        const settings = await this.prisma.tenantSetting.findMany({
-          where: { tenantId: actor.tenantId, key: 'school_logo' },
-        });
-        const logoSetting = settings[0]?.value;
-        if (
-          logoSetting &&
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-            String(logoSetting),
-          )
-        ) {
-          try {
-            const { content } =
-              await this.fileRegistryService.getProtectedDownload(
-                actor.tenantId,
-                String(logoSetting),
-                actor.userId,
-              );
-            logoBuffer = content;
-            logoDimensions = getJpegDimensions(content);
-          } catch (e) {
-            // Silently fail logo load
-          }
-        }
-      }
-
-      const content =
-        request.format === 'pdf'
-          ? buildTableReportPdf({
-              schoolName: actor.tenantSlug,
-              title: executor.definition.name,
-              subtitle: `Module: ${executor.definition.module}`,
-              rows: data,
-              logo:
-                logoBuffer && logoDimensions
-                  ? {
-                      buffer: logoBuffer,
-                      width: logoDimensions.width,
-                      height: logoDimensions.height,
-                      format: 'jpeg',
-                    }
-                  : null,
-            })
-          : Buffer.from(this.convertToCsv(data));
-      const contentType =
-        request.format === 'pdf' ? 'application/pdf' : 'text/csv';
-      const fileName = `${reportKey}.${request.format}`;
+      const { content, contentType, fileName } = await this.buildExportArtifact(
+        {
+          actor,
+          data,
+          executor,
+          format: request.format,
+          reportKey,
+        },
+      );
 
       await this.recordExportHistory({
         tenantId: actor.tenantId,
@@ -2058,6 +2024,81 @@ export class ReportsService {
     };
   }
 
+  async completeQueuedExport(input: {
+    exportId: string;
+    reportKey: string;
+    filters: Record<string, unknown>;
+    format: ReportFormat;
+    actor: AuthContext;
+  }) {
+    const executor = this.registry.get(input.reportKey);
+    if (!executor) {
+      throw new NotFoundException('Report not found');
+    }
+
+    if (
+      !executor.definition.requiredPermissions.every((permission) =>
+        input.actor.permissions.includes(permission),
+      )
+    ) {
+      throw new ForbiddenException(
+        'Insufficient permissions to run this report',
+      );
+    }
+
+    if (!executor.definition.formats.includes(input.format)) {
+      throw new ForbiddenException(
+        `Format ${input.format} not supported for this report`,
+      );
+    }
+
+    const data = await executor.execute(
+      input.actor,
+      input.filters,
+      input.format,
+    );
+    const artifact = await this.buildExportArtifact({
+      actor: input.actor,
+      data,
+      executor,
+      format: input.format,
+      reportKey: input.reportKey,
+    });
+    const fileAssetId = await this.registerReportExportFile({
+      tenantId: input.actor.tenantId,
+      requestedBy: input.actor.userId,
+      reportKey: input.reportKey,
+      format: input.format,
+      filters: input.filters as Prisma.InputJsonValue,
+      module: executor.definition.module,
+      ...artifact,
+    });
+
+    await this.prisma.reportExport.update({
+      where: { id: input.exportId },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        errorSummary: null,
+        fileAssetId,
+      },
+    });
+
+    await this.auditService.record({
+      action: 'export_report',
+      resource: 'report',
+      resourceId: input.reportKey,
+      tenantId: input.actor.tenantId,
+      userId: input.actor.userId,
+      after: {
+        format: input.format,
+        filters: input.filters,
+        async: true,
+        fileAssetId,
+      },
+    });
+  }
+
   private convertToCsv(data: Array<Record<string, unknown>>): string {
     if (data.length === 0) return '';
 
@@ -2074,6 +2115,112 @@ export class ReportsService {
     );
 
     return [headers.join(','), ...rows].join('\n');
+  }
+
+  private async buildExportArtifact(input: {
+    reportKey: string;
+    executor: ReportExecutor;
+    actor: AuthContext;
+    data: Array<Record<string, unknown>>;
+    format: ReportFormat;
+  }): Promise<ReportExportArtifact> {
+    const fileName = `${input.reportKey}.${input.format}`;
+
+    if (input.format === 'json') {
+      return {
+        content: Buffer.from(JSON.stringify(input.data, null, 2)),
+        contentType: 'application/json',
+        fileName,
+      };
+    }
+
+    if (input.format === 'pdf') {
+      const logo = await this.loadReportLogo(input.actor);
+      return {
+        content: buildTableReportPdf({
+          schoolName: input.actor.tenantSlug,
+          title: input.executor.definition.name,
+          subtitle: `Module: ${input.executor.definition.module}`,
+          rows: input.data,
+          logo,
+        }),
+        contentType: 'application/pdf',
+        fileName,
+      };
+    }
+
+    return {
+      content: Buffer.from(this.convertToCsv(input.data)),
+      contentType: 'text/csv',
+      fileName,
+    };
+  }
+
+  private async loadReportLogo(actor: AuthContext): Promise<{
+    buffer: Buffer;
+    width: number;
+    height: number;
+    format: 'jpeg';
+  } | null> {
+    const settings = await this.prisma.tenantSetting.findMany({
+      where: { tenantId: actor.tenantId, key: 'school_logo' },
+    });
+    const logoSetting = settings[0]?.value;
+    const logoFileAssetId =
+      typeof logoSetting === 'string' ? logoSetting : null;
+    if (
+      !logoFileAssetId ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        logoFileAssetId,
+      )
+    ) {
+      return null;
+    }
+
+    try {
+      const { content } = await this.fileRegistryService.getProtectedDownload(
+        actor.tenantId,
+        logoFileAssetId,
+        actor.userId,
+      );
+      const dimensions = getJpegDimensions(content);
+      return {
+        buffer: content,
+        width: dimensions.width,
+        height: dimensions.height,
+        format: 'jpeg',
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private async registerReportExportFile(input: {
+    tenantId: string;
+    requestedBy: string;
+    reportKey: string;
+    format: string;
+    filters: Prisma.InputJsonValue;
+    content: Buffer;
+    contentType: string;
+    fileName: string;
+    module?: string;
+  }) {
+    const asset = await this.fileRegistryService.registerGeneratedFile({
+      tenantId: input.tenantId,
+      generatedByUserId: input.requestedBy,
+      originalFilename: input.fileName,
+      content: input.content,
+      mimeType: input.contentType,
+      module: 'reports',
+      metadata: {
+        module: input.module ?? 'reports',
+        reportKey: input.reportKey,
+        format: input.format,
+        filters: input.filters,
+      },
+    });
+    return asset.id;
   }
 
   private async recordExportHistory(input: {
@@ -2099,21 +2246,17 @@ export class ReportsService {
     }
     let fileAssetId: string | undefined;
     if (input.content && input.contentType && input.fileName) {
-      const asset = await this.fileRegistryService.registerGeneratedFile({
+      fileAssetId = await this.registerReportExportFile({
         tenantId: input.tenantId,
-        generatedByUserId: input.requestedBy,
-        originalFilename: input.fileName,
+        requestedBy: input.requestedBy,
+        reportKey: input.reportKey,
+        format: input.format,
+        filters: input.filters,
+        module: input.module,
+        fileName: input.fileName,
         content: input.content,
-        mimeType: input.contentType,
-        module: 'reports',
-        metadata: {
-          module: input.module ?? 'reports',
-          reportKey: input.reportKey,
-          format: input.format,
-          filters: input.filters,
-        },
+        contentType: input.contentType,
       });
-      fileAssetId = asset.id;
     }
 
     await delegate.create({

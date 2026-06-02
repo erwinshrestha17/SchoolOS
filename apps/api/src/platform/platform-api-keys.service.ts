@@ -3,7 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { createHash, randomBytes } from 'node:crypto';
+import {
+  createHash,
+  createHmac,
+  randomBytes,
+  timingSafeEqual,
+} from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import type {
   PlatformApiKeyCreated,
@@ -20,7 +25,7 @@ import {
 const SECRET_PREFIX = 'sk_schoolos_';
 const MAX_SCOPES = 25;
 
-type ApiKeyRecord = {
+interface ApiKeyRecord {
   id: string;
   tenantId: string;
   name: string;
@@ -34,7 +39,20 @@ type ApiKeyRecord = {
   createdBy: string | null;
   createdAt: Date;
   updatedAt: Date;
-};
+}
+
+interface ApiKeyValidationRecord {
+  id: string;
+  tenantId: string;
+  scopes: string[];
+  status: 'ACTIVE' | 'REVOKED';
+  expiresAt: Date | null;
+  keyHash: string;
+  tenant: {
+    id: string;
+    isActive: boolean;
+  } | null;
+}
 
 @Injectable()
 export class PlatformApiKeysService {
@@ -156,12 +174,9 @@ export class PlatformApiKeysService {
     const hashV2 = this.hmacSecret(secret);
     const hashV1 = this.hashSecret(secret);
 
-    const key = await this.prisma.platformApiKey.findFirst({
+    const key = (await this.prisma.platformApiKey.findFirst({
       where: {
-        OR: [
-          { keyHash: hashV2 },
-          { keyHash: hashV1 },
-        ],
+        OR: [{ keyHash: hashV2 }, { keyHash: hashV1 }],
       },
       select: {
         id: true,
@@ -177,7 +192,7 @@ export class PlatformApiKeysService {
           },
         },
       },
-    });
+    })) as ApiKeyValidationRecord | null;
 
     if (!key) {
       await this.auditService.record({
@@ -212,7 +227,7 @@ export class PlatformApiKeysService {
       });
       return null;
     }
-    if (!key.tenant || !key.tenant.isActive) {
+    if (key.tenant?.isActive !== true) {
       await this.auditService.record({
         action: 'api_key_validation_failed',
         resource: 'api_keys',
@@ -231,9 +246,16 @@ export class PlatformApiKeysService {
       return null;
     }
 
+    const updateData: Prisma.PlatformApiKeyUpdateInput = {
+      lastUsedAt: new Date(),
+    };
+    if (isMatchV1 && !isMatchV2) {
+      updateData.keyHash = hashV2;
+    }
+
     await this.prisma.platformApiKey.update({
       where: { id: key.id },
-      data: { lastUsedAt: new Date() },
+      data: updateData,
     });
 
     return {
@@ -311,7 +333,7 @@ export class PlatformApiKeysService {
 
   private hmacSecret(secret: string) {
     const pepper = this.configService.tokenHashPepper;
-    return require('crypto').createHmac('sha256', pepper).update(secret).digest('hex');
+    return createHmac('sha256', pepper).update(secret).digest('hex');
   }
 
   private safeCompare(a: string, b: string) {
@@ -320,7 +342,7 @@ export class PlatformApiKeysService {
     if (bufA.length !== bufB.length) {
       return false;
     }
-    return require('crypto').timingSafeEqual(bufA, bufB);
+    return timingSafeEqual(bufA, bufB);
   }
 
   private safeSelect() {

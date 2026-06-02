@@ -321,6 +321,35 @@ async function request<T>(path: string, init?: RequestOptions): Promise<T> {
   return payload.data;
 }
 
+async function downloadCsv(path: string, fileName: string, retryOnUnauthorized = true) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: 'include',
+  });
+
+  if (
+    response.status === 401 &&
+    retryOnUnauthorized &&
+    (await refreshAccessCookie())
+  ) {
+    return downloadCsv(path, fileName, false);
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(parseApiErrorMessage(text) || 'Export failed');
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(anchor);
+}
+
 function parseApiErrorMessage(text: string) {
   if (!text) return '';
 
@@ -472,6 +501,8 @@ export const transportApi = {
     request<{ items: any[]; meta: { total: number } }>(
       withQuery('/transport/reports/trips', params ?? {}),
     ),
+  downloadTripHistoryCsv: () =>
+    downloadCsv('/transport/reports/trips.csv', 'transport-trip-history.csv'),
   getBoardingReport: (params?: { tripId?: string; studentId?: string }) =>
     request<{ items: any[]; meta: { total: number } }>(
       withQuery('/transport/reports/boarding', params ?? {}),

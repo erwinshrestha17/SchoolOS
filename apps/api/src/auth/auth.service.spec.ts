@@ -48,6 +48,7 @@ describe('AuthService', () => {
       refreshToken: {
         create: jest.fn(),
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
       },
@@ -74,6 +75,7 @@ describe('AuthService', () => {
     };
     configService = {
       jwtSecret: 'secret',
+      tokenHashPepper: 'mock-pepper-for-tests-at-least-32-chars-long-12345',
       challengeSecret: 'challenge-secret',
       accessTokenTtl: '15m',
       challengeTokenTtl: '10m',
@@ -288,7 +290,7 @@ describe('AuthService', () => {
 
   it('rotates refresh tokens on refresh', async () => {
     const rawRefreshToken = 'refresh-token';
-    prisma.refreshToken.findUnique.mockResolvedValue({
+    prisma.refreshToken.findFirst.mockResolvedValue({
       id: 'session-1',
       userId: authUser.id,
       expiresAt: new Date(Date.now() + 60_000),
@@ -311,7 +313,11 @@ describe('AuthService', () => {
 
     expect(prisma.refreshToken.update).toHaveBeenCalledWith({
       where: { id: 'session-1' },
-      data: { revokedAt: expect.any(Date) },
+      data: {
+        revokedAt: expect.any(Date),
+        revokedReason: 'rotated',
+        replacedByTokenId: expect.any(String),
+      },
     });
     expect(prisma.refreshToken.create).toHaveBeenCalled();
     expect(result.accessToken).toBe('access-token');
@@ -330,7 +336,7 @@ describe('AuthService', () => {
 
   it('revokes refresh tokens on logout', async () => {
     prisma.refreshToken.updateMany.mockResolvedValue({ count: 1 });
-    prisma.refreshToken.findUnique.mockResolvedValue({
+    prisma.refreshToken.findFirst.mockResolvedValue({
       userId: authUser.id,
       user: { tenantId: authUser.tenantId },
     });
@@ -343,10 +349,15 @@ describe('AuthService', () => {
     expect(result).toEqual({ success: true });
     expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
       where: {
-        tokenHash: hashToken('refresh-token'),
+        tokenHash: {
+          in: [hashToken('refresh-token'), expect.any(String)],
+        },
         revokedAt: null,
       },
-      data: { revokedAt: expect.any(Date) },
+      data: {
+        revokedAt: expect.any(Date),
+        revokedReason: 'logout',
+      },
     });
     expect(response.clearCookie).toHaveBeenCalledWith(
       'refresh_token',
@@ -405,7 +416,7 @@ describe('AuthService', () => {
 
   it('detects suspicious refresh token reuse, revokes all sessions for the user, and audits it', async () => {
     const rawRefreshToken = 'reused-refresh-token';
-    prisma.refreshToken.findUnique.mockResolvedValue({
+    prisma.refreshToken.findFirst.mockResolvedValue({
       id: 'session-1',
       userId: authUser.id,
       expiresAt: new Date(Date.now() + 60_000),
@@ -420,11 +431,12 @@ describe('AuthService', () => {
 
     expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
       where: {
-        userId: authUser.id,
+        familyId: 'session-1',
         revokedAt: null,
       },
       data: {
         revokedAt: expect.any(Date),
+        revokedReason: 'family_theft',
       },
     });
 

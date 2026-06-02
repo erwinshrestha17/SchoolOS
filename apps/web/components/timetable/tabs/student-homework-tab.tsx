@@ -34,14 +34,18 @@ import { cn } from '../../../lib/utils';
 type HomeworkAttachment = {
   id: string;
   fileAsset?: {
-    publicUrl?: string | null;
+    id?: string;
     originalFilename?: string | null;
+    mimeType?: string;
+    sizeBytes?: string | number;
   } | null;
 };
 
 export function StudentHomeworkTab() {
   const queryClient = useQueryClient();
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
+  const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
   const { data: submissions, isLoading } = useQuery({
     queryKey: ['my-homework'],
@@ -49,6 +53,24 @@ export function StudentHomeworkTab() {
   });
 
   const selectedSubmission = submissions?.find((s: HomeworkSubmissionSummary) => s.id === selectedSubmissionId);
+
+  async function openAttachment(attachmentId: string) {
+    setAttachmentError(null);
+    setOpeningAttachmentId(attachmentId);
+
+    try {
+      const access = await api.getHomeworkAttachmentDownloadUrl(attachmentId);
+      window.open(access.url, '_blank', 'noopener,noreferrer');
+    } catch (err: unknown) {
+      setAttachmentError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to open the homework attachment.',
+      );
+    } finally {
+      setOpeningAttachmentId(null);
+    }
+  }
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 items-start">
@@ -182,18 +204,29 @@ export function StudentHomeworkTab() {
                     {selectedSubmission.attachments && selectedSubmission.attachments.length > 0 && (
                       <div className="space-y-4">
                         <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900">Attachments</h4>
+                        {attachmentError ? (
+                          <div className="flex items-center gap-2 rounded-2xl border border-red-100 bg-red-50 p-3 text-[11px] font-bold text-red-700">
+                            <AlertCircle size={14} />
+                            {attachmentError}
+                          </div>
+                        ) : null}
                         <div className="grid gap-3 sm:grid-cols-2">
                           {selectedSubmission.attachments.map((a: HomeworkAttachment) => (
-                            <a
+                            <button
                               key={a.id}
-                              href={a.fileAsset?.publicUrl || '#'}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-[11px] font-black uppercase tracking-widest transition hover:bg-slate-100"
+                              type="button"
+                              data-testid="student-homework-attachment-download"
+                              disabled={openingAttachmentId === a.id}
+                              onClick={() => void openAttachment(a.id)}
+                              className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left text-[11px] font-black uppercase tracking-widest transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
                             >
                               <FileText size={16} className="text-indigo-500" />
-                              <span className="truncate flex-1">{a.fileAsset?.originalFilename}</span>
-                            </a>
+                              <span className="truncate flex-1">
+                                {openingAttachmentId === a.id
+                                  ? 'Opening signed file...'
+                                  : a.fileAsset?.originalFilename ?? 'Attachment'}
+                              </span>
+                            </button>
                           ))}
                         </div>
                       </div>

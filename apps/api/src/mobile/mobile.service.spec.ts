@@ -4,9 +4,22 @@ import type { AuthContext } from '../auth/auth.types';
 import { MobileService } from './mobile.service';
 
 describe('MobileService', () => {
-  let prisma: any;
-  let attendanceService: any;
-  let financeService: any;
+  type MockModel<TMethods extends string> = Record<TMethods, jest.Mock>;
+  interface MobileServicePrismaMock {
+    guardian: MockModel<'findFirst'>;
+    student: MockModel<'findFirst' | 'findMany'>;
+    invoice: MockModel<'findMany'>;
+    notificationDelivery: MockModel<'findMany' | 'findFirst'>;
+    notificationReadReceipt: MockModel<'upsert'>;
+    homeworkAssignment: MockModel<'findMany'>;
+    transportStudentAssignment: MockModel<'findFirst'>;
+    transportEnrollment: MockModel<'findFirst'>;
+    transportTripStudentStatus: MockModel<'findFirst'>;
+  }
+
+  let prisma: MobileServicePrismaMock;
+  let attendanceService: { getParentSummary: jest.Mock };
+  let financeService: { getReceiptPdfForStudent: jest.Mock };
   let service: MobileService;
   let actor: AuthContext;
 
@@ -32,6 +45,15 @@ describe('MobileService', () => {
       homeworkAssignment: {
         findMany: jest.fn(),
       },
+      transportStudentAssignment: {
+        findFirst: jest.fn(),
+      },
+      transportEnrollment: {
+        findFirst: jest.fn(),
+      },
+      transportTripStudentStatus: {
+        findFirst: jest.fn(),
+      },
     };
     attendanceService = {
       getParentSummary: jest.fn(),
@@ -39,7 +61,11 @@ describe('MobileService', () => {
     financeService = {
       getReceiptPdfForStudent: jest.fn(),
     };
-    service = new MobileService(prisma, attendanceService, financeService);
+    service = new MobileService(
+      prisma as never,
+      attendanceService as never,
+      financeService as never,
+    );
     actor = {
       userId: 'parent-1',
       tenantId: 'tenant-1',
@@ -346,6 +372,88 @@ describe('MobileService', () => {
         attachmentCount: 2,
       }),
     ]);
+  });
+
+  it('returns parent-safe transport route, vehicle, and latest location detail', async () => {
+    prisma.student.findFirst.mockResolvedValue({ id: 'student-1' });
+    prisma.guardian.findFirst.mockResolvedValue({
+      id: 'guardian-1',
+      studentLinks: [{ studentId: 'student-1' }],
+    });
+    prisma.transportStudentAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-1',
+      route: { id: 'route-1', name: 'Route A', code: 'R-A' },
+      stop: { id: 'stop-1', name: 'Gate 2', sequence: 3 },
+      pickupDirection: 'PICKUP',
+      status: 'ACTIVE',
+    });
+    prisma.transportEnrollment.findFirst.mockResolvedValue({
+      id: 'enrollment-1',
+      route: { id: 'route-1', name: 'Route A', code: 'R-A' },
+      stop: { id: 'stop-1', name: 'Gate 2', sequence: 3 },
+      feeAmount: 1200,
+      status: 'ACTIVE',
+    });
+    prisma.transportTripStudentStatus.findFirst.mockResolvedValue({
+      status: 'BOARDED',
+      stop: { id: 'stop-1', name: 'Gate 2', sequence: 3 },
+      trip: {
+        id: 'trip-1',
+        route: { id: 'route-1', name: 'Route A', code: 'R-A' },
+        vehicle: {
+          id: 'vehicle-1',
+          registrationNumber: 'BA-1-PA-1234',
+          model: 'Bus 3',
+          capacity: 32,
+        },
+        direction: 'PICKUP',
+        status: 'ACTIVE',
+        isDelayed: true,
+        delayMinutes: 12,
+        delayReason: 'Traffic near Ring Road',
+        locationPings: [
+          {
+            latitude: 27.7101,
+            longitude: 85.3222,
+            speedKph: 18.5,
+            recordedAt: new Date('2026-06-02T07:45:00.000Z'),
+          },
+        ],
+      },
+    });
+
+    const result = await service.getStudentTransport('student-1', actor);
+
+    expect(prisma.transportTripStudentStatus.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          studentId: 'student-1',
+        }),
+      }),
+    );
+    expect(result.activeTrip).toEqual(
+      expect.objectContaining({
+        id: 'trip-1',
+        direction: 'PICKUP',
+        status: 'ACTIVE',
+        studentStatus: 'BOARDED',
+        isDelayed: true,
+        delayMinutes: 12,
+        delayReason: 'Traffic near Ring Road',
+        vehicle: expect.objectContaining({
+          registrationNumber: 'BA-1-PA-1234',
+          model: 'Bus 3',
+          capacity: 32,
+        }),
+        latestLocation: {
+          latitude: 27.7101,
+          longitude: 85.3222,
+          speedKph: 18.5,
+          recordedAt: '2026-06-02T07:45:00.000Z',
+        },
+      }),
+    );
   });
 
   it('streams receipt PDFs only after linked-child access is verified', async () => {

@@ -1,13 +1,12 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { SectionCard } from '@/components/ui/section-card';
 import { DataTable } from '@/components/ui/data-table';
-import { FilterBar } from '@/components/ui/filter-bar';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Download, FileText, Filter, Search, BarChart2, PieChart } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function DuesAnalysisSection() {
@@ -26,6 +25,10 @@ export function DuesAnalysisSection() {
   const feeHeadsQuery = useQuery({
     queryKey: ['fee-heads'],
     queryFn: api.listFeeHeads,
+  });
+
+  const exportMutation = useMutation({
+    mutationFn: () => api.downloadReport('dues-table-report', { format: 'csv', filters }),
   });
 
   const columns = [
@@ -100,22 +103,31 @@ export function DuesAnalysisSection() {
       headerAction={
         <div className="flex items-center gap-2">
           <button
-            onClick={() => api.downloadReport('dues-table-report', { format: 'csv', filters })}
+            onClick={() => exportMutation.mutate()}
+            disabled={exportMutation.isPending}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+            data-testid="finance-dues-csv-export"
           >
             <Download size={14} />
-            Export Dues
+            {exportMutation.isPending ? 'Exporting...' : 'Export Dues'}
           </button>
         </div>
       }
     >
       <div className="space-y-8">
+        {exportMutation.error ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+            {exportMutation.error.message}
+          </div>
+        ) : null}
+
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 p-6 bg-slate-50 rounded-[2.5rem] border border-slate-100">
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
               <div className="space-y-2">
                 <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">Class Filter</label>
                 <select 
                   className="premium-input bg-white h-12"
+                  value={filters.classId ?? ''}
                   onChange={(e) => setFilters({ ...filters, classId: e.target.value })}
                 >
                   <option value="">All Classes</option>
@@ -128,6 +140,7 @@ export function DuesAnalysisSection() {
                 <label className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest ml-2">Fee Head Filter</label>
                 <select 
                   className="premium-input bg-white h-12"
+                  value={filters.feeHeadId ?? ''}
                   onChange={(e) => setFilters({ ...filters, feeHeadId: e.target.value })}
                 >
                   <option value="">All Fee Heads</option>
@@ -138,14 +151,13 @@ export function DuesAnalysisSection() {
               </div>
            </div>
            
-           <div className="flex gap-2">
-              <button className="h-12 w-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors">
-                 <BarChart2 size={20} />
-              </button>
-              <button className="h-12 w-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors">
-                 <PieChart size={20} />
-              </button>
-           </div>
+           <button
+             type="button"
+             className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:text-slate-900"
+             onClick={() => setFilters({})}
+           >
+             Clear filters
+           </button>
         </div>
 
         <div className="relative rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm bg-white">

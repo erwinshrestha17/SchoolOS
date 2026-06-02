@@ -1,9 +1,8 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { SectionCard } from '@/components/ui/section-card';
-import { Clock, AlertTriangle, ChevronRight, TrendingUp } from 'lucide-react';
+import { Clock, ChevronRight, Download, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LoadingState } from '@/components/ui/loading-state';
 
@@ -11,6 +10,13 @@ export function DefaulterAgingSummary() {
   const defaultersQuery = useQuery({
     queryKey: ['defaulters'],
     queryFn: () => api.listDefaulters(),
+  });
+  const exportMutation = useMutation({
+    mutationFn: () =>
+      api.downloadReport('defaulter-aging-report', {
+        format: 'csv',
+        filters: {},
+      }),
   });
 
   if (defaultersQuery.isLoading) return <LoadingState variant="page" label="Analyzing aging buckets..." />;
@@ -51,7 +57,32 @@ export function DefaulterAgingSummary() {
   ] as const;
 
   return (
-    <div className="space-y-6">
+    <section className="space-y-6 rounded-[2.5rem] border border-slate-100 bg-white p-6 shadow-sm">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-xl font-black tracking-tight text-slate-900">Defaulter Aging</h2>
+          <p className="mt-1 text-sm font-medium text-slate-500">
+            Backend defaulter buckets for collection follow-up and guardian reminders.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-black text-slate-600 shadow-sm transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={exportMutation.isPending}
+          onClick={() => exportMutation.mutate()}
+          data-testid="finance-defaulter-aging-csv-export"
+        >
+          <Download size={14} />
+          {exportMutation.isPending ? 'Exporting...' : 'Export Aging CSV'}
+        </button>
+      </div>
+
+      {exportMutation.error ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+          {exportMutation.error.message}
+        </div>
+      ) : null}
+
       <div className="grid gap-6 md:grid-cols-4">
         {bucketData.map((b) => (
           <div 
@@ -92,6 +123,6 @@ export function DefaulterAgingSummary() {
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

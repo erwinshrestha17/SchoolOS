@@ -953,6 +953,14 @@ export function buildCashierClosePdf(input: {
   closedAt: Date;
   collectorName: string;
   paymentMethod: string | null;
+  methodBreakdown: Array<{
+    method: string;
+    grossCollected: number;
+    totalRefunded: number;
+    netCollected: number;
+    paymentCount: number;
+    refundCount: number;
+  }>;
   grossCollected: number;
   totalRefunded: number;
   netCollected: number;
@@ -1021,31 +1029,58 @@ export function buildCashierClosePdf(input: {
       ? moneyText(input.varianceAmount, 450, 532, 'F2')
       : text('N/A', 450, 532, 10, 'F2'),
 
+    // Method breakdown
+    infoBox(48, 386, 496, 110),
+    sectionLabel('Payment Method Breakdown', 60, 482),
+    text('Method', 60, 462, 8, 'F2'),
+    text('Gross', 190, 462, 8, 'F2'),
+    text('Refunds', 300, 462, 8, 'F2'),
+    text('Net', 430, 462, 8, 'F2'),
+    '60 454 m 500 454 l S',
+    ...input.methodBreakdown.slice(0, 5).flatMap((row, index) => {
+      const y = 438 - index * 14;
+      return [
+        text(
+          `${row.method} (${row.paymentCount} pay / ${row.refundCount} ref)`,
+          60,
+          y,
+          8,
+          'F1',
+        ),
+        moneyText(row.grossCollected, 212, y, 'F1'),
+        moneyText(-row.totalRefunded, 322, y, 'F1'),
+        moneyText(row.netCollected, 464, y, 'F2'),
+      ];
+    }),
+    ...(input.methodBreakdown.length === 0
+      ? [text('No payments or refunds in this close window.', 60, 438, 9, 'F1')]
+      : []),
+
     // Activity summary box
-    infoBox(48, 410, 496, 86),
-    sectionLabel('Activity Details', 60, 482),
-    text(`Total Payments Count: ${input.paymentCount}`, 60, 464, 9, 'F1'),
-    text(`Total Refunds Count: ${input.refundCount}`, 60, 448, 9, 'F1'),
+    infoBox(48, 306, 496, 66),
+    sectionLabel('Receipt Activity', 60, 358),
+    text(`Total Payments Count: ${input.paymentCount}`, 60, 340, 9, 'F1'),
+    text(`Total Refunds Count: ${input.refundCount}`, 60, 324, 9, 'F1'),
     text(
       `First Receipt: ${input.firstReceiptNumber ?? '—'}`,
       304,
-      464,
+      340,
       9,
       'F1',
     ),
-    text(`Last Receipt: ${input.lastReceiptNumber ?? '—'}`, 304, 448, 9, 'F1'),
+    text(`Last Receipt: ${input.lastReceiptNumber ?? '—'}`, 304, 324, 9, 'F1'),
 
     // Variance Reason & Notes
-    infoBox(48, 250, 496, 146),
-    sectionLabel('Auditable Explanations & Notes', 60, 382),
-    text('Variance Reason:', 60, 364, 9, 'F2'),
+    infoBox(48, 184, 496, 108),
+    sectionLabel('Auditable Explanations & Notes', 60, 278),
+    text('Variance Reason:', 60, 260, 9, 'F2'),
     ...(input.varianceReason
-      ? wrapPdfLine(input.varianceReason, 60, 350, 460, 9)
-      : [text('None recorded', 60, 350, 9, 'F1')]),
-    text('General Handoff Notes:', 60, 300, 9, 'F2'),
+      ? wrapPdfLine(input.varianceReason, 60, 246, 460, 9).slice(0, 2)
+      : [text('None recorded', 60, 246, 9, 'F1')]),
+    text('General Handoff Notes:', 60, 214, 9, 'F2'),
     ...(input.notes
-      ? wrapPdfLine(input.notes, 60, 286, 460, 9)
-      : [text('No notes provided', 60, 286, 9, 'F1')]),
+      ? wrapPdfLine(input.notes, 60, 200, 460, 9).slice(0, 2)
+      : [text('No notes provided', 60, 200, 9, 'F1')]),
 
     '72 138 m 220 138 l S',
     text('Cashier Signature', 108, 122, 9, 'F1'),

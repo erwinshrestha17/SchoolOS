@@ -120,10 +120,18 @@ class _CanteenContent extends ConsumerWidget {
             const SizedBox(height: AppSpacing.lg),
             const SectionHeader(title: 'Menu preview'),
             const SizedBox(height: AppSpacing.sm),
-            for (final item in info.menuItems.take(6)) ...[
-              _MenuItemTile(item: item),
-              const SizedBox(height: AppSpacing.md),
-            ],
+            if (info.menuItems.isEmpty)
+              const AppEmptyState(
+                title: 'No menu published',
+                message:
+                    'School menu items will appear once the canteen publishes them.',
+                icon: Icons.lunch_dining_rounded,
+              )
+            else
+              for (final item in info.menuItems.take(6)) ...[
+                _MenuItemTile(item: item),
+                const SizedBox(height: AppSpacing.md),
+              ],
           ],
         ),
       ),
@@ -180,6 +188,18 @@ class _WalletCard extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+                if (info.lowBalanceThreshold != null) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'Low balance threshold ${_money(info.lowBalanceThreshold!)}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: info.isLowBalance
+                          ? AppColors.warningDark
+                          : AppColors.slate500,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

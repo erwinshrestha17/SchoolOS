@@ -231,7 +231,11 @@ describe('LibraryService Phase 3A foundation', () => {
     const { service, prisma } = buildService({ issue: null });
 
     await expect(
-      service.returnCopy('issue-cross-tenant', { returnCondition: 'Good' }, actor),
+      service.returnCopy(
+        'issue-cross-tenant',
+        { returnCondition: 'Good' },
+        actor,
+      ),
     ).rejects.toThrow(NotFoundException);
 
     expect(prisma.libraryIssue.findFirst).toHaveBeenCalledWith(
@@ -264,9 +268,9 @@ describe('LibraryService Phase 3A foundation', () => {
   it('prevents book history reads for books outside the actor tenant', async () => {
     const { service, prisma } = buildService({ book: null });
 
-    await expect(service.getBookHistory(actor, 'book-cross-tenant')).rejects.toThrow(
-      NotFoundException,
-    );
+    await expect(
+      service.getBookHistory(actor, 'book-cross-tenant'),
+    ).rejects.toThrow(NotFoundException);
 
     expect(prisma.libraryBook.findFirst).toHaveBeenCalledWith({
       where: { id: 'book-cross-tenant', tenantId: actor.tenantId },

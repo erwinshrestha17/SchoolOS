@@ -1,9 +1,46 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { createHash, createHmac } from 'node:crypto';
+import type { AuditService } from '../audit/audit.service';
+import type { ConfigService } from '../config/config.service';
+import type { PrismaService } from '../prisma/prisma.service';
 import { PlatformApiKeysService } from './platform-api-keys.service';
+
+const tokenHashPepper = 'mock-pepper-for-tests-at-least-32-chars-long-12345';
+
+interface PlatformApiKeyPrismaMock {
+  tenant: {
+    findUnique: jest.Mock;
+  };
+  platformApiKey: {
+    findMany: jest.Mock;
+    findFirst: jest.Mock;
+    findUnique: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+  };
+}
+
+interface ApiKeyRecordFixture {
+  id: string;
+  tenantId: string;
+  name: string;
+  prefix: string;
+  keySuffix: string;
+  keyHash: string;
+  scopes: string[];
+  status: 'ACTIVE' | 'REVOKED';
+  expiresAt: Date | null;
+  lastUsedAt: Date | null;
+  revokedAt: Date | null;
+  createdBy: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  tenant?: { id: string; isActive: boolean } | null;
+}
 
 describe('PlatformApiKeysService', () => {
   let service: PlatformApiKeysService;
-  let prisma: any;
+  let prisma: PlatformApiKeyPrismaMock;
   let auditService: { record: jest.Mock };
 
   beforeEach(() => {
@@ -21,12 +58,12 @@ describe('PlatformApiKeysService', () => {
     };
     auditService = { record: jest.fn().mockResolvedValue({}) };
     const configService = {
-      tokenHashPepper: 'mock-pepper-for-tests-at-least-32-chars-long-12345',
+      tokenHashPepper,
     };
     service = new PlatformApiKeysService(
-      prisma,
-      auditService as any,
-      configService as any,
+      prisma as unknown as PrismaService,
+      auditService as unknown as AuditService,
+      configService as unknown as ConfigService,
     );
   });
 
@@ -65,6 +102,12 @@ describe('PlatformApiKeysService', () => {
     expect(
       prisma.platformApiKey.create.mock.calls[0][0].data,
     ).not.toHaveProperty('secret');
+    expect(prisma.platformApiKey.create.mock.calls[0][0].data.keyHash).toBe(
+      hmacSecret(result.secret, tokenHashPepper),
+    );
+    expect(prisma.platformApiKey.create.mock.calls[0][0].data.keyHash).not.toBe(
+      shaSecret(result.secret),
+    );
     expect(auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'platform_api_key_created',
@@ -186,17 +229,75 @@ describe('PlatformApiKeysService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('rejects keys if the tenant does not exist or is inactive', async () => {
-    prisma.platformApiKey.findUnique.mockResolvedValue(
+  it('validates active HMAC-hashed API keys and records last use', async () => {
+    const secret = 'sk_schoolos_validkey_123';
+    prisma.platformApiKey.findFirst.mockResolvedValue(
       apiKeyRecord({
+        keyHash: hmacSecret(secret, tokenHashPepper),
+        tenant: { id: 'tenant-1', isActive: true },
+      }),
+    );
+
+    const result = await service.validateApiKey(secret);
+
+    expect(result).toEqual({
+      id: 'api-key-1',
+      tenantId: 'tenant-1',
+      scopes: ['students:read'],
+    });
+    expect(prisma.platformApiKey.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          OR: [
+            { keyHash: hmacSecret(secret, tokenHashPepper) },
+            { keyHash: shaSecret(secret) },
+          ],
+        },
+      }),
+    );
+    expect(prisma.platformApiKey.update).toHaveBeenCalledWith({
+      where: { id: 'api-key-1' },
+      data: {
+        lastUsedAt: expect.any(Date),
+      },
+    });
+  });
+
+  it('upgrades legacy SHA-256 API key hashes after a successful validation', async () => {
+    const secret = 'sk_schoolos_legacykey_123';
+    prisma.platformApiKey.findFirst.mockResolvedValue(
+      apiKeyRecord({
+        keyHash: shaSecret(secret),
+        tenant: { id: 'tenant-1', isActive: true },
+      }),
+    );
+
+    await expect(service.validateApiKey(secret)).resolves.toEqual(
+      expect.objectContaining({ id: 'api-key-1', tenantId: 'tenant-1' }),
+    );
+
+    expect(prisma.platformApiKey.update).toHaveBeenCalledWith({
+      where: { id: 'api-key-1' },
+      data: {
+        lastUsedAt: expect.any(Date),
+        keyHash: hmacSecret(secret, tokenHashPepper),
+      },
+    });
+  });
+
+  it('rejects keys if the tenant does not exist or is inactive', async () => {
+    prisma.platformApiKey.findFirst.mockResolvedValue(
+      apiKeyRecord({
+        keyHash: hmacSecret('sk_schoolos_validkey_123', tokenHashPepper),
         tenant: { id: 'tenant-1', isActive: false },
       }),
     );
     const result = await service.validateApiKey('sk_schoolos_validkey_123');
     expect(result).toBeNull();
 
-    prisma.platformApiKey.findUnique.mockResolvedValue(
+    prisma.platformApiKey.findFirst.mockResolvedValue(
       apiKeyRecord({
+        keyHash: hmacSecret('sk_schoolos_validkey_123', tokenHashPepper),
         tenant: null,
       }),
     );
@@ -210,14 +311,18 @@ describe('PlatformApiKeysService', () => {
   });
 });
 
-function apiKeyRecord(overrides: Partial<any> = {}) {
+function apiKeyRecord(
+  overrides: Partial<ApiKeyRecordFixture> = {},
+): ApiKeyRecordFixture {
   const now = new Date('2026-05-24T09:00:00.000Z');
+  const secret = 'sk_schoolos_defaultkey_123';
   return {
     id: 'api-key-1',
     tenantId: 'tenant-1',
     name: 'Read integration',
     prefix: 'sk_schoolos_prefix12',
     keySuffix: 'abcd',
+    keyHash: hmacSecret(secret, tokenHashPepper),
     scopes: ['students:read'],
     status: 'ACTIVE',
     expiresAt: null,
@@ -228,4 +333,12 @@ function apiKeyRecord(overrides: Partial<any> = {}) {
     updatedAt: now,
     ...overrides,
   };
+}
+
+function shaSecret(secret: string) {
+  return createHash('sha256').update(secret).digest('hex');
+}
+
+function hmacSecret(secret: string, pepper: string) {
+  return createHmac('sha256', pepper).update(secret).digest('hex');
 }

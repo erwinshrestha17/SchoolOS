@@ -1436,11 +1436,7 @@ export function createPrismaMock() {
       updateMany: jest.fn((q: PrismaQuery) => {
         let count = 0;
         for (const token of state.refreshTokens) {
-          if (
-            token.userId === q.where?.userId &&
-            (q.where?.revokedAt === undefined ||
-              token.revokedAt === q.where.revokedAt)
-          ) {
+          if (matchesWhere(token, q.where)) {
             Object.assign(token, q.data ?? {});
             count += 1;
           }
@@ -1459,6 +1455,17 @@ export function createPrismaMock() {
           (t) =>
             t.token === q.where?.token || t.tokenHash === q.where?.tokenHash,
         );
+        if (!token) return Promise.resolve(null);
+        return Promise.resolve({
+          ...token,
+          user: attachUserRoles(
+            state,
+            state.users.find((user) => user.id === token.userId),
+          ),
+        });
+      }),
+      findFirst: jest.fn((q: PrismaQuery) => {
+        const token = state.refreshTokens.find((t) => matchesWhere(t, q.where));
         if (!token) return Promise.resolve(null);
         return Promise.resolve({
           ...token,

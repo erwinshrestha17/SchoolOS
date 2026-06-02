@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../app/constants/app_routes.dart';
 import '../../../../app/design_system/app_spacing.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/auth/auth_provider.dart';
@@ -26,222 +28,226 @@ class AdminDashboard extends ConsumerWidget {
     return RoleShellScaffold(
       role: 'ADMIN',
       selectedIndex: 0,
-      body: SingleChildScrollView(
+      body: ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Welcome Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Welcome, $displayName',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Admin mobile companion - $email',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.slate500,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              const RoleBadge(role: 'ADMIN'),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          AppGradientCard(
+            gradient: const LinearGradient(
+              colors: AppColors.adminGradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            child: Row(
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Welcome, $displayName',
+                        displayName,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 22,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(
-                        'Monitoring & approvals • $email',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.slate500,
-                          fontSize: 13,
+                        'Mobile companion for admin alerts and account access',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        'Use the web console for live operational dashboards',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white60,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
-                const RoleBadge(role: 'ADMIN'),
+                UserAvatar(
+                  name: displayName,
+                  radius: 36,
+                  borderColor: Colors.white,
+                  borderWidth: 2,
+                ),
               ],
             ),
-            const SizedBox(height: AppSpacing.xl),
-
-            // Profile info gradient card
-            AppGradientCard(
-              gradient: const LinearGradient(
-                colors: AppColors.adminGradient,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          displayName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        const Text(
-                          'Administrative workspace',
-                          style: TextStyle(color: Colors.white70, fontSize: 13),
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        const Text(
-                          'Active Approvals: 3 Pending Review',
-                          style: TextStyle(color: Colors.white60, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  UserAvatar(
-                    name: displayName,
-                    radius: 36,
-                    borderColor: Colors.white,
-                    borderWidth: 2,
-                  ),
-                ],
-              ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          const SectionHeader(title: 'Mobile admin scope'),
+          const SizedBox(height: AppSpacing.sm),
+          DashboardCard(
+            title: 'Operations dashboard',
+            value: 'Web console',
+            icon: Icons.dashboard_customize_rounded,
+            iconColor: AppColors.primary,
+            badge: const StatusChip(
+              status: AppStatusType.draft,
+              label: 'Web-first',
             ),
-            const SizedBox(height: AppSpacing.xl),
-
-            // Metrics and summaries
-            const SectionHeader(title: "Daily School Snapshot"),
-            const SizedBox(height: AppSpacing.sm),
-
-            DashboardCard(
-              title: 'Student Attendance Today',
-              value: '91.8% Present',
-              icon: Icons.people_outline_rounded,
-              iconColor: AppColors.primary,
-              subtitle: '864/941 Students boarded or arrived in class',
-            ),
-            const SizedBox(height: AppSpacing.md),
-
-            DashboardCard(
-              title: 'Today Collection',
-              value: 'NPR 1,84,500',
-              icon: Icons.monetization_on_rounded,
-              iconColor: AppColors.success,
-              subtitle: '12 Fee transactions processed today',
-            ),
-            const SizedBox(height: AppSpacing.xl),
-
-            // Pending Approvals List
-            const SectionHeader(title: "Pending Approvals"),
-            const SizedBox(height: AppSpacing.sm),
-
-            AppCard(
-              child: Column(
-                children: [
-                  _buildApprovalRow(
-                    context,
-                    'Staff Leave Request',
-                    'Hari Prasad (Accountant)',
-                    '3 Days (Casual)',
-                    AppStatusType.pending,
-                  ),
-                  const Divider(),
-                  _buildApprovalRow(
-                    context,
-                    'Equipment Purchase',
-                    'Science Lab Chemicals',
-                    'NPR 25,000 Budget',
-                    AppStatusType.pending,
-                  ),
-                  const Divider(),
-                  _buildApprovalRow(
-                    context,
-                    'Substitution Request',
-                    'Grade 5 Maths (Mrs. Sharma)',
-                    'Period 3 Substitution',
-                    AppStatusType.pending,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-
-            // Quick Actions Grid
-            const SectionHeader(title: "Emergency notice & tools"),
-            const SizedBox(height: AppSpacing.sm),
-
-            GridView.count(
-              crossAxisCount: 3,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: AppSpacing.md,
-              mainAxisSpacing: AppSpacing.md,
-              childAspectRatio: 1.0,
+            subtitle:
+                'Live attendance, fees, transport maps, and approvals stay in the scoped web admin dashboard.',
+          ),
+          const SizedBox(height: AppSpacing.md),
+          DashboardCard(
+            title: 'Mobile notifications',
+            value: 'Available',
+            icon: Icons.notifications_active_rounded,
+            iconColor: AppColors.success,
+            subtitle:
+                'Open the mobile notification center for account-visible updates.',
+            onTap: () => context.go(AppRoutes.notifications),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          const SectionHeader(title: 'Admin work queue'),
+          const SizedBox(height: AppSpacing.sm),
+          AppCard(
+            child: Column(
               children: [
-                QuickActionCard(
-                  title: 'Send Alert',
-                  icon: Icons.notifications_active_rounded,
-                  color: AppColors.danger,
-                  onTap: () {},
+                _InfoRow(
+                  icon: Icons.verified_user_rounded,
+                  title: 'Approvals',
+                  detail:
+                      'Approval queues are intentionally web-only until mobile admin APIs are scoped.',
                 ),
-                QuickActionCard(
-                  title: 'School Log',
+                const Divider(),
+                _InfoRow(
                   icon: Icons.receipt_long_rounded,
-                  color: AppColors.primary,
-                  onTap: () {},
+                  title: 'Finance and payroll',
+                  detail:
+                      'Use the web console for cashier close, payroll posting, and accounting reports.',
                 ),
-                QuickActionCard(
-                  title: 'Bus Map',
-                  icon: Icons.map_rounded,
-                  color: AppColors.driverAccent,
-                  onTap: () {},
+                const Divider(),
+                _InfoRow(
+                  icon: Icons.directions_bus_rounded,
+                  title: 'Transport operations',
+                  detail:
+                      'Driver and parent transport companion views are mobile-ready; admin live maps remain web-gated.',
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          const SectionHeader(title: 'Quick access'),
+          const SizedBox(height: AppSpacing.sm),
+          GridView.count(
+            crossAxisCount: 3,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: AppSpacing.md,
+            mainAxisSpacing: AppSpacing.md,
+            childAspectRatio: 1.0,
+            children: [
+              QuickActionCard(
+                title: 'Notices',
+                icon: Icons.campaign_rounded,
+                color: AppColors.danger,
+                onTap: () => context.go(AppRoutes.notices),
+              ),
+              QuickActionCard(
+                title: 'Alerts',
+                icon: Icons.notifications_active_rounded,
+                color: AppColors.primary,
+                onTap: () => context.go(AppRoutes.notifications),
+              ),
+              QuickActionCard(
+                title: 'Settings',
+                icon: Icons.settings_rounded,
+                color: AppColors.info,
+                onTap: () => context.go(AppRoutes.settings),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
+}
 
-  Widget _buildApprovalRow(
-    BuildContext context,
-    String category,
-    String requestBy,
-    String detail,
-    AppStatusType status,
-  ) {
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
+    required this.title,
+    required this.detail,
+  });
+
+  final IconData icon;
+  final String title;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Icon(icon, color: AppColors.adminAccent),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  category,
-                  style: TextStyle(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w800,
-                    fontSize: 14,
                     color: isDark ? Colors.white : AppColors.slate800,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$requestBy • $detail',
-                  style: TextStyle(fontSize: 11, color: AppColors.slate500),
+                  detail,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.slate500,
+                  ),
                 ),
               ],
             ),
           ),
-          StatusChip(status: status, label: 'Review'),
         ],
       ),
     );

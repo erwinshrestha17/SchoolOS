@@ -9,9 +9,10 @@ import { CheckCircle2, AlertCircle, Printer, X, Download } from 'lucide-react';
 interface CollectionSectionProps {
   invoices: any[];
   isLoading?: boolean;
+  initialInvoiceId?: string | null;
 }
 
-export function CollectionSection({ invoices, isLoading }: CollectionSectionProps) {
+export function CollectionSection({ invoices, isLoading, initialInvoiceId }: CollectionSectionProps) {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [lastReceipt, setLastReceipt] = useState<any>(null);
@@ -87,6 +88,7 @@ export function CollectionSection({ invoices, isLoading }: CollectionSectionProp
         onSearch={setSearchQuery}
         invoices={filteredInvoices}
         isLoading={isLoading}
+        initialInvoiceId={initialInvoiceId}
         onCollect={(invoiceId, amount, method, reference, remarks) => {
           setLastReceipt(null);
           paymentMutation.mutate({

@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { AttendanceForm } from '@/components/forms/attendance-form';
 import { AttendanceAnalytics } from '@/components/attendance/attendance-analytics';
 import { AttendanceConflictReview } from '@/components/attendance/attendance-conflict-review';
+import { AttendanceCorrectionReview } from '@/components/attendance/attendance-correction-review';
 import { PageHeader } from '@/components/ui/page-header';
 import { CalendarCheck, History, BarChart3, AlertTriangle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -18,6 +19,11 @@ export default function AttendancePage() {
   const conflictsQuery = useQuery({
     queryKey: ['attendance-conflicts'],
     queryFn: api.listAttendanceConflicts,
+  });
+  const correctionsQuery = useQuery({
+    queryKey: ['attendance-corrections', 'PENDING'],
+    queryFn: () =>
+      api.listAttendanceCorrections({ status: 'PENDING', limit: 25 }),
   });
 
   return (
@@ -43,20 +49,34 @@ export default function AttendancePage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="marking" className="space-y-6 animate-in fade-in-50 duration-500">
+        <TabsContent
+          value="marking"
+          className="space-y-6 animate-in fade-in-50 duration-500"
+        >
           <AttendanceForm />
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-6 animate-in fade-in-50 duration-500">
+        <TabsContent
+          value="analytics"
+          className="space-y-6 animate-in fade-in-50 duration-500"
+        >
           <AttendanceAnalytics analytics={analyticsQuery.data} />
-          
+
           <div className="grid gap-6">
             {/* Additional reporting widgets can go here */}
           </div>
         </TabsContent>
 
-        <TabsContent value="conflicts" className="space-y-6 animate-in fade-in-50 duration-500">
+        <TabsContent
+          value="conflicts"
+          className="space-y-6 animate-in fade-in-50 duration-500"
+        >
           <AttendanceConflictReview conflicts={conflictsQuery.data ?? []} />
+          <AttendanceCorrectionReview
+            corrections={correctionsQuery.data?.items ?? []}
+            isLoading={correctionsQuery.isLoading}
+            total={correctionsQuery.data?.total ?? 0}
+          />
         </TabsContent>
       </Tabs>
     </div>

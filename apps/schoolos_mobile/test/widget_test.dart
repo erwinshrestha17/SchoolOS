@@ -147,4 +147,27 @@ void main() {
     expect(find.text('Notices'), findsOneWidget);
     expect(find.text('More'), findsOneWidget);
   });
+
+  testWidgets('RoleShellScaffold renders routed student navigation', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: RoleShellScaffold(
+            role: 'STUDENT',
+            selectedIndex: 0,
+            body: Center(child: Text('Student Home Body')),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Student Home Body'), findsOneWidget);
+    expect(find.text('Home'), findsOneWidget);
+    expect(find.text('Homework'), findsOneWidget);
+    expect(find.text('Timetable'), findsOneWidget);
+    expect(find.text('Notices'), findsOneWidget);
+    expect(find.text('More'), findsOneWidget);
+  });
 }

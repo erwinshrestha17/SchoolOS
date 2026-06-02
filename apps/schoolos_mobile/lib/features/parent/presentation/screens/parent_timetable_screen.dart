@@ -14,26 +14,40 @@ import '../../domain/parent_models.dart';
 import '../widgets/parent_state_view.dart';
 
 class ParentTimetableScreen extends ConsumerWidget {
-  const ParentTimetableScreen({super.key});
+  const ParentTimetableScreen({
+    super.key,
+    this.role = 'PARENT',
+    this.selectedIndex = 4,
+    this.title = 'Timetable',
+  });
+
+  final String role;
+  final int selectedIndex;
+  final String title;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(parentControllerProvider);
     final controller = ref.read(parentControllerProvider.notifier);
     final childId = state.selectedChildId;
+    final isStudent = role.toUpperCase() == 'STUDENT';
 
     return RoleShellScaffold(
-      role: 'PARENT',
-      selectedIndex: 4,
-      title: 'Timetable',
+      role: role,
+      selectedIndex: selectedIndex,
+      title: title,
       body: ParentStateView(
         status: state.status,
         message: state.message,
         onRetry: controller.load,
         child: childId == null
-            ? const AppEmptyState(
-                title: 'No child selected',
-                message: 'Select a child before viewing timetable.',
+            ? AppEmptyState(
+                title: isStudent
+                    ? 'No student profile linked'
+                    : 'No child selected',
+                message: isStudent
+                    ? 'Ask the school office to link this login to a student profile.'
+                    : 'Select a child before viewing timetable.',
                 icon: Icons.event_note_rounded,
               )
             : _TimetableContent(childId: childId),

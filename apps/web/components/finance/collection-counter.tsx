@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { SectionCard } from '@/components/ui/section-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Wallet, Search, CreditCard, Banknote, History, ChevronRight, User, GraduationCap, MapPin, Phone, Receipt, Printer, AlertCircle, Loader2 } from 'lucide-react';
@@ -16,6 +16,7 @@ interface CollectionCounterProps {
   invoices: any[];
   onCollect: (invoiceId: string, amount: number, method: string, reference?: string, remarks?: string) => void;
   isLoading?: boolean;
+  initialInvoiceId?: string | null;
 }
 
 const formatCurrency = (amount: number) => {
@@ -33,7 +34,7 @@ const formatDate = (value: string) =>
     year: 'numeric',
   }).format(new Date(value));
 
-export function CollectionCounter({ onSearch, invoices, onCollect, isLoading }: CollectionCounterProps) {
+export function CollectionCounter({ onSearch, invoices, onCollect, isLoading, initialInvoiceId }: CollectionCounterProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [amount, setAmount] = useState<number>(0);
@@ -57,6 +58,19 @@ export function CollectionCounter({ onSearch, invoices, onCollect, isLoading }: 
     setReference('');
     setRemarks('');
   };
+
+  useEffect(() => {
+    if (!initialInvoiceId || selectedInvoiceId === initialInvoiceId) return;
+
+    const linkedInvoice = invoices.find((invoice) => invoice.id === initialInvoiceId);
+
+    if (!linkedInvoice) return;
+
+    setSelectedInvoiceId(linkedInvoice.id);
+    setAmount(linkedInvoice.outstandingAmount);
+    setReference('');
+    setRemarks('');
+  }, [initialInvoiceId, invoices, selectedInvoiceId]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[400px_1fr]">

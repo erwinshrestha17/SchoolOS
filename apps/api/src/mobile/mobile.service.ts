@@ -777,7 +777,12 @@ export class MobileService {
             include: {
               route: { select: { id: true, name: true, code: true } },
               vehicle: {
-                select: { id: true, registrationNumber: true, model: true },
+                select: {
+                  id: true,
+                  registrationNumber: true,
+                  model: true,
+                  capacity: true,
+                },
               },
               locationPings: {
                 orderBy: [{ recordedAt: 'desc' }],
@@ -821,6 +826,7 @@ export class MobileService {
             stop: activeStatus.stop,
             isDelayed: activeStatus.trip.isDelayed,
             delayMinutes: activeStatus.trip.delayMinutes,
+            delayReason: activeStatus.trip.delayReason,
             latestLocation: activeStatus.trip.locationPings[0]
               ? {
                   latitude: money(activeStatus.trip.locationPings[0].latitude),
@@ -939,7 +945,7 @@ function boundedTake(value: string | undefined, fallback: number) {
   return Math.min(Math.floor(parsed), 50);
 }
 
-function money(value: unknown) {
+function money(value: unknown): number {
   if (value === null || value === undefined) {
     return 0;
   }
@@ -952,15 +958,20 @@ function money(value: unknown) {
     return Number(value);
   }
 
-  if (
-    typeof value === 'object' &&
-    'toNumber' in value &&
-    typeof value.toNumber === 'function'
-  ) {
+  if (hasToNumber(value)) {
     return value.toNumber();
   }
 
   return Number(value);
+}
+
+function hasToNumber(value: unknown): value is { toNumber: () => number } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'toNumber' in value &&
+    typeof value.toNumber === 'function'
+  );
 }
 
 function roundMoney(value: number) {

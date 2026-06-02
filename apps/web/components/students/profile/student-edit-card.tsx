@@ -8,6 +8,13 @@ import { Heart, ImageUp, Save, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
+const STUDENT_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+const STUDENT_PHOTO_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]);
+
 type StudentEditCardProps = {
   profile: StudentProfileDetail;
   isSaving: boolean;
@@ -48,7 +55,29 @@ export function StudentEditCard({
   const [emergencyPhone, setEmergencyPhone] = useState(student.emergencyPhone ?? '');
 
   const [validationError, setValidationError] = useState('');
+  const [photoValidationError, setPhotoValidationError] = useState('');
   const [removePhotoDialogOpen, setRemovePhotoDialogOpen] = useState(false);
+  const isPhotoBusy = Boolean(isUploadingPhoto || isRemovingPhoto);
+
+  const handlePhotoSelection = (file: File | undefined) => {
+    setPhotoValidationError('');
+
+    if (!file) {
+      return;
+    }
+
+    if (!STUDENT_PHOTO_MIME_TYPES.has(file.type)) {
+      setPhotoValidationError('Use a JPG, PNG, or WEBP image for the student photo.');
+      return;
+    }
+
+    if (file.size > STUDENT_PHOTO_MAX_BYTES) {
+      setPhotoValidationError('Student photo must be 2MB or smaller.');
+      return;
+    }
+
+    onUploadPhoto?.(file);
+  };
 
   const handleSave = () => {
     setValidationError('');
@@ -100,25 +129,32 @@ export function StudentEditCard({
               <div>
                 <p className="text-sm font-bold text-slate-900">Student Photo</p>
                 <p className="mt-1 max-w-md text-xs font-medium text-slate-500">
-                  JPG, PNG, or WEBP only. Files are stored privately and served
+                  JPG, PNG, or WEBP only, up to 2MB. Files are stored privately and served
                   through short-lived preview URLs.
                 </p>
+                {isPhotoBusy ? (
+                  <p className="mt-2 text-xs font-bold text-primary-600">
+                    {isUploadingPhoto ? 'Uploading photo...' : 'Removing photo...'}
+                  </p>
+                ) : null}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800">
+              <label className={cn(
+                'inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800',
+                isPhotoBusy && 'cursor-not-allowed opacity-50',
+              )}>
                 <ImageUp size={16} />
                 {isUploadingPhoto ? 'Uploading...' : student.photoUrl ? 'Replace' : 'Upload'}
                 <input
+                  aria-label="Upload student photo"
+                  data-testid="student-photo-upload-input"
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   className="sr-only"
-                  disabled={isUploadingPhoto || isRemovingPhoto}
+                  disabled={isPhotoBusy}
                   onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file && onUploadPhoto) {
-                      onUploadPhoto(file);
-                    }
+                    handlePhotoSelection(event.target.files?.[0]);
                     event.currentTarget.value = '';
                   }}
                 />
@@ -127,7 +163,8 @@ export function StudentEditCard({
                 <button
                   type="button"
                   onClick={() => setRemovePhotoDialogOpen(true)}
-                  disabled={isUploadingPhoto || isRemovingPhoto}
+                  disabled={isPhotoBusy}
+                  data-testid="student-photo-remove-button"
                   className="inline-flex items-center gap-2 rounded-xl border border-danger-100 bg-white px-4 py-2.5 text-sm font-bold text-danger-600 transition hover:bg-danger-50 disabled:opacity-50"
                 >
                   <Trash2 size={16} />
@@ -136,6 +173,11 @@ export function StudentEditCard({
               ) : null}
             </div>
           </div>
+          {photoValidationError ? (
+            <p className="mt-3 text-sm font-bold text-danger-500">
+              {photoValidationError}
+            </p>
+          ) : null}
           {photoError ? (
             <p className="mt-3 text-sm font-bold text-danger-500">
               {photoError.message}

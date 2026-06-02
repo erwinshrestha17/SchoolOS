@@ -13,6 +13,7 @@ import { CashierCloseSection } from '@/components/finance/cashier-close-section'
 import { Badge } from '@/components/ui/badge';
 import { useSession } from '@/components/session-provider';
 import type { InvoiceSummary } from '@schoolos/core';
+import { useSearchParams } from 'next/navigation';
 
 type InvoiceWithOutstanding = InvoiceSummary & {
   outstandingAmount?: number;
@@ -20,6 +21,8 @@ type InvoiceWithOutstanding = InvoiceSummary & {
 
 export default function FinancePage() {
   const { session } = useSession();
+  const searchParams = useSearchParams();
+  const initialInvoiceId = searchParams.get('invoiceId');
   const invoicesQuery = useQuery({
     queryKey: ['invoices'],
     queryFn: () => api.listInvoices(),
@@ -124,7 +127,7 @@ export default function FinancePage() {
         </div>
 
         <TabsContent value="collection" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <CollectionSection invoices={invoices} isLoading={invoicesQuery.isLoading} />
+          <CollectionSection invoices={invoices} isLoading={invoicesQuery.isLoading} initialInvoiceId={initialInvoiceId} />
         </TabsContent>
 
         <TabsContent value="close" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">

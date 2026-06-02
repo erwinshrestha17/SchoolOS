@@ -1,6 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+import sharp from 'sharp';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../storage/storage.service';
 
@@ -10,6 +11,10 @@ export interface ActivityMediaCompressionJob {
   fileAssetId: string;
   requestedById: string;
 }
+
+const ACTIVITY_PREVIEW_MAX_EDGE_PX = 1280;
+const ACTIVITY_PREVIEW_JPEG_QUALITY = 72;
+const ACTIVITY_PREVIEW_WEBP_QUALITY = 72;
 
 @Processor('activity-media')
 export class ActivityMediaProcessor extends WorkerHost {
@@ -47,22 +52,18 @@ export class ActivityMediaProcessor extends WorkerHost {
         attachment.fileAsset.objectKey,
       );
 
-      // In a real production environment, we would use 'sharp' here.
-      // Since we don't have sharp installed, we simulate the compression.
-      // The logic below establishes the architectural pattern.
+      const optimizedBuffer = await this.buildOptimizedPreview(
+        originalBuffer,
+        attachment.contentType,
+        attachmentId,
+      );
 
-      this.logger.log(`Simulating compression for attachment ${attachmentId}`);
-
-      // Simulate some processing time
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // We'll just "optimize" by creating a copy with a suffix for this demo
       const optimizedResult = await this.storageService.saveBufferObject({
         tenantId,
         prefix: `activity-feed/optimized`,
         fileName: `optimized_${attachment.fileName}`,
         contentType: attachment.contentType,
-        content: originalBuffer, // In reality, this would be the compressed buffer
+        content: optimizedBuffer,
       });
 
       await this.prisma.activityAttachment.update({
@@ -94,5 +95,86 @@ export class ActivityMediaProcessor extends WorkerHost {
       );
       throw error;
     }
+  }
+
+  private async buildOptimizedPreview(
+    originalBuffer: Buffer,
+    contentType: string,
+    attachmentId: string,
+  ) {
+    const normalizedType = contentType.toLowerCase();
+
+    if (normalizedType === 'image/heic' || normalizedType === 'image/heif') {
+      this.logger.warn(
+        `Activity media ${attachmentId} is ${normalizedType}; keeping original bytes for preview until HEIC transcoding is enabled.`,
+      );
+      return originalBuffer;
+    }
+
+    try {
+      const pipeline = sharp(originalBuffer, { failOn: 'none' })
+        .rotate()
+        .resize({
+          width: ACTIVITY_PREVIEW_MAX_EDGE_PX,
+          height: ACTIVITY_PREVIEW_MAX_EDGE_PX,
+          fit: 'inside',
+          withoutEnlargement: true,
+        });
+
+      const optimizedBuffer = await this.applyOutputFormat(
+        pipeline,
+        normalizedType,
+      );
+
+      if (optimizedBuffer.byteLength <= 0) {
+        return originalBuffer;
+      }
+
+      return optimizedBuffer.byteLength < originalBuffer.byteLength
+        ? optimizedBuffer
+        : originalBuffer;
+    } catch (error) {
+      this.logger.warn(
+        `Activity media ${attachmentId} could not be optimized; keeping original bytes for preview. ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return originalBuffer;
+    }
+  }
+
+  private applyOutputFormat(
+    pipeline: sharp.Sharp,
+    normalizedType: string,
+  ): Promise<Buffer> {
+    if (normalizedType === 'image/jpeg' || normalizedType === 'image/jpg') {
+      return pipeline
+        .jpeg({
+          quality: ACTIVITY_PREVIEW_JPEG_QUALITY,
+          mozjpeg: true,
+        })
+        .toBuffer();
+    }
+
+    if (normalizedType === 'image/png') {
+      return pipeline
+        .png({
+          compressionLevel: 9,
+          adaptiveFiltering: true,
+          effort: 7,
+        })
+        .toBuffer();
+    }
+
+    if (normalizedType === 'image/webp') {
+      return pipeline
+        .webp({
+          quality: ACTIVITY_PREVIEW_WEBP_QUALITY,
+          effort: 4,
+        })
+        .toBuffer();
+    }
+
+    return Promise.resolve(Buffer.alloc(0));
   }
 }

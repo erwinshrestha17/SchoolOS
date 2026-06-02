@@ -5,7 +5,7 @@ import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { FinanceService } from '../finance/finance.service';
 import { AuthMethod } from '@prisma/client';
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 
@@ -13,6 +13,7 @@ describe('ReportsService', () => {
   let service: ReportsService;
   let prisma: PrismaService;
   let audit: AuditService;
+  let fileRegistry: FileRegistryService;
 
   const actor: AuthContext = {
     tenantId: 'tenant-1',
@@ -106,6 +107,7 @@ describe('ReportsService', () => {
             },
             reportExport: {
               create: jest.fn(),
+              update: jest.fn(),
               findMany: jest.fn().mockResolvedValue([]),
               count: jest.fn().mockResolvedValue(0),
               findFirst: jest.fn(),
@@ -213,6 +215,7 @@ describe('ReportsService', () => {
     service = module.get<ReportsService>(ReportsService);
     prisma = module.get<PrismaService>(PrismaService);
     audit = module.get<AuditService>(AuditService);
+    fileRegistry = module.get<FileRegistryService>(FileRegistryService);
   });
 
   it('lists reports the user has permission to see', () => {
@@ -249,7 +252,7 @@ describe('ReportsService', () => {
     );
 
     expect(result.format).toBe('csv');
-    const csvString = result.content.toString();
+    const csvString = expectBufferText(result.content);
     expect(csvString).toContain('Student ID,Full Name,Class,Section');
     expect(csvString).toContain('Total School Days,Present Count,Absent Count');
     expect(csvString).toContain('"SCH-001","Erwin Shrestha","Grade 1"');
@@ -309,7 +312,7 @@ describe('ReportsService', () => {
     );
 
     expect(result.format).toBe('csv');
-    const csvString = result.content.toString();
+    const csvString = expectBufferText(result.content);
     expect(csvString).toContain(
       'Student ID,Student Name,Class,Section,Guardian Name,Guardian Phone',
     );
@@ -335,7 +338,7 @@ describe('ReportsService', () => {
     );
 
     expect(result.format).toBe('csv');
-    const csvString = result.content.toString();
+    const csvString = expectBufferText(result.content);
     expect(csvString).toContain(
       'Student ID,Student,Subject,Category,Observed On,Score,Max Score,Percentage,Note',
     );
@@ -359,7 +362,7 @@ describe('ReportsService', () => {
     );
 
     expect(result.format).toBe('csv');
-    const csvString = result.content.toString();
+    const csvString = expectBufferText(result.content);
     expect(csvString).toContain(
       'Student ID,Student,Class,Section,Roll Number,Percentage,Grade,GPA,Promotion Eligible,Status,Version',
     );
@@ -367,4 +370,57 @@ describe('ReportsService', () => {
       '"SCH-001","Erwin Shrestha","Grade 1","A","1","85.50","A","3.60","YES","LOCKED","1"',
     );
   });
+
+  it('completes queued exports with a protected File Registry snapshot', async () => {
+    await service.completeQueuedExport({
+      exportId: 'export-1',
+      reportKey: 'student-roster',
+      filters: { status: 'ACTIVE' },
+      format: 'csv',
+      actor,
+    });
+
+    expect(fileRegistry.registerGeneratedFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: actor.tenantId,
+        generatedByUserId: actor.userId,
+        originalFilename: 'student-roster.csv',
+        mimeType: 'text/csv',
+        module: 'reports',
+        metadata: expect.objectContaining({
+          module: 'students',
+          reportKey: 'student-roster',
+          format: 'csv',
+          filters: { status: 'ACTIVE' },
+        }),
+      }),
+    );
+    expect(prisma.reportExport.update).toHaveBeenCalledWith({
+      where: { id: 'export-1' },
+      data: expect.objectContaining({
+        status: 'COMPLETED',
+        completedAt: expect.any(Date),
+        errorSummary: null,
+        fileAssetId: 'file-1',
+      }),
+    });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'export_report',
+        resource: 'report',
+        resourceId: 'student-roster',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        after: expect.objectContaining({
+          async: true,
+          fileAssetId: 'file-1',
+        }),
+      }),
+    );
+  });
 });
+
+function expectBufferText(content: unknown) {
+  expect(Buffer.isBuffer(content)).toBe(true);
+  return (content as Buffer).toString();
+}

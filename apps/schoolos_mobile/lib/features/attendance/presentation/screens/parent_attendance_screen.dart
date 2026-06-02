@@ -34,7 +34,9 @@ class ParentAttendanceScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final parentState = ref.watch(parentControllerProvider);
     final parentController = ref.read(parentControllerProvider.notifier);
-    final effectiveStudentId = studentId == 'selected-child'
+    final usesSelectedStudent =
+        studentId == 'selected-child' || studentId == 'student-self';
+    final effectiveStudentId = usesSelectedStudent
         ? parentState.selectedChildId
         : studentId;
 
@@ -43,15 +45,19 @@ class ParentAttendanceScreen extends ConsumerWidget {
       selectedIndex: selectedIndex,
       title: 'Attendance',
       body: ParentStateView(
-        status: studentId == 'selected-child'
+        status: usesSelectedStudent
             ? parentState.status
             : ParentDataStatus.success,
         message: parentState.message,
         onRetry: parentController.load,
         child: effectiveStudentId == null
-            ? const AppEmptyState(
-                title: 'No child selected',
-                message: 'Select a child before viewing attendance.',
+            ? AppEmptyState(
+                title: studentId == 'student-self'
+                    ? 'No student profile linked'
+                    : 'No child selected',
+                message: studentId == 'student-self'
+                    ? 'Ask the school office to link this login to a student profile.'
+                    : 'Select a child before viewing attendance.',
                 icon: Icons.fact_check_rounded,
               )
             : _ParentAttendanceContent(studentId: effectiveStudentId),
@@ -144,7 +150,7 @@ class StudentAttendanceScreen extends StatelessWidget {
     return const ParentAttendanceScreen(
       studentId: 'student-self',
       role: 'STUDENT',
-      selectedIndex: 1,
+      selectedIndex: 0,
     );
   }
 }

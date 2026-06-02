@@ -91,4 +91,24 @@ describe('SchoolOS Settings Page Contracts', () => {
     assert.doesNotMatch(page, /api\.updateGlobalSetting/);
     assert.doesNotMatch(page, /tenantId: ['"]all['"]/);
   });
+
+  it('wires school logo branding to private File Registry APIs', () => {
+    const page = read('app/dashboard/settings/page.tsx');
+    const apiClient = read('lib/api.ts');
+
+    assert.match(page, /data-testid="school-logo-upload-panel"/);
+    assert.match(page, /TENANT_LOGO_MAX_BYTES = 1024 \* 1024/);
+    assert.match(page, /TENANT_LOGO_MIME_TYPES/);
+    assert.match(page, /api\.uploadSchoolLogo\(file\)/);
+    assert.match(page, /api\.getSchoolLogoPreview\(\)/);
+    assert.match(page, /api\.getSchoolLogoDownload\(\)/);
+    assert.match(page, /api\.removeSchoolLogo\(\)/);
+    assert.match(page, /ConfirmDialog/);
+    assert.match(page, /Private File Registry/);
+    assert.doesNotMatch(page, /Logo and Stamp uploads are managed via the File Registry \(Coming Soon\)/);
+    assert.match(apiClient, /uploadSchoolLogo:/);
+    assert.match(apiClient, /getSchoolLogoPreview:/);
+    assert.match(apiClient, /getSchoolLogoDownload:/);
+    assert.match(apiClient, /removeSchoolLogo:/);
+  });
 });

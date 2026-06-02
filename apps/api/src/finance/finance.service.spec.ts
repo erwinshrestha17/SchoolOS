@@ -1081,6 +1081,14 @@ describe('finance production controls', () => {
       collectorUser: null,
       closedBy: { id: actor.userId, email: actor.email },
     };
+    const fileRegistryService = {
+      registerGeneratedFile: jest.fn().mockResolvedValue({
+        id: 'file-close-1',
+        originalFilename: 'DayEndClose_CLS-2026-00001.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: BigInt(2048),
+      }),
+    };
     const { service, prisma } = buildService({
       invoice: null,
       feeHead: null,
@@ -1088,6 +1096,7 @@ describe('finance production controls', () => {
       cashierRefunds: refundRows,
       createdCashierClose: createdClose,
       cashierCloseCount: 0,
+      fileRegistryService,
     });
 
     const preview = await service.previewCashierClose(
@@ -1161,6 +1170,26 @@ describe('finance production controls', () => {
     expect(finalized.closeNumber).toBe('CLS-2026-00001');
     expect(Number(finalized.actualCashAmount)).toBe(390);
     expect(Number(finalized.varianceAmount)).toBe(-10);
+    expect(finalized.closePdfFile).toEqual({
+      fileAssetId: 'file-close-1',
+      fileName: 'DayEndClose_CLS-2026-00001.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 2048,
+    });
+    expect(fileRegistryService.registerGeneratedFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: actor.tenantId,
+        originalFilename: 'DayEndClose_CLS-2026-00001.pdf',
+        mimeType: 'application/pdf',
+        module: 'fees',
+        entityId: 'close-1',
+        metadata: expect.objectContaining({
+          kind: 'cashier_close_pdf',
+          closeId: 'close-1',
+          closeNumber: 'CLS-2026-00001',
+        }),
+      }),
+    );
   });
 
   it('requires a variance reason when actual cash differs from expected cash', async () => {
@@ -1558,6 +1587,8 @@ function buildService(options: {
   reconciliationPaymentEntries?: unknown[];
   reconciliationRefundEntries?: unknown[];
   gatewayProvider?: unknown;
+  cashierClosePdfFiles?: unknown[];
+  fileRegistryService?: unknown;
 }) {
   const prisma = {
     student: {
@@ -1656,6 +1687,7 @@ function buildService(options: {
     },
     fileAsset: {
       findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue(options.cashierClosePdfFiles ?? []),
     },
     tenant: {
       findUnique: jest
@@ -1731,6 +1763,7 @@ function buildService(options: {
         checkLimit: jest.fn().mockResolvedValue(undefined),
         incrementUsage: jest.fn().mockResolvedValue(undefined),
       } as any,
+      options.fileRegistryService as never,
     ),
     prisma,
     auditService,

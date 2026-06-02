@@ -49,6 +49,10 @@ describe('ConfigService production validation', () => {
     process.env.JWT_SECRET = 'x'.repeat(40);
     process.env.JWT_CHALLENGE_SECRET = 'y'.repeat(40);
     process.env.MEDICAL_ENCRYPTION_KEY = 'z'.repeat(40);
+    process.env.TOKEN_HASH_PEPPER = 'w'.repeat(40);
+    process.env.JWT_ISSUER = 'non-default-issuer';
+    process.env.JWT_AUDIENCE_WEB = 'non-default-audience-web';
+    process.env.JWT_AUDIENCE_MOBILE = 'non-default-audience-mobile';
     process.env.FRONTEND_ORIGIN =
       'https://app.schoolos.local,https://platform.schoolos.local,https://admin.schoolos.local';
     process.env.EMAIL_DELIVERY_MODE = 'log';
@@ -68,6 +72,10 @@ describe('ConfigService production validation', () => {
     process.env.JWT_SECRET = 'x'.repeat(40);
     process.env.JWT_CHALLENGE_SECRET = 'y'.repeat(40);
     process.env.MEDICAL_ENCRYPTION_KEY = 'z'.repeat(40);
+    process.env.TOKEN_HASH_PEPPER = 'w'.repeat(40);
+    process.env.JWT_ISSUER = 'non-default-issuer';
+    process.env.JWT_AUDIENCE_WEB = 'non-default-audience-web';
+    process.env.JWT_AUDIENCE_MOBILE = 'non-default-audience-mobile';
     process.env.FRONTEND_ORIGIN = 'https://schoolos.example.com';
 
     expect(() => {
@@ -84,6 +92,10 @@ describe('ConfigService production validation', () => {
     process.env.JWT_SECRET = 'x'.repeat(40);
     process.env.JWT_CHALLENGE_SECRET = 'y'.repeat(40);
     process.env.MEDICAL_ENCRYPTION_KEY = 'z'.repeat(40);
+    process.env.TOKEN_HASH_PEPPER = 'w'.repeat(40);
+    process.env.JWT_ISSUER = 'non-default-issuer';
+    process.env.JWT_AUDIENCE_WEB = 'non-default-audience-web';
+    process.env.JWT_AUDIENCE_MOBILE = 'non-default-audience-mobile';
     process.env.FRONTEND_ORIGIN = 'http://schoolos.example.com';
 
     expect(() => {
@@ -159,6 +171,10 @@ describe('ConfigService production validation', () => {
     process.env.JWT_SECRET = 'x'.repeat(40);
     process.env.JWT_CHALLENGE_SECRET = 'y'.repeat(40);
     process.env.MEDICAL_ENCRYPTION_KEY = 'z'.repeat(40);
+    process.env.TOKEN_HASH_PEPPER = 'w'.repeat(40);
+    process.env.JWT_ISSUER = 'non-default-issuer';
+    process.env.JWT_AUDIENCE_WEB = 'non-default-audience-web';
+    process.env.JWT_AUDIENCE_MOBILE = 'non-default-audience-mobile';
     process.env.FRONTEND_ORIGIN = 'http://localhost:3000';
 
     expect(() => {

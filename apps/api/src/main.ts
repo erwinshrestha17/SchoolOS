@@ -4,14 +4,24 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { randomUUID } from 'crypto';
-import { json, urlencoded } from 'express';
+import {
+  json,
+  urlencoded,
+  type NextFunction,
+  type Request,
+  type Response,
+} from 'express';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
 import { ResponseEnvelopeInterceptor } from './common/interceptors/response-envelope.interceptor';
 import { ConfigService } from './config/config.service';
-import helmet from 'helmet';
-import type { NextFunction, Request, Response } from 'express';
+
+interface ExpressAdapterInstance {
+  disable?: (setting: string) => void;
+  set?: (setting: string, value: unknown) => void;
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -25,7 +35,9 @@ async function bootstrap() {
     }),
   );
 
-  const httpAdapter = app.getHttpAdapter().getInstance();
+  const httpAdapter = app
+    .getHttpAdapter()
+    .getInstance() as ExpressAdapterInstance;
 
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ limit: '10mb', extended: true }));
@@ -39,7 +51,10 @@ async function bootstrap() {
   }
 
   app.enableCors({
-    origin: (origin, callback) => {
+    origin: (
+      origin: string | undefined,
+      callback: (error: Error | null, allow?: boolean) => void,
+    ) => {
       if (!origin) {
         callback(null, true);
         return;
@@ -76,6 +91,7 @@ async function bootstrap() {
       'Authorization',
       'X-Requested-With',
       'X-Request-Id',
+      'X-CSRF-Token',
       'X-SchoolOS-Tenant-Id',
       'X-SchoolOS-Tenant-Override-Reason',
     ],
@@ -131,6 +147,6 @@ async function bootstrap() {
   app.enableShutdownHooks();
   await app.listen(configService.port);
 }
-bootstrap().catch((err) => {
+bootstrap().catch((err: unknown) => {
   console.error('Error during bootstrap', err);
 });

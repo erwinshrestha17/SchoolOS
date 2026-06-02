@@ -5,11 +5,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
   AlertCircle,
+  ArrowUpRight,
   BellRing,
   BookOpen,
   CheckCircle2,
   ClipboardList,
   Copy,
+  Download,
+  FileText,
   Library,
   PackageCheck,
   RotateCcw,
@@ -23,8 +26,11 @@ import {
   type LibraryCopy,
   type LibraryCopyPayload,
   type LibraryCopyStatus,
+  type LibraryFineSummaryReport,
   type LibraryIssue,
   type LibraryIssuePayload,
+  type LibraryPaginatedResult,
+  type LibraryPopularBookReportItem,
   type ReturnLibraryIssuePayload,
 } from '../../lib/library-api';
 import { api } from '../../lib/api';
@@ -152,7 +158,7 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
   });
   const overdueQuery = useQuery({
     queryKey: ['library-overdue'],
-    queryFn: libraryApi.listOverdue,
+    queryFn: () => libraryApi.listOverdue({ limit: '100' }),
   });
   const schoolStudentsQuery = useQuery({ 
     queryKey: ['students-for-library'], 
@@ -175,9 +181,27 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
     enabled: activeTab === 'reports',
   });
 
+  const issuedBooksReportQuery = useQuery({
+    queryKey: ['library-issued-books-report'],
+    queryFn: () => libraryApi.getIssuedBooksReport({ limit: '8' }),
+    enabled: activeTab === 'reports',
+  });
+
+  const overdueBooksReportQuery = useQuery({
+    queryKey: ['library-overdue-books-report'],
+    queryFn: libraryApi.getOverdueBooksReport,
+    enabled: activeTab === 'reports',
+  });
+
   const lostDamagedQuery = useQuery({
     queryKey: ['library-lost-damaged'],
     queryFn: () => libraryApi.getLostDamagedReport(),
+    enabled: activeTab === 'reports',
+  });
+
+  const fineSummaryQuery = useQuery({
+    queryKey: ['library-fine-summary'],
+    queryFn: libraryApi.getFineSummary,
     enabled: activeTab === 'reports',
   });
 
@@ -203,6 +227,21 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
     onSuccess: () => {
       setNotice('Fine updated successfully.');
       void queryClient.invalidateQueries({ queryKey: ['library-fines'] });
+    },
+  });
+
+  const postFineToFeesMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      libraryApi.postFineToFees(id, { reason }),
+    onSuccess: (fine) => {
+      setNotice(
+        fine.alreadyPosted
+          ? 'Library fine was already linked to a fee invoice.'
+          : 'Library fine posted to Fees. Open the linked invoice from the fine row.',
+      );
+      void queryClient.invalidateQueries({ queryKey: ['library-fines'] });
+      void queryClient.invalidateQueries({ queryKey: ['library-issues'] });
+      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
     },
   });
 
@@ -295,10 +334,17 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
     },
   });
 
+  const issuedCsvMutation = useMutation({
+    mutationFn: libraryApi.downloadIssuedBooksCsv,
+    onSuccess: () => {
+      setNotice('Issued books CSV export downloaded.');
+    },
+  });
+
   const books = booksQuery.data?.items ?? emptyBooks;
   const copies = copiesQuery.data?.items ?? emptyCopies;
   const issues = issuesQuery.data?.items ?? emptyIssues;
-  const overdueIssues = overdueQuery.data ?? emptyIssues;
+  const overdueIssues = overdueQuery.data?.items ?? emptyIssues;
 
   const stats = useMemo(() => {
     const totalBooks = booksQuery.data?.meta.total ?? books.length;
@@ -314,10 +360,10 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
       totalCopies,
       availableCopies,
       issuedCopies,
-      overdueIssues: overdueIssues.length,
+      overdueIssues: overdueQuery.data?.meta.total ?? overdueIssues.length,
       lostDamaged,
     };
-  }, [books, booksQuery.data?.meta.total, copies, copiesQuery.data?.meta.total, overdueIssues.length]);
+  }, [books, booksQuery.data?.meta.total, copies, copiesQuery.data?.meta.total, overdueIssues.length, overdueQuery.data?.meta.total]);
 
   const isLoading = booksQuery.isLoading || copiesQuery.isLoading || issuesQuery.isLoading;
   const error =
@@ -549,14 +595,31 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
           isLoading={finesQuery.isLoading}
           onUpdateFine={(id, body) => updateFineMutation.mutate({ id, body })}
           isUpdating={updateFineMutation.isPending}
+          onPostFineToFees={(id, reason) =>
+            postFineToFeesMutation.mutate({ id, reason })
+          }
+          isPosting={postFineToFeesMutation.isPending}
+          postError={postFineToFeesMutation.error}
         />
       )}
 
       {activeTab === 'reports' && (
         <ReportsPanel
+          issuedBooksReport={issuedBooksReportQuery.data}
+          overdueBooksReport={overdueBooksReportQuery.data}
           popularBooks={popularBooksQuery.data?.items ?? []}
           lostDamaged={lostDamagedQuery.data?.items ?? []}
-          isLoading={popularBooksQuery.isLoading || lostDamagedQuery.isLoading}
+          fineSummary={fineSummaryQuery.data}
+          isLoading={
+            issuedBooksReportQuery.isLoading ||
+            overdueBooksReportQuery.isLoading ||
+            popularBooksQuery.isLoading ||
+            lostDamagedQuery.isLoading ||
+            fineSummaryQuery.isLoading
+          }
+          isExportingIssuedCsv={issuedCsvMutation.isPending}
+          exportError={issuedCsvMutation.error}
+          onExportIssuedCsv={() => issuedCsvMutation.mutate()}
         />
       )}
     </div>
@@ -1525,52 +1588,101 @@ function FinesPanel({
   isLoading,
   onUpdateFine,
   isUpdating,
+  onPostFineToFees,
+  isPosting,
+  postError,
 }: {
   fines: any[];
   isLoading: boolean;
   onUpdateFine: (id: string, body: any) => void;
   isUpdating: boolean;
+  onPostFineToFees: (id: string, reason: string) => void;
+  isPosting: boolean;
+  postError: Error | null;
 }) {
   const [waivingId, setWaivingId] = useState<string | null>(null);
   const [waiveReason, setWaiveReason] = useState('');
   const [waiveAmount, setWaiveAmount] = useState<number>(0);
+  const [postingId, setPostingId] = useState<string | null>(null);
+  const [postReason, setPostReason] = useState('');
 
   return (
     <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
-      <PanelHeader title="Fine Management" description="Track and waive library fines with mandatory audit logging." />
+      <PanelHeader title="Fine Management" description="Track, waive, and hand student library fines to the Fees counter with mandatory audit logging." />
+      {postError && <ErrorNotice message={postError.message} />}
       <div className="mt-5 space-y-3">
         {isLoading && <LoadingState label="Loading fines..." />}
         {!isLoading && fines.length === 0 && <EmptyState title="No fines found" description="Library circulation is currently clear of outstanding fines." />}
-        {fines.map((fine) => (
-          <div key={fine.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-bold text-slate-900">{fine.issue?.copy?.book?.title ?? 'Unknown book'}</h3>
-                  <StatusBadge status={fine.status} label={fine.status} tone={fine.status === 'PENDING' ? 'overdue' : 'approved'} />
+        {fines.map((fine) => {
+          const linkedInvoiceId = fine.feeInvoiceId ?? fine.issue?.invoiceId ?? null;
+          const canPostToFees =
+            fine.status === 'PENDING' &&
+            Boolean(fine.issue?.borrowerStudentId) &&
+            !linkedInvoiceId;
+
+          return (
+            <div key={fine.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-bold text-slate-900">{fine.issue?.copy?.book?.title ?? 'Unknown book'}</h3>
+                    <StatusBadge status={fine.status} label={fine.status} tone={fine.status === 'PENDING' ? 'overdue' : 'approved'} />
+                  </div>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Borrower: {fine.issue ? borrowerName(fine.issue) : 'Unknown'} • Amount: {money(fine.amount)}
+                  </p>
+                  {fine.waivedAmount > 0 && (
+                    <p className="mt-1 text-xs text-emerald-600 font-semibold">Waived: {money(fine.waivedAmount)} (Reason: {fine.waiverReason})</p>
+                  )}
+                  {linkedInvoiceId && (
+                    <p className="mt-1 text-xs font-semibold text-primary-700">
+                      Linked Fees invoice: {fine.issue?.invoice?.invoiceNumber ?? linkedInvoiceId}
+                    </p>
+                  )}
+                  {!fine.issue?.borrowerStudentId && fine.status === 'PENDING' && (
+                    <p className="mt-1 text-xs font-semibold text-slate-500">Staff fines stay in Library and are not posted to student fees.</p>
+                  )}
                 </div>
-                <p className="mt-1 text-sm text-slate-500">
-                  Borrower: {fine.issue ? borrowerName(fine.issue) : 'Unknown'} • Amount: {money(fine.amount)}
-                </p>
-                {fine.waivedAmount > 0 && (
-                  <p className="mt-1 text-xs text-emerald-600 font-semibold">Waived: {money(fine.waivedAmount)} (Reason: {fine.waiverReason})</p>
-                )}
+                <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                  {linkedInvoiceId && (
+                    <Link
+                      href={`/dashboard/finance?invoiceId=${encodeURIComponent(linkedInvoiceId)}`}
+                      className="btn-secondary"
+                      data-testid="library-fine-open-invoice"
+                    >
+                      <ArrowUpRight size={16} /> Open invoice
+                    </Link>
+                  )}
+                  {canPostToFees && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPostingId(fine.id);
+                        setPostReason(`Post library fine for ${fine.issue?.copy?.book?.title ?? 'returned book'}`);
+                      }}
+                      className="btn-primary"
+                      data-testid="library-fine-post-to-fees"
+                    >
+                      <FileText size={16} /> Post to fees
+                    </button>
+                  )}
+                  {fine.status === 'PENDING' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWaivingId(fine.id);
+                        setWaiveAmount(Number(fine.amount));
+                      }}
+                      className="btn-secondary"
+                    >
+                      Waive / Correct
+                    </button>
+                  )}
+                </div>
               </div>
-              {fine.status === 'PENDING' && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setWaivingId(fine.id);
-                    setWaiveAmount(Number(fine.amount));
-                  }}
-                  className="btn-secondary"
-                >
-                  Waive / Correct
-                </button>
-              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <ConfirmDialog
@@ -1610,67 +1722,236 @@ function FinesPanel({
           />
         </div>
       </ConfirmDialog>
+      <ConfirmDialog
+        isOpen={Boolean(postingId)}
+        onClose={() => {
+          setPostingId(null);
+          setPostReason('');
+        }}
+        onConfirm={() => {
+          if (postingId) {
+            onPostFineToFees(postingId, postReason);
+          }
+          setPostingId(null);
+          setPostReason('');
+        }}
+        title="Post Library Fine to Fees"
+        description="This creates a student fee invoice through the M3 Fees module and routes collection to the Finance counter."
+        confirmLabel="Post to Fees"
+        isConfirming={isPosting}
+      >
+        <div className="mt-4">
+          <TextInput
+            label="Audit reason"
+            placeholder="e.g. Returned overdue book fine"
+            value={postReason}
+            required
+            onChange={setPostReason}
+          />
+        </div>
+      </ConfirmDialog>
     </section>
   );
 }
 
 function ReportsPanel({
+  issuedBooksReport,
+  overdueBooksReport,
   popularBooks,
   lostDamaged,
+  fineSummary,
   isLoading,
+  isExportingIssuedCsv,
+  exportError,
+  onExportIssuedCsv,
 }: {
-  popularBooks: any[];
-  lostDamaged: any[];
+  issuedBooksReport?: LibraryPaginatedResult<LibraryIssue>;
+  overdueBooksReport?: LibraryPaginatedResult<LibraryIssue>;
+  popularBooks: LibraryPopularBookReportItem[];
+  lostDamaged: LibraryCopy[];
+  fineSummary?: LibraryFineSummaryReport;
   isLoading: boolean;
+  isExportingIssuedCsv: boolean;
+  exportError: Error | null;
+  onExportIssuedCsv: () => void;
 }) {
+  const issuedBooks = issuedBooksReport?.items ?? emptyIssues;
+  const overdueBooks = overdueBooksReport?.items ?? emptyIssues;
+  const issuedTotal = issuedBooksReport?.meta.total ?? issuedBooks.length;
+  const overdueTotal = overdueBooksReport?.meta.total ?? overdueBooks.length;
+  const fineTotal = fineSummary?.summary.totalFine ?? 0;
+  const fineIssueTotal = fineSummary?.summary.totalIssuesWithFine ?? 0;
+
   return (
-    <div className="grid gap-6 xl:grid-cols-2">
+    <div className="space-y-6">
       <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center justify-between">
-          <PanelHeader title="Popular Books" description="Most frequently issued books in the library." />
-          <a
-            href={`${process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1'}/library/reports/issued.csv`}
-            className="btn-secondary flex items-center gap-2"
-            target="_blank"
-            rel="noreferrer"
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <PanelHeader
+            title="Reports & Exports"
+            description="Review circulation, overdue, inventory health, and fine exposure from backend reports."
+          />
+          <button
+            type="button"
+            className="btn-secondary inline-flex items-center justify-center gap-2"
+            disabled={isExportingIssuedCsv}
+            onClick={onExportIssuedCsv}
+            data-testid="library-issued-books-csv-export"
           >
-             Export CSV
-          </a>
+            <Download className="h-4 w-4" />
+            {isExportingIssuedCsv ? 'Exporting...' : 'Export issued CSV'}
+          </button>
         </div>
-        <div className="mt-5 space-y-3">
-          {isLoading && <LoadingState label="Loading popularity report..." />}
-          {popularBooks.map((item, idx) => (
-            <div key={idx} className="flex items-center justify-between p-3 border-b border-slate-50 last:border-0">
-              <div className="min-w-0">
-                <p className="font-bold text-slate-900 truncate">{item.book?.title}</p>
-                <p className="text-xs text-slate-500">{item.book?.author}</p>
-              </div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
-                {item.issueCount} issues
-              </span>
-            </div>
-          ))}
+
+        {exportError && <ErrorNotice message={exportError.message} />}
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <LibraryReportStat
+            title="Issued books"
+            value={issuedTotal}
+            description="Currently issued copies"
+          />
+          <LibraryReportStat
+            title="Overdue report"
+            value={overdueTotal}
+            description="Past due active issues"
+            tone={overdueTotal > 0 ? 'danger' : 'normal'}
+          />
+          <LibraryReportStat
+            title="Fine exposure"
+            value={money(fineTotal)}
+            description={`${fineIssueTotal} issue(s) with fines`}
+          />
+          <LibraryReportStat
+            title="Lost or damaged"
+            value={lostDamaged.length}
+            description="Unusable inventory copies"
+            tone={lostDamaged.length > 0 ? 'warning' : 'normal'}
+          />
         </div>
       </section>
 
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
-        <PanelHeader title="Lost / Damaged Copies" description="Current inventory items marked as unusable." />
-        <div className="mt-5 space-y-3">
-          {isLoading && <LoadingState label="Loading loss report..." />}
-          {lostDamaged.map((copy) => (
-            <div key={copy.id} className="flex items-center justify-between p-3 border-b border-slate-50 last:border-0">
-              <div>
-                <p className="font-bold text-slate-900">{copy.book?.title}</p>
-                <p className="text-xs text-slate-500">Barcode: {copy.barcode} • Status: {copy.status}</p>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+          <PanelHeader title="Issued Books" description="Recent active circulation records included in the CSV export." />
+          <div className="mt-5 space-y-3">
+            {isLoading && <LoadingState label="Loading issued report..." />}
+            {issuedBooks.map((issue) => (
+              <LibraryIssueReportRow key={issue.id} issue={issue} />
+            ))}
+            {issuedBooks.length === 0 && !isLoading && (
+              <EmptyState title="No issued books" description="There are no active issued copies in this report." />
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+          <PanelHeader title="Overdue Books" description="Active issues past their due date." />
+          <div className="mt-5 space-y-3">
+            {isLoading && <LoadingState label="Loading overdue report..." />}
+            {overdueBooks.map((issue) => (
+              <LibraryIssueReportRow key={issue.id} issue={issue} overdue />
+            ))}
+            {overdueBooks.length === 0 && !isLoading && (
+              <EmptyState title="No overdue books" description="No active library issues are past their due date." />
+            )}
+          </div>
+        </section>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+          <PanelHeader title="Popular Books" description="Most frequently issued books in the library." />
+          <div className="mt-5 space-y-3">
+            {isLoading && <LoadingState label="Loading popularity report..." />}
+            {popularBooks.map((item, idx) => (
+              <div key={`${item.book?.id ?? 'book'}-${idx}`} className="flex items-center justify-between border-b border-slate-50 p-3 last:border-0">
+                <div className="min-w-0">
+                  <p className="truncate font-bold text-slate-900">{item.book?.title ?? 'Unknown book'}</p>
+                  <p className="text-xs text-slate-500">{item.book?.author ?? 'Unknown author'}</p>
+                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+                  {item.issueCount} issues
+                </span>
               </div>
-              <LibraryStatusBadge status={copy.status} />
-            </div>
-          ))}
-          {lostDamaged.length === 0 && !isLoading && (
-            <EmptyState title="No lost/damaged books" description="Inventory health is currently perfect." />
-          )}
-        </div>
-      </section>
+            ))}
+            {popularBooks.length === 0 && !isLoading && (
+              <EmptyState title="No popularity data" description="Book issue history will appear here after circulation starts." />
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+          <PanelHeader title="Lost / Damaged Copies" description="Current inventory items marked as unusable." />
+          <div className="mt-5 space-y-3">
+            {isLoading && <LoadingState label="Loading loss report..." />}
+            {lostDamaged.map((copy) => (
+              <div key={copy.id} className="flex items-center justify-between border-b border-slate-50 p-3 last:border-0">
+                <div>
+                  <p className="font-bold text-slate-900">{copy.book?.title ?? 'Unknown book'}</p>
+                  <p className="text-xs text-slate-500">Barcode: {copy.barcode} - Status: {copy.status}</p>
+                </div>
+                <LibraryStatusBadge status={copy.status} />
+              </div>
+            ))}
+            {lostDamaged.length === 0 && !isLoading && (
+              <EmptyState title="No lost/damaged books" description="Inventory health is currently clear." />
+            )}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function LibraryReportStat({
+  title,
+  value,
+  description,
+  tone = 'normal',
+}: {
+  title: string;
+  value: string | number;
+  description: string;
+  tone?: 'normal' | 'warning' | 'danger';
+}) {
+  const toneClass =
+    tone === 'danger'
+      ? 'border-red-100 bg-red-50 text-red-700'
+      : tone === 'warning'
+        ? 'border-amber-100 bg-amber-50 text-amber-700'
+        : 'border-slate-100 bg-slate-50 text-slate-700';
+
+  return (
+    <div className={cn('rounded-2xl border p-4', toneClass)}>
+      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide">
+        <FileText className="h-4 w-4" />
+        {title}
+      </div>
+      <p className="mt-2 text-2xl font-black text-slate-900">{value}</p>
+      <p className="mt-1 text-xs font-semibold">{description}</p>
+    </div>
+  );
+}
+
+function LibraryIssueReportRow({
+  issue,
+  overdue = false,
+}: {
+  issue: LibraryIssue;
+  overdue?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-slate-50 p-3 last:border-0">
+      <div className="min-w-0">
+        <p className="truncate font-bold text-slate-900">{issue.copy?.book?.title ?? 'Unknown book'}</p>
+        <p className="text-xs text-slate-500">
+          {borrowerName(issue)} - Barcode {issue.copy?.barcode ?? 'N/A'}
+        </p>
+      </div>
+      <div className="shrink-0 text-right text-xs font-semibold text-slate-500">
+        <p>{overdue ? `${overdueDays(issue.dueAt)} day(s) overdue` : `Due ${formatDate(issue.dueAt)}`}</p>
+        <p className={overdue ? 'text-red-600' : 'text-slate-400'}>{issue.status}</p>
+      </div>
     </div>
   );
 }

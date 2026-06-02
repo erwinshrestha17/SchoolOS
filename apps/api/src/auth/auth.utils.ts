@@ -43,6 +43,8 @@ export function verifyCsrfToken(token: string, secret: string) {
   const parts = token.split('.');
   if (parts.length !== 2) return false;
   const [value, signature] = parts;
-  const expectedSignature = createHmac('sha256', secret).update(value).digest('hex');
+  const expectedSignature = createHmac('sha256', secret)
+    .update(value)
+    .digest('hex');
   return signature === expectedSignature;
 }

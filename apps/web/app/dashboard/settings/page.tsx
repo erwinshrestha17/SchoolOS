@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { cn } from '../../../lib/utils';
-import { api } from '../../../lib/api';
+import { api, type TenantLogoAccess } from '../../../lib/api';
 import { TenantSettingSummary, TenantSettingKey } from '@schoolos/core';
 import { 
   Save, 
@@ -26,7 +26,9 @@ import {
   Download,
   ShieldCheck,
   Lock,
-  ArrowUpRight
+  ArrowUpRight,
+  ImageUp,
+  Trash2,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
@@ -39,6 +41,7 @@ import { Checkbox } from '../../../components/ui/checkbox';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEntitlements } from '../../../components/entitlements-provider';
+import { ConfirmDialog } from '../../../components/ui/confirm-dialog';
 
 // --- Helpers ---
 
@@ -132,6 +135,13 @@ const BRANDING_SETTING_KEYS: TenantSettingKey[] = [
   'report_card_footer_text', 'default_paper_size', 'timezone', 'currency', 'date_format'
 ];
 
+const TENANT_LOGO_MAX_BYTES = 1024 * 1024;
+const TENANT_LOGO_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]);
+
 const ACADEMIC_SETTING_KEYS: TenantSettingKey[] = [
   'active_academic_year_label', 'default_calendar', 'attendance_working_days', 
   'promotion_rule_mode', 'grading_scheme_label'
@@ -171,6 +181,22 @@ const SECURITY_SETTING_KEYS: TenantSettingKey[] = [
   'sensitive_staff_fields_masked', 'export_requires_permission', 'audit_log_retention_days', 
   'session_timeout_minutes', 'require_reason_for_sensitive_reveal'
 ];
+
+function formatFileSize(sizeBytes: number) {
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+    return '0 B';
+  }
+
+  if (sizeBytes < 1024) {
+    return `${sizeBytes} B`;
+  }
+
+  if (sizeBytes < 1024 * 1024) {
+    return `${(sizeBytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 // --- Components ---
 
@@ -454,49 +480,280 @@ function SectionSchoolProfile({ initialValues, onUpdate }: { initialValues: Tena
 
 function SectionBranding({ initialValues, onUpdate }: { initialValues: TenantSettingSummary[], onUpdate: () => void }) {
   const { form, setFieldValue, save, isSaving, alert } = useSettingsForm(initialValues, BRANDING_SETTING_KEYS, onUpdate);
+  const logoSetting = initialValues.find((setting) => setting.key === 'school_logo');
+  const logoFileAssetId = typeof logoSetting?.value === 'string' ? logoSetting.value : null;
+  const [logoPreview, setLogoPreview] = useState<TenantLogoAccess | null>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const [logoMessage, setLogoMessage] = useState<string | null>(null);
+  const [isLogoLoading, setIsLogoLoading] = useState(false);
+  const [isLogoUploading, setIsLogoUploading] = useState(false);
+  const [isLogoDownloading, setIsLogoDownloading] = useState(false);
+  const [isLogoRemoving, setIsLogoRemoving] = useState(false);
+  const [removeLogoDialogOpen, setRemoveLogoDialogOpen] = useState(false);
+  const logoBusy = isLogoLoading || isLogoUploading || isLogoDownloading || isLogoRemoving;
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (!logoFileAssetId) {
+      setLogoPreview(null);
+      setLogoError(null);
+      return () => {
+        isActive = false;
+      };
+    }
+
+    setIsLogoLoading(true);
+    setLogoError(null);
+
+    api.getSchoolLogoPreview()
+      .then((access) => {
+        if (isActive) {
+          setLogoPreview(access);
+        }
+      })
+      .catch((err: unknown) => {
+        if (isActive) {
+          setLogoPreview(null);
+          setLogoError(err instanceof Error ? err.message : 'Failed to load the school logo preview.');
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLogoLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [logoFileAssetId]);
+
+  async function handleLogoSelection(file: File | undefined) {
+    setLogoError(null);
+    setLogoMessage(null);
+
+    if (!file) {
+      return;
+    }
+
+    if (!TENANT_LOGO_MIME_TYPES.has(file.type)) {
+      setLogoError('Use a JPG, PNG, or WEBP image for the school logo.');
+      return;
+    }
+
+    if (file.size > TENANT_LOGO_MAX_BYTES) {
+      setLogoError('School logo must be 1MB or smaller.');
+      return;
+    }
+
+    try {
+      setIsLogoUploading(true);
+      await api.uploadSchoolLogo(file);
+      const preview = await api.getSchoolLogoPreview();
+      setLogoPreview(preview);
+      setLogoMessage('School logo uploaded through the File Registry.');
+      void onUpdate();
+    } catch (err: unknown) {
+      setLogoError(err instanceof Error ? err.message : 'Failed to upload the school logo.');
+    } finally {
+      setIsLogoUploading(false);
+    }
+  }
+
+  async function openLogoDownload() {
+    setLogoError(null);
+    setLogoMessage(null);
+
+    try {
+      setIsLogoDownloading(true);
+      const access = await api.getSchoolLogoDownload();
+      window.open(access.url, '_blank', 'noopener,noreferrer');
+    } catch (err: unknown) {
+      setLogoError(err instanceof Error ? err.message : 'Failed to open the school logo download.');
+    } finally {
+      setIsLogoDownloading(false);
+    }
+  }
+
+  async function removeLogo() {
+    setLogoError(null);
+    setLogoMessage(null);
+
+    try {
+      setIsLogoRemoving(true);
+      await api.removeSchoolLogo();
+      setLogoPreview(null);
+      setLogoMessage('School logo removed.');
+      void onUpdate();
+      setRemoveLogoDialogOpen(false);
+    } catch (err: unknown) {
+      setLogoError(err instanceof Error ? err.message : 'Failed to remove the school logo.');
+    } finally {
+      setIsLogoRemoving(false);
+    }
+  }
 
   return (
-    <SectionWrapper 
-      title="Branding & Documents" 
-      description="Visual identity and document preferences."
-      onSave={save}
-      isSaving={isSaving}
-      alert={alert}
-    >
-      <FormField label="Primary Color" description="Used for UI highlights.">
-        <div className="flex items-center gap-3">
-          <input type="color" value={form.branding_primary_color || '#6366f1'} onChange={e => setFieldValue('branding_primary_color', e.target.value)} className="h-10 w-20 rounded-lg border p-1 cursor-pointer" />
-          <span className="font-mono text-xs uppercase">{form.branding_primary_color}</span>
+    <>
+      <SectionWrapper
+        title="Branding & Documents"
+        description="Visual identity and document preferences."
+        onSave={save}
+        isSaving={isSaving}
+        alert={alert}
+      >
+        <div
+          data-testid="school-logo-upload-panel"
+          className="col-span-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+        >
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                {logoPreview?.url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logoPreview.url}
+                    alt="School logo preview"
+                    className="h-full w-full object-contain p-2"
+                  />
+                ) : (
+                  <ImageUp className="h-8 w-8 text-slate-300" />
+                )}
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-900">School Logo</p>
+                <p className="mt-1 max-w-xl text-xs font-medium text-slate-500">
+                  Upload a JPG, PNG, or WEBP logo up to 1MB. Logos are stored privately through File Registry and served through signed preview/download links.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Badge variant={logoFileAssetId ? 'success' : 'neutral'}>
+                    {logoFileAssetId ? 'Configured' : 'Not configured'}
+                  </Badge>
+                  <Badge variant="outline">Private File Registry</Badge>
+                  {logoPreview ? (
+                    <Badge variant="outline">{formatFileSize(logoPreview.sizeBytes)}</Badge>
+                  ) : null}
+                </div>
+                {logoPreview ? (
+                  <p className="mt-2 text-xs font-medium text-slate-500">
+                    {logoPreview.fileName} · Preview expires in {logoPreview.expiresInSeconds}s
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <label className={cn(
+                'inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800',
+                logoBusy && 'cursor-not-allowed opacity-50',
+              )}>
+                {isLogoUploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                {isLogoUploading ? 'Uploading...' : logoFileAssetId ? 'Replace' : 'Upload'}
+                <input
+                  aria-label="Upload school logo"
+                  data-testid="school-logo-upload-input"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  disabled={logoBusy}
+                  onChange={(event) => {
+                    void handleLogoSelection(event.target.files?.[0]);
+                    event.currentTarget.value = '';
+                  }}
+                />
+              </label>
+              {logoFileAssetId ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-2"
+                    disabled={logoBusy}
+                    data-testid="school-logo-download-button"
+                    onClick={() => void openLogoDownload()}
+                  >
+                    {isLogoDownloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                    Download
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-2 border-danger-100 text-danger-600 hover:bg-danger-50"
+                    disabled={logoBusy}
+                    data-testid="school-logo-remove-button"
+                    onClick={() => setRemoveLogoDialogOpen(true)}
+                  >
+                    <Trash2 size={16} />
+                    Remove
+                  </Button>
+                </>
+              ) : null}
+            </div>
+          </div>
+
+          {isLogoLoading ? (
+            <p className="mt-4 flex items-center gap-2 text-xs font-bold text-primary-600">
+              <Loader2 size={14} className="animate-spin" />
+              Loading signed preview...
+            </p>
+          ) : null}
+          {logoMessage ? (
+            <p className="mt-4 flex items-center gap-2 text-xs font-bold text-emerald-700">
+              <CheckCircle2 size={14} />
+              {logoMessage}
+            </p>
+          ) : null}
+          {logoError ? (
+            <p className="mt-4 flex items-center gap-2 text-xs font-bold text-danger-600">
+              <AlertCircle size={14} />
+              {logoError}
+            </p>
+          ) : null}
         </div>
-      </FormField>
-      <FormField label="Receipt Header"><Input value={form.receipt_header_text || ''} onChange={e => setFieldValue('receipt_header_text', e.target.value)} /></FormField>
-      <FormField label="Receipt Footer"><Input value={form.receipt_footer_text || ''} onChange={e => setFieldValue('receipt_footer_text', e.target.value)} /></FormField>
-      <FormField label="ID Card Footer"><Input value={form.id_card_footer_text || ''} onChange={e => setFieldValue('id_card_footer_text', e.target.value)} /></FormField>
-      <FormField label="Payslip Footer"><Input value={form.payslip_footer_text || ''} onChange={e => setFieldValue('payslip_footer_text', e.target.value)} /></FormField>
-      <FormField label="Report Card Footer"><Input value={form.report_card_footer_text || ''} onChange={e => setFieldValue('report_card_footer_text', e.target.value)} /></FormField>
-      <FormField label="Default Paper Size"><Select value={form.default_paper_size || 'A4'} onChange={e => setFieldValue('default_paper_size', e.target.value)}>
-        <option value="A4">A4</option>
-        <option value="LETTER">Letter</option>
-        <option value="LEGAL">Legal</option>
-        <option value="80MM">Thermal 80mm</option>
-      </Select></FormField>
-      <FormField label="Timezone"><Select value={form.timezone || 'Asia/Kathmandu'} onChange={e => setFieldValue('timezone', e.target.value)}>
-        <option value="Asia/Kathmandu">Nepal (UTC+5:45)</option>
-        <option value="UTC">UTC</option>
-      </Select></FormField>
-      <FormField label="Currency"><Select value={form.currency || 'NPR'} onChange={e => setFieldValue('currency', e.target.value)}>
-        <option value="NPR">Nepalese Rupee (NPR)</option>
-        <option value="USD">US Dollar (USD)</option>
-      </Select></FormField>
-      <FormField label="Date Format"><Select value={form.date_format || 'YYYY-MM-DD'} onChange={e => setFieldValue('date_format', e.target.value)}>
-        <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-        <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-        <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-      </Select></FormField>
-      <div className="col-span-full border-t border-slate-100 pt-4">
-        <p className="text-xs text-slate-400">Logo and Stamp uploads are managed via the File Registry (Coming Soon).</p>
-      </div>
-    </SectionWrapper>
+
+        <FormField label="Primary Color" description="Used for UI highlights.">
+          <div className="flex items-center gap-3">
+            <input type="color" value={form.branding_primary_color || '#6366f1'} onChange={e => setFieldValue('branding_primary_color', e.target.value)} className="h-10 w-20 rounded-lg border p-1 cursor-pointer" />
+            <span className="font-mono text-xs uppercase">{form.branding_primary_color}</span>
+          </div>
+        </FormField>
+        <FormField label="Receipt Header"><Input value={form.receipt_header_text || ''} onChange={e => setFieldValue('receipt_header_text', e.target.value)} /></FormField>
+        <FormField label="Receipt Footer"><Input value={form.receipt_footer_text || ''} onChange={e => setFieldValue('receipt_footer_text', e.target.value)} /></FormField>
+        <FormField label="ID Card Footer"><Input value={form.id_card_footer_text || ''} onChange={e => setFieldValue('id_card_footer_text', e.target.value)} /></FormField>
+        <FormField label="Payslip Footer"><Input value={form.payslip_footer_text || ''} onChange={e => setFieldValue('payslip_footer_text', e.target.value)} /></FormField>
+        <FormField label="Report Card Footer"><Input value={form.report_card_footer_text || ''} onChange={e => setFieldValue('report_card_footer_text', e.target.value)} /></FormField>
+        <FormField label="Default Paper Size"><Select value={form.default_paper_size || 'A4'} onChange={e => setFieldValue('default_paper_size', e.target.value)}>
+          <option value="A4">A4</option>
+          <option value="LETTER">Letter</option>
+          <option value="LEGAL">Legal</option>
+          <option value="80MM">Thermal 80mm</option>
+        </Select></FormField>
+        <FormField label="Timezone"><Select value={form.timezone || 'Asia/Kathmandu'} onChange={e => setFieldValue('timezone', e.target.value)}>
+          <option value="Asia/Kathmandu">Nepal (UTC+5:45)</option>
+          <option value="UTC">UTC</option>
+        </Select></FormField>
+        <FormField label="Currency"><Select value={form.currency || 'NPR'} onChange={e => setFieldValue('currency', e.target.value)}>
+          <option value="NPR">Nepalese Rupee (NPR)</option>
+          <option value="USD">US Dollar (USD)</option>
+        </Select></FormField>
+        <FormField label="Date Format"><Select value={form.date_format || 'YYYY-MM-DD'} onChange={e => setFieldValue('date_format', e.target.value)}>
+          <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+          <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+          <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+        </Select></FormField>
+      </SectionWrapper>
+      <ConfirmDialog
+        isOpen={removeLogoDialogOpen}
+        title="Remove School Logo"
+        description="Remove the current school logo from document branding? Existing audit history and file records are retained."
+        confirmLabel="Remove Logo"
+        destructive
+        isConfirming={isLogoRemoving}
+        onConfirm={() => void removeLogo()}
+        onClose={() => setRemoveLogoDialogOpen(false)}
+      />
+    </>
   );
 }
 

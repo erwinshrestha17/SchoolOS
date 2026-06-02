@@ -103,8 +103,15 @@ describe('M0 File & Report boundary contracts', () => {
         'src/admissions/admissions.service.ts',
         'src/communications/communications.service.ts',
         'src/homework/homework.service.ts',
+        'src/homework/homework-attachment-access.service.ts',
         'src/academics/report-card-pdf.service.ts',
         'src/accounting/accounting-report-exports.service.ts',
+        'src/settings/settings.service.ts',
+        'src/finance/finance.service.ts',
+        'src/reports/reports.service.ts',
+        'src/library/library.service.ts',
+        'src/canteen/canteen.service.ts',
+        'src/transport/transport.service.ts',
       ];
       const forbiddenPatterns = [
         /@aws-sdk/,

@@ -103,7 +103,7 @@ describe('M0 Platform Core hardening contracts', () => {
     expect(controller).toContain("@Permissions('platform:api-keys:read')");
     expect(controller).toContain("@Permissions('platform:api-keys:manage')");
     expect(service).toContain('createHash');
-    expect(service).toContain('keyHash: this.hashSecret(secret)');
+    expect(service).toContain('keyHash: this.hmacSecret(secret)');
     expect(service).toContain('select: this.safeSelect()');
     expect(service).toContain('where: { id: apiKeyId, tenantId }');
     expect(service).toContain('platform_api_key_created');

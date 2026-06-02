@@ -1,6 +1,6 @@
 # SchoolOS Master Project Memory
 
-**Status:** M0 Platform Core Provider/Queue Hardening + M10 Provider/Attachment Depth + Phase 2 Academics/Accounting Production Polish + Student QR Foundation + M2 Attendance Hardening Slice + M3 Fees/Receipts Hardening Slice + Phase 3/4 Operations Depth Hardened
+**Status:** M0 Platform Core Provider/Queue Hardening + M10 Provider/Attachment Depth + Phase 2 Academics/Accounting Production Polish + Student QR Foundation + M2 Attendance Hardening Slice + M3 Fees/Receipts Hardening Slice + Active Finance Analysis Exports + Phase 3/4 Operations Depth Hardened
 **Product:** Production-grade multi-tenant SaaS School Management System for Nepal, targeting Montessori to Class 10  
 **Architecture:** NestJS modular monolith, PostgreSQL/Prisma, Redis/BullMQ, Next.js dashboard
 
@@ -35,8 +35,8 @@ Phase 2 Academics production polish: Completed (report-card PDFs, corrections/hi
 Student QR Foundation: Implemented; release hardening remains
 Phase 2D M9 Accounting: Completed
 Phase 2 Accounting production polish: Completed (report PDFs, snapshots, reconciliation suggestions, audit trail, and smoke coverage)
-SchoolOS Flutter mobile app: Started under apps/schoolos_mobile with auth/API wiring now in progress
-Current stage: M0 platform foundation complete with provider/queue hardening + M5 activity media privacy hardening + M10 provider/attachment/retry depth + Phase 1 pilot-ready core + M2 attendance correction/offline-draft hardening slice + M3 fees/receipts reprint/reversal/close/readiness hardening slice + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3/4 operations feature-depth hardening for M6, M7, M8A, M8C, and M8B + mobile companion app foundation started
+SchoolOS Flutter mobile app: Active under apps/schoolos_mobile with scoped parent/student/teacher/staff/driver API surfaces and web-first admin companion cleanup
+Current stage: M0 platform foundation complete with provider/queue hardening + M5 activity media privacy hardening + M10 provider/attachment/retry depth + Phase 1 pilot-ready core + M2 attendance correction/offline-draft hardening slice + M3 fees/receipts reprint/reversal/close/readiness hardening slice + active Finance Analysis dues/defaulter CSV exports + Phase 2 Academics/Accounting complete + Student QR foundation implemented + Phase 3/4 operations feature-depth hardening for M6, M7, M8A, M8C, and M8B + mobile companion app foundation started
 ```
 
 Targeted web-admin frontend polish and Phase 2F browser smoke coverage are now present on main.
@@ -115,19 +115,19 @@ Rules:
 
 | Module | Name | Current Status |
 |---|---|---|
-| M0 | Platform Core / SaaS Starter | Foundation completed across eight sprints; provider/queue pilot hardening implemented; entitlement/SaaS/staging depth remains |
-| M1 | Admissions & Student Profiles | Phase 1A/1B complete / pilot-ready with Student QR, storage-hardened student photo and school logo uploads, document audit visibility, iEMIS export artifact registration, duplicate candidate review, and generated PDF storage-route hardening foundations |
-| M2 | Smart Attendance | Phase 1A/1B complete / pilot-ready plus correction/offline-draft hardening slice |
-| M3 | Fees & Receipts | Phase 1A/1B complete / pilot-ready plus receipt reprint, reversal, cashier-close, reconciliation, and gateway-readiness hardening slice |
+| M0 | Platform Core / SaaS Starter | Foundation completed across eight sprints; provider/queue pilot hardening and M1-M10 storage-boundary audit coverage implemented; entitlement/SaaS/staging depth remains |
+| M1 | Admissions & Student Profiles | Phase 1A/1B complete / pilot-ready with Student QR, storage-hardened student photo and school logo uploads, photo/logo upload UX polish, document audit visibility, parent-safe mobile profile views, iEMIS export artifact registration, duplicate candidate review, and generated PDF storage-route hardening foundations |
+| M2 | Smart Attendance | Phase 1A/1B complete / pilot-ready plus correction/offline-draft hardening, web correction-review queue, and real-data Flutter teacher dashboard |
+| M3 | Fees & Receipts | Phase 1A/1B complete / pilot-ready plus receipt reprint, reversal, cashier-close, reconciliation, active Analysis report exports, protected day-end close PDF snapshots, and gateway-readiness hardening slice |
 | M4 | Exams, CAS & Report Cards | Phase 2 backend/admin UI plus production PDF/report/correction/snapshot polish implemented |
-| M5 | Activity Feed & Milestones | Phase 1A/1B complete with media/moderation hardening foundations, sanitized private-media responses, PHOTO_USAGE consent-aware parent media blocking, backend-backed web post detail, parent activity feed route, and web lifecycle/moderation controls |
-| M6 | Homework & Timetable | Phase 3 operational hardening complete plus parent/student homework assignment and submission access fail-closed depth |
-| M7 | HR & Payroll | Phase 3 operational hardening complete plus run-scoped register/PF/TDS/component reporting depth |
-| M8A | Library Management | Phase 3 admin/backend foundation plus fine-to-fees/accounting tests, staff borrower support, bounded history, and QR lookup |
-| M8B | Transport Management | Phase 3 admin/trip/location/report foundation plus GPS pressure guard, Redis cache/fanout tests, and retention cleanup bounds; live/driver/parent later |
-| M8C | Canteen Management | Phase 3 admin/wallet/POS/inventory/vendor/report foundation plus POS receipt JSON/PDF reprint endpoints, supplier/item admin UI, wallet negative-balance guards, and meal-plan-to-M3 invoice linkage; parent views later |
+| M5 | Activity Feed & Milestones | Phase 1A/1B complete with media/moderation hardening foundations, sanitized private-media responses, PHOTO_USAGE consent-aware parent media blocking, sharp-backed optimized preview variants, backend-backed web post detail, parent activity feed route, teacher media gallery, milestone entry without raw private object-key input, and web lifecycle/moderation controls |
+| M6 | Homework & Timetable | Phase 3 operational hardening complete plus parent/student homework assignment and submission access fail-closed depth, student signed-download attachment access, and Flutter parent/student homework/timetable views |
+| M7 | HR & Payroll | Phase 3 operational hardening complete plus run-scoped register/PF/TDS/component reporting depth and real-data Flutter staff self-service/dashboard |
+| M8A | Library Management | Phase 3 admin/backend foundation plus fine-to-fees/accounting tests, Finance counter invoice handoff, staff borrower support, bounded history, QR lookup, and report/export UI polish |
+| M8B | Transport Management | Phase 3 admin/trip/location/report foundation plus route operations metrics, trip-history CSV export polish, GPS pressure guard, Redis cache/fanout tests, retention cleanup bounds, real-data Flutter driver route board/manifest actions/manual GPS ping, and parent latest-GPS transport view; live maps, driver GPS device QA/background flow, ETA/geofence UX later |
+| M8C | Canteen Management | Phase 3 admin/wallet/POS/inventory/vendor/report foundation plus POS receipt JSON/PDF reprint endpoints, supplier/item admin UI, report CSV exports, linked M3 invoice handoff into Finance, wallet negative-balance guards, meal-plan-to-M3 invoice linkage, and parent mobile wallet/menu/spending views |
 | M9 | Accounting & Finance | Phase 2D production-candidate complete plus PDF/snapshot/reconciliation polish implemented |
-| M10 | Notices & Communication | Phase 1A/1B + parent-teacher chat foundation plus provider modes, File Registry attachments, and failure-dashboard depth |
+| M10 | Notices & Communication | Phase 1A/1B + parent-teacher chat foundation plus provider modes, File Registry attachments, failure-dashboard depth, and Flutter parent chat UI |
 | M11 | School Intelligence & Analytics | Roadmap only; implementation deferred |
 
 ---
@@ -160,7 +160,7 @@ Implemented M0 capabilities:
 - Manual tenant billing profile.
 - SaaS invoices, invoice lines, payments, and cancellation rules.
 - Provider config masking and secret-safe response shape.
-- Tenant-scoped platform API key management with server-generated one-time secrets, SHA-256 hashed storage, masked metadata responses, revoke flow, and audit records.
+- Tenant-scoped platform API key management with server-generated one-time secrets, peppered HMAC hashed storage, legacy SHA-256 validation upgrade, masked metadata responses, revoke flow, and audit records.
 - Provider readiness detail API with dry-run validation, disabled-mode warnings, masked secret reporting, and S3-compatible object-storage readiness checks without paid external calls by default.
 - Shared storage service now uses a provider-neutral adapter contract with normalized local/s3/r2/minio/gcp config, local and S3-compatible adapters, backward-compatible R2 env aliases, private-by-default writes, and short-lived signed URL helpers while keeping provider secrets out of API responses.
 - Queue health, failed-job detail inspection, sanitized payload visibility, stack/timing detail, retry audit history, and audited retry endpoint.
@@ -260,7 +260,7 @@ Remaining M0 hardening work:
 - SaaS billing lifecycle tests: invoice -> payment -> overdue/cancel/suspend.
 - Entitlement enforcement tests against real school APIs.
 - Object storage readiness verification against explicit staging provider.
-- File Registry signed URL/direct-upload hardening and M1-M10 module-by-module storage migration audit.
+- Staging object-storage/provider verification for File Registry signed URL/direct-upload flows.
 - Docker-backed smoke once Postgres, Redis, and API are running.
 ```
 
@@ -283,7 +283,7 @@ Status: **Partially complete**.
 2B Homework and Timetable — Completed / Pilot-Ready
 2C HR and Payroll — Completed / Pilot-Ready
 2D M9 Accounting and Finance — production-candidate complete with PDF/snapshot/reconciliation polish
-2E Parent Communication Expansion — foundation implemented / provider, moderation, retention, and mobile depth remains
+2E Parent Communication Expansion — foundation implemented / provider, moderation, retention, and staging depth remains
 2F Student Identity QR Foundation — implemented foundation; release QA, ID-card PDF verification, and deeper scan tests remain
 ```
 
@@ -396,7 +396,7 @@ Remaining M9 future enhancements:
 - Accounting audit log viewer UI.
 - Browser smoke execution in local/staging where web ports and credentials are available.
 - Production seed review for default Chart of Accounts and report mappings.
-- Optional background export workers for large reports if tenant size requires it.
+- Large-report threshold tuning for the queued background export worker now that it produces protected File Registry snapshots.
 ```
 
 ---
@@ -481,7 +481,7 @@ Feature -> tenant isolation -> indexes -> pagination -> queue slow work -> audit
 ```text
 Full SchoolOS vision: around 70-80% implemented
 Phase 1 pilot product: around 90-95% implemented
-M0 Platform Core: 85-90% foundation complete with provider/queue pilot hardening; entitlement/SaaS/staging depth remains
+M0 Platform Core: 85-90% foundation complete with provider/queue pilot hardening and M1-M10 storage-boundary audit coverage; entitlement/SaaS/staging depth remains
 Phase 2A M4 Academics: backend/admin UI plus PDF/report/correction/snapshot polish implemented
 Student QR Foundation: implemented / release hardening remains
 M9 Accounting: production-candidate complete plus PDF/snapshot/reconciliation polish implemented
@@ -493,18 +493,18 @@ Module estimates:
 |---|---:|
 | Auth/Security/Tenant | 90-95% |
 | M0 Platform Core | 85-90% |
-| M1 Admissions & Student Profiles | 90-95% |
-| M2 Attendance | 85-90% |
-| M3 Fees & Receipts | 90-95% |
-| M5 Activity Feed | 80-90% |
-| M10 Notices & Communication | 85-90% |
+| M1 Admissions & Student Profiles | 93-97% |
+| M2 Attendance | 93-97% |
+| M3 Fees & Receipts | 93-97% |
+| M5 Activity Feed | 90-95% |
+| M10 Notices & Communication | 92-96% |
 | M4 Academics | 100% |
-| M6 Homework & Timetable | 95-100% |
+| M6 Homework & Timetable | 98-100% |
 | M7 HR & Payroll | 95-100% |
 | M9 Accounting | 98-100% |
-| M8A Library | 65-75% |
-| M8B Transport | 60-70% |
-| M8C Canteen | 85-91% |
+| M8A Library | 92-96% |
+| M8B Transport | 91-95% |
+| M8C Canteen | 93-97% |
 | M11 Intelligence / AI | 0% implementation |
 
 Biggest risks:
@@ -517,7 +517,7 @@ Biggest risks:
 - Student QR foundation exists, but QR-in-PDF release behavior and cross-module manual QA still need verification.
 - Homework/Timetable schema/service/test stability after recent verification follow-ups, including parent/student submission list/detail scoping.
 - Pilot operations exposing real-world data-entry, fee, attendance, guardian-contact, PDF, and slow-network issues.
-- Deep parent/mobile workflows beyond the started Flutter companion app, driver live-trip workflow, live map/WebSocket, full canteen purchase-bill/wastage/vendor workflows, and AI/ML implementation remain intentionally unbuilt.
+- Deep parent/mobile workflows beyond the started Flutter companion app, driver GPS device QA/background ping flow, live maps/WebSocket, ETA/geofence UX, full canteen purchase-bill/wastage/vendor workflows, and AI/ML implementation remain intentionally unbuilt.
 - Tiered pricing and entitlements must be enforced backend-side before broad paid rollout; sidebar hiding alone is not security.
 ```
 

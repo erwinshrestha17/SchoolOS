@@ -2306,6 +2306,8 @@ function CashierCloseSection({
   setVarianceReason: (value: string) => void;
   varianceReason: string;
 }) {
+  const [openingClosePdfId, setOpeningClosePdfId] = useState<string | null>(null);
+  const [closePdfError, setClosePdfError] = useState<string | null>(null);
   const preview = previewQuery.data;
   const methodNetTotal = (methods: string[]) =>
     preview?.methodBreakdown
@@ -2324,6 +2326,29 @@ function CashierCloseSection({
     closeMutation.isPending ||
     (needsVarianceReason && !varianceReason.trim()) ||
     (parsedActualCash !== null && (!Number.isFinite(parsedActualCash) || parsedActualCash < 0));
+
+  async function openClosePdf(close: CashierCloseSummary) {
+    setClosePdfError(null);
+
+    if (!close.closePdfFile) {
+      setClosePdfError('The protected day-end PDF is not available for this close yet.');
+      return;
+    }
+
+    try {
+      setOpeningClosePdfId(close.id);
+      const view = await api.getFileView(close.closePdfFile.fileAssetId);
+      window.open(view.url, '_blank', 'noopener,noreferrer');
+    } catch (err: unknown) {
+      setClosePdfError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to open the day-end close PDF.',
+      );
+    } finally {
+      setOpeningClosePdfId(null);
+    }
+  }
 
   return (
     <section
@@ -2430,8 +2455,8 @@ function CashierCloseSection({
                   <Fact label="Wallet / mobile total" value={formatCurrency(methodNetTotal(['MOBILE']))} />
                 </div>
                 <p className="mt-3 text-sm text-[var(--muted)]">
-                  Method-wise totals are calculated by the backend from the selected close window; PDF export is intentionally
-                  not generated in this slice.
+                  Method-wise totals are calculated by the backend from the selected close window; finalized closes generate
+                  protected day-end PDFs in File Registry.
                 </p>
               </div>
 
@@ -2510,6 +2535,7 @@ function CashierCloseSection({
 
       <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
         <p className="label mb-4">Previous Closes</p>
+        {closePdfError ? <InlineError message={closePdfError} /> : null}
         {closesQuery.isLoading ? (
           <InvoiceSkeleton />
         ) : closesQuery.isError ? (
@@ -2545,6 +2571,19 @@ function CashierCloseSection({
                   <span>Payments: {close.paymentCount} / Refunds: {close.refundCount}</span>
                   {close.notes ? <span>Notes: {close.notes}</span> : null}
                 </div>
+                {close.closePdfFile ? (
+                  <button
+                    type="button"
+                    data-testid="finance-cashier-close-pdf-open"
+                    disabled={openingClosePdfId === close.id}
+                    onClick={() => void openClosePdf(close)}
+                    className="mt-4 inline-flex min-h-10 items-center justify-center rounded-xl border border-[var(--line)] bg-white px-4 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {openingClosePdfId === close.id
+                      ? 'Opening day-end PDF...'
+                      : `Open ${close.closePdfFile.fileName}`}
+                  </button>
+                ) : null}
               </article>
             ))}
           </div>

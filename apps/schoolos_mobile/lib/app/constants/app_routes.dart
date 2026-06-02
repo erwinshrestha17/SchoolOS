@@ -25,6 +25,8 @@ class AppRoutes {
   static const parentMore = '/parent/more';
   static const studentHome = '/student/home';
   static const studentAttendance = '/student/attendance';
+  static const studentHomework = '/student/homework';
+  static const studentTimetable = '/student/timetable';
   static const teacherHome = '/teacher/home';
   static const teacherAttendance = '/teacher/attendance';
   static const driverHome = '/driver/home';

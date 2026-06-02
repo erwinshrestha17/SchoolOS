@@ -20,6 +20,7 @@ import {
   Prisma,
   ChartAccountType,
   FeeFrequency,
+  FileAsset,
 } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AccountingPostingService } from '../accounting/accounting-posting.service';
@@ -113,6 +114,13 @@ export interface CashierCloseMethodBreakdown extends Prisma.JsonObject {
   refundCount: number;
 }
 
+export interface CashierClosePdfFileSummary {
+  fileAssetId: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+}
+
 export interface CashierCloseSummary {
   openedAt: Date;
   closedAt: Date;
@@ -131,6 +139,7 @@ export interface CashierCloseSummary {
   refundCount: number;
   firstReceiptNumber: string | null;
   lastReceiptNumber: string | null;
+  closePdfFile?: CashierClosePdfFileSummary | null;
 }
 
 type CashierCloseWithUsers = Prisma.CashierCloseGetPayload<{
@@ -3291,7 +3300,14 @@ export class FinanceService {
       take: 100,
     });
 
-    return closes.map((close) => this.buildCashierCloseResponse(close));
+    const pdfFilesByCloseId = await this.getCashierClosePdfFilesByCloseId(
+      actor.tenantId,
+      closes.map((close) => close.id),
+    );
+
+    return closes.map((close) =>
+      this.buildCashierCloseResponse(close, pdfFilesByCloseId.get(close.id)),
+    );
   }
 
   async finalizeCashierClose(dto: CreateCashierCloseDto, actor: AuthContext) {
@@ -3438,6 +3454,10 @@ export class FinanceService {
     });
     const schoolName = school?.name || 'SchoolOS';
 
+    const methodBreakdown = parseCashierCloseMethodBreakdown(
+      close.methodBreakdown,
+    );
+
     const closePdf = buildCashierClosePdf({
       schoolName,
       closeNumber: close.closeNumber,
@@ -3445,6 +3465,7 @@ export class FinanceService {
       closedAt: close.closedAt,
       collectorName: close.collectorUser?.email ?? 'System',
       paymentMethod: close.paymentMethod,
+      methodBreakdown,
       grossCollected: Number(close.grossCollected),
       totalRefunded: Number(close.totalRefunded),
       netCollected: Number(close.netCollected),
@@ -3463,6 +3484,7 @@ export class FinanceService {
     });
 
     let fileAssetId: string | null = null;
+    let closePdfFile: CashierClosePdfFileSummary | null = null;
     if (this.fileRegistryService) {
       const asset = await this.fileRegistryService.registerGeneratedFile({
         tenantId: actor.tenantId,
@@ -3479,6 +3501,7 @@ export class FinanceService {
         },
       });
       fileAssetId = asset.id;
+      closePdfFile = mapCashierClosePdfFile(asset);
     }
 
     await this.auditService.record({
@@ -3509,8 +3532,7 @@ export class FinanceService {
     });
 
     return {
-      ...close,
-      methodBreakdown: parseCashierCloseMethodBreakdown(close.methodBreakdown),
+      ...this.buildCashierCloseResponse(close, closePdfFile),
     };
   }
 
@@ -4159,7 +4181,10 @@ export class FinanceService {
     });
   }
 
-  private buildCashierCloseResponse(close: CashierCloseWithUsers) {
+  private buildCashierCloseResponse(
+    close: CashierCloseWithUsers,
+    closePdfFile: CashierClosePdfFileSummary | null = null,
+  ) {
     return {
       id: close.id,
       closeNumber: close.closeNumber,
@@ -4195,7 +4220,39 @@ export class FinanceService {
           }
         : null,
       createdAt: close.createdAt,
+      closePdfFile,
     };
+  }
+
+  private async getCashierClosePdfFilesByCloseId(
+    tenantId: string,
+    closeIds: string[],
+  ) {
+    const filesByCloseId = new Map<string, CashierClosePdfFileSummary>();
+
+    if (closeIds.length === 0) {
+      return filesByCloseId;
+    }
+
+    const files = await this.prisma.fileAsset.findMany({
+      where: {
+        tenantId,
+        module: 'fees',
+        entityId: { in: closeIds },
+        originalFilename: { startsWith: 'DayEndClose_' },
+        mimeType: 'application/pdf',
+        softDeletedAt: null,
+      },
+      orderBy: [{ createdAt: 'desc' }],
+    });
+
+    for (const file of files) {
+      if (file.entityId && !filesByCloseId.has(file.entityId)) {
+        filesByCloseId.set(file.entityId, mapCashierClosePdfFile(file));
+      }
+    }
+
+    return filesByCloseId;
   }
 
   private async buildCashierCloseSummary(
@@ -5030,6 +5087,15 @@ function parseCashierCloseMethodBreakdown(
   return value.filter((item): item is CashierCloseMethodBreakdown =>
     isCashierCloseMethodBreakdown(item),
   );
+}
+
+function mapCashierClosePdfFile(file: FileAsset): CashierClosePdfFileSummary {
+  return {
+    fileAssetId: file.id,
+    fileName: file.originalFilename,
+    mimeType: file.mimeType,
+    sizeBytes: Number(file.sizeBytes),
+  };
 }
 
 function isCashierCloseMethodBreakdown(

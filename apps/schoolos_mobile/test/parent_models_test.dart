@@ -151,10 +151,24 @@ void main() {
         'studentStatus': 'BOARDED',
         'isDelayed': true,
         'delayMinutes': 12,
-        'route': {'name': 'Route A'},
-        'stop': {'name': 'Gate 2'},
-        'vehicle': {'registrationNumber': 'BA-1-PA-1234'},
+        'delayReason': 'Traffic',
+        'direction': 'PICKUP',
+        'route': {'name': 'Route A', 'code': 'R-A'},
+        'stop': {'name': 'Gate 2', 'sequence': 3},
+        'vehicle': {
+          'registrationNumber': 'BA-1-PA-1234',
+          'model': 'Bus 3',
+          'capacity': 32,
+        },
+        'latestLocation': {
+          'latitude': 27.7101,
+          'longitude': 85.3222,
+          'speedKph': 18.5,
+          'recordedAt': '2026-06-02T07:45:00.000Z',
+        },
       },
+      'assignment': {'status': 'ACTIVE', 'pickupDirection': 'PICKUP'},
+      'enrollment': {'status': 'ACTIVE', 'feeAmount': 1200},
     });
     final canteen = ParentCanteenInfo.fromJson({
       'wallet': {
@@ -181,8 +195,19 @@ void main() {
     });
 
     expect(transport.routeName, 'Route A');
+    expect(transport.routeCode, 'R-A');
+    expect(transport.stopSequence, 3);
+    expect(transport.vehicleModel, 'Bus 3');
+    expect(transport.vehicleCapacity, 32);
+    expect(transport.tripDirection, 'PICKUP');
     expect(transport.isDelayed, isTrue);
     expect(transport.delayMinutes, 12);
+    expect(transport.delayReason, 'Traffic');
+    expect(transport.speedKph, 18.5);
+    expect(transport.latitude, 27.7101);
+    expect(transport.longitude, 85.3222);
+    expect(transport.hasLatestLocation, isTrue);
+    expect(transport.feeAmount, 1200);
     expect(canteen.isLowBalance, isTrue);
     expect(canteen.activeMealPlans.single.name, 'Lunch');
     expect(canteen.menuItems.single.allergenTags, ['gluten']);

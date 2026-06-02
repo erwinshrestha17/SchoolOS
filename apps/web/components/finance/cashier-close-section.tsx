@@ -8,10 +8,13 @@ import { LoadingState } from '@/components/ui/loading-state';
 import { Wallet, Printer, CheckCircle2, AlertCircle, Banknote, CreditCard, History, Loader2, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import type { CashierCloseSummary } from '@schoolos/core';
 
 export function CashierCloseSection() {
   const queryClient = useQueryClient();
   const [remarks, setRemarks] = useState('');
+  const [openingClosePdfId, setOpeningClosePdfId] = useState<string | null>(null);
+  const [closePdfError, setClosePdfError] = useState<string | null>(null);
   
   const openedAt = new Date();
   openedAt.setHours(0, 0, 0, 0);
@@ -23,6 +26,11 @@ export function CashierCloseSection() {
       openedAt: openedAt.toISOString(),
       closedAt: closedAt.toISOString(),
     }),
+  });
+
+  const closesQuery = useQuery({
+    queryKey: ['cashier-closes'],
+    queryFn: () => api.listCashierCloses(),
   });
 
   const closeMutation = useMutation({
@@ -37,6 +45,34 @@ export function CashierCloseSection() {
   if (previewQuery.isLoading) return <LoadingState variant="page" label="Calculating daily collection totals..." />;
 
   const preview = previewQuery.data;
+  const latestCloseWithPdf =
+    closeMutation.data?.closePdfFile
+      ? closeMutation.data
+      : closesQuery.data?.find((close) => close.closePdfFile);
+
+  async function openClosePdf(close: CashierCloseSummary) {
+    setClosePdfError(null);
+
+    if (!close.closePdfFile) {
+      setClosePdfError('The protected close PDF is not available yet.');
+      return;
+    }
+
+    try {
+      setOpeningClosePdfId(close.id);
+      const view = await api.getFileView(close.closePdfFile.fileAssetId);
+      window.open(view.url, '_blank', 'noopener,noreferrer');
+    } catch (err: unknown) {
+      setClosePdfError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to open the day-end close PDF.',
+      );
+    } finally {
+      setOpeningClosePdfId(null);
+    }
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NP', {
       style: 'currency',
@@ -160,10 +196,25 @@ export function CashierCloseSection() {
                Close Counter & Handover
              </button>
 
-             <button className="w-full flex items-center justify-center gap-2 py-3 text-[0.65rem] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">
-                <Printer size={16} />
-                Print Close Report
-             </button>
+             {closePdfError ? (
+                <div className="flex items-center gap-2 rounded-2xl border border-danger-100 bg-danger-50 p-3 text-[0.7rem] font-bold text-danger-700">
+                  <AlertCircle size={14} />
+                  {closePdfError}
+                </div>
+             ) : null}
+
+             {latestCloseWithPdf ? (
+               <button
+                type="button"
+                data-testid="finance-day-end-close-pdf-open"
+                disabled={openingClosePdfId === latestCloseWithPdf.id}
+                onClick={() => void openClosePdf(latestCloseWithPdf)}
+                className="w-full flex items-center justify-center gap-2 py-3 text-[0.65rem] font-black text-slate-500 uppercase tracking-widest hover:text-slate-900 transition-colors disabled:cursor-wait disabled:opacity-60"
+               >
+                  {openingClosePdfId === latestCloseWithPdf.id ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
+                  {openingClosePdfId === latestCloseWithPdf.id ? 'Opening Close PDF' : 'Open Close Report PDF'}
+               </button>
+             ) : null}
           </div>
         </SectionCard>
       </div>

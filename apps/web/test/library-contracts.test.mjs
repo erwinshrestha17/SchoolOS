@@ -48,7 +48,13 @@ describe('Phase 3B Library frontend contracts', () => {
       'issueCopy',
       'returnIssue',
       'listOverdue',
+      'getIssuedBooksReport',
+      'getOverdueBooksReport',
+      'getFineSummary',
+      'getBorrowerHistory',
+      'downloadIssuedBooksCsv',
       'sendOverdueReminders',
+      'postFineToFees',
     ]) {
       assert.match(libraryApi, new RegExp(`${helper}:`), `Missing ${helper}`);
     }
@@ -59,11 +65,18 @@ describe('Phase 3B Library frontend contracts', () => {
       '/library/issues',
       '/library/overdue',
       '/library/overdue/reminders',
+      '/library/reports/issued',
+      '/library/reports/overdue',
+      '/library/reports/fines',
+      '/library/reports/borrower-history',
+      '/library/reports/issued.csv',
     ]) {
       assert.match(libraryApi, new RegExp(endpoint.replaceAll('/', '\\/')));
     }
 
+    assert.match(libraryApi, /encodeURIComponent\(fineId\).*post-to-fees/s);
     assert.match(libraryApi, /credentials:\s*'include'/);
+    assert.match(libraryApi, /downloadCsv/);
     assert.doesNotMatch(libraryApi, /Authorization:\s*`Bearer/);
   });
 
@@ -81,6 +94,11 @@ describe('Phase 3B Library frontend contracts', () => {
       'Copy Management',
       'Issue / Return',
       'Overdue Issues',
+      'Reports & Exports',
+      'Export issued CSV',
+      'Issued Books',
+      'Overdue Books',
+      'Fine exposure',
     ]) {
       assert.match(workspace, new RegExp(section.replace('/', '\\/')));
     }
@@ -97,11 +115,21 @@ describe('Phase 3B Library frontend contracts', () => {
       'libraryApi.issueCopy',
       'libraryApi.returnIssue',
       'libraryApi.listOverdue',
+      'libraryApi.getIssuedBooksReport',
+      'libraryApi.getOverdueBooksReport',
+      'libraryApi.getFineSummary',
+      'libraryApi.downloadIssuedBooksCsv',
       'libraryApi.sendOverdueReminders',
+      'libraryApi.postFineToFees',
     ]) {
       assert.match(workspace, new RegExp(apiCall.replace('.', '\\.')));
     }
 
+    assert.match(workspace, /library-issued-books-csv-export/);
+    assert.match(workspace, /library-fine-post-to-fees/);
+    assert.match(workspace, /library-fine-open-invoice/);
+    assert.match(workspace, /\/dashboard\/finance\?invoiceId=/);
+    assert.match(workspace, /overdueQuery\.data\?\.items/);
     assert.match(workspace, /LoadingState/);
     assert.match(workspace, /EmptyState/);
     assert.match(workspace, /ErrorNotice/);
