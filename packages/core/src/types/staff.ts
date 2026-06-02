@@ -1,4 +1,4 @@
-import type { SalaryStructureSummary, PayrollLineSummary } from '../payroll.js';
+import type { SalaryStructureSummary, PayrollLineSummary } from './payroll.js';
 
 export type StaffSummary = {
   id: string;

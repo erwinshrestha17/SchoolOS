@@ -10,11 +10,13 @@ export interface PermissionDefinition {
   description: string;
 }
 
-export const PERMISSION_CATALOG: PermissionDefinition[] = permissionCatalog.map(p => ({
-  resource: p.resource,
-  action: p.action,
-  description: p.description,
-}));
+export const PERMISSION_CATALOG: PermissionDefinition[] = permissionCatalog.map(
+  (p) => ({
+    resource: p.resource,
+    action: p.action,
+    description: p.description,
+  }),
+);
 export const SYSTEM_ROLE_DEFINITIONS = systemRoleDefinitions;
 export const SYSTEM_ROLE_PERMISSIONS = systemRolePermissions;
 

@@ -1,4 +1,4 @@
-import type { PaginatedResponse, TenantSummary } from './types.js';
+import type { PaginatedResponse, TenantSummary } from './common.js';
 
 export type PlatformTenantSummary = {
   id: string;

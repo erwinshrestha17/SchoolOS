@@ -1,4 +1,4 @@
-import type { StaffSummary } from "./types.js";
+import type { StaffSummary } from './staff.js';
 
 export type SalaryComponentSummary = {
   id: string;

@@ -4,7 +4,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { PermissionKey } from './permissions.js';
-import type { SalaryStructureSummary, PayrollLineSummary } from './payroll.js';
 
 // ─── Compiled from types/common.ts ───
 
@@ -864,6 +863,52 @@ export type MoodLog = {
 };
 
 
+// ─── Compiled from types/attendance-history.ts ───
+export type StudentAttendanceHistoryRow = {
+  id: string;
+  sessionId: string;
+  date: string;
+  status: string;
+  remarks: string | null;
+  className: string;
+  sectionName: string | null;
+  markedByUserId: string | null;
+  markedByName: string | null;
+  submittedAt: string | null;
+};
+
+export type StudentAttendanceHistorySummary = {
+  presentCount: number;
+  absentCount: number;
+  lateCount: number;
+  leaveCount: number;
+  sickLeaveCount: number;
+  excusedLeaveCount: number;
+  unexcusedLeaveCount: number;
+  totalRecords: number;
+  attendancePercentage: number;
+};
+
+export type StudentAttendanceHistory = {
+  student: {
+    id: string;
+    studentSystemId: string;
+    fullNameEn: string;
+    className: string;
+    sectionName: string | null;
+  };
+  summary: StudentAttendanceHistorySummary;
+  records: StudentAttendanceHistoryRow[];
+};
+
+export type StudentAttendanceHistoryFilters = {
+  fromDate?: string;
+  toDate?: string;
+  academicYearId?: string;
+  status?: string;
+};
+
+
 // ─── Compiled from types/attendance.ts ───
 
 export type AttendanceSummary = {
@@ -1654,6 +1699,600 @@ export type SendParentTeacherMessageResult = {
   availability: ChatAvailabilityStatus;
   queuedNotice: string | null;
   sla: string;
+};
+
+
+// ─── Compiled from types/payroll.ts ───
+
+export type SalaryComponentSummary = {
+  id: string;
+  name: string;
+  componentType: string;
+  amount: number;
+  taxable: boolean;
+};
+
+export type SalaryStructureSummary = {
+  id: string;
+  staffId: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  basicSalary: number;
+  allowances: number;
+  deductions: number;
+  pfEnabled: boolean;
+  tdsEnabled: boolean;
+  paymentMethod: string;
+  bankAccount?: string | null;
+  bankName?: string | null;
+  status: string;
+  components?: SalaryComponentSummary[];
+  staff?: StaffSummary;
+};
+
+export type PayrollRunSummary = {
+  id: string;
+  periodMonth: number;
+  periodYear: number;
+  status: string;
+  grossAmount: number;
+  deductionAmount: number;
+  netAmount: number;
+  pfEmployeeAmount?: number;
+  pfEmployerAmount?: number;
+  tdsAmount?: number;
+  lineCount?: number;
+  journalEntryId: string | null;
+  disbursementJournalEntryId?: string | null;
+  lines?: PayrollLineSummary[];
+};
+
+export type PayrollLineSummary = {
+  id: string;
+  staffId: string;
+  grossSalary: number;
+  basicSalary?: number;
+  earnings?: number;
+  allowances?: number;
+  leaveDeductions?: number;
+  pfEmployee?: number;
+  pfEmployer?: number;
+  tds?: number;
+  otherDeductions?: number;
+  deductions: number;
+  netSalary: number;
+  paidDays?: number;
+  unpaidDays?: number;
+  attendanceDays: number;
+  workingDays: number;
+  paymentStatus?: string;
+  status: string;
+  staff?: {
+    id: string;
+    firstNameEn?: string;
+    lastNameEn?: string;
+    employeeId?: string;
+  };
+};
+
+export type PayrollPreviewResult = {
+  staffId: string;
+  fullName: string;
+  employeeId: string;
+  contractSummary?: {
+    contractNumber: string;
+    position: string;
+    baseSalary: number;
+    allowances: number;
+    deductions: number;
+  };
+  periodMonth: number;
+  periodYear: number;
+  workingDays: number;
+  presentDays: number;
+  approvedPaidLeaveDays: number;
+  unpaidLeaveDays: number;
+  baseSalary: number;
+  allowances: number;
+  grossPay: number;
+  deductions: number;
+  netPay: number;
+  warnings: string[];
+};
+
+export type PayslipSummary = {
+  id: string;
+  payrollRunId: string;
+  payrollLineId: string;
+  staffId: string;
+  payslipNumber: string;
+  status: string;
+  grossSalary: number;
+  deductionAmount: number;
+  netSalary: number;
+  issuedAt: string | null;
+  staff?: StaffSummary & { fullName?: string };
+  payrollRun?: {
+    id: string;
+    periodMonth: number;
+    periodYear: number;
+    status: string;
+  };
+  periodMonth?: number;
+  periodYear?: number;
+  netAmount?: number;
+};
+
+
+// ─── Compiled from types/platform.ts ───
+
+export type PlatformTenantSummary = {
+  id: string;
+  name: string;
+  slug: string;
+  plan: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  studentCount: number;
+  staffCount: number;
+};
+
+export type PlatformTenantUsage = {
+  tenantId: string;
+  studentCount: number;
+  staffCount: number;
+  userCount: number;
+  activeStudents?: number;
+  activeStaff?: number;
+  storageSizeBytes?: number;
+  lastActivityAt?: string | null;
+};
+
+export type PlatformTenantDetail = PlatformTenantSummary & {
+  usage: PlatformTenantUsage;
+  panNumber?: string | null;
+  subscription?: PlatformTenantSubscriptionSummary | null;
+  billingProfile?: PlatformBillingProfile | null;
+  recentAudit?: PlatformAuditLog[];
+  onboarding?: PlatformOnboardingChecklist;
+  overrides?: Array<{ featureKey: string; enabled: boolean; reason: string }>;
+  enabledFeatures?: string[];
+  usageCounters?: PlatformUsageCounterSummary[];
+  providerReadiness?: Array<{
+    providerId: string;
+    type: string;
+    name: string;
+    status: 'ready' | 'degraded' | 'not_configured' | 'failed';
+    message: string;
+  }>;
+  supportOverrideHistory?: Array<{
+    id: string;
+    platformUserId: string;
+    platformUserEmail: string | null;
+    reason: string;
+    startsAt: string;
+    expiresAt: string;
+    isActive: boolean;
+    createdAt: string;
+  }>;
+};
+
+export type PlatformDashboardSummary = {
+  totalTenants: number;
+  activeTenants: number;
+  suspendedTenants: number;
+  pendingOnboarding: number;
+  usage: {
+    totalActiveStudents: number;
+    totalActiveStaff: number;
+    totalUsers: number;
+    totalStorageBytes: number;
+  };
+  healthStatus: 'ready' | 'degraded';
+  failedJobsCount: number;
+  recentAudit: PlatformAuditLog[];
+  providerReadinessStatus: Record<string, 'ready' | 'degraded' | 'not_configured' | 'failed'>;
+  subscriptionSummary?: {
+    activeSubscriptions: number;
+    graceSubscriptions: number;
+    expiredSubscriptions: number;
+  };
+  invoiceSummary?: {
+    totalUnpaidAmount: number;
+    overdueCount: number;
+  };
+  usageWarnings?: Array<{
+    tenantId: string;
+    tenantName: string;
+    usageKey: string;
+    value: number;
+    limit: number;
+  }>;
+};
+
+export type PlatformPlanSummary = {
+  id: string;
+  key: string;
+  name: string;
+  description?: string | null;
+  status: 'ACTIVE' | 'ARCHIVED';
+  priceNpr: string;
+  billingCycle: string;
+  features: Array<{ featureKey: string; enabled: boolean }>;
+  limits: Array<{ usageKey: string; limit: number; period: string }>;
+};
+
+export type PlatformTenantSubscriptionSummary = {
+  id: string;
+  tenantId: string;
+  planId: string;
+  planKey: string;
+  planName: string;
+  status: 'TRIAL' | 'ACTIVE' | 'GRACE' | 'SUSPENDED' | 'EXPIRED' | 'CANCELLED';
+  startsAt: string;
+  endsAt?: string | null;
+  renewsAt?: string | null;
+  trialEndsAt?: string | null;
+  addOns?: string[];
+};
+
+export type PlatformEntitlementCheck = {
+  allowed: boolean;
+  tenantId: string;
+  featureKey: string;
+  reason:
+    | 'allowed'
+    | 'tenant_inactive'
+    | 'no_subscription'
+    | 'subscription_inactive'
+    | 'feature_locked';
+  source?: 'plan' | 'override' | 'none';
+  subscriptionStatus?: string | null;
+  limit?: number | null;
+  currentValue?: number | null;
+};
+
+export type PlatformUsageCounterSummary = {
+  tenantId: string;
+  usageKey: string;
+  value: number;
+  limit?: number | null;
+  period: string;
+  periodStart: string;
+  exceeded: boolean;
+};
+
+export type PlatformBillingProfile = {
+  tenantId: string;
+  billingContactName?: string | null;
+  billingEmail?: string | null;
+  billingPhone?: string | null;
+  billingAddress?: string | null;
+  panVatNumber?: string | null;
+  preferredBillingCycle: string;
+  notes?: string | null;
+};
+
+export type PlatformSaaSInvoiceSummary = {
+  id: string;
+  tenantId: string;
+  invoiceNumber: string;
+  amount: string;
+  paidAmount: string;
+  balanceAmount: string;
+  currency: string;
+  issueDate: string;
+  dueDate: string;
+  status: 'DRAFT' | 'ISSUED' | 'PAID' | 'PARTIAL' | 'OVERDUE' | 'CANCELLED';
+  lines: Array<{
+    id: string;
+    lineType: string;
+    description: string;
+    quantity: number;
+    unitAmount: string;
+    totalAmount: string;
+  }>;
+};
+
+export type PlatformApiKeySummary = {
+  id: string;
+  tenantId: string;
+  name: string;
+  prefix: string;
+  keyPreview: string;
+  scopes: string[];
+  status: 'ACTIVE' | 'REVOKED';
+  expiresAt?: string | null;
+  lastUsedAt?: string | null;
+  revokedAt?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PlatformApiKeyCreated = PlatformApiKeySummary & {
+  secret: string;
+};
+
+export type PlatformProviderConfigSummary = {
+  id: string;
+  type: string;
+  name: string;
+  enabled: boolean;
+  environment: string;
+  config: Record<string, unknown>;
+  secretKeys: string[];
+  validationStatus?: string | null;
+  lastValidatedAt?: string | null;
+  updatedAt: string;
+};
+
+export type PlatformProviderReadinessDetail = {
+  provider: PlatformProviderConfigSummary;
+  status: 'ready' | 'degraded' | 'not_configured' | 'failed';
+  mode: 'disabled' | 'dry_run';
+  message: string;
+  missingKeys: string[];
+  paidExternalCallSkipped: boolean;
+  secretKeysMasked: string[];
+  checkedAt: string;
+  recentAudit: Array<{
+    id: string;
+    action: string;
+    createdAt: string;
+    status?: string | null;
+    message?: string | null;
+  }>;
+};
+
+export type PlatformWebhookEndpointSummary = {
+  id: string;
+  ownerType: 'PLATFORM' | 'TENANT';
+  tenantId?: string | null;
+  url: string;
+  eventTypes: string[];
+  status: 'ACTIVE' | 'DISABLED';
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PlatformWebhookDeliverySummary = {
+  id: string;
+  endpointId: string;
+  tenantId?: string | null;
+  eventType: string;
+  payloadChecksum: string;
+  status: 'PENDING' | 'DELIVERED' | 'FAILED' | 'RETRYING';
+  retryCount: number;
+  responseCode?: number | null;
+  responseMessageSummary?: string | null;
+  createdAt: string;
+  lastAttemptAt?: string | null;
+  deliveredAt?: string | null;
+};
+
+export type PlatformQueueSummary = {
+  name: string;
+  waiting: number;
+  active: number;
+  completed: number;
+  failed: number;
+  delayed: number;
+  paused: boolean;
+  workerHealth: 'healthy' | 'degraded' | 'unknown';
+  error?: string;
+};
+
+export type PlatformFailedJobSummary = {
+  id: string;
+  queueName: string;
+  name: string;
+  failedReason?: string | null;
+  attemptsMade: number;
+  timestamp?: number;
+  data: Record<string, unknown>;
+  processedOn?: number | null;
+  finishedOn?: number | null;
+  stacktrace?: string[];
+  retryHistory?: Array<{
+    id: string;
+    userId?: string | null;
+    reason?: string | null;
+    attemptsMade?: number | null;
+    createdAt: string;
+  }>;
+};
+
+export type PlatformHealthSummary = {
+  status: 'ready' | 'degraded';
+  checks: Record<string, { status: 'ok' | 'error'; message?: string }>;
+  timestamp: string;
+};
+
+export type PlatformOnboardingChecklist = {
+  tenantId: string;
+  completed: number;
+  total: number;
+  progressPercent: number;
+  items: Array<{
+    key: string;
+    label: string;
+    completed: boolean;
+    source: 'computed' | 'manual';
+    href: string;
+    required: boolean;
+  }>;
+};
+
+export type PlatformAuditLog = {
+  id: string;
+  action: string;
+  resource: string;
+  resourceId?: string | null;
+  tenantId: string;
+  userId?: string | null;
+  before?: any;
+  after?: any;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  requestId?: string | null;
+  createdAt: string;
+  user?: {
+    id: string;
+    email?: string | null;
+    phone?: string | null;
+  } | null;
+};
+
+
+// ─── Compiled from types/reports.ts ───
+export type ReportFormat = "csv" | "pdf" | "json";
+
+export interface ReportFilterDefinition {
+  key: string;
+  label: string;
+  type:
+    | "text"
+    | "date"
+    | "select"
+    | "boolean"
+    | "class"
+    | "section"
+    | "student";
+  required?: boolean;
+  options?: Array<{ label: string; value: string }>;
+  placeholder?: string;
+}
+
+export interface ReportDefinition {
+  key: string;
+  name: string;
+  description: string;
+  category:
+    | "academics"
+    | "finance"
+    | "students"
+    | "hr"
+    | "payroll"
+    | "inventory"
+    | "attendance"
+    | "platform";
+  module: string;
+  formats: ReportFormat[];
+  filters: ReportFilterDefinition[];
+  requiredPermissions: string[];
+}
+
+export interface ReportExportRequest {
+  format: ReportFormat;
+  filters: Record<string, any>;
+  async?: boolean;
+}
+
+export interface ReportExportResult {
+  format?: ReportFormat;
+  content?: any; // Buffer for binary, object for JSON
+  fileName?: string;
+  contentType?: string;
+  data?: any;
+  status?: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
+  jobId?: string | number;
+}
+
+
+// ─── Compiled from types/settings.ts ───
+export type TenantSettingKey =
+  | 'school_logo'
+  | 'branding_primary_color'
+  | 'timezone'
+  | 'currency'
+  | 'date_format'
+  | 'attendance_lock_hours'
+  | 'receipt_format'
+  | 'fee_reminder_days'
+  | 'sms_provider'
+  | 'feature_toggles'
+  | 'school_name'
+  | 'school_address'
+  | 'school_phone'
+  | 'school_email'
+  | 'school_pan_number'
+  | 'principal_name'
+  | 'municipality'
+  | 'ward_number'
+  | 'district'
+  | 'province'
+  | 'school_type'
+  | 'iemis_school_code'
+  | 'receipt_header_text'
+  | 'receipt_footer_text'
+  | 'id_card_footer_text'
+  | 'payslip_footer_text'
+  | 'certificate_footer_text'
+  | 'report_card_footer_text'
+  | 'default_paper_size'
+  | 'active_academic_year_label'
+  | 'default_calendar'
+  | 'attendance_working_days'
+  | 'promotion_rule_mode'
+  | 'grading_scheme_label'
+  | 'active_fee_plan_required'
+  | 'receipt_number_prefix'
+  | 'payment_methods_enabled'
+  | 'late_fee_enabled'
+  | 'late_fee_grace_days'
+  | 'waiver_approval_required'
+  | 'discount_approval_required'
+  | 'cashier_close_required'
+  | 'late_threshold_minutes'
+  | 'half_day_threshold_minutes'
+  | 'allow_teacher_correction_request'
+  | 'parent_attendance_visibility'
+  | 'weekend_policy'
+  | 'payroll_month_day'
+  | 'default_working_days_per_month'
+  | 'pf_enabled'
+  | 'tds_enabled'
+  | 'leave_approval_required'
+  | 'unpaid_leave_affects_payroll'
+  | 'payroll_approval_required'
+  | 'salary_payment_methods'
+  | 'active_fiscal_year_label'
+  | 'fiscal_period_lock_policy'
+  | 'default_cash_account_label'
+  | 'default_bank_account_label'
+  | 'salary_payable_account_label'
+  | 'tds_payable_account_label'
+  | 'pf_payable_account_label'
+  | 'fee_income_account_label'
+  | 'journal_number_prefix'
+  | 'voucher_number_prefix'
+  | 'default_notice_channel'
+  | 'parent_notification_enabled'
+  | 'consent_required_for_media'
+  | 'quiet_hours_enabled'
+  | 'chat_availability_enabled'
+  | 'chat_sunday_to_thursday_hours'
+  | 'chat_friday_hours'
+  | 'chat_saturday_enabled'
+  | 'emergency_override_requires_admin'
+  | 'sensitive_staff_fields_masked'
+  | 'export_requires_permission'
+  | 'audit_log_retention_days'
+  | 'session_timeout_minutes'
+  | 'require_reason_for_sensitive_reveal'
+  | 'block_report_card_on_dues'
+  | 'block_publishing_on_dues';
+
+export type TenantSettingSummary = {
+  key: TenantSettingKey;
+  value: any;
+  updatedAt: string;
+};
+
+export type UpdateTenantSettingPayload = {
+  value: any;
 };
 
 

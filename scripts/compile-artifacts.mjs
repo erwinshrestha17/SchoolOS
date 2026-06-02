@@ -131,7 +131,6 @@ if (fs.existsSync(typesDir)) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { PermissionKey } from './permissions.js';
-import type { SalaryStructureSummary, PayrollLineSummary } from './payroll.js';
 
 `;
 
