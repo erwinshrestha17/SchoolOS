@@ -91,6 +91,26 @@ const emptyBooks: LibraryBook[] = [];
 const emptyCopies: LibraryCopy[] = [];
 const emptyIssues: LibraryIssue[] = [];
 
+type LibraryQrBorrower = {
+  id?: string;
+  studentId?: string;
+  name?: string;
+  studentCode?: string;
+  classSection?: string;
+  photoUrl?: string | null;
+  activeIssues?: number;
+  overdueBooks?: number;
+  canBorrow?: boolean;
+};
+
+type LibraryCopyScanResult = {
+  code: string;
+  status: 'matched' | 'unavailable' | 'missing';
+  message: string;
+  copy?: LibraryCopy;
+  scannedAt: string;
+};
+
 export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<LibraryTab>(initialTab);
   const [bookSearch, setBookSearch] = useState('');
@@ -867,6 +887,81 @@ function IssuesPanel(props: {
   error: Error | null;
 }) {
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [copyScanValue, setCopyScanValue] = useState('');
+  const [copyScanResult, setCopyScanResult] = useState<LibraryCopyScanResult | null>(null);
+  const [recentCopyScans, setRecentCopyScans] = useState<LibraryCopyScanResult[]>([]);
+  const [resolvedBorrower, setResolvedBorrower] = useState<LibraryQrBorrower | null>(null);
+  const availableCopies = props.copies.filter((copy) => copy.status === 'AVAILABLE');
+  const selectedCopy = props.copies.find((copy) => copy.id === props.form.copyId);
+  const selectedStudent = props.students.find(
+    (student) => student.id === props.form.borrowerStudentId,
+  );
+  const selectedStaff = props.staff.find(
+    (staff) => staff.id === props.form.borrowerStaffId,
+  );
+
+  function recordCopyScan(scan: LibraryCopyScanResult) {
+    setCopyScanResult(scan);
+    setRecentCopyScans((items) => [
+      scan,
+      ...items.filter(
+        (item) => item.code.toLowerCase() !== scan.code.toLowerCase(),
+      ),
+    ].slice(0, 5));
+  }
+
+  function selectCopyFromScan(copy: LibraryCopy, code: string) {
+    props.setForm({ ...props.form, copyId: copy.id });
+    recordCopyScan({
+      code,
+      copy,
+      status: 'matched',
+      message: `${copy.book?.title ?? 'Copy'} selected for issue.`,
+      scannedAt: new Date().toISOString(),
+    });
+  }
+
+  function handleCopyScan() {
+    const code = copyScanValue.trim();
+    if (!code) return;
+
+    const copy = props.copies.find((item) => copyMatchesScan(item, code));
+    if (!copy) {
+      recordCopyScan({
+        code,
+        status: 'missing',
+        message: 'No library copy matched this barcode or QR code.',
+        scannedAt: new Date().toISOString(),
+      });
+      return;
+    }
+
+    if (copy.status !== 'AVAILABLE') {
+      recordCopyScan({
+        code,
+        copy,
+        status: 'unavailable',
+        message: `${copy.book?.title ?? 'Copy'} is ${formatStatus(copy.status)} and cannot be issued.`,
+        scannedAt: new Date().toISOString(),
+      });
+      return;
+    }
+
+    selectCopyFromScan(copy, code);
+    setCopyScanValue('');
+  }
+
+  function handleBorrowerResolved(data: LibraryQrBorrower) {
+    const studentId = data.id ?? data.studentId;
+    if (!studentId) return;
+
+    setResolvedBorrower({ ...data, id: studentId });
+    props.setForm({
+      ...props.form,
+      borrowerStudentId: studentId,
+      borrowerStaffId: '',
+    });
+  }
   
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
@@ -920,35 +1015,62 @@ function IssuesPanel(props: {
 
       <section className="space-y-6">
         <section className="rounded-[2rem] border border-primary-100 bg-primary-50/20 p-5 shadow-sm">
-          <PanelHeader title="Quick QR Lookup" description="Scan student QR to instantly select borrower." />
+          <PanelHeader title="Quick QR Lookup" description="Scan student QR to select the borrower and review borrowing status." />
           <QRResolver
             purpose="LIBRARY"
-            onResolved={(data) => {
-              if (data.id) {
-                props.setForm({ ...props.form, borrowerStudentId: data.id, borrowerStaffId: '' });
-              }
-            }}
+            autoFocus
+            helperText="Scan or paste a student QR token; the borrower field updates automatically."
+            submitLabel="Select"
+            onResolved={handleBorrowerResolved}
             className="mt-4"
           />
+          {resolvedBorrower ? <QrBorrowerSummary borrower={resolvedBorrower} /> : null}
         </section>
 
         <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
           <PanelHeader title="Issue copy" description="Select a physical copy and a borrower." />
           {props.error && <ErrorNotice message={props.error.message} />}
-          <div className="mt-5 space-y-4">
+          <form onSubmit={props.onIssueSubmit} className="mt-5 space-y-4">
+            <LibraryCopyScanner
+              value={copyScanValue}
+              onChange={setCopyScanValue}
+              onScan={handleCopyScan}
+              result={copyScanResult}
+              recentScans={recentCopyScans}
+              onSelectCopy={(copy, code) => selectCopyFromScan(copy, code)}
+            />
+
             <BookSelector
               mode="copy"
-              copies={props.copies}
+              copies={availableCopies}
               selectedId={props.form.copyId}
-              onSelect={(copyId) => props.setForm({ ...props.form, copyId })}
+              onSelect={(copyId) => {
+                props.setForm({ ...props.form, copyId });
+                setCopyScanResult(null);
+              }}
               label="Physical Copy"
-              placeholder="Search barcode or book title..."
+              placeholder="Search available barcode or book title..."
+            />
+
+            <IssueSelectionSummary
+              copy={selectedCopy}
+              student={selectedStudent}
+              staff={selectedStaff}
             />
             
             <StudentSelector
               students={props.students}
               selectedId={props.form.borrowerStudentId ?? ''}
-              onSelect={(studentId) => props.setForm({ ...props.form, borrowerStudentId: studentId, borrowerStaffId: studentId ? '' : props.form.borrowerStaffId })}
+              onSelect={(studentId) => {
+                props.setForm({
+                  ...props.form,
+                  borrowerStudentId: studentId,
+                  borrowerStaffId: studentId ? '' : props.form.borrowerStaffId,
+                });
+                if (studentId !== resolvedBorrower?.id) {
+                  setResolvedBorrower(null);
+                }
+              }}
               label="Student Borrower"
               optional
             />
@@ -964,7 +1086,20 @@ function IssuesPanel(props: {
 
             <label className="block text-sm font-semibold text-slate-700">
               Staff Borrower
-              <select value={props.form.borrowerStaffId ?? ''} onChange={(e) => props.setForm({ ...props.form, borrowerStaffId: e.target.value, borrowerStudentId: e.target.value ? '' : props.form.borrowerStudentId })} className="input-control mt-1">
+              <select
+                value={props.form.borrowerStaffId ?? ''}
+                onChange={(e) => {
+                  props.setForm({
+                    ...props.form,
+                    borrowerStaffId: e.target.value,
+                    borrowerStudentId: e.target.value ? '' : props.form.borrowerStudentId,
+                  });
+                  if (e.target.value) {
+                    setResolvedBorrower(null);
+                  }
+                }}
+                className="input-control mt-1"
+              >
                 <option value="">No staff borrower</option>
                 {props.staff.map((staff) => <option key={staff.id} value={staff.id}>{staffName(staff)}</option>)}
               </select>
@@ -973,17 +1108,193 @@ function IssuesPanel(props: {
             <TextInput label="Due date" type="date" value={props.form.dueAt} required onChange={(dueAt) => props.setForm({ ...props.form, dueAt })} />
             <TextInput label="Internal Notes" value={props.form.notes ?? ''} onChange={(notes) => props.setForm({ ...props.form, notes })} />
             
-            <button 
-              type="button" 
+            <button
+              type="submit"
               className="btn-primary w-full h-12 text-base shadow-lg shadow-primary-100" 
-              disabled={props.isSaving || !props.form.copyId || (!props.form.borrowerStudentId && !props.form.borrowerStaffId)}
-              onClick={() => props.onIssueSubmit({ preventDefault: () => {} } as any)}
+              disabled={
+                props.isSaving ||
+                !props.form.copyId ||
+                !props.form.dueAt ||
+                (!props.form.borrowerStudentId && !props.form.borrowerStaffId)
+              }
             >
               {props.isSaving ? 'Issuing...' : 'Issue book now'}
             </button>
-          </div>
+          </form>
         </section>
       </section>
+    </div>
+  );
+}
+
+function LibraryCopyScanner({
+  value,
+  onChange,
+  onScan,
+  result,
+  recentScans,
+  onSelectCopy,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onScan: () => void;
+  result: LibraryCopyScanResult | null;
+  recentScans: LibraryCopyScanResult[];
+  onSelectCopy: (copy: LibraryCopy, code: string) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900">Copy barcode / QR scan</h3>
+          <p className="mt-0.5 text-xs font-semibold text-slate-500">
+            Scan the physical copy code, then scan borrower QR or select manually.
+          </p>
+        </div>
+        {result?.status === 'matched' ? (
+          <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-emerald-500" />
+        ) : null}
+      </div>
+
+      <div className="mt-3 flex gap-2">
+        <label className="relative block min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={value}
+            autoComplete="off"
+            aria-label="Library copy barcode or QR code"
+            onChange={(event) => onChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                onScan();
+              }
+            }}
+            placeholder="Scan barcode or QR code"
+            className={cn(
+              'input-control pl-10',
+              result?.status === 'matched' && 'border-emerald-300 focus:border-emerald-400 focus:ring-emerald-100',
+              result?.status === 'unavailable' && 'border-amber-300 focus:border-amber-400 focus:ring-amber-100',
+              result?.status === 'missing' && 'border-red-300 focus:border-red-400 focus:ring-red-100',
+            )}
+          />
+        </label>
+        <button type="button" onClick={onScan} disabled={!value.trim()} className="btn-secondary shrink-0">
+          Scan
+        </button>
+      </div>
+
+      {result ? (
+        <div
+          className={cn(
+            'mt-3 rounded-xl border px-3 py-2 text-xs font-bold',
+            result.status === 'matched' && 'border-emerald-100 bg-emerald-50 text-emerald-700',
+            result.status === 'unavailable' && 'border-amber-100 bg-amber-50 text-amber-800',
+            result.status === 'missing' && 'border-red-100 bg-red-50 text-red-700',
+          )}
+        >
+          {result.message}
+        </div>
+      ) : null}
+
+      {recentScans.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {recentScans.map((scan) => (
+            <button
+              key={`${scan.code}-${scan.scannedAt}`}
+              type="button"
+              disabled={!scan.copy || scan.copy.status !== 'AVAILABLE'}
+              onClick={() => scan.copy && onSelectCopy(scan.copy, scan.code)}
+              className={cn(
+                'rounded-xl border px-3 py-1.5 text-xs font-bold transition',
+                scan.status === 'matched'
+                  ? 'border-emerald-100 bg-white text-emerald-700 hover:bg-emerald-50'
+                  : 'border-slate-100 bg-white text-slate-500',
+                (!scan.copy || scan.copy.status !== 'AVAILABLE') && 'cursor-not-allowed opacity-70',
+              )}
+            >
+              {scan.copy?.barcode ?? scan.code}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function QrBorrowerSummary({ borrower }: { borrower: LibraryQrBorrower }) {
+  const activeIssues = borrower.activeIssues ?? 0;
+  const overdueBooks = borrower.overdueBooks ?? 0;
+  const canBorrow = borrower.canBorrow ?? true;
+
+  return (
+    <div className="mt-4 rounded-2xl border border-primary-100 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-wide text-primary-600">QR borrower selected</p>
+          <h3 className="mt-1 truncate font-bold text-slate-900">{borrower.name ?? 'Student'}</h3>
+          <p className="mt-1 text-xs font-semibold text-slate-500">
+            {[borrower.studentCode, borrower.classSection].filter(Boolean).join(' • ') || 'Student QR resolved'}
+          </p>
+        </div>
+        <StatusBadge
+          status={canBorrow ? 'CAN_BORROW' : 'LIMIT_REACHED'}
+          label={canBorrow ? 'Can borrow' : 'Limit reached'}
+          tone={canBorrow ? 'approved' : 'conflict'}
+        />
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-bold">
+        <div className="rounded-xl bg-slate-50 p-3 text-slate-600">
+          <p className="text-slate-400">Active issues</p>
+          <p className="mt-1 text-lg text-slate-900">{activeIssues}</p>
+        </div>
+        <div className="rounded-xl bg-slate-50 p-3 text-slate-600">
+          <p className="text-slate-400">Overdue books</p>
+          <p className={cn('mt-1 text-lg', overdueBooks > 0 ? 'text-red-600' : 'text-slate-900')}>
+            {overdueBooks}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IssueSelectionSummary({
+  copy,
+  student,
+  staff,
+}: {
+  copy?: LibraryCopy;
+  student?: StudentProfile;
+  staff?: { id: string; firstName?: string; lastName?: string; employeeId?: string };
+}) {
+  if (!copy && !student && !staff) return null;
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-4 text-sm shadow-sm">
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Selected issue</p>
+      <div className="mt-3 space-y-2">
+        <IssueSummaryLine label="Copy" value={copy ? `${copy.book?.title ?? 'Book'} (${copy.barcode})` : 'No copy selected'} />
+        <IssueSummaryLine
+          label="Borrower"
+          value={
+            student
+              ? studentName(student)
+              : staff
+                ? staffName(staff)
+                : 'No borrower selected'
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+function IssueSummaryLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-slate-400">{label}</span>
+      <span className="min-w-0 text-right font-semibold text-slate-700">{value}</span>
     </div>
   );
 }
@@ -1167,6 +1478,13 @@ function cleanCopyPayload(form: LibraryCopyPayload): LibraryCopyPayload {
       : {}),
     ...(form.purchasedAt ? { purchasedAt: form.purchasedAt } : {}),
   };
+}
+
+function copyMatchesScan(copy: LibraryCopy, code: string) {
+  const normalizedCode = code.trim().toLowerCase();
+  return [copy.barcode, copy.qrCode]
+    .filter(Boolean)
+    .some((value) => value?.trim().toLowerCase() === normalizedCode);
 }
 
 function formatStatus(status: string) {

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { DataTable } from '@/components/ui/data-table';
@@ -7,11 +8,16 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { LoadingState } from '@/components/ui/loading-state';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Button } from '@/components/ui/button';
-import { CheckCircle2, Lock, Archive, History, Zap } from 'lucide-react';
+import { Toast, type ToastTone } from '@/components/ui/toast';
+import { CheckCircle2, Lock, Archive, History } from 'lucide-react';
 
 export function TimetableVersionsList({ academicYearId }: { academicYearId?: string }) {
   const queryClient = useQueryClient();
+  const [notice, setNotice] = useState<{
+    title: string;
+    description?: string;
+    tone: ToastTone;
+  } | null>(null);
   
   const versionsQuery = useQuery({
     queryKey: ['timetable-versions', academicYearId],
@@ -22,24 +28,57 @@ export function TimetableVersionsList({ academicYearId }: { academicYearId?: str
   const publishMutation = useMutation({
     mutationFn: (id: string) => api.publishTimetableVersion(id),
     onSuccess: () => {
-      alert('Version published');
-      queryClient.invalidateQueries({ queryKey: ['timetable-versions'] });
+      setNotice({
+        title: 'Version published',
+        description: 'The selected timetable version is now active for school operations.',
+        tone: 'success',
+      });
+      void queryClient.invalidateQueries({ queryKey: ['timetable-versions'] });
+    },
+    onError: (error: Error) => {
+      setNotice({
+        title: 'Publish failed',
+        description: error.message,
+        tone: 'danger',
+      });
     },
   });
 
   const lockMutation = useMutation({
     mutationFn: (id: string) => api.lockTimetableVersion(id),
     onSuccess: () => {
-      alert('Version locked');
-      queryClient.invalidateQueries({ queryKey: ['timetable-versions'] });
+      setNotice({
+        title: 'Version locked',
+        description: 'The timetable version is locked for audit-safe changes.',
+        tone: 'success',
+      });
+      void queryClient.invalidateQueries({ queryKey: ['timetable-versions'] });
+    },
+    onError: (error: Error) => {
+      setNotice({
+        title: 'Lock failed',
+        description: error.message,
+        tone: 'danger',
+      });
     },
   });
 
   const archiveMutation = useMutation({
     mutationFn: (id: string) => api.archiveTimetableVersion(id),
     onSuccess: () => {
-      alert('Version archived');
-      queryClient.invalidateQueries({ queryKey: ['timetable-versions'] });
+      setNotice({
+        title: 'Version archived',
+        description: 'The timetable version has been moved out of active use.',
+        tone: 'success',
+      });
+      void queryClient.invalidateQueries({ queryKey: ['timetable-versions'] });
+    },
+    onError: (error: Error) => {
+      setNotice({
+        title: 'Archive failed',
+        description: error.message,
+        tone: 'danger',
+      });
     },
   });
 
@@ -107,6 +146,16 @@ export function TimetableVersionsList({ academicYearId }: { academicYearId?: str
 
   return (
     <div className="space-y-4">
+      {notice ? (
+        <Toast
+          title={notice.title}
+          description={notice.description}
+          tone={notice.tone}
+          onDismiss={() => setNotice(null)}
+          className="max-w-none"
+        />
+      ) : null}
+
       {versionsQuery.data?.length === 0 ? (
         <EmptyState 
           title="No versions found" 

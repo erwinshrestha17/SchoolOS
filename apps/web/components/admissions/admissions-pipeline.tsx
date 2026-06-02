@@ -29,6 +29,13 @@ import {
   Check
 } from 'lucide-react';
 import Link from 'next/link';
+import { Toast, ToastTone } from '../ui/toast';
+
+type AdmissionNotice = {
+  title: string;
+  description?: string;
+  tone: ToastTone;
+};
 
 // Pipeline Stages
 const STAGES = [
@@ -57,6 +64,7 @@ export function AdmissionsPipeline() {
   const [uploadingKind, setUploadingKind] = useState<string | null>(null);
   const [verificationNotes, setVerificationNotes] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<AdmissionNotice | null>(null);
 
   // Queries
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
@@ -356,6 +364,14 @@ export function AdmissionsPipeline() {
                   {actionError}
                 </div>
               )}
+              {actionNotice ? (
+                <Toast
+                  title={actionNotice.title}
+                  description={actionNotice.description}
+                  tone={actionNotice.tone}
+                  onDismiss={() => setActionNotice(null)}
+                />
+              ) : null}
 
               {/* Grid split of details */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -468,7 +484,11 @@ export function AdmissionsPipeline() {
                                         const res = await api.previewStudentDocument(match.id);
                                         window.open(res.url, '_blank');
                                       } catch (err) {
-                                        alert('Could not preview document');
+                                        setActionNotice({
+                                          title: 'Could not preview document',
+                                          description: 'The protected preview link could not be created.',
+                                          tone: 'danger',
+                                        });
                                       }
                                     }}
                                     className="p-1 text-slate-400 hover:text-primary-600 transition-colors"
@@ -570,7 +590,11 @@ export function AdmissionsPipeline() {
                         try {
                           await api.openStudentDocumentPdf(selectedAdmission.id, 'ID_CARD');
                         } catch (err) {
-                          alert('Failed to generate or view student ID PDF');
+                          setActionNotice({
+                            title: 'Could not open ID card',
+                            description: 'The ID-card PDF could not be generated or viewed.',
+                            tone: 'danger',
+                          });
                         }
                       }}
                       className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all"
@@ -583,7 +607,11 @@ export function AdmissionsPipeline() {
                   <button
                     onClick={() => {
                       // Mark complete review
-                      alert('Enrollment checklist is cleared! Proceed to verify enrollment details on student directory.');
+                      setActionNotice({
+                        title: 'Checklist cleared',
+                        description: 'Proceed to verify enrollment details in the student directory.',
+                        tone: 'success',
+                      });
                     }}
                     className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-40"
                     disabled={selectedAdmission.documentCount === 0}

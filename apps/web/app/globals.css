@@ -174,7 +174,7 @@ button:disabled {
 /* ─── Shared control helpers ─── */
 .input-control {
   min-height: 2.75rem;
-  border-radius: var(--radius-2xl);
+  border-radius: var(--radius-xl);
 }
 
 .btn-primary,
@@ -184,7 +184,7 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border-radius: var(--radius-2xl);
+  border-radius: var(--radius-xl);
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
   font-weight: 700;
@@ -451,23 +451,23 @@ button:disabled {
 }
 
 .tracking-tighter {
-  letter-spacing: -0.05em;
+  letter-spacing: 0;
 }
 
 .tracking-tight {
-  letter-spacing: -0.025em;
+  letter-spacing: 0;
 }
 
 /* ─── Refined Card ─── */
 .shell-card {
   border: 1px solid #f1f5f9;
   background: #ffffff;
-  border-radius: 2rem;
+  border-radius: 1rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .shell-card:hover {
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 12px 20px -12px rgba(15, 23, 42, 0.18);
   border-color: #e2e8f0;
 }

@@ -8,11 +8,19 @@ import { PageState } from '../ui/page-state';
 import { ReportTable } from './report-table';
 import { useState } from 'react';
 import { OpeningBalanceDialog } from './opening-balance-dialog';
+import { ConfirmDialog } from '../ui/confirm-dialog';
+import { Toast, type ToastTone } from '../ui/toast';
 
 export function ChartOfAccountsView() {
   const queryClient = useQueryClient();
   const [openingBalOpen, setOpeningBalOpen] = useState(false);
   const [selectedFy, setSelectedFy] = useState<any>(null);
+  const [seedConfirmOpen, setSeedConfirmOpen] = useState(false);
+  const [notice, setNotice] = useState<{
+    title: string;
+    description?: string;
+    tone: ToastTone;
+  } | null>(null);
 
   const accountsQuery = useQuery({ 
     queryKey: ['chart-accounts'], 
@@ -28,6 +36,19 @@ export function ChartOfAccountsView() {
     mutationFn: () => api.seedDefaultChartAccounts(),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['chart-accounts'] });
+      setSeedConfirmOpen(false);
+      setNotice({
+        title: 'Default accounts seeded',
+        description: 'The chart of accounts has been refreshed from system defaults.',
+        tone: 'success',
+      });
+    },
+    onError: (error: Error) => {
+      setNotice({
+        title: 'Could not seed accounts',
+        description: error.message,
+        tone: 'danger',
+      });
     },
   });
 
@@ -46,12 +67,19 @@ export function ChartOfAccountsView() {
       <div className="flex flex-wrap gap-3">
         <button
           onClick={() => {
-            const openFy = (fiscalYearsQuery.data ?? []).find(y => y.status === 'OPEN');
+            const openFy = (fiscalYearsQuery.data ?? []).find(
+              (y) => y.status === 'OPEN',
+            );
             if (openFy) {
               setSelectedFy(openFy);
               setOpeningBalOpen(true);
             } else {
-              alert('No open fiscal year found to record opening balance.');
+              setNotice({
+                title: 'Open fiscal year required',
+                description:
+                  'Open a fiscal year in Accounting Management before recording opening balances.',
+                tone: 'warning',
+              });
             }
           }}
           className="inline-flex items-center gap-2 rounded-2xl bg-primary-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-primary-600/20 hover:bg-primary-700 transition-all"
@@ -68,11 +96,7 @@ export function ChartOfAccountsView() {
           <button
             type="button"
             disabled={seedMutation.isPending}
-            onClick={() => {
-              if (window.confirm('This will seed default accounts. Continue?')) {
-                seedMutation.mutate();
-              }
-            }}
+            onClick={() => setSeedConfirmOpen(true)}
             className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:opacity-50"
           >
             <Landmark size={16} />
@@ -80,6 +104,16 @@ export function ChartOfAccountsView() {
           </button>
         }
       >
+        {notice ? (
+          <Toast
+            title={notice.title}
+            description={notice.description}
+            tone={notice.tone}
+            onDismiss={() => setNotice(null)}
+            className="mb-5 max-w-none"
+          />
+        ) : null}
+
         <ReportTable
           headers={['Code', 'Name', 'Group', 'Kind']}
           rows={(accountsQuery.data ?? []).map((account) => ({
@@ -99,6 +133,16 @@ export function ChartOfAccountsView() {
         onClose={() => setOpeningBalOpen(false)}
         fiscalYear={selectedFy}
         accounts={accountsQuery.data ?? []}
+      />
+
+      <ConfirmDialog
+        isOpen={seedConfirmOpen}
+        onClose={() => setSeedConfirmOpen(false)}
+        onConfirm={() => seedMutation.mutate()}
+        title="Seed default chart accounts?"
+        description="This adds system default accounts through the backend. Existing custom accounts are not edited from this screen."
+        confirmLabel="Seed defaults"
+        isConfirming={seedMutation.isPending}
       />
     </div>
   );

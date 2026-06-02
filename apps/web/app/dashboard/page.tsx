@@ -10,6 +10,7 @@ import {
   Users,
   Wallet,
   Calculator,
+  ArrowRight,
   type LucideIcon,
 } from 'lucide-react';
 import type {
@@ -180,7 +181,7 @@ export default function DashboardPage() {
             tone: 'danger' as const,
             title: `${defaultersQuery.data?.length ?? 0} overdue fee record${defaultersQuery.data?.length === 1 ? '' : 's'}`,
             body: 'Review defaulters and send reminders from Fee Collection.',
-            href: '/dashboard/finance',
+            href: '/dashboard/fees',
             cta: 'Open Fees',
           },
         ]
@@ -212,10 +213,10 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Setup needs attention */}
-      <header className="relative overflow-hidden rounded-3xl bg-slate-950 px-6 py-9 text-white shadow-xl lg:px-10">
-        <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+      <header className="relative overflow-hidden rounded-2xl border border-slate-900 bg-slate-950 px-6 py-8 text-white shadow-xl shadow-slate-900/10 lg:px-10">
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-center">
           <div className="max-w-2xl">
-            <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+            <h1 className="text-3xl font-extrabold sm:text-4xl">
               School Dashboard
             </h1>
             <p className="mt-3 text-base leading-7 text-slate-300">
@@ -245,33 +246,42 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-4">
-            <Link
-              href="/dashboard/admissions"
-              className="flex items-center gap-2 rounded-xl bg-primary-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary-500/20 transition hover:bg-primary-600 hover:-translate-y-0.5"
-            >
-              <UserPlus size={18} />
-              New Admission
-            </Link>
-            <Link
-              href="/dashboard/attendance"
-              className="flex items-center gap-2 rounded-xl bg-white/10 px-5 py-3 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/20"
-            >
-              <CalendarCheck size={18} />
-              Mark Attendance
-            </Link>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+            <div className="grid grid-cols-3 gap-2 rounded-xl border border-white/10 bg-white/[0.06] p-3">
+              <DashboardHeroMetric
+                label="Alerts"
+                value={operationalAlerts.length}
+              />
+              <DashboardHeroMetric label="Queued" value={queuedDeliveries} />
+              <DashboardHeroMetric label="Sent" value={sentDeliveries} />
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/dashboard/admissions"
+                className="flex items-center gap-2 rounded-xl bg-primary-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary-500/20 transition hover:-translate-y-0.5 hover:bg-primary-600"
+              >
+                <UserPlus size={18} />
+                New Admission
+              </Link>
+              <Link
+                href="/dashboard/attendance"
+                className="flex items-center gap-2 rounded-xl bg-white/10 px-5 py-3 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/20"
+              >
+                <CalendarCheck size={18} />
+                Mark Attendance
+              </Link>
+            </div>
           </div>
         </div>
-
-        <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-primary-600/20 blur-3xl" />
-        <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-indigo-600/20 blur-3xl" />
       </header>
 
       {session?.user.roles.includes('teacher') && (
         <section className="space-y-6">
           <div className="flex items-center gap-3">
             <div className="h-1 w-8 bg-indigo-500 rounded-full" />
-            <h2 className="text-xl font-black uppercase italic tracking-tight text-slate-900">Teacher Insights</h2>
+            <h2 className="text-xl font-black text-slate-900">
+              Teacher Insights
+            </h2>
           </div>
           <TeacherDashboard />
         </section>
@@ -321,10 +331,20 @@ export default function DashboardPage() {
                 <Link
                   key={alert.title}
                   href={alert.href}
-                  className="rounded-2xl border border-warning-200 bg-warning-50 p-4 text-sm transition hover:bg-warning-100"
+                  className={cn(
+                    'group rounded-xl border p-4 text-sm transition hover:-translate-y-0.5',
+                    alertToneStyles[alert.tone],
+                  )}
                 >
-                  <p className="font-bold text-warning-900">{alert.title}</p>
-                  <p className="mt-1 text-warning-700">{alert.body}</p>
+                  <p className="font-bold">{alert.title}</p>
+                  <p className="mt-1 opacity-85">{alert.body}</p>
+                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-black uppercase tracking-wider">
+                    {alert.cta}
+                    <ArrowRight
+                      size={13}
+                      className="transition group-hover:translate-x-0.5"
+                    />
+                  </span>
                 </Link>
               ))}
             </div>
@@ -547,6 +567,30 @@ export default function DashboardPage() {
           />
         </SectionCard>
       </div>
+    </div>
+  );
+}
+
+const alertToneStyles = {
+  warning: 'border-warning-200 bg-warning-50 text-warning-900 hover:bg-warning-100',
+  danger: 'border-danger-200 bg-danger-50 text-danger-900 hover:bg-danger-100',
+} as const;
+
+function DashboardHeroMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="rounded-lg bg-white/[0.06] px-3 py-2">
+      <p className="text-[0.65rem] font-black uppercase tracking-wider text-slate-400">
+        {label}
+      </p>
+      <p className="mt-1 text-lg font-black leading-none text-white">
+        {value}
+      </p>
     </div>
   );
 }

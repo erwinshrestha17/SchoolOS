@@ -113,6 +113,7 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
   let eventEmitter: { emit: jest.Mock };
   let fileRegistryService: {
     registerFile: jest.Mock;
+    markUploaded: jest.Mock;
     getSignedUrl: jest.Mock;
     auditAccess: jest.Mock;
   };
@@ -152,6 +153,7 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
     eventEmitter = { emit: jest.fn() };
     fileRegistryService = {
       registerFile: jest.fn().mockResolvedValue({ id: 'file-asset-1' }),
+      markUploaded: jest.fn().mockResolvedValue({ id: 'file-asset-1' }),
       getSignedUrl: jest
         .fn()
         .mockResolvedValue('signed://activity/file-asset-1'),
@@ -214,6 +216,11 @@ describe('Activity Media + Consent Privacy Integration (E2E)', () => {
         originalFilename: 'art.jpg',
         objectKey: `${tenantId}/activity/photo.jpg`,
       }),
+    );
+    expect(fileRegistryService.markUploaded).toHaveBeenCalledWith(
+      tenantId,
+      'file-asset-1',
+      teacherActor.userId,
     );
     expect(prisma.__state.activityAttachments).toEqual([
       expect.objectContaining({

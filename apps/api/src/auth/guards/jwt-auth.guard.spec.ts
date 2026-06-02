@@ -30,6 +30,8 @@ describe('JwtAuthGuard', () => {
     email: 'admin@schoolos.com',
     authMethod: AuthMethod.PASSWORD,
     roles: ['admin'],
+    iss: 'schoolos',
+    aud: 'schoolos-web',
   };
 
   const mockUser = {
@@ -79,6 +81,9 @@ describe('JwtAuthGuard', () => {
       jwtService as unknown as JwtService,
       {
         jwtSecret: 'test-secret',
+        jwtIssuer: 'schoolos',
+        jwtAudienceWeb: 'schoolos-web',
+        jwtAudienceMobile: 'schoolos-mobile',
         accessCookieName: 'access_token',
       } as ConfigService,
       auditService as unknown as AuditService,
@@ -119,7 +124,53 @@ describe('JwtAuthGuard', () => {
 
     expect(jwtService.verifyAsync).toHaveBeenCalledWith('access-cookie-token', {
       secret: 'test-secret',
+      algorithms: ['HS256'],
     });
+    expect(request.auth?.tenantId).toBe('tenant-1');
+    expect(cls.set).toHaveBeenCalledWith(TENANT_ID_KEY, 'tenant-1');
+  });
+
+  it('rejects tokens with the wrong issuer before tenant lookup', async () => {
+    jwtService.verifyAsync.mockResolvedValueOnce({
+      ...basePayload,
+      iss: 'unexpected-issuer',
+    });
+    const { context } = createContext();
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      new UnauthorizedException('Invalid token issuer'),
+    );
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(cls.set).not.toHaveBeenCalled();
+  });
+
+  it('rejects browser tokens with the mobile audience before tenant lookup', async () => {
+    jwtService.verifyAsync.mockResolvedValueOnce({
+      ...basePayload,
+      aud: 'schoolos-mobile',
+    });
+    const { context } = createContext({
+      'user-agent': 'Mozilla/5.0',
+    });
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      new UnauthorizedException('Invalid token audience'),
+    );
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(cls.set).not.toHaveBeenCalled();
+  });
+
+  it('accepts Flutter client tokens only with the mobile audience', async () => {
+    jwtService.verifyAsync.mockResolvedValueOnce({
+      ...basePayload,
+      aud: 'schoolos-mobile',
+    });
+    const { context, request } = createContext({
+      'user-agent': 'Dart/3.4 (Flutter)',
+    });
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+
     expect(request.auth?.tenantId).toBe('tenant-1');
     expect(cls.set).toHaveBeenCalledWith(TENANT_ID_KEY, 'tenant-1');
   });
@@ -153,6 +204,42 @@ describe('JwtAuthGuard', () => {
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
+    expect(prisma.tenant.findUnique).not.toHaveBeenCalled();
+    expect(cls.set).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
+  });
+
+  it('rejects platform overrides without an active support session', async () => {
+    prisma.user.findUnique.mockResolvedValueOnce({
+      ...mockUser,
+      userRoles: [
+        {
+          role: {
+            name: 'platform_super_admin',
+            rolePermissions: [],
+          },
+        },
+      ],
+    });
+    prisma.supportOverride.findFirst.mockResolvedValueOnce(null);
+    const { context } = createContext({
+      'x-schoolos-tenant-id': 'tenant-2',
+      'x-schoolos-tenant-override-reason': 'Support investigation',
+    });
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      new ForbiddenException(
+        'No active support override session found or session expired',
+      ),
+    );
+    expect(prisma.supportOverride.findFirst).toHaveBeenCalledWith({
+      where: {
+        platformUserId: 'user-1',
+        tenantId: 'tenant-2',
+        isActive: true,
+        expiresAt: { gt: expect.any(Date) },
+      },
+    });
     expect(prisma.tenant.findUnique).not.toHaveBeenCalled();
     expect(cls.set).not.toHaveBeenCalled();
     expect(auditService.record).not.toHaveBeenCalled();
@@ -207,9 +294,20 @@ describe('JwtAuthGuard', () => {
   });
 
   it('rejects platform super admin overrides to missing or inactive tenants', async () => {
-    jwtService.verifyAsync.mockResolvedValue({
-      ...basePayload,
-      roles: ['platform_super_admin'],
+    prisma.user.findUnique.mockResolvedValue({
+      ...mockUser,
+      userRoles: [
+        {
+          role: {
+            name: 'platform_super_admin',
+            rolePermissions: [],
+          },
+        },
+      ],
+    });
+    prisma.supportOverride.findFirst.mockResolvedValue({
+      id: 'override-1',
+      isActive: true,
     });
     prisma.tenant.findUnique.mockResolvedValueOnce(null);
     const missingTenant = createContext({

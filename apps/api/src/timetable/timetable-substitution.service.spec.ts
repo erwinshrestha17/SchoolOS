@@ -47,11 +47,13 @@ describe('TimetableSubstitutionService', () => {
           provide: PrismaService,
           useValue: {
             timetableSlot: {
+              findMany: jest.fn(),
               findFirst: jest.fn(),
               findUnique: jest.fn(),
             },
             timetableSubstitution: {
               create: jest.fn(),
+              findMany: jest.fn(),
               findFirst: jest.fn(),
               update: jest.fn(),
             },
@@ -160,6 +162,53 @@ describe('TimetableSubstitutionService', () => {
       await expect(
         service.createSubstitution(dto, mockActor as any),
       ).rejects.toThrow(/does not fall on the slot's day of week/);
+    });
+
+    it('should accept Sunday substitutions using timetable day 7', async () => {
+      const sundaySlot = {
+        ...mockSlot,
+        dayOfWeek: 7,
+      };
+      const dto: CreateSubstitutionDto = {
+        timetableSlotId: 'slot-1',
+        absentTeacherId: 'teacher-absent',
+        date: '2026-05-10',
+        reason: 'Sunday duty leave',
+      };
+
+      jest
+        .spyOn(prisma.timetableSlot, 'findFirst')
+        .mockResolvedValue(sundaySlot as any);
+      jest
+        .spyOn(prisma.staff, 'findFirst')
+        .mockResolvedValue({ id: 'teacher-absent' } as any);
+      jest
+        .spyOn(prisma.timetableSubstitution, 'findFirst')
+        .mockResolvedValue(null);
+      jest
+        .spyOn(attendanceService, 'getTeacherAbsenceContext')
+        .mockResolvedValue({
+          isAbsent: true,
+          attendanceStatus: 'ABSENT',
+          leaveType: null,
+        });
+      jest.spyOn(prisma.timetableSubstitution, 'create').mockResolvedValue({
+        id: 'sub-sunday',
+        ...dto,
+        status: 'DRAFT',
+      } as any);
+
+      await expect(
+        service.createSubstitution(dto, mockActor as any),
+      ).resolves.toBeDefined();
+
+      expect(prisma.timetableSubstitution.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            date: expect.any(Date),
+          }),
+        }),
+      );
     });
 
     it('should block if absentTeacherId does not match slot teacher', async () => {
@@ -317,6 +366,98 @@ describe('TimetableSubstitutionService', () => {
         ),
       ).rejects.toThrow(
         /Substitute teacher has a conflicting timetable assignment or substitution/,
+      );
+    });
+
+    it('normalizes substitution dates before same-day substitute collision checks', async () => {
+      const nonMidnightDate = new Date('2026-05-11T08:45:00.000Z');
+      const normalizedDate = new Date(nonMidnightDate);
+      normalizedDate.setHours(0, 0, 0, 0);
+
+      jest
+        .spyOn(prisma.timetableSubstitution, 'findFirst')
+        .mockResolvedValueOnce({
+          ...mockSubstitution,
+          date: nonMidnightDate,
+        } as any)
+        .mockResolvedValueOnce({ id: 'another-sub' } as any);
+      jest
+        .spyOn(prisma.staff, 'findFirst')
+        .mockResolvedValue({ id: 'substitute-teacher' } as any);
+      jest
+        .spyOn(attendanceService, 'getTeacherAbsenceContext')
+        .mockResolvedValue({ isAbsent: false } as any);
+
+      const lifecycleService = (service as any).lifecycleService;
+      jest
+        .spyOn(lifecycleService, 'validateCandidateSlot')
+        .mockResolvedValue({ valid: true, errors: [], warnings: [] });
+
+      await expect(
+        service.assignSubstitution(
+          'sub-1',
+          { substituteTeacherId: 'substitute-teacher' },
+          mockActor as any,
+        ),
+      ).rejects.toThrow(
+        /Substitute teacher has a conflicting timetable assignment or substitution/,
+      );
+
+      expect(
+        (prisma.timetableSubstitution.findFirst as jest.Mock).mock.calls[1][0],
+      ).toEqual(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            date: normalizedDate,
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('getDailySubstitutionSummary', () => {
+    it('uses timetable day 7 for Sunday absence summaries', async () => {
+      jest.spyOn(prisma.timetableSlot, 'findMany').mockResolvedValue([
+        {
+          ...mockSlot,
+          dayOfWeek: 7,
+          subject: { name: 'Mathematics' },
+          class: { name: 'Grade 4' },
+          section: null,
+          staff: { firstName: 'Absent', lastName: 'Teacher' },
+        } as any,
+      ]);
+      jest
+        .spyOn(prisma.timetableSubstitution, 'findMany')
+        .mockResolvedValue([]);
+      jest
+        .spyOn(attendanceService, 'getTeacherAbsenceContext')
+        .mockResolvedValue({
+          isAbsent: true,
+          attendanceStatus: 'ABSENT',
+          leaveType: null,
+        });
+
+      const summary = await service.getDailySubstitutionSummary(
+        '2026-05-10',
+        mockActor as any,
+      );
+
+      expect(prisma.timetableSlot.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            dayOfWeek: 7,
+          }),
+        }),
+      );
+      expect(summary.absentSlots).toBe(1);
+      expect(summary.needsSubstitution).toBe(1);
+      expect(summary.slots[0]).toEqual(
+        expect.objectContaining({
+          isTeacherAbsent: true,
+          needsAction: true,
+          absenceReason: 'ABSENT',
+        }),
       );
     });
   });

@@ -45,6 +45,8 @@ Important working-tree note:
 Phase Gate 0 verification was green before M0 and feature-depth work started.
 M0 provider/queue/API-key pilot hardening and M10/M6/M7/M8A/M8C/M8B feature-depth hardening have now been implemented and verified through build during their sprint gates.
 M0/File Registry storage hardening now includes a provider-neutral `StorageAdapter` contract, normalized local/s3/r2/minio/gcp config, backward-compatible R2 aliases, private-by-default object writes, short-lived signed URL helpers, and StorageService delegation through local and S3-compatible adapters. M0 platform storage readiness has started using the normalized config; staging bucket verification remains environment-gated.
+Current local M0-M10 backend hardening added Accounting PDF control-total summaries, Student QR tenant-filtered lookup regressions, timetable Sunday/normalized-date conflict coverage, guardian-owned chat scope coverage, activity media upload-completion, CSRF/JWT guard regressions, attendance rejected-offline replay coverage, library tenant-scope regressions, and cashier-close duplicate race coverage.
+Current admin web polish added dashboard shell/card typography cleanup, accounting audit context, transport location freshness, scanner-first Library/Canteen QR flows, and a global Toast/ConfirmDialog feedback pass that removes browser-native `alert()`/`confirm()` from `apps/web/app` and `apps/web/components`.
 `pnpm verify:production` must be rerun in local/staging if the current sandbox blocks browser E2E local-port binding.
 `pnpm smoke:phase1` still requires local Postgres, Redis, API, and web services.
 ```
@@ -77,7 +79,7 @@ Biometric workflows
 |---|---|---:|
 | Auth / Security / Tenant Isolation | Strong foundation | 90-95% |
 | M0 Platform Core | Foundation complete with provider/queue pilot hardening; broader pilot hardening remains | 85-90% |
-| M1 Admissions & Student Profiles | Pilot-ready plus Student QR foundation | 90-95% |
+| M1 Admissions & Student Profiles | Pilot-ready plus Student QR foundation and tenant-scope QR hardening | 92-96% |
 | M2 Smart Attendance | Pilot-ready | 85-90% |
 | M3 Fees & Receipts | Pilot-ready plus focused finance hardening slice | 90-95% |
 | M4 Academics / Exams / CAS / Report Cards | Completed / Pilot-Ready | 100% |
@@ -106,12 +108,13 @@ Implemented:
 - App-level throttling and production verification scripts.
 - Request/correlation ID propagation through response headers, response envelopes, structured request logs, and audit records.
 - Production secret, cookie, and same-site runtime validation.
+- JWT issuer/audience regressions now reject invalid web/mobile tokens before tenant lookup, mobile Flutter tokens require the mobile audience, and support tenant overrides require an active support session plus an explicit reason before tenant context is changed.
+- CSRF guard regressions now cover safe method bypass, bearer API-client bypass, public auth/register route bypass, development and production cookie names, cookie/header mismatch denial, and signed-token validation.
 - Dashboard direct-route permission-denied gating before protected module pages load.
 - Dashboard slow-session recovery with retry/sign-in actions when cookie validation or permission loading stalls.
 
 Remaining backend:
 
-- More denial, override, tenant-isolation, and session/security regression tests.
 - Final production credential review during deployment.
 
 Remaining frontend:
@@ -151,6 +154,7 @@ Remaining frontend:
 - Platform tenant-action manual QA.
 - Broader browser coverage for queue/provider failure detail surfaces.
 - Browser coverage for suspend/activate, overrides, billing, API keys, webhooks, providers, and queue retry.
+- App-controlled confirmation/status feedback is implemented locally; staging/browser coverage still needs to exercise the critical platform mutations.
 
 ### M1 - Admissions & Student Profiles
 
@@ -162,7 +166,8 @@ Implemented:
 - School logo uploads now use the same private object storage + File Registry pattern with tenant-scoped preview/download URLs, validation, update/remove audit logs, and PDF-safe file asset IDs in `school_logo`.
 - Student document audit trail API and profile visibility, with sanitized document list responses that avoid raw storage keys and read-history entries for preview/download access.
 - Student identity models.
-- Student QR credential model, secure token hashing, generate/rotate/revoke/resolve API, transactional rotation that preserves old credentials as ROTATED history, safe status/history API, QR admin card, and Library/Canteen QR resolver foundations.
+- Student QR credential model, secure token hashing, generate/rotate/revoke/resolve API, tenant-filtered QR resolution, transactional rotation that preserves old credentials as ROTATED history, safe status/history API, QR admin card, and Library/Canteen QR resolver foundations.
+- Student QR regressions now cover tenant-filtered scan lookup, inactive/expired/rotated/revoked scan denial, last-scan metadata, purpose-limited responses, parent/teacher ownership checks, cross-tenant status denial, cross-tenant rotation denial, and cross-tenant revocation denial.
 - iEMIS export now persists a tenant-scoped CSV artifact through File Registry/report export history and exposes a directory export action.
 - Duplicate review now has an admin-only candidate list endpoint and directory UI based on name, guardian phone, DOB, admission number, and previous-school signals.
 
@@ -171,15 +176,16 @@ Remaining backend:
 - iEMIS final export mapping still needs staging validation against a real Nepal iEMIS template; unsupported schema fields must stay blank/documented until modeled.
 - Duplicate merge execution remains implemented but still needs broader linked-module staging verification before enabling aggressive admin workflows.
 - Staging verification for storage-backed student photo/document/logo flows.
-- QR scan release verification, browser coverage, and more tenant/permission tests.
+- QR scan release verification and browser coverage.
 - ID-card QR PDF behavior has backend integration coverage for opaque QR payload support; visual/manual PDF QR rendering still needs staging verification with real generated cards.
 
 Remaining frontend:
 
 - QR manual QA in student, library, and canteen flows.
-- Student photo/logo upload UX polish beyond the current profile-edit and settings API foundations.
+- Student photo/logo upload UX polish beyond the current profile-edit/settings API foundations and app-controlled photo removal dialog.
 - [x] Student document audit trail visibility.
 - [x] Student directory duplicate candidate review visibility for lifecycle admins.
+- [x] Admissions document preview, ID-card, and checklist feedback no longer uses browser-native alerts.
 - Parent-safe student profile views later.
 
 ### M2 - Smart Attendance
@@ -194,12 +200,13 @@ Implemented:
 - M2 hardening slice: correction requests now persist previous status and reason-required review metadata, correction lists are paginated, teacher lock-window failures use the school-friendly correction message, parent/student attendance access checks correctly honor guardian-owned children, attendance register exports register generated artifacts through File Registry when available, and the web attendance form has tenant/user/class/date-scoped local draft recovery plus sync/conflict states.
 - Parent mobile attendance now uses the purpose-limited `/mobile/students/:id/attendance-summary` API with month-history data instead of admin-shaped attendance endpoints or hard-coded child fallbacks.
 - Teacher mobile attendance now uses purpose-limited `/mobile/teacher/attendance/classes`, `/mobile/teacher/attendance/roster`, and `/mobile/teacher/attendance/submit` APIs backed by existing teacher-scope attendance validation.
+- Mobile teacher attendance permission regressions now deny unassigned class/section roster access and attendance submission before roster exposure or attendance writes.
+- Correction review permission regressions now deny non-reviewers, return not-found for cross-tenant correction lookups, persist rejection reasons without attendance writes, and deny parent attendance summaries outside guardian links.
+- Offline sync regressions now persist rejected submissions with rejection reason/audit payloads and replay the same `clientSubmissionId` without resubmitting attendance.
 
 Remaining backend:
 
 - Broader attendance report/export staging verification against real object storage.
-- More service-level permission tests for correction approval/rejection, guardian denial, and tenant isolation.
-- More mobile teacher attendance permission/tenant-isolation tests beyond the focused controller and repository contract coverage.
 
 Remaining frontend:
 
@@ -215,20 +222,20 @@ Implemented:
 - Payments, receipts, refunds/reversals, cashier close.
 - Student fee ledger, dues/report foundations, M9 consistency coverage.
 - Fees/finance collection and ledger UI foundations.
-- M3 hardening slice: receipt reprints now record payment/student/File Registry metadata and list latest reprint history, reversal paths require service-level permission and reason, already-reversed and closed-cashier-day reversals are blocked with school-friendly messages, cashier close uses a deterministic duplicate-protection key, reconciliation summaries include payment-method rollups and registered CSV artifacts, and gateway readiness exposes disabled/configured status without fake payment collection.
+- M3 hardening slice: receipt reprints now record payment/student/File Registry metadata and list latest reprint history, reversal paths require service-level permission and reason, already-reversed and closed-cashier-day reversals are blocked with school-friendly messages, cashier close uses a deterministic duplicate-protection key plus transaction-level duplicate race coverage, reconciliation summaries include payment-method rollups and registered CSV artifacts, and gateway readiness exposes disabled/configured status without fake payment collection.
+- Collection counter dues table supports fee-head and billing-period filtering plus line-level quick-fill collection amounts while preserving overpayment guards in the payment panel.
 
 Remaining backend:
 
 - Real online payment provider initiation/webhook implementation after provider config and settlement contracts are approved.
 - Broader receipt/report export PDF polish and staging File Registry verification.
-- More concurrent cashier-close race tests against a real database.
+- Live concurrent cashier-close race verification against a real database.
 - Full day-end close PDF report polish.
 
 Remaining frontend:
 
-- More detailed fee-head/period dues table interactions in the main counter screen.
 - Gateway payment collection UX after backend provider integration is approved.
-- Finance reports/export polish beyond current receipt history, gateway-readiness notice, and reconciliation export foundations.
+- Finance reports/export polish beyond current receipt history, gateway-readiness notice, dues filtering, quick-fill collection, and reconciliation export foundations.
 
 ### M4 - Academics, Exams, CAS, Report Cards
 
@@ -254,8 +261,9 @@ Remaining backend:
 Remaining frontend:
 
 - [x] Browser/manual smoke execution in an environment with seeded credentials and local ports.
-- [ ] Dialog-level correction UX polish beyond the current guarded action.
+- [x] Dialog-level correction UX polish beyond the current guarded action.
 - [x] Academic reporting UI depth beyond the smoke-tested report-card workflow.
+- [x] Exams, components, marks lock, report-card batch generation, promotion, and result publishing use app-controlled Toast/ConfirmDialog feedback instead of browser-native prompts.
 
 ### M5 - Activity Feed & Milestones
 
@@ -268,12 +276,12 @@ Implemented:
 - Media privacy tests.
 - Activity media responses now avoid raw storage keys, public URLs, and File Registry IDs; feed/detail/gallery previews route through controlled backend preview endpoints.
 - Parent media previews now fail closed when PHOTO_USAGE consent is missing and show a school-friendly hidden-media state in the web UI.
+- Activity media server-side uploads now mark their File Registry assets uploaded after the private storage write, preventing stored media from remaining in pending-upload state.
 - Parent activity feed route added for approved child-scoped activity posts.
 - Activity dashboard route.
 
 Remaining backend:
 
-- Direct-upload API/UX hardening beyond backend storage-service R2 read/write support.
 - Real image compression/variant generation depth for low-bandwidth Nepal usage beyond the current queue pattern.
 - Staging object-storage verification for private activity media preview/download.
 
@@ -299,13 +307,14 @@ Remaining backend:
 - [x] Homework upload through File Registry.
 - [x] Homework reminder queue hardening.
 - [x] Leave/absent teacher integration into conflict validation.
-- [x] Deeper timetable conflict/service tests for absence edge cases.
+- [x] Deeper timetable conflict/service tests for absence edge cases, including Sunday timetable-day mapping and normalized same-day substitute collision checks.
 
 Remaining frontend:
 
 - [x] Timetable builder conflict visualization.
 - [x] Teacher dashboard widgets (Today's Classes, Homework Reviews).
 - [x] Homework attachment UX (detail page, review modal).
+- [x] Homework cancel/reminder/file-open feedback uses shared app UI rather than browser-native alerts.
 - [ ] Student/parent homework and timetable views later.
 
 ### M7 - HR & Payroll
@@ -335,6 +344,7 @@ Remaining frontend:
 - [x] Payslip PDF and reversal action UI.
 - [x] Payroll reports UI uses real backend totals and no hard-coded payroll/ledger status figures.
 - [x] Staff lifecycle audit log visibility in HR staff detail.
+- [x] Staff payslip download failure feedback uses shared app UI rather than browser-native alerts.
 - [ ] Browser/mobile smoke execution in staging environment.
 
 ### M8A - Library Management
@@ -348,16 +358,16 @@ Implemented:
 - Book/copy history.
 - Overdue reminder hardening now uses deterministic daily source IDs through the base delivery path, so manual and cron retries dedupe against the same delivery window.
 - Library dashboard, books, copies, issues, overdue, fines, reports routes.
+- Scanner-first admin issue flow with copy barcode/QR lookup, QR borrower status context, recent scan feedback, available-copy selection, and real due-date form validation.
+- Tenant-scope regressions now cover cross-tenant student issue denial, cross-tenant return denial, and cross-tenant book history denial in addition to existing fine posting, staff borrower, QR, and report coverage.
 
 Remaining backend:
 
 - Receipt/payment linkage polish for library fines after M3 collection rules are finalized.
 - Overdue reminder queue operational depth in staging.
-- More tenant/permission tests beyond fine posting, staff borrowers, QR, and report coverage.
 
 Remaining frontend:
 
-- Barcode/QR scanner polish beyond current admin scan surface.
 - Report/export UI polish beyond current CSV/report routes.
 - Browser smoke execution in seeded staging.
 
@@ -403,6 +413,7 @@ Implemented:
 - Daily meal count, item-wise sales, low-balance, student spending, stock ledger reports and CSV exports.
 - Canteen dashboard, menu, plans, enrollments, serving, wallets, POS, controls, reports routes.
 - Admin supplier and inventory item list/create surfaces now use real canteen APIs, support purchase-bill/wastage/manual stock-adjustment operation posting, and show backend stock ledger visibility.
+- Serving and POS QR scan flows now normalize backend canteen purpose aliases, show wallet/allergy/spending warning scan cards, use correct serving/POS student preview queries, and gate POS submission until student, menu item, and quantity are ready.
 
 Remaining backend:
 
@@ -412,7 +423,6 @@ Remaining backend:
 
 Remaining frontend:
 
-- QR/student ID scan speed polish beyond current admin POS/serving surfaces.
 - Parent wallet/menu/spending views later.
 - Canteen report/export polish and deeper linked-invoice actions beyond the current enrollment invoice indicator and POS receipt preview/PDF actions.
 - Browser smoke execution in seeded staging.
@@ -425,7 +435,7 @@ Implemented:
 - Double-entry enforcement, Decimal-safe posting, immutable posted journals.
 - Source-based idempotent posting, reversal/correction workflows.
 - Fiscal close/reopen, opening balances, vouchers.
-- Trial balance, general ledger, cash book, income statement, balance sheet, VAT/TDS/PF summaries, CSV/PDF exports.
+- Trial balance, general ledger, cash book, income statement, balance sheet, VAT/TDS/PF summaries, CSV/PDF exports, with Trial Balance and Balance Sheet PDFs showing control-total summary cards.
 - File Registry report snapshots, bank reconciliation, deterministic auto-match suggestions, and accounting report mapping.
 - Accounting dashboard, accounts, journals, reports, reconciliation, management routes with PDF/snapshot/suggestion surfaces.
 
@@ -454,17 +464,17 @@ Implemented:
 - Communication retention-policy review API and communication-scoped audit trail API.
 - Notices/detail/messages/messaging routes.
 - Flutter notification center reads from `/mobile/me/notifications`, maps backend source families to mobile categories, and marks delivery read state through the mobile notification read endpoint.
+- Parent-teacher chat guardian ownership tests now cover list filter scope precedence, unlinked-student thread creation denial, cross-guardian message read denial, and cross-guardian abuse-report denial.
+- Parent-teacher messaging admin UI now includes a moderation decision panel with thread status, priority/unread counts, explicit concern/moderation/escalation reasons, and close/escalate success notices.
+- Notice detail unread-recipient panel now supports search, channel/class filters, follow-up queue summaries, failed-delivery counts, and contact-cleanup cues.
 
 Remaining backend:
 
 - Production SMS/FCM/email adapters and signed provider callbacks where provider contracts are approved.
-- More guardian ownership tests across all chat/message routes.
 
 Remaining frontend:
 
 - Parent/mobile chat UI later.
-- Moderation/escalation UI depth.
-- Unread recipient list polish.
 - Mobile notification browser/device smoke in staging.
 
 ### M11 - School Intelligence and AI
@@ -582,7 +592,7 @@ Backend tasks:
 1. [x] Done: Route homework attachments through File Registry.
 2. [x] Done: Harden homework reminder queues.
 3. [x] Done: Integrate timetable substitutions with leave/absent teacher workflows.
-4. [x] Done: Deepen timetable conflict validation and tests.
+4. [x] Done: Deepen timetable conflict validation and tests, including Sunday/calendar edge cases.
 5. [x] Done: Harden leave accrual and payroll approval/posting locks.
 6. [x] Done: Harden payroll reports/exports and payslip generation.
 7. [x] Done: Review sensitive staff field masking/encryption.

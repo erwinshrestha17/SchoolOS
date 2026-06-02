@@ -2,6 +2,7 @@ import { Injectable, Optional } from '@nestjs/common';
 import { TeacherAvailabilityType, Prisma } from '@prisma/client';
 import { AttendanceService } from '../attendance/attendance.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { toTimetableDayOfWeek } from './timetable-calendar';
 
 export type TimetableConflictType =
   | 'TEACHER_DOUBLE_BOOKED'
@@ -88,12 +89,12 @@ export interface TimetableConflictValidationInput {
   } | null;
   roomCapacity?: number | null;
   classSize?: number | null;
-  allPeriods?: {
+  allPeriods?: Array<{
     id: string;
     startsAt: string;
     endsAt: string;
     dayOfWeek: number | null;
-  }[];
+  }>;
   date?: Date | string | null;
 }
 
@@ -161,12 +162,6 @@ export class TimetableConflictService {
     tenantId: string,
     candidate: ConflictSlotInput,
   ): Promise<TimetableConflictValidationResult> {
-    if (!this.prisma) {
-      throw new Error(
-        'PrismaService is required for database-backed validation',
-      );
-    }
-
     const candidateScopes = [
       candidate.versionId ? { versionId: candidate.versionId } : null,
       { staffId: candidate.staffId },
@@ -338,12 +333,12 @@ export class TimetableConflictService {
     requirements: SubjectWeeklyRequirementInput[] = [],
     workloadLimits: TeacherWorkloadLimitInput[] = [],
     availability: AvailabilityInput[] = [],
-    allPeriods: {
+    allPeriods: Array<{
       id: string;
       startsAt: string;
       endsAt: string;
       dayOfWeek: number | null;
-    }[] = [],
+    }> = [],
     roomCapacities: Record<string, number> = {},
     classSizes: Record<string, number> = {},
   ): TimetableConflictValidationResult {
@@ -643,12 +638,12 @@ export class TimetableConflictService {
 
   private detectOutsideSchedule(
     candidate: ConflictSlotInput,
-    allPeriods: {
+    allPeriods: Array<{
       id: string;
       startsAt: string;
       endsAt: string;
       dayOfWeek: number | null;
-    }[],
+    }>,
   ): TimetableConflictIssue[] {
     if (allPeriods.length === 0) return [];
 
@@ -725,7 +720,7 @@ export class TimetableConflictService {
           message: `Teacher is ${reason} on this date.`,
           affectedPeriodIds: [], // To be filled by caller
           teacherId: staffId,
-          dayOfWeek: targetDate.getDay(),
+          dayOfWeek: toTimetableDayOfWeek(targetDate),
         },
       ];
     }

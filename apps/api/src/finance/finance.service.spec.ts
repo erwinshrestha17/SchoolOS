@@ -1203,6 +1203,33 @@ describe('finance production controls', () => {
     ).rejects.toThrow('This cashier window is already closed for today.');
   });
 
+  it('blocks cashier close races when a duplicate appears inside the transaction', async () => {
+    const { service, prisma } = buildService({
+      invoice: null,
+      feeHead: null,
+      cashierPayments: [],
+      cashierRefunds: [],
+      cashierCloseCount: 0,
+    });
+    prisma.cashierClose.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'close-race' });
+
+    await expect(
+      service.finalizeCashierClose(
+        {
+          openedAt: '2026-04-27T09:00:00.000Z',
+          closedAt: '2026-04-27T17:00:00.000Z',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('This cashier window is already closed for today.');
+
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.cashierClose.create).not.toHaveBeenCalled();
+  });
+
   it('builds reconciliation rows and csv export from the same payments', async () => {
     const paymentRows = [
       {

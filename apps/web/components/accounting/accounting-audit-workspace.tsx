@@ -8,6 +8,8 @@ import { ReportTable } from './report-table';
 import { Select } from '../ui/select';
 import { Search, History, Eye } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { EmptyState } from '../ui/empty-state';
+import { LoadingState } from '../ui/loading-state';
 
 export function AccountingAuditWorkspace() {
   const [resourceFilter, setResourceFilter] = useState<string>('');
@@ -26,13 +28,25 @@ export function AccountingAuditWorkspace() {
       }),
   });
 
+  const records = query.data?.items ?? [];
+  const activeFilterLabel =
+    [resourceFilter || null, actionFilter || null]
+      .filter(Boolean)
+      .join(' / ') || 'All accounting events';
+
   return (
     <div className="space-y-6 animate-fade-in">
       <SectionCard
         title="Accounting Audit Trail"
         description="Immutable record of all changes to accounting entities, ledgers, and configurations."
       >
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="mb-6 grid gap-3 sm:grid-cols-3">
+          <AuditSummaryCard label="Records on page" value={records.length} />
+          <AuditSummaryCard label="Page" value={page} />
+          <AuditSummaryCard label="Filter" value={activeFilterLabel} />
+        </div>
+
+        <div className="mb-6 flex flex-col gap-4 md:flex-row">
           <div className="relative flex-1">
             <Search
               size={16}
@@ -76,19 +90,13 @@ export function AccountingAuditWorkspace() {
         </div>
 
         {query.isLoading ? (
-          <div className="py-20 text-center text-slate-500">
-            Loading audit trail...
-          </div>
+          <LoadingState variant="skeleton" label="Loading audit trail..." />
         ) : query.data?.items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 rounded-[2rem] bg-slate-50 border border-dashed border-slate-200 text-center">
-            <div className="h-16 w-16 rounded-3xl bg-slate-100 flex items-center justify-center text-slate-400 mb-4">
-              <History size={32} />
-            </div>
-            <h3 className="text-lg font-bold text-slate-900">No Audit Records</h3>
-            <p className="mt-2 text-sm text-slate-500 max-w-sm">
-              No audit logs match your current filters.
-            </p>
-          </div>
+          <EmptyState
+            title="No audit records"
+            description="No accounting audit logs match your current filters."
+            icon={<History size={32} />}
+          />
         ) : (
           <div className="space-y-4">
             <ReportTable
@@ -133,7 +141,7 @@ export function AccountingAuditWorkspace() {
               }))}
             />
 
-            <div className="flex justify-between items-center px-4">
+            <div className="flex items-center justify-between px-4">
               <button
                 disabled={page === 1}
                 onClick={() => setPage((p) => p - 1)}
@@ -141,8 +149,11 @@ export function AccountingAuditWorkspace() {
               >
                 Previous
               </button>
-              <span className="text-sm font-bold text-slate-500">
-                Page {page}
+              <span
+                className="text-sm font-bold text-slate-500"
+                data-testid="accounting-audit-page-summary"
+              >
+                Page {page} / {records.length} records
               </span>
               <button
                 disabled={!query.data?.hasNextPage}
@@ -163,31 +174,39 @@ export function AccountingAuditWorkspace() {
           </DialogHeader>
           {selectedLog && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Action
-                  </label>
-                  <p className="font-bold text-slate-900">
-                    {selectedLog.action.toUpperCase()}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Resource
-                  </label>
-                  <p className="font-bold text-slate-900">
-                    {selectedLog.resource}
-                  </p>
-                </div>
+              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                <AuditDetailField
+                  label="Action"
+                  value={selectedLog.action.toUpperCase()}
+                />
+                <AuditDetailField
+                  label="Resource"
+                  value={selectedLog.resource}
+                />
+                <AuditDetailField
+                  label="Resource ID"
+                  value={selectedLog.resourceId || 'N/A'}
+                />
+                <AuditDetailField
+                  label="Actor ID"
+                  value={selectedLog.userId || 'SYSTEM'}
+                />
+                <AuditDetailField
+                  label="Timestamp"
+                  value={new Date(selectedLog.createdAt).toLocaleString()}
+                />
+                <AuditDetailField
+                  label="Tenant scope"
+                  value={selectedLog.tenantId || 'N/A'}
+                />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                     Before
                   </label>
-                  <div className="rounded-2xl bg-slate-50 p-4 text-[10px] overflow-auto max-h-60 border border-slate-100">
+                  <div className="max-h-60 overflow-auto rounded-2xl border border-slate-100 bg-slate-50 p-4 text-[10px]">
                     <pre>
                       {selectedLog.before
                         ? JSON.stringify(selectedLog.before, null, 2)
@@ -199,7 +218,7 @@ export function AccountingAuditWorkspace() {
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                     After
                   </label>
-                  <div className="rounded-2xl bg-slate-50 p-4 text-[10px] overflow-auto max-h-60 border border-slate-100">
+                  <div className="max-h-60 overflow-auto rounded-2xl border border-slate-100 bg-slate-50 p-4 text-[10px]">
                     <pre>
                       {selectedLog.after
                         ? JSON.stringify(selectedLog.after, null, 2)
@@ -212,6 +231,42 @@ export function AccountingAuditWorkspace() {
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function AuditSummaryCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+      <p className="text-[0.65rem] font-black uppercase tracking-wider text-slate-400">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-lg font-black text-slate-950">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function AuditDetailField({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+        {label}
+      </label>
+      <p className="mt-1 break-words font-bold text-slate-900">{value}</p>
     </div>
   );
 }

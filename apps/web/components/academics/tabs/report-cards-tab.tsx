@@ -18,6 +18,14 @@ import {
   Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Toast, ToastTone } from '@/components/ui/toast';
+
+type ReportCardNotice = {
+  title: string;
+  description?: string;
+  tone: ToastTone;
+};
 
 type Props = {
   academicYears: any[];
@@ -41,6 +49,8 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
     remarks: '',
     lock: true,
   });
+  const [batchConfirmOpen, setBatchConfirmOpen] = useState(false);
+  const [notice, setNotice] = useState<ReportCardNotice | null>(null);
 
   const sectionsForClass = useMemo(() => allSections.filter((s: any) => s.classId === report.classId), [allSections, report.classId]);
   const studentsForClass = useMemo(() => students.filter(
@@ -56,8 +66,20 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
     mutationFn: api.batchGenerateReportCards, 
     onSuccess: (data) => {
       invalidate();
-      alert(`Successfully queued ${data.length} report cards for generation.`);
-    } 
+      setBatchConfirmOpen(false);
+      setNotice({
+        title: 'Report cards queued',
+        description: `${data.length} report cards were queued for generation.`,
+        tone: 'success',
+      });
+    },
+    onError: (error: any) => {
+      setNotice({
+        title: 'Could not queue report cards',
+        description: error.message || 'Batch generation failed.',
+        tone: 'danger',
+      });
+    },
   });
   
   const generateMut = useMutation({ 
@@ -69,8 +91,10 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
 
   const handleBatchGenerate = () => {
     if (!report.academicYearId || !report.examTermId || studentsForClass.length === 0) return;
-    if (!confirm(`Confirm batch generation for all ${studentsForClass.length} students in the selected roster? This will overwrite existing drafts.`)) return;
+    setBatchConfirmOpen(true);
+  };
 
+  const confirmBatchGenerate = () => {
     batchGenerateMut.mutate({
       academicYearId: report.academicYearId,
       examTermId: report.examTermId,
@@ -96,12 +120,25 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (err: any) {
-      alert(err.message ?? 'Could not load report card PDF');
+      setNotice({
+        title: 'Could not load report card PDF',
+        description: err.message ?? 'The generated PDF could not be opened.',
+        tone: 'danger',
+      });
     }
   };
 
   return (
     <div className="space-y-10 animate-fade-in">
+      {notice ? (
+        <Toast
+          title={notice.title}
+          description={notice.description}
+          tone={notice.tone}
+          onDismiss={() => setNotice(null)}
+        />
+      ) : null}
+
       {/* Configuration & Generation */}
       <section className="rounded-[2.5rem] border border-slate-200 bg-white/50 p-8 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between mb-8">
@@ -305,6 +342,16 @@ export function ReportCardsTab({ academicYears, classes, allSections, students, 
            </div>
          )}
       </section>
+
+      <ConfirmDialog
+        isOpen={batchConfirmOpen}
+        title="Batch Generate Report Cards"
+        description={`Generate report cards for ${studentsForClass.length} students in the selected roster? Existing drafts may be overwritten by the backend workflow.`}
+        confirmLabel="Generate Batch"
+        isConfirming={batchGenerateMut.isPending}
+        onConfirm={confirmBatchGenerate}
+        onClose={() => setBatchConfirmOpen(false)}
+      />
     </div>
   );
 }

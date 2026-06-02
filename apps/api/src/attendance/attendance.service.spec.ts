@@ -188,6 +188,63 @@ describe('attendance production hardening', () => {
     );
   });
 
+  it('rejects mobile teacher roster access for unassigned class sections', async () => {
+    const scopeSection = { id: 'section-1', name: 'A', classId: 'class-1' };
+    const { service, prisma } = buildService({
+      academicYear: { id: 'ay-1' },
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      section: scopeSection,
+      staffFindFirst: { id: 'staff-1' },
+    });
+    prisma.section.findFirst
+      .mockResolvedValueOnce(scopeSection)
+      .mockResolvedValueOnce(null);
+    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.getRoster(
+        teacherActor,
+        'ay-1',
+        'class-1',
+        'section-1',
+        '2026-04-28',
+      ),
+    ).rejects.toThrow(
+      'You are not assigned as Class Teacher or Subject Teacher for this section',
+    );
+    expect(prisma.student.findMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects mobile teacher attendance submission for unassigned class sections', async () => {
+    const scopeSection = { id: 'section-1', name: 'A', classId: 'class-1' };
+    const { service, prisma } = buildService({
+      academicYear: { id: 'ay-1' },
+      classroom: { id: 'class-1', name: 'Grade 1' },
+      section: scopeSection,
+      staffFindFirst: { id: 'staff-1' },
+    });
+    prisma.section.findFirst
+      .mockResolvedValueOnce(scopeSection)
+      .mockResolvedValueOnce(null);
+    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.submitAttendance(
+        {
+          academicYearId: 'ay-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          attendanceDate: '2026-04-28',
+          exceptions: [],
+        },
+        teacherActor,
+      ),
+    ).rejects.toThrow(
+      'You are not assigned as Class Teacher or Subject Teacher for this section',
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it('rejects section and class mismatches before attendance writes', async () => {
     const { service, prisma } = buildService({
       academicYear: { id: 'ay-1' },
@@ -526,6 +583,106 @@ describe('attendance production hardening', () => {
         teacherActor,
       ),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('restricts correction review to attendance reviewers', async () => {
+    const { service, prisma } = buildService({});
+
+    await expect(
+      service.approveCorrectionRequest(
+        'correction-1',
+        {
+          status: 'APPROVED',
+          reviewNote: 'Correcting teacher-submitted mistake',
+        },
+        teacherActor,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.attendanceCorrectionRequest.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('returns not found for cross-tenant correction review lookups', async () => {
+    const { service, prisma } = buildService({ correctionRequest: null });
+
+    await expect(
+      service.approveCorrectionRequest(
+        'correction-foreign',
+        {
+          status: 'APPROVED',
+          reviewNote: 'Approved after checking class register',
+        },
+        adminActor,
+      ),
+    ).rejects.toThrow(NotFoundException);
+    expect(prisma.attendanceCorrectionRequest.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'correction-foreign', tenantId: adminActor.tenantId },
+      }),
+    );
+  });
+
+  it('records rejected correction reasons without mutating attendance records', async () => {
+    const rejectedCorrection = {
+      id: 'correction-1',
+      status: 'REJECTED',
+      reviewedById: adminActor.userId,
+      reviewReason: 'Register already matches the submitted status',
+    };
+    const { service, prisma } = buildService({
+      correctionRequest: {
+        id: 'correction-1',
+        status: 'PENDING',
+        attendanceRecordId: 'record-1',
+        studentId: 'student-1',
+        requestedStatus: AttendanceStatus.ABSENT,
+        previousStatus: AttendanceStatus.PRESENT,
+        reason: 'Marked by mistake',
+      },
+      correctionUpdated: rejectedCorrection,
+    });
+
+    const result = await service.approveCorrectionRequest(
+      'correction-1',
+      {
+        status: 'REJECTED',
+        reviewNote: 'Register already matches the submitted status',
+      },
+      adminActor,
+    );
+
+    expect(result).toBe(rejectedCorrection);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.attendanceCorrectionRequest.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'REJECTED',
+          reviewReason: 'Register already matches the submitted status',
+          reviewNote: 'Register already matches the submitted status',
+        }),
+      }),
+    );
+  });
+
+  it('denies parent attendance summaries for students outside guardian links', async () => {
+    const parentActor = {
+      ...teacherActor,
+      userId: 'parent-1',
+      roles: ['parent'],
+      permissions: ['attendance:read'],
+    };
+    const { service, prisma } = buildService({
+      studentFindFirst: { id: 'student-2', classId: 'class-1', sectionId: null },
+      guardianFindFirst: {
+        id: 'guardian-1',
+        studentLinks: [{ studentId: 'student-1' }],
+      },
+    });
+
+    await expect(
+      service.getParentSummary('student-2', parentActor),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.attendanceRecord.findFirst).not.toHaveBeenCalled();
+    expect(prisma.attendanceRecord.findMany).not.toHaveBeenCalled();
   });
 
   it('marks rejected resubmissions and updates linked sync records', async () => {
@@ -880,6 +1037,8 @@ function buildService(options: {
   conflictRecord?: unknown;
   attendanceConflict?: unknown;
   updatedConflict?: unknown;
+  correctionRequest?: unknown;
+  correctionUpdated?: unknown;
   updatedSyncCount?: number;
   leaveRequest?: unknown;
   reviewedLeave?: unknown;
@@ -891,6 +1050,7 @@ function buildService(options: {
   staffFindFirst?: unknown;
   teacherAssignments?: unknown[];
   classTeacherSections?: unknown[];
+  guardianFindFirst?: unknown;
 }) {
   const tx = {
     attendanceConflict: {
@@ -980,7 +1140,18 @@ function buildService(options: {
       update: jest.fn().mockResolvedValue(options.updatedConflict ?? null),
     },
     attendanceRecord: {
+      findFirst: jest.fn().mockResolvedValue(null),
       findMany: jest.fn().mockResolvedValue(options.attendanceRecords ?? []),
+    },
+    attendanceCorrectionRequest: {
+      findFirst: jest.fn().mockResolvedValue(options.correctionRequest ?? null),
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+      update: jest.fn().mockResolvedValue(options.correctionUpdated ?? null),
+      create: jest.fn().mockResolvedValue(options.correctionUpdated ?? null),
+    },
+    guardian: {
+      findFirst: jest.fn().mockResolvedValue(options.guardianFindFirst ?? null),
     },
     notificationDelivery: {
       findFirst: jest.fn().mockImplementation(async () => {

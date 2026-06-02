@@ -310,6 +310,7 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
   const activeTrips = activeTripsQuery.data ?? [];
   const trips = tripsQuery.data ?? [];
   const selectedTrip = activeTrips.find((trip) => trip.id === selectedTripId) ?? trips.find((trip) => trip.id === selectedTripId);
+  const locationFreshness = getLocationFreshness(locationQuery.data?.recordedAt);
   const activeTripStudentStatuses = activeTrips.flatMap(
     (trip) => trip.studentStatuses ?? [],
   );
@@ -725,31 +726,87 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
 
       {activeTab === 'location' && (
         <TwoColumn>
-          <Panel title="Latest location" description="Map and WebSocket live tracking will be added later; this reads the latest backend location.">
-            <SelectInput label="Trip" value={selectedTripId} onChange={setSelectedTripId} options={[...activeTrips, ...trips].map((trip) => ({ label: `${trip.route?.name ?? trip.routeId} • ${trip.status} (${trip.direction})`, value: trip.id }))} />
-            {locationQuery.isFetching ? <LoadingState label="Loading latest location..." /> : null}
+          <Panel
+            title="Latest location"
+            description="Map and WebSocket live tracking will be added later; this reads the latest backend location."
+          >
+            <SelectInput
+              label="Trip"
+              value={selectedTripId}
+              onChange={setSelectedTripId}
+              options={[...activeTrips, ...trips].map((trip) => ({
+                label: `${trip.route?.name ?? trip.routeId} • ${trip.status} (${trip.direction})`,
+                value: trip.id,
+              }))}
+            />
+            {locationQuery.isFetching ? (
+              <LoadingState label="Loading latest location..." />
+            ) : null}
             {locationQuery.data ? (
               <div className="mt-4 space-y-4">
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                   <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div><p className="text-slate-500">Latitude</p><p className="font-bold">{locationQuery.data.latitude}</p></div>
-                      <div><p className="text-slate-500">Longitude</p><p className="font-bold">{locationQuery.data.longitude}</p></div>
-                      <div><p className="text-slate-500">Speed</p><p className="font-bold">{locationQuery.data.speedKph ?? '0'} km/h</p></div>
-                      <div><p className="text-slate-500">Recorded</p><p className="font-bold">{formatDateTime(locationQuery.data.recordedAt)}</p></div>
-                   </div>
-                   {new Date().getTime() - new Date(locationQuery.data.recordedAt).getTime() > 120000 && (
-                     <div className="mt-3 flex items-center gap-2 rounded-xl bg-red-100 px-3 py-2 text-xs font-bold text-red-700">
-                        <AlertTriangle size={14} />
-                        Stale Data: Last update was over 2 minutes ago.
-                     </div>
-                   )}
+                <div
+                  className="rounded-xl border border-slate-100 bg-slate-50 p-4"
+                  data-testid="transport-location-freshness-panel"
+                >
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+                        Selected trip
+                      </p>
+                      <p className="mt-1 font-bold text-slate-900">
+                        {selectedTrip?.route?.name ??
+                          selectedTrip?.routeId ??
+                          'Trip selected'}
+                      </p>
+                    </div>
+                    <span
+                      className={cn(
+                        'rounded-full px-3 py-1 text-xs font-black uppercase tracking-wider',
+                        locationFreshness.className,
+                      )}
+                    >
+                      {locationFreshness.label}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <LocationMetric
+                      label="Latitude"
+                      value={locationQuery.data.latitude}
+                    />
+                    <LocationMetric
+                      label="Longitude"
+                      value={locationQuery.data.longitude}
+                    />
+                    <LocationMetric
+                      label="Speed"
+                      value={`${locationQuery.data.speedKph ?? '0'} km/h`}
+                    />
+                    <LocationMetric
+                      label="Recorded"
+                      value={formatDateTime(locationQuery.data.recordedAt)}
+                    />
+                  </div>
+                  <div
+                    className={cn(
+                      'mt-3 flex items-start gap-2 rounded-xl px-3 py-2 text-xs font-bold',
+                      locationFreshness.noticeClassName,
+                    )}
+                  >
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                    <span>{locationFreshness.message}</span>
+                  </div>
                 </div>
-                <div className="flex h-48 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-100 text-slate-400">
                   <MapPin size={32} />
                   <span className="ml-2 font-semibold">Map Preview Deferred</span>
                 </div>
               </div>
-            ) : <EmptyState title="No location selected" description="Select an active or recent trip to read its latest location." />}
+            ) : (
+              <EmptyState
+                title="No location selected"
+                description="Select an active or recent trip to read its latest location."
+              />
+            )}
           </Panel>
           <div className="space-y-6">
             <Panel title="Manual location ping" description="Useful for API smoke testing until the driver app sends GPS automatically.">
@@ -926,6 +983,21 @@ function InfoCard({ title, lines }: { title: string; lines: string[] }) {
   );
 }
 
+function LocationMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div>
+      <p className="text-xs font-bold text-slate-500">{label}</p>
+      <p className="mt-1 break-words font-bold text-slate-950">{value}</p>
+    </div>
+  );
+}
+
 function TripList({ trips, emptyTitle, onComplete, onCancel, onSelect, onDelay, compact, showLocationWarning }: { trips: TransportTrip[]; emptyTitle: string; onComplete?: (tripId: string) => void; onCancel?: (tripId: string) => void; onSelect?: (tripId: string) => void; onDelay?: (tripId: string, isDelayed: boolean) => void; compact?: boolean; showLocationWarning?: boolean }) {
   if (trips.length === 0) return <EmptyState title={emptyTitle} description="Trip records will appear here." />;
 
@@ -1061,6 +1133,45 @@ function studentLabel(student?: { firstNameEn?: string; lastNameEn?: string; stu
 function formatDateTime(value?: string | null) {
   if (!value) return 'Not recorded';
   return new Date(value).toLocaleString();
+}
+
+function getLocationFreshness(recordedAt?: string | null) {
+  if (!recordedAt) {
+    return {
+      label: 'No ping',
+      className: 'bg-slate-100 text-slate-600',
+      noticeClassName: 'bg-slate-100 text-slate-700',
+      message: 'No backend coordinate has been recorded for this trip yet.',
+    };
+  }
+
+  const ageMs = Date.now() - new Date(recordedAt).getTime();
+  const ageMinutes = Math.max(0, Math.round(ageMs / 60000));
+
+  if (ageMs > 10 * 60 * 1000) {
+    return {
+      label: 'Stale',
+      className: 'bg-red-100 text-red-700',
+      noticeClassName: 'bg-red-100 text-red-700',
+      message: `Last backend coordinate is ${ageMinutes} minutes old. Confirm with the driver before sharing transport updates.`,
+    };
+  }
+
+  if (ageMs > 2 * 60 * 1000) {
+    return {
+      label: 'Delayed',
+      className: 'bg-amber-100 text-amber-700',
+      noticeClassName: 'bg-amber-100 text-amber-800',
+      message: `Last backend coordinate is ${ageMinutes} minutes old. Treat the trip position as approximate.`,
+    };
+  }
+
+  return {
+    label: 'Fresh',
+    className: 'bg-emerald-100 text-emerald-700',
+    noticeClassName: 'bg-emerald-100 text-emerald-800',
+    message: 'Latest backend coordinate is fresh enough for admin monitoring.',
+  };
 }
 
 function cleanRoute(form: TransportRoutePayload): TransportRoutePayload {

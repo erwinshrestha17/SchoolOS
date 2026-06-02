@@ -166,6 +166,42 @@ describe('ParentTeacherChatService', () => {
     expect(result.items).toHaveLength(1);
   });
 
+  it('does not let parent thread list filters override guardian ownership scope', async () => {
+    prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
+    prisma.parentTeacherThread.count.mockResolvedValue(0);
+    prisma.parentTeacherThread.findMany.mockResolvedValue([]);
+    mockEnrichment();
+
+    await service.listThreads({ guardianId: 'guardian-2' }, parentActor);
+
+    expect(prisma.parentTeacherThread.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          guardianId: 'guardian-1',
+        }),
+      }),
+    );
+  });
+
+  it('does not let teacher thread list filters override assigned-teacher scope', async () => {
+    prisma.staff.findFirst.mockResolvedValue({ id: 'staff-1' });
+    prisma.parentTeacherThread.count.mockResolvedValue(0);
+    prisma.parentTeacherThread.findMany.mockResolvedValue([]);
+    mockEnrichment();
+
+    await service.listThreads({ classTeacherId: 'staff-2' }, teacherActor);
+
+    expect(prisma.parentTeacherThread.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: 'tenant-1',
+          classTeacherId: 'staff-1',
+        }),
+      }),
+    );
+  });
+
   it('rejects a parent trying to open a thread with an arbitrary teacher', async () => {
     mockCurrentYearAndStudent();
     prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
@@ -178,6 +214,22 @@ describe('ParentTeacherChatService', () => {
         parentActor,
       ),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('rejects a parent opening a thread for an unlinked student', async () => {
+    mockCurrentYearAndStudent();
+    prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
+    prisma.studentGuardian.findFirst.mockResolvedValue(null);
+    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue({
+      staffId: 'staff-1',
+    });
+
+    await expect(
+      service.createOrGetThread(
+        { studentId: 'student-1', classTeacherId: 'staff-1' },
+        parentActor,
+      ),
+    ).rejects.toThrow('Guardian is not linked to this student');
   });
 
   it('allows teachers to read only their assigned thread', async () => {
@@ -297,6 +349,45 @@ describe('ParentTeacherChatService', () => {
         data: expect.objectContaining({ status: MessageStatus.READ }),
       }),
     );
+  });
+
+  it('rejects read receipts for messages in another guardian thread', async () => {
+    prisma.parentTeacherMessage.findFirst.mockResolvedValue({
+      id: 'message-2',
+      tenantId: 'tenant-1',
+      threadId: 'thread-2',
+      senderUserId: 'teacher-user-1',
+      readAt: null,
+    });
+    prisma.parentTeacherThread.findFirst.mockResolvedValue({
+      ...thread,
+      id: 'thread-2',
+      guardianId: 'guardian-2',
+    });
+    prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
+
+    await expect(
+      service.markMessageRead('message-2', parentActor),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.parentTeacherMessage.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects abuse reports on another guardian thread', async () => {
+    prisma.parentTeacherThread.findFirst.mockResolvedValue({
+      ...thread,
+      id: 'thread-2',
+      guardianId: 'guardian-2',
+    });
+    prisma.guardian.findFirst.mockResolvedValue({ id: 'guardian-1' });
+
+    await expect(
+      service.createAbuseReport(
+        'thread-2',
+        { reason: 'This message is not visible to me' },
+        parentActor,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.chatAbuseReport.create).not.toHaveBeenCalled();
   });
 
   it('rejects new normal messages on closed threads', async () => {

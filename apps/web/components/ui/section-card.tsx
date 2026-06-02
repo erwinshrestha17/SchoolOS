@@ -25,13 +25,13 @@ export function SectionCard({
   return (
     <div className={cn('shell-card flex flex-col', className)}>
       {(title || description || headerAction) && (
-        <div className="flex items-center justify-between border-b border-slate-100 p-5 lg:p-6">
-          <div>
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-start sm:justify-between lg:p-6">
+          <div className="min-w-0">
             {title && (
-              <h3 className="text-xl font-black italic uppercase tracking-tight text-slate-900">{title}</h3>
+              <h3 className="text-lg font-black leading-tight text-slate-950">{title}</h3>
             )}
             {description && (
-              <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">{description}</p>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">{description}</p>
             )}
           </div>
           {headerAction && (

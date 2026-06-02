@@ -120,6 +120,7 @@ export function ParentTeacherMessagingWorkspace({ threadId }: Props) {
       }),
     onSuccess: () => {
       setModerationReason('');
+      setSuccessNotice('Thread closed with an audited moderation reason.');
       void queryClient.invalidateQueries({ queryKey: ['parent-teacher-thread', activeThreadId] });
       void queryClient.invalidateQueries({ queryKey: ['parent-teacher-threads'] });
     },
@@ -132,6 +133,7 @@ export function ParentTeacherMessagingWorkspace({ threadId }: Props) {
       }),
     onSuccess: () => {
       setModerationReason('');
+      setSuccessNotice('Thread escalated for school leadership review.');
       void queryClient.invalidateQueries({ queryKey: ['parent-teacher-thread', activeThreadId] });
       void queryClient.invalidateQueries({ queryKey: ['parent-teacher-threads'] });
     },
@@ -280,6 +282,11 @@ export function ParentTeacherMessagingWorkspace({ threadId }: Props) {
           ) : activeThread ? (
             <div className="space-y-5">
               <ThreadContext thread={activeThread} />
+              <ModerationDecisionPanel
+                thread={activeThread}
+                messages={messages}
+                isModerator={isModerator}
+              />
               <MessageTimeline messages={messages} currentUserId={session?.user.id ?? ''} />
 
               {successNotice ? (
@@ -337,17 +344,21 @@ export function ParentTeacherMessagingWorkspace({ threadId }: Props) {
               <div className="grid gap-4 lg:grid-cols-2">
                 <ActionPanel
                   title="Report Concern"
+                  description="Create a school-reviewable abuse or safety report for this thread."
                   icon={<Flag size={18} />}
                   value={reportReason}
                   onChange={setReportReason}
                   onSubmit={() => reportMutation.mutate()}
                   buttonLabel="Report"
+                  reasonLabel="Concern reason"
+                  placeholder="Describe the message or behavior that needs review."
                   disabled={reportReason.trim().length < 3 || reportMutation.isPending}
                 />
 
                 {isModerator ? (
                   <ActionPanel
                     title="Moderation"
+                    description="Close resolved threads or escalate unresolved safety concerns."
                     icon={<ShieldCheck size={18} />}
                     value={moderationReason}
                     onChange={setModerationReason}
@@ -357,16 +368,21 @@ export function ParentTeacherMessagingWorkspace({ threadId }: Props) {
                     secondaryAction={() => escalateMutation.mutate()}
                     buttonLabel="Close"
                     secondaryLabel="Escalate"
-                    disabled={moderationReason.trim().length < 3 || closeMutation.isPending}
+                    reasonLabel="Moderation reason"
+                    placeholder="Record why this thread is being closed or escalated."
+                    disabled={moderationReason.trim().length < 3 || closeMutation.isPending || escalateMutation.isPending}
                   />
                 ) : (
                   <ActionPanel
                     title="Escalation"
+                    description="Ask a school moderator to review this parent-teacher conversation."
                     icon={<AlertTriangle size={18} />}
                     value={moderationReason}
                     onChange={setModerationReason}
                     onSubmit={() => escalateMutation.mutate()}
                     buttonLabel="Escalate"
+                    reasonLabel="Escalation reason"
+                    placeholder="Explain why this needs school leadership review."
                     disabled={moderationReason.trim().length < 3 || escalateMutation.isPending}
                   />
                 )}
@@ -460,6 +476,55 @@ function ContextItem({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ModerationDecisionPanel({
+  thread,
+  messages,
+  isModerator,
+}: {
+  thread: ParentTeacherThreadSummary;
+  messages: ParentTeacherMessageSummary[];
+  isModerator: boolean;
+}) {
+  const latest = messages[messages.length - 1];
+  const importantCount = messages.filter((item) => item.priority !== 'NORMAL').length;
+  const unreadCount = messages.filter((item) => item.status !== 'READ').length;
+  const decision = getModerationDecision(thread, messages);
+
+  return (
+    <div
+      className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4"
+      data-testid="chat-moderation-decision-panel"
+    >
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-amber-700">
+            Safety & Escalation Queue
+          </p>
+          <h3 className="mt-1 text-sm font-bold text-amber-950">{decision.title}</h3>
+          <p className="mt-1 text-sm leading-6 text-amber-900">{decision.body}</p>
+        </div>
+        <StatusBadge value={isModerator ? 'MODERATOR' : 'SCHOOL_REVIEW'} />
+      </div>
+
+      <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+        <ModerationFact label="Thread status" value={thread.status} />
+        <ModerationFact label="Latest priority" value={latest?.priority ?? 'No messages'} />
+        <ModerationFact label="Priority messages" value={String(importantCount)} />
+        <ModerationFact label="Unread messages" value={String(unreadCount)} />
+      </div>
+    </div>
+  );
+}
+
+function ModerationFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-white px-3 py-2 shadow-sm">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="mt-1 font-semibold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
 function MessageTimeline({
   messages,
   currentUserId,
@@ -511,22 +576,28 @@ function MessageTimeline({
 
 function ActionPanel({
   title,
+  description,
   icon,
   value,
   onChange,
   onSubmit,
   buttonLabel,
   disabled,
+  reasonLabel = 'Reason',
+  placeholder = 'Reason',
   secondaryAction,
   secondaryLabel,
 }: {
   title: string;
+  description?: string;
   icon: ReactNode;
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
   buttonLabel: string;
   disabled: boolean;
+  reasonLabel?: string;
+  placeholder?: string;
   secondaryAction?: () => void;
   secondaryLabel?: string;
 }) {
@@ -536,10 +607,14 @@ function ActionPanel({
         {icon}
         {title}
       </div>
+      {description ? <p className="mb-3 text-sm leading-6 text-slate-500">{description}</p> : null}
+      <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
+        {reasonLabel}
+      </label>
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder="Reason"
+        placeholder={placeholder}
         className="min-h-20 w-full resize-y rounded-xl border border-slate-200 px-3 py-2 text-sm"
       />
       <div className="mt-3 flex flex-wrap gap-2">
@@ -564,6 +639,47 @@ function ActionPanel({
       </div>
     </div>
   );
+}
+
+function getModerationDecision(
+  thread: ParentTeacherThreadSummary,
+  messages: ParentTeacherMessageSummary[],
+) {
+  const hasEmergency = messages.some((item) => item.priority === 'EMERGENCY');
+  const hasImportant = messages.some((item) => item.priority === 'IMPORTANT');
+
+  if (thread.status === 'ESCALATED') {
+    return {
+      title: 'Escalated thread needs owner review',
+      body: 'Review the message history, record the decision reason, then close or keep the escalation active for leadership follow-up.',
+    };
+  }
+
+  if (thread.status === 'CLOSED') {
+    return {
+      title: 'Closed thread is audit-only',
+      body: 'Replies are disabled. Reopen is intentionally not available from this surface; use a new thread if communication must continue.',
+    };
+  }
+
+  if (hasEmergency) {
+    return {
+      title: 'Emergency message present',
+      body: 'Emergency messages should be reviewed by school staff immediately and escalated if the class teacher cannot resolve it.',
+    };
+  }
+
+  if (hasImportant) {
+    return {
+      title: 'Important message needs timely response',
+      body: 'Monitor response progress and escalate if the conversation needs principal or administrator review.',
+    };
+  }
+
+  return {
+    title: 'Standard monitored conversation',
+    body: 'Keep communication professional, student-linked, and within school chat-hour expectations.',
+  };
 }
 
 function StatusBadge({ value }: { value: string }) {

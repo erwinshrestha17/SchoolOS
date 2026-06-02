@@ -4,6 +4,7 @@ import type { ApiResponse } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useMemo, useState } from 'react';
 import { ArrowLeft, CalendarClock, Megaphone, Paperclip, Send, UsersRound } from 'lucide-react';
 
 const API_BASE_URL =
@@ -271,6 +272,50 @@ function UnreadRecipientsPanel({
   isLoading: boolean;
   error: string | null;
 }) {
+  const [search, setSearch] = useState('');
+  const [channelFilter, setChannelFilter] = useState('');
+  const [classFilter, setClassFilter] = useState('');
+  const recipients = useMemo(() => result?.recipients ?? [], [result?.recipients]);
+  const channels = Array.from(new Set(recipients.map((recipient) => recipient.channel))).sort();
+  const classes = Array.from(
+    new Set(
+      recipients
+        .map((recipient) => recipient.student?.className)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ).sort();
+  const filteredRecipients = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    return recipients.filter((recipient) => {
+      const matchesSearch =
+        !term ||
+        [
+          recipient.guardian?.fullName,
+          recipient.guardian?.primaryPhone,
+          recipient.guardian?.email,
+          recipient.recipientEmail,
+          recipient.destination,
+          recipient.student?.fullName,
+          recipient.student?.studentSystemId,
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(term));
+      const matchesChannel = !channelFilter || recipient.channel === channelFilter;
+      const matchesClass = !classFilter || recipient.student?.className === classFilter;
+
+      return matchesSearch && matchesChannel && matchesClass;
+    });
+  }, [channelFilter, classFilter, recipients, search]);
+  const failedVisible = filteredRecipients.filter((recipient) => recipient.status === 'FAILED').length;
+  const missingContactVisible = filteredRecipients.filter(
+    (recipient) =>
+      !recipient.guardian?.primaryPhone &&
+      !recipient.guardian?.email &&
+      !recipient.recipientEmail &&
+      !recipient.destination,
+  ).length;
+
   return (
     <section className="rounded-[32px] border border-[var(--line)] bg-white p-6 shadow-sm sm:p-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -299,6 +344,58 @@ function UnreadRecipientsPanel({
         <UnreadMetric label="Unread" value={String(result?.unreadCount ?? 0)} tone="warning" />
       </div>
 
+      {recipients.length > 0 ? (
+        <div className="mt-5 space-y-3" data-testid="notice-unread-recipient-controls">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px_auto]">
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search guardian, student, phone, or email"
+              aria-label="Search unread notice recipients"
+              className="min-h-11"
+            />
+            <select
+              value={channelFilter}
+              onChange={(event) => setChannelFilter(event.target.value)}
+              aria-label="Filter unread recipients by channel"
+              className="min-h-11"
+            >
+              <option value="">All channels</option>
+              {channels.map((channel) => (
+                <option key={channel} value={channel}>{formatEnumLabel(channel)}</option>
+              ))}
+            </select>
+            <select
+              value={classFilter}
+              onChange={(event) => setClassFilter(event.target.value)}
+              aria-label="Filter unread recipients by class"
+              className="min-h-11"
+            >
+              <option value="">All classes</option>
+              {classes.map((className) => (
+                <option key={className} value={className}>{className}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('');
+                setChannelFilter('');
+                setClassFilter('');
+              }}
+              className="rounded-2xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 hover:text-gray-950"
+            >
+              Clear
+            </button>
+          </div>
+          <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Follow-up queue: {filteredRecipients.length} visible unread recipients.
+            {failedVisible > 0 ? ` ${failedVisible} visible delivery records failed.` : ''}
+            {missingContactVisible > 0 ? ` ${missingContactVisible} visible recipients need contact cleanup.` : ''}
+          </div>
+        </div>
+      ) : null}
+
       <div className="mt-6 overflow-hidden rounded-3xl border border-gray-100">
         {isLoading ? (
           <div className="p-6 text-sm text-gray-500">Loading unread recipients...</div>
@@ -311,9 +408,16 @@ function UnreadRecipientsPanel({
               All available recipients have read this notice, or no delivery records exist yet.
             </p>
           </div>
+        ) : filteredRecipients.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="text-sm font-semibold text-gray-950">No unread recipients match these filters</p>
+            <p className="mt-1 text-sm text-gray-500">
+              Clear the search, channel, or class filter to return to the full unread list.
+            </p>
+          </div>
         ) : (
           <div className="divide-y divide-gray-100">
-            {result.recipients.map((recipient) => (
+            {filteredRecipients.map((recipient) => (
               <article
                 key={recipient.deliveryId}
                 className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
@@ -337,6 +441,9 @@ function UnreadRecipientsPanel({
                     {recipient.student
                       ? `${recipient.student.fullName} (${recipient.student.studentSystemId})`
                       : recipient.destination ?? 'No destination'}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Contact: {recipient.guardian?.primaryPhone ?? recipient.guardian?.email ?? recipient.recipientEmail ?? recipient.destination ?? 'Not available'}
                   </p>
                   {recipient.errorMessage ? (
                     <p className="mt-1 text-xs text-danger-700">{recipient.errorMessage}</p>

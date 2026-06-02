@@ -11,11 +11,19 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { Plus, Users, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Toast, type ToastTone } from '@/components/ui/toast';
 
 export function SubstitutionsList({ filters }: { filters: any }) {
   const queryClient = useQueryClient();
   const [selectedSub, setSelectedSub] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [confirmingCancelId, setConfirmingCancelId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{
+    title: string;
+    description?: string;
+    tone: ToastTone;
+  } | null>(null);
 
   const substitutionsQuery = useQuery({
     queryKey: ['timetable-substitutions', filters],
@@ -24,12 +32,41 @@ export function SubstitutionsList({ filters }: { filters: any }) {
 
   const cancelMutation = useMutation({
     mutationFn: (id: string) => api.cancelSubstitution(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['timetable-substitutions'] }),
+    onSuccess: () => {
+      setConfirmingCancelId(null);
+      setNotice({
+        title: 'Substitution cancelled',
+        description: 'The substitution record has been cancelled and refreshed.',
+        tone: 'success',
+      });
+      void queryClient.invalidateQueries({ queryKey: ['timetable-substitutions'] });
+    },
+    onError: (error: Error) => {
+      setNotice({
+        title: 'Cancellation failed',
+        description: error.message,
+        tone: 'danger',
+      });
+    },
   });
 
   const completeMutation = useMutation({
     mutationFn: (id: string) => api.completeSubstitution(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['timetable-substitutions'] }),
+    onSuccess: () => {
+      setNotice({
+        title: 'Substitution completed',
+        description: 'The substitution has been marked complete.',
+        tone: 'success',
+      });
+      void queryClient.invalidateQueries({ queryKey: ['timetable-substitutions'] });
+    },
+    onError: (error: Error) => {
+      setNotice({
+        title: 'Completion failed',
+        description: error.message,
+        tone: 'danger',
+      });
+    },
   });
 
   if (substitutionsQuery.isLoading) return <LoadingState />;
@@ -98,11 +135,7 @@ export function SubstitutionsList({ filters }: { filters: any }) {
             {
               label: 'Cancel',
               icon: <XCircle className="h-4 w-4" />,
-              onClick: () => {
-                if (confirm('Are you sure you want to cancel this substitution?')) {
-                  cancelMutation.mutate(row.id);
-                }
-              },
+              onClick: () => setConfirmingCancelId(row.id),
               disabled: row.status === 'CANCELLED' || row.status === 'COMPLETED',
             },
           ]}
@@ -113,6 +146,16 @@ export function SubstitutionsList({ filters }: { filters: any }) {
 
   return (
     <div className="space-y-6">
+      {notice ? (
+        <Toast
+          title={notice.title}
+          description={notice.description}
+          tone={notice.tone}
+          onDismiss={() => setNotice(null)}
+          className="max-w-none"
+        />
+      ) : null}
+
       <div className="flex justify-between items-center">
         <div className="flex flex-col">
           <h2 className="text-lg font-black uppercase italic tracking-tight text-slate-900">Teacher Substitutions</h2>
@@ -142,6 +185,21 @@ export function SubstitutionsList({ filters }: { filters: any }) {
         }}
         substitution={selectedSub}
         mode="assign"
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(confirmingCancelId)}
+        onClose={() => setConfirmingCancelId(null)}
+        onConfirm={() => {
+          if (confirmingCancelId) {
+            cancelMutation.mutate(confirmingCancelId);
+          }
+        }}
+        title="Cancel substitution?"
+        description="This records a cancelled substitution through the backend and keeps the timetable audit trail intact."
+        confirmLabel="Cancel substitution"
+        variant="destructive"
+        isConfirming={cancelMutation.isPending}
       />
     </div>
   );

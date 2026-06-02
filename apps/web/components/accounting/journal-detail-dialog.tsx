@@ -6,6 +6,7 @@ import { Badge } from '../ui/badge';
 import { Loader2, ArrowLeftRight, Ban, CheckCircle2, AlertCircle, RotateCcw, Wrench } from 'lucide-react';
 import { JournalEntryView } from '@schoolos/core';
 import { cn } from '../../lib/utils';
+import { Toast, type ToastTone } from '../ui/toast';
 
 interface JournalDetailDialogProps {
   isOpen: boolean;
@@ -18,39 +19,56 @@ export function JournalDetailDialog({ isOpen, onClose, entry }: JournalDetailDia
   const [isReversing, setIsReversing] = useState(false);
   const [isCorrecting, setIsCorrecting] = useState(false);
   const [reason, setReason] = useState('');
+  const [notice, setNotice] = useState<{
+    title: string;
+    description?: string;
+    tone: ToastTone;
+  } | null>(null);
 
   const postMutation = useMutation({
     mutationFn: (id: string) => api.postJournal(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
+      void queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
       onClose();
     },
-    onError: (err) => {
-      alert(err.message || 'Failed to post journal entry');
+    onError: (err: Error) => {
+      setNotice({
+        title: 'Posting failed',
+        description: err.message || 'Failed to post journal entry',
+        tone: 'danger',
+      });
     },
   });
 
   const reverseMutation = useMutation({
     mutationFn: (id: string) => api.reverseJournal(id, { reason }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
+      void queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
       resetState();
       onClose();
     },
-    onError: (err) => {
-      alert(err.message || 'Failed to reverse journal entry');
+    onError: (err: Error) => {
+      setNotice({
+        title: 'Reversal failed',
+        description: err.message || 'Failed to reverse journal entry',
+        tone: 'danger',
+      });
     },
   });
 
   const correctMutation = useMutation({
     mutationFn: (id: string) => api.correctJournal(id, { reason }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
+      void queryClient.invalidateQueries({ queryKey: ['ledger-entries'] });
       resetState();
       onClose();
     },
-    onError: (err) => {
-      alert(err.message || 'Failed to correct journal entry');
+    onError: (err: Error) => {
+      setNotice({
+        title: 'Correction failed',
+        description: err.message || 'Failed to correct journal entry',
+        tone: 'danger',
+      });
     },
   });
 
@@ -62,6 +80,7 @@ export function JournalDetailDialog({ isOpen, onClose, entry }: JournalDetailDia
 
   const handleClose = () => {
     resetState();
+    setNotice(null);
     onClose();
   };
 
@@ -110,6 +129,16 @@ export function JournalDetailDialog({ isOpen, onClose, entry }: JournalDetailDia
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto py-6 space-y-6">
+          {notice ? (
+            <Toast
+              title={notice.title}
+              description={notice.description}
+              tone={notice.tone}
+              onDismiss={() => setNotice(null)}
+              className="max-w-none"
+            />
+          ) : null}
+
           {(isReversing || isCorrecting) && (
             <div className={cn(
               "rounded-2xl p-5 border animate-in slide-in-from-top-4 duration-300",

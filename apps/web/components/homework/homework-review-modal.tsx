@@ -19,6 +19,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { Toast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 
 interface HomeworkReviewModalProps {
@@ -38,11 +39,12 @@ export function HomeworkReviewModal({
   const [score, setScore] = useState<number | string>(submission?.score ?? '');
   const [feedback, setFeedback] = useState(submission?.feedback ?? '');
   const [isCorrectionRequested, setIsCorrectionRequested] = useState(false);
+  const [fileNotice, setFileNotice] = useState<string | null>(null);
 
   const reviewMutation = useMutation({
     mutationFn: (data: any) => api.reviewHomeworkSubmissionById(submission.id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['homework-submissions', homework.id] });
+      void queryClient.invalidateQueries({ queryKey: ['homework-submissions', homework.id] });
       onClose();
     },
   });
@@ -50,7 +52,7 @@ export function HomeworkReviewModal({
   const requestCorrectionMutation = useMutation({
     mutationFn: (data: any) => api.requestHomeworkCorrection(submission.id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['homework-submissions', homework.id] });
+      void queryClient.invalidateQueries({ queryKey: ['homework-submissions', homework.id] });
       onClose();
     },
   });
@@ -135,7 +137,7 @@ export function HomeworkReviewModal({
                           const view = await api.getFileView(attachment.fileAssetId);
                           window.open(view.url, '_blank');
                         } catch (err) {
-                          alert('Failed to open file');
+                          setFileNotice('The file view link could not be created.');
                         }
                       }}
                     >
@@ -146,6 +148,15 @@ export function HomeworkReviewModal({
               </div>
             </div>
           )}
+
+          {fileNotice ? (
+            <Toast
+              title="Could not open attachment"
+              description={fileNotice}
+              tone="danger"
+              onDismiss={() => setFileNotice(null)}
+            />
+          ) : null}
 
           {/* Feedback & Score */}
           <div className="pt-6 border-t border-slate-100 space-y-6">

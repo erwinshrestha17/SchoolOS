@@ -20,7 +20,31 @@ import {
 import { SectionCard } from '@/components/ui/section-card';
 import { StatCard } from '@/components/ui/stat-card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import Link from 'next/link';
+
+type ReportCardRow = {
+  id: string;
+  grade?: string | null;
+  gpa?: string | number | null;
+  percentage?: string | number | null;
+  status?: string | null;
+  publishStatus?: string | null;
+  version?: number | null;
+  student?: {
+    firstNameEn?: string | null;
+    lastNameEn?: string | null;
+    studentSystemId?: string | null;
+  } | null;
+};
 
 export function ReportCardsWorkspace() {
   const queryClient = useQueryClient();
@@ -33,6 +57,7 @@ export function ReportCardsWorkspace() {
   const [selectedReportCardId, setSelectedReportCardId] = useState<string | null>(null);
   const [correctionTargetId, setCorrectionTargetId] = useState<string | null>(null);
   const [correctionReason, setCorrectionReason] = useState('');
+  const [generationStudentIds, setGenerationStudentIds] = useState<string[] | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,11 +90,12 @@ export function ReportCardsWorkspace() {
   const generateMutation = useMutation({
     mutationFn: api.batchGenerateReportCards,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['report-cards'] });
+      void queryClient.invalidateQueries({ queryKey: ['report-cards'] });
       setMessage('Report cards generated from locked backend marks.');
       setError(null);
+      setGenerationStudentIds(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       setError(error.message || 'Failed to generate report cards');
       setMessage(null);
     },
@@ -89,14 +115,18 @@ export function ReportCardsWorkspace() {
       setError(null);
       setCorrectionTargetId(null);
       setCorrectionReason('');
-      queryClient.invalidateQueries({ queryKey: ['report-cards'] });
-      queryClient.invalidateQueries({ queryKey: ['report-card-history'] });
+      void queryClient.invalidateQueries({ queryKey: ['report-cards'] });
+      void queryClient.invalidateQueries({ queryKey: ['report-card-history'] });
     },
-    onError: (err: any) => {
+    onError: (err: Error) => {
       setError(err.message || 'Could not regenerate report card');
       setMessage(null);
     },
   });
+
+  const correctionTarget = (reportsQuery.data ?? []).find(
+    (item: ReportCardRow) => item.id === correctionTargetId,
+  ) as ReportCardRow | undefined;
 
   const handleGenerate = () => {
     if (!academicYearId || !examTermId || !classId) {
@@ -110,15 +140,9 @@ export function ReportCardsWorkspace() {
       return;
     }
 
-    if (confirm(`Generate report cards for ${studentIds.length} students from locked backend marks?`)) {
-      generateMutation.mutate({
-        academicYearId,
-        examTermId,
-        studentIds,
-        remarks,
-        lock: true,
-      });
-    }
+    setMessage(null);
+    setError(null);
+    setGenerationStudentIds(studentIds);
   };
 
   const prepareCorrection = (id: string) => {
@@ -148,8 +172,9 @@ export function ReportCardsWorkspace() {
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
-    } catch (err) {
-      alert('Could not load report card PDF');
+    } catch {
+      setError('Could not load report card PDF');
+      setMessage(null);
     }
   };
 
@@ -335,41 +360,16 @@ export function ReportCardsWorkspace() {
                 </SectionCard>
                 <SectionCard title="Generation History" description="Previous locked versions and correction requests.">
                   {correctionTargetId && (
-                    <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50 p-4" data-testid="report-card-correction-panel">
-                      <div className="mb-3">
-                        <p className="text-sm font-black text-amber-900">Locked report-card correction</p>
-                        <p className="text-xs font-medium leading-5 text-amber-800">
-                          Corrections create a new report-card version with history. The original artifact is not overwritten.
-                        </p>
-                      </div>
-                      <TextArea
-                        value={correctionReason}
-                        onChange={(event: any) => setCorrectionReason(event.target.value)}
-                        placeholder="Required correction reason for audit history..."
-                        className="min-h-[96px] bg-white"
-                        data-testid="report-card-correction-reason"
-                      />
-                      <div className="mt-3 flex gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={submitCorrection}
-                          disabled={regenerateMutation.isPending || !correctionReason.trim()}
-                          data-testid="report-card-submit-correction"
-                        >
-                          <RotateCcw size={14} className="mr-2" />
-                          {regenerateMutation.isPending ? 'Regenerating...' : 'Regenerate Corrected Card'}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setCorrectionTargetId(null);
-                            setCorrectionReason('');
-                          }}
-                        >
-                          Cancel
+                    <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50 p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-sm font-black text-amber-900">Correction review open</p>
+                          <p className="text-xs font-medium leading-5 text-amber-800">
+                            A locked report-card correction must be reviewed in the dialog before regeneration.
+                          </p>
+                        </div>
+                        <Button type="button" size="sm" variant="outline" onClick={() => setCorrectionTargetId(correctionTargetId)}>
+                          Review correction
                         </Button>
                       </div>
                     </div>
@@ -419,6 +419,127 @@ export function ReportCardsWorkspace() {
           </SectionCard>
         </TabsContent>
       </Tabs>
+      <ReportCardCorrectionDialog
+        isOpen={Boolean(correctionTargetId)}
+        reportCard={correctionTarget}
+        reason={correctionReason}
+        isSubmitting={regenerateMutation.isPending}
+        onReasonChange={setCorrectionReason}
+        onSubmit={submitCorrection}
+        onClose={() => {
+          setCorrectionTargetId(null);
+          setCorrectionReason('');
+        }}
+      />
+      <ConfirmDialog
+        isOpen={Boolean(generationStudentIds)}
+        title="Confirm locked report-card generation"
+        description={`Generate report cards for ${generationStudentIds?.length ?? 0} students from locked backend marks. This keeps prior generated artifacts auditable and refreshes this screen after completion.`}
+        confirmLabel="Generate report cards"
+        isConfirming={generateMutation.isPending}
+        onClose={() => setGenerationStudentIds(null)}
+        onConfirm={() => {
+          if (!generationStudentIds) return;
+          generateMutation.mutate({
+            academicYearId,
+            examTermId,
+            studentIds: generationStudentIds,
+            remarks,
+            lock: true,
+          });
+        }}
+      />
     </div>
   );
+}
+
+function ReportCardCorrectionDialog({
+  isOpen,
+  reportCard,
+  reason,
+  isSubmitting,
+  onReasonChange,
+  onSubmit,
+  onClose,
+}: {
+  isOpen: boolean;
+  reportCard?: ReportCardRow;
+  reason: string;
+  isSubmitting: boolean;
+  onReasonChange: (value: string) => void;
+  onSubmit: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="rounded-[2rem]">
+        <DialogHeader>
+          <DialogTitle>Review Locked Report-Card Correction</DialogTitle>
+          <DialogDescription>
+            Regeneration creates a new report-card version and keeps the original artifact in history.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5 overflow-y-auto p-6" data-testid="report-card-correction-panel">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <p className="text-xs font-black uppercase tracking-wide text-slate-400">Selected report card</p>
+            <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+              <CorrectionMeta label="Student" value={reportCardStudentName(reportCard)} />
+              <CorrectionMeta label="Version" value={reportCard?.version ? `v${reportCard.version}` : 'Latest'} />
+              <CorrectionMeta label="Grade" value={reportCard?.grade ?? 'Not set'} />
+              <CorrectionMeta label="GPA" value={reportCard?.gpa !== undefined && reportCard?.gpa !== null ? Number(reportCard.gpa).toFixed(2) : 'Not set'} />
+              <CorrectionMeta label="Status" value={[reportCard?.status, reportCard?.publishStatus].filter(Boolean).join(' / ') || 'Locked'} />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs font-semibold leading-5 text-amber-800">
+            Use this only after confirming the marks source has been corrected. The previous locked report card remains auditable and the regenerated card becomes a new version.
+          </div>
+
+          <div>
+            <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">Correction reason</p>
+            <TextArea
+              value={reason}
+              onChange={(event: any) => onReasonChange(event.target.value)}
+              placeholder="Required correction reason for audit history..."
+              className="min-h-[120px] bg-white"
+              data-testid="report-card-correction-reason"
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="gap-3">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={onSubmit}
+            disabled={isSubmitting || !reason.trim()}
+            data-testid="report-card-submit-correction"
+          >
+            <RotateCcw size={14} className="mr-2" />
+            {isSubmitting ? 'Regenerating...' : 'Regenerate Corrected Card'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CorrectionMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[10px] font-black uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-1 font-bold text-slate-800">{value}</p>
+    </div>
+  );
+}
+
+function reportCardStudentName(reportCard?: ReportCardRow) {
+  if (!reportCard?.student) return 'Selected student';
+  const name = `${reportCard.student.firstNameEn ?? ''} ${reportCard.student.lastNameEn ?? ''}`.trim();
+  return reportCard.student.studentSystemId
+    ? `${name || 'Student'} (${reportCard.student.studentSystemId})`
+    : name || 'Student';
 }

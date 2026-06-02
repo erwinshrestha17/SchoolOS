@@ -95,6 +95,7 @@ describe('Activity Hardening Verification', () => {
 
     fileRegistry = {
       registerFile: jest.fn(),
+      markUploaded: jest.fn(),
       getSignedUrl: jest.fn(),
       auditAccess: jest.fn(),
       updateFileEntity: jest.fn().mockResolvedValue({}),
@@ -222,6 +223,11 @@ describe('Activity Hardening Verification', () => {
         'compress',
         expect.objectContaining({ attachmentId: 'attach-1' }),
         expect.any(Object),
+      );
+      expect(fileRegistry.markUploaded).toHaveBeenCalledWith(
+        tenantId,
+        'file-1',
+        actor.userId,
       );
     });
   });

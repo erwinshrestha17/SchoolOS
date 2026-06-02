@@ -71,11 +71,11 @@ export class ParentTeacherChatService {
     const scopeWhere = await this.buildThreadScope(actor);
     const where: Prisma.ParentTeacherThreadWhereInput = {
       tenantId: actor.tenantId,
-      ...scopeWhere,
       ...(query.status ? { status: query.status } : {}),
       ...(query.studentId ? { studentId: query.studentId } : {}),
       ...(query.guardianId ? { guardianId: query.guardianId } : {}),
       ...(query.classTeacherId ? { classTeacherId: query.classTeacherId } : {}),
+      ...scopeWhere,
     };
 
     const [total, threads] = await this.prisma.$transaction([
@@ -479,7 +479,14 @@ export class ParentTeacherChatService {
               appliesToRole: rule.appliesToRole,
             },
           },
-          create: { tenantId: actor.tenantId, ...rule },
+          create: {
+            tenantId: actor.tenantId,
+            dayOfWeek: rule.dayOfWeek,
+            appliesToRole: rule.appliesToRole,
+            enabled: rule.enabled,
+            startTime: rule.startTime,
+            endTime: rule.endTime,
+          },
           update: {
             enabled: rule.enabled,
             startTime: rule.startTime,
@@ -1151,8 +1158,8 @@ function filterThreadSearch<
       thread.classTeacher?.firstName,
       thread.classTeacher?.lastName,
     ]
-      .filter(Boolean)
-      .some((value) => value!.toLowerCase().includes(term)),
+      .filter((value): value is string => Boolean(value))
+      .some((value) => value.toLowerCase().includes(term)),
   );
 }
 

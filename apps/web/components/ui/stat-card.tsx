@@ -30,19 +30,19 @@ export function StatCard({
 }: StatCardProps) {
   const content = (
     <>
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
           {title}
         </p>
         {icon && (
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary-100 bg-primary-50 text-primary-600">
             {icon}
           </div>
         )}
       </div>
 
       <div className="mt-2">
-        <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
+        <h3 className="break-words text-2xl font-black leading-tight text-slate-950">{value}</h3>
         {trend && (
           <div className="mt-1 flex items-center gap-1.5">
             <span
@@ -82,7 +82,7 @@ export function StatCard({
 
   if (href) {
     return (
-      <Link href={href} className={cn('shell-card p-6 block transition-transform hover:scale-[1.02] active:scale-[0.98]', className)}>
+      <Link href={href} className={cn('shell-card block p-6 transition hover:-translate-y-0.5 active:translate-y-0', className)}>
         {content}
       </Link>
     );

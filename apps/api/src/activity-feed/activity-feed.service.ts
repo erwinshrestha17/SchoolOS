@@ -36,10 +36,10 @@ import {
 const MAX_ACTIVITY_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const ACTIVITY_MEDIA_CONSENT_BLOCK_REASON = 'PHOTO_USAGE_CONSENT_REQUIRED';
 
-type ActorMediaAccess = {
+interface ActorMediaAccess {
   blocked: boolean;
   reason?: string;
-};
+}
 
 @Injectable()
 export class ActivityFeedService {
@@ -299,10 +299,18 @@ export class ActivityFeedService {
           module: 'activity',
           metadata: { sortOrder: index },
         });
+        await this.fileRegistryService.markUploaded(
+          actor.tenantId,
+          asset.id,
+          actor.userId,
+        );
 
         return {
-          ...attachment,
-          ...stored,
+          fileName: attachment.fileName,
+          contentType: attachment.contentType,
+          sizeBytes: stored.sizeBytes,
+          provider: stored.provider,
+          objectKey: stored.objectKey,
           fileAssetId: asset.id,
           publicUrl: null,
           sortOrder: index,

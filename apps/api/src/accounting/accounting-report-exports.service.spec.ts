@@ -391,6 +391,75 @@ describe('AccountingReportExportsService', () => {
     );
 
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+    const pdfText = pdf.toString('latin1');
+    expect(pdfText).toContain('CONTROL TOTALS');
+    expect(pdfText).toContain('CLOSING DEBIT');
+    expect(pdfText).toContain('CLOSING CREDIT');
+    expect(pdfText).toContain('BALANCED');
+  });
+
+  it('exports a styled Balance Sheet PDF with accounting control totals', async () => {
+    reportsService.getBalanceSheet.mockResolvedValue({
+      sections: [
+        {
+          section: 'ASSETS',
+          total: new Prisma.Decimal('10000'),
+          accounts: [
+            {
+              accountCode: '1001',
+              accountName: 'Cash',
+              amount: new Prisma.Decimal('10000'),
+            },
+          ],
+        },
+        {
+          section: 'LIABILITIES',
+          total: new Prisma.Decimal('5000'),
+          accounts: [
+            {
+              accountCode: '2001',
+              accountName: 'Payables',
+              amount: new Prisma.Decimal('5000'),
+            },
+          ],
+        },
+        {
+          section: 'EQUITY',
+          total: new Prisma.Decimal('5000'),
+          accounts: [
+            {
+              accountCode: '3001',
+              accountName: 'Capital',
+              amount: new Prisma.Decimal('5000'),
+            },
+          ],
+        },
+      ],
+      totalAssets: new Prisma.Decimal('10000'),
+      totalLiabilities: new Prisma.Decimal('5000'),
+      totalEquity: new Prisma.Decimal('5000'),
+      totalLiabilitiesAndEquity: new Prisma.Decimal('10000'),
+      isBalanced: true,
+      imbalanceAmount: new Prisma.Decimal('0'),
+    } as any);
+
+    const pdf = await service.exportBalanceSheetPdf(
+      'tenant-1',
+      { fiscalYearId: 'fy-1' },
+      {
+        tenantId: 'tenant-1',
+        tenantSlug: 'test',
+        userId: 'user-1',
+      } as any,
+    );
+
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+    const pdfText = pdf.toString('latin1');
+    expect(pdfText).toContain('CONTROL TOTALS');
+    expect(pdfText).toContain('TOTAL ASSETS');
+    expect(pdfText).toContain('TOTAL LIABILITIES');
+    expect(pdfText).toContain('TOTAL EQUITY');
+    expect(pdfText).toContain('BALANCED');
   });
 
   it('returns empty CSV for reports with no data rows', async () => {

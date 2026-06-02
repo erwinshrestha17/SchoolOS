@@ -7,12 +7,18 @@ import {
 import { ConfigService } from '../../config/config.service';
 import { parseCookie, verifyCsrfToken } from '../auth.utils';
 
+interface CsrfRequest {
+  method: string;
+  path?: string;
+  headers: Record<string, string | string[] | undefined>;
+}
+
 @Injectable()
 export class CsrfGuard implements CanActivate {
   constructor(private readonly configService: ConfigService) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<CsrfRequest>();
 
     // 1. Safe methods do not require CSRF
     const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
@@ -21,13 +27,13 @@ export class CsrfGuard implements CanActivate {
     }
 
     // 2. Bearer token requests (mobile/API clients) do not require CSRF
-    const authHeader = request.headers.authorization;
+    const authHeader = resolveHeader(request.headers.authorization);
     if (authHeader?.startsWith('Bearer ')) {
       return true;
     }
 
     // 3. Allow public unauthenticated paths like login/register/otp
-    const path = request.path;
+    const path = request.path ?? '';
     const publicPrefixes = [
       '/api/v1/auth/login',
       '/api/v1/auth/otp/',
@@ -43,8 +49,11 @@ export class CsrfGuard implements CanActivate {
       ? '__Host-schoolos_csrf'
       : 'schoolos_csrf';
 
-    const csrfCookie = parseCookie(request.headers.cookie, cookieName);
-    const csrfHeader = request.headers['x-csrf-token'];
+    const csrfCookie = parseCookie(
+      resolveHeader(request.headers.cookie),
+      cookieName,
+    );
+    const csrfHeader = resolveHeader(request.headers['x-csrf-token']);
 
     if (!csrfCookie) {
       throw new ForbiddenException('CSRF cookie missing');
@@ -66,4 +75,12 @@ export class CsrfGuard implements CanActivate {
 
     return true;
   }
+}
+
+function resolveHeader(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+
+  return value;
 }

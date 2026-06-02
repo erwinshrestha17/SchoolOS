@@ -5117,8 +5117,11 @@ function buildCashierCloseWindowKey(input: {
 }
 
 function isPrismaUniqueConstraintError(error: unknown) {
+  const KnownRequestError = Prisma.PrismaClientKnownRequestError;
+
   return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
+    typeof KnownRequestError === 'function' &&
+    error instanceof KnownRequestError &&
     error.code === 'P2002'
   );
 }

@@ -90,6 +90,24 @@ export class AccountingReportExportsService {
       title: 'Trial Balance',
       subtitle: this.periodSubtitle(query),
       filters: query as unknown as Prisma.InputJsonValue,
+      summaryCards: [
+        {
+          label: 'Closing Debit',
+          value: formatCsvDecimal(data.totalClosingDebit),
+        },
+        {
+          label: 'Closing Credit',
+          value: formatCsvDecimal(data.totalClosingCredit),
+        },
+        {
+          label: 'Imbalance',
+          value: formatCsvDecimal(data.imbalanceAmount),
+        },
+        {
+          label: 'Status',
+          value: data.isBalanced ? 'BALANCED' : 'IMBALANCED',
+        },
+      ],
       rows,
     });
   }
@@ -147,7 +165,17 @@ export class AccountingReportExportsService {
     actor: AuthContext,
   ) {
     const data = await this.reportsService.getGeneralLedger(tenantId, {
-      ...query,
+      fiscalYearId: query.fiscalYearId,
+      fiscalPeriodId: query.fiscalPeriodId,
+      fromDate: query.fromDate,
+      toDate: query.toDate,
+      accountId: query.accountId,
+      accountCode: query.accountCode,
+      sourceModule: query.sourceModule,
+      sourceType: query.sourceType,
+      sourceId: query.sourceId,
+      page: query.page,
+      sort: query.sort,
       limit: 10000,
     });
     const rows: Array<Record<string, unknown>> = [
@@ -238,7 +266,14 @@ export class AccountingReportExportsService {
     actor: AuthContext,
   ) {
     const data = await this.reportsService.getCashBook(tenantId, {
-      ...query,
+      fiscalYearId: query.fiscalYearId,
+      fiscalPeriodId: query.fiscalPeriodId,
+      fromDate: query.fromDate,
+      toDate: query.toDate,
+      accountId: query.accountId,
+      accountCode: query.accountCode,
+      accountKind: query.accountKind,
+      page: query.page,
       limit: 10000,
     });
     const rows: Array<Record<string, unknown>> = data.rows.map((row) => ({
@@ -459,6 +494,24 @@ export class AccountingReportExportsService {
       title: 'Balance Sheet',
       subtitle: this.periodSubtitle(query),
       filters: query as unknown as Prisma.InputJsonValue,
+      summaryCards: [
+        {
+          label: 'Total Assets',
+          value: formatCsvDecimal(data.totalAssets),
+        },
+        {
+          label: 'Total Liabilities',
+          value: formatCsvDecimal(data.totalLiabilities),
+        },
+        {
+          label: 'Total Equity',
+          value: formatCsvDecimal(data.totalEquity),
+        },
+        {
+          label: 'Status',
+          value: data.isBalanced ? 'BALANCED' : 'IMBALANCED',
+        },
+      ],
       rows,
     });
   }
@@ -699,6 +752,11 @@ export class AccountingReportExportsService {
     subtitle: string;
     filters: Prisma.InputJsonValue;
     rows: Array<Record<string, unknown>>;
+    summaryCards?: Array<{
+      label: string;
+      value: string | number;
+      note?: string | null;
+    }>;
   }) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: input.tenantId },
@@ -708,6 +766,7 @@ export class AccountingReportExportsService {
       title: input.title,
       subtitle: input.subtitle,
       rows: input.rows,
+      summaryCards: input.summaryCards,
     });
     const fileName = `${input.reportKey.replace(/\./g, '-')}-${new Date()
       .toISOString()

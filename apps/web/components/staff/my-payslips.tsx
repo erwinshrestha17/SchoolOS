@@ -14,10 +14,12 @@ import {
 } from '@/components/ui/table';
 import { Download, FileText, Loader2 } from 'lucide-react';
 import { api } from '../../lib/api';
+import { Toast } from '@/components/ui/toast';
 
 export function MyPayslips() {
   const [payslips, setPayslips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     api.listMyPayslips()
@@ -36,7 +38,7 @@ export function MyPayslips() {
       await api.openPayslipPdf(payslipNumber);
     } catch (error) {
       console.error('Download failed', error);
-      alert('Failed to download payslip. Please try again.');
+      setDownloadError('Failed to download payslip. Please try again.');
     }
   };
 
@@ -56,6 +58,15 @@ export function MyPayslips() {
 
   return (
     <Card>
+      {downloadError ? (
+        <Toast
+          title="Could not download payslip"
+          description={downloadError}
+          tone="danger"
+          onDismiss={() => setDownloadError(null)}
+          className="m-4"
+        />
+      ) : null}
       <CardHeader>
         <CardTitle className="text-lg">My Payslips</CardTitle>
       </CardHeader>

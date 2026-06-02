@@ -5,7 +5,7 @@ This file records the latest web-admin UI/UX implementation progress so large ro
 ## Current UI Sprint
 
 ```text
-Current UI sprint: M5 activity media privacy hardening, parent activity feed foundation, M10 communication/provider/attachment depth, Flutter companion parent/staff/teacher API wiring, and Canteen inventory operation UI depth are implemented alongside M6/M7/M8A/M8C/M8B backend/admin feature-depth hardening; next UI work is staging/browser QA plus targeted polish where pilot evidence shows risk.
+Current UI sprint: backend M0-M10 local hardening and the admin web global polish pass are implemented for the current modular-monolith scope. Latest UI depth includes dashboard shell polish, accounting audit context, transport freshness, Library/Canteen scanner-first QR flows, report-card correction review, and app-controlled toasts/confirmation dialogs across operator workflows; next work is staging/browser QA and provider/production-gated checks.
 ```
 
 Current repo reality:
@@ -20,8 +20,32 @@ Flutter teacher attendance now uses purpose-limited mobile teacher class, roster
 Flutter notifications now read from `/mobile/me/notifications`, mark notification deliveries read through the mobile read endpoint, and map backend source families into mobile categories.
 Flutter staff self-service now has backend-backed profile, attendance, leave, and payslip screens using `/staff/me`, `/attendance/me/*`, and `/payroll/me/payslips`, plus payslip PDF download/share through the backend payroll PDF endpoint.
 HR staff detail now has a backend-backed lifecycle Audit tab using `/hr/staff/:staffId/history`.
-Next UI work is browser/staging QA for delivery failures, retry/resend, QR/POS scan speed, transport stale-location clarity, and permission/error states.
+Dashboard overview now routes fee alerts to the canonical Fees workspace, uses clearer alert/queue/delivery metrics, and exposes a keyboard-accessible skip link in the dashboard shell.
+Accounting audit now has summary cards, richer log-detail fields, and explicit loading/empty states.
+Transport latest-location operators now get Fresh/Delayed/Stale location context before inspecting trip location records.
+Operator feedback no longer depends on browser-native `alert()` or `confirm()` calls anywhere under `apps/web/app` or `apps/web/components`; destructive and high-impact actions use shared `ConfirmDialog`, while results/errors use `Toast` or inline state.
+Next UI work is browser/staging QA for authenticated dashboard routes, delivery failures, retry/resend, QR/POS scan speed, provider/queue mutation states, and permission/error states.
 ```
+
+### UI-7B - Global Admin Polish and App-Controlled Feedback
+
+Status: **Implemented locally; authenticated staging/browser smoke still required.**
+
+Completed:
+
+- Dashboard shell now includes a visible-on-focus skip link, sharper card radius, readable section/stat typography, and the overdue-fees dashboard action points to `/dashboard/fees`.
+- Accounting audit workspace now surfaces record/page/filter context through summary cards and shows richer action/resource/actor/timestamp/tenant fields in the audit detail dialog.
+- Transport latest-location workflow now shows selected-trip freshness state with Fresh, Delayed, Stale, and No ping messaging.
+- Library issue and Canteen serving/POS workflows now use scanner-first copy/student QR context, recent scan feedback, wallet/allergy/spending warnings, and submit gating.
+- Academics exam terms, assessment components, marks lock requests, legacy report-card generation, promotion, and result publishing now use in-app toasts plus shared confirmation dialogs.
+- Homework cancel/reminder/file-open actions, admissions document/ID-card/checklist actions, staff payslip downloads, student photo removal, and platform subscription cancellation now use app-controlled feedback.
+- Added a web contract that rejects future `alert()`/`confirm()` usage in `apps/web/app` and `apps/web/components`.
+
+Verification:
+
+- `pnpm --filter @schoolos/web test -- web-contracts.test.mjs` passed with 107 tests.
+- `pnpm --filter @schoolos/web typecheck` passed.
+- Targeted ESLint passed for the global polish files touched in this sprint.
 
 ### M10 and Extended Operations Feature-Depth Pass
 
@@ -43,6 +67,12 @@ Completed:
 - M8C Canteen meal-plan enrollment now creates linked M3 fee invoices through backend FinanceService/M9 posting boundaries, and the enrollments UI shows the linked invoice marker.
 - M8C POS now has backend-protected receipt preview and PDF reprint actions in the admin canteen workspace.
 - M8C inventory now uses real supplier, inventory item, purchase bill, wastage, manual stock-adjustment, and stock ledger APIs for admin list/create, operation posting, and visibility surfaces.
+- M10 parent-teacher messaging now shows an admin moderation decision panel with thread status, priority/unread counts, explicit concern/moderation/escalation reason fields, and close/escalate success notices.
+- M10 notice detail unread-recipient panel now has guardian/student/contact search, channel/class filters, follow-up queue summary, failed-delivery count, and contact-cleanup cues.
+- M3 collection counter dues table now supports fee-head and billing-period filters plus line-level quick-fill collection amounts while keeping overpayment guards in the existing payment flow.
+- M8A Library issue flow now has scanner-first copy barcode/QR lookup, QR borrower status context, recent scan feedback, available-copy selection, and real form validation for due dates.
+- Shared QR resolver now normalizes canteen POS/serving scan aliases to the backend-supported `CANTEEN` purpose and normalizes `studentId` into `id` for scanner callers.
+- M8C Canteen serving and POS now show QR scan result cards with wallet status, allergy warnings, spending warnings, correct serving/POS student preview queries, and POS submit gating for student/item/quantity readiness.
 - M8B Transport backend/admin depth now guards GPS ingestion pressure, verifies Redis latest-location/cache fanout, and bounds retention cleanup.
 
 Deferred:
@@ -132,6 +162,7 @@ Completed:
 
 - **Academics Report Cards:**
   - Added clearer report-card status, PDF download, generation history, and correction/regeneration actions.
+  - Moved locked report-card correction/regeneration into an explicit review dialog with selected report context and audited reason entry.
   - Added readable loading, empty, and error states around report-card generation/download flows.
   - Updated Academics Playwright smoke coverage for exams, marks, CAS, results, report cards, download visibility, and history.
 - **Accounting Reports:**
@@ -368,14 +399,14 @@ Completed:
 - [x] Staff self-service `/dashboard/my-profile` finalization (PDF slips).
 - [x] Staff lifecycle audit logs in HR staff detail.
 - [x] Payroll posting boundary final wiring (payment/reversal actions remain outside the Phase 2 UI).
-- [ ] Trial Balance / Balance Sheet PDF export styling.
+- [x] Trial Balance / Balance Sheet PDF export styling with control-total summary cards.
 - [x] Homework file attachments after File Registry.
 - [x] Advanced timetable conflict visualization.
 - [x] Credential-gated Phase 4 Library/Canteen/Transport Playwright smoke coverage.
-- [ ] Library barcode/QR scan polish beyond current admin scan/report surfaces.
+- [x] Library barcode/QR scan polish beyond current admin scan/report surfaces.
 - [ ] Transport live map only after admin real-time readiness is product-approved.
 - [x] Canteen purchase-bill/wastage/manual-adjustment UI depth beyond current supplier/item list-create and stock-ledger surfaces.
-- [ ] Canteen POS/QR speed polish beyond current routes.
+- [x] Canteen POS/QR speed polish beyond current routes.
 - [ ] Canteen meal-plan cancellation/void and collection-link UX after product rules are finalized.
 - Full mobile/PWA later.
 

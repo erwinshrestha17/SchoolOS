@@ -159,6 +159,27 @@ describe('LibraryService Phase 3A foundation', () => {
     });
   });
 
+  it('prevents issuing to a student outside the actor tenant', async () => {
+    const { service, prisma } = buildService();
+    prisma.student.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.issueCopy(
+        {
+          copyId: 'copy-1',
+          borrowerStudentId: 'student-cross-tenant',
+          dueAt: '2026-05-30T00:00:00.000Z',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(prisma.student.findFirst).toHaveBeenCalledWith({
+      where: { id: 'student-cross-tenant', tenantId: actor.tenantId },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it('returns an active issued copy inside a transaction', async () => {
     const { service, tx } = buildService();
 
@@ -206,6 +227,21 @@ describe('LibraryService Phase 3A foundation', () => {
     ).rejects.toThrow(ConflictException);
   });
 
+  it('prevents returning issues outside the actor tenant', async () => {
+    const { service, prisma } = buildService({ issue: null });
+
+    await expect(
+      service.returnCopy('issue-cross-tenant', { returnCondition: 'Good' }, actor),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(prisma.libraryIssue.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'issue-cross-tenant', tenantId: actor.tenantId },
+      }),
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it('prevents cross-tenant copy creation by requiring the book in the actor tenant', async () => {
     const { service, prisma } = buildService({ book: null });
 
@@ -223,6 +259,19 @@ describe('LibraryService Phase 3A foundation', () => {
       where: { id: 'book-cross-tenant', tenantId: actor.tenantId },
     });
     expect(prisma.libraryCopy.create).not.toHaveBeenCalled();
+  });
+
+  it('prevents book history reads for books outside the actor tenant', async () => {
+    const { service, prisma } = buildService({ book: null });
+
+    await expect(service.getBookHistory(actor, 'book-cross-tenant')).rejects.toThrow(
+      NotFoundException,
+    );
+
+    expect(prisma.libraryBook.findFirst).toHaveBeenCalledWith({
+      where: { id: 'book-cross-tenant', tenantId: actor.tenantId },
+    });
+    expect(prisma.libraryIssue.findMany).not.toHaveBeenCalled();
   });
 
   it('prevents marking an actively issued copy as lost or damaged directly', async () => {
@@ -419,7 +468,7 @@ function buildService(
     book,
   };
 
-  const issue = options.issue ?? {
+  const defaultIssue = {
     id: 'issue-1',
     tenantId: actor.tenantId,
     copyId: 'copy-1',
@@ -434,9 +483,11 @@ function buildService(
     },
     borrowerStudent: { id: 'student-1' },
   };
+  const issue = options.issue === undefined ? defaultIssue : options.issue;
+  const issueRecord = (issue ?? defaultIssue) as Record<string, unknown>;
 
   const returnedIssue = {
-    ...(issue as Record<string, unknown>),
+    ...issueRecord,
     status: LibraryIssueStatus.RETURNED,
     returnedAt: new Date('2026-05-01T00:00:00.000Z'),
     fineAmount: new Prisma.Decimal(0),
@@ -474,7 +525,7 @@ function buildService(
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       update: jest.fn().mockImplementation((args) =>
         Promise.resolve({
-          ...(issue as Record<string, unknown>),
+          ...issueRecord,
           ...args.data,
         }),
       ),

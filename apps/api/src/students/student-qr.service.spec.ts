@@ -1,11 +1,15 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   Prisma,
   StudentLifecycleStatus,
   StudentQrStatus,
 } from '@prisma/client';
 import { StudentQrResolvePurpose } from '@schoolos/core';
-import { hashToken } from '../auth/auth.utils';
+import { hashToken, hmacToken } from '../auth/auth.utils';
 import { StudentQrService } from './student-qr.service';
 
 const issuedAt = new Date('2026-05-13T00:00:00.000Z');
@@ -36,13 +40,6 @@ function createService() {
       findUnique: jest.fn().mockResolvedValue(null),
     },
   };
-
-  prisma.studentQrCredential.findFirst.mockImplementation(async (args: any) => {
-    if (args?.where?.tokenHash) {
-      return prisma.studentQrCredential.findUnique(args);
-    }
-    return null;
-  });
 
   const auditService = {
     record: jest.fn(),
@@ -183,7 +180,7 @@ describe('StudentQrService', () => {
 
   it('rejects revoked QR scans', async () => {
     const { service, prisma } = createService();
-    prisma.studentQrCredential.findUnique.mockResolvedValue({
+    prisma.studentQrCredential.findFirst.mockResolvedValue({
       ...baseCredential,
       status: StudentQrStatus.REVOKED,
       student: activeStudent,
@@ -281,11 +278,7 @@ describe('StudentQrService', () => {
 
   it('keeps QR scans tenant-scoped', async () => {
     const { service, prisma } = createService();
-    prisma.studentQrCredential.findUnique.mockResolvedValue({
-      ...baseCredential,
-      tenantId: 'tenant-2',
-      student: activeStudent,
-    });
+    prisma.studentQrCredential.findFirst.mockResolvedValue(null);
 
     await expect(
       service.resolveQr(
@@ -295,11 +288,29 @@ describe('StudentQrService', () => {
         adminAuth,
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.studentQrCredential.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tenantId: 'tenant-1',
+          tokenHash: {
+            in: [
+              hmacToken(
+                'qr-token',
+                'mock-pepper-for-tests-at-least-32-chars-long-12345',
+              ),
+              hashToken('qr-token'),
+            ],
+          },
+        },
+      }),
+    );
+    expect(prisma.studentQrCredential.update).not.toHaveBeenCalled();
   });
 
   it('limits canteen response shape to purpose-specific safe fields', async () => {
     const { service, prisma } = createService();
-    prisma.studentQrCredential.findUnique.mockResolvedValue({
+    prisma.studentQrCredential.findFirst.mockResolvedValue({
       ...baseCredential,
       student: activeStudent,
     });
@@ -333,7 +344,7 @@ describe('StudentQrService', () => {
 
   it('blocks parent scan access for unrelated children', async () => {
     const { service, prisma } = createService();
-    prisma.studentQrCredential.findUnique.mockResolvedValue({
+    prisma.studentQrCredential.findFirst.mockResolvedValue({
       ...baseCredential,
       student: activeStudent,
     });
@@ -355,7 +366,7 @@ describe('StudentQrService', () => {
 
   it('blocks teachers from resolving unassigned students', async () => {
     const { service, prisma } = createService();
-    prisma.studentQrCredential.findUnique.mockResolvedValue({
+    prisma.studentQrCredential.findFirst.mockResolvedValue({
       ...baseCredential,
       student: activeStudent,
     });
@@ -487,7 +498,7 @@ describe('StudentQrService', () => {
 
   it('creates audit log for QR resolve/scan', async () => {
     const { service, prisma, auditService } = createService();
-    prisma.studentQrCredential.findUnique.mockResolvedValue({
+    prisma.studentQrCredential.findFirst.mockResolvedValue({
       ...baseCredential,
       student: activeStudent,
     });
@@ -516,11 +527,7 @@ describe('StudentQrService', () => {
 
   it('audits failed cross-tenant resolve attempts', async () => {
     const { service, prisma, auditService } = createService();
-    prisma.studentQrCredential.findUnique.mockResolvedValue({
-      ...baseCredential,
-      tenantId: 'tenant-2',
-      student: activeStudent,
-    });
+    prisma.studentQrCredential.findFirst.mockResolvedValue(null);
 
     await expect(
       service.resolveQr(
@@ -537,10 +544,11 @@ describe('StudentQrService', () => {
         resource: 'student_qr',
         tenantId: 'tenant-1',
         after: expect.objectContaining({
-          reason: 'wrong_tenant',
+          reason: 'not_found',
         }),
       }),
     );
+    expect(prisma.studentQrCredential.update).not.toHaveBeenCalled();
   });
 
   // --- Cross-tenant generate/revoke ---
@@ -552,6 +560,72 @@ describe('StudentQrService', () => {
     await expect(
       service.generateQr('tenant-1', 'student-in-tenant-2', adminAuth),
     ).rejects.toThrow('Active student not found');
+  });
+
+  it('cannot return QR status history for a student outside the actor tenant', async () => {
+    const { service, prisma } = createService();
+    prisma.student.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.getQrStatus('tenant-1', 'student-in-tenant-2'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(prisma.student.findFirst).toHaveBeenCalledWith({
+      where: { id: 'student-in-tenant-2', tenantId: 'tenant-1' },
+      select: { id: true },
+    });
+    expect(prisma.studentQrCredential.findMany).not.toHaveBeenCalled();
+  });
+
+  it('cannot rotate a QR credential for a student outside the actor tenant', async () => {
+    const { service, prisma } = createService();
+    prisma.student.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.rotateQr(
+        'tenant-1',
+        'student-in-tenant-2',
+        adminAuth,
+        'Card lost',
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(prisma.student.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'student-in-tenant-2',
+        tenantId: 'tenant-1',
+        lifecycleStatus: StudentLifecycleStatus.ACTIVE,
+      },
+      select: { id: true },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.studentQrCredential.update).not.toHaveBeenCalled();
+    expect(prisma.studentQrCredential.create).not.toHaveBeenCalled();
+  });
+
+  it('cannot revoke a QR credential outside the actor tenant', async () => {
+    const { service, prisma, auditService } = createService();
+    prisma.studentQrCredential.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.revokeQr(
+        'tenant-1',
+        'student-in-tenant-2',
+        adminAuth,
+        'Card compromised',
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(prisma.studentQrCredential.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: 'tenant-1',
+        studentId: 'student-in-tenant-2',
+        status: StudentQrStatus.ACTIVE,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(prisma.studentQrCredential.update).not.toHaveBeenCalled();
+    expect(auditService.record).not.toHaveBeenCalled();
   });
 
   // --- Rotate invalidation ---
@@ -618,7 +692,7 @@ describe('StudentQrService', () => {
 
   it('library response does not leak guardian phone or health data', async () => {
     const { service, prisma } = createService();
-    prisma.studentQrCredential.findUnique.mockResolvedValue({
+    prisma.studentQrCredential.findFirst.mockResolvedValue({
       ...baseCredential,
       student: activeStudent,
     });
@@ -650,7 +724,7 @@ describe('StudentQrService', () => {
 
   it('updates lastScannedAt on successful resolve', async () => {
     const { service, prisma } = createService();
-    prisma.studentQrCredential.findUnique.mockResolvedValue({
+    prisma.studentQrCredential.findFirst.mockResolvedValue({
       ...baseCredential,
       student: activeStudent,
     });
@@ -673,7 +747,7 @@ describe('StudentQrService', () => {
 
   it('rejects rotated QR scans (rotated/revoked QR cannot resolve as active)', async () => {
     const { service, prisma } = createService();
-    prisma.studentQrCredential.findUnique.mockResolvedValue({
+    prisma.studentQrCredential.findFirst.mockResolvedValue({
       ...baseCredential,
       status: StudentQrStatus.ROTATED,
       student: activeStudent,
@@ -689,9 +763,40 @@ describe('StudentQrService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('rejects active QR scans for inactive students without updating scan metadata', async () => {
+    const { service, prisma, auditService } = createService();
+    prisma.studentQrCredential.findFirst.mockResolvedValue({
+      ...baseCredential,
+      student: {
+        ...activeStudent,
+        lifecycleStatus: StudentLifecycleStatus.ARCHIVED,
+      },
+    });
+
+    await expect(
+      service.resolveQr(
+        'tenant-1',
+        'qr-token',
+        StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP,
+        adminAuth,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.studentQrCredential.update).not.toHaveBeenCalled();
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'QR_RESOLVE_FAILED',
+        after: expect.objectContaining({
+          failureCode: 'inactive_student',
+          studentId: 'student-1',
+        }),
+      }),
+    );
+  });
+
   it('allows multi-role parent and teacher users to resolve QR codes if they pass either ownership check', async () => {
     const { service, prisma } = createService();
-    prisma.studentQrCredential.findUnique.mockResolvedValue({
+    prisma.studentQrCredential.findFirst.mockResolvedValue({
       ...baseCredential,
       student: activeStudent,
     });
@@ -753,7 +858,7 @@ describe('StudentQrService', () => {
 
   it('rejects expired QR scans', async () => {
     const { service, prisma, auditService } = createService();
-    prisma.studentQrCredential.findUnique.mockResolvedValue({
+    prisma.studentQrCredential.findFirst.mockResolvedValue({
       ...baseCredential,
       expiresAt: new Date(Date.now() - 10000), // 10 seconds ago
       student: activeStudent,

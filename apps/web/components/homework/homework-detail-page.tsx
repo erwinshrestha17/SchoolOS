@@ -31,7 +31,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { DataTable } from '@/components/ui/data-table';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Toast, ToastTone } from '@/components/ui/toast';
 import { HomeworkReviewModal } from '@/components/homework/homework-review-modal';
+
+type HomeworkNotice = {
+  title: string;
+  description?: string;
+  tone: ToastTone;
+};
 
 export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
   const router = useRouter();
@@ -42,6 +49,7 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [notice, setNotice] = useState<HomeworkNotice | null>(null);
 
   const homeworkQuery = useQuery({
     queryKey: ['homework-detail', homeworkId],
@@ -58,21 +66,30 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
   const cancelMutation = useMutation({
     mutationFn: () => api.cancelHomework(homeworkId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['homework-detail', homeworkId] });
+      void queryClient.invalidateQueries({ queryKey: ['homework-detail', homeworkId] });
       setShowCancelDialog(false);
+      setNotice({ title: 'Homework cancelled', tone: 'success' });
     },
     onError: (error: any) => {
-      alert(error.message || 'Failed to cancel homework');
+      setNotice({
+        title: 'Could not cancel homework',
+        description: error.message || 'Failed to cancel homework',
+        tone: 'danger',
+      });
     },
   });
 
   const sendReminderMutation = useMutation({
     mutationFn: () => api.sendHomeworkReminders(homeworkId),
     onSuccess: () => {
-      alert('Reminders sent to students');
+      setNotice({ title: 'Reminders sent', description: 'Student reminder notifications were queued.', tone: 'success' });
     },
     onError: (error: any) => {
-      alert(error.message || 'Failed to send reminders');
+      setNotice({
+        title: 'Could not send reminders',
+        description: error.message || 'Failed to send reminders',
+        tone: 'danger',
+      });
     },
   });
 
@@ -149,6 +166,15 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
 
   return (
     <div className="space-y-8 pb-12">
+      {notice ? (
+        <Toast
+          title={notice.title}
+          description={notice.description}
+          tone={notice.tone}
+          onDismiss={() => setNotice(null)}
+        />
+      ) : null}
+
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-4">
           <Link href="/dashboard/homework">
@@ -250,7 +276,11 @@ export function HomeworkDetailPage({ homeworkId }: { homeworkId: string }) {
                               const view = await api.getFileView(attachment.fileAssetId);
                               window.open(view.url, '_blank');
                             } catch (err) {
-                              alert('Failed to open file');
+                              setNotice({
+                                title: 'Could not open attachment',
+                                description: 'The file view link could not be created.',
+                                tone: 'danger',
+                              });
                             }
                           }}
                         >

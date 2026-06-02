@@ -524,6 +524,11 @@ export function buildTableReportPdf(input: {
   generatedAt?: Date;
   rows: Array<Record<string, unknown>>;
   maxColumns?: number;
+  summaryCards?: Array<{
+    label: string;
+    value: string | number;
+    note?: string | null;
+  }>;
   logo?: PdfImage | null;
 }) {
   const headers = Object.keys(input.rows[0] ?? {}).slice(
@@ -531,6 +536,10 @@ export function buildTableReportPdf(input: {
     input.maxColumns ?? 6,
   );
   const widths = headers.map(() => 492 / Math.max(headers.length, 1));
+  const summaryRows = chunk(input.summaryCards ?? [], 4);
+  const tableTopY = summaryRows.length
+    ? 640 - summaryRows.length * 42 - 22
+    : 640;
   const contentParts = [
     ...pageFrame(
       fitText(input.title.toUpperCase(), 24),
@@ -545,15 +554,16 @@ export function buildTableReportPdf(input: {
       8,
       'F1',
     ),
+    ...reportSummaryCards(summaryRows),
     tableHeader(
       48,
-      640,
+      tableTopY,
       headers.length ? headers : ['Status'],
       widths.length ? widths : [492],
     ),
   ];
 
-  let y = 616;
+  let y = tableTopY - 24;
   const rows = input.rows.length ? input.rows : [{ Status: 'No rows found' }];
   for (const row of rows.slice(0, 30)) {
     let x = 60;
@@ -575,6 +585,52 @@ export function buildTableReportPdf(input: {
     contentParts.filter(Boolean).join('\n'),
     input.logo,
   );
+}
+
+function reportSummaryCards(
+  rows: Array<
+    Array<{ label: string; value: string | number; note?: string | null }>
+  >,
+) {
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const parts = [text('CONTROL TOTALS', 48, 656, 8, 'F2')];
+  rows.forEach((row, rowIndex) => {
+    const cardWidth = 492 / Math.max(row.length, 1);
+    const topY = 644 - rowIndex * 42;
+
+    row.forEach((card, index) => {
+      const x = 48 + index * cardWidth;
+      parts.push(
+        infoBox(x, topY - 32, cardWidth - 8, 34),
+        text(fitText(card.label.toUpperCase(), 20), x + 8, topY - 10, 7, 'F1'),
+        text(
+          fitText(formatPdfCell(card.value), 20),
+          x + 8,
+          topY - 23,
+          10,
+          'F2',
+        ),
+      );
+      if (card.note) {
+        parts.push(
+          text(fitText(card.note, 18), x + cardWidth - 96, topY - 23, 7, 'F1'),
+        );
+      }
+    });
+  });
+
+  return parts;
+}
+
+function chunk<T>(items: T[], size: number) {
+  const result: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    result.push(items.slice(index, index + size));
+  }
+  return result;
 }
 
 export function buildRosterPdf(input: {
@@ -924,7 +980,7 @@ export function buildCashierClosePdf(input: {
     text(`Close Number: ${input.closeNumber}`, 60, 654, 9, 'F2'),
     text(`Collector: ${input.collectorName}`, 60, 640, 9, 'F1'),
     text(
-      `Method Scope: ${input.paymentMethod || 'ALL METHODS'}`,
+      `Method Scope: ${input.paymentMethod ?? 'ALL METHODS'}`,
       60,
       626,
       9,
@@ -971,13 +1027,13 @@ export function buildCashierClosePdf(input: {
     text(`Total Payments Count: ${input.paymentCount}`, 60, 464, 9, 'F1'),
     text(`Total Refunds Count: ${input.refundCount}`, 60, 448, 9, 'F1'),
     text(
-      `First Receipt: ${input.firstReceiptNumber || '—'}`,
+      `First Receipt: ${input.firstReceiptNumber ?? '—'}`,
       304,
       464,
       9,
       'F1',
     ),
-    text(`Last Receipt: ${input.lastReceiptNumber || '—'}`, 304, 448, 9, 'F1'),
+    text(`Last Receipt: ${input.lastReceiptNumber ?? '—'}`, 304, 448, 9, 'F1'),
 
     // Variance Reason & Notes
     infoBox(48, 250, 496, 146),

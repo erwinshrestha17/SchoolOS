@@ -827,7 +827,17 @@ function CollectionCounterSection({
 
       <div className="space-y-6 xl:sticky xl:top-28 xl:self-start">
         <InvoiceProfileCard invoice={selectedInvoice} outstanding={outstanding} />
-        <OutstandingDuesTable invoice={selectedInvoice} lines={selectedInvoiceLines} />
+        <OutstandingDuesTable
+          invoice={selectedInvoice}
+          lines={selectedInvoiceLines}
+          onQuickCollect={(lineAmount) => {
+            setPaymentError(null);
+            setPayment((current) => ({
+              ...current,
+              amount: Math.min(lineAmount, outstanding),
+            }));
+          }}
+        />
         <InvoiceDetailPanel
           invoice={selectedInvoice}
           detail={selectedInvoiceDetail}
@@ -906,43 +916,131 @@ function InvoiceProfileCard({
 function OutstandingDuesTable({
   invoice,
   lines,
+  onQuickCollect,
 }: {
   invoice: InvoiceForUi | undefined;
   lines: InvoiceLineForUi[];
+  onQuickCollect: (amount: number) => void;
 }) {
+  const [feeHeadFilter, setFeeHeadFilter] = useState('');
+  const [periodFilter, setPeriodFilter] = useState('');
+  const feeHeadOptions = Array.from(new Set(lines.map(getLineFeeHeadLabel))).filter(Boolean);
+  const periodOptions = Array.from(new Set(lines.map(getLinePeriodLabel))).filter(Boolean);
+  const visibleLines = lines.filter((line) => {
+    const feeHeadMatches = !feeHeadFilter || getLineFeeHeadLabel(line) === feeHeadFilter;
+    const periodMatches = !periodFilter || getLinePeriodLabel(line) === periodFilter;
+
+    return feeHeadMatches && periodMatches;
+  });
+  const visibleNetDue = visibleLines.reduce((total, line) => total + getLineNetDue(line), 0);
+
   return (
     <section className="shell-card rounded-[30px] border border-[var(--line)] bg-white/90 p-6 shadow-sm backdrop-blur-sm">
-      <p className="label">Outstanding Dues</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="label">Outstanding Dues</p>
+          {invoice && lines.length > 0 ? (
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              {visibleLines.length} of {lines.length} line items visible / {formatCurrency(visibleNetDue)} due in view
+            </p>
+          ) : null}
+        </div>
+        {invoice && lines.length > 0 ? (
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+            Click a row amount to quick-fill collection
+          </span>
+        ) : null}
+      </div>
       {invoice && lines.length > 0 ? (
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[680px] overflow-hidden rounded-2xl text-left text-sm">
-            <thead className="bg-gray-50 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
-              <tr>
-                <th className="py-3 pr-4">Fee Head</th>
-                <th className="py-3 pr-4">Period</th>
-                <th className="py-3 pr-4">Amount</th>
-                <th className="py-3 pr-4">Late Fee</th>
-                <th className="py-3 pr-4">Discount</th>
-                <th className="py-3 pr-4">VAT</th>
-                <th className="py-3 pr-4">Net Due</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((line, index) => (
-                <tr key={line.id ?? index} className="border-t border-[var(--line)] transition hover:bg-gray-50/80">
-                  <td className="py-3 pr-4 font-semibold">
-                    {line.feeHead?.name ?? line.feeHeadName ?? line.description ?? 'Fee item'}
-                  </td>
-                  <td className="py-3 pr-4 text-[var(--muted)]">{line.periodLabel ?? 'Invoice period'}</td>
-                  <td className="py-3 pr-4">{formatCurrency(line.baseAmount ?? line.amount)}</td>
-                  <td className="py-3 pr-4">{formatCurrency(line.lateFeeAmount)}</td>
-                  <td className="py-3 pr-4">{formatCurrency(line.discountAmount ?? line.waiverAmount)}</td>
-                  <td className="py-3 pr-4">{formatCurrency(line.vatAmount)}</td>
-                  <td className="py-3 pr-4 font-semibold">{formatCurrency(line.netAmount ?? line.totalAmount)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="mt-4 space-y-4" data-testid="finance-dues-interaction-toolbar">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+            <label>
+              <span className="label mb-2 block">Fee Head</span>
+              <select
+                value={feeHeadFilter}
+                onChange={(event) => setFeeHeadFilter(event.target.value)}
+                aria-label="Filter dues by fee head"
+                className="min-h-11"
+              >
+                <option value="">All fee heads</option>
+                {feeHeadOptions.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span className="label mb-2 block">Billing Period</span>
+              <select
+                value={periodFilter}
+                onChange={(event) => setPeriodFilter(event.target.value)}
+                aria-label="Filter dues by billing period"
+                className="min-h-11"
+              >
+                <option value="">All periods</option>
+                {periodOptions.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setFeeHeadFilter('');
+                setPeriodFilter('');
+              }}
+              className="self-end rounded-2xl border border-[var(--line)] px-4 py-3 text-xs font-semibold text-[var(--muted)] transition hover:bg-gray-50 hover:text-gray-950"
+            >
+              Clear filters
+            </button>
+          </div>
+
+          {visibleLines.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] overflow-hidden rounded-2xl text-left text-sm">
+                <thead className="bg-gray-50 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
+                  <tr>
+                    <th className="py-3 pr-4">Fee Head</th>
+                    <th className="py-3 pr-4">Period</th>
+                    <th className="py-3 pr-4">Amount</th>
+                    <th className="py-3 pr-4">Late Fee</th>
+                    <th className="py-3 pr-4">Discount</th>
+                    <th className="py-3 pr-4">VAT</th>
+                    <th className="py-3 pr-4">Net Due</th>
+                    <th className="py-3 pr-4">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleLines.map((line, index) => {
+                    const lineNetDue = getLineNetDue(line);
+
+                    return (
+                      <tr key={line.id ?? index} className="border-t border-[var(--line)] transition hover:bg-gray-50/80">
+                        <td className="py-3 pr-4 font-semibold">{getLineFeeHeadLabel(line)}</td>
+                        <td className="py-3 pr-4 text-[var(--muted)]">{getLinePeriodLabel(line)}</td>
+                        <td className="py-3 pr-4">{formatCurrency(line.baseAmount ?? line.amount)}</td>
+                        <td className="py-3 pr-4">{formatCurrency(line.lateFeeAmount)}</td>
+                        <td className="py-3 pr-4">{formatCurrency(line.discountAmount ?? line.waiverAmount)}</td>
+                        <td className="py-3 pr-4">{formatCurrency(line.vatAmount)}</td>
+                        <td className="py-3 pr-4 font-semibold">{formatCurrency(lineNetDue)}</td>
+                        <td className="py-3 pr-4">
+                          <button
+                            type="button"
+                            disabled={lineNetDue <= 0}
+                            onClick={() => onQuickCollect(lineNetDue)}
+                            className="rounded-xl bg-gray-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+                          >
+                            Collect line
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState title="No dues in this filter" body="Clear fee-head or period filters to show invoice lines." />
+          )}
         </div>
       ) : invoice ? (
         <div className="mt-4 rounded-2xl border border-dashed border-[var(--line)] bg-white/70 p-4">
@@ -2741,6 +2839,18 @@ function matchesInvoiceSearch(invoice: InvoiceForUi, search: string) {
 
 function getOutstanding(invoice: InvoiceForUi) {
   return Math.max(0, Number(invoice.totalAmount ?? 0) - Number(invoice.paidAmount ?? 0));
+}
+
+function getLineFeeHeadLabel(line: InvoiceLineForUi) {
+  return line.feeHead?.name ?? line.feeHeadName ?? line.description ?? 'Fee item';
+}
+
+function getLinePeriodLabel(line: InvoiceLineForUi) {
+  return line.periodLabel ?? 'Invoice period';
+}
+
+function getLineNetDue(line: InvoiceLineForUi) {
+  return Math.max(0, Number(line.netAmount ?? line.totalAmount ?? line.amount ?? 0));
 }
 
 function getPaymentRefundableAmount(payment: InvoiceDetail['payments'][number]) {

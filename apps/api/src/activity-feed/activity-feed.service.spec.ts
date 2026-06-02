@@ -52,6 +52,9 @@ describe('ActivityFeedService', () => {
         create: jest.fn(),
         groupBy: jest.fn(),
       },
+      fileAsset: {
+        update: jest.fn(),
+      },
       moodLog: {
         create: jest.fn(),
         findMany: jest.fn(),
@@ -82,6 +85,7 @@ describe('ActivityFeedService', () => {
 
     fileRegistry = {
       registerFile: jest.fn(),
+      markUploaded: jest.fn(),
       getSignedUrl: jest.fn(),
       auditAccess: jest.fn(),
     };
@@ -171,6 +175,11 @@ describe('ActivityFeedService', () => {
           }),
         }),
       }),
+    );
+    expect(fileRegistry.markUploaded).toHaveBeenCalledWith(
+      'tenant-1',
+      'file-asset-1',
+      'teacher-1',
     );
     expect(communicationsService.recordDeliveryRecords).toHaveBeenCalledWith(
       expect.objectContaining({

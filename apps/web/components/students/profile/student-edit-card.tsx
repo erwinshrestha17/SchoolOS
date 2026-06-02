@@ -6,6 +6,7 @@ import { SectionCard } from '@/components/ui/section-card';
 import { Badge } from '@/components/ui/badge';
 import { Heart, ImageUp, Save, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 type StudentEditCardProps = {
   profile: StudentProfileDetail;
@@ -47,6 +48,7 @@ export function StudentEditCard({
   const [emergencyPhone, setEmergencyPhone] = useState(student.emergencyPhone ?? '');
 
   const [validationError, setValidationError] = useState('');
+  const [removePhotoDialogOpen, setRemovePhotoDialogOpen] = useState(false);
 
   const handleSave = () => {
     setValidationError('');
@@ -75,6 +77,7 @@ export function StudentEditCard({
   };
 
   return (
+    <>
     <SectionCard title="Edit Profile" description={`Updating record for ${student.studentSystemId}`} className="animate-in fade-in slide-in-from-top-4">
       <div className="grid gap-8">
         <div className="rounded-[2rem] border border-slate-100 bg-slate-50 p-6">
@@ -123,11 +126,7 @@ export function StudentEditCard({
               {student.photoUrl ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    if (confirm('Remove this student photo?')) {
-                      onRemovePhoto?.();
-                    }
-                  }}
+                  onClick={() => setRemovePhotoDialogOpen(true)}
                   disabled={isUploadingPhoto || isRemovingPhoto}
                   className="inline-flex items-center gap-2 rounded-xl border border-danger-100 bg-white px-4 py-2.5 text-sm font-bold text-danger-600 transition hover:bg-danger-50 disabled:opacity-50"
                 >
@@ -230,6 +229,20 @@ export function StudentEditCard({
         </div>
       </div>
     </SectionCard>
+    <ConfirmDialog
+      isOpen={removePhotoDialogOpen}
+      title="Remove Student Photo"
+      description="Remove this profile photo? The student record will remain, but the current photo preview will no longer be available."
+      confirmLabel="Remove Photo"
+      destructive
+      isConfirming={isRemovingPhoto}
+      onConfirm={() => {
+        onRemovePhoto?.();
+        setRemovePhotoDialogOpen(false);
+      }}
+      onClose={() => setRemovePhotoDialogOpen(false)}
+    />
+    </>
   );
 }
 

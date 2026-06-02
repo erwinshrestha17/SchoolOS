@@ -43,9 +43,12 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid token issuer');
     }
 
-    const userAgent = (request.headers['user-agent'] as string | undefined)?.toLowerCase() ?? '';
-    const isMobile = userAgent.includes('dart') || userAgent.includes('flutter');
-    const expectedAudience = isMobile ? this.configService.jwtAudienceMobile : this.configService.jwtAudienceWeb;
+    const userAgent = request.headers['user-agent']?.toLowerCase() ?? '';
+    const isMobile =
+      userAgent.includes('dart') || userAgent.includes('flutter');
+    const expectedAudience = isMobile
+      ? this.configService.jwtAudienceMobile
+      : this.configService.jwtAudienceWeb;
 
     if (payload.aud !== expectedAudience) {
       throw new UnauthorizedException('Invalid token audience');

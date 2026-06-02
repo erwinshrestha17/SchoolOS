@@ -107,4 +107,35 @@ describe('Phase 3B Library frontend contracts', () => {
     assert.match(workspace, /ErrorNotice/);
     assert.doesNotMatch(workspace, /demo-|fake-|placeholderId/i);
   });
+
+  it('adds a scanner-first Library issue workflow without bypassing form validation', () => {
+    const workspace = read('components/library/library-workspace.tsx');
+
+    for (const marker of [
+      'Copy barcode / QR scan',
+      'LibraryCopyScanner',
+      'copyMatchesScan',
+      'QrBorrowerSummary',
+      'recentCopyScans',
+      'onSubmit={props.onIssueSubmit}',
+      'copies={availableCopies}',
+    ]) {
+      assert.match(workspace, new RegExp(marker.replaceAll('/', '\\/')));
+    }
+
+    assert.doesNotMatch(
+      workspace,
+      /preventDefault:\s*\(\)\s*=>\s*\{\s*\}\s*\}\s*as any/,
+    );
+  });
+
+  it('keeps the shared QR resolver compatible with Library and Canteen scans', () => {
+    const resolver = read('components/ui/qr-resolver.tsx');
+
+    assert.match(resolver, /id: data\.id \?\? data\.studentId/);
+    assert.match(resolver, /normalizeQrPurpose/);
+    assert.match(resolver, /purpose === 'CANTEEN_POS' \|\| purpose === 'CANTEEN_SERVE'/);
+    assert.match(resolver, /return 'CANTEEN'/);
+    assert.match(resolver, /inputRef\.current\?\.focus/);
+  });
 });

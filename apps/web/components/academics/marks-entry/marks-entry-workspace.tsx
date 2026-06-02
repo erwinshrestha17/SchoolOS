@@ -9,7 +9,14 @@ import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { Save, Lock, History, Search } from 'lucide-react';
 import { SectionCard } from '@/components/ui/section-card';
-import { StatCard } from '@/components/ui/stat-card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Toast, ToastTone } from '@/components/ui/toast';
+
+type MarksNotice = {
+  title: string;
+  description?: string;
+  tone: ToastTone;
+};
 
 export function MarksEntryWorkspace() {
   const queryClient = useQueryClient();
@@ -21,7 +28,8 @@ export function MarksEntryWorkspace() {
   const [marks, setMarks] = useState<Record<string, string>>({});
   const [remarks, setRemarks] = useState<Record<string, string>>({});
   const [statuses, setStatuses] = useState<Record<string, string>>({});
-  const [isLockRequestPending, setIsLockRequestPending] = useState(false);
+  const [showLockDialog, setShowLockDialog] = useState(false);
+  const [notice, setNotice] = useState<MarksNotice | null>(null);
 
   const examsQuery = useQuery({ queryKey: ['exam-terms'], queryFn: api.listExamTerms });
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
@@ -80,30 +88,41 @@ export function MarksEntryWorkspace() {
   const batchMutation = useMutation({
     mutationFn: api.batchEnterMarks,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['marks-grid'] });
-      alert('Marks saved successfully');
+      void queryClient.invalidateQueries({ queryKey: ['marks-grid'] });
+      setNotice({ title: 'Marks saved', tone: 'success' });
     },
     onError: (error: any) => {
-      alert(error.message || 'Failed to save marks');
+      setNotice({
+        title: 'Could not save marks',
+        description: error.message || 'Failed to save marks',
+        tone: 'danger',
+      });
     },
   });
 
   const lockRequestMutation = useMutation({
     mutationFn: api.createMarkLockRequest,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['exam-terms'] });
-      alert('Lock request submitted to administrator');
+      void queryClient.invalidateQueries({ queryKey: ['exam-terms'] });
+      setShowLockDialog(false);
+      setNotice({
+        title: 'Lock request submitted',
+        description: 'An administrator can now review the request.',
+        tone: 'success',
+      });
     },
     onError: (error: any) => {
-      alert(error.message || 'Failed to submit lock request');
+      setNotice({
+        title: 'Could not submit lock request',
+        description: error.message || 'Failed to submit lock request',
+        tone: 'danger',
+      });
     },
   });
 
   const handleLockRequest = () => {
     if (!examTermId) return;
-    if (confirm('Are you sure you want to request a mark lock? Once approved, you will no longer be able to edit marks for this exam.')) {
-      lockRequestMutation.mutate({ examTermId, reason: 'Marks entry completed' });
-    }
+    setShowLockDialog(true);
   };
 
   const handleSave = () => {
@@ -261,6 +280,15 @@ export function MarksEntryWorkspace() {
 
   return (
     <div className="space-y-8">
+      {notice ? (
+        <Toast
+          title={notice.title}
+          description={notice.description}
+          tone={notice.tone}
+          onDismiss={() => setNotice(null)}
+        />
+      ) : null}
+
       <FilterBar
         label="Context"
         description="Select exam and roster to begin"
@@ -387,6 +415,18 @@ export function MarksEntryWorkspace() {
           <p className="mt-2 text-sm font-medium text-slate-400">Choose an exam, class, subject and component from the filters above.</p>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={showLockDialog}
+        title="Request Mark Lock"
+        description="Once approved, marks for this exam term will no longer be editable without an administrator unlocking the term."
+        confirmLabel="Submit Request"
+        isConfirming={lockRequestMutation.isPending}
+        onConfirm={() => {
+          lockRequestMutation.mutate({ examTermId, reason: 'Marks entry completed' });
+        }}
+        onClose={() => setShowLockDialog(false)}
+      />
     </div>
   );
 }

@@ -49,6 +49,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from "@/components/ui/progress";
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 type InvoiceDialogMode = 'view' | 'payment' | 'cancel';
 
@@ -72,6 +73,7 @@ export default function PlatformSchoolDetail() {
   const [supportReason, setSupportReason] = useState('');
   const [supportDuration, setSupportDuration] = useState('30');
   const [supportSaving, setSupportSaving] = useState(false);
+  const [cancelSubscriptionDialogOpen, setCancelSubscriptionDialogOpen] = useState(false);
   
   // Feature Override State
   const [overrideTarget, setOverrideTarget] = useState<{ key: string; enabled: boolean } | null>(null);
@@ -120,7 +122,7 @@ export default function PlatformSchoolDetail() {
       setOverrideTarget(null);
       setOverrideReason('');
     } catch (error: any) {
-      alert(error.message || 'Failed to update feature override');
+      setActionError(error.message || 'Failed to update feature override');
     } finally {
       setUpdating(false);
     }
@@ -162,9 +164,6 @@ export default function PlatformSchoolDetail() {
 
   const handleCancelSubscription = async () => {
     if (!tenant || !tenant.subscription) return;
-    if (!window.confirm('Are you sure you want to cancel this school\'s subscription? This will disable access to all paid modules.')) {
-      return;
-    }
     setCancellingSubscription(true);
     setActionError(null);
     setMessage(null);
@@ -174,6 +173,7 @@ export default function PlatformSchoolDetail() {
         notes: 'Cancelled from platform dashboard by operator',
       });
       setMessage('Subscription cancelled successfully.');
+      setCancelSubscriptionDialogOpen(false);
       await loadTenantData();
     } catch (error: any) {
       setActionError(error.message || 'Failed to cancel subscription');
@@ -559,6 +559,19 @@ export default function PlatformSchoolDetail() {
         </div>
       )}
 
+      <ConfirmDialog
+        isOpen={cancelSubscriptionDialogOpen}
+        title="Cancel School Subscription"
+        description="Cancel this school's subscription? This disables access to paid modules until a platform operator restores or changes the plan."
+        confirmLabel="Cancel Subscription"
+        destructive
+        isConfirming={cancellingSubscription}
+        onConfirm={() => {
+          void handleCancelSubscription();
+        }}
+        onClose={() => setCancelSubscriptionDialogOpen(false)}
+      />
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
         <TabsList className="flex h-auto flex-wrap justify-start gap-1 bg-slate-100/50 p-1 rounded-2xl border border-slate-100">
           <TabsTrigger value="overview" className="rounded-xl px-6 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
@@ -619,7 +632,7 @@ export default function PlatformSchoolDetail() {
                          <Button
                            variant="outline"
                            className="rounded-xl font-bold border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 bg-white"
-                           onClick={handleCancelSubscription}
+                           onClick={() => setCancelSubscriptionDialogOpen(true)}
                            disabled={cancellingSubscription}
                            data-testid="cancel-subscription-button"
                          >

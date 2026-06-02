@@ -11,6 +11,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { StatCard } from '@/components/ui/stat-card';
 import { ClipboardList, CheckCircle2, AlertCircle, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Toast, ToastTone } from '@/components/ui/toast';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+
+type ExamNotice = {
+  title: string;
+  description?: string;
+  tone: ToastTone;
+};
 
 export function ExamsWorkspace() {
   const queryClient = useQueryClient();
@@ -18,6 +26,9 @@ export function ExamsWorkspace() {
   const [isComponentsOpen, setIsComponentsOpen] = useState(false);
   const [editingExam, setEditingExam] = useState<ExamTermSummary | null>(null);
   const [selectedExam, setSelectedExam] = useState<ExamTermSummary | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ExamTermSummary | null>(null);
+  const [notice, setNotice] = useState<ExamNotice | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years'],
@@ -32,12 +43,16 @@ export function ExamsWorkspace() {
   const createMutation = useMutation({
     mutationFn: api.createExamTerm,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['exam-terms'] });
+      void queryClient.invalidateQueries({ queryKey: ['exam-terms'] });
       setIsFormOpen(false);
-      alert('Exam term created successfully');
+      setNotice({ title: 'Exam term created', tone: 'success' });
     },
     onError: (error: any) => {
-      alert(error.message || 'Failed to create exam term');
+      setNotice({
+        title: 'Could not create exam term',
+        description: error.message || 'Failed to create exam term',
+        tone: 'danger',
+      });
     },
   });
 
@@ -45,13 +60,17 @@ export function ExamsWorkspace() {
     mutationFn: ({ id, data }: { id: string; data: any }) =>
       api.updateExamTerm(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['exam-terms'] });
+      void queryClient.invalidateQueries({ queryKey: ['exam-terms'] });
       setIsFormOpen(false);
       setEditingExam(null);
-      alert('Exam term updated successfully');
+      setNotice({ title: 'Exam term updated', tone: 'success' });
     },
     onError: (error: any) => {
-      alert(error.message || 'Failed to update exam term');
+      setNotice({
+        title: 'Could not update exam term',
+        description: error.message || 'Failed to update exam term',
+        tone: 'danger',
+      });
     },
   });
 
@@ -81,14 +100,25 @@ export function ExamsWorkspace() {
   };
 
   const handleDelete = async (exam: ExamTermSummary) => {
-    if (confirm(`Are you sure you want to delete ${exam.name}? This action cannot be undone.`)) {
-      try {
-        await api.deleteExamTerm(exam.id);
-        queryClient.invalidateQueries({ queryKey: ['exam-terms'] });
-        alert('Exam term deleted');
-      } catch (error: any) {
-        alert(error.message || 'Failed to delete exam term');
-      }
+    setDeleteTarget(exam);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await api.deleteExamTerm(deleteTarget.id);
+      void queryClient.invalidateQueries({ queryKey: ['exam-terms'] });
+      setNotice({ title: 'Exam term deleted', tone: 'success' });
+      setDeleteTarget(null);
+    } catch (error: any) {
+      setNotice({
+        title: 'Could not delete exam term',
+        description: error.message || 'Failed to delete exam term',
+        tone: 'danger',
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -98,6 +128,15 @@ export function ExamsWorkspace() {
 
   return (
     <div className="space-y-8">
+      {notice ? (
+        <Toast
+          title={notice.title}
+          description={notice.description}
+          tone={notice.tone}
+          onDismiss={() => setNotice(null)}
+        />
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard
           title="Total Exam Terms"
@@ -177,6 +216,23 @@ export function ExamsWorkspace() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteTarget)}
+        title="Delete Exam Term"
+        description={
+          deleteTarget
+            ? `Delete ${deleteTarget.name}? This cannot be undone.`
+            : 'Delete this exam term?'
+        }
+        confirmLabel="Delete Exam Term"
+        destructive
+        isConfirming={isDeleting}
+        onConfirm={() => {
+          void confirmDelete();
+        }}
+        onClose={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

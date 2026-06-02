@@ -23,6 +23,7 @@ import {
   SubstitutionQueryDto,
   UpdateSubstitutionDto,
 } from './dto/timetable-setup.dto';
+import { toTimetableDayOfWeek } from './timetable-calendar';
 
 @Injectable()
 export class TimetableSubstitutionService {
@@ -70,7 +71,7 @@ export class TimetableSubstitutionService {
 
   async getDailySubstitutionSummary(dateStr: string, actor: AuthContext) {
     const date = stripTime(parseDate(dateStr, 'date'));
-    const dayOfWeek = date.getDay();
+    const dayOfWeek = toTimetableDayOfWeek(date);
 
     // 1. Fetch all slots for this day of week from PUBLISHED/LOCKED versions
     const slots = await this.prisma.timetableSlot.findMany({
@@ -121,7 +122,7 @@ export class TimetableSubstitutionService {
           className: slot.class.name,
           sectionName: slot.section?.name ?? null,
           originalTeacherId: slot.staffId,
-          originalTeacherName: `${slot.staff?.firstName} ${slot.staff?.lastName}`,
+          originalTeacherName: `${slot.staff.firstName} ${slot.staff.lastName}`,
           isTeacherAbsent: absenceContext.isAbsent,
           absenceReason:
             absenceContext.leaveType ?? absenceContext.attendanceStatus ?? null,
@@ -162,7 +163,7 @@ export class TimetableSubstitutionService {
     }
 
     // 2. Validation: Date matches day of week
-    if (date.getDay() !== slot.dayOfWeek) {
+    if (toTimetableDayOfWeek(date) !== slot.dayOfWeek) {
       throw new ConflictException(
         `Substitution date ${dto.date} does not fall on the slot's day of week (${slot.dayOfWeek})`,
       );
@@ -440,7 +441,7 @@ export class TimetableSubstitutionService {
         where: {
           tenantId: actor.tenantId,
           substituteTeacherId,
-          date,
+          date: targetDate,
           status: TimetableSubstitutionStatus.ASSIGNED,
           timetableSlot: {
             dayOfWeek: slot.dayOfWeek,
@@ -469,7 +470,7 @@ export class TimetableSubstitutionService {
         teacherId,
         date,
       );
-    } catch (_error) {
+    } catch {
       // Fallback if attendance service fails or has issues
       return { isAbsent: false, attendanceStatus: null, leaveType: null };
     }

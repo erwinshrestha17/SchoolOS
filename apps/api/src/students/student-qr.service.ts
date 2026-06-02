@@ -311,6 +311,7 @@ export class StudentQrService {
     const tokenHashV1 = hashToken(token);
     const credential = await this.prisma.studentQrCredential.findFirst({
       where: {
+        tenantId,
         tokenHash: { in: [tokenHashV2, tokenHashV1] },
       },
       include: {
@@ -328,13 +329,29 @@ export class StudentQrService {
       },
     });
 
-    const isExpired = credential?.expiresAt && credential.expiresAt.getTime() <= Date.now();
+    const isExpired = Boolean(
+      credential?.expiresAt && credential.expiresAt.getTime() <= Date.now(),
+    );
     if (
       credential?.tenantId !== tenantId ||
       credential.status !== StudentQrStatus.ACTIVE ||
       credential.student.lifecycleStatus !== StudentLifecycleStatus.ACTIVE ||
       isExpired
     ) {
+      let failureCode = 'expired';
+      if (!credential) {
+        failureCode = 'not_found';
+      } else if (credential.tenantId !== tenantId) {
+        failureCode = 'wrong_tenant';
+      } else if (credential.status !== StudentQrStatus.ACTIVE) {
+        failureCode =
+          credential.status === StudentQrStatus.ROTATED ? 'rotated' : 'revoked';
+      } else if (
+        credential.student.lifecycleStatus !== StudentLifecycleStatus.ACTIVE
+      ) {
+        failureCode = 'inactive_student';
+      }
+
       await this.auditService.record({
         action: 'QR_RESOLVE_FAILED',
         resource: 'student_qr',
@@ -347,28 +364,8 @@ export class StudentQrService {
           studentId: credential?.studentId ?? null,
           resolvedEntity: credential?.studentId ?? null,
           success: false,
-          failureCode: !credential
-            ? 'not_found'
-            : credential.tenantId !== tenantId
-              ? 'wrong_tenant'
-              : credential.status !== StudentQrStatus.ACTIVE
-                ? credential.status === StudentQrStatus.ROTATED
-                  ? 'rotated'
-                  : 'revoked'
-                : credential.student.lifecycleStatus !== StudentLifecycleStatus.ACTIVE
-                  ? 'inactive_student'
-                  : 'expired',
-          reason: !credential
-            ? 'not_found'
-            : credential.tenantId !== tenantId
-              ? 'wrong_tenant'
-              : credential.status !== StudentQrStatus.ACTIVE
-                ? credential.status === StudentQrStatus.ROTATED
-                  ? 'rotated'
-                  : 'revoked'
-                : credential.student.lifecycleStatus !== StudentLifecycleStatus.ACTIVE
-                  ? 'inactive_student'
-                  : 'expired',
+          failureCode,
+          reason: failureCode,
           timestamp: new Date().toISOString(),
         },
       });
@@ -466,7 +463,7 @@ export class StudentQrService {
       classSection: `${student.class.name}${
         student.sectionRef ? ` - ${student.sectionRef.name}` : ''
       }`,
-      photoUrl: student.photoUrl || null,
+      photoUrl: student.photoUrl ?? null,
       lifecycleStatus: student.lifecycleStatus,
       purpose,
     };
@@ -526,7 +523,7 @@ export class StudentQrService {
           allergyWarnings: student.severeAllergies
             ? student.severeAllergies.split(',').map((item) => item.trim())
             : [],
-          spendingWarnings: control?.blockedCategories?.length
+          spendingWarnings: control?.blockedCategories.length
             ? `Blocked: ${control.blockedCategories.join(', ')}`
             : null,
           canPurchase: balance.gt(0),
@@ -549,8 +546,8 @@ export class StudentQrService {
         return {
           ...baseResponse,
           hasActiveTransport: !!assignment,
-          route: assignment?.route.name || null,
-          stop: assignment?.stop.name || null,
+          route: assignment?.route.name ?? null,
+          stop: assignment?.stop.name ?? null,
         };
       }
       case StudentQrResolvePurpose.ATTENDANCE: {
@@ -572,8 +569,8 @@ export class StudentQrService {
 
         return {
           ...baseResponse,
-          attendanceToday: record?.status || 'NOT_MARKED',
-          markedAt: record?.createdAt.toISOString() || null,
+          attendanceToday: record?.status ?? 'NOT_MARKED',
+          markedAt: record?.createdAt.toISOString() ?? null,
         };
       }
       case StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP:
@@ -663,7 +660,7 @@ export class StudentQrService {
     purpose: StudentQrResolvePurpose,
     auth: AuthContext,
   ) {
-    const allowedPermissions = PURPOSE_PERMISSIONS[purpose] ?? [];
+    const allowedPermissions = PURPOSE_PERMISSIONS[purpose];
     return allowedPermissions.some((permission) =>
       this.hasPermission(auth, permission),
     );

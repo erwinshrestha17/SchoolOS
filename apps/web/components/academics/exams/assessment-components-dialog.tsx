@@ -10,6 +10,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Trash2, Plus } from 'lucide-react';
 import { useState } from 'react';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Toast, ToastTone } from '@/components/ui/toast';
+
+type ComponentNotice = {
+  title: string;
+  description?: string;
+  tone: ToastTone;
+};
 
 const componentSchema = z.object({
   subjectId: z.string().min(1, 'Subject is required'),
@@ -32,7 +40,8 @@ export function AssessmentComponentsDialog({
   onClose,
 }: AssessmentComponentsDialogProps) {
   const queryClient = useQueryClient();
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AssessmentComponentSummary | null>(null);
+  const [notice, setNotice] = useState<ComponentNotice | null>(null);
 
   const subjectsQuery = useQuery({
     queryKey: ['subjects'],
@@ -47,19 +56,34 @@ export function AssessmentComponentsDialog({
   const createMutation = useMutation({
     mutationFn: (data: ComponentFormValues) => api.createAssessmentComponent({ ...data, examTermId: exam.id }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['components', exam.id] });
-      queryClient.invalidateQueries({ queryKey: ['exam-terms'] });
+      void queryClient.invalidateQueries({ queryKey: ['components', exam.id] });
+      void queryClient.invalidateQueries({ queryKey: ['exam-terms'] });
       reset();
-      alert('Component added');
+      setNotice({ title: 'Assessment component added', tone: 'success' });
+    },
+    onError: (error: any) => {
+      setNotice({
+        title: 'Could not add component',
+        description: error.message || 'Failed to add component',
+        tone: 'danger',
+      });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: api.deleteAssessmentComponent,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['components', exam.id] });
-      queryClient.invalidateQueries({ queryKey: ['exam-terms'] });
-      alert('Component removed');
+      void queryClient.invalidateQueries({ queryKey: ['components', exam.id] });
+      void queryClient.invalidateQueries({ queryKey: ['exam-terms'] });
+      setDeleteTarget(null);
+      setNotice({ title: 'Assessment component removed', tone: 'success' });
+    },
+    onError: (error: any) => {
+      setNotice({
+        title: 'Could not remove component',
+        description: error.message || 'Failed to remove component',
+        tone: 'danger',
+      });
     },
   });
 
@@ -87,6 +111,15 @@ export function AssessmentComponentsDialog({
 
   return (
     <div className="space-y-6">
+      {notice ? (
+        <Toast
+          title={notice.title}
+          description={notice.description}
+          tone={notice.tone}
+          onDismiss={() => setNotice(null)}
+        />
+      ) : null}
+
       <div className="rounded-2xl bg-slate-50 p-4 flex items-center justify-between">
         <div>
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Weighting</p>
@@ -117,11 +150,7 @@ export function AssessmentComponentsDialog({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                if (confirm(`Are you sure you want to remove the component "${comp.name}"?`)) {
-                  deleteMutation.mutate(comp.id);
-                }
-              }}
+              onClick={() => setDeleteTarget(comp)}
               className="h-8 w-8 p-0 border-none hover:bg-rose-50 hover:text-rose-600 opacity-0 group-hover:opacity-100"
             >
               <Trash2 size={14} />
@@ -179,6 +208,25 @@ export function AssessmentComponentsDialog({
           </div>
         </form>
       </div>
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteTarget)}
+        title="Remove Assessment Component"
+        description={
+          deleteTarget
+            ? `Remove "${deleteTarget.name}" from this exam term?`
+            : 'Remove this assessment component?'
+        }
+        confirmLabel="Remove Component"
+        destructive
+        isConfirming={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTarget) {
+            deleteMutation.mutate(deleteTarget.id);
+          }
+        }}
+        onClose={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

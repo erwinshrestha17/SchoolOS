@@ -20,6 +20,14 @@ import {
   Users
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Toast, ToastTone } from '@/components/ui/toast';
+
+type PromotionNotice = {
+  title: string;
+  description?: string;
+  tone: ToastTone;
+};
 
 type Props = {
   academicYears: any[];
@@ -45,6 +53,8 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
 
   const [filters, setFilters] = useState({ sectionId: '', status: '', search: '' });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [notice, setNotice] = useState<PromotionNotice | null>(null);
 
   const readinessQuery = useQuery({
     queryKey: ['promotion-readiness', promo.academicYearId, promo.fromClassId, filters.sectionId, filters.status],
@@ -72,8 +82,20 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['promotion-readiness'] });
       void queryClient.invalidateQueries({ queryKey: ['students'] });
-      alert(`Promotion Complete: ${data.summary.promoted} promoted, ${data.summary.skipped} skipped.`);
+      setNotice({
+        title: 'Promotion complete',
+        description: `${data.summary.promoted} promoted, ${data.summary.skipped} skipped.`,
+        tone: 'success',
+      });
+      setConfirmOpen(false);
       setSelectedIds(new Set());
+    },
+    onError: (error: any) => {
+      setNotice({
+        title: 'Could not complete promotion',
+        description: error.message || 'Promotion failed.',
+        tone: 'danger',
+      });
     },
   });
 
@@ -82,12 +104,18 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
     const readyCount = students.filter(s => selectedIds.has(s.studentId) && s.status === 'READY').length;
     
     if (readyCount === 0) {
-      alert('None of the selected students are in READY status. Fix missing marks or dues first.');
+      setNotice({
+        title: 'No eligible students selected',
+        description: 'Fix missing marks or dues before promotion.',
+        tone: 'warning',
+      });
       return;
     }
 
-    if (!confirm(`Confirm promotion for ${readyCount} READY students? Others will be skipped.`)) return;
+    setConfirmOpen(true);
+  };
 
+  const confirmBatchPromote = () => {
     batchPromoteMut.mutate({
       academicYearId: promo.academicYearId,
       targetAcademicYearId: promo.targetAcademicYearId,
@@ -115,6 +143,15 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
 
   return (
     <div className="space-y-10 animate-fade-in">
+      {notice ? (
+        <Toast
+          title={notice.title}
+          description={notice.description}
+          tone={notice.tone}
+          onDismiss={() => setNotice(null)}
+        />
+      ) : null}
+
       {/* Promotion Config */}
       <section className="rounded-[2.5rem] border border-slate-200 bg-white/50 p-8 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between mb-8">
@@ -373,6 +410,16 @@ export function PromotionTab({ academicYears, classes, allSections }: Props) {
           </div>
         </section>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        title="Execute Promotion"
+        description={`Promote ${students.filter(s => selectedIds.has(s.studentId) && s.status === 'READY').length} READY students? Any non-ready selections will be skipped by the backend workflow.`}
+        confirmLabel="Promote Students"
+        isConfirming={batchPromoteMut.isPending}
+        onConfirm={confirmBatchPromote}
+        onClose={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

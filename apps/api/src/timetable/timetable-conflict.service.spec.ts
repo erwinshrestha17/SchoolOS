@@ -221,6 +221,36 @@ describe('TimetableConflictService', () => {
     expect(result.errors).toHaveLength(0);
   });
 
+  it('reports Sunday teacher absences with timetable day 7', async () => {
+    const attendanceService = {
+      getTeacherAbsenceContext: jest.fn().mockResolvedValue({
+        isAbsent: true,
+        attendanceStatus: null,
+        leaveType: 'SICK',
+      }),
+    };
+    const serviceWithAttendance = new TimetableConflictService(
+      {} as never,
+      attendanceService as never,
+    );
+
+    const issues = await serviceWithAttendance.detectTeacherAbsenceConflict(
+      'tenant-a',
+      'teacher-1',
+      '2026-05-10',
+    );
+
+    expect(issues).toEqual([
+      expect.objectContaining({
+        type: 'TEACHER_ABSENT',
+        severity: 'WARNING',
+        teacherId: 'teacher-1',
+        dayOfWeek: 7,
+        message: 'Teacher is on approved sick leave on this date.',
+      }),
+    ]);
+  });
+
   describe('validateVersionSlots', () => {
     it('aggregates conflicts for all slots in a version', () => {
       const slots = [

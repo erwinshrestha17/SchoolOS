@@ -23,6 +23,16 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Toast, ToastTone } from '@/components/ui/toast';
+
+type ResultDeliveryNotice = {
+  title: string;
+  description?: string;
+  tone: ToastTone;
+};
+
+type ConfirmAction = 'publish' | 'notify';
 
 type Props = {
   academicYears: any[];
@@ -50,6 +60,8 @@ export function ResultPublishingTab({
   });
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
+  const [notice, setNotice] = useState<ResultDeliveryNotice | null>(null);
 
   const publishingQuery = useQuery({
     queryKey: ['result-publishing-readiness', selection.academicYearId, selection.examTermId, selection.classId, selection.sectionId, selection.status],
@@ -81,8 +93,20 @@ export function ResultPublishingTab({
     mutationFn: api.publishResults,
     onSuccess: (data) => {
       invalidate();
-      alert(`Successfully published ${data.published} results to student/parent dashboards.`);
+      setNotice({
+        title: 'Results published',
+        description: `${data.published} results are now visible to student and parent dashboards.`,
+        tone: 'success',
+      });
+      setConfirmAction(null);
       setSelectedIds(new Set());
+    },
+    onError: (error: any) => {
+      setNotice({
+        title: 'Could not publish results',
+        description: error.message || 'Publishing failed.',
+        tone: 'danger',
+      });
     },
   });
 
@@ -90,15 +114,38 @@ export function ResultPublishingTab({
     mutationFn: api.unpublishResults,
     onSuccess: () => {
       invalidate();
-      alert('Results removed from dashboards.');
+      setNotice({
+        title: 'Results unpublished',
+        description: 'Selected results were removed from dashboards.',
+        tone: 'success',
+      });
       setSelectedIds(new Set());
+    },
+    onError: (error: any) => {
+      setNotice({
+        title: 'Could not unpublish results',
+        description: error.message || 'Unpublish failed.',
+        tone: 'danger',
+      });
     },
   });
 
   const notifyMut = useMutation({
     mutationFn: api.notifyResults,
     onSuccess: () => {
-      alert('Push notifications and emails queued.');
+      setNotice({
+        title: 'Guardian notifications queued',
+        description: 'Push notifications and emails were queued.',
+        tone: 'success',
+      });
+      setConfirmAction(null);
+    },
+    onError: (error: any) => {
+      setNotice({
+        title: 'Could not queue notifications',
+        description: error.message || 'Notification queueing failed.',
+        tone: 'danger',
+      });
     },
   });
 
@@ -107,12 +154,19 @@ export function ResultPublishingTab({
     const publishable = records.filter(r => selectedIds.has(r.reportCardId) && r.reportStatus === 'LOCKED' && r.publishStatus !== 'PUBLISHED');
     
     if (publishable.length === 0) {
-      alert('No publishable report cards selected. Must be LOCKED first.');
+      setNotice({
+        title: 'No publishable results selected',
+        description: 'Report cards must be LOCKED before publishing.',
+        tone: 'warning',
+      });
       return;
     }
 
-    if (!confirm(`CONFIRM PUBLISH: This will make results for ${publishable.length} students visible on the Parent/Student App. Proceed?`)) return;
+    setConfirmAction('publish');
+  };
 
+  const confirmBatchPublish = () => {
+    const publishable = records.filter(r => selectedIds.has(r.reportCardId) && r.reportStatus === 'LOCKED' && r.publishStatus !== 'PUBLISHED');
     publishMut.mutate({ reportCardIds: publishable.map(r => r.reportCardId) });
   };
 
@@ -121,12 +175,19 @@ export function ResultPublishingTab({
     const notified = records.filter(r => selectedIds.has(r.reportCardId) && r.publishStatus === 'PUBLISHED');
     
     if (notified.length === 0) {
-      alert('Only PUBLISHED results can be notified.');
+      setNotice({
+        title: 'No published results selected',
+        description: 'Only PUBLISHED results can notify guardians.',
+        tone: 'warning',
+      });
       return;
     }
 
-    if (!confirm(`Send automated alerts to ${notified.length} guardians?`)) return;
+    setConfirmAction('notify');
+  };
 
+  const confirmBatchNotify = () => {
+    const notified = records.filter(r => selectedIds.has(r.reportCardId) && r.publishStatus === 'PUBLISHED');
     notifyMut.mutate({ reportCardIds: notified.map(r => r.reportCardId) });
   };
 
@@ -142,8 +203,24 @@ export function ResultPublishingTab({
     setSelectedIds(next);
   };
 
+  const publishableCount = records.filter(
+    r => selectedIds.has(r.reportCardId) && r.reportStatus === 'LOCKED' && r.publishStatus !== 'PUBLISHED',
+  ).length;
+  const notifyCount = records.filter(
+    r => selectedIds.has(r.reportCardId) && r.publishStatus === 'PUBLISHED',
+  ).length;
+
   return (
     <div className="space-y-10 animate-fade-in">
+      {notice ? (
+        <Toast
+          title={notice.title}
+          description={notice.description}
+          tone={notice.tone}
+          onDismiss={() => setNotice(null)}
+        />
+      ) : null}
+
       {/* Configuration & High-Level Actions */}
       <section className="rounded-[2.5rem] border border-slate-200 bg-white/50 p-8 shadow-xl shadow-slate-200/50 backdrop-blur-xl">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between mb-8">
@@ -367,6 +444,20 @@ export function ResultPublishingTab({
           </div>
         </section>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmAction !== null}
+        title={confirmAction === 'publish' ? 'Publish Result Visibility' : 'Notify Guardians'}
+        description={
+          confirmAction === 'publish'
+            ? `Publish ${publishableCount} locked results to parent and student dashboards?`
+            : `Queue result notifications for ${notifyCount} published results?`
+        }
+        confirmLabel={confirmAction === 'publish' ? 'Publish Results' : 'Notify Guardians'}
+        isConfirming={publishMut.isPending || notifyMut.isPending}
+        onConfirm={confirmAction === 'publish' ? confirmBatchPublish : confirmBatchNotify}
+        onClose={() => setConfirmAction(null)}
+      />
     </div>
   );
 }

@@ -76,6 +76,18 @@ describe('SchoolOS web production contracts', () => {
     assert.match(dataTable, /getRowKey/);
   });
 
+  it('keeps operator feedback inside the app UI instead of browser-native prompts', () => {
+    const files = [...sourceFiles('app'), ...sourceFiles('components')];
+
+    for (const file of files) {
+      assert.doesNotMatch(
+        read(file),
+        /\b(?:window\.)?(alert|confirm)\s*\(/,
+        `${file} should use Toast, ConfirmDialog, or inline status UI instead of alert/confirm`,
+      );
+    }
+  });
+
   it('keeps Phase 1 and Phase 2 admin dashboard routes present', () => {
     const requiredRoutes = ['admissions', 'attendance', 'fees', 'finance', 'activity', 'notices', 'academics', 'timetable', 'homework', 'hr', 'payroll', 'accounting', 'messaging', 'messages', 'settings'];
 
@@ -106,6 +118,35 @@ describe('SchoolOS web production contracts', () => {
     }
 
     assert.doesNotMatch(`${timetableBuilder}\n${homeworkTab}`, /demo-|fake-|placeholderId/i);
+  });
+
+  it('uses in-app feedback for timetable, report export, and accounting safety actions', () => {
+    const polishedSurfaces = readMany([
+      'components/timetable/versions-list.tsx',
+      'components/timetable/substitutions-list.tsx',
+      'app/dashboard/reports/page.tsx',
+      'components/accounting/chart-of-accounts-view.tsx',
+      'components/accounting/journal-entries-view.tsx',
+      'components/accounting/journal-detail-dialog.tsx',
+    ]);
+
+    for (const marker of [
+      'Toast',
+      'Version published',
+      'Export ready',
+      'Seed default chart accounts?',
+      'Cancel substitution?',
+      'Open fiscal year required',
+      'Active fiscal period required',
+      'Posting failed',
+      'Reversal failed',
+      'Correction failed',
+    ]) {
+      assert.ok(polishedSurfaces.includes(marker), `Missing marker: ${marker}`);
+    }
+
+    assert.doesNotMatch(polishedSurfaces, /alert\(/);
+    assert.doesNotMatch(polishedSurfaces, /window\.confirm|confirm\(/);
   });
 
   it('keeps platform administration routes present and secure', () => {
@@ -254,6 +295,21 @@ describe('SchoolOS web production contracts', () => {
     assert.doesNotMatch(dashboard, /94\.2%/);
     assert.doesNotMatch(dashboard, /8,45,000|845000/);
     assert.doesNotMatch(dashboard, /Phase 2 Academic Cycle/);
+  });
+
+  it('keeps the dashboard shell polished and routes fee alerts to the canonical fees page', () => {
+    const dashboard = read('app/dashboard/page.tsx');
+    const shell = read('components/layout/dashboard-shell.tsx');
+    const globals = read('app/globals.css');
+
+    assert.match(shell, /Skip to workspace/);
+    assert.match(dashboard, /DashboardHeroMetric/);
+    assert.match(dashboard, /alertToneStyles/);
+    assert.match(dashboard, /href: '\/dashboard\/fees'/);
+    assert.doesNotMatch(dashboard, /href: '\/dashboard\/finance'/);
+    assert.doesNotMatch(dashboard, /blur-3xl/);
+    assert.match(globals, /\.tracking-tight\s*\{\s*letter-spacing: 0;/);
+    assert.match(globals, /\.shell-card\s*\{[\s\S]*border-radius: 1rem;/);
   });
 
   it('keeps admin dashboard quick actions on existing Phase 1 routes', () => {
@@ -563,6 +619,22 @@ describe('SchoolOS web production contracts', () => {
     assert.match(financeForm, /Payment amount must be greater than zero/);
   });
 
+  it('adds interactive fee-head and period controls to the collection counter dues table', () => {
+    const financeForm = read('components/forms/finance-form.tsx');
+
+    for (const marker of [
+      'finance-dues-interaction-toolbar',
+      'Filter dues by fee head',
+      'Filter dues by billing period',
+      'Collect line',
+      'onQuickCollect',
+      'getLineNetDue',
+      'Math.min(lineAmount, outstanding)',
+    ]) {
+      assert.ok(financeForm.includes(marker), `Missing marker: ${marker}`);
+    }
+  });
+
   it('keeps receipt success, discounts, waivers, and defaulter reminders available', () => {
     const financeForm = read('components/forms/finance-form.tsx');
 
@@ -588,6 +660,29 @@ describe('SchoolOS web production contracts', () => {
     assert.match(financeForm, /Export Defaulter Aging CSV/);
     assert.match(financeForm, /api\.exportReport\('defaulter-aging-report'/);
     assert.match(financeForm, /asOfDate: new Date\(\)\.toISOString\(\)/);
+  });
+
+  it('keeps report-card corrections behind a review dialog with audited reason entry', () => {
+    const reportCardsWorkspace = read('components/academics/report-cards/report-cards-workspace.tsx');
+
+    for (const marker of [
+      'ReportCardCorrectionDialog',
+      'Review Locked Report-Card Correction',
+      'Regeneration creates a new report-card version',
+      'data-testid="report-card-correction-panel"',
+      'data-testid="report-card-correction-reason"',
+      'data-testid="report-card-submit-correction"',
+      'disabled={isSubmitting || !reason.trim()}',
+      'reportCardStudentName',
+      'Confirm locked report-card generation',
+      'generationStudentIds',
+      'Could not load report card PDF',
+    ]) {
+      assert.ok(reportCardsWorkspace.includes(marker), `Missing marker: ${marker}`);
+    }
+
+    assert.doesNotMatch(reportCardsWorkspace, /alert\(/);
+    assert.doesNotMatch(reportCardsWorkspace, /confirm\(/);
   });
 
   it('keeps ledger preview preview-only without direct accounting calls', () => {
@@ -625,6 +720,60 @@ describe('SchoolOS web production contracts', () => {
     assert.match(canteenWorkspace, /ReceiptPreview/);
     assert.match(canteenWorkspace, /onReceiptPdf/);
     assert.doesNotMatch(canteenWorkspace, /window\.print/);
+  });
+
+  it('adds accounting audit summary context and richer log detail fields', () => {
+    const auditWorkspace = read('components/accounting/accounting-audit-workspace.tsx');
+
+    for (const marker of [
+      'AuditSummaryCard',
+      'Records on page',
+      'activeFilterLabel',
+      'data-testid="accounting-audit-page-summary"',
+      'AuditDetailField',
+      'Tenant scope',
+      'Resource ID',
+      'Actor ID',
+    ]) {
+      assert.ok(auditWorkspace.includes(marker), `Missing marker: ${marker}`);
+    }
+  });
+
+  it('makes transport latest-location freshness explicit for operators', () => {
+    const transportWorkspace = read('components/transport/transport-workspace.tsx');
+
+    for (const marker of [
+      'transport-location-freshness-panel',
+      'getLocationFreshness',
+      'LocationMetric',
+      'Latest backend coordinate is fresh enough',
+      'Confirm with the driver before sharing transport updates',
+      'Treat the trip position as approximate',
+    ]) {
+      assert.ok(transportWorkspace.includes(marker), `Missing marker: ${marker}`);
+    }
+  });
+
+  it('keeps canteen Serving and POS QR scan flows fast and backend-purpose compatible', () => {
+    const canteenWorkspace = read('components/canteen/canteen-workspace.tsx');
+    const resolver = read('components/ui/qr-resolver.tsx');
+
+    for (const marker of [
+      'CanteenQrStudentCard',
+      'resolvedServingStudent',
+      'resolvedPosStudent',
+      'canteen-serving-control-preview',
+      'Scan a student QR; the serving form stays ready',
+      'Scan student QR to select wallet payment',
+      "!posForm.studentId",
+      "!posForm.items[0]?.menuItemId",
+      "Number(posForm.items[0]?.quantity ?? 0) <= 0",
+    ]) {
+      assert.ok(canteenWorkspace.includes(marker), `Missing marker: ${marker}`);
+    }
+
+    assert.match(resolver, /purpose === 'CANTEEN_POS' \|\| purpose === 'CANTEEN_SERVE'/);
+    assert.match(resolver, /return 'CANTEEN'/);
   });
 
   it('keeps canteen inventory and supplier surfaces wired to real APIs', () => {
@@ -736,6 +885,42 @@ describe('SchoolOS web production contracts', () => {
 
     for (const status of deliveryStatuses) {
       assert.match(communicationsForm, new RegExp(status));
+    }
+  });
+
+  it('keeps parent-teacher messaging moderation and escalation decisions explicit', () => {
+    const messaging = read('components/messaging/parent-teacher-messaging-workspace.tsx');
+
+    for (const marker of [
+      'chat-moderation-decision-panel',
+      'Safety & Escalation Queue',
+      'getModerationDecision',
+      'Concern reason',
+      'Moderation reason',
+      'Escalation reason',
+      'Thread closed with an audited moderation reason.',
+      'Thread escalated for school leadership review.',
+      'Escalated thread needs owner review',
+    ]) {
+      assert.ok(messaging.includes(marker), `Missing marker: ${marker}`);
+    }
+  });
+
+  it('keeps notice unread recipient follow-up controls available', () => {
+    const noticeDetail = read('app/dashboard/notices/[noticeId]/page.tsx');
+
+    for (const marker of [
+      'notice-unread-recipient-controls',
+      'Search unread notice recipients',
+      'Filter unread recipients by channel',
+      'Filter unread recipients by class',
+      'Follow-up queue:',
+      'visible delivery records failed',
+      'visible recipients need contact cleanup',
+      'Contact:',
+      'No unread recipients match these filters',
+    ]) {
+      assert.ok(noticeDetail.includes(marker), `Missing marker: ${marker}`);
     }
   });
 

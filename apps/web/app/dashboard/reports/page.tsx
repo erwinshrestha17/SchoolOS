@@ -7,6 +7,7 @@ import { SectionCard } from '@/components/ui/section-card';
 import { PageHeader } from '@/components/ui/page-header';
 import { Select, Input } from '@/components/ui/form-field';
 import { Button } from '@/components/ui/button';
+import { Toast, type ToastTone } from '@/components/ui/toast';
 import { 
   ClipboardList, 
   Download, 
@@ -34,6 +35,11 @@ function ReportsWorkspace() {
   const [selectedReportKey, setSelectedReportKey] = useState<string | null>(null);
   const [filters, setFilters] = useState<Record<string, any>>({});
   const [exporting, setExporting] = useState<string | null>(null);
+  const [exportNotice, setExportNotice] = useState<{
+    title: string;
+    description?: string;
+    tone: ToastTone;
+  } | null>(null);
 
   const reportsQuery = useQuery({
     queryKey: ['report-definitions'],
@@ -55,8 +61,18 @@ function ReportsWorkspace() {
         format,
         filters,
       });
-    } catch (error: any) {
-      alert(error.message || 'Export failed');
+      setExportNotice({
+        title: 'Export ready',
+        description: `${selectedReport?.name ?? 'Report'} ${format.toUpperCase()} export completed.`,
+        tone: 'success',
+      });
+    } catch (error: unknown) {
+      setExportNotice({
+        title: 'Export failed',
+        description:
+          error instanceof Error ? error.message : 'The report export failed.',
+        tone: 'danger',
+      });
     } finally {
       setExporting(null);
     }
@@ -117,6 +133,16 @@ function ReportsWorkspace() {
 
       {/* Configuration & Actions */}
       <div className="lg:col-span-2 space-y-6">
+        {exportNotice ? (
+          <Toast
+            title={exportNotice.title}
+            description={exportNotice.description}
+            tone={exportNotice.tone}
+            onDismiss={() => setExportNotice(null)}
+            className="max-w-none"
+          />
+        ) : null}
+
         {selectedReport ? (
           <SectionCard 
             title={selectedReport.name} 
