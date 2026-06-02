@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, Module, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { AuditModule } from '../audit/audit.module';
 import { ConfigModule } from '../config/config.module';
@@ -8,7 +8,9 @@ import { AuthController } from './auth.controller';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesPermissionsGuard } from './guards/roles-permissions.guard';
 import { EntitlementGuard } from './guards/entitlement.guard';
+import { ApiKeyAuthGuard } from './guards/api-key-auth.guard';
 import { PlansModule } from '../plans/plans.module';
+import { PlatformModule } from '../platform/platform.module';
 
 @Global()
 @Module({
@@ -18,6 +20,7 @@ import { PlansModule } from '../plans/plans.module';
     AuditModule,
     NotificationsModule,
     PlansModule,
+    forwardRef(() => PlatformModule),
   ],
   controllers: [AuthController],
   providers: [
@@ -25,12 +28,14 @@ import { PlansModule } from '../plans/plans.module';
     JwtAuthGuard,
     RolesPermissionsGuard,
     EntitlementGuard,
+    ApiKeyAuthGuard,
   ],
   exports: [
     AuthService,
     JwtAuthGuard,
     RolesPermissionsGuard,
     EntitlementGuard,
+    ApiKeyAuthGuard,
     JwtModule,
   ],
 })

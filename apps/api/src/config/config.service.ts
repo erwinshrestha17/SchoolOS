@@ -37,6 +37,58 @@ export class ConfigService {
     return process.env.JWT_SECRET ?? 'school-os-access-secret';
   }
 
+  get jwtIssuer() {
+    return process.env.JWT_ISSUER ?? 'schoolos';
+  }
+
+  get jwtAudienceWeb() {
+    return process.env.JWT_AUDIENCE_WEB ?? 'schoolos-web';
+  }
+
+  get jwtAudienceMobile() {
+    return process.env.JWT_AUDIENCE_MOBILE ?? 'schoolos-mobile';
+  }
+
+  get tokenHashPepper() {
+    if (process.env.TOKEN_HASH_PEPPER) {
+      return process.env.TOKEN_HASH_PEPPER;
+    }
+    if (this.isProduction) {
+      throw new Error('TOKEN_HASH_PEPPER is required in production');
+    }
+    return 'school-os-local-hash-pepper-change-me-at-least-32-chars';
+  }
+
+  get rateLimitEnabled() {
+    return ['1', 'true', 'yes'].includes(
+      (process.env.RATE_LIMIT_ENABLED ?? 'true').toLowerCase(),
+    );
+  }
+
+  get authRateLimitWindow() {
+    return Number(process.env.AUTH_RATE_LIMIT_WINDOW ?? 60);
+  }
+
+  get authRateLimitMax() {
+    return Number(process.env.AUTH_RATE_LIMIT_MAX ?? 5);
+  }
+
+  get qrRateLimitWindow() {
+    return Number(process.env.QR_RATE_LIMIT_WINDOW ?? 60);
+  }
+
+  get qrRateLimitMax() {
+    return Number(process.env.QR_RATE_LIMIT_MAX ?? 10);
+  }
+
+  get apiKeyRateLimitWindow() {
+    return Number(process.env.API_KEY_RATE_LIMIT_WINDOW ?? 60);
+  }
+
+  get apiKeyRateLimitMax() {
+    return Number(process.env.API_KEY_RATE_LIMIT_MAX ?? 30);
+  }
+
   get challengeSecret() {
     return process.env.JWT_CHALLENGE_SECRET ?? `${this.jwtSecret}-challenge`;
   }
@@ -306,6 +358,22 @@ export class ConfigService {
       process.env.MEDICAL_ENCRYPTION_KEY,
       'school-os-local-medical-encryption-key-change-me',
     );
+    this.requireProductionSecret(
+      errors,
+      'TOKEN_HASH_PEPPER',
+      process.env.TOKEN_HASH_PEPPER,
+      'school-os-local-hash-pepper-change-me-at-least-32-chars',
+    );
+
+    if (process.env.JWT_ISSUER === 'schoolos' || !process.env.JWT_ISSUER) {
+      errors.push('JWT_ISSUER is required in production and must not be default');
+    }
+    if (process.env.JWT_AUDIENCE_WEB === 'schoolos-web' || !process.env.JWT_AUDIENCE_WEB) {
+      errors.push('JWT_AUDIENCE_WEB is required in production and must not be default');
+    }
+    if (process.env.JWT_AUDIENCE_MOBILE === 'schoolos-mobile' || !process.env.JWT_AUDIENCE_MOBILE) {
+      errors.push('JWT_AUDIENCE_MOBILE is required in production and must not be default');
+    }
 
     if (!process.env.FRONTEND_ORIGIN && !process.env.FRONTEND_ORIGINS?.trim()) {
       errors.push(
@@ -314,6 +382,9 @@ export class ConfigService {
     }
 
     for (const origin of this.frontendOrigins) {
+      if (origin === '*') {
+        errors.push('Wildcard (*) CORS origin is not allowed in production when credentials are enabled');
+      }
       try {
         const parsedOrigin = new URL(origin);
         if (parsedOrigin.protocol !== 'https:') {

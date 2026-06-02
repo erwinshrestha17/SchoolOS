@@ -237,7 +237,12 @@ export class EntitlementsService {
       return false;
     }
     const entitlements = await this.getEntitlements(tenantId);
-    return entitlements.modules.includes(cleaned);
+    return (
+      entitlements.modules.includes(cleaned) ||
+      entitlements.features.includes(cleaned) ||
+      (cleaned === 'timetable' && entitlements.modules.includes('homework')) ||
+      (cleaned === 'communications' && entitlements.modules.includes('notices'))
+    );
   }
 
   async assertFeatureEnabled(
@@ -282,3 +287,4 @@ export class EntitlementsService {
     }
   }
 }
+// Trigger build

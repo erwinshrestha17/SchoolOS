@@ -19,6 +19,9 @@ export interface JwtAccessPayload {
   email: string | null;
   authMethod: AuthMethod;
   roles: string[];
+  iss?: string;
+  aud?: string;
+  jti?: string;
 }
 
 export interface JwtChallengePayload {

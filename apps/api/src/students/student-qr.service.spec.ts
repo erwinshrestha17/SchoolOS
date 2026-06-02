@@ -37,11 +37,26 @@ function createService() {
     },
   };
 
+  prisma.studentQrCredential.findFirst.mockImplementation(async (args: any) => {
+    if (args?.where?.tokenHash) {
+      return prisma.studentQrCredential.findUnique(args);
+    }
+    return null;
+  });
+
   const auditService = {
     record: jest.fn(),
   };
 
-  const service = new StudentQrService(prisma as any, auditService as any);
+  const configService = {
+    tokenHashPepper: 'mock-pepper-for-tests-at-least-32-chars-long-12345',
+  };
+
+  const service = new StudentQrService(
+    prisma as any,
+    auditService as any,
+    configService as any,
+  );
 
   return { service, prisma, auditService };
 }
@@ -672,5 +687,94 @@ describe('StudentQrService', () => {
         adminAuth,
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('allows multi-role parent and teacher users to resolve QR codes if they pass either ownership check', async () => {
+    const { service, prisma } = createService();
+    prisma.studentQrCredential.findUnique.mockResolvedValue({
+      ...baseCredential,
+      student: activeStudent,
+    });
+    prisma.studentQrCredential.update.mockResolvedValue(baseCredential);
+
+    // Case A: User is parent of the child but not their teacher
+    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
+
+    const resultParentOnly = await service.resolveQr(
+      'tenant-1',
+      'qr-token',
+      StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP,
+      {
+        ...adminAuth,
+        userId: 'guardian-user-1',
+        roles: ['parent', 'teacher'],
+        permissions: ['students:qr:resolve', 'students:read'],
+      },
+    );
+    expect(resultParentOnly).toBeDefined();
+    expect(resultParentOnly.studentId).toBe('student-1');
+
+    // Case B: User is teacher of the child but not their parent
+    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue({
+      id: 'assignment-1',
+    });
+
+    const resultTeacherOnly = await service.resolveQr(
+      'tenant-1',
+      'qr-token',
+      StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP,
+      {
+        ...adminAuth,
+        userId: 'teacher-user-1',
+        roles: ['parent', 'teacher'],
+        permissions: ['students:qr:resolve', 'students:read'],
+      },
+    );
+    expect(resultTeacherOnly).toBeDefined();
+    expect(resultTeacherOnly.studentId).toBe('student-1');
+
+    // Case C: User is neither parent nor teacher of the child
+    prisma.subjectTeacherAssignment.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.resolveQr(
+        'tenant-1',
+        'qr-token',
+        StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP,
+        {
+          ...adminAuth,
+          userId: 'other-user',
+          roles: ['parent', 'teacher'],
+          permissions: ['students:qr:resolve', 'students:read'],
+        },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('rejects expired QR scans', async () => {
+    const { service, prisma, auditService } = createService();
+    prisma.studentQrCredential.findUnique.mockResolvedValue({
+      ...baseCredential,
+      expiresAt: new Date(Date.now() - 10000), // 10 seconds ago
+      student: activeStudent,
+    });
+
+    await expect(
+      service.resolveQr(
+        'tenant-1',
+        'qr-token',
+        StudentQrResolvePurpose.GENERAL_STUDENT_LOOKUP,
+        adminAuth,
+      ),
+    ).rejects.toThrow('QR token has expired');
+
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'QR_RESOLVE_FAILED',
+        after: expect.objectContaining({
+          failureCode: 'expired',
+        }),
+      }),
+    );
   });
 });

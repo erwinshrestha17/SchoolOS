@@ -11,6 +11,7 @@ import type {
 } from '@schoolos/core';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { ConfigService } from '../config/config.service';
 import {
   CreatePlatformApiKeyDto,
   RevokePlatformApiKeyDto,
@@ -40,6 +41,7 @@ export class PlatformApiKeysService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly configService: ConfigService,
   ) {}
 
   async listApiKeys(tenantId: string): Promise<PlatformApiKeySummary[]> {
@@ -142,24 +144,90 @@ export class PlatformApiKeysService {
 
   async validateApiKey(secret: string) {
     if (!secret.startsWith(SECRET_PREFIX)) {
+      await this.auditService.record({
+        action: 'api_key_validation_failed',
+        resource: 'api_keys',
+        tenantId: 'platform',
+        after: { reason: 'invalid_prefix', prefix: secret.slice(0, 16) },
+      });
       return null;
     }
 
-    const key = await this.prisma.platformApiKey.findUnique({
-      where: { keyHash: this.hashSecret(secret) },
+    const hashV2 = this.hmacSecret(secret);
+    const hashV1 = this.hashSecret(secret);
+
+    const key = await this.prisma.platformApiKey.findFirst({
+      where: {
+        OR: [
+          { keyHash: hashV2 },
+          { keyHash: hashV1 },
+        ],
+      },
       select: {
         id: true,
         tenantId: true,
         scopes: true,
         status: true,
         expiresAt: true,
+        keyHash: true,
+        tenant: {
+          select: {
+            id: true,
+            isActive: true,
+          },
+        },
       },
     });
 
-    if (!key || key.status !== 'ACTIVE') {
+    if (!key) {
+      await this.auditService.record({
+        action: 'api_key_validation_failed',
+        resource: 'api_keys',
+        tenantId: 'platform',
+        after: { reason: 'not_found', prefix: secret.slice(0, 16) },
+      });
+      return null;
+    }
+
+    // Constant-time check
+    const isMatchV2 = this.safeCompare(key.keyHash, hashV2);
+    const isMatchV1 = this.safeCompare(key.keyHash, hashV1);
+
+    if (!isMatchV2 && !isMatchV1) {
+      await this.auditService.record({
+        action: 'api_key_validation_failed',
+        resource: 'api_keys',
+        tenantId: key.tenantId,
+        after: { reason: 'hash_mismatch', apiKeyId: key.id },
+      });
+      return null;
+    }
+
+    if (key.status !== 'ACTIVE') {
+      await this.auditService.record({
+        action: 'api_key_validation_failed',
+        resource: 'api_keys',
+        tenantId: key.tenantId,
+        after: { reason: 'revoked', apiKeyId: key.id },
+      });
+      return null;
+    }
+    if (!key.tenant || !key.tenant.isActive) {
+      await this.auditService.record({
+        action: 'api_key_validation_failed',
+        resource: 'api_keys',
+        tenantId: key.tenantId,
+        after: { reason: 'tenant_inactive', apiKeyId: key.id },
+      });
       return null;
     }
     if (key.expiresAt && key.expiresAt.getTime() <= Date.now()) {
+      await this.auditService.record({
+        action: 'api_key_validation_failed',
+        resource: 'api_keys',
+        tenantId: key.tenantId,
+        after: { reason: 'expired', apiKeyId: key.id },
+      });
       return null;
     }
 
@@ -218,7 +286,7 @@ export class PlatformApiKeysService {
             tenantId: input.tenantId,
             name: input.name,
             prefix,
-            keyHash: this.hashSecret(secret),
+            keyHash: this.hmacSecret(secret),
             keySuffix,
             scopes: input.scopes,
             expiresAt: input.expiresAt,
@@ -239,6 +307,20 @@ export class PlatformApiKeysService {
 
   private hashSecret(secret: string) {
     return createHash('sha256').update(secret).digest('hex');
+  }
+
+  private hmacSecret(secret: string) {
+    const pepper = this.configService.tokenHashPepper;
+    return require('crypto').createHmac('sha256', pepper).update(secret).digest('hex');
+  }
+
+  private safeCompare(a: string, b: string) {
+    const bufA = Buffer.from(a, 'hex');
+    const bufB = Buffer.from(b, 'hex');
+    if (bufA.length !== bufB.length) {
+      return false;
+    }
+    return require('crypto').timingSafeEqual(bufA, bufB);
   }
 
   private safeSelect() {

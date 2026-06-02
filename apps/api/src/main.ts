@@ -10,12 +10,20 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
 import { ResponseEnvelopeInterceptor } from './common/interceptors/response-envelope.interceptor';
 import { ConfigService } from './config/config.service';
+import helmet from 'helmet';
 import type { NextFunction, Request, Response } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   configService.validateForRuntime();
+
+  app.use(
+    helmet({
+      contentSecurityPolicy: configService.isProduction ? undefined : false,
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
 
   const httpAdapter = app.getHttpAdapter().getInstance();
 
@@ -34,6 +42,11 @@ async function bootstrap() {
     origin: (origin, callback) => {
       if (!origin) {
         callback(null, true);
+        return;
+      }
+
+      if (origin === '*' || origin.includes('*')) {
+        callback(new Error('Wildcard origin is not allowed by CORS'), false);
         return;
       }
 

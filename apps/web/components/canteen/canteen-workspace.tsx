@@ -389,15 +389,15 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
     },
   });
 
-  const menuItems = menuQuery.data ?? [];
-  const plans = plansQuery.data ?? [];
-  const enrollments = enrollmentsQuery.data ?? [];
-  const servings = servingsQuery.data ?? [];
-  const sales = salesQuery.data ?? [];
-  const lowBalanceWallets = lowBalanceQuery.data ?? [];
+  const menuItems = itemsFromResult(menuQuery.data);
+  const plans = itemsFromResult(plansQuery.data);
+  const enrollments = itemsFromResult(enrollmentsQuery.data);
+  const servings = itemsFromResult(servingsQuery.data);
+  const sales = itemsFromResult(salesQuery.data);
+  const lowBalanceWallets = itemsFromResult(lowBalanceQuery.data);
   const suppliers = itemsFromResult(suppliersQuery.data);
   const inventoryItems = itemsFromResult(inventoryItemsQuery.data);
-  const stockLedgerRows = stockLedgerQuery.data ?? [];
+  const stockLedgerRows = itemsFromResult(stockLedgerQuery.data);
   const allergyWarnings = servings.filter((serving) => Boolean(serving.dietaryWarning));
 
   const stats = {

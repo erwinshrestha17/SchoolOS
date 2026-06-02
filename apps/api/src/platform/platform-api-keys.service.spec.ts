@@ -20,7 +20,14 @@ describe('PlatformApiKeysService', () => {
       },
     };
     auditService = { record: jest.fn().mockResolvedValue({}) };
-    service = new PlatformApiKeysService(prisma, auditService as any);
+    const configService = {
+      tokenHashPepper: 'mock-pepper-for-tests-at-least-32-chars-long-12345',
+    };
+    service = new PlatformApiKeysService(
+      prisma,
+      auditService as any,
+      configService as any,
+    );
   });
 
   it('creates tenant-scoped API keys with one-time secret reveal and hashed persistence', async () => {
@@ -177,6 +184,29 @@ describe('PlatformApiKeysService', () => {
         'platform-user-1',
       ),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects keys if the tenant does not exist or is inactive', async () => {
+    prisma.platformApiKey.findUnique.mockResolvedValue(
+      apiKeyRecord({
+        tenant: { id: 'tenant-1', isActive: false },
+      }),
+    );
+    const result = await service.validateApiKey('sk_schoolos_validkey_123');
+    expect(result).toBeNull();
+
+    prisma.platformApiKey.findUnique.mockResolvedValue(
+      apiKeyRecord({
+        tenant: null,
+      }),
+    );
+    const result2 = await service.validateApiKey('sk_schoolos_validkey_123');
+    expect(result2).toBeNull();
+  });
+
+  it('rejects incorrect prefix formats during key validation', async () => {
+    const result = await service.validateApiKey('invalid_prefix_key_123');
+    expect(result).toBeNull();
   });
 });
 

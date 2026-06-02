@@ -41,7 +41,10 @@ export default function StudentsPage() {
   });
   const studentsQuery = useQuery({ 
     queryKey: ['students', filters], 
-    queryFn: () => api.listStudents(filters) 
+    queryFn: () => {
+      const { academicYearId, ...studentFilters } = filters;
+      return api.listStudents(studentFilters);
+    } 
   });
   const duplicateCandidatesQuery = useQuery({
     queryKey: ['student-duplicate-candidates'],

@@ -58,6 +58,7 @@
     "class-validator": "^0.15.1",
     "dotenv": "^17.4.2",
     "express": "^5.0.1",
+    "helmet": "^8.2.0",
     "ioredis": "^5.10.1",
     "nestjs-cls": "^6.2.0",
     "passport": "^0.7.0",

@@ -103,7 +103,7 @@ export function createRequestMock(): RequestMock {
   return {
     ip: '127.0.0.1',
     headers: {
-      'user-agent': 'jest',
+      'user-agent': 'schoolos-mobile-flutter-test',
     },
   };
 }

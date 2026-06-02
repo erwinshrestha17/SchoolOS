@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { PlatformController } from './platform.controller';
 import { PlatformService } from './platform.service';
@@ -19,7 +19,7 @@ import { PlatformBillingLifecycleService } from './platform-billing-lifecycle.se
   imports: [
     PrismaModule,
     AuditModule,
-    AuthModule,
+    forwardRef(() => AuthModule),
     UsageModule,
     ConfigModule,
     RedisModule,

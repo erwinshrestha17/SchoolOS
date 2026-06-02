@@ -265,7 +265,7 @@ describe('School OS Auth + RBAC integration', () => {
     const teacherRequest = await authenticateRequest(
       jwtAuthGuard,
       rolesGuard,
-      teacherVerifiedLogin.accessToken,
+      teacherVerifiedLogin.accessToken as string,
       ClassesController.prototype.listClasses as unknown as (
         ...args: unknown[]
       ) => unknown,
@@ -586,19 +586,19 @@ function getLatestCode(
 
 function asSession(
   result:
-    | { accessToken: string; user: unknown }
+    | { accessToken?: string; user: unknown }
     | { requiresMfa: boolean; challengeToken: string },
 ) {
-  if (!('accessToken' in result)) {
+  if (!('accessToken' in result) || !result.accessToken) {
     throw new Error('Expected a session response');
   }
 
-  return result;
+  return result as { accessToken: string; user: unknown };
 }
 
 function asChallenge(
   result:
-    | { accessToken: string; user: unknown }
+    | { accessToken?: string; user: unknown }
     | { requiresMfa: boolean; challengeToken: string },
 ) {
   if (!('challengeToken' in result)) {
@@ -618,6 +618,7 @@ async function authenticateRequest(
   const request = {
     headers: {
       authorization: `Bearer ${accessToken}`,
+      'user-agent': 'schoolos-mobile-flutter-test',
     },
   } as unknown as AuthenticatedRequest;
 

@@ -357,23 +357,102 @@ describe('AuthService', () => {
       expect.objectContaining({ httpOnly: true }),
     );
   });
+
+  it('revokes active refresh tokens when the account gets locked', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({
+      id: 'tenant-1',
+      slug: 'school-a',
+      name: 'School A',
+      isActive: true,
+    });
+    prisma.user.findUnique.mockResolvedValue({
+      ...authUser,
+      failedLoginCount: 4,
+    });
+    prisma.user.update.mockResolvedValue({});
+    prisma.refreshToken.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(
+      service.login(
+        {
+          tenantSlug: 'school-a',
+          email: authUser.email,
+          password: 'wrong-password',
+        },
+        response,
+      ),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: authUser.id },
+        data: expect.objectContaining({
+          failedLoginCount: 5,
+          lockedUntil: expect.any(Date),
+        }),
+      }),
+    );
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: authUser.id,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: expect.any(Date),
+      },
+    });
+  });
+
+  it('detects suspicious refresh token reuse, revokes all sessions for the user, and audits it', async () => {
+    const rawRefreshToken = 'reused-refresh-token';
+    prisma.refreshToken.findUnique.mockResolvedValue({
+      id: 'session-1',
+      userId: authUser.id,
+      expiresAt: new Date(Date.now() + 60_000),
+      revokedAt: new Date(),
+      user: authUser,
+    });
+    prisma.refreshToken.updateMany.mockResolvedValue({ count: 2 });
+
+    await expect(
+      service.refresh({ refreshToken: rawRefreshToken }, response),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: authUser.id,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: expect.any(Date),
+      },
+    });
+
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'suspicious_refresh_token_reuse',
+        userId: authUser.id,
+        tenantId: authUser.tenantId,
+      }),
+    );
+  });
 });
 
 function asSession(
   result:
-    | { accessToken: string; refreshToken?: string; user: any }
+    | { accessToken?: string; refreshToken?: string; user: any }
     | { requiresMfa: boolean; challengeToken: string },
 ) {
-  if (!('accessToken' in result)) {
+  if (!('accessToken' in result) || !result.accessToken) {
     throw new Error('Expected a session response');
   }
 
-  return result;
+  return result as { accessToken: string; refreshToken?: string; user: any };
 }
 
 function asChallenge(
   result:
-    | { accessToken: string; refreshToken?: string; user: any }
+    | { accessToken?: string; refreshToken?: string; user: any }
     | { requiresMfa: boolean; challengeToken: string },
 ) {
   if (!('challengeToken' in result)) {

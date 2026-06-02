@@ -1077,6 +1077,7 @@ async function seedPlatformInfrastructure() {
     { key: 'free', name: 'Free Tier', priceNpr: 0, billingCycle: 'ANNUAL' },
     { key: 'standard', name: 'Standard Tier', priceNpr: 50000, billingCycle: 'ANNUAL' },
     { key: 'premium', name: 'Premium Tier', priceNpr: 150000, billingCycle: 'ANNUAL' },
+    { key: 'enterprise', name: 'Enterprise Tier', priceNpr: 300000, billingCycle: 'ANNUAL' },
   ];
 
   const createdPlans: any[] = [];
@@ -1111,8 +1112,8 @@ async function seedPlatformInfrastructure() {
 
     // Seed limits
     const limits = [
-      { usageKey: 'students', limit: planData.key === 'free' ? 50 : planData.key === 'standard' ? 500 : 5000 },
-      { usageKey: 'storage', limit: planData.key === 'free' ? 1 : planData.key === 'standard' ? 10 : 100 },
+      { usageKey: 'students', limit: planData.key === 'free' ? 50 : planData.key === 'standard' ? 500 : planData.key === 'premium' ? 5000 : 50000 },
+      { usageKey: 'storage', limit: planData.key === 'free' ? 1 : planData.key === 'standard' ? 10 : planData.key === 'premium' ? 100 : 1000 },
     ];
     for (const limitData of limits) {
       await prisma.usageLimit.upsert({

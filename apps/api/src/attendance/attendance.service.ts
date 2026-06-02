@@ -89,6 +89,7 @@ export class AttendanceService {
             subject: { select: { name: true } },
           },
           orderBy: [{ class: { level: 'asc' } }, { createdAt: 'asc' }],
+          take: 100,
         }),
         this.prisma.section.findMany({
           where: { tenantId: actor.tenantId, classTeacherId: staff.id },
@@ -96,6 +97,7 @@ export class AttendanceService {
             class: { select: { id: true, name: true, level: true } },
           },
           orderBy: [{ class: { level: 'asc' } }, { name: 'asc' }],
+          take: 100,
         }),
         this.prisma.academicYear.findFirst({
           where: { tenantId: actor.tenantId, isCurrent: true },

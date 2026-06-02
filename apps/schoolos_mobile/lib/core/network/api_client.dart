@@ -179,7 +179,16 @@ class ApiClient {
       onRequest: (options, handler) {
         Logger.debug('API Request [${options.method}] -> ${options.uri}');
         if (options.data != null) {
-          Logger.debug('Request Data: ${options.data}');
+          final path = options.path.toLowerCase();
+          if (path.contains('/auth/login') ||
+              path.contains('/auth/refresh') ||
+              path.contains('otp') ||
+              path.contains('password-recovery') ||
+              path.contains('mfa')) {
+            Logger.debug('Request Data: [REDACTED]');
+          } else {
+            Logger.debug('Request Data: ${options.data}');
+          }
         }
         return handler.next(options);
       },

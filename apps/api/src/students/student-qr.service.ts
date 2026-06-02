@@ -16,8 +16,9 @@ import QRCode from 'qrcode';
 import { StudentQrResolvePurpose } from '@schoolos/core';
 import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
-import { hashToken } from '../auth/auth.utils';
+import { hashToken, hmacToken } from '../auth/auth.utils';
 import { PrismaService } from '../prisma/prisma.service';
+import { ConfigService } from '../config/config.service';
 
 interface QrCredentialRecord {
   id: string;
@@ -101,6 +102,7 @@ export class StudentQrService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -305,9 +307,12 @@ export class StudentQrService {
       );
     }
 
-    const tokenHash = hashToken(token);
-    const credential = await this.prisma.studentQrCredential.findUnique({
-      where: { tokenHash },
+    const tokenHashV2 = hmacToken(token, this.configService.tokenHashPepper);
+    const tokenHashV1 = hashToken(token);
+    const credential = await this.prisma.studentQrCredential.findFirst({
+      where: {
+        tokenHash: { in: [tokenHashV2, tokenHashV1] },
+      },
       include: {
         student: {
           include: {
@@ -323,10 +328,12 @@ export class StudentQrService {
       },
     });
 
+    const isExpired = credential?.expiresAt && credential.expiresAt.getTime() <= Date.now();
     if (
       credential?.tenantId !== tenantId ||
       credential.status !== StudentQrStatus.ACTIVE ||
-      credential.student.lifecycleStatus !== StudentLifecycleStatus.ACTIVE
+      credential.student.lifecycleStatus !== StudentLifecycleStatus.ACTIVE ||
+      isExpired
     ) {
       await this.auditService.record({
         action: 'QR_RESOLVE_FAILED',
@@ -348,7 +355,9 @@ export class StudentQrService {
                 ? credential.status === StudentQrStatus.ROTATED
                   ? 'rotated'
                   : 'revoked'
-                : 'inactive_student',
+                : credential.student.lifecycleStatus !== StudentLifecycleStatus.ACTIVE
+                  ? 'inactive_student'
+                  : 'expired',
           reason: !credential
             ? 'not_found'
             : credential.tenantId !== tenantId
@@ -357,53 +366,74 @@ export class StudentQrService {
                 ? credential.status === StudentQrStatus.ROTATED
                   ? 'rotated'
                   : 'revoked'
-                : 'inactive_student',
+                : credential.student.lifecycleStatus !== StudentLifecycleStatus.ACTIVE
+                  ? 'inactive_student'
+                  : 'expired',
           timestamp: new Date().toISOString(),
         },
       });
-      throw new ForbiddenException('Invalid or revoked QR token');
+      throw new ForbiddenException(
+        isExpired ? 'QR token has expired' : 'Invalid or revoked QR token',
+      );
     }
 
     const student = credential.student;
 
-    if (auth.roles.includes('parent')) {
-      const isLinked = student.guardianLinks.some(
-        (link) => link.guardian.userId === auth.userId,
-      );
-      if (!isLinked) {
-        await this.recordResolveDenied(
-          tenantId,
-          auth,
-          student.id,
-          purpose,
-          'unrelated_parent',
-        );
-        throw new ForbiddenException('Parent cannot resolve unrelated child');
-      }
-    }
+    if (!this.hasPermission(auth, 'students:qr:resolve_all')) {
+      const isParent = auth.roles.includes('parent');
+      const isTeacher = auth.roles.includes('teacher');
 
-    if (
-      auth.roles.includes('teacher') &&
-      !this.hasPermission(auth, 'students:qr:resolve_all')
-    ) {
-      const isAssigned = await this.prisma.subjectTeacherAssignment.findFirst({
-        where: {
-          tenantId,
-          staff: { userId: auth.userId },
-          classId: student.classId,
-          OR: [{ sectionId: student.sectionId }, { sectionId: null }],
-        },
-      });
+      if (isParent || isTeacher) {
+        let parentAllowed = false;
+        let teacherAllowed = false;
 
-      if (!isAssigned) {
-        await this.recordResolveDenied(
-          tenantId,
-          auth,
-          student.id,
-          purpose,
-          'unassigned_teacher',
-        );
-        throw new ForbiddenException('Teacher not assigned to this student');
+        if (isParent) {
+          parentAllowed = student.guardianLinks.some(
+            (link) => link.guardian.userId === auth.userId,
+          );
+        }
+
+        if (isTeacher) {
+          const isAssigned =
+            await this.prisma.subjectTeacherAssignment.findFirst({
+              where: {
+                tenantId,
+                staff: { userId: auth.userId },
+                classId: student.classId,
+                OR: [{ sectionId: student.sectionId }, { sectionId: null }],
+              },
+            });
+          teacherAllowed = !!isAssigned;
+        }
+
+        const isAllowed =
+          (isParent && parentAllowed) || (isTeacher && teacherAllowed);
+
+        if (!isAllowed) {
+          if (isParent && !parentAllowed) {
+            await this.recordResolveDenied(
+              tenantId,
+              auth,
+              student.id,
+              purpose,
+              'unrelated_parent',
+            );
+            throw new ForbiddenException(
+              'Parent cannot resolve unrelated child',
+            );
+          } else {
+            await this.recordResolveDenied(
+              tenantId,
+              auth,
+              student.id,
+              purpose,
+              'unassigned_teacher',
+            );
+            throw new ForbiddenException(
+              'Teacher not assigned to this student',
+            );
+          }
+        }
       }
     }
 
@@ -596,7 +626,7 @@ export class StudentQrService {
     tx: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
     const rawToken = randomBytes(32).toString('hex');
-    const tokenHash = hashToken(rawToken);
+    const tokenHash = hmacToken(rawToken, this.configService.tokenHashPepper);
 
     const credential = await tx.studentQrCredential.create({
       data: {

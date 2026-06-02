@@ -33,9 +33,22 @@ export class JwtAuthGuard implements CanActivate {
     try {
       payload = await this.jwtService.verifyAsync<JwtAccessPayload>(token, {
         secret: this.configService.jwtSecret,
+        algorithms: ['HS256'],
       });
     } catch {
       throw new UnauthorizedException('Invalid access token');
+    }
+
+    if (payload.iss !== this.configService.jwtIssuer) {
+      throw new UnauthorizedException('Invalid token issuer');
+    }
+
+    const userAgent = (request.headers['user-agent'] as string | undefined)?.toLowerCase() ?? '';
+    const isMobile = userAgent.includes('dart') || userAgent.includes('flutter');
+    const expectedAudience = isMobile ? this.configService.jwtAudienceMobile : this.configService.jwtAudienceWeb;
+
+    if (payload.aud !== expectedAudience) {
+      throw new UnauthorizedException('Invalid token audience');
     }
 
     const user = await this.prisma.user.findUnique({

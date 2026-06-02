@@ -31,6 +31,8 @@ import {
   generateRefreshToken,
   hashOtpCode,
   hashToken,
+  hmacToken,
+  generateCsrfToken,
   parseCookie,
 } from './auth.utils';
 import { ConfirmMfaSetupDto } from './dto/confirm-mfa-setup.dto';
@@ -339,20 +341,29 @@ export class AuthService {
     requestMeta?: RequestMeta,
   ) {
     try {
+      const cookieName = this.getRefreshCookieName();
       if (!cookieHeader && !dto.refreshToken) {
         throw new UnauthorizedException('Refresh token is required');
       }
 
       const rawToken =
         dto.refreshToken ??
-        parseCookie(cookieHeader, this.configService.refreshCookieName);
+        parseCookie(cookieHeader, cookieName);
 
       if (!rawToken) {
         throw new UnauthorizedException('Refresh token is invalid');
       }
 
-      const existingSession = await this.prisma.refreshToken.findUnique({
-        where: { tokenHash: hashToken(rawToken) },
+      const hashV2 = hmacToken(rawToken, this.configService.tokenHashPepper);
+      const hashV1 = hashToken(rawToken);
+
+      const existingSession = await this.prisma.refreshToken.findFirst({
+        where: {
+          OR: [
+            { tokenHash: hashV2, hashVersion: 2 },
+            { tokenHash: hashV1, hashVersion: 1 },
+          ],
+        },
         include: {
           user: {
             include: this.userAuthInclude,
@@ -360,11 +371,34 @@ export class AuthService {
         },
       });
 
-      if (
-        !existingSession ||
-        existingSession.revokedAt ||
-        existingSession.expiresAt.getTime() < Date.now()
-      ) {
+      if (!existingSession) {
+        throw new UnauthorizedException('Refresh token is invalid');
+      }
+
+      if (existingSession.revokedAt) {
+        // Suspicious refresh token reuse! Revoke all sessions in the family.
+        const familyId = existingSession.familyId ?? existingSession.id;
+        await this.revokeRefreshTokenFamily(familyId, existingSession.userId);
+
+        await this.auditService.record({
+          action: 'suspicious_refresh_token_reuse',
+          resource: 'auth',
+          tenantId: existingSession.user.tenantId,
+          userId: existingSession.userId,
+          ipAddress: requestMeta?.ipAddress,
+          userAgent: requestMeta?.userAgent,
+          requestId: requestMeta?.requestId,
+          after: {
+            tokenId: existingSession.id,
+            familyId,
+            revokedAt: existingSession.revokedAt.toISOString(),
+          },
+        });
+
+        throw new UnauthorizedException('Refresh token is invalid');
+      }
+
+      if (existingSession.expiresAt.getTime() < Date.now()) {
         throw new UnauthorizedException('Refresh token is invalid');
       }
 
@@ -382,20 +416,33 @@ export class AuthService {
         throw new UnauthorizedException('Tenant is not active');
       }
 
-      await this.prisma.refreshToken.update({
-        where: { id: existingSession.id },
-        data: { revokedAt: new Date() },
-      });
-
       const authContext = this.buildAuthContext(
         existingSession.user,
         tenant.slug,
       );
 
-      const session = await this.issueSession(authContext);
+      const userAgent = requestMeta?.userAgent?.toLowerCase();
+      const isMobile = userAgent
+        ? (userAgent.includes('dart') || userAgent.includes('flutter'))
+        : undefined;
+
+      const session = await this.issueSession(authContext, requestMeta, {
+        id: existingSession.id,
+        familyId: existingSession.familyId ?? existingSession.id,
+      });
+
+      await this.prisma.refreshToken.update({
+        where: { id: existingSession.id },
+        data: {
+          revokedAt: new Date(),
+          revokedReason: 'rotated',
+          replacedByTokenId: session.id,
+        },
+      });
 
       this.attachRefreshCookie(response, session.refreshToken);
       this.attachAccessCookie(response, session.accessToken);
+      this.attachCsrfCookie(response, generateCsrfToken(this.configService.jwtSecret));
 
       await this.auditService.record({
         action: 'refresh',
@@ -412,6 +459,7 @@ export class AuthService {
         authContext,
         tenant,
         session.refreshToken,
+        isMobile,
       );
     } catch (error) {
       if (error instanceof Error) {
@@ -429,17 +477,24 @@ export class AuthService {
     cookieHeader?: string,
     requestMeta?: RequestMeta,
   ) {
+    const cookieName = this.getRefreshCookieName();
     const rawToken =
       dto.refreshToken ??
-      parseCookie(cookieHeader, this.configService.refreshCookieName);
+      parseCookie(cookieHeader, cookieName);
 
     if (rawToken) {
+      const hashV2 = hmacToken(rawToken, this.configService.tokenHashPepper);
+      const hashV1 = hashToken(rawToken);
+
       await this.prisma.refreshToken.updateMany({
         where: {
-          tokenHash: hashToken(rawToken),
+          tokenHash: { in: [hashV1, hashV2] },
           revokedAt: null,
         },
-        data: { revokedAt: new Date() },
+        data: {
+          revokedAt: new Date(),
+          revokedReason: 'logout',
+        },
       });
     }
 
@@ -447,8 +502,10 @@ export class AuthService {
     this.clearAccessCookie(response);
 
     const session = rawToken
-      ? await this.prisma.refreshToken.findUnique({
-          where: { tokenHash: hashToken(rawToken) },
+      ? await this.prisma.refreshToken.findFirst({
+          where: {
+            tokenHash: { in: [hashToken(rawToken), hmacToken(rawToken, this.configService.tokenHashPepper)] },
+          },
           include: { user: true },
         })
       : null;
@@ -552,9 +609,10 @@ export class AuthService {
     });
 
     const authContext = this.buildAuthContext(user, tenant.slug);
-    const session = await this.issueSession(authContext);
+    const session = await this.issueSession(authContext, requestMeta);
     this.attachRefreshCookie(response, session.refreshToken);
     this.attachAccessCookie(response, session.accessToken);
+    this.attachCsrfCookie(response, generateCsrfToken(this.configService.jwtSecret));
 
     await this.auditService.record({
       action: audit?.action ?? 'login',
@@ -567,11 +625,17 @@ export class AuthService {
       requestId: requestMeta?.requestId,
     });
 
+    const userAgent = requestMeta?.userAgent?.toLowerCase();
+    const isMobile = userAgent
+      ? (userAgent.includes('dart') || userAgent.includes('flutter'))
+      : undefined;
+
     return this.buildAuthSession(
       session.accessToken,
       authContext,
       tenant,
       session.refreshToken,
+      isMobile,
     );
   }
 
@@ -656,6 +720,10 @@ export class AuthService {
         lockedUntil,
       },
     });
+
+    if (lockedUntil) {
+      await this.revokeUserSessions(user.id);
+    }
 
     await this.auditService.record({
       action: lockedUntil ? 'login_locked' : 'login_failed',
@@ -886,7 +954,15 @@ export class AuthService {
     };
   }
 
-  private async issueSession(authContext: AuthContext) {
+  private async issueSession(
+    authContext: AuthContext,
+    requestMeta?: RequestMeta,
+    parentSession?: { id: string; familyId: string | null },
+  ) {
+    const isMobile = (requestMeta?.userAgent as string | undefined)?.toLowerCase().includes('dart') ||
+                     (requestMeta?.userAgent as string | undefined)?.toLowerCase().includes('flutter');
+    const audience = isMobile ? this.configService.jwtAudienceMobile : this.configService.jwtAudienceWeb;
+
     const payload: JwtAccessPayload = {
       sub: authContext.userId,
       tenantId: authContext.tenantId,
@@ -899,18 +975,33 @@ export class AuthService {
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: this.configService.jwtSecret,
       expiresIn: this.configService.accessTokenTtl as never,
+      issuer: this.configService.jwtIssuer,
+      audience: audience,
+      algorithm: 'HS256',
+      jwtid: require('crypto').randomUUID(),
     });
     const refreshToken = generateRefreshToken();
+    const tokenHash = hmacToken(refreshToken, this.configService.tokenHashPepper);
+
+    const tokenId = require('crypto').randomUUID();
+    const familyId = parentSession?.familyId ?? tokenId;
 
     await this.prisma.refreshToken.create({
       data: {
+        id: tokenId,
         userId: authContext.userId,
-        tokenHash: hashToken(refreshToken),
+        tokenHash,
+        hashVersion: 2,
         expiresAt: this.getRefreshTokenExpiry(),
+        familyId,
+        parentTokenId: parentSession?.id ?? null,
+        userAgent: requestMeta?.userAgent ?? null,
+        ipAddress: requestMeta?.ipAddress ?? null,
+        lastUsedAt: new Date(),
       },
     });
 
-    return { accessToken, refreshToken };
+    return { accessToken, refreshToken, id: tokenId };
   }
 
   private buildAuthSession(
@@ -918,15 +1009,18 @@ export class AuthService {
     authContext: AuthContext,
     tenant: Tenant,
     refreshToken?: string,
+    isMobile?: boolean,
   ) {
     const decoded =
       typeof this.jwtService.decode === 'function'
         ? (this.jwtService.decode(accessToken) ?? null)
         : null;
 
+    const hideTokens = isMobile === false;
+
     return {
-      accessToken,
-      refreshToken,
+      accessToken: hideTokens ? undefined : accessToken,
+      refreshToken: hideTokens ? undefined : refreshToken,
       accessTokenExpiresAt: decoded?.exp
         ? new Date(decoded.exp * 1000).toISOString()
         : null,
@@ -952,45 +1046,107 @@ export class AuthService {
     };
   }
 
+  private getAccessCookieName() {
+    return this.configService.isProduction
+      ? `__Host-${this.configService.accessCookieName}`
+      : this.configService.accessCookieName;
+  }
+
+  private getRefreshCookieName() {
+    return this.configService.isProduction
+      ? `__Host-${this.configService.refreshCookieName}`
+      : this.configService.refreshCookieName;
+  }
+
   private attachRefreshCookie(response: Response, refreshToken: string) {
-    response.cookie(this.configService.refreshCookieName, refreshToken, {
+    const cookieName = this.getRefreshCookieName();
+    const options: any = {
       httpOnly: true,
       sameSite: this.configService.cookieSameSite,
       secure: this.configService.isProduction,
       path: '/',
-      domain: this.configService.cookieDomain,
+    };
+    if (!this.configService.isProduction) {
+      options.domain = this.configService.cookieDomain;
+    }
+    response.cookie(cookieName, refreshToken, {
+      ...options,
       maxAge: this.configService.refreshTokenTtlDays * 24 * 60 * 60 * 1000,
     });
   }
 
   private attachAccessCookie(response: Response, accessToken: string) {
-    response.cookie(this.configService.accessCookieName, accessToken, {
+    const cookieName = this.getAccessCookieName();
+    const options: any = {
       httpOnly: true,
       sameSite: this.configService.cookieSameSite,
       secure: this.configService.isProduction,
       path: '/',
-      domain: this.configService.cookieDomain,
+    };
+    if (!this.configService.isProduction) {
+      options.domain = this.configService.cookieDomain;
+    }
+    response.cookie(cookieName, accessToken, {
+      ...options,
       maxAge: resolveAccessTokenMaxAge(this.configService.accessTokenTtl),
     });
   }
 
+  private attachCsrfCookie(response: Response, csrfToken: string) {
+    const cookieName = this.configService.isProduction
+      ? '__Host-schoolos_csrf'
+      : 'schoolos_csrf';
+
+    const options: any = {
+      httpOnly: false, // Must be readable by Javascript/Next.js client!
+      sameSite: this.configService.cookieSameSite,
+      secure: this.configService.isProduction,
+      path: '/',
+    };
+    if (!this.configService.isProduction) {
+      options.domain = this.configService.cookieDomain;
+    }
+    response.cookie(cookieName, csrfToken, options);
+  }
+
   private clearRefreshCookie(response: Response) {
-    response.clearCookie(this.configService.refreshCookieName, {
+    const cookieName = this.getRefreshCookieName();
+    const options: any = {
       httpOnly: true,
       sameSite: this.configService.cookieSameSite,
       secure: this.configService.isProduction,
       path: '/',
-      domain: this.configService.cookieDomain,
-    });
+    };
+    if (!this.configService.isProduction) {
+      options.domain = this.configService.cookieDomain;
+    }
+    response.clearCookie(cookieName, options);
   }
 
   private clearAccessCookie(response: Response) {
-    response.clearCookie(this.configService.accessCookieName, {
+    const cookieName = this.getAccessCookieName();
+    const options: any = {
       httpOnly: true,
       sameSite: this.configService.cookieSameSite,
       secure: this.configService.isProduction,
       path: '/',
-      domain: this.configService.cookieDomain,
+    };
+    if (!this.configService.isProduction) {
+      options.domain = this.configService.cookieDomain;
+    }
+    response.clearCookie(cookieName, options);
+  }
+
+  private async revokeRefreshTokenFamily(familyId: string, userId: string) {
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        familyId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+        revokedReason: 'family_theft',
+      },
     });
   }
 

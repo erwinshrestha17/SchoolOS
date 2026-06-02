@@ -220,6 +220,14 @@ export type StaffLifecycleHistoryEvent = {
   } | null;
 };
 
+function getCookie(name: string): string | undefined {
+  if (typeof document === 'undefined') return undefined;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift();
+  return undefined;
+}
+
 async function request<T>(path: string, init?: RequestOptions) {
   const requestId = createRequestId();
   const headers: Record<string, string> = {
@@ -227,6 +235,15 @@ async function request<T>(path: string, init?: RequestOptions) {
     'X-Request-Id': requestId,
     ...(init?.headers as Record<string, string> ?? {}),
   };
+
+  const method = init?.method?.toUpperCase() ?? 'GET';
+  const unsafeMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
+  if (unsafeMethods.includes(method)) {
+    const csrfToken = getCookie('__Host-schoolos_csrf') ?? getCookie('schoolos_csrf');
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
+  }
 
   const overrideTenantId = getSupportOverrideTenantId();
   const overrideReason = getSupportOverrideReason();
@@ -371,14 +388,20 @@ async function downloadCsv(path: string, fileName: string) {
 }
 
 async function downloadReport(reportKey: string, payload: ReportExportRequest) {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  const csrfToken = getCookie('__Host-schoolos_csrf') ?? getCookie('schoolos_csrf');
+  if (csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken;
+  }
+
   const response = await fetch(
     `${API_BASE_URL}/reports/${encodeURIComponent(reportKey)}/export`,
     {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(payload),
     },
   );

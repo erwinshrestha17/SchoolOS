@@ -72,6 +72,87 @@ export default function PlatformSchools() {
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Onboard school states
+  const [onboardDialogOpen, setOnboardDialogOpen] = useState(false);
+  const [newSchoolName, setNewSchoolName] = useState('');
+  const [newSchoolSlug, setNewSchoolSlug] = useState('');
+  const [newSchoolPlan, setNewSchoolPlan] = useState('');
+  const [newSchoolAdminEmail, setNewSchoolAdminEmail] = useState('');
+  const [newSchoolAdminPassword, setNewSchoolAdminPassword] = useState('');
+  const [onboardSubmitting, setOnboardSubmitting] = useState(false);
+  const [onboardError, setOnboardError] = useState<string | null>(null);
+  const [dbPlans, setDbPlans] = useState<any[]>([]);
+
+  useEffect(() => {
+    api.listPlatformPlans()
+      .then((res) => {
+        const arr = asArray(res);
+        setDbPlans(arr);
+        if (arr.length > 0) {
+          const defaultPlan = arr.find(p => p.key === 'premium') || arr.find(p => p.key === 'standard') || arr[0];
+          setNewSchoolPlan(defaultPlan.id);
+        }
+      })
+      .catch((err) => console.error('Failed to load platform plans', err));
+  }, []);
+
+  const handleOnboardSchool = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSchoolName.trim() || !newSchoolSlug.trim() || !newSchoolAdminEmail.trim() || !newSchoolAdminPassword.trim()) {
+      setOnboardError('All fields are required');
+      return;
+    }
+    if (!/^[a-z0-9-]+$/.test(newSchoolSlug.trim())) {
+      setOnboardError('Slug must contain only lowercase letters, numbers, and hyphens');
+      return;
+    }
+    if (newSchoolAdminPassword.length < 8) {
+      setOnboardError('Password must be at least 8 characters long');
+      return;
+    }
+
+    setOnboardSubmitting(true);
+    setOnboardError(null);
+
+    try {
+      const selectedPlan = dbPlans.find((p) => p.id === newSchoolPlan);
+      const planKey = selectedPlan?.key || 'standard';
+
+      // 1. Register the school tenant and admin user
+      const registerRes = (await api.registerTenant({
+        name: newSchoolName.trim(),
+        slug: newSchoolSlug.trim(),
+        plan: planKey,
+        adminEmail: newSchoolAdminEmail.trim(),
+        adminPassword: newSchoolAdminPassword,
+      })) as any;
+
+      const tenantId = registerRes.tenant?.id;
+      if (!tenantId) {
+        throw new Error('School registered but ID was not returned');
+      }
+
+      // 2. Assign the subscription plan (ACTIVE)
+      await api.assignPlatformSubscription(tenantId, {
+        planId: newSchoolPlan,
+        status: 'ACTIVE',
+        startsAt: new Date().toISOString(),
+      });
+
+      // Clear forms and close
+      setNewSchoolName('');
+      setNewSchoolSlug('');
+      setNewSchoolAdminEmail('');
+      setNewSchoolAdminPassword('');
+      setOnboardDialogOpen(false);
+      void fetchTenants();
+    } catch (err: any) {
+      setOnboardError(err.message ?? 'Failed to onboard school');
+    } finally {
+      setOnboardSubmitting(false);
+    }
+  };
+
   const fetchTenants = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -140,7 +221,13 @@ export default function PlatformSchools() {
             workflows, and perform audited lifecycle actions.
           </p>
         </div>
-        <Button className="h-12 gap-2 rounded-2xl bg-slate-900 px-8 font-bold shadow-sm hover:bg-slate-800">
+        <Button
+          className="h-12 gap-2 rounded-2xl bg-slate-900 px-8 font-bold shadow-sm hover:bg-slate-800"
+          onClick={() => {
+            setOnboardDialogOpen(true);
+            setOnboardError(null);
+          }}
+        >
           <Plus size={20} />
           Onboard school
         </Button>
@@ -447,6 +534,147 @@ export default function PlatformSchools() {
               {submitting ? 'Processing...' : 'Confirm audited action'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={onboardDialogOpen}
+        onOpenChange={(open: boolean) => {
+          if (!open) {
+            setOnboardDialogOpen(false);
+            setNewSchoolName('');
+            setNewSchoolSlug('');
+            setNewSchoolAdminEmail('');
+            setNewSchoolAdminPassword('');
+            setOnboardError(null);
+          }
+        }}
+      >
+        <DialogContent className="rounded-3xl sm:max-w-lg bg-white/95 backdrop-blur-md shadow-2xl border border-slate-100">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3 text-2xl font-black text-slate-900">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                <Plus size={24} />
+              </div>
+              Onboard new school
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-slate-500 font-medium">
+              Create a new school tenant, setup default roles, and assign their active platform subscription.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleOnboardSchool} className="space-y-5 py-4">
+            {onboardError && (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-800 flex items-center gap-2">
+                <AlertTriangle size={16} className="shrink-0" />
+                {onboardError}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="font-bold text-slate-700">School name</Label>
+                <Input
+                  placeholder="e.g. Antigravity Academy"
+                  value={newSchoolName}
+                  onChange={(e) => setNewSchoolName(e.target.value)}
+                  className="rounded-2xl border-slate-200 h-11"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="font-bold text-slate-700">School URL slug</Label>
+                <Input
+                  placeholder="e.g. antigravity-academy"
+                  value={newSchoolSlug}
+                  onChange={(e) => {
+                    setNewSchoolSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+                  }}
+                  className="rounded-2xl border-slate-200 h-11 font-mono text-sm"
+                  required
+                />
+                <p className="text-[10px] text-slate-400 font-medium">
+                  Only lowercase letters, numbers, and hyphens. Used for school logins.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="font-bold text-slate-700">Admin email</Label>
+                  <Input
+                    type="email"
+                    placeholder="admin@school.com"
+                    value={newSchoolAdminEmail}
+                    onChange={(e) => setNewSchoolAdminEmail(e.target.value)}
+                    className="rounded-2xl border-slate-200 h-11"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="font-bold text-slate-700">Admin password</Label>
+                  <Input
+                    type="password"
+                    placeholder="Min 8 characters"
+                    value={newSchoolAdminPassword}
+                    onChange={(e) => setNewSchoolAdminPassword(e.target.value)}
+                    className="rounded-2xl border-slate-200 h-11"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="font-bold text-slate-700">Active subscription plan</Label>
+                <Select
+                  value={newSchoolPlan}
+                  onChange={(e) => setNewSchoolPlan(e.target.value)}
+                  className="rounded-2xl border-slate-200 h-11 bg-white font-bold"
+                  required
+                >
+                  {dbPlans.length === 0 ? (
+                    <option value="" disabled>Loading plans...</option>
+                  ) : (
+                    dbPlans.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.key.toUpperCase()})
+                      </option>
+                    ))
+                  )}
+                </Select>
+                <p className="text-[10px] text-slate-400 font-medium">
+                  This plan subscription will be created and activated immediately.
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-3 pt-4 border-t border-slate-100 mt-6">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setOnboardDialogOpen(false);
+                  setNewSchoolName('');
+                  setNewSchoolSlug('');
+                  setNewSchoolAdminEmail('');
+                  setNewSchoolAdminPassword('');
+                  setOnboardError(null);
+                }}
+                className="rounded-xl border-slate-200 px-6 font-bold"
+                disabled={onboardSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={onboardSubmitting || !newSchoolPlan}
+                className="rounded-xl px-8 font-bold bg-slate-900 hover:bg-slate-800 text-white"
+              >
+                {onboardSubmitting ? 'Onboarding...' : 'Onboard school'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

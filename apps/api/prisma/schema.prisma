@@ -1049,15 +1049,25 @@ model RolePermission {
 }
 
 model RefreshToken {
-  id        String    @id @default(uuid())
-  userId    String
-  tokenHash String    @unique
-  deviceId  String?
-  expiresAt DateTime
-  revokedAt DateTime?
-  createdAt DateTime  @default(now())
+  id                String    @id @default(uuid())
+  userId            String
+  tokenHash         String    @unique
+  deviceId          String?
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  familyId          String?
+  parentTokenId     String?
+  replacedByTokenId String?
+  hashVersion       Int       @default(1)
+  revokedReason     String?
+  userAgent         String?
+  ipAddress         String?
+  lastUsedAt        DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
 }
 
 model OtpCode {

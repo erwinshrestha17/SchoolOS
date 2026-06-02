@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -49,6 +49,8 @@ import { UsageModule } from './usage/usage.module';
 import { PlansModule } from './plans/plans.module';
 import { UsageInterceptor } from './usage/usage.interceptor';
 import { RequestIdInterceptor } from './common/interceptors/request-id.interceptor';
+import { CsrfGuard } from './auth/guards/csrf.guard';
+import { AppThrottlerGuard } from './auth/guards/app-throttler.guard';
 
 @Module({
   imports: [
@@ -57,12 +59,21 @@ import { RequestIdInterceptor } from './common/interceptors/request-id.intercept
       global: true,
       middleware: { mount: true },
     }),
-    ThrottlerModule.forRoot([
-      {
-        limit: APP_RATE_LIMIT,
-        ttl: APP_RATE_TTL_MS,
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        if (!configService.rateLimitEnabled) {
+          return [];
+        }
+        return [
+          {
+            name: 'default',
+            limit: 100,
+            ttl: 60000,
+          },
+        ];
       },
-    ]),
+    }),
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
     BullModule.forRootAsync({
@@ -117,7 +128,11 @@ import { RequestIdInterceptor } from './common/interceptors/request-id.intercept
     AppService,
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: AppThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: CsrfGuard,
     },
     {
       provide: APP_INTERCEPTOR,
