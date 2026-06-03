@@ -23,6 +23,7 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
   const [verifyError, setVerifyError] = useState<string | null>(null);
 
   const [fileViewPendingId, setFileViewPendingId] = useState<string | null>(null);
+  const [fileViewError, setFileViewError] = useState<string | null>(null);
 
   const documentsQuery = useQuery({
     queryKey: ['staff-documents', staffId],
@@ -48,13 +49,14 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
     onMutate: (fileId) => setFileViewPendingId(fileId),
     onSuccess: (data) => {
       setFileViewPendingId(null);
+      setFileViewError(null);
       if (data && data.url) {
         window.open(data.url, '_blank', 'noopener,noreferrer');
       }
     },
     onError: (err: any) => {
       setFileViewPendingId(null);
-      alert(err.message || 'Failed to retrieve download link.');
+      setFileViewError(err.message || 'Failed to retrieve download link.');
     },
   });
 
@@ -83,6 +85,23 @@ export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
           Upload Document
         </button>
       </div>
+
+      {fileViewError ? (
+        <div className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <div className="min-w-0">
+            <p className="font-bold">Could not open document</p>
+            <p className="mt-0.5">{fileViewError}</p>
+          </div>
+          <button
+            type="button"
+            className="ml-auto text-xs font-bold text-red-700 underline"
+            onClick={() => setFileViewError(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       <div className="rounded-2xl border border-slate-100 overflow-hidden">
         {documentsQuery.isLoading ? (

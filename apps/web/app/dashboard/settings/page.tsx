@@ -806,10 +806,10 @@ function SectionAcademic({ initialValues, onUpdate }: { initialValues: TenantSet
       </div>
       <div className="col-span-full pt-4">
         <Link 
-          href="/dashboard/academics/years" 
+          href="/dashboard/academics/exam-terms" 
           className="inline-flex h-9 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-sm font-medium shadow-sm hover:bg-slate-50 transition-colors gap-2"
         >
-          Manage Academic Years <ExternalLink size={14} />
+          Manage Exam Terms <ExternalLink size={14} />
         </Link>
       </div>
     </SectionWrapper>
@@ -1177,8 +1177,8 @@ function SectionData({ initialValues }: { initialValues: TenantSettingSummary[] 
             <Upload size={14} /> Imports
           </h4>
           <div className="grid gap-3">
-            <DataActionCard title="Student Import" description="Import students from CSV/iEMIS." href="/dashboard/admissions/bulk-import" />
-            <DataActionCard title="Staff Import" description="Bulk upload staff records." href="/dashboard/staff" />
+            <DataActionCard title="Student Import" description="Import students from CSV/iEMIS." href="/dashboard/admissions" />
+            <DataActionCard title="Staff Import" description="Bulk upload staff records." href="/dashboard/hr/staff" />
             <DataActionCard title="Fee Ledger Import" description="Import historic fee data." href="/dashboard/fees" />
           </div>
         </div>
@@ -1191,7 +1191,7 @@ function SectionData({ initialValues }: { initialValues: TenantSettingSummary[] 
             <DataActionCard title="iEMIS Export" description="Government-ready Excel files." href="/dashboard/students" />
             <DataActionCard title="Accounting Audit" description="Download full journal trail." href="/dashboard/accounting" />
             <DataActionCard title="Class Roster" description="Student list by class." href="/dashboard/students" />
-            <DataActionCard title="Payroll Register" description="Export approved payroll runs." href="/dashboard/hr/payroll" />
+            <DataActionCard title="Payroll Register" description="Export approved payroll runs." href="/dashboard/payroll/reports" />
           </div>
         </div>
 
@@ -1200,8 +1200,8 @@ function SectionData({ initialValues }: { initialValues: TenantSettingSummary[] 
             <ExternalLink size={14} /> Integrations
           </h4>
           <div className="grid gap-3">
-            <DataActionCard title="API Access" description="Generate keys for integration." href="/dashboard/settings/security" />
-            <DataActionCard title="Webhooks" description="Configure real-time events." href="/dashboard/settings/security" />
+            <DataActionCard title="API Access" description="Tenant API key routes are not available yet." disabled />
+            <DataActionCard title="Webhooks" description="Tenant webhook routes are not available yet." disabled />
           </div>
         </div>
       </div>
@@ -1231,14 +1231,50 @@ function SectionAudit({ initialValues }: { initialValues: TenantSettingSummary[]
   );
 }
 
-function DataActionCard({ title, description, href }: { title: string, description: string, href: string }) {
-  return (
-    <Link href={href} className="group rounded-xl border border-slate-200 p-4 transition-all hover:border-primary-500 hover:shadow-md bg-white block">
+function DataActionCard({
+  title,
+  description,
+  href,
+  disabled = false,
+}: {
+  title: string;
+  description: string;
+  href?: string;
+  disabled?: boolean;
+}) {
+  const content = (
+    <>
       <div className="flex items-center justify-between mb-2">
-        <h4 className="font-bold text-slate-800 text-sm">{title}</h4>
-        <ExternalLink size={14} className="text-slate-300 group-hover:text-primary-500" />
+        <h4 className={cn("font-bold text-sm", disabled ? "text-slate-500" : "text-slate-800")}>{title}</h4>
+        {disabled ? (
+          <Lock size={14} className="text-slate-300" />
+        ) : (
+          <ExternalLink size={14} className="text-slate-300 group-hover:text-primary-500" />
+        )}
       </div>
       <p className="text-[11px] text-slate-500 leading-relaxed">{description}</p>
+      {disabled ? (
+        <span className="mt-3 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          Backend route pending
+        </span>
+      ) : null}
+    </>
+  );
+
+  if (disabled || !href) {
+    return (
+      <div
+        aria-disabled="true"
+        className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4"
+      >
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link href={href} className="group rounded-xl border border-slate-200 p-4 transition-all hover:border-primary-500 hover:shadow-md bg-white block">
+      {content}
     </Link>
   );
 }

@@ -36,6 +36,7 @@ const schoolRoutes = [
   '/dashboard/hr',
   '/dashboard/payroll',
   '/dashboard/accounting',
+  '/dashboard/reports',
   '/dashboard/library',
   '/dashboard/canteen',
   '/dashboard/transport',

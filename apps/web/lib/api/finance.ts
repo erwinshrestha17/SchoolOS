@@ -28,6 +28,27 @@ import {
   withQuery,
 } from './client';
 
+export type ReportSnapshot = {
+  id: string;
+  reportKey: string;
+  format: string;
+  filters: Record<string, unknown>;
+  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  fileAssetId?: string | null;
+  requestedBy?: string | null;
+  errorSummary?: string | null;
+  createdAt: string;
+  completedAt?: string | null;
+};
+
+export type ReportSnapshotsPage = {
+  items: ReportSnapshot[];
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+};
+
 export const financeApi = {
   listFeeHeads: () => request<FeeHeadSummary[]>('/fees/heads'),
   listFeePlans: () => request<FeePlanSummary[]>('/fees/plans'),
@@ -161,7 +182,9 @@ export const financeApi = {
   exportReport: (reportKey: string, payload: ReportExportRequest) =>
     downloadReport(reportKey, payload),
   listReportSnapshots: (params?: { page?: number; limit?: number }) =>
-    request<any>(withQuery('/reports/export-history', params ?? {})),
+    request<ReportSnapshotsPage>(
+      withQuery('/reports/export-history', params ?? {}),
+    ),
   downloadReportSnapshot: async (id: string) => {
     const response = await fetch(
       `${API_BASE_URL}/reports/export-history/${encodeURIComponent(id)}/download`,

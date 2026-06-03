@@ -205,11 +205,6 @@ export const payrollApi = {
       method: 'POST',
       json: body,
     }),
-  reversePayrollRun: (id: string, body: JsonBody) =>
-    request<PayrollRunSummary>(`/payroll/runs/${encodeURIComponent(id)}/reverse`, {
-      method: 'POST',
-      json: body,
-    }),
   exportPayrollRunRegisterCsv: (id: string) =>
     downloadCsv(
       `/payroll/runs/${encodeURIComponent(id)}/register/export.csv`,
@@ -221,4 +216,3 @@ export const payrollApi = {
       json: body,
     }),
 };
-

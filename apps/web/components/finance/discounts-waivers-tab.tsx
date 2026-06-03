@@ -513,7 +513,7 @@ export function DiscountsWaiversTab() {
                       <tr key={item.id} className="hover:bg-slate-100/35 transition-colors">
                         <td className="px-4 py-3">
                           <div className="flex flex-col">
-                            <span className="font-mono font-bold text-slate-700">
+                            <span className="font-bold text-slate-700">
                               {item.invoiceId ? `Inv #${item.invoiceId.slice(0, 8)}` : 'Whole Invoice'}
                             </span>
                             <span className="text-[10px] text-slate-500 font-semibold">

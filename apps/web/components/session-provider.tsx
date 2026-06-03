@@ -8,7 +8,7 @@ import {
   useEffect,
   useState,
 } from 'react';
-import { api } from '../lib/api';
+import { api, type AuthProfile } from '../lib/api';
 import {
   type BrowserSession,
   clearStoredSession,
@@ -31,6 +31,27 @@ type SessionContextValue = {
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
+
+function browserSessionFromProfile(
+  profile: AuthProfile,
+  existingSession: BrowserSession,
+): BrowserSession {
+  return {
+    accessTokenExpiresAt: existingSession.accessTokenExpiresAt,
+    user: {
+      id: profile.userId,
+      tenantId: profile.tenantId,
+      originalTenantId: profile.originalTenantId,
+      isSupportOverride: profile.isSupportOverride,
+      tenantSlug: profile.tenantSlug,
+      email: profile.email,
+      authMethod: profile.authMethod,
+      roles: profile.roles,
+      permissions: profile.permissions,
+    },
+    tenant: profile.tenant,
+  };
+}
 
 export function SessionProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<BrowserSession | null>(null);
@@ -58,16 +79,29 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
     async function bootstrapSession() {
       try {
-        const refreshedSession = await api.refreshSession();
+        if (existingSession) {
+          const profile = await api.getProfile();
+
+          if (cancelled) {
+            return;
+          }
+
+          const browserSession = browserSessionFromProfile(
+            profile,
+            existingSession,
+          );
+          storeSession(browserSession);
+          setSession(browserSession);
+          setStatus('authenticated');
+          return;
+        }
 
         if (cancelled) {
           return;
         }
 
-        const browserSession = toBrowserSession(refreshedSession);
-        storeSession(browserSession);
-        setSession(browserSession);
-        setStatus('authenticated');
+        setSession(null);
+        setStatus('anonymous');
       } catch {
         if (cancelled) {
           return;

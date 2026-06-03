@@ -44,7 +44,7 @@ export function ErrorState({
             {showStack ? "Hide technical details" : "Show technical details"}
           </button>
           {showStack && (
-            <pre className="mt-2 max-h-40 overflow-y-auto rounded-lg bg-slate-950 p-3 text-[10px] font-mono text-rose-400 border border-slate-800">
+            <pre className="mt-2 max-h-40 overflow-y-auto rounded-lg bg-slate-950 p-3 text-[10px] text-rose-400 border border-slate-800">
               {error.stack || error.message || JSON.stringify(error, null, 2)}
             </pre>
           )}

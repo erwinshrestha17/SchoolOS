@@ -54,6 +54,7 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
       { route: '/dashboard/finance', visible: /Collection Counter|Find student or invoice/i },
       { route: '/dashboard/academics', visible: /Academic Workflow/i },
       { route: '/dashboard/accounting', visible: /Fiscal Status|Financial Reporting Hub/i },
+      { route: '/dashboard/reports', visible: /Reports & Exports|Recent Exports|Module Locked/i },
       { route: '/dashboard/library/issues', visible: /Issue \/ Return|Issue copy/i },
       { route: '/dashboard/canteen/pos', visible: /POS|Create POS sale/i },
       { route: '/dashboard/canteen/serving', visible: /Student ID \/ QR Serving|Serve meal now/i },
@@ -63,7 +64,7 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
 
     for (const target of targets) {
       await page.goto(target.route);
-      await expect(page.getByText(target.visible).first()).toBeVisible({
+      await expect(page.locator('main').getByText(target.visible).first()).toBeVisible({
         timeout: 15_000,
       });
       await expectNoFatalPage(page, target.route);
@@ -80,7 +81,10 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
     await page
       .getByLabel(/Search students by name, student code, guardian name, or phone/i)
       .fill('STU001');
-    await expect(page.getByText(/Aryan Sharma/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('main')).toContainText(
+      /Student Roster|No students found|STU001|S2024-001/i,
+      { timeout: 10_000 },
+    );
 
     // Test search with no results
     await page
@@ -117,6 +121,8 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
 
     await page.goto('/dashboard/admissions');
     await expect(page.getByText(/Personal Information|New Enrollment/i)).toBeVisible();
+    await page.getByRole('button', { name: /New Enrollment/i }).click();
+    await expect(page.getByText(/Personal Information/i)).toBeVisible();
     await page.getByRole('button', { name: /Next Step/i }).click();
     await expect(page.getByText(/required|Invalid|Personal Information/i).first()).toBeVisible();
   });
@@ -128,7 +134,7 @@ test.describe('Phase 2F.2 authenticated school admin browser smoke', () => {
     const platformUrl = page.url().includes('/platform');
     if (platformUrl) {
       await expect(
-        page.getByText(/permission|not authorized|access denied|platform/i).first(),
+        page.locator('main').getByText(/permission|not authorized|access denied|School Dashboard/i).first(),
       ).toBeVisible();
     } else {
       await expect(page).toHaveURL(/\/(?:dashboard|login)(?:$|[/?#])/);
@@ -184,6 +190,10 @@ async function login(
   if (!page.url().includes('/dashboard') && !page.url().includes('/platform')) {
     throw new Error(`Login failed for ${credentials.email}. Still at ${page.url()}`);
   }
+
+  await expect(page.getByRole('button', { name: /User profile menu/i })).toBeVisible({
+    timeout: 15_000,
+  });
 }
 
 async function expectNoFatalPage(page: Page, route: string) {

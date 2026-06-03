@@ -15,8 +15,6 @@ import {
   ShieldCheck,
   ShieldAlert,
   Ban,
-  CreditCard,
-  RotateCcw,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useSession } from '../session-provider';
@@ -143,8 +141,6 @@ export function PayrollRuns() {
   const canReviewRun = hasPermissions(['payroll:run:review']) || canManagePayroll;
   const canApproveRun = hasPermissions(['payroll:run:approve']) || canManagePayroll;
   const canPostRun = hasPermissions(['payroll:run:post']) || canManagePayroll;
-  const canPayRun = hasPermissions(['payroll:run:pay']) || canManagePayroll;
-  const canReverseRun = hasPermissions(['payroll:run:reverse']) || canManagePayroll;
 
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
@@ -650,48 +646,16 @@ export function PayrollRuns() {
 
                 {/* Actions for POSTED */}
                 {selectedRun.status === 'POSTED' && (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={!canPayRun}
-                      onClick={() => {
-                        setActionType('MARK_PAID');
-                        setIsActionDialogOpen(true);
-                      }}
-                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <CreditCard size={14} />
-                      Mark Paid
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!canReverseRun}
-                      onClick={() => {
-                        setActionType('REVERSE');
-                        setIsActionDialogOpen(true);
-                      }}
-                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <RotateCcw size={14} />
-                      Reverse Run
-                    </button>
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900">
+                    Posted payroll runs stay locked in this workspace. Salary disbursement and correction controls remain outside the Phase 2 posting boundary.
                   </div>
                 )}
 
                 {/* Actions for PAID */}
                 {selectedRun.status === 'PAID' && (
-                  <button
-                    type="button"
-                    disabled={!canReverseRun}
-                    onClick={() => {
-                      setActionType('REVERSE');
-                      setIsActionDialogOpen(true);
-                    }}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <RotateCcw size={15} />
-                    Reverse / Void Payroll Run
-                  </button>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-600">
+                    Paid payroll runs are read-only here. Correction workflows must be handled through audited accounting controls.
+                  </div>
                 )}
               </div>
 

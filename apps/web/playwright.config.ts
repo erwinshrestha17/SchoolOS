@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const port = process.env.SCHOOLOS_WEB_E2E_PORT ?? '3101';
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${port}`;
 
 export default defineConfig({
   testDir: './e2e',
@@ -21,7 +21,7 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command: `pnpm build && pnpm exec next start --hostname 127.0.0.1 --port ${port}`,
+    command: `pnpm build && pnpm exec next start --hostname localhost --port ${port}`,
     url: baseURL,
     reuseExistingServer: false,
     timeout: 120_000,

@@ -7,9 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '../ui/button';
 import { FormField, Input, TextArea } from '../ui/form-field';
 import { Toast } from '../ui/toast';
-import { X, ShieldAlert, Landmark, ShieldCheck, Ban, CreditCard, RotateCcw } from 'lucide-react';
+import { X, ShieldAlert, Landmark, ShieldCheck, Ban, CreditCard } from 'lucide-react';
 
-export type PayrollActionType = 'SUBMIT_REVIEW' | 'APPROVE' | 'REJECT' | 'POST' | 'MARK_PAID' | 'REVERSE';
+export type PayrollActionType = 'SUBMIT_REVIEW' | 'APPROVE' | 'REJECT' | 'POST' | 'MARK_PAID';
 
 interface PayrollActionDialogProps {
   isOpen: boolean;
@@ -46,8 +46,6 @@ export function PayrollActionDialog({
           return api.postPayrollRun(runId);
         case 'MARK_PAID':
           return api.markPayrollRunPaid(runId, { paymentAccountCode, reason });
-        case 'REVERSE':
-          return api.reversePayrollRun(runId, { reason });
         default:
           throw new Error('Unsupported payroll action');
       }
@@ -120,17 +118,6 @@ export function PayrollActionDialog({
           requiresAccount: true,
           confirmText: 'Mark Paid',
           confirmVariant: 'default' as const,
-        };
-      case 'REVERSE':
-        return {
-          title: 'Reverse Payroll',
-          description: 'Reverse this posted/paid payroll run and create reversal journals.',
-          icon: <RotateCcw size={20} className="text-red-600" />,
-          warning: 'This action creates offset reversal journal entries, cancels/voids the payroll run, and resets staff lines. It is highly disruptive.',
-          requiresReason: true,
-          requiresAccount: false,
-          confirmText: 'Reverse Run',
-          confirmVariant: 'destructive' as const,
         };
     }
   };

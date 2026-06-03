@@ -205,7 +205,7 @@ export function StaffAttendanceMarkDialog({ isOpen, onClose }: StaffAttendanceMa
                     <tr key={row.staffId} className="hover:bg-slate-50/30 transition-colors">
                       <td className="px-5 py-4">
                         <p className="font-bold text-slate-900">{row.fullName}</p>
-                        <p className="text-[10px] text-slate-400 font-mono mt-0.5">{row.employeeId}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{row.employeeId}</p>
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex gap-1.5 p-1 bg-slate-100 rounded-xl w-fit">

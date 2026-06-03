@@ -333,3 +333,56 @@ Add `flutter build apk --debug` and `flutter build ios --no-codesign` when prepa
 - Do not introduce microservices or Angular migration without explicit owner approval.
 - Apply code-file modularization gradually in touched areas, not as a risky repo-wide rewrite.
 ```
+
+---
+
+## 9. Fresh Backend/Web Audit Checklist - 2026-06-03
+
+Audit inputs used for this checklist:
+
+```text
+DEVELOPMENT_RULES.md
+docs/project/SCHOOLOS_MASTER_PROJECT_MEMORY.md
+docs/project/SCHOOLOS_IMPLEMENTATION_STATUS_AND_PLAN.md
+docs/design/SCHOOLOS_UI_UX_GUIDE.md
+apps/api/src controllers/services/modules
+apps/web/lib/api
+apps/web/app/dashboard and apps/web/app/platform routes
+apps/web/components dashboard/module workspaces
+```
+
+| Module | Backend implemented | Backend missing / hardening | Web API implemented | Web UI implemented | Web UI missing / route issue | Browser/runtime / test gap |
+|---|---|---|---|---|---|---|
+| Auth / tenant / RBAC | Yes: auth, tenants, roles, users, RBAC, support override foundations | Continue suspended-tenant and cross-tenant denial tests | Yes: auth plus shared client/session helpers | Yes: login/register/session shell | No broad route issue found in first pass | Full browser session smoke still required |
+| M0 Platform | Yes: tenants, plans, billing, providers, queues, API keys, webhooks, report exports | Staging provider/object-storage/browser verification remains | Yes: `platform.ts` exported | Yes: platform dashboard, schools, billing, settings | No broken platform links found in first pass | `test:web:e2e` still environment-sensitive |
+| M1 Students / Admissions | Yes: students, admissions, records, QR, documents, classes, sections, academic-years | Continue ownership and document-access tests | Yes: `students.ts` plus academics helpers | Yes: students, admissions, student detail | Settings had dead student/staff import links; fixed in current slice | Needs dashboard route smoke |
+| M2 Attendance | Yes: attendance and HR attendance controllers/services | Continue correction/offline/suspended-tenant tests | Yes: `attendance.ts` | Yes: attendance and register routes | No broken route found in first pass | Needs route smoke and mutation confirmation audit |
+| M3 Fees / Receipts | Yes: fees, finance compat, payments, receipts, ledger | Continue reversal/refund/cashier-close isolation tests | Yes: `finance.ts` | Yes: fees/finance components | No broken route found in first pass | Needs browser mutation smoke |
+| M4 Academics / Report Cards | Yes: academics, subjects, marks, CAS, locks, report-card PDFs | Continue report generation failure and correction tests | Yes: `academics.ts` | Yes: academics overview and subroutes | Settings linked to missing `/dashboard/academics/years`; fixed to implemented exam terms route | Specifically smoke `/dashboard/academics/report-cards` |
+| M5 Activity Feed | Yes: activity feed, media access, privacy routes | Continue consent/media cross-tenant tests | Yes: `activity.ts` | Yes: activity, parent activity, detail route | No broken route found in first pass | Needs protected media browser smoke |
+| M6 Homework / Timetable | Yes: homework, timetable, substitutions, conflicts | Continue attachment and conflict lifecycle tests | Yes: homework/timetable methods in `academics.ts` | Yes: homework, timetable, builder, review/subroutes | Timetable linked to missing `/dashboard/timetable/new`; fixed to builder route | Needs dashboard route smoke |
+| M7 HR / Payroll | Yes: staff, HR attendance/leave, payroll, payslips, reports | Continue PII/approval/post/reverse tests | Yes: `payroll.ts`; staff APIs via shared exports | Yes: HR, HR staff, payroll, payslips, reports | Settings linked to old `/dashboard/hr/payroll`; fixed to payroll reports | Needs HR/payroll mutation smoke |
+| M8 Library | Yes: library CRUD, fines, reports, QR lookup | Continue lost/damaged/fine posting tests | Yes: `library.ts` | Yes: library workspace and subroutes | No broken route found in first pass | Needs reports/export smoke |
+| M8 Transport | Yes: routes, stops, vehicles, assignments, trips, GPS, reports | Continue driver/parent scope and GPS retention tests | Yes: `transport.ts` | Yes: transport workspace and subroutes | No broken route found in first pass | Needs route and CSV smoke |
+| M8 Canteen | Yes: menu, plans, POS, wallets, inventory, reports | Continue stock/POS reversal/wallet guard tests | Yes: `canteen.ts` | Yes: canteen workspace and subroutes | No broken route found in first pass | Needs POS/report smoke |
+| M9 Accounting | Yes: accounts, journals, reports, reconciliation, PDFs | Continue fiscal lock/reversal/export failure tests | Yes: `accounting.ts` | Yes: accounting dashboard and subroutes | No broken route found in first pass | Needs report/export smoke |
+| M10 Notices / Messaging | Yes: notices, communications deliveries, messaging, parent-teacher chat | Continue provider failure, retry, moderation, attachment tests | Yes: `communications.ts`, `messaging.ts` | Yes: notices, messages/messaging routes | No broken route found in first pass | Needs provider-mode browser smoke |
+| Reports / File Registry / Storage | Yes: reports, export history, File Registry, storage boundaries | Continue signed URL, export failure, background retry coverage | Report helpers in `client.ts` and module APIs now cover async export acknowledgements plus protected snapshot history/downloads | Yes: dashboard reports page now has report selection, background export queueing, Recent Exports status rows, and module-locked route gating for non-entitled tenants | Tenant API access/webhook cards had no backend tenant route; disabled in current slice. Reports module entitlement gate added to avoid frontend calls/buttons when plan lacks `module.reports` | Needs entitled-tenant export-history browser smoke once a seeded tenant includes the Reports module |
+
+First mechanical route audit result:
+
+```text
+routes: 103
+links scanned: 69
+broken links before current slice: 7
+broken links fixed/disabled in current slice: 7
+```
+
+Focused browser verification added after the route audit:
+
+```text
+/dashboard/academics/report-cards was exercised with the real seeded
+school-admin login and running API. The page and backend route passed once the
+Playwright web server default was aligned to localhost, matching the API cookie
+host used by local authenticated smoke tests.
+```

@@ -568,9 +568,13 @@ export const academicsApi = {
 
   // Academics - Mark Lock Requests
   listMarkLockRequests: (filters?: MarkLockFilters) =>
-    request<MarkLockRequestSummary[]>(
+    request<
+      | PaginatedResponse<MarkLockRequestSummary>
+      | { items: MarkLockRequestSummary[] }
+      | MarkLockRequestSummary[]
+    >(
       withQuery('/academics/marks/lock-requests', filters ?? {}),
-    ),
+    ).then((result) => (Array.isArray(result) ? result : result.items)),
   createMarkLockRequest: (body: { examTermId: string; reason: string }) =>
     request<MarkLockRequestSummary>('/academics/marks/lock-requests', {
       method: 'POST',

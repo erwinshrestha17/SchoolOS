@@ -232,7 +232,7 @@ export function BillingRunsTab() {
                               {run.academicYear?.name || 'Year'}
                             </Badge>
                             {run.feePlan && (
-                              <span className="text-[10px] text-slate-500 font-semibold font-mono">Plan: {run.feePlan.code}</span>
+                              <span className="text-[10px] text-slate-500 font-semibold">Plan: {run.feePlan.code}</span>
                             )}
                           </div>
                         </td>

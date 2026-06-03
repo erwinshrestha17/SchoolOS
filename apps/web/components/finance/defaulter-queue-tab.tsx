@@ -221,7 +221,7 @@ export function DefaulterQueueTab() {
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-mono text-slate-500">{item.invoiceNumber}</span>
+                      <span className="text-slate-500">{item.invoiceNumber}</span>
                       <span className="font-extrabold text-rose-600">{formatCurrency(item.outstanding)}</span>
                     </div>
                     {(item.reportCardBlocked || item.hallTicketBlocked) && (

@@ -455,7 +455,7 @@ export async function downloadReport(reportKey: string, payload: ReportExportReq
     return openPdfBlob(response);
   }
 
-  if (contentType.includes('application/json') && payload.format === 'json') {
+  if (contentType.includes('application/json')) {
     const blob = await response.blob();
     const text = await blob.text();
     return JSON.parse(text).data;
@@ -487,12 +487,19 @@ export async function refreshAccessCookie() {
 
   refreshPromise = (async () => {
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      const csrfToken =
+        getCookie('__Host-schoolos_csrf') ?? getCookie('schoolos_csrf');
+      if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+      }
+
       const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({}),
       });
 
@@ -634,4 +641,3 @@ export type MarkLockRequestSummary = {
     phone?: string | null;
   } | null;
 };
-

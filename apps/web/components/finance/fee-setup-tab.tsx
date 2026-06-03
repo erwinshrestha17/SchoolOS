@@ -393,7 +393,7 @@ export function FeeSetupTab() {
                   <tbody className="divide-y divide-slate-100">
                     {feeHeadsQuery.data.map((head: any) => (
                       <tr key={head.id} className="hover:bg-slate-100/35 transition-colors">
-                        <td className="px-4 py-3 font-mono font-bold text-slate-700">{head.code}</td>
+                        <td className="px-4 py-3 font-bold text-slate-700">{head.code}</td>
                         <td className="px-4 py-3 font-semibold text-slate-900">{head.name}</td>
                         <td className="px-4 py-3">
                           <Badge variant="neutral" className="uppercase tracking-widest text-[9px] font-black px-2 py-0.5">
@@ -438,7 +438,7 @@ export function FeeSetupTab() {
                       <tr key={plan.id} className="hover:bg-slate-100/35 transition-colors">
                         <td className="px-4 py-3">
                           <div className="flex flex-col">
-                            <span className="font-mono font-bold text-slate-700">{plan.code}</span>
+                            <span className="font-bold text-slate-700">{plan.code}</span>
                             <span className="text-[10px] text-slate-400 font-semibold">{plan.name}</span>
                           </div>
                         </td>

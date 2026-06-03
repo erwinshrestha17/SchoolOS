@@ -67,6 +67,7 @@ function getRequiredModuleForHref(href: string): string | null {
   if (href.startsWith('/dashboard/notices')) return 'notices';
   if (href.startsWith('/dashboard/activity')) return 'activity';
   if (href.startsWith('/dashboard/messages')) return 'notices';
+  if (href.startsWith('/dashboard/reports')) return 'reports';
   return null;
 }
 
@@ -192,6 +193,7 @@ export const dashboardNavGroups: NavGroup[] = [
         href: '/dashboard/hr',
         label: 'HR / Staff',
         icon: UserCog,
+        permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
       },
       {
         href: '/dashboard/payroll',

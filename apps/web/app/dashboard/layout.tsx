@@ -162,6 +162,7 @@ function getRequiredModuleForHref(href: string): string | null {
   if (href.startsWith('/dashboard/notices')) return 'notices';
   if (href.startsWith('/dashboard/activity')) return 'activity';
   if (href.startsWith('/dashboard/messages')) return 'notices';
+  if (href.startsWith('/dashboard/reports')) return 'reports';
   return null;
 }
 
@@ -287,6 +288,22 @@ export default function DashboardLayout({
 
   // Enforce frontend entitlement gating on direct URL access
   const requiredModule = getRequiredModuleForHref(pathname || '');
+  if (requiredModule && entitlementsLoading) {
+    return (
+      <DashboardShell>
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <div className="rounded-2xl border border-slate-200 bg-white px-6 py-5 text-center shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">
+              Checking module access
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Loading your school&apos;s enabled modules before opening this workspace.
+            </p>
+          </div>
+        </div>
+      </DashboardShell>
+    );
+  }
   if (requiredModule && !entitlementsLoading && !hasModule(requiredModule)) {
     return (
       <DashboardShell>

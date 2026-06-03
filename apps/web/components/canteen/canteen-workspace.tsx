@@ -173,6 +173,8 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmingSaleId, setConfirmingSaleId] = useState<string | null>(null);
   const [confirmingEnrollmentId, setConfirmingEnrollmentId] = useState<string | null>(null);
+  const [walletReversal, setWalletReversal] = useState<{ transactionId: string; label: string } | null>(null);
+  const [walletReversalReason, setWalletReversalReason] = useState('');
   const [receiptPreview, setReceiptPreview] = useState<CanteenPosReceipt | null>(null);
   const [resolvedServingStudent, setResolvedServingStudent] = useState<CanteenQrStudent | null>(null);
   const [resolvedPosStudent, setResolvedPosStudent] = useState<CanteenQrStudent | null>(null);
@@ -412,6 +414,8 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
   const reverseWalletTransactionMutation = useMutation({
     mutationFn: ({ transactionId, reason }: { transactionId: string; reason: string }) => canteenApi.reverseWalletTransaction(transactionId, { reason }),
     onSuccess: () => {
+      setWalletReversal(null);
+      setWalletReversalReason('');
       setNotice('Transaction reversed.');
       invalidateCanteen();
     },
@@ -718,6 +722,51 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
             ) : (
               <EmptyState title="No wallet selected" description="Select a student to view or create a wallet." />
             )}
+            {walletReversal ? (
+              <form
+                className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const reason = walletReversalReason.trim();
+                  if (!reason) return;
+                  reverseWalletTransactionMutation.mutate({
+                    transactionId: walletReversal.transactionId,
+                    reason,
+                  });
+                }}
+              >
+                <p className="text-sm font-bold text-amber-950">Reverse wallet transaction</p>
+                <p className="mt-1 text-xs text-amber-800">{walletReversal.label}</p>
+                <textarea
+                  className="mt-3 min-h-24 w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-amber-400"
+                  value={walletReversalReason}
+                  onChange={(event) => setWalletReversalReason(event.target.value)}
+                  placeholder="Enter an audited reversal reason"
+                />
+                {reverseWalletTransactionMutation.error ? (
+                  <InlineError message={reverseWalletTransactionMutation.error.message} />
+                ) : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="submit"
+                    className="btn-primary text-xs"
+                    disabled={!walletReversalReason.trim() || reverseWalletTransactionMutation.isPending}
+                  >
+                    Confirm reversal
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary text-xs"
+                    onClick={() => {
+                      setWalletReversal(null);
+                      setWalletReversalReason('');
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : null}
             <div className="mt-4 space-y-3">
               {(transactionsQuery.data ?? []).slice(0, 10).map((tx) => (
                 <RecordCard
@@ -730,12 +779,11 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
                         type="button"
                         className="btn-secondary text-xs"
                         onClick={() => {
-                          const reason = window.prompt('Reason for reversal?');
-                          if (reason)
-                            reverseWalletTransactionMutation.mutate({
-                              transactionId: tx.id,
-                              reason,
-                            });
+                          setWalletReversal({
+                            transactionId: tx.id,
+                            label: `${tx.type} - ${money(tx.amount)}`,
+                          });
+                          setWalletReversalReason('');
                         }}
                       >
                         Reverse

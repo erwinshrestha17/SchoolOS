@@ -90,7 +90,7 @@ export default function TimetablePage() {
   ];
 
   const headerActions = (
-    <Link href="/dashboard/timetable/new">
+    <Link href="/dashboard/timetable/builder">
       <Button className="rounded-2xl font-bold shadow-lg bg-slate-900 text-white hover:bg-slate-800">
         <Plus className="mr-2 h-5 w-5" />
         New Timetable Version

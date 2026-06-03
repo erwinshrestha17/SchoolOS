@@ -1,11 +1,26 @@
 import type {
   AuthSession,
+  PermissionKey,
 } from '@schoolos/core';
 import {
   AuthChallengeResponse,
   JsonBody,
+  RequestOptions,
   request,
 } from './client';
+
+export type AuthProfile = {
+  userId: string;
+  tenantId: string;
+  originalTenantId?: string;
+  isSupportOverride?: boolean;
+  tenantSlug: string;
+  email: string | null;
+  authMethod: string;
+  roles: string[];
+  permissions: PermissionKey[];
+  tenant: AuthSession['tenant'];
+};
 
 export const authApi = {
   login: (body: JsonBody) =>
@@ -26,7 +41,8 @@ export const authApi = {
       json: {},
       auth: false,
     }),
-  getProfile: () => request('/auth/me'),
+  getProfile: (options?: RequestOptions) =>
+    request<AuthProfile>('/auth/me', options),
   getEntitlements: () =>
     request<{
       tier: string | null;
