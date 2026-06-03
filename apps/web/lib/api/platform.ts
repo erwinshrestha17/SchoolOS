@@ -273,8 +273,14 @@ export const platformApi = {
   retryPlatformFailedJob: (body: JsonBody) =>
     request('/platform/queues/retry', { method: 'POST', json: body }),
   getPlatformHealth: () => request<PlatformHealthSummary>('/platform/health'),
-  listPlatformReportExports: (params?: { tenantId?: string }) =>
-    request(withQuery('/platform/report-exports', params ?? {})),
+  listPlatformReportExports: (params?: {
+    tenantId?: string;
+    module?: string;
+    status?: string;
+    reportType?: string;
+    page?: number;
+    limit?: number;
+  }) => request<any>(withQuery('/platform/report-exports', params ?? {})),
   getTenantOnboardingChecklist: (tenantId: string) =>
     request<PlatformOnboardingChecklist>(
       `/platform/tenants/${encodeURIComponent(tenantId)}/onboarding`,

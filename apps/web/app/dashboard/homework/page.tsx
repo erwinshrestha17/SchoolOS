@@ -6,14 +6,15 @@ import { Plus, BookOpen, Clock, AlertCircle, CheckCircle2, History } from 'lucid
 import Link from 'next/link';
 
 import { api } from '../../../lib/api';
-import { PageHeader } from '../../../components/ui/page-header';
-import { StatCard } from '../../../components/ui/stat-card';
-import { FilterBar } from '../../../components/ui/filter-bar';
+import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
+import { ModuleHero } from '../../../components/dashboard/module-hero';
+import { StatCard } from '../../../components/dashboard/stat-card';
+import { FilterBar } from '../../../components/dashboard/filter-bar';
 import { DataTable } from '../../../components/ui/data-table';
-import { StatusBadge } from '../../../components/ui/status-badge';
+import { StatusChip } from '../../../components/dashboard/status-chip';
 import { ActionMenu } from '../../../components/ui/action-menu';
-import { LoadingState } from '../../../components/ui/loading-state';
-import { EmptyState } from '../../../components/ui/empty-state';
+import { LoadingState } from '../../../components/dashboard/loading-state';
+import { EmptyState } from '../../../components/dashboard/empty-state';
 import { Button } from '../../../components/ui/button';
 import { Select } from '../../../components/ui/select';
 import { PermissionState } from '../../../components/ui/permission-state';
@@ -136,7 +137,7 @@ export default function HomeworkPage() {
     {
       header: 'Status',
       accessorKey: 'status',
-      cell: (row: any) => <StatusBadge status={row.status || 'DRAFT'} />,
+      cell: (row: any) => <StatusChip status={row.status || 'DRAFT'} />,
     },
     {
       header: 'Submissions',
@@ -145,7 +146,7 @@ export default function HomeworkPage() {
         <div className="flex items-center gap-2">
           <div className="h-2 w-16 bg-slate-100 rounded-full overflow-hidden">
             <div 
-              className="h-full bg-primary-500" 
+              className="h-full bg-indigo-500" 
               style={{ width: `${Math.min(100, (row.submissions?.length || 0) * 10)}%` }} 
             />
           </div>
@@ -182,19 +183,26 @@ export default function HomeworkPage() {
     },
   ];
 
+  const headerActions = (
+    <Link href="/dashboard/homework/new">
+      <Button className="rounded-2xl font-bold shadow-lg bg-slate-900 text-white hover:bg-slate-800">
+        <Plus className="mr-2 h-5 w-5" />
+        Create Homework
+      </Button>
+    </Link>
+  );
+
   return (
-    <div className="space-y-8 pb-12">
-      <PageHeader
-        title="Homework"
-        description="Assign, track, review, and remind students about homework assignments."
-        actions={
-          <Link href="/dashboard/homework/new">
-            <Button size="lg" className="rounded-2xl font-bold shadow-lg shadow-primary-500/20">
-              <Plus className="mr-2 h-5 w-5" />
-              Create Homework
-            </Button>
-          </Link>
-        }
+    <DashboardPageShell>
+      <ModuleHero
+        title="Homework Portal"
+        subtitle="Assign, track, review, and remind students about homework assignments."
+        badge="Homework"
+        category="Student Academics"
+        icon={<BookOpen size={32} className="text-indigo-400" />}
+        accentColor="indigo"
+        variant="dark"
+        actions={headerActions}
       />
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -277,6 +285,6 @@ export default function HomeworkPage() {
           onRowClick={(row) => router.push(`/dashboard/homework/${row.id}`)}
         />
       )}
-    </div>
+    </DashboardPageShell>
   );
 }

@@ -11,12 +11,12 @@ import type {
 } from '@schoolos/core';
 import Link from 'next/link';
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { SectionCard } from '../ui/section-card';
-import { StatCard } from '../ui/stat-card';
+import { SectionCard } from '../dashboard/section-card';
+import { StatCard } from '../dashboard/stat-card';
 import { Badge } from '../ui/badge';
 import { Avatar } from '../ui/avatar';
 import { LoadingState } from '../ui/loading-state';
-import { EmptyState } from '../ui/empty-state';
+import { EmptyState } from '../dashboard/empty-state';
 import { cn } from '../../lib/utils';
 import {
   BookOpenText,
@@ -35,7 +35,7 @@ import {
   ChevronRight,
   AlertTriangle,
 } from 'lucide-react';
-import { StatusBadge } from '../ui/status-badge';
+import { StatusChip } from '../dashboard/status-chip';
 
 type StudentDirectoryProps = {
   academicYears: AcademicYearSummary[];
@@ -401,7 +401,7 @@ export function StudentDirectory({
                         >
                           {studentName}
                         </Link>
-                        <StatusBadge status={student.lifecycleStatus || 'ACTIVE'} />
+                        <StatusChip status={student.lifecycleStatus || 'ACTIVE'} />
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-slate-500">
                         <span className="text-primary-600 font-bold tracking-tight">{student.studentSystemId}</span>

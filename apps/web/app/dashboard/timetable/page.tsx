@@ -6,13 +6,13 @@ import { Plus, Calendar, Settings, FileWarning, Users, LayoutGrid, ClipboardList
 import Link from 'next/link';
 
 import { api } from '@/lib/api';
-import { PageHeader } from '@/components/ui/page-header';
-import { StatCard } from '@/components/ui/stat-card';
-import { FilterBar } from '@/components/ui/filter-bar';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { DashboardPageShell } from '@/components/dashboard/dashboard-page-shell';
+import { ModuleHero } from '@/components/dashboard/module-hero';
+import { StatCard } from '@/components/dashboard/stat-card';
+import { FilterBar } from '@/components/dashboard/filter-bar';
+import { ModuleTabs } from '@/components/dashboard/module-tabs';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
-import { LoadingState } from '@/components/ui/loading-state';
 import { TimetableGrid } from '@/components/timetable/timetable-grid';
 import { TimetableVersionsList } from '@/components/timetable/versions-list';
 import { WeeklyRequirementsList } from '@/components/timetable/weekly-requirements-list';
@@ -20,6 +20,7 @@ import { ConflictsList } from '@/components/timetable/conflicts-list';
 import { SubstitutionsList } from '@/components/timetable/substitutions-list';
 
 export default function TimetablePage() {
+  const [activeTab, setActiveTab] = useState('grid');
   const [filters, setFilters] = useState({
     academicYearId: '',
     classId: '',
@@ -70,29 +71,44 @@ export default function TimetablePage() {
     },
     {
       title: 'Conflicts',
-      value: 0, // Should come from a dedicated API
+      value: 0,
       icon: <FileWarning className="h-5 w-5" />,
     },
     {
       title: 'Substitutions',
-      value: 0, // Should come from a dedicated API
+      value: 0,
       icon: <Users className="h-5 w-5" />,
     },
   ];
 
+  const tabItems = [
+    { value: 'grid', label: 'Weekly Grid', icon: LayoutGrid },
+    { value: 'versions', label: 'Versions', icon: Settings },
+    { value: 'requirements', label: 'Requirements', icon: ClipboardList },
+    { value: 'conflicts', label: 'Conflicts', icon: FileWarning },
+    { value: 'substitutions', label: 'Substitutions', icon: Users },
+  ];
+
+  const headerActions = (
+    <Link href="/dashboard/timetable/new">
+      <Button className="rounded-2xl font-bold shadow-lg bg-slate-900 text-white hover:bg-slate-800">
+        <Plus className="mr-2 h-5 w-5" />
+        New Timetable Version
+      </Button>
+    </Link>
+  );
+
   return (
-    <div className="space-y-8 pb-12">
-      <PageHeader
-        title="Timetable"
-        description="Build, validate, publish, and manage class schedules and teacher assignments."
-        actions={
-          <Link href="/dashboard/timetable/new">
-            <Button size="lg" className="rounded-2xl font-bold shadow-lg shadow-primary-500/20">
-              <Plus className="mr-2 h-5 w-5" />
-              New Timetable Version
-            </Button>
-          </Link>
-        }
+    <DashboardPageShell>
+      <ModuleHero
+        title="Timetable Manager"
+        subtitle="Build, validate, publish, and manage class schedules and teacher assignments."
+        badge="Timetable"
+        category="School Operations"
+        icon={<Calendar size={32} className="text-indigo-400" />}
+        accentColor="indigo"
+        variant="dark"
+        actions={headerActions}
       />
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -151,50 +167,47 @@ export default function TimetablePage() {
         </div>
       </FilterBar>
 
-      <Tabs defaultValue="grid" className="space-y-8">
-        <TabsList className="bg-slate-100 p-1.5 rounded-[1.5rem] inline-flex h-auto flex-wrap">
-          <TabsTrigger value="grid" className="rounded-[1.2rem] px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 font-black uppercase tracking-widest text-[10px]">
-            <LayoutGrid className="mr-2 h-3 w-3" />
-            Weekly Grid
-          </TabsTrigger>
-          <TabsTrigger value="versions" className="rounded-[1.2rem] px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 font-black uppercase tracking-widest text-[10px]">
-            <Settings className="mr-2 h-3 w-3" />
-            Versions
-          </TabsTrigger>
-          <TabsTrigger value="requirements" className="rounded-[1.2rem] px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 font-black uppercase tracking-widest text-[10px]">
-            <ClipboardList className="mr-2 h-3 w-3" />
-            Requirements
-          </TabsTrigger>
-          <TabsTrigger value="conflicts" className="rounded-[1.2rem] px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 font-black uppercase tracking-widest text-[10px]">
-            <FileWarning className="mr-2 h-3 w-3" />
-            Conflicts
-          </TabsTrigger>
-          <TabsTrigger value="substitutions" className="rounded-[1.2rem] px-6 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-slate-900 font-black uppercase tracking-widest text-[10px]">
-            <Users className="mr-2 h-3 w-3" />
-            Substitutions
-          </TabsTrigger>
-        </TabsList>
+      <div className="space-y-6">
+        <ModuleTabs
+          items={tabItems}
+          activeValue={activeTab}
+          onValueChange={setActiveTab}
+          accentColor="indigo"
+          variant="light"
+        />
 
-        <TabsContent value="grid" className="mt-0">
-          <TimetableGrid filters={filters} activeVersionId={activeVersion?.id} />
-        </TabsContent>
+        <div className="min-h-[400px]">
+          {activeTab === 'grid' && (
+            <div className="animate-in fade-in duration-300">
+              <TimetableGrid filters={filters} activeVersionId={activeVersion?.id} />
+            </div>
+          )}
 
-        <TabsContent value="versions" className="mt-0">
-          <TimetableVersionsList academicYearId={filters.academicYearId} />
-        </TabsContent>
+          {activeTab === 'versions' && (
+            <div className="animate-in fade-in duration-300">
+              <TimetableVersionsList academicYearId={filters.academicYearId} />
+            </div>
+          )}
 
-        <TabsContent value="requirements" className="mt-0">
-          <WeeklyRequirementsList filters={filters} />
-        </TabsContent>
+          {activeTab === 'requirements' && (
+            <div className="animate-in fade-in duration-300">
+              <WeeklyRequirementsList filters={filters} />
+            </div>
+          )}
 
-        <TabsContent value="conflicts" className="mt-0">
-          <ConflictsList activeVersionId={activeVersion?.id} />
-        </TabsContent>
+          {activeTab === 'conflicts' && (
+            <div className="animate-in fade-in duration-300">
+              <ConflictsList activeVersionId={activeVersion?.id} />
+            </div>
+          )}
 
-        <TabsContent value="substitutions" className="mt-0">
-          <SubstitutionsList filters={filters} />
-        </TabsContent>
-      </Tabs>
-    </div>
+          {activeTab === 'substitutions' && (
+            <div className="animate-in fade-in duration-300">
+              <SubstitutionsList filters={filters} />
+            </div>
+          )}
+        </div>
+      </div>
+    </DashboardPageShell>
   );
 }

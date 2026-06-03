@@ -3,10 +3,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
 import { StudentDirectory } from '../../../components/forms/student-directory';
-import { PageHeader } from '../../../components/ui/page-header';
 import { Users } from 'lucide-react';
 import { useState } from 'react';
 import { useSession } from '../../../components/session-provider';
+import { DashboardPageShell } from '../../../components/dashboard/dashboard-page-shell';
+import { ModuleHero } from '../../../components/dashboard/module-hero';
 
 export default function StudentsPage() {
   const [pdfError, setPdfError] = useState('');
@@ -100,10 +101,15 @@ export default function StudentsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <DashboardPageShell>
+      <ModuleHero
         title="Student Directory"
-        description="Search student records, manage placement, and open profile details."
+        subtitle="Search student records, manage placement, and open profile details."
+        badge="Students"
+        category="Student Management"
+        icon={<Users size={32} className="text-blue-400" />}
+        accentColor="blue"
+        variant="dark"
       />
 
       <StudentDirectory
@@ -144,6 +150,6 @@ export default function StudentsPage() {
         }
         onFilterChange={setFilters}
       />
-    </div>
+    </DashboardPageShell>
   );
 }

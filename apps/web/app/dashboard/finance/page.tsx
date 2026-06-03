@@ -5,7 +5,7 @@ import { CollectionSection } from '@/components/finance/collection-section';
 import { LedgerSection } from '@/components/finance/ledger-section';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Wallet, Receipt, Settings, BarChart3, Calculator, History, FileText } from 'lucide-react';
+import { Wallet, Receipt, Settings, BarChart3, Calculator, History, FileText, Percent, Database, Play } from 'lucide-react';
 import { StatCard } from '@/components/ui/stat-card';
 import { DuesAnalysisSection } from '@/components/finance/dues-analysis-section';
 import { DefaulterAgingSummary } from '@/components/finance/defaulter-aging-summary';
@@ -14,6 +14,13 @@ import { Badge } from '@/components/ui/badge';
 import { useSession } from '@/components/session-provider';
 import type { InvoiceSummary } from '@schoolos/core';
 import { useSearchParams } from 'next/navigation';
+
+// Parity Sub-Tabs Imports
+import { FeeSetupTab } from '@/components/finance/fee-setup-tab';
+import { DiscountsWaiversTab } from '@/components/finance/discounts-waivers-tab';
+import { BillingRunsTab } from '@/components/finance/billing-runs-tab';
+import { DefaulterQueueTab } from '@/components/finance/defaulter-queue-tab';
+
 
 type InvoiceWithOutstanding = InvoiceSummary & {
   outstandingAmount?: number;
@@ -140,20 +147,41 @@ export default function FinancePage() {
 
         <TabsContent value="reports" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <DefaulterAgingSummary />
+          <DefaulterQueueTab />
           <DuesAnalysisSection />
         </TabsContent>
 
-        <TabsContent value="setup" className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="flex flex-col items-center justify-center py-24 bg-white rounded-[3rem] border-2 border-dashed border-slate-100">
-             <div className="h-20 w-20 rounded-[2rem] bg-slate-50 flex items-center justify-center text-slate-300 mb-6">
-               <Settings size={40} />
-             </div>
-             <h4 className="text-xl font-bold text-slate-900">Fee Configuration</h4>
-             <p className="text-sm text-slate-500 mt-2 max-w-xs text-center">Configure fee heads, billing plans, and discount rules in this high-level settings panel.</p>
-             <button className="mt-8 px-8 py-3 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors">
-                Initialize Setup
-             </button>
-          </div>
+        <TabsContent value="setup" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <Tabs defaultValue="heads-plans" className="space-y-6">
+            <div className="flex justify-center sm:justify-start border-b border-slate-100 pb-2">
+              <TabsList className="bg-slate-50 p-1 rounded-xl border border-slate-100">
+                <TabsTrigger value="heads-plans" className="flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm text-slate-500 hover:text-slate-900 bg-transparent shadow-none">
+                  <Database size={12} />
+                  Heads & Plans
+                </TabsTrigger>
+                <TabsTrigger value="discounts" className="flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm text-slate-500 hover:text-slate-900 bg-transparent shadow-none">
+                  <Percent size={12} />
+                  Discounts & Waivers
+                </TabsTrigger>
+                <TabsTrigger value="billing-runs" className="flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm text-slate-500 hover:text-slate-900 bg-transparent shadow-none">
+                  <Play size={12} />
+                  Billing Runs
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContent value="heads-plans" className="animate-in fade-in duration-300">
+              <FeeSetupTab />
+            </TabsContent>
+
+            <TabsContent value="discounts" className="animate-in fade-in duration-300">
+              <DiscountsWaiversTab />
+            </TabsContent>
+
+            <TabsContent value="billing-runs" className="animate-in fade-in duration-300">
+              <BillingRunsTab />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
     </div>

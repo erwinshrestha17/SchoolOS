@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
   Table, 
@@ -14,24 +15,24 @@ import {
 import { Loader2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { api } from '../../lib/api';
+import { LeaveRequestCreateDialog } from '../hr/leave-request-create-dialog';
 
-export function MyLeaveRequests() {
-  const [requests, setRequests] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+interface MyLeaveRequestsProps {
+  staffId?: string;
+}
 
-  useEffect(() => {
-    api.listMyLeaveRequests()
-      .then(data => {
-        setRequests(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Failed to fetch leave requests', err);
-        setLoading(false);
-      });
-  }, []);
+export function MyLeaveRequests({ staffId }: MyLeaveRequestsProps) {
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  if (loading) return (
+  const { data: requests = [], isLoading, error } = useQuery({
+    queryKey: ['my-leave-requests'],
+    queryFn: async () => {
+      const data = await api.listMyLeaveRequests();
+      return Array.isArray(data) ? data : [];
+    },
+  });
+
+  if (isLoading) return (
     <div className="flex justify-center p-8">
       <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
     </div>
@@ -41,7 +42,7 @@ export function MyLeaveRequests() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-900">Leave Requests</h3>
-        <Button size="sm">
+        <Button size="sm" onClick={() => setIsCreateOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
           Request Leave
         </Button>
@@ -60,14 +61,20 @@ export function MyLeaveRequests() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {requests.length === 0 ? (
+              {error ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-red-500 py-8">
+                    Failed to load leave requests.
+                  </TableCell>
+                </TableRow>
+              ) : requests.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                     No leave requests found.
                   </TableCell>
                 </TableRow>
               ) : (
-                requests.map((req) => (
+                requests.map((req: any) => (
                   <TableRow key={req.id}>
                     <TableCell className="pl-6 font-medium">{req.leaveType}</TableCell>
                     <TableCell>
@@ -93,6 +100,14 @@ export function MyLeaveRequests() {
           </Table>
         </CardContent>
       </Card>
+
+      {isCreateOpen && (
+        <LeaveRequestCreateDialog
+          isOpen={isCreateOpen}
+          onClose={() => setIsCreateOpen(false)}
+          lockedStaffId={staffId}
+        />
+      )}
     </div>
   );
 }

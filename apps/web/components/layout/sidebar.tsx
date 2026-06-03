@@ -59,8 +59,8 @@ function getRequiredModuleForHref(href: string): string | null {
   if (href.startsWith('/dashboard/homework')) return 'homework';
   if (href.startsWith('/dashboard/fees')) return 'fees';
   if (href.startsWith('/dashboard/accounting')) return 'accounting';
-  if (href.startsWith('/dashboard/hr')) return 'hr';
-  if (href.startsWith('/dashboard/payroll')) return 'hr';
+  if (href.startsWith('/dashboard/hr')) return null;
+  if (href.startsWith('/dashboard/payroll')) return null;
   if (href.startsWith('/dashboard/library')) return 'library';
   if (href.startsWith('/dashboard/transport')) return 'transport';
   if (href.startsWith('/dashboard/canteen')) return 'canteen';
@@ -192,13 +192,11 @@ export const dashboardNavGroups: NavGroup[] = [
         href: '/dashboard/hr',
         label: 'HR / Staff',
         icon: UserCog,
-        permissions: ['hr:read', 'payroll:read', 'payroll:manage'],
       },
       {
         href: '/dashboard/payroll',
         label: 'Payroll',
         icon: CalendarDays,
-        permissions: ['payroll:read', 'payroll:manage'],
       },
       {
         href: '/dashboard/accounting',

@@ -14,6 +14,7 @@ interface StatCardProps {
     label: string;
     isUp: boolean;
   };
+  description?: string;
   className?: string;
   loading?: boolean;
   href?: string;
@@ -24,6 +25,7 @@ export function StatCard({
   value,
   icon,
   trend,
+  description,
   className,
   loading = false,
   href,
@@ -62,6 +64,9 @@ export function StatCard({
             </span>
             <span className="text-xs text-slate-400">{trend.label}</span>
           </div>
+        )}
+        {description && (
+          <p className="mt-1 text-xs text-slate-400">{description}</p>
         )}
       </div>
     </>

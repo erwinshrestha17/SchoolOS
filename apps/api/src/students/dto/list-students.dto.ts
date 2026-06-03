@@ -12,7 +12,7 @@ export class ListStudentsDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(1000)
   @Type(() => Number)
   limit?: number = 50;
 

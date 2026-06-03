@@ -468,20 +468,6 @@ export function CanteenWorkspace({ initialTab = 'overview' }: CanteenWorkspacePr
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Canteen Management"
-        description="Manage menu items, meal plans, enrollments, meal serving, wallets, POS sales, spending controls, and reports."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            {tabs.map((tab) => (
-              <Link key={tab.key} href={tab.href} onClick={() => setActiveTab(tab.key)} className={cn('inline-flex min-h-10 items-center rounded-2xl px-4 text-sm font-semibold transition', activeTab === tab.key ? 'bg-slate-900 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900')}>
-                {tab.label}
-              </Link>
-            ))}
-          </div>
-        }
-      />
-
       {notice ? <Notice tone="success" message={notice} onDismiss={() => setNotice(null)} /> : null}
       {firstError ? <Notice tone="error" message={(firstError as Error).message} /> : null}
 

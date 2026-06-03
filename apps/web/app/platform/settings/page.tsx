@@ -23,6 +23,7 @@ import {
   ShieldAlert,
   Search,
   Webhook,
+  Loader2,
 } from 'lucide-react';
 import { api } from '../../../lib/api';
 import type {
@@ -83,6 +84,41 @@ export default function PlatformSettings() {
   const [refreshing, setRefreshing] = useState(false);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+
+  // Report Exports Tab State
+  const [reportExports, setReportExports] = useState<any[]>([]);
+  const [loadingExports, setLoadingExports] = useState(false);
+  const [exportTenantFilter, setExportTenantFilter] = useState('');
+  const [exportModuleFilter, setExportModuleFilter] = useState('');
+  const [exportStatusFilter, setExportStatusFilter] = useState('');
+
+  const loadReportExports = useCallback(async () => {
+    setLoadingExports(true);
+    try {
+      const result = await api.listPlatformReportExports({
+        tenantId: exportTenantFilter.trim() || undefined,
+        module: exportModuleFilter.trim() || undefined,
+        status: exportStatusFilter.trim() || undefined,
+      });
+      const items = Array.isArray(result) ? result : (result as any)?.items || [];
+      setReportExports(items);
+    } catch (err: any) {
+      setError(err.message ?? 'Failed to load report exports');
+    } finally {
+      setLoadingExports(false);
+    }
+  }, [exportTenantFilter, exportModuleFilter, exportStatusFilter]);
+
+  const downloadExport = async (fileAssetId: string) => {
+    try {
+      const fileData = await api.getFileView(fileAssetId);
+      if (fileData.url) {
+        window.open(fileData.url, '_blank');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to download file');
+    }
+  };
 
   // Audit Filters
   const [auditFilters, setAuditFilters] = useState({
@@ -279,6 +315,12 @@ export default function PlatformSettings() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (activeTab === 'exports') {
+      loadReportExports();
+    }
+  }, [activeTab, loadReportExports]);
 
   useEffect(() => {
     const nextTab = getInitialSettingsTab();
@@ -496,10 +538,16 @@ export default function PlatformSettings() {
           <Button
             variant="outline"
             className="rounded-2xl h-12 px-6 font-bold border-slate-200 gap-2"
-            onClick={() => load(true)}
-            disabled={refreshing}
+            onClick={() => {
+              if (activeTab === 'exports') {
+                loadReportExports();
+              } else {
+                load(true);
+              }
+            }}
+            disabled={refreshing || loadingExports}
           >
-            <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
+            <RefreshCw size={18} className={refreshing || loadingExports ? 'animate-spin' : ''} />
             Refresh State
           </Button>
           <Button
@@ -586,6 +634,12 @@ export default function PlatformSettings() {
             className="rounded-xl px-6 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm"
           >
             Global Audit
+          </TabsTrigger>
+          <TabsTrigger
+            value="exports"
+            className="rounded-xl px-6 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm"
+          >
+            Report Exports
           </TabsTrigger>
         </TabsList>
 
@@ -1444,6 +1498,201 @@ export default function PlatformSettings() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent
+          value="exports"
+          className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300"
+        >
+          <div className="flex flex-col gap-4 md:flex-row md:items-end justify-between bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1">
+              <div className="space-y-2">
+                <Label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                  Tenant ID Filter
+                </Label>
+                <Input
+                  placeholder="e.g. school-slug"
+                  className="rounded-xl border-slate-200"
+                  value={exportTenantFilter}
+                  onChange={(e) => setExportTenantFilter(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                  Module / Scope
+                </Label>
+                <select
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none bg-white"
+                  value={exportModuleFilter}
+                  onChange={(e) => setExportModuleFilter(e.target.value)}
+                >
+                  <option value="">All Modules</option>
+                  <option value="tenant">Tenant</option>
+                  <option value="accounting">Accounting</option>
+                  <option value="fees">Fees</option>
+                  <option value="payroll">Payroll</option>
+                  <option value="attendance">Attendance</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                  Status
+                </Label>
+                <select
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-primary-500 focus:outline-none bg-white"
+                  value={exportStatusFilter}
+                  onChange={(e) => setExportStatusFilter(e.target.value)}
+                >
+                  <option value="">All Statuses</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="FAILED">Failed</option>
+                  <option value="PENDING">Pending</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex items-end gap-2 py-0.5">
+              <Button
+                variant="outline"
+                className="rounded-xl font-bold border-slate-200"
+                onClick={() => {
+                  setExportTenantFilter('');
+                  setExportModuleFilter('');
+                  setExportStatusFilter('');
+                }}
+              >
+                Clear
+              </Button>
+              <Button
+                className="rounded-xl font-bold bg-slate-900 text-white"
+                onClick={loadReportExports}
+                disabled={loadingExports}
+              >
+                {loadingExports ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  'Apply Filters'
+                )}
+              </Button>
+            </div>
+          </div>
+
+          <Card className="rounded-3xl border-slate-100 shadow-sm overflow-hidden">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-slate-50/50 border-b border-slate-100">
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        Timestamp
+                      </th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        Tenant ID
+                      </th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        Module
+                      </th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        Report Details
+                      </th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        Status
+                      </th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">
+                        Action
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {loadingExports ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-20 text-center">
+                          <Loader2 className="h-6 w-6 animate-spin mx-auto text-slate-400" />
+                          <p className="mt-2 text-xs font-bold text-slate-400 uppercase tracking-widest">Loading exports...</p>
+                        </td>
+                      </tr>
+                    ) : reportExports.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="px-6 py-20 text-center text-slate-400 font-bold"
+                        >
+                          No generated report exports found.
+                        </td>
+                      </tr>
+                    ) : (
+                      reportExports.map((exp) => (
+                        <tr
+                          key={exp.id}
+                          className="group hover:bg-slate-50/50 transition-colors"
+                        >
+                          <td className="px-6 py-4">
+                            <p className="text-xs font-bold text-slate-900">
+                              {formatDate(exp.createdAt)}
+                            </p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-xs font-mono font-bold text-slate-700">
+                              {exp.tenantId || 'platform'}
+                            </span>
+                          </td>
+                           <td className="px-6 py-4">
+                            <Badge className="rounded-lg font-black text-[10px] bg-slate-100 text-slate-600 border-slate-200 uppercase">
+                              {exp.scope}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-slate-800">
+                                {exp.reportKey} ({exp.format})
+                              </span>
+                              {exp.requestedBy && (
+                                <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                                  by {exp.requestedBy}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <Badge
+                              variant={
+                                exp.status === 'COMPLETED'
+                                  ? 'success'
+                                  : exp.status === 'FAILED'
+                                    ? 'destructive'
+                                    : 'neutral'
+                              }
+                              className="rounded-lg font-black text-[10px]"
+                            >
+                              {exp.status}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            {exp.fileAssetId && exp.status === 'COMPLETED' ? (
+                              <button
+                                type="button"
+                                className="text-xs font-black text-primary-500 hover:text-primary-700 uppercase tracking-widest transition-colors"
+                                onClick={() => downloadExport(exp.fileAssetId)}
+                              >
+                                Download
+                              </button>
+                            ) : exp.errorSummary ? (
+                              <span className="text-xs text-rose-500 font-semibold" title={exp.errorSummary}>
+                                Error
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-400 font-semibold">
+                                N/A
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       <Dialog
@@ -2006,7 +2255,7 @@ function exportSettingsAuditCsv(logs: PlatformAuditLog[]) {
 function getInitialSettingsTab() {
   if (typeof window === 'undefined') return 'health';
   const tab = new URLSearchParams(window.location.search).get('tab');
-  return ['health', 'providers', 'webhooks', 'queues', 'plans', 'audit'].includes(tab ?? '')
+  return ['health', 'providers', 'webhooks', 'queues', 'plans', 'audit', 'exports'].includes(tab ?? '')
     ? tab!
     : 'health';
 }

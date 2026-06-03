@@ -60,7 +60,9 @@ export const academicsApi = {
       method: 'POST',
       json: body,
     }),
-  listExamTerms: () => request<ExamTermSummary[]>('/academics/exam-terms'),
+  listExamTerms: () =>
+    request<PaginatedResponse<ExamTermSummary> | ExamTermSummary[]>('/academics/exam-terms')
+      .then((result) => (Array.isArray(result) ? result : result.items)),
   createExamTerm: (body: JsonBody) =>
     request<ExamTermSummary>('/academics/exam-terms', {
       method: 'POST',

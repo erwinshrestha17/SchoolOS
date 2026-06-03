@@ -172,4 +172,53 @@ export const payrollApi = {
     );
     await openPdfBlob(response);
   },
+
+  archiveStaff: (staffId: string, reason?: string) =>
+    request<StaffDetail>(`/hr/staff/${encodeURIComponent(staffId)}/archive`, {
+      method: 'POST',
+      json: { reason },
+    }),
+  terminateStaff: (staffId: string, body: JsonBody) =>
+    request<StaffDetail>(`/hr/staff/${encodeURIComponent(staffId)}/terminate`, {
+      method: 'POST',
+      json: body,
+    }),
+  listStaffDocuments: (staffId: string, params?: { page?: number; limit?: number }) =>
+    request<any>(withQuery(`/hr/staff/${encodeURIComponent(staffId)}/documents`, params ?? {})),
+  addStaffDocument: (staffId: string, body: JsonBody) =>
+    request<any>(`/hr/staff/${encodeURIComponent(staffId)}/documents`, {
+      method: 'POST',
+      json: body,
+    }),
+  verifyStaffDocument: (staffId: string, documentId: string, body: JsonBody) =>
+    request<any>(`/hr/staff/${encodeURIComponent(staffId)}/documents/${encodeURIComponent(documentId)}/verify`, {
+      method: 'POST',
+      json: body,
+    }),
+  updateSalaryStructure: (id: string, body: JsonBody) =>
+    request<SalaryStructureSummary>(`/payroll/salary-structures/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      json: body,
+    }),
+  markPayrollRunPaid: (id: string, body: JsonBody) =>
+    request<PayrollRunSummary>(`/payroll/runs/${encodeURIComponent(id)}/mark-paid`, {
+      method: 'POST',
+      json: body,
+    }),
+  reversePayrollRun: (id: string, body: JsonBody) =>
+    request<PayrollRunSummary>(`/payroll/runs/${encodeURIComponent(id)}/reverse`, {
+      method: 'POST',
+      json: body,
+    }),
+  exportPayrollRunRegisterCsv: (id: string) =>
+    downloadCsv(
+      `/payroll/runs/${encodeURIComponent(id)}/register/export.csv`,
+      `payroll-register-${id}-${new Date().toISOString().slice(0, 10)}.csv`,
+    ),
+  processLeaveAccruals: (body: { year: number; month: number }) =>
+    request<any>('/hr/staff/accruals/process', {
+      method: 'POST',
+      json: body,
+    }),
 };
+

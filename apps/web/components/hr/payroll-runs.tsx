@@ -13,12 +13,17 @@ import {
   Loader2,
   Plus,
   ShieldCheck,
+  ShieldAlert,
+  Ban,
+  CreditCard,
+  RotateCcw,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useSession } from '../session-provider';
 import { api } from '../../lib/api';
 import { JournalEntryDialog } from '../accounting/journal-entry-dialog';
 import { cn } from '@/lib/utils';
+import { PayrollActionDialog, PayrollActionType } from './payroll-action-dialog';
 
 type PayrollLineView = {
   id?: string;
@@ -135,6 +140,11 @@ export function PayrollRuns() {
   const queryClient = useQueryClient();
   const { status, hasPermissions } = useSession();
   const canManagePayroll = hasPermissions(['payroll:manage']);
+  const canReviewRun = hasPermissions(['payroll:run:review']) || canManagePayroll;
+  const canApproveRun = hasPermissions(['payroll:run:approve']) || canManagePayroll;
+  const canPostRun = hasPermissions(['payroll:run:post']) || canManagePayroll;
+  const canPayRun = hasPermissions(['payroll:run:pay']) || canManagePayroll;
+  const canReverseRun = hasPermissions(['payroll:run:reverse']) || canManagePayroll;
 
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
@@ -147,6 +157,8 @@ export function PayrollRuns() {
   const [selectedJournalId, setSelectedJournalId] = useState<string | null>(null);
   const [isJournalDialogOpen, setIsJournalDialogOpen] = useState(false);
   const [salarySlipError, setSalarySlipError] = useState<string | null>(null);
+  const [isActionDialogOpen, setIsActionDialogOpen] = useState(false);
+  const [actionType, setActionType] = useState<PayrollActionType>('SUBMIT_REVIEW');
 
   const runsQuery = useQuery({
     queryKey: ['payroll-runs'],
@@ -525,8 +537,9 @@ export function PayrollRuns() {
               <div className="flex items-center justify-between px-2 py-4">
                 {[
                   { label: 'Draft', active: true },
-                  { label: 'Approved', active: ['APPROVED', 'POSTED'].includes(selectedRun.status) },
-                  { label: 'Posted', active: selectedRun.status === 'POSTED' },
+                  { label: 'Approved', active: ['APPROVED', 'POSTED', 'PAID'].includes(selectedRun.status) },
+                  { label: 'Posted', active: ['POSTED', 'PAID'].includes(selectedRun.status) },
+                  { label: 'Paid', active: selectedRun.status === 'PAID' },
                 ].map((step, idx, arr) => (
                   <div key={step.label} className="flex items-center flex-1 last:flex-none">
                     <div className="flex flex-col items-center gap-1">
@@ -551,51 +564,148 @@ export function PayrollRuns() {
                 ))}
               </div>
 
-              <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs leading-relaxed text-amber-800">
-                <strong>Posting note:</strong> Approved payroll can be posted once to M9 Accounting. Posting creates the payroll accrual journal through the backend accounting boundary and changes the run to POSTED. It does not disburse salaries, create reversal entries, or enable editing posted runs.
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-xs leading-relaxed text-slate-700 space-y-1">
+                <p><strong>Payroll Status:</strong> {selectedRun.status}</p>
+                {selectedRun.status === 'POSTED' && <p>Accruals have been posted to M9 General Ledger. Salaries can now be paid.</p>}
+                {selectedRun.status === 'PAID' && <p>Payments completed and disbursement journal recorded.</p>}
+                {selectedRun.status === 'VOID' && <p className="text-red-600 font-semibold">This run has been voided/reversed.</p>}
               </div>
 
-              {['DRAFT', 'GENERATED', 'UNDER_REVIEW', 'REVIEWED'].includes(selectedRun.status) && (
-                <button
-                  type="button"
-                  disabled={!canManagePayroll || approveMutation.isPending}
-                  onClick={() => approveMutation.mutate(selectedRun.id)}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-success-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-success-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {approveMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                  Approve Payroll Run
-                </button>
-              )}
+              <div className="flex flex-col gap-2">
+                {/* Actions for DRAFT / GENERATED */}
+                {['DRAFT', 'GENERATED'].includes(selectedRun.status) && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={!canReviewRun}
+                      onClick={() => {
+                        setActionType('SUBMIT_REVIEW');
+                        setIsActionDialogOpen(true);
+                      }}
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <ShieldAlert size={14} />
+                      Submit Review
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canApproveRun}
+                      onClick={() => {
+                        setActionType('APPROVE');
+                        setIsActionDialogOpen(true);
+                      }}
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-success-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-success-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <CheckCircle2 size={14} />
+                      Approve Run
+                    </button>
+                  </div>
+                )}
 
-              {selectedRun.status === 'APPROVED' && (
-                <button
-                  type="button"
-                  disabled={!canManagePayroll || postMutation.isPending}
-                  onClick={() => postMutation.mutate(selectedRun.id)}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {postMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Landmark size={16} />}
-                  Post to M9 Accounting
-                </button>
-              )}
+                {/* Actions for UNDER_REVIEW / REVIEWED */}
+                {['UNDER_REVIEW', 'REVIEWED'].includes(selectedRun.status) && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={!canReviewRun}
+                      onClick={() => {
+                        setActionType('REJECT');
+                        setIsActionDialogOpen(true);
+                      }}
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Ban size={14} />
+                      Reject (Draft)
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canApproveRun}
+                      onClick={() => {
+                        setActionType('APPROVE');
+                        setIsActionDialogOpen(true);
+                      }}
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-success-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-success-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <CheckCircle2 size={14} />
+                      Approve Run
+                    </button>
+                  </div>
+                )}
 
-              {!canManagePayroll && (selectedRun.status === 'DRAFT' || selectedRun.status === 'APPROVED') && (
-                <p className="rounded-xl bg-gray-50 px-4 py-3 text-xs font-medium text-gray-600">
-                  Approval and posting require payroll:manage permission.
-                </p>
-              )}
+                {/* Actions for APPROVED */}
+                {selectedRun.status === 'APPROVED' && (
+                  <button
+                    type="button"
+                    disabled={!canPostRun}
+                    onClick={() => {
+                      setActionType('POST');
+                      setIsActionDialogOpen(true);
+                    }}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Landmark size={15} />
+                    Post to M9 Accounting
+                  </button>
+                )}
 
-              {approveMutation.error && (
-                <p className="rounded-xl bg-danger-50 px-4 py-3 text-xs font-semibold text-danger-700">
-                  {(approveMutation.error as Error).message}
-                </p>
-              )}
+                {/* Actions for POSTED */}
+                {selectedRun.status === 'POSTED' && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={!canPayRun}
+                      onClick={() => {
+                        setActionType('MARK_PAID');
+                        setIsActionDialogOpen(true);
+                      }}
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <CreditCard size={14} />
+                      Mark Paid
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!canReverseRun}
+                      onClick={() => {
+                        setActionType('REVERSE');
+                        setIsActionDialogOpen(true);
+                      }}
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <RotateCcw size={14} />
+                      Reverse Run
+                    </button>
+                  </div>
+                )}
 
-              {postMutation.error && (
-                <p className="rounded-xl bg-danger-50 px-4 py-3 text-xs font-semibold text-danger-700">
-                  {(postMutation.error as Error).message}
-                </p>
-              )}
+                {/* Actions for PAID */}
+                {selectedRun.status === 'PAID' && (
+                  <button
+                    type="button"
+                    disabled={!canReverseRun}
+                    onClick={() => {
+                      setActionType('REVERSE');
+                      setIsActionDialogOpen(true);
+                    }}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <RotateCcw size={15} />
+                    Reverse / Void Payroll Run
+                  </button>
+                )}
+              </div>
+
+              {/* Export Specific Run Register button */}
+              <button
+                type="button"
+                onClick={() => {
+                  void api.exportPayrollRunRegisterCsv(selectedRun.id);
+                }}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                <Download size={14} />
+                Export Run Register (CSV)
+              </button>
 
               {salarySlipError && (
                 <p className="rounded-xl bg-danger-50 px-4 py-3 text-xs font-semibold text-danger-700">
@@ -679,6 +789,15 @@ export function PayrollRuns() {
         open={isJournalDialogOpen} 
         onOpenChange={setIsJournalDialogOpen} 
       />
+      {isActionDialogOpen && selectedRun && (
+        <PayrollActionDialog
+          isOpen={isActionDialogOpen}
+          onClose={() => setIsActionDialogOpen(false)}
+          runId={selectedRun.id}
+          periodText={formatPeriod(selectedRun.periodMonth, selectedRun.periodYear)}
+          actionType={actionType}
+        />
+      )}
     </div>
   );
 }

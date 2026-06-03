@@ -208,4 +208,28 @@ export const attendanceApi = {
     request<StaffLeaveBalanceSummary[]>('/hr/leave-balances'),
   listMyAttendance: () => request<any[]>('/attendance/me/attendance'),
   listMyLeaveRequests: () => request<any[]>('/attendance/me/leave-requests'),
+
+  submitStaffAttendance: (body: JsonBody) =>
+    request<any>('/hr/staff-attendance', {
+      method: 'POST',
+      json: body,
+    }),
+  correctStaffAttendance: (id: string, body: JsonBody) =>
+    request<any>(`/hr/staff-attendance/${encodeURIComponent(id)}/correct`, {
+      method: 'PATCH',
+      json: body,
+    }),
+  reviewLeaveRequest: (id: string, body: JsonBody) =>
+    request<any>(`/hr/leave-requests/${encodeURIComponent(id)}/review`, {
+      method: 'PATCH',
+      json: body,
+    }),
+  adjustLeaveBalance: (body: JsonBody) =>
+    request<any>('/hr/leave-balances/adjust', {
+      method: 'POST',
+      json: body,
+    }),
+  getStaffAttendanceHistory: (staffId: string) =>
+    request<any[]>(`/hr/staff/${encodeURIComponent(staffId)}/attendance-history`),
 };
+

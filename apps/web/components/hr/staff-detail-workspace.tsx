@@ -14,13 +14,31 @@ import {
   MapPin,
   Mail,
   Phone,
-  Banknote
+  Banknote,
+  Upload,
+  UserCheck,
+  Edit2,
+  FileText,
+  Sliders,
+  AlertTriangle,
+  Receipt
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { api, type StaffLifecycleHistoryEvent } from '../../lib/api';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { cn } from '../../lib/utils';
 import { Badge } from '../ui/badge';
+import { Toast } from '../ui/toast';
+import { FormField, Input, Select, TextArea } from '../ui/form-field';
+
+// Dialog Modals
+import { StaffLifecycleDialog } from './staff-lifecycle-dialog';
+import { StaffDocumentsPanel } from './staff-documents-panel';
+import { StaffAttendanceCorrectionDialog } from './staff-attendance-correction-dialog';
+import { LeaveRequestCreateDialog } from './leave-request-create-dialog';
+import { LeaveReviewDialog } from './leave-review-dialog';
+import { LeaveBalanceAdjustDialog } from './leave-balance-adjust-dialog';
+import { SalaryStructureDialog } from './salary-structure-dialog';
 
 export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
   const queryClient = useQueryClient();
@@ -32,36 +50,125 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
     queryKey: ['staff-history', staffId],
     queryFn: () => api.listStaffHistory(staffId),
   });
+  
   const staff = staffQuery.data;
 
+  // Form states
   const [draft, setDraft] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    address: '',
     department: '',
     designation: '',
     bankName: '',
     bankAccount: '',
-    email: '',
-    phone: '',
-    address: '',
+    emergencyName: '',
+    emergencyPhone: '',
+    emergencyRelation: '',
+    qualifications: '',
+    experience: '',
+    teacherRegistryId: '',
+    citizenshipNo: '',
+    panNumber: '',
   });
+
+  const [toastMsg, setToastMsg] = useState<{ title: string; desc: string; tone: 'success' | 'danger' } | null>(null);
+
+  // Dialog triggers
+  const [isLifecycleOpen, setIsLifecycleOpen] = useState(false);
+  const [isRequestLeaveOpen, setIsRequestLeaveOpen] = useState(false);
+  const [isAdjustBalanceOpen, setIsAdjustBalanceOpen] = useState(false);
+  const [isSalaryStructureOpen, setIsSalaryStructureOpen] = useState(false);
+  
+  // Selected items for correction/review/edit
+  const [selectedAttendanceRecord, setSelectedAttendanceRecord] = useState<any | null>(null);
+  const [selectedLeaveRequest, setSelectedLeaveRequest] = useState<any | null>(null);
+  const [selectedSalaryStructure, setSelectedSalaryStructure] = useState<any | null>(null);
 
   useEffect(() => {
     if (staff) {
       setDraft({
-        department: staff.employment?.department ?? '',
-        designation: staff.employment?.designation ?? '',
+        firstName: staff.firstName ?? '',
+        lastName: staff.lastName ?? '',
+        email: staff.email ?? '',
+        address: staff.personal?.address ?? staff.address ?? '',
+        department: staff.employment?.department ?? staff.department ?? '',
+        designation: staff.employment?.designation ?? staff.designation ?? '',
         bankName: staff.bankName ?? '',
         bankAccount: staff.bankAccount ?? '',
-        email: staff.email ?? '',
-        phone: staff.personal?.emergencyContact?.phone ?? '',
-        address: staff.personal?.address ?? '',
+        emergencyName: staff.personal?.emergencyContact?.name ?? '',
+        emergencyPhone: staff.personal?.emergencyContact?.phone ?? '',
+        emergencyRelation: staff.personal?.emergencyContact?.relation ?? '',
+        qualifications: (staff as any).qualifications ?? '',
+        experience: (staff as any).experience ?? '',
+        teacherRegistryId: (staff as any).employment?.teacherRegistryId ?? (staff as any).teacherRegistryId ?? '',
+        citizenshipNo: (staff as any).citizenshipNo ?? '',
+        panNumber: (staff as any).panNumber ?? '',
       });
     }
   }, [staff]);
 
   const updateMutation = useMutation({
-    mutationFn: () => api.updateStaffDetail(staffId, draft),
+    mutationFn: () => 
+      api.updateStaffDetail(staffId, {
+        firstName: draft.firstName,
+        lastName: draft.lastName,
+        email: draft.email,
+        address: draft.address,
+        department: draft.department,
+        designation: draft.designation,
+        bankName: draft.bankName,
+        bankAccount: draft.bankAccount,
+        emergencyContactName: draft.emergencyName,
+        emergencyContactPhone: draft.emergencyPhone,
+        emergencyContactRelation: draft.emergencyRelation,
+        qualifications: draft.qualifications,
+        experience: draft.experience,
+        teacherRegistryId: draft.teacherRegistryId,
+        citizenshipNo: draft.citizenshipNo,
+        panNumber: draft.panNumber,
+      }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['staff-detail', staffId] });
+      void queryClient.invalidateQueries({ queryKey: ['staff'] });
+      setToastMsg({
+        title: 'Profile Updated',
+        desc: 'Staff member information has been updated successfully.',
+        tone: 'success',
+      });
+    },
+    onError: (err: any) => {
+      setToastMsg({
+        title: 'Update Failed',
+        desc: err.message || 'Failed to update staff member details.',
+        tone: 'danger',
+      });
+    },
+  });
+
+  const activateStructureMutation = useMutation({
+    mutationFn: (id: string) => api.activateSalaryStructure(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['staff-detail', staffId] });
+      void queryClient.invalidateQueries({ queryKey: ['payroll-preview'] });
+      setToastMsg({
+        title: 'Salary Structure Activated',
+        desc: 'The selected salary structure is now active.',
+        tone: 'success',
+      });
+    },
+  });
+
+  const archiveStructureMutation = useMutation({
+    mutationFn: (id: string) => api.archiveSalaryStructure(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['staff-detail', staffId] });
+      setToastMsg({
+        title: 'Salary Structure Archived',
+        desc: 'The salary structure has been archived.',
+        tone: 'success',
+      });
     },
   });
 
@@ -69,7 +176,9 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <div className="h-12 w-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
-        <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Hydrating Staff Profile...</p>
+        <p className="text-sm font-bold text-slate-500 uppercase tracking-widest animate-pulse">
+          Hydrating Staff Profile...
+        </p>
       </div>
     );
   }
@@ -84,6 +193,16 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {toastMsg && (
+        <Toast
+          title={toastMsg.title}
+          description={toastMsg.desc}
+          tone={toastMsg.tone}
+          onDismiss={() => setToastMsg(null)}
+          className="fixed bottom-6 right-6 z-50 shadow-2xl"
+        />
+      )}
+
       {/* Header Profile Card */}
       <section className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-sm relative overflow-hidden">
         <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-blue-500/5 blur-3xl" />
@@ -98,7 +217,11 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
               </h2>
               <Badge className={cn(
                 "font-black uppercase tracking-widest text-[10px] px-3 py-1",
-                staff.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/10" : "bg-slate-100 text-slate-500"
+                staff.status === 'ACTIVE' || !staff.status
+                  ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/10"
+                  : staff.status === 'TERMINATED'
+                  ? "bg-rose-500/10 text-rose-600 border-rose-500/10"
+                  : "bg-slate-100 text-slate-500"
               )}>
                 {staff.status ?? 'ACTIVE'}
               </Badge>
@@ -110,20 +233,28 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
               </span>
               <span className="flex items-center gap-2">
                 <Briefcase size={16} className="text-slate-400" />
-                {staff.employment?.designation ?? 'No designation'}
+                {staff.employment?.designation ?? staff.designation ?? 'No designation'}
               </span>
               <span className="flex items-center gap-2">
                 <Landmark size={16} className="text-slate-400" />
-                {staff.employment?.department ?? 'No department'}
+                {staff.employment?.department ?? staff.department ?? 'No department'}
               </span>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setIsLifecycleOpen(true)}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 transition-all text-sm"
+            >
+              <UserCheck size={18} />
+              Status Lifecycle
+            </button>
             <button
               type="button"
               onClick={() => updateMutation.mutate()}
-              disabled={updateMutation.isPending}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-slate-900 text-white font-bold hover:bg-blue-600 transition-all shadow-lg shadow-slate-900/10 disabled:opacity-50"
+              disabled={updateMutation.isPending || staff.status === 'TERMINATED'}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-slate-900 text-white font-bold hover:bg-blue-600 transition-all shadow-lg shadow-slate-900/10 disabled:opacity-50 text-sm"
             >
               <Save size={18} />
               {updateMutation.isPending ? 'Saving...' : 'Save Profile'}
@@ -132,8 +263,17 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
         </div>
       </section>
 
+      {staff.status === 'TERMINATED' && (
+        <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex gap-3 text-xs text-rose-800 leading-relaxed items-center">
+          <AlertTriangle className="text-rose-600 shrink-0" size={18} />
+          <div>
+            <strong>Termination Notice:</strong> This profile is locked. Terminated profiles cannot be edited or modified without shifting the user lifecycle status back to ACTIVE.
+          </div>
+        </div>
+      )}
+
       <Tabs defaultValue="overview" className="space-y-8">
-        <TabsList className="bg-white/50 border border-slate-200 p-1 rounded-2xl">
+        <TabsList className="bg-white/80 border border-slate-200 p-1.5 rounded-2xl flex-wrap h-auto">
           <TabsTrigger value="overview" className="gap-2">
             <User size={14} />
             Overview
@@ -142,59 +282,121 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
             <Briefcase size={14} />
             Employment
           </TabsTrigger>
+          <TabsTrigger value="documents" className="gap-2">
+            <FileText size={14} />
+            Documents
+          </TabsTrigger>
           <TabsTrigger value="attendance" className="gap-2">
             <ClipboardCheck size={14} />
             Attendance
           </TabsTrigger>
           <TabsTrigger value="leave" className="gap-2">
             <CalendarDays size={14} />
-            Leave
+            Leaves
           </TabsTrigger>
           <TabsTrigger value="payroll" className="gap-2">
             <Calculator size={14} />
-            Payroll
+            Payroll & salary
           </TabsTrigger>
           <TabsTrigger value="history" className="gap-2">
             <History size={14} />
-            Audit
+            Audit Log
           </TabsTrigger>
         </TabsList>
 
         <div className="grid lg:grid-cols-[1fr_360px] gap-8 items-start">
           <div className="space-y-8">
+            {/* Tab: Overview */}
             <TabsContent value="overview" className="m-0 outline-none">
               <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-8">
                 <h3 className="text-xl font-bold flex items-center gap-3">
                   <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center">
                     <User size={18} />
                   </div>
-                  Personal Information
+                  Personal Details
                 </h3>
                 <div className="grid md:grid-cols-2 gap-6">
-                  <Field 
-                    label="Email Address" 
-                    value={draft.email} 
-                    icon={Mail}
-                    onChange={(email) => setDraft((c) => ({ ...c, email }))} 
-                  />
-                  <Field 
-                    label="Emergency Contact" 
-                    value={draft.phone} 
-                    icon={Phone}
-                    onChange={(phone) => setDraft((c) => ({ ...c, phone }))} 
-                  />
-                  <div className="md:col-span-2">
-                    <Field 
-                      label="Residential Address" 
-                      value={draft.address} 
-                      icon={MapPin}
-                      onChange={(address) => setDraft((c) => ({ ...c, address }))} 
+                  <FormField label="First Name">
+                    <Input 
+                      value={draft.firstName} 
+                      onChange={(e: any) => setDraft(c => ({ ...c, firstName: e.target.value }))}
+                      disabled={staff.status === 'TERMINATED'}
                     />
+                  </FormField>
+                  <FormField label="Last Name">
+                    <Input 
+                      value={draft.lastName} 
+                      onChange={(e: any) => setDraft(c => ({ ...c, lastName: e.target.value }))}
+                      disabled={staff.status === 'TERMINATED'}
+                    />
+                  </FormField>
+                  <FormField label="Email Address">
+                    <Input 
+                      type="email" 
+                      value={draft.email} 
+                      disabled={staff.status === 'TERMINATED'}
+                      onChange={(e: any) => setDraft(c => ({ ...c, email: e.target.value }))}
+                    />
+                  </FormField>
+                  <FormField label="Residential Address">
+                    <Input 
+                      value={draft.address} 
+                      disabled={staff.status === 'TERMINATED'}
+                      onChange={(e: any) => setDraft(c => ({ ...c, address: e.target.value }))}
+                    />
+                  </FormField>
+                  <FormField label="Academic Qualifications">
+                    <TextArea 
+                      value={draft.qualifications} 
+                      disabled={staff.status === 'TERMINATED'}
+                      onChange={(e: any) => setDraft(c => ({ ...c, qualifications: e.target.value }))}
+                    />
+                  </FormField>
+                  <FormField label="Prior Experience">
+                    <TextArea 
+                      value={draft.experience} 
+                      disabled={staff.status === 'TERMINATED'}
+                      onChange={(e: any) => setDraft(c => ({ ...c, experience: e.target.value }))}
+                    />
+                  </FormField>
+                </div>
+
+                <h3 className="text-lg font-bold flex items-center gap-3 pt-6 border-t">
+                  <div className="h-8 w-8 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center">
+                    <Phone size={18} />
                   </div>
+                  Emergency Contact
+                </h3>
+                <div className="grid md:grid-cols-3 gap-6">
+                  <FormField label="Contact Name">
+                    <Input 
+                      value={draft.emergencyName} 
+                      disabled={staff.status === 'TERMINATED'}
+                      onChange={(e: any) => setDraft(c => ({ ...c, emergencyName: e.target.value }))}
+                      placeholder="Contact full name"
+                    />
+                  </FormField>
+                  <FormField label="Contact Phone">
+                    <Input 
+                      value={draft.emergencyPhone} 
+                      disabled={staff.status === 'TERMINATED'}
+                      onChange={(e: any) => setDraft(c => ({ ...c, emergencyPhone: e.target.value }))}
+                      placeholder="Emergency contact phone"
+                    />
+                  </FormField>
+                  <FormField label="Relation">
+                    <Input 
+                      value={draft.emergencyRelation} 
+                      disabled={staff.status === 'TERMINATED'}
+                      onChange={(e: any) => setDraft(c => ({ ...c, emergencyRelation: e.target.value }))}
+                      placeholder="e.g. Spouse, Father, Friend"
+                    />
+                  </FormField>
                 </div>
               </section>
             </TabsContent>
 
+            {/* Tab: Employment */}
             <TabsContent value="employment" className="m-0 outline-none">
               <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-8">
                 <h3 className="text-xl font-bold flex items-center gap-3">
@@ -204,58 +406,420 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                   Employment Details
                 </h3>
                 <div className="grid md:grid-cols-2 gap-6">
-                  <Field 
-                    label="Department" 
-                    value={draft.department} 
-                    onChange={(v) => setDraft((c) => ({ ...c, department: v }))} 
-                  />
-                  <Field 
-                    label="Designation" 
-                    value={draft.designation} 
-                    onChange={(v) => setDraft((c) => ({ ...c, designation: v }))} 
-                  />
-                  <Field 
-                    label="Bank Name" 
-                    value={draft.bankName} 
-                    icon={Landmark}
-                    onChange={(v) => setDraft((c) => ({ ...c, bankName: v }))} 
-                  />
-                  <Field 
-                    label="Bank Account #" 
-                    value={draft.bankAccount} 
-                    icon={Banknote}
-                    onChange={(v) => setDraft((c) => ({ ...c, bankAccount: v }))} 
-                  />
+                  <FormField label="Department">
+                    <Input 
+                      value={draft.department} 
+                      disabled={staff.status === 'TERMINATED'}
+                      onChange={(e: any) => setDraft(c => ({ ...c, department: e.target.value }))}
+                    />
+                  </FormField>
+                  <FormField label="Designation">
+                    <Input 
+                      value={draft.designation} 
+                      disabled={staff.status === 'TERMINATED'}
+                      onChange={(e: any) => setDraft(c => ({ ...c, designation: e.target.value }))}
+                    />
+                  </FormField>
+                  <FormField label="Teacher Registry ID">
+                    <Input 
+                      value={draft.teacherRegistryId} 
+                      disabled={staff.status === 'TERMINATED'}
+                      onChange={(e: any) => setDraft(c => ({ ...c, teacherRegistryId: e.target.value }))}
+                      placeholder="TRN registry ID"
+                    />
+                  </FormField>
+                  <FormField label="Citizenship / National ID">
+                    <Input 
+                      value={draft.citizenshipNo} 
+                      disabled={staff.status === 'TERMINATED'}
+                      onChange={(e: any) => setDraft(c => ({ ...c, citizenshipNo: e.target.value }))}
+                    />
+                  </FormField>
+                  <FormField label="PAN Number">
+                    <Input 
+                      value={draft.panNumber} 
+                      disabled={staff.status === 'TERMINATED'}
+                      onChange={(e: any) => setDraft(c => ({ ...c, panNumber: e.target.value }))}
+                    />
+                  </FormField>
+                </div>
+
+                <h3 className="text-lg font-bold flex items-center gap-3 pt-6 border-t">
+                  <div className="h-8 w-8 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center">
+                    <Landmark size={18} />
+                  </div>
+                  Disbursement Bank Details
+                </h3>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <FormField label="Bank Name">
+                    <Input 
+                      value={draft.bankName} 
+                      disabled={staff.status === 'TERMINATED'}
+                      onChange={(e: any) => setDraft(c => ({ ...c, bankName: e.target.value }))}
+                    />
+                  </FormField>
+                  <FormField label="Account Number">
+                    <Input 
+                      value={draft.bankAccount} 
+                      disabled={staff.status === 'TERMINATED'}
+                      onChange={(e: any) => setDraft(c => ({ ...c, bankAccount: e.target.value }))}
+                    />
+                  </FormField>
                 </div>
               </section>
             </TabsContent>
 
+            {/* Tab: Documents */}
+            <TabsContent value="documents" className="m-0 outline-none">
+              <StaffDocumentsPanel staffId={staffId} />
+            </TabsContent>
+
+            {/* Tab: Attendance */}
             <TabsContent value="attendance" className="m-0 outline-none">
-              <HistoryTable 
-                title="Recent Attendance" 
-                items={staff.attendanceRecords ?? []} 
-                icon={ClipboardCheck}
-              />
+              <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-6">
+                <h3 className="text-xl font-bold flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center">
+                    <ClipboardCheck size={18} />
+                  </div>
+                  Attendance Log
+                </h3>
+                <div className="rounded-2xl border border-slate-100 overflow-hidden">
+                  {staff.attendanceRecords && staff.attendanceRecords.length > 0 ? (
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50/50 border-b border-slate-100">
+                        <tr>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Check In</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Remarks</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {(staff.attendanceRecords as any[]).slice(0, 15).map((item, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/30 transition-colors">
+                            <td className="px-5 py-3.5 font-bold text-slate-900">
+                              {new Date(item.attendanceDate).toLocaleDateString()}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <Badge variant="outline" className={cn(
+                                "font-bold text-[9px] uppercase tracking-widest",
+                                item.status === 'PRESENT' ? 'text-emerald-600 bg-emerald-50 border-emerald-100' :
+                                item.status === 'ABSENT' ? 'text-rose-600 bg-rose-50 border-rose-100' :
+                                'text-amber-600 bg-amber-50 border-amber-100'
+                              )}>
+                                {item.status}
+                              </Badge>
+                            </td>
+                            <td className="px-5 py-3.5 text-slate-600 font-medium">
+                              {item.checkIn ? new Date(item.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            </td>
+                            <td className="px-5 py-3.5 text-slate-500 max-w-xs truncate">
+                              {item.note || '-'}
+                            </td>
+                            <td className="px-5 py-3.5 text-right">
+                              <button
+                                type="button"
+                                disabled={staff.status === 'TERMINATED'}
+                                onClick={() => setSelectedAttendanceRecord(item)}
+                                className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-blue-600 border border-blue-100 rounded-lg hover:bg-blue-50 transition-colors"
+                              >
+                                Correct
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="py-12 text-center text-slate-400 italic">
+                      No attendance logged for this staff member.
+                    </div>
+                  )}
+                </div>
+              </section>
             </TabsContent>
 
-            <TabsContent value="leave" className="m-0 outline-none">
-              <HistoryTable 
-                title="Leave History" 
-                items={staff.leaveRequests ?? []} 
-                icon={CalendarDays}
-              />
+            {/* Tab: Leave */}
+            <TabsContent value="leave" className="m-0 outline-none space-y-8">
+              {/* Leave Balances */}
+              <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="text-xl font-bold flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center">
+                      <Sliders size={18} />
+                    </div>
+                    Leave Balances
+                  </h3>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={staff.status === 'TERMINATED'}
+                      onClick={() => setIsAdjustBalanceOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-xs transition-colors"
+                    >
+                      Adjust Balance
+                    </button>
+                    <button
+                      type="button"
+                      disabled={staff.status === 'TERMINATED'}
+                      onClick={() => setIsRequestLeaveOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors"
+                    >
+                      Request Leave
+                    </button>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-100 overflow-hidden">
+                  {staff.leaveBalances && staff.leaveBalances.length > 0 ? (
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-slate-50/50 border-b border-slate-100">
+                        <tr>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Leave Type</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center">Entitlement</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center">Used</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center">Pending</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center text-primary-600">Remaining</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {(staff.leaveBalances as any[]).map((balance) => (
+                          <tr key={balance.id} className="hover:bg-slate-50/30 transition-colors">
+                            <td className="px-5 py-3.5 font-bold text-slate-900">{balance.leaveType.replace('_', ' ')}</td>
+                            <td className="px-5 py-3.5 text-center text-slate-600 font-medium">{balance.entitlement + balance.carriedForward}</td>
+                            <td className="px-5 py-3.5 text-center text-rose-600 font-bold">{balance.used}</td>
+                            <td className="px-5 py-3.5 text-center text-amber-500 font-bold">{balance.pending}</td>
+                            <td className="px-5 py-3.5 text-center font-black text-emerald-600">{balance.remaining}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="py-12 text-center text-slate-400 italic">
+                      No leave balance details configured for this staff member.
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Leave History / Requests */}
+              <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-6">
+                <h3 className="text-xl font-bold flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center">
+                    <CalendarDays size={18} />
+                  </div>
+                  Leave Request History
+                </h3>
+                <div className="rounded-2xl border border-slate-100 overflow-hidden">
+                  {staff.leaveRequests && staff.leaveRequests.length > 0 ? (
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-slate-50/50 border-b border-slate-100">
+                        <tr>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Leave Type</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Period</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-center">Days</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {(staff.leaveRequests as any[]).map((req) => (
+                          <tr key={req.id} className="hover:bg-slate-50/30 transition-colors">
+                            <td className="px-5 py-3.5 font-bold text-slate-900 uppercase tracking-tight">{req.leaveType.replace('_', ' ')}</td>
+                            <td className="px-5 py-3.5 text-slate-500 font-medium">
+                              {new Date(req.startsOn).toLocaleDateString()} - {new Date(req.endsOn).toLocaleDateString()}
+                            </td>
+                            <td className="px-5 py-3.5 text-center font-bold text-slate-700">{req.days}</td>
+                            <td className="px-5 py-3.5">
+                              <Badge variant="outline" className={cn(
+                                "font-black uppercase tracking-widest text-[8px]",
+                                req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                req.status === 'REJECTED' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                                'bg-amber-50 text-amber-600 border-amber-100'
+                              )}>
+                                {req.status}
+                              </Badge>
+                            </td>
+                            <td className="px-5 py-3.5 text-right">
+                              {req.status === 'PENDING' && (
+                                <button
+                                  type="button"
+                                  disabled={staff.status === 'TERMINATED'}
+                                  onClick={() => setSelectedLeaveRequest(req)}
+                                  className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-blue-600 border border-blue-100 rounded-lg hover:bg-blue-50 transition-colors"
+                                >
+                                  Review
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="py-12 text-center text-slate-400 italic">
+                      No leave requests submitted.
+                    </div>
+                  )}
+                </div>
+              </section>
             </TabsContent>
 
-            <TabsContent value="payroll" className="m-0 outline-none">
-              <HistoryTable 
-                title="Payroll History" 
-                items={staff.payrollLines ?? []} 
-                icon={Calculator}
-              />
+            {/* Tab: Payroll */}
+            <TabsContent value="payroll" className="m-0 outline-none space-y-8">
+              {/* Salary Structures */}
+              <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="text-xl font-bold flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-500 flex items-center justify-center">
+                      <Calculator size={18} />
+                    </div>
+                    Salary Structures
+                  </h3>
+                  <button
+                    type="button"
+                    disabled={staff.status === 'TERMINATED'}
+                    onClick={() => {
+                      setSelectedSalaryStructure(null);
+                      setIsSalaryStructureOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors"
+                  >
+                    Add Structure
+                  </button>
+                </div>
+                <div className="rounded-2xl border border-slate-100 overflow-hidden">
+                  {staff.salaryStructures && staff.salaryStructures.length > 0 ? (
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-slate-50/50 border-b border-slate-100">
+                        <tr>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Effective Period</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Details</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-right">Basic Pay</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {(staff.salaryStructures as any[]).map((structure) => (
+                          <tr key={structure.id} className="hover:bg-slate-50/30 transition-colors">
+                            <td className="px-5 py-3.5 font-bold text-slate-900">
+                              {new Date(structure.effectiveFrom).toLocaleDateString()}
+                              {structure.effectiveTo ? ` - ${new Date(structure.effectiveTo).toLocaleDateString()}` : ' - Present'}
+                            </td>
+                            <td className="px-5 py-3.5 text-slate-500">
+                              {structure.pfEnabled ? 'PF' : 'No PF'} • {structure.tdsEnabled ? 'TDS' : 'No TDS'}
+                            </td>
+                            <td className="px-5 py-3.5 text-right font-black text-slate-900">
+                              NPR {structure.basicSalary.toLocaleString()}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <Badge variant="outline" className={cn(
+                                "font-black uppercase tracking-widest text-[8px]",
+                                structure.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-100 text-slate-500'
+                              )}>
+                                {structure.status}
+                              </Badge>
+                            </td>
+                            <td className="px-5 py-3.5 text-right">
+                              <div className="flex justify-end gap-2">
+                                {structure.status !== 'ACTIVE' && (
+                                  <button
+                                    onClick={() => activateStructureMutation.mutate(structure.id)}
+                                    disabled={staff.status === 'TERMINATED' || activateStructureMutation.isPending}
+                                    className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-600 border border-emerald-100 rounded-lg hover:bg-emerald-50 transition-colors"
+                                  >
+                                    Activate
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => archiveStructureMutation.mutate(structure.id)}
+                                  disabled={staff.status === 'TERMINATED' || archiveStructureMutation.isPending}
+                                  className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-rose-600 border border-rose-100 rounded-lg hover:bg-rose-50 transition-colors"
+                                >
+                                  Archive
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSelectedSalaryStructure(structure);
+                                    setIsSalaryStructureOpen(true);
+                                  }}
+                                  disabled={staff.status === 'TERMINATED'}
+                                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="py-12 text-center text-slate-400 italic">
+                      No salary structure configured. Payroll run will require basic salary details.
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Payroll History */}
+              <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-6">
+                <h3 className="text-xl font-bold flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center">
+                    <Receipt size={18} />
+                  </div>
+                  Payslips
+                </h3>
+                <div className="rounded-2xl border border-slate-100 overflow-hidden">
+                  {staff.payrollLines && staff.payrollLines.length > 0 ? (
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-slate-50/50 border-b border-slate-100">
+                        <tr>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Payroll Period</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Gross</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Deductions</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider text-right">Net Payable</th>
+                          <th className="px-5 py-3 font-bold text-slate-500 uppercase tracking-wider">Payment Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {(staff.payrollLines as any[]).map((line) => (
+                          <tr key={line.id} className="hover:bg-slate-50/30 transition-colors">
+                            <td className="px-5 py-3.5 font-bold text-slate-900">
+                              {line.payrollRun?.periodMonth}/{line.payrollRun?.periodYear}
+                            </td>
+                            <td className="px-5 py-3.5 text-slate-600 font-medium">NPR {line.grossSalary.toLocaleString()}</td>
+                            <td className="px-5 py-3.5 text-rose-600 font-medium">- NPR {line.deductions.toLocaleString()}</td>
+                            <td className="px-5 py-3.5 text-right font-black text-slate-900">NPR {line.netSalary.toLocaleString()}</td>
+                            <td className="px-5 py-3.5">
+                              <Badge className={cn(
+                                "font-bold text-[8px] uppercase tracking-widest",
+                                line.paymentStatus === 'PAID' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/10' : 'bg-slate-100 text-slate-500'
+                              )}>
+                                {line.paymentStatus || 'UNPAID'}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="py-12 text-center text-slate-400 italic">
+                      No payroll lines exist for this profile.
+                    </div>
+                  )}
+                </div>
+              </section>
             </TabsContent>
 
+            {/* Tab: History */}
             <TabsContent value="history" className="m-0 outline-none">
-              <LifecycleHistoryPanel events={historyQuery.data ?? []} loading={historyQuery.isLoading} error={historyQuery.error} />
+              <LifecycleHistoryPanel 
+                events={historyQuery.data ?? []} 
+                loading={historyQuery.isLoading} 
+                error={historyQuery.error} 
+              />
             </TabsContent>
           </div>
 
@@ -265,7 +829,7 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
               <div className="space-y-4">
                 <div className="flex justify-between items-center py-2 border-b border-white/5">
                   <span className="text-xs text-slate-400 font-medium">Joined Date</span>
-                  <span className="text-xs font-bold">{staff.employment?.joiningDate ? new Date(staff.employment.joiningDate).toLocaleDateString() : 'N/A'}</span>
+                  <span className="text-xs font-bold">{staff.employment?.joiningDate ? new Date(staff.employment.joiningDate).toLocaleDateString() : new Date(staff.joiningDate).toLocaleDateString()}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-white/5">
                   <span className="text-xs text-slate-400 font-medium">Contract Type</span>
@@ -273,14 +837,16 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
                 </div>
                 <div className="flex justify-between items-center py-2">
                   <span className="text-xs text-slate-400 font-medium">Active Salary Structure</span>
-                  <span className="text-xs font-bold text-emerald-400">NPR {staff.salaryStructures?.[0]?.basicSalary?.toLocaleString() ?? 0}</span>
+                  <span className="text-xs font-bold text-emerald-400">
+                    NPR {staff.salaryStructures?.find((ss) => ss.status === 'ACTIVE')?.basicSalary?.toLocaleString() ?? 0}
+                  </span>
                 </div>
               </div>
             </div>
 
             <div className="bg-blue-50 border border-blue-100 rounded-[2rem] p-6">
               <h4 className="font-bold mb-2 text-blue-900 text-sm">HR Note</h4>
-              <p className="text-xs text-blue-700 leading-relaxed">
+              <p className="text-xs text-blue-700 leading-relaxed font-medium">
                 Profile updates are audited and synced with user authentication records. 
                 Sensitive financial changes require a separate salary structure update.
               </p>
@@ -288,6 +854,64 @@ export function StaffDetailWorkspace({ staffId }: { staffId: string }) {
           </aside>
         </div>
       </Tabs>
+
+      {/* Lifecycle Status Dialog */}
+      <StaffLifecycleDialog
+        isOpen={isLifecycleOpen}
+        onClose={() => setIsLifecycleOpen(false)}
+        staffId={staffId}
+        currentStatus={staff.status ?? 'ACTIVE'}
+        fullName={`${staff.firstName} ${staff.lastName}`}
+      />
+
+      {/* Leave Request Dialog */}
+      <LeaveRequestCreateDialog
+        isOpen={isRequestLeaveOpen}
+        onClose={() => setIsRequestLeaveOpen(false)}
+        lockedStaffId={staffId}
+      />
+
+      {/* Adjust Leave Balance Dialog */}
+      <LeaveBalanceAdjustDialog
+        isOpen={isAdjustBalanceOpen}
+        onClose={() => setIsAdjustBalanceOpen(false)}
+        lockedStaffId={staffId}
+      />
+
+      {/* Salary Structure Create/Edit Dialog */}
+      <SalaryStructureDialog
+        isOpen={isSalaryStructureOpen}
+        onClose={() => setIsSalaryStructureOpen(false)}
+        lockedStaffId={staffId}
+        existingStructure={selectedSalaryStructure}
+      />
+
+      {/* Attendance Correction Dialog */}
+      {selectedAttendanceRecord && (
+        <StaffAttendanceCorrectionDialog
+          isOpen={!!selectedAttendanceRecord}
+          onClose={() => setSelectedAttendanceRecord(null)}
+          staffId={staffId}
+          record={selectedAttendanceRecord}
+          fullName={`${staff.firstName} ${staff.lastName}`}
+        />
+      )}
+
+      {/* Leave Review Dialog */}
+      {selectedLeaveRequest && (
+        <LeaveReviewDialog
+          isOpen={!!selectedLeaveRequest}
+          onClose={() => setSelectedLeaveRequest(null)}
+          leaveRequest={{
+            ...selectedLeaveRequest,
+            staff: {
+              firstName: staff.firstName,
+              lastName: staff.lastName,
+              employeeId: staff.employeeId
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -296,12 +920,14 @@ function Field({
   label,
   value,
   onChange,
-  icon: Icon
+  icon: Icon,
+  disabled
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   icon?: any;
+  disabled?: boolean;
 }) {
   return (
     <label className="grid gap-2">
@@ -310,61 +936,15 @@ function Field({
         {Icon && <Icon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />}
         <input
           value={value}
+          disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
           className={cn(
-            "w-full rounded-2xl border border-slate-200 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all",
+            "w-full rounded-2xl border border-slate-200 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all disabled:opacity-50",
             Icon ? "pl-11 pr-4" : "px-4"
           )}
         />
       </div>
     </label>
-  );
-}
-
-function HistoryTable({ title, items, icon: Icon }: { title: string; items: any[]; icon: any }) {
-  return (
-    <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-6">
-      <h3 className="text-xl font-bold flex items-center gap-3">
-        <div className="h-8 w-8 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center">
-          <Icon size={18} />
-        </div>
-        {title}
-      </h3>
-      <div className="rounded-2xl border border-slate-100 overflow-hidden">
-        {items.length > 0 ? (
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50/50 border-b border-slate-100">
-              <tr>
-                <th className="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider">Date/Period</th>
-                <th className="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider">Status/Summary</th>
-                <th className="px-4 py-3 font-bold text-slate-500 uppercase tracking-wider text-right">Details</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {items.slice(0, 10).map((item, idx) => (
-                <tr key={idx} className="hover:bg-slate-50/30 transition-colors">
-                  <td className="px-4 py-3 font-bold text-slate-900">
-                    {item.attendanceDate || item.periodMonth ? `${item.periodMonth}/${item.periodYear}` : item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'N/A'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge variant="outline" className="font-bold text-[10px] uppercase tracking-widest">
-                      {item.status || item.attendanceStatus || 'COMPLETED'}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3 text-right text-slate-500 font-medium">
-                    {item.netSalary ? `NPR ${item.netSalary.toLocaleString()}` : item.leaveType || 'Record Logged'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="py-12 text-center">
-            <p className="text-sm text-slate-400 font-medium italic">No historical records found for this category.</p>
-          </div>
-        )}
-      </div>
-    </section>
   );
 }
 
@@ -399,7 +979,7 @@ function LifecycleHistoryPanel({ events, loading, error }: { events: StaffLifecy
                       {formatLifecycleEvent(event.eventType)}
                     </Badge>
                     <p className="mt-2 text-sm font-bold text-slate-900">{event.reason || event.notes || 'Lifecycle record'}</p>
-                    <p className="mt-1 text-xs font-medium text-slate-500">{actorName}</p>
+                    <p className="mt-1 text-xs font-medium text-slate-500">Performed by: {actorName}</p>
                   </div>
                   <span className="text-xs font-bold text-slate-400">{new Date(event.eventDate).toLocaleDateString()}</span>
                 </div>

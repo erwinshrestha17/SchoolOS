@@ -446,30 +446,6 @@ export function LibraryWorkspace({ initialTab = 'overview' }: LibraryWorkspacePr
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Library Management"
-        description="Manage book catalogues, barcode copies, issue-return workflows, overdue tracking, and library reminders."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            {tabs.map((tab) => (
-              <Link
-                key={tab.key}
-                href={tab.href}
-                onClick={() => setActiveTab(tab.key)}
-                className={cn(
-                  'inline-flex min-h-10 items-center rounded-2xl px-4 text-sm font-semibold transition',
-                  activeTab === tab.key
-                    ? 'bg-slate-900 text-white shadow-sm'
-                    : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900',
-                )}
-              >
-                {tab.label}
-              </Link>
-            ))}
-          </div>
-        }
-      />
-
       {notice && (
         <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           <span>{notice}</span>

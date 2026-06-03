@@ -1,0 +1,211 @@
+'use client';
+
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from '../../lib/api';
+import { FileText, Download, CheckCircle, Clock, AlertTriangle, Plus, ShieldCheck, X } from 'lucide-react';
+import { StaffDocumentUploadDialog } from './staff-document-upload-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
+import { Button } from '../ui/button';
+import { FormField, TextArea } from '../ui/form-field';
+import { Badge } from '../ui/badge';
+import { useSession } from '../session-provider';
+import { cn } from '../../lib/utils';
+
+export function StaffDocumentsPanel({ staffId }: { staffId: string }) {
+  const queryClient = useQueryClient();
+  const { hasPermissions } = useSession();
+  const canUpdateStaff = hasPermissions(['hr:staff:update']);
+
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [selectedDocToVerify, setSelectedDocToVerify] = useState<{ id: string; name: string } | null>(null);
+  const [verifyNotes, setVerifyNotes] = useState('');
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+
+  const [fileViewPendingId, setFileViewPendingId] = useState<string | null>(null);
+
+  const documentsQuery = useQuery({
+    queryKey: ['staff-documents', staffId],
+    queryFn: () => api.listStaffDocuments(staffId),
+  });
+
+  const verifyMutation = useMutation({
+    mutationFn: (note: string) =>
+      api.verifyStaffDocument(staffId, selectedDocToVerify!.id, { notes: note }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['staff-documents', staffId] });
+      void queryClient.invalidateQueries({ queryKey: ['staff-detail', staffId] });
+      setSelectedDocToVerify(null);
+      setVerifyNotes('');
+    },
+    onError: (error: any) => {
+      setVerifyError(error.message || 'Failed to verify document.');
+    },
+  });
+
+  const fileViewMutation = useMutation({
+    mutationFn: (fileId: string) => api.getFileView(fileId),
+    onMutate: (fileId) => setFileViewPendingId(fileId),
+    onSuccess: (data) => {
+      setFileViewPendingId(null);
+      if (data && data.url) {
+        window.open(data.url, '_blank', 'noopener,noreferrer');
+      }
+    },
+    onError: (err: any) => {
+      setFileViewPendingId(null);
+      alert(err.message || 'Failed to retrieve download link.');
+    },
+  });
+
+  const handleVerifySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setVerifyError(null);
+    verifyMutation.mutate(verifyNotes);
+  };
+
+  const docs = documentsQuery.data?.items ?? documentsQuery.data ?? [];
+
+  return (
+    <section className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-sm space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h3 className="text-xl font-bold flex items-center gap-3">
+          <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center">
+            <FileText size={18} />
+          </div>
+          Staff Documents
+        </h3>
+        <button
+          onClick={() => setIsUploadOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 border border-slate-200 hover:border-blue-200 hover:bg-blue-50/20 text-slate-700 hover:text-blue-600 rounded-xl font-bold text-xs transition-all active:scale-[0.98]"
+        >
+          <Plus size={14} />
+          Upload Document
+        </button>
+      </div>
+
+      <div className="rounded-2xl border border-slate-100 overflow-hidden">
+        {documentsQuery.isLoading ? (
+          <div className="py-12 flex justify-center items-center gap-3">
+            <div className="h-5 w-5 border-2 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Hydrating records...</span>
+          </div>
+        ) : docs.length > 0 ? (
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50/50 border-b border-slate-100">
+              <tr>
+                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider">Document Details</th>
+                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider">Kind</th>
+                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider">Audit / Remarks</th>
+                <th className="px-6 py-4 font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {docs.map((doc: any) => (
+                <tr key={doc.id} className="hover:bg-slate-50/30 transition-all group">
+                  <td className="px-6 py-4 font-bold text-slate-900">
+                    <p className="font-bold text-slate-900">{doc.name}</p>
+                    <p className="text-[10px] text-slate-400 mt-1 font-medium">Uploaded {new Date(doc.createdAt).toLocaleDateString()}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <Badge variant="secondary" className="font-bold text-[9px] uppercase tracking-wider">
+                      {doc.kind.replace('_', ' ')}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={cn(
+                      "px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border inline-flex items-center gap-1",
+                      doc.status === 'VERIFIED' ? "bg-emerald-50 text-emerald-600 border-emerald-200/50" :
+                      doc.status === 'ACTIVE' || doc.status === 'PENDING' ? "bg-amber-50 text-amber-600 border-amber-200/50" :
+                      "bg-rose-50 text-rose-600 border-rose-200/50"
+                    )}>
+                      {doc.status === 'VERIFIED' ? <CheckCircle size={10} /> : <Clock size={10} />}
+                      {doc.status === 'ACTIVE' ? 'PENDING' : doc.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-slate-500 font-medium leading-relaxed max-w-xs truncate">
+                    {doc.notes || doc.verificationNotes || '-'}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end items-center gap-2">
+                      {doc.status !== 'VERIFIED' && canUpdateStaff && (
+                        <button
+                          onClick={() => setSelectedDocToVerify({ id: doc.id, name: doc.name })}
+                          className="px-3 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-50 text-emerald-700 font-bold text-[10px] uppercase tracking-widest transition-all"
+                        >
+                          Verify
+                        </button>
+                      )}
+                      <button
+                        onClick={() => fileViewMutation.mutate(doc.fileId)}
+                        disabled={fileViewPendingId === doc.fileId}
+                        className="p-1.5 rounded-lg border border-slate-200 hover:border-slate-300 text-slate-400 hover:text-slate-700 transition-all"
+                        title="Download / View"
+                      >
+                        {fileViewPendingId === doc.fileId ? (
+                          <div className="h-4 w-4 border-2 border-slate-200 border-t-slate-500 rounded-full animate-spin" />
+                        ) : (
+                          <Download size={14} />
+                        )}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div className="py-12 text-center text-slate-400 italic font-medium">
+            No files or records uploaded for this staff member.
+          </div>
+        )}
+      </div>
+
+      <StaffDocumentUploadDialog
+        isOpen={isUploadOpen}
+        onClose={() => setIsUploadOpen(false)}
+        staffId={staffId}
+      />
+
+      {/* Verification Dialog */}
+      {selectedDocToVerify && (
+        <Dialog open={!!selectedDocToVerify} onOpenChange={() => setSelectedDocToVerify(null)}>
+          <DialogContent className="max-w-md rounded-[2.5rem]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ShieldCheck className="text-emerald-500" />
+                Verify Document
+              </DialogTitle>
+              <p className="text-xs text-slate-500 mt-1">Reviewing: {selectedDocToVerify.name}</p>
+            </DialogHeader>
+            <form onSubmit={handleVerifySubmit} className="p-6 space-y-4">
+              <FormField label="Audit / Verification Note">
+                <TextArea
+                  value={verifyNotes}
+                  onChange={(e) => setVerifyNotes(e.target.value)}
+                  placeholder="e.g. Document reviewed against original records."
+                  rows={3}
+                />
+              </FormField>
+              {verifyError && <p className="text-xs font-bold text-rose-500">{verifyError}</p>}
+            </form>
+            <DialogFooter className="bg-slate-50 border-t flex justify-end gap-3 p-6">
+              <Button type="button" variant="outline" onClick={() => setSelectedDocToVerify(null)}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                onClick={handleVerifySubmit}
+                isLoading={verifyMutation.isPending}
+                disabled={verifyMutation.isPending}
+              >
+                Approve & Mark Verified
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </section>
+  );
+}

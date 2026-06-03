@@ -135,7 +135,7 @@ export function StaffDashboard() {
             </TabsContent>
 
             <TabsContent value="leave" className="mt-6">
-              <MyLeaveRequests />
+              <MyLeaveRequests staffId={profile.id} />
             </TabsContent>
 
             <TabsContent value="contracts" className="mt-6">
