@@ -1882,7 +1882,7 @@ function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
         setFeePlan((prev) => ({ ...prev, academicYearId: currentYear.id }));
       }
     }
-  }, [academicYearsQuery.data]);
+  }, [academicYearsQuery.data, feePlan.academicYearId]);
 
   const feeHeadMutation = useMutation({
     mutationFn: api.createFeeHead,

@@ -1,144 +1,146 @@
+import * as React from 'react';
 import Link from 'next/link';
+import { 
+  School, 
+  ClipboardList, 
+  Users, 
+  ArrowRight,
+  ShieldCheck
+} from 'lucide-react';
 
-const modules = [
-  'Admissions',
-  'Attendance',
-  'Fees & Receipts',
-  'Academics',
-  'Notices',
-  'HR & Payroll',
-  'Accounting',
-  'Transport',
-  'Library',
-  'Canteen',
-  'Parent Portal',
-];
+import { RequestDemoForm } from '../../components/forms/request-demo-form';
 
 export default function RequestDemoPage() {
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-8 font-sans text-slate-950">
-      <div className="mx-auto max-w-6xl">
-        <header className="mb-8 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-500 text-sm font-black text-white">S</span>
-            <span>
-              <span className="block text-xl font-black tracking-tight">SchoolOS</span>
-              <span className="block text-xs font-semibold text-slate-500">Guided onboarding</span>
+    <div className="min-h-screen flex flex-col bg-slate-50 font-sans antialiased text-slate-650">
+      
+      {/* ── Minimal Header ── */}
+      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-md px-6 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-sm font-black text-white">
+              S
             </span>
-          </Link>
-          <Link href="/login" className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:border-slate-300">
-            Sign in
-          </Link>
-        </header>
+            <div className="flex flex-col">
+              <span className="text-base font-black tracking-tight leading-none text-slate-900">
+                SchoolOS
+              </span>
+              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                School ERP for Nepal
+              </span>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-5">
+            <Link 
+              href="/" 
+              className="text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors"
+            >
+              Back to website
+            </Link>
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 h-8 px-4 active:scale-[0.98] transition-all"
+            >
+              Sign in
+            </Link>
+          </div>
+        </div>
+      </header>
 
-        <section className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
-          <div className="rounded-[2rem] bg-[#08111f] p-8 text-white shadow-2xl shadow-slate-200 lg:sticky lg:top-8">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-primary-300">Request Demo</p>
-            <h1 className="mt-4 text-4xl font-black leading-tight tracking-tight md:text-5xl">
-              Request a SchoolOS demo.
+      {/* ── Main Layout Grid ── */}
+      <main className="flex-1 max-w-6xl w-full mx-auto grid grid-cols-1 lg:grid-cols-[1fr_1.1fr] gap-8 lg:gap-12 px-6 py-10 items-start">
+        
+        {/* Left Column: Short Info Panel */}
+        <div className="space-y-6 lg:sticky lg:top-24">
+          
+          <div className="space-y-2">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 leading-tight">
+              Request a SchoolOS Demo
             </h1>
-            <p className="mt-5 text-base leading-7 text-slate-300">
-              Tell us about your school and our team will contact you for verification, demo, and onboarding planning.
+            <p className="text-slate-500 text-xs sm:text-sm leading-relaxed">
+              Tell us about your school and our team will contact you for verification, demo, and guided onboarding.
             </p>
+          </div>
 
-            <div className="mt-8 space-y-4">
-              {[
-                ['Verified setup', 'SchoolOS workspaces are created after school verification.'],
-                ['Tenant isolation', 'Each school receives its own protected workspace and role setup.'],
-                ['Nepal-ready defaults', 'Academic year, NPR fees, notices, and reports can be configured for local workflows.'],
-              ].map(([title, desc]) => (
-                <div key={title} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <p className="font-black">{title}</p>
-                  <p className="mt-1 text-sm leading-6 text-slate-400">{desc}</p>
-                </div>
-              ))}
+          {/* Small Note Card */}
+          <div className="rounded-xl border border-slate-200 bg-slate-100/50 p-4 text-[11px] text-slate-600 leading-relaxed font-semibold">
+            SchoolOS workspaces are created only after verification, so your school starts with the correct academic year, class structure, fee setup, roles, and access permissions.
+          </div>
+
+          {/* 3 Benefit Rows */}
+          <div className="space-y-4 pt-2">
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 border border-blue-100">
+                <School size={16} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-950">Verified school setup</h4>
+                <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">
+                  We check registration details and structure configurations before system handoff.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 border border-blue-100">
+                <ClipboardList size={16} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-950">Guided onboarding</h4>
+                <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">
+                  Our rollout engineers map your classes, fees schedules, and existing sheets.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 border border-blue-100">
+                <Users size={16} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-950">Role-aware school access</h4>
+                <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">
+                  Admins, teachers, accountants, and coordinators access customized layouts.
+                </p>
+              </div>
             </div>
           </div>
 
-          <form className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/70 md:p-8">
-            <div className="mb-8">
-              <h2 className="text-3xl font-black tracking-tight">Tell us about your school</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                SchoolOS workspaces are created after verification by the SchoolOS team.
-              </p>
-            </div>
+          {/* Process Timeline */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+            <h4 className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Process Roadmap</h4>
+            <div className="relative pl-6 space-y-4 text-[11px] font-bold text-slate-650">
+              {/* Vertical connecting line */}
+              <div className="absolute left-[9px] top-2 bottom-2 w-0.5 bg-slate-100" />
 
-            <div className="grid gap-5 md:grid-cols-2">
-              <div>
-                <label htmlFor="schoolName" className="label mb-2 block">School Name</label>
-                <input id="schoolName" name="schoolName" placeholder="Shree Janata Secondary School" />
+              <div className="relative flex gap-3 items-center">
+                <span className="absolute -left-[23px] h-5 w-5 rounded-full bg-blue-600 border border-blue-600 text-white font-extrabold flex items-center justify-center text-[9px] shrink-0 ring-4 ring-white">1</span>
+                <span>Submit request</span>
               </div>
-              <div>
-                <label htmlFor="contactName" className="label mb-2 block">Contact Person Name</label>
-                <input id="contactName" name="contactName" placeholder="Ramesh Adhikari" />
+              <div className="relative flex gap-3 items-center">
+                <span className="absolute -left-[23px] h-5 w-5 rounded-full bg-slate-100 border border-slate-200 text-slate-500 font-extrabold flex items-center justify-center text-[9px] shrink-0 ring-4 ring-white">2</span>
+                <span>SchoolOS team contacts you</span>
               </div>
-              <div>
-                <label htmlFor="role" className="label mb-2 block">Role / Designation</label>
-                <input id="role" name="role" placeholder="Principal / Admin / Director" />
+              <div className="relative flex gap-3 items-center">
+                <span className="absolute -left-[23px] h-5 w-5 rounded-full bg-slate-100 border border-slate-200 text-slate-500 font-extrabold flex items-center justify-center text-[9px] shrink-0 ring-4 ring-white">3</span>
+                <span>Demo and planning</span>
               </div>
-              <div>
-                <label htmlFor="phone" className="label mb-2 block">Phone Number</label>
-                <input id="phone" name="phone" placeholder="98XXXXXXXX" />
-              </div>
-              <div>
-                <label htmlFor="email" className="label mb-2 block">Email</label>
-                <input id="email" name="email" type="email" placeholder="school@example.edu.np" />
-              </div>
-              <div>
-                <label htmlFor="location" className="label mb-2 block">School Location</label>
-                <input id="location" name="location" placeholder="Pokhara, Gandaki Province" />
-              </div>
-              <div>
-                <label htmlFor="students" className="label mb-2 block">Number of Students</label>
-                <select id="students" name="students" defaultValue="">
-                  <option value="" disabled>Select range</option>
-                  <option>Below 200</option>
-                  <option>200 - 500</option>
-                  <option>500 - 1,000</option>
-                  <option>1,000 - 2,000</option>
-                  <option>2,000+</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="timeline" className="label mb-2 block">Expected Timeline</label>
-                <select id="timeline" name="timeline" defaultValue="">
-                  <option value="" disabled>Select timeline</option>
-                  <option>Immediately</option>
-                  <option>Within 1 month</option>
-                  <option>Within 3 months</option>
-                  <option>Exploring only</option>
-                </select>
+              <div className="relative flex gap-3 items-center">
+                <span className="absolute -left-[23px] h-5 w-5 rounded-full bg-slate-100 border border-slate-200 text-slate-500 font-extrabold flex items-center justify-center text-[9px] shrink-0 ring-4 ring-white">4</span>
+                <span>Verified school setup</span>
               </div>
             </div>
+          </div>
 
-            <div className="mt-6">
-              <p className="label mb-3 block">Interested Modules</p>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {modules.map((module) => (
-                  <label key={module} className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-                    <input type="checkbox" name="modules" value={module} className="h-4 w-4 rounded border-slate-300 p-0" />
-                    {module}
-                  </label>
-                ))}
-              </div>
-            </div>
+        </div>
 
-            <div className="mt-6">
-              <label htmlFor="message" className="label mb-2 block">Message / Requirements</label>
-              <textarea id="message" name="message" rows={5} placeholder="Tell us what problems you want SchoolOS to solve first..." />
-            </div>
+        {/* Right Column: Intake Form Card */}
+        <div className="w-full">
+          <RequestDemoForm />
+        </div>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs leading-5 text-slate-500">
-                Submitting this request does not create a public tenant. Our team will contact you first.
-              </p>
-              <button type="button" className="rounded-full bg-primary-500 px-7 py-3 text-sm font-black text-white shadow-lg shadow-primary-500/20 transition hover:bg-primary-600">
-                Submit Demo Request
-              </button>
-            </div>
-          </form>
-        </section>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

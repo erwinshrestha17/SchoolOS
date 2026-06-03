@@ -12,12 +12,12 @@ export default function LoginPage() {
         <div className="pointer-events-none absolute inset-0 opacity-[0.03]"
           style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '40px 40px' }} />
         <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-indigo-600 opacity-20 blur-3xl" />
-        <div className="absolute -right-32 -bottom-32 h-96 w-96 rounded-full bg-amber-500 opacity-10 blur-3xl" />
+        <div className="absolute -right-32 -bottom-32 h-96 w-96 rounded-full bg-primary-500 opacity-10 blur-3xl" />
         
         {/* Top: Logo */}
         <div className="relative z-10 flex items-center gap-2">
           <Link href="/" className="flex items-center gap-2 transition-opacity hover:opacity-80">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500 text-sm font-black text-white">S</span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500 text-sm font-black text-white">S</span>
             <span className="text-xl font-black tracking-tight text-white">SchoolOS</span>
           </Link>
         </div>
@@ -76,7 +76,7 @@ export default function LoginPage() {
         
         {/* Mobile Header (Shows only on small screens) */}
         <div className="absolute top-6 left-6 lg:hidden flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500 text-sm font-black text-white">S</span>
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500 text-sm font-black text-white">S</span>
           <span className="text-xl font-black tracking-tight text-slate-900">SchoolOS</span>
         </div>
 
@@ -107,12 +107,15 @@ export default function LoginPage() {
             </Suspense>
           </div>
 
-          <p className="mt-8 text-center text-xs text-slate-500">
-            Need to register your school?{' '}
-            <Link href="/register" className="font-bold text-amber-600 hover:text-amber-500 transition-colors">
-              Register here
-            </Link>
-          </p>
+          <div className="mt-8 text-center text-xs text-slate-500 space-y-1">
+            <p>Need access? Contact your school administrator.</p>
+            <p>
+              New school?{' '}
+              <Link href="/request-demo" className="font-bold text-primary-500 hover:text-primary-600 transition-colors">
+                Request a demo.
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
 
