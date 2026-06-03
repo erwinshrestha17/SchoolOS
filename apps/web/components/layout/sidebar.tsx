@@ -122,12 +122,6 @@ export const dashboardNavGroups: NavGroup[] = [
     label: 'Academics',
     items: [
       {
-        href: '/dashboard/setup',
-        label: 'School Setup',
-        icon: School,
-        permissions: schoolSetupPermissions,
-      },
-      {
         href: '/dashboard/academics/report-cards',
         label: 'Exams, CAS & Reports',
         icon: FileCheck2,
@@ -240,6 +234,12 @@ export const dashboardNavGroups: NavGroup[] = [
   {
     label: 'System',
     items: [
+      {
+        href: '/dashboard/setup',
+        label: 'School Setup',
+        icon: School,
+        permissions: schoolSetupPermissions,
+      },
       {
         href: '/dashboard/settings',
         label: 'Settings',
