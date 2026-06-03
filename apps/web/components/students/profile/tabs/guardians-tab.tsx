@@ -173,9 +173,11 @@ function GuardianEditForm({
           <input
             type="text"
             className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:border-primary-500 focus:outline-none"
+            maxLength={10}
             value={primaryPhone}
             onChange={(e) => {
-              setPrimaryPhone(e.target.value);
+              const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+              setPrimaryPhone(val);
               if (phoneError) setPhoneError(null);
             }}
             disabled={isSaving}

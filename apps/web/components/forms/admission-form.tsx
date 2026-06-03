@@ -379,7 +379,15 @@ export function AdmissionForm() {
                             <input className="premium-input" {...form.register(`guardians.${idx}.relation`)} />
                           </FormField>
                           <FormField label="Phone Number" error={form.formState.errors.guardians?.[idx]?.primaryPhone?.message}>
-                            <input className="premium-input" {...form.register(`guardians.${idx}.primaryPhone`)} />
+                            <input
+                              className="premium-input"
+                              maxLength={10}
+                              {...form.register(`guardians.${idx}.primaryPhone`, {
+                                onChange: (e) => {
+                                  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                }
+                              })}
+                            />
                           </FormField>
                        </div>
                     </div>
