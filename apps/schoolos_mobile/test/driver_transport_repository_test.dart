@@ -103,6 +103,54 @@ void main() {
       ).called(1);
     });
 
+    test('loads driver trip history from history endpoint', () async {
+      when(
+        () => apiClient.get<dynamic>('/transport/driver/trips/history'),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(
+            path: '/transport/driver/trips/history',
+          ),
+          data: {
+            'trips': [
+              {
+                'id': 'trip-history-1',
+                'direction': 'DROPOFF',
+                'status': 'COMPLETED',
+                'startedAt': '2026-06-01T15:20:00.000Z',
+                'completedAt': '2026-06-01T16:00:00.000Z',
+                'isDelayed': false,
+                'route': {
+                  'id': 'route-1',
+                  'name': 'Kapan - Chabahil',
+                  'code': 'R12',
+                },
+                'vehicle': {
+                  'id': 'vehicle-1',
+                  'registrationNumber': 'BA 2 PA 4005',
+                  'model': 'Bus 3',
+                  'capacity': 32,
+                },
+              },
+            ],
+          },
+        ),
+      );
+
+      final history = await repository.listDriverTripHistory();
+
+      expect(history, hasLength(1));
+      expect(history.single.id, 'trip-history-1');
+      expect(history.single.status, 'COMPLETED');
+      expect(history.single.routeCode, 'R12');
+      expect(history.single.vehicleRegistration, 'BA 2 PA 4005');
+      expect(history.single.vehicleCapacity, 32);
+
+      verify(
+        () => apiClient.get<dynamic>('/transport/driver/trips/history'),
+      ).called(1);
+    });
+
     test('loads manifest and sends driver trip actions', () async {
       when(
         () => apiClient.get<dynamic>('/transport/driver/trips/trip-1/manifest'),

@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../core/network/api_client.dart';
 import '../domain/attendance_models.dart';
 
@@ -127,6 +131,7 @@ class AttendanceRepository {
         ],
       },
     );
+    await _removeDraft(classSection.id, date);
     return AttendanceSyncStatus.synced;
   }
 
@@ -134,13 +139,50 @@ class AttendanceRepository {
     String classSectionId,
     DateTime date,
     List<AttendanceStudentEntry> entries,
-  ) async {}
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _draftKey(classSectionId, date),
+      jsonEncode({
+        'savedAt': DateTime.now().toIso8601String(),
+        'entries': [
+          for (final entry in entries)
+            {
+              'studentId': entry.studentId,
+              'studentName': entry.studentName,
+              'rollNumber': entry.rollNumber,
+              'status': _statusToApi(entry.status),
+            },
+        ],
+      }),
+    );
+  }
 
   Future<List<AttendanceStudentEntry>> loadDraftAttendance(
     String classSectionId,
     DateTime date,
   ) async {
-    return const [];
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_draftKey(classSectionId, date));
+    if (raw == null || raw.isEmpty) {
+      return const [];
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      final data = decoded is Map<String, dynamic> ? decoded : const {};
+      return _asList(data['entries'])
+          .whereType<Map<String, dynamic>>()
+          .map(AttendanceStudentEntry.fromJson)
+          .toList();
+    } catch (_) {
+      await prefs.remove(_draftKey(classSectionId, date));
+      return const [];
+    }
+  }
+
+  Future<void> _removeDraft(String classSectionId, DateTime date) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_draftKey(classSectionId, date));
   }
 }
 
@@ -148,6 +190,10 @@ String _dateOnly(DateTime value) {
   final month = value.month.toString().padLeft(2, '0');
   final day = value.day.toString().padLeft(2, '0');
   return '${value.year}-$month-$day';
+}
+
+String _draftKey(String classSectionId, DateTime date) {
+  return 'schoolos.teacher_attendance_draft.$classSectionId.${_dateOnly(date)}';
 }
 
 String _statusToApi(AttendanceStatus status) {

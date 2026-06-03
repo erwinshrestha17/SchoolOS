@@ -193,8 +193,10 @@ async function seedTenantSettings(tenantId: string) {
     { key: 'tds_enabled', value: true },
     { key: 'active_academic_year_label', value: '2081/82' },
     { key: 'active_fiscal_year_label', value: 'FY 2081/82' },
-    { key: 'chat_sunday_to_thursday_hours', value: '4:00 PM–7:00 PM' },
-    { key: 'chat_friday_hours', value: '2:00 PM–5:00 PM' },
+    { key: 'chat_sunday_to_thursday_start', value: '16:00' },
+    { key: 'chat_sunday_to_thursday_end', value: '19:00' },
+    { key: 'chat_friday_start', value: '14:00' },
+    { key: 'chat_friday_end', value: '17:00' },
     { key: 'chat_saturday_enabled', value: false },
   ];
 

@@ -9,6 +9,7 @@ import '../../../core/auth/auth_provider.dart';
 import '../../../core/network/connectivity_provider.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_scaffold.dart';
+import '../../../shared/widgets/status_chip.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -45,28 +46,26 @@ class SettingsScreen extends ConsumerWidget {
               children: [
                 ListTile(
                   leading: const Icon(Icons.palette_outlined),
-                  title: const Text('Dark Mode'),
-                  subtitle: const Text('Toggle light and dark themes'),
-                  trailing: Switch(
-                    value: isDark,
-                    onChanged: (value) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Theme switches automatically based on system settings.',
-                          ),
-                        ),
-                      );
-                    },
+                  title: const Text('Appearance'),
+                  subtitle: const Text(
+                    'Theme follows the device system setting.',
+                  ),
+                  trailing: StatusChip(
+                    status: isDark
+                        ? AppStatusType.onRoute
+                        : AppStatusType.completed,
+                    label: isDark ? 'Dark' : 'Light',
                   ),
                 ),
                 const Divider(),
                 ListTile(
                   leading: const Icon(Icons.language_rounded),
                   title: const Text('App Language'),
-                  subtitle: const Text('Choose English or Nepali'),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () {},
+                  subtitle: const Text('English is active for this build.'),
+                  trailing: const StatusChip(
+                    status: AppStatusType.draft,
+                    label: 'Managed',
+                  ),
                 ),
               ],
             ),
@@ -74,7 +73,7 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: AppSpacing.xl),
 
           Text(
-            'Offline & Cache Testing',
+            'Connectivity',
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w800,
               color: AppColors.slate500,
@@ -90,11 +89,11 @@ class SettingsScreen extends ConsumerWidget {
                     isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
                     color: isOnline ? AppColors.success : AppColors.danger,
                   ),
-                  title: const Text('Mock Online State'),
+                  title: const Text('Network State'),
                   subtitle: Text(
                     isOnline
-                        ? 'App is connected to internet'
-                        : 'App is mimicking offline state',
+                        ? 'The app is using online API requests.'
+                        : 'Offline preview is active for draft-capable flows.',
                   ),
                   trailing: Switch(
                     value: isOnline,
@@ -124,8 +123,13 @@ class SettingsScreen extends ConsumerWidget {
                 ListTile(
                   leading: const Icon(Icons.fingerprint_rounded),
                   title: const Text('Biometric Unlock'),
-                  subtitle: const Text('Lock app using fingerprint or face ID'),
-                  trailing: Switch(value: false, onChanged: (value) {}),
+                  subtitle: const Text(
+                    'Requires a device security integration before release.',
+                  ),
+                  trailing: const StatusChip(
+                    status: AppStatusType.pending,
+                    label: 'Planned',
+                  ),
                 ),
               ],
             ),

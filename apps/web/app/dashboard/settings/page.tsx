@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useMemo, useState, Suspense } from 'react';
 import { cn } from '../../../lib/utils';
 import { api, type TenantLogoAccess } from '../../../lib/api';
 import { TenantSettingSummary, TenantSettingKey } from '@schoolos/core';
@@ -78,11 +78,6 @@ function parseTimeRange(range: string | undefined | null, defaultStart: string, 
   return [clean(parts[0], defaultStart), clean(parts[1], defaultEnd)];
 }
 
-function formatTimeRange(start: string, end: string): string {
-  if (!start || !end) return '';
-  return `${start}–${end}`; // Project uses en-dash
-}
-
 const formatTimeForPreview = (time?: string | null) => {
   if (!time || !/^\d{2}:\d{2}$/.test(time)) {
     return 'Not configured';
@@ -119,6 +114,12 @@ const formatTimeRangeForPreview = (
   }
 
   return `${startLabel} – ${endLabel}`;
+};
+
+const normalizeTimeValue = (value: unknown, fallback: string) => {
+  return typeof value === 'string' && /^\d{2}:\d{2}$/.test(value)
+    ? value
+    : fallback;
 };
 
 // --- Constants ---
@@ -173,8 +174,9 @@ const ACCOUNTING_SETTING_KEYS: TenantSettingKey[] = [
 
 const COMMUNICATION_SETTING_KEYS: TenantSettingKey[] = [
   'default_notice_channel', 'parent_notification_enabled', 'consent_required_for_media', 
-  'quiet_hours_enabled', 'chat_availability_enabled', 'chat_sunday_to_thursday_hours', 
-  'chat_friday_hours', 'chat_saturday_enabled', 'emergency_override_requires_admin', 'timezone'
+  'quiet_hours_enabled', 'chat_availability_enabled', 'chat_sunday_to_thursday_start',
+  'chat_sunday_to_thursday_end', 'chat_friday_start', 'chat_friday_end',
+  'chat_saturday_enabled', 'emergency_override_requires_admin', 'timezone'
 ];
 
 const SECURITY_SETTING_KEYS: TenantSettingKey[] = [
@@ -404,7 +406,12 @@ function SectionWrapper({
 
 // --- Form Hook ---
 
-function useSettingsForm(initialValues: TenantSettingSummary[], keys: TenantSettingKey[], onUpdate: () => void) {
+function useSettingsForm(
+  initialValues: TenantSettingSummary[],
+  keys: TenantSettingKey[],
+  onUpdate: () => void,
+  initialFallbacks?: Partial<Record<TenantSettingKey, any>>,
+) {
   const [form, setForm] = useState<Record<string, any>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [alert, setAlert] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -413,10 +420,10 @@ function useSettingsForm(initialValues: TenantSettingSummary[], keys: TenantSett
     const initial: Record<string, any> = {};
     keys.forEach(key => {
       const s = initialValues.find(sv => sv.key === key);
-      initial[key] = s ? s.value : '';
+      initial[key] = s ? s.value : initialFallbacks?.[key] ?? '';
     });
     setForm(initial);
-  }, [initialValues, keys]);
+  }, [initialValues, keys, initialFallbacks]);
 
   const setFieldValue = (key: string, value: any) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -989,22 +996,40 @@ function SectionAccounting({ initialValues, onUpdate }: { initialValues: TenantS
 }
 
 function SectionCommunication({ initialValues, onUpdate }: { initialValues: TenantSettingSummary[], onUpdate: () => void }) {
-  const { form, setFieldValue, save, isSaving, alert: formAlert } = useSettingsForm(initialValues, COMMUNICATION_SETTING_KEYS, onUpdate);
-
-  // TODO: Backend schema normalization - separate these into distinct database columns (chat_start, chat_end)
-  // for better reporting and filtering in future phases.
-  const [sunThuStart, sunThuEnd] = parseTimeRange(form.chat_sunday_to_thursday_hours, '16:00', '19:00');
-  const [friStart, friEnd] = parseTimeRange(form.chat_friday_hours, '14:00', '17:00');
+  const legacySunThuHours = initialValues.find(setting => setting.key === 'chat_sunday_to_thursday_hours')?.value;
+  const legacyFridayHours = initialValues.find(setting => setting.key === 'chat_friday_hours')?.value;
+  const [legacySunThuStart, legacySunThuEnd] = parseTimeRange(legacySunThuHours, '16:00', '19:00');
+  const [legacyFriStart, legacyFriEnd] = parseTimeRange(legacyFridayHours, '14:00', '17:00');
+  const communicationFallbacks = useMemo(
+    () => ({
+      chat_sunday_to_thursday_start: legacySunThuStart,
+      chat_sunday_to_thursday_end: legacySunThuEnd,
+      chat_friday_start: legacyFriStart,
+      chat_friday_end: legacyFriEnd,
+    }),
+    [legacySunThuStart, legacySunThuEnd, legacyFriStart, legacyFriEnd],
+  );
+  const { form, setFieldValue, save, isSaving, alert: formAlert } = useSettingsForm(initialValues, COMMUNICATION_SETTING_KEYS, onUpdate, communicationFallbacks);
+  const sunThuStart = normalizeTimeValue(form.chat_sunday_to_thursday_start, legacySunThuStart);
+  const sunThuEnd = normalizeTimeValue(form.chat_sunday_to_thursday_end, legacySunThuEnd);
+  const friStart = normalizeTimeValue(form.chat_friday_start, legacyFriStart);
+  const friEnd = normalizeTimeValue(form.chat_friday_end, legacyFriEnd);
 
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const handleTimeChange = (key: 'chat_sunday_to_thursday_hours' | 'chat_friday_hours', start: string, end: string) => {
+  const handleTimeChange = (
+    key: 'chat_sunday_to_thursday_start' | 'chat_sunday_to_thursday_end' | 'chat_friday_start' | 'chat_friday_end',
+    label: 'Friday' | 'Sun–Thu',
+    value: string,
+    start: string,
+    end: string,
+  ) => {
     if (start && end && start >= end) {
-      setValidationError(`${key.includes('friday') ? 'Friday' : 'Sun–Thu'}: Start time must be before end time.`);
+      setValidationError(`${label}: Start time must be before end time.`);
     } else {
       setValidationError(null);
     }
-    setFieldValue(key, formatTimeRange(start, end));
+    setFieldValue(key, value);
   };
 
   const alert = validationError ? { type: 'error' as const, text: validationError } : formAlert;
@@ -1040,10 +1065,10 @@ function SectionCommunication({ initialValues, onUpdate }: { initialValues: Tena
           </div>
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Start">
-              <Input type="time" value={sunThuStart} onChange={e => handleTimeChange('chat_sunday_to_thursday_hours', e.target.value, sunThuEnd)} />
+              <Input type="time" value={sunThuStart} onChange={e => handleTimeChange('chat_sunday_to_thursday_start', 'Sun–Thu', e.target.value, e.target.value, sunThuEnd)} />
             </FormField>
             <FormField label="End">
-              <Input type="time" value={sunThuEnd} onChange={e => handleTimeChange('chat_sunday_to_thursday_hours', sunThuStart, e.target.value)} />
+              <Input type="time" value={sunThuEnd} onChange={e => handleTimeChange('chat_sunday_to_thursday_end', 'Sun–Thu', e.target.value, sunThuStart, e.target.value)} />
             </FormField>
           </div>
         </div>
@@ -1055,10 +1080,10 @@ function SectionCommunication({ initialValues, onUpdate }: { initialValues: Tena
           </div>
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Start">
-              <Input type="time" value={friStart} onChange={e => handleTimeChange('chat_friday_hours', e.target.value, friEnd)} />
+              <Input type="time" value={friStart} onChange={e => handleTimeChange('chat_friday_start', 'Friday', e.target.value, e.target.value, friEnd)} />
             </FormField>
             <FormField label="End">
-              <Input type="time" value={friEnd} onChange={e => handleTimeChange('chat_friday_hours', friStart, e.target.value)} />
+              <Input type="time" value={friEnd} onChange={e => handleTimeChange('chat_friday_end', 'Friday', e.target.value, friStart, e.target.value)} />
             </FormField>
           </div>
         </div>

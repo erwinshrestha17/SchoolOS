@@ -24,10 +24,19 @@ class ProfileScreen extends ConsumerWidget {
     final auth = ref.watch(authProvider);
     final appPrefs = ref.watch(appPreferencesServiceProvider);
     final userRole = auth.role ?? 'User';
-    final userName = auth.user?.name ?? 'Demo $userRole Account';
-    final userEmail = auth.user?.email ?? 'demo@school.edu.np';
+    final userName = _displayValue(auth.user?.name, fallback: 'SchoolOS User');
+    final userEmail = _displayValue(
+      auth.user?.email,
+      fallback: 'Email unavailable',
+    );
     final userAvatar = auth.user?.avatarUrl;
-    final tenantCode = appPrefs.getTenantCode() ?? 'holyland';
+    final tenantCode = _displayValue(
+      auth.user?.tenantSlug ?? appPrefs.getTenantCode(),
+      fallback: 'Tenant unavailable',
+    );
+    final roleSummary = auth.user?.roles.isNotEmpty == true
+        ? auth.user!.roles.join(', ')
+        : userRole;
 
     return AppScaffold(
       appBar: AppBar(
@@ -84,18 +93,25 @@ class ProfileScreen extends ConsumerWidget {
                 const Divider(),
                 _buildInfoTile(
                   context,
-                  Icons.fingerprint_rounded,
-                  'Session Token',
-                  auth.token != null && auth.token!.length > 15
-                      ? auth.token!.substring(0, 15)
-                      : (auth.token ?? 'No active session'),
+                  Icons.verified_user_rounded,
+                  'Session',
+                  auth.status == AuthStatus.authenticated
+                      ? 'Signed in'
+                      : 'Not signed in',
+                ),
+                const Divider(),
+                _buildInfoTile(
+                  context,
+                  Icons.badge_rounded,
+                  'Access',
+                  roleSummary,
                 ),
                 const Divider(),
                 _buildInfoTile(
                   context,
                   Icons.info_outline_rounded,
                   'App Version',
-                  '1.0.0 (Sprint 1)',
+                  '1.0.0',
                 ),
               ],
             ),
@@ -157,4 +173,9 @@ class ProfileScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+String _displayValue(String? value, {required String fallback}) {
+  final trimmed = value?.trim();
+  return trimmed == null || trimmed.isEmpty ? fallback : trimmed;
 }

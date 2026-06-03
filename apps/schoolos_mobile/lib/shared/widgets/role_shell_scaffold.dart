@@ -73,7 +73,7 @@ class RoleShellScaffold extends StatelessWidget {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      '${item.label} is being prepared for the next mobile sprint.',
+                      '${item.label} is not available in this mobile workspace yet.',
                     ),
                   ),
                 );
@@ -161,6 +161,7 @@ class RoleShellScaffold extends StatelessWidget {
             label: 'Classes',
             icon: Icons.calendar_today_outlined,
             selectedIcon: Icons.calendar_today_rounded,
+            route: AppRoutes.teacherClasses,
           ),
           _RoleNavItem(
             label: 'Attendance',
@@ -223,16 +224,19 @@ class RoleShellScaffold extends StatelessWidget {
             label: 'Route',
             icon: Icons.map_outlined,
             selectedIcon: Icons.map_rounded,
+            route: AppRoutes.driverRoute,
           ),
           _RoleNavItem(
             label: 'Students',
             icon: Icons.groups_outlined,
             selectedIcon: Icons.groups_rounded,
+            route: AppRoutes.driverStudents,
           ),
           _RoleNavItem(
             label: 'History',
             icon: Icons.history_outlined,
             selectedIcon: Icons.history_rounded,
+            route: AppRoutes.driverHistory,
           ),
           _RoleNavItem(
             label: 'More',
@@ -290,16 +294,19 @@ class RoleShellScaffold extends StatelessWidget {
             label: 'Alerts',
             icon: Icons.warning_amber_outlined,
             selectedIcon: Icons.warning_amber_rounded,
+            route: AppRoutes.notifications,
           ),
           _RoleNavItem(
             label: 'Notices',
             icon: Icons.campaign_outlined,
             selectedIcon: Icons.campaign_rounded,
+            route: AppRoutes.notices,
           ),
           _RoleNavItem(
             label: 'More',
             icon: Icons.grid_view_outlined,
             selectedIcon: Icons.grid_view_rounded,
+            route: AppRoutes.settings,
           ),
         ];
     }

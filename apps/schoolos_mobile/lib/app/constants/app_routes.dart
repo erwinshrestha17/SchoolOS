@@ -28,8 +28,12 @@ class AppRoutes {
   static const studentHomework = '/student/homework';
   static const studentTimetable = '/student/timetable';
   static const teacherHome = '/teacher/home';
+  static const teacherClasses = '/teacher/classes';
   static const teacherAttendance = '/teacher/attendance';
   static const driverHome = '/driver/home';
+  static const driverRoute = '/driver/route';
+  static const driverStudents = '/driver/students';
+  static const driverHistory = '/driver/history';
   static const staffHome = '/staff/home';
   static const staffAttendance = '/staff/attendance';
   static const staffLeave = '/staff/leave';

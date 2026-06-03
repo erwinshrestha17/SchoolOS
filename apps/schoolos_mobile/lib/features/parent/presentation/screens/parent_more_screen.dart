@@ -93,15 +93,15 @@ class ParentMoreScreen extends StatelessWidget {
                   _SupportRow(
                     icon: Icons.help_outline_rounded,
                     title: 'Help desk',
-                    subtitle: 'Ask the school office for account or fee help.',
-                    onTap: () => _comingSoon(context, 'Help desk'),
+                    subtitle: 'Message the class teacher or school office.',
+                    onTap: () => context.go(AppRoutes.parentChat),
                   ),
                   const Divider(),
                   _SupportRow(
                     icon: Icons.privacy_tip_outlined,
                     title: 'Privacy',
-                    subtitle: 'Review how SchoolOS protects school data.',
-                    onTap: () => _comingSoon(context, 'Privacy'),
+                    subtitle: 'Review account preferences and session state.',
+                    onTap: () => context.go(AppRoutes.settings),
                   ),
                 ],
               ),
@@ -117,24 +117,13 @@ class ParentMoreScreen extends StatelessWidget {
     String title,
     IconData icon,
     Color color, {
-    String? route,
+    required String route,
   }) {
     return QuickActionCard(
       title: title,
       icon: icon,
       color: color,
-      onTap: () =>
-          route == null ? _comingSoon(context, title) : context.go(route),
-    );
-  }
-
-  void _comingSoon(BuildContext context, String label) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '$label will open when that mobile module is connected to the backend.',
-        ),
-      ),
+      onTap: () => context.go(route),
     );
   }
 }

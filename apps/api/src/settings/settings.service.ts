@@ -93,7 +93,11 @@ export class SettingsService {
     'consent_required_for_media',
     'quiet_hours_enabled',
     'chat_availability_enabled',
+    'chat_sunday_to_thursday_start',
+    'chat_sunday_to_thursday_end',
     'chat_sunday_to_thursday_hours',
+    'chat_friday_start',
+    'chat_friday_end',
     'chat_friday_hours',
     'chat_saturday_enabled',
     'emergency_override_requires_admin',
@@ -468,6 +472,19 @@ export class SettingsService {
         if (typeof value !== 'string') {
           throw new BadRequestException(
             `Invalid value for ${key}. Expected string.`,
+          );
+        }
+        break;
+      case 'chat_sunday_to_thursday_start':
+      case 'chat_sunday_to_thursday_end':
+      case 'chat_friday_start':
+      case 'chat_friday_end':
+        if (
+          typeof value !== 'string' ||
+          !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)
+        ) {
+          throw new BadRequestException(
+            `Invalid value for ${key}. Expected HH:mm time.`,
           );
         }
         break;

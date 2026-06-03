@@ -262,6 +262,9 @@ describe('SchoolOS web production contracts', () => {
     const studentHomeworkTab = read(
       'components/timetable/tabs/student-homework-tab.tsx',
     );
+    const teacherWorkloadTab = read(
+      'components/timetable/tabs/teacher-workload-tab.tsx',
+    );
     const activityForm = read('components/forms/activity-feed-form.tsx');
 
     for (const label of [
@@ -285,9 +288,13 @@ describe('SchoolOS web production contracts', () => {
     assert.doesNotMatch(studentHomeworkTab, /fileAsset\?\.publicUrl/);
     assert.doesNotMatch(activityForm, /Private object key/);
     assert.doesNotMatch(activityForm, /Photo Reference/);
+    assert.match(teacherWorkloadTab, /teacher-workload-distribution/);
+    assert.match(teacherWorkloadTab, /workloadDistribution/);
+    assert.match(teacherWorkloadTab, /Bars use live timetable workload totals/);
+    assert.doesNotMatch(teacherWorkloadTab, /Coming soon/);
 
     assert.doesNotMatch(
-      `${timetableBuilder}\n${homeworkTab}\n${studentHomeworkTab}\n${activityForm}`,
+      `${timetableBuilder}\n${homeworkTab}\n${studentHomeworkTab}\n${teacherWorkloadTab}\n${activityForm}`,
       /demo-|fake-|placeholderId/i,
     );
   });
@@ -1313,6 +1320,32 @@ describe('SchoolOS web production contracts', () => {
         `Missing marker: ${marker}`,
       );
     }
+  });
+
+  it('keeps transport safety boundary operational instead of placeholder-only', () => {
+    const transportWorkspace = read(
+      'components/transport/transport-workspace.tsx',
+    );
+
+    for (const marker of [
+      'transport-safety-boundary-panel',
+      'SafetyMetric',
+      'activeTripsMissingDriver',
+      'activeTripsMissingStudents',
+      'Parent visibility stays scoped',
+      'Check latest location',
+      'Review assignments',
+    ]) {
+      assert.ok(
+        transportWorkspace.includes(marker),
+        `Missing marker: ${marker}`,
+      );
+    }
+
+    assert.doesNotMatch(
+      transportWorkspace,
+      /Foundation placeholder for future school-level visibility controls/,
+    );
   });
 
   it('keeps transport route operations and trip report exports backend-backed', () => {

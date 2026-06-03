@@ -16,6 +16,11 @@ const validPng = Buffer.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00,
 ]);
 
+interface TenantSettingUpsertArgs {
+  where: { tenantId_key: { tenantId: string; key: string } };
+  create: { value: unknown };
+}
+
 function buildService() {
   const prisma = {
     tenantSetting: {
@@ -52,6 +57,39 @@ function buildService() {
 }
 
 describe('SettingsService school logo uploads', () => {
+  it('accepts normalized chat-hour settings and rejects malformed times', async () => {
+    const { service, prisma, auditService } = buildService();
+    prisma.tenantSetting.findUnique.mockResolvedValue(null);
+    prisma.tenantSetting.upsert.mockResolvedValue({});
+    auditService.record.mockResolvedValue({});
+
+    await service.updateSetting(
+      actor.tenantId,
+      'chat_sunday_to_thursday_start',
+      '16:00',
+      actor.userId,
+    );
+
+    await expect(
+      service.updateSetting(
+        actor.tenantId,
+        'chat_friday_end',
+        '5:00 PM',
+        actor.userId,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    const upsertMock = prisma.tenantSetting.upsert as jest.MockedFunction<
+      (args: TenantSettingUpsertArgs) => Promise<unknown>
+    >;
+    const upsertArgs = upsertMock.mock.calls[0]?.[0];
+    expect(upsertArgs?.where.tenantId_key).toEqual({
+      tenantId: actor.tenantId,
+      key: 'chat_sunday_to_thursday_start',
+    });
+    expect(upsertArgs?.create.value).toBe('16:00');
+  });
+
   it('stores tenant logo through private storage and File Registry', async () => {
     const {
       service,

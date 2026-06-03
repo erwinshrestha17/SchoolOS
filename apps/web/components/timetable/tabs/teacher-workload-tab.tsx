@@ -37,6 +37,13 @@ export function TeacherWorkloadTab({ workload, isLoading }: Props) {
   const avgSlots = workload.length > 0 
     ? workload.reduce((acc, curr) => acc + curr.slotCount, 0) / workload.length / 5 
     : 0;
+  const workloadDistribution = [...workload]
+    .sort((a, b) => b.teachingMinutes - a.teachingMinutes)
+    .slice(0, 5);
+  const maxTeachingMinutes = Math.max(
+    1,
+    ...workloadDistribution.map((item) => item.teachingMinutes),
+  );
 
   return (
     <div className="space-y-8">
@@ -230,12 +237,53 @@ export function TeacherWorkloadTab({ workload, isLoading }: Props) {
             )}
           </SectionCard>
           
-          <SectionCard title="Performance Chart" className="bg-slate-900 text-white border-slate-800">
-             <div className="h-40 flex flex-col items-center justify-center text-center space-y-3">
+          <SectionCard title="Workload Distribution" className="border-slate-800 bg-slate-900 text-white">
+            {workloadDistribution.length === 0 ? (
+              <div className="flex h-40 flex-col items-center justify-center space-y-3 text-center">
                 <BarChart3 className="h-10 w-10 text-slate-700" />
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Live Workload Heatmap</p>
-                <p className="text-[11px] text-slate-400 font-medium">Coming soon in Phase 2B.4</p>
-             </div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">No slots assigned</p>
+                <p className="text-[11px] font-medium text-slate-400">Publish timetable slots to compare teacher load.</p>
+              </div>
+            ) : (
+              <div className="space-y-4" data-testid="teacher-workload-distribution">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Top teaching load</p>
+                  <Badge variant="secondary" className="border-white/10 bg-white/10 text-[9px] font-black uppercase text-slate-200">
+                    {workloadDistribution.length} shown
+                  </Badge>
+                </div>
+                <div className="space-y-3">
+                  {workloadDistribution.map((item) => {
+                    const hours = item.teachingMinutes / 60;
+                    const percent = Math.max(
+                      8,
+                      (item.teachingMinutes / maxTeachingMinutes) * 100,
+                    );
+
+                    return (
+                      <div key={item.staffId} className="space-y-1">
+                        <div className="flex items-center justify-between gap-3 text-[11px]">
+                          <span className="truncate font-bold text-slate-200">{item.staffName}</span>
+                          <span className="shrink-0 font-black text-white">{hours.toFixed(1)}h</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className={cn(
+                              'h-full rounded-full',
+                              hours > 30 ? 'bg-amber-400' : 'bg-emerald-400',
+                            )}
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] font-medium leading-relaxed text-slate-400">
+                  Bars use live timetable workload totals and highlight teachers above 30 weekly hours.
+                </p>
+              </div>
+            )}
           </SectionCard>
         </div>
       </div>

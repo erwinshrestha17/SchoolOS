@@ -13,6 +13,7 @@ import '../features/dashboard/presentation/role_dashboards/staff_dashboard.dart'
 import '../features/dashboard/presentation/role_dashboards/student_dashboard.dart';
 import '../features/dashboard/presentation/role_dashboards/teacher_dashboard.dart';
 import '../features/attendance/presentation/screens/parent_attendance_screen.dart';
+import '../features/attendance/presentation/screens/teacher_classes_screen.dart';
 import '../features/attendance/presentation/screens/teacher_attendance_screen.dart';
 import '../features/notices/presentation/screens/notice_detail_screen.dart';
 import '../features/notices/presentation/screens/notice_list_screen.dart';
@@ -35,6 +36,7 @@ import '../features/splash/splash_screen.dart';
 import '../features/staff/presentation/screens/staff_attendance_screen.dart';
 import '../features/staff/presentation/screens/staff_leave_screen.dart';
 import '../features/staff/presentation/screens/staff_payslips_screen.dart';
+import '../features/transport/presentation/screens/driver_route_screen.dart';
 import '../shared/widgets/app_empty_state.dart';
 import '../shared/widgets/app_scaffold.dart';
 import 'constants/app_routes.dart';
@@ -167,12 +169,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const TeacherDashboard(),
       ),
       GoRoute(
+        path: AppRoutes.teacherClasses,
+        builder: (context, state) => const TeacherClassesScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.teacherAttendance,
         builder: (context, state) => const TeacherAttendanceScreen(),
       ),
       GoRoute(
         path: AppRoutes.driverHome,
         builder: (context, state) => const DriverDashboard(),
+      ),
+      GoRoute(
+        path: AppRoutes.driverRoute,
+        builder: (context, state) => const DriverRouteScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.driverStudents,
+        builder: (context, state) => const DriverStudentsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.driverHistory,
+        builder: (context, state) => const DriverHistoryScreen(),
       ),
       GoRoute(
         path: AppRoutes.staffHome,
@@ -230,12 +248,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             role != MobileRole.student) {
           return AppRoutes.home;
         }
-        if ((location == AppRoutes.teacherHome ||
-                location == AppRoutes.teacherAttendance) &&
-            role != MobileRole.teacher) {
+        if (_isTeacherRoute(location) && role != MobileRole.teacher) {
           return AppRoutes.home;
         }
-        if (location == AppRoutes.driverHome && role != MobileRole.driver) {
+        if (_isDriverRoute(location) && role != MobileRole.driver) {
           return AppRoutes.home;
         }
         if (_isStaffRoute(location) && role != MobileRole.staff) {
@@ -276,6 +292,19 @@ bool _isStaffRoute(String location) {
       location == AppRoutes.staffAttendance ||
       location == AppRoutes.staffLeave ||
       location == AppRoutes.staffPayslips;
+}
+
+bool _isDriverRoute(String location) {
+  return location == AppRoutes.driverHome ||
+      location == AppRoutes.driverRoute ||
+      location == AppRoutes.driverStudents ||
+      location == AppRoutes.driverHistory;
+}
+
+bool _isTeacherRoute(String location) {
+  return location == AppRoutes.teacherHome ||
+      location == AppRoutes.teacherClasses ||
+      location == AppRoutes.teacherAttendance;
 }
 
 bool _isParentRoute(String location) {

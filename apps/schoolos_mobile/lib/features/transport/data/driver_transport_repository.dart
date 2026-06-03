@@ -20,6 +20,14 @@ class DriverTransportRepository {
     return DriverTripManifest.fromJson(data);
   }
 
+  Future<List<DriverTransportTrip>> listDriverTripHistory() async {
+    final response = await _client.get('/transport/driver/trips/history');
+    return _list(response.data)
+        .whereType<Map<String, dynamic>>()
+        .map(DriverTransportTrip.fromJson)
+        .toList();
+  }
+
   Future<void> markStudentBoarded(String tripId, String studentId) async {
     await _client.patch(
       '/transport/driver/trips/$tripId/students/boarded',
@@ -74,4 +82,25 @@ class DriverTransportRepository {
 
     await _client.post('/transport/driver/trips/$tripId/location', data: data);
   }
+}
+
+List<dynamic> _list(Object? value) {
+  if (value is List<dynamic>) {
+    return value;
+  }
+  if (value is Map<String, dynamic>) {
+    final items = value['items'];
+    if (items is List<dynamic>) {
+      return items;
+    }
+    final data = value['data'];
+    if (data is List<dynamic>) {
+      return data;
+    }
+    final trips = value['trips'];
+    if (trips is List<dynamic>) {
+      return trips;
+    }
+  }
+  return const [];
 }

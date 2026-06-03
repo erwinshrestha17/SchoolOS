@@ -101,48 +101,6 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class RoleDashboardPlaceholder extends StatelessWidget {
-  const RoleDashboardPlaceholder({
-    super.key,
-    required this.title,
-    required this.description,
-  });
-
-  final String title;
-  final String description;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: AppCard(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(description),
-              const SizedBox(height: 16),
-              Text(
-                'Sprint 1 will replace this placeholder with authenticated role routing.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _RoleTile {
   const _RoleTile(this.title, this.subtitle, this.icon, this.route);
 

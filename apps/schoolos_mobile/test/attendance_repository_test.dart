@@ -4,6 +4,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:schoolos_mobile/core/network/api_client.dart';
 import 'package:schoolos_mobile/features/attendance/data/attendance_repository.dart';
 import 'package:schoolos_mobile/features/attendance/domain/attendance_models.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MockApiClient extends Mock implements ApiClient {}
 
@@ -13,6 +14,7 @@ void main() {
     late AttendanceRepository repository;
 
     setUp(() {
+      SharedPreferences.setMockInitialValues({});
       apiClient = MockApiClient();
       repository = AttendanceRepository(apiClient);
     });
@@ -183,5 +185,69 @@ void main() {
         {'studentId': 'student-2', 'status': 'ABSENT'},
       ]);
     });
+
+    test(
+      'persists teacher draft attendance locally and clears after submit',
+      () async {
+        const classSection = TeacherClassSection(
+          id: 'year-1:class-1:section-1',
+          academicYearId: 'year-1',
+          classId: 'class-1',
+          sectionId: 'section-1',
+          name: 'Grade 3 - A',
+          subject: 'Mathematics',
+        );
+        final date = DateTime(2026, 6, 2);
+        const draftEntries = [
+          AttendanceStudentEntry(
+            studentId: 'student-1',
+            studentName: 'Asha Sharma',
+            rollNumber: '7',
+            status: AttendanceStatus.present,
+          ),
+          AttendanceStudentEntry(
+            studentId: 'student-2',
+            studentName: 'Bikash Thapa',
+            rollNumber: '8',
+            status: AttendanceStatus.late,
+          ),
+        ];
+        when(
+          () => apiClient.post<dynamic>(
+            '/mobile/teacher/attendance/submit',
+            data: any(named: 'data'),
+          ),
+        ).thenAnswer(
+          (_) async => Response(
+            requestOptions: RequestOptions(
+              path: '/mobile/teacher/attendance/submit',
+            ),
+            data: {'sessionId': 'session-1'},
+          ),
+        );
+
+        await repository.saveDraftAttendanceLocally(
+          classSection.id,
+          date,
+          draftEntries,
+        );
+        final loadedDraft = await repository.loadDraftAttendance(
+          classSection.id,
+          date,
+        );
+
+        expect(loadedDraft, hasLength(2));
+        expect(loadedDraft.last.studentId, 'student-2');
+        expect(loadedDraft.last.status, AttendanceStatus.late);
+
+        await repository.submitAttendance(classSection, date, loadedDraft);
+        final clearedDraft = await repository.loadDraftAttendance(
+          classSection.id,
+          date,
+        );
+
+        expect(clearedDraft, isEmpty);
+      },
+    );
   });
 }

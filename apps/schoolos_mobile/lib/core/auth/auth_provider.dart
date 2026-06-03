@@ -147,34 +147,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Sign in with a simulated mock account
-  Future<void> loginMock(String role) async {
-    state = state.copyWith(status: AuthStatus.loading);
-
-    // Simulate API delay
-    await Future<void>.delayed(const Duration(milliseconds: 600));
-
-    final mockToken = 'mock_jwt_token_for_$role';
-    final mockUser = AuthUser(
-      id: 'mock_id',
-      name: 'Demo $role Account',
-      email: 'demo@school.edu.np',
-      role: role,
-    );
-
-    await _tokenStorage.saveAccessToken(mockToken);
-    await _tokenStorage.saveRefreshToken('mock_refresh_token');
-    await _tokenStorage.saveUserRole(role);
-    await _appPrefs.saveCachedUser(jsonEncode(mockUser.toJson()));
-
-    state = AuthState(
-      status: AuthStatus.authenticated,
-      role: role,
-      token: mockToken,
-      user: mockUser,
-    );
-  }
-
   /// Gracefully sign out
   Future<void> logout() async {
     state = state.copyWith(status: AuthStatus.loading);

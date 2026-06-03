@@ -343,6 +343,13 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
   const driversOnline = new Set(
     activeTrips.map((trip) => trip.driverAssignmentId).filter(Boolean),
   ).size;
+  const activeTripsMissingDriver = activeTrips.filter(
+    (trip) => !trip.driverAssignmentId,
+  ).length;
+  const activeTripsMissingStudents = activeTrips.filter(
+    (trip) => (trip.studentStatuses ?? []).length === 0,
+  ).length;
+  const delayedActiveTrips = activeTrips.filter((trip) => trip.isDelayed).length;
 
   const stats = {
     activeTrips: reportsQuery.data?.activeTrips ?? activeTrips.length,
@@ -665,10 +672,39 @@ export function TransportWorkspace({ initialTab = 'overview' }: TransportWorkspa
           <Panel title="Trip History" description="Current trip history returned by the backend; live route replay can come later.">
             <TripList trips={trips.slice(0, 8)} emptyTitle="No trip history" compact />
           </Panel>
-          <Panel title="Safety boundary" description="Foundation placeholder for future school-level visibility controls.">
-            <div className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">
-              <p className="font-bold">Live Tracking Boundary</p>
-              <p className="mt-1">Live map/WebSocket UI and driver app controls are deferred. This admin slice shows latest coordinates only to ensure privacy and system stability.</p>
+          <Panel title="Safety boundary" description="Current trip visibility and privacy checks for transport operators.">
+            <div className="space-y-4" data-testid="transport-safety-boundary-panel">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <SafetyMetric
+                  label="Missing driver"
+                  value={activeTripsMissingDriver}
+                  warning={activeTripsMissingDriver > 0}
+                />
+                <SafetyMetric
+                  label="No manifest"
+                  value={activeTripsMissingStudents}
+                  warning={activeTripsMissingStudents > 0}
+                />
+                <SafetyMetric
+                  label="Delayed"
+                  value={delayedActiveTrips}
+                  warning={delayedActiveTrips > 0}
+                />
+              </div>
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                <p className="font-bold">Parent visibility stays scoped</p>
+                <p className="mt-1">
+                  Operators can verify latest coordinates and manifests here; parent-facing transport stays limited to each guardian&apos;s child, assigned trip, and safe status summaries.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="btn-secondary" onClick={() => setActiveTab('location')}>
+                  Check latest location
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => setActiveTab('assignments')}>
+                  Review assignments
+                </button>
+              </div>
             </div>
           </Panel>
           </div>
@@ -1143,6 +1179,30 @@ function LocationMetric({
     <div>
       <p className="text-xs font-bold text-slate-500">{label}</p>
       <p className="mt-1 break-words font-bold text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function SafetyMetric({
+  label,
+  value,
+  warning,
+}: {
+  label: string;
+  value: number;
+  warning?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-xl border px-3 py-2',
+        warning
+          ? 'border-amber-200 bg-amber-50 text-amber-900'
+          : 'border-slate-100 bg-slate-50 text-slate-600',
+      )}
+    >
+      <p className="text-[10px] font-bold uppercase tracking-wide">{label}</p>
+      <p className="mt-1 text-lg font-black text-slate-950">{value}</p>
     </div>
   );
 }

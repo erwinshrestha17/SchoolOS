@@ -92,6 +92,18 @@ describe('SchoolOS Settings Page Contracts', () => {
     assert.doesNotMatch(page, /tenantId: ['"]all['"]/);
   });
 
+  it('uses normalized communication chat-hour setting keys', () => {
+    const page = read('app/dashboard/settings/page.tsx');
+
+    assert.match(page, /chat_sunday_to_thursday_start/);
+    assert.match(page, /chat_sunday_to_thursday_end/);
+    assert.match(page, /chat_friday_start/);
+    assert.match(page, /chat_friday_end/);
+    assert.doesNotMatch(page, /TODO: Backend schema normalization/);
+    assert.match(page, /legacySunThuHours/);
+    assert.match(page, /legacyFridayHours/);
+  });
+
   it('wires school logo branding to private File Registry APIs', () => {
     const page = read('app/dashboard/settings/page.tsx');
     const apiClient = read('lib/api/platform.ts');

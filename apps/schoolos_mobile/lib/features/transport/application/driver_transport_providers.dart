@@ -21,3 +21,9 @@ final driverTripManifestProvider =
           .watch(driverTransportRepositoryProvider)
           .getDriverTripManifest(tripId);
     });
+
+final driverTripHistoryProvider = FutureProvider<List<DriverTransportTrip>>((
+  ref,
+) {
+  return ref.watch(driverTransportRepositoryProvider).listDriverTripHistory();
+});
