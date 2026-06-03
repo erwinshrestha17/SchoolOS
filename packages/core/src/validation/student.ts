@@ -3,8 +3,17 @@ import { z } from 'zod';
 export const guardianSchema = z.object({
   fullName: z.string().min(2),
   relation: z.string().min(2),
-  primaryPhone: z.string().min(7),
-  secondaryPhone: z.string().optional().nullable(),
+  primaryPhone: z.string().regex(/^9[678]\d{8}$/, {
+    message: 'Must be exactly 10 digits starting with 98, 97, or 96',
+  }),
+  secondaryPhone: z
+    .string()
+    .regex(/^9[678]\d{8}$/, {
+      message: 'Must be exactly 10 digits starting with 98, 97, or 96',
+    })
+    .or(z.literal(''))
+    .optional()
+    .nullable(),
   email: z.email().optional().nullable(),
   occupation: z.string().optional().nullable(),
   wardNumber: z.string().optional().nullable(),

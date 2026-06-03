@@ -116,9 +116,15 @@ function GuardianEditForm({
   const [email, setEmail] = useState(guardian.email || '');
   const [wardNumber, setWardNumber] = useState(guardian.wardNumber || '');
   const [isPrimary, setIsPrimary] = useState(guardian.isPrimary);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!/^9[678]\d{8}$/.test(primaryPhone)) {
+      setPhoneError('Must be exactly 10 digits starting with 98, 97, or 96');
+      return;
+    }
+    setPhoneError(null);
     onSave({
       fullName,
       relation,
@@ -168,9 +174,15 @@ function GuardianEditForm({
             type="text"
             className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:border-primary-500 focus:outline-none"
             value={primaryPhone}
-            onChange={(e) => setPrimaryPhone(e.target.value)}
+            onChange={(e) => {
+              setPrimaryPhone(e.target.value);
+              if (phoneError) setPhoneError(null);
+            }}
             disabled={isSaving}
           />
+          {phoneError && (
+            <p className="text-[10px] font-bold text-rose-600 mt-1">{phoneError}</p>
+          )}
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">

@@ -372,13 +372,13 @@ export function AdmissionForm() {
                          {idx > 0 && <button type="button" className="text-xs font-bold text-danger-500" onClick={() => guardians.remove(idx)}>Remove</button>}
                        </div>
                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                          <FormField label="Full Name">
+                          <FormField label="Full Name" error={form.formState.errors.guardians?.[idx]?.fullName?.message}>
                             <input className="premium-input" {...form.register(`guardians.${idx}.fullName`)} />
                           </FormField>
-                          <FormField label="Relation">
+                          <FormField label="Relation" error={form.formState.errors.guardians?.[idx]?.relation?.message}>
                             <input className="premium-input" {...form.register(`guardians.${idx}.relation`)} />
                           </FormField>
-                          <FormField label="Phone Number">
+                          <FormField label="Phone Number" error={form.formState.errors.guardians?.[idx]?.primaryPhone?.message}>
                             <input className="premium-input" {...form.register(`guardians.${idx}.primaryPhone`)} />
                           </FormField>
                        </div>

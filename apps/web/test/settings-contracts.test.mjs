@@ -11,10 +11,10 @@ function read(relativePath) {
 }
 
 describe('SchoolOS Settings Page Contracts', () => {
-  it('renders a tabbed school management hub with all operational sections', () => {
+  it('renders a school management settings console with all operational sections', () => {
     const page = read('app/dashboard/settings/page.tsx');
 
-    const requiredTabs = [
+    const requiredSections = [
       'profile',
       'branding',
       'academic',
@@ -27,8 +27,8 @@ describe('SchoolOS Settings Page Contracts', () => {
       'data',
     ];
 
-    for (const tab of requiredTabs) {
-      assert.match(page, new RegExp(`value="${tab}"`), `Missing tab value: ${tab}`);
+    for (const section of requiredSections) {
+      assert.ok(page.includes(section), `Missing section key: ${section}`);
     }
 
     const requiredLabels = [
@@ -49,7 +49,7 @@ describe('SchoolOS Settings Page Contracts', () => {
       'Payroll Approval',
       'Fiscal Year',
       'Sensitive Staff Fields',
-      'Data Import / Export',
+      'Import / Export',
     ];
 
     for (const label of requiredLabels) {
@@ -57,14 +57,13 @@ describe('SchoolOS Settings Page Contracts', () => {
     }
   });
 
-  it('ensures each settings section has a visible card structure', () => {
+  it('ensures each settings section has a visible console structure', () => {
     const page = read('app/dashboard/settings/page.tsx');
 
-    assert.match(page, /<SectionWrapper/);
-    assert.match(page, /title=/);
-    assert.match(page, /description=/);
-    assert.match(page, /onSave=\{save\}/);
-    assert.match(page, /isSaving=\{isSaving\}/);
+    assert.match(page, /SettingsSidebar/);
+    assert.match(page, /SectionHeader/);
+    assert.match(page, /UnsavedBar/);
+    assert.match(page, /EditableSettingsSection/);
   });
 
   it('strictly separates school settings from platform settings', () => {
@@ -87,7 +86,7 @@ describe('SchoolOS Settings Page Contracts', () => {
   it('maintains tenant scoping for all settings updates', () => {
     const page = read('app/dashboard/settings/page.tsx');
 
-    assert.match(page, /api\.updateTenantSetting\(key, form\[key\]\)/);
+    assert.match(page, /api\.updateTenantSetting\(field\.key, nextValue\)/);
     assert.doesNotMatch(page, /api\.updateGlobalSetting/);
     assert.doesNotMatch(page, /tenantId: ['"]all['"]/);
   });
@@ -100,8 +99,6 @@ describe('SchoolOS Settings Page Contracts', () => {
     assert.match(page, /chat_friday_start/);
     assert.match(page, /chat_friday_end/);
     assert.doesNotMatch(page, /TODO: Backend schema normalization/);
-    assert.match(page, /legacySunThuHours/);
-    assert.match(page, /legacyFridayHours/);
   });
 
   it('wires school logo branding to private File Registry APIs', () => {

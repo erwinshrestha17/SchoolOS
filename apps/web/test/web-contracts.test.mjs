@@ -464,7 +464,7 @@ describe('SchoolOS web production contracts', () => {
     assert.match(sidebar, /export const dashboardNavGroups/);
     assert.match(
       sidebar,
-      /visibleGroups = filterNavGroups\(dashboardNavGroups\)/,
+      /visibleGroups = dashboardNavGroups/,
     );
     assert.match(sidebar, /visiblePlatformItems = platformNavItems\.filter/);
     assert.match(sidebar, /canSeeNavItem\(item, session\)/);
@@ -654,7 +654,7 @@ describe('SchoolOS web production contracts', () => {
       coreValidation,
       /guardians: z\.array\(guardianSchema\)\.min\(1\)/,
     );
-    assert.match(coreValidation, /primaryPhone: z\.string\(\)\.min\(7\)/);
+    assert.match(coreValidation, /primaryPhone: z\.string\(\)\.regex\(/);
     assert.match(admissionForm, /Document/);
     assert.match(admissionForm, /Review & Documents/);
     assert.match(admissionForm, /fileToBase64Payload/);

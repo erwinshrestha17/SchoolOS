@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { LucideIcon } from 'lucide-react';
 import {
   AlertCircle,
@@ -36,11 +37,14 @@ import {
   X,
   Check,
   ChevronRight,
+  Plus,
+  Wallet,
 } from 'lucide-react';
 
 import { Button } from '../../../components/ui/button';
 import { ConfirmDialog } from '../../../components/ui/confirm-dialog';
 import { SetupForm } from '../../../components/forms/setup-form';
+import { Badge } from '../../../components/ui/badge';
 import { useEntitlements } from '../../../components/entitlements-provider';
 import { api, type TenantLogoAccess } from '../../../lib/api';
 import { cn } from '../../../lib/utils';
@@ -445,6 +449,14 @@ const SPECIAL_SECTIONS = [
     tone: 'bg-purple-50 text-purple-700 border-purple-100',
   },
   {
+    id: 'fee-setup',
+    eyebrow: 'Billing structure',
+    title: 'Active Fee Plans',
+    description: 'Configure fee heads and class/year-specific fee plans.',
+    icon: Wallet,
+    tone: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+  },
+  {
     id: 'data',
     eyebrow: 'Data operations',
     title: 'Import / Export',
@@ -478,7 +490,7 @@ const ALL_SECTIONS = [...SPECIAL_SECTIONS, ...SETTINGS_SECTIONS] as const;
 const NAV_GROUPS: NavGroup[] = [
   { label: 'School', items: ['overview', 'school-setup', 'profile', 'branding'] },
   { label: 'Access Control', items: ['users-access', 'roles-permissions'] },
-  { label: 'Academic & Operations', items: ['academic', 'attendance', 'fees', 'communication'] },
+  { label: 'Academic & Operations', items: ['academic', 'attendance', 'fee-setup', 'fees', 'communication'] },
   { label: 'Staff & Finance', items: ['payroll', 'accounting'] },
   { label: 'Security & Data', items: ['security', 'data', 'audit', 'subscription'] },
 ];
@@ -493,6 +505,9 @@ const SECTION_ALIASES: Record<string, string> = {
   attendance: 'attendance',
   fees: 'fees',
   fee: 'fees',
+  'fee-setup': 'fee-setup',
+  'fee-plans': 'fee-setup',
+  'fee-plan': 'fee-setup',
   communication: 'communication',
   payroll: 'payroll',
   hr: 'payroll',
@@ -571,6 +586,7 @@ function TenantSettingsContent() {
   const activeSectionId = resolveSection(requestedSection);
 
   const [settings, setSettings] = useState<TenantSettingSummary[]>([]);
+  const [feePlans, setFeePlans] = useState<any[]>([]);
   const [form, setForm] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -614,8 +630,12 @@ function TenantSettingsContent() {
     try {
       setLoading(true);
       setError(null);
-      const data = await api.getTenantSettings();
-      setSettings(data);
+      const [settingsData, feePlansData] = await Promise.all([
+        api.getTenantSettings(),
+        api.listFeePlans().catch(() => []),
+      ]);
+      setSettings(settingsData);
+      setFeePlans(feePlansData);
     } catch {
       setError('Failed to load school settings.');
     } finally {
@@ -781,7 +801,13 @@ function TenantSettingsContent() {
             {/* Special Panels */}
             {activeSectionId === 'overview' && (
               <div className="p-6">
-                <OverviewPanel settings={settings} schoolName={schoolName} logoFileAssetId={logoFileAssetId} onSwitchSection={switchSection} />
+                <OverviewPanel
+                  settings={settings}
+                  schoolName={schoolName}
+                  logoFileAssetId={logoFileAssetId}
+                  activeFeePlanCount={feePlans.filter((p: any) => p.isActive).length}
+                  onSwitchSection={switchSection}
+                />
               </div>
             )}
             {activeSectionId === 'school-setup' && (
@@ -797,6 +823,11 @@ function TenantSettingsContent() {
             {activeSectionId === 'roles-permissions' && (
               <div className="p-6">
                 <RolesPermissionsPanel />
+              </div>
+            )}
+            {activeSectionId === 'fee-setup' && (
+              <div className="p-6">
+                <FeeSetupPanel onPlanCreated={fetchSettings} />
               </div>
             )}
             {activeSectionId === 'data' && <div className="p-6"><DataOperations /></div>}
@@ -1500,7 +1531,7 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
 
   return (
     <>
-      <div>
+      <div data-testid="school-logo-upload-panel">
         <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">School Logo</p>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
@@ -1620,11 +1651,13 @@ function OverviewPanel({
   settings,
   schoolName,
   logoFileAssetId,
+  activeFeePlanCount,
   onSwitchSection,
 }: {
   settings: TenantSettingSummary[];
   schoolName: string;
   logoFileAssetId: string | null;
+  activeFeePlanCount: number;
   onSwitchSection: (id: string) => void;
 }) {
   function getSettingValue(key: TenantSettingKey): string | null {
@@ -1667,6 +1700,12 @@ function OverviewPanel({
       description: 'Grading scheme, calendar, promotion mode',
       sectionId: 'academic',
       status: hasAcademicYear ? 'ok' : 'review',
+    },
+    {
+      label: 'Active Fee Plans',
+      description: activeFeePlanCount > 0 ? `${activeFeePlanCount} active fee plan(s) configured` : 'No active fee plans configured',
+      sectionId: 'fee-setup',
+      status: activeFeePlanCount > 0 ? 'ok' : 'review',
     },
     {
       label: 'Fee & Payment Rules',
@@ -1787,6 +1826,486 @@ function SchoolSetupPanel() {
       </div>
       {/* Render the existing SetupForm — it manages its own data fetching and mutations */}
       <SetupForm />
+    </div>
+  );
+}
+
+// ─── Fee Setup Panel ──────────────────────────────────────────────────────────
+
+function FeeSetupPanel({ onPlanCreated }: { onPlanCreated: () => void }) {
+  const queryClient = useQueryClient();
+
+  const [feeHead, setFeeHead] = useState({
+    code: '',
+    name: '',
+    frequency: 'MONTHLY',
+    defaultAmount: 0,
+    vatApplicable: false,
+  });
+
+  const [feePlan, setFeePlan] = useState({
+    academicYearId: '',
+    classId: '',
+    feeHeadId: '',
+    code: '',
+    name: '',
+    amount: 0,
+  });
+
+  const [headSuccess, setHeadSuccess] = useState(false);
+  const [planSuccess, setPlanSuccess] = useState(false);
+
+  const academicYearsQuery = useQuery({
+    queryKey: ['academic-years'],
+    queryFn: api.listAcademicYears,
+  });
+
+  const classesQuery = useQuery({
+    queryKey: ['classes'],
+    queryFn: api.listClasses,
+  });
+
+  const feeHeadsQuery = useQuery({
+    queryKey: ['fee-heads'],
+    queryFn: api.listFeeHeads,
+  });
+
+  const feePlansQuery = useQuery({
+    queryKey: ['fee-plans'],
+    queryFn: api.listFeePlans,
+  });
+
+  useEffect(() => {
+    if (academicYearsQuery.data && !feePlan.academicYearId) {
+      const currentYear = academicYearsQuery.data.find(y => y.isCurrent) ?? academicYearsQuery.data[0];
+      if (currentYear) {
+        setFeePlan((prev) => ({ ...prev, academicYearId: currentYear.id }));
+      }
+    }
+  }, [academicYearsQuery.data]);
+
+  const feeHeadMutation = useMutation({
+    mutationFn: api.createFeeHead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fee-heads'] });
+      setFeeHead({
+        code: '',
+        name: '',
+        frequency: 'MONTHLY',
+        defaultAmount: 0,
+        vatApplicable: false,
+      });
+      setHeadSuccess(true);
+      setTimeout(() => setHeadSuccess(false), 3000);
+    },
+  });
+
+  const feePlanMutation = useMutation({
+    mutationFn: api.createFeePlan,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fee-plans'] });
+      setFeePlan((prev) => ({
+        ...prev,
+        classId: '',
+        feeHeadId: '',
+        code: '',
+        name: '',
+        amount: 0,
+      }));
+      setPlanSuccess(true);
+      onPlanCreated();
+      setTimeout(() => setPlanSuccess(false), 3000);
+    },
+  });
+
+  const handleCreateFeeHead = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feeHead.code || !feeHead.name) return;
+    feeHeadMutation.mutate(feeHead);
+  };
+
+  const handleCreateFeePlan = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feePlan.academicYearId || !feePlan.feeHeadId || !feePlan.code || !feePlan.name) return;
+    feePlanMutation.mutate({
+      academicYearId: feePlan.academicYearId,
+      classId: feePlan.classId || null,
+      code: feePlan.code,
+      name: feePlan.name,
+      items: [{ feeHeadId: feePlan.feeHeadId, amount: feePlan.amount }],
+    });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-NP', {
+      style: 'currency',
+      currency: 'NPR',
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  return (
+    <div className="grid gap-6 xl:grid-cols-2">
+      {/* Forms Column */}
+      <div className="space-y-6">
+        {/* Create Fee Head Form */}
+        <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Create Fee Head</h3>
+            <p className="mt-0.5 text-xs text-slate-500">Define reusable heads of account like Tuition, Exam, or Transportation.</p>
+          </div>
+
+          <form onSubmit={handleCreateFeeHead} className="space-y-4">
+            {headSuccess && (
+              <div className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                <Check size={14} />
+                Fee head created successfully!
+              </div>
+            )}
+            {feeHeadMutation.isError && (
+              <div className="flex items-center gap-2 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+                <AlertCircle size={14} />
+                {feeHeadMutation.error.message || 'Failed to create fee head.'}
+              </div>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Code</label>
+                <input
+                  type="text"
+                  placeholder="e.g. TUITION"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:bg-slate-50"
+                  value={feeHead.code}
+                  onChange={(e) => setFeeHead((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                  required
+                  disabled={feeHeadMutation.isPending}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Tuition Fee"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:bg-slate-50"
+                  value={feeHead.name}
+                  onChange={(e) => setFeeHead((prev) => ({ ...prev, name: e.target.value }))}
+                  required
+                  disabled={feeHeadMutation.isPending}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Frequency</label>
+                <select
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none bg-white disabled:bg-slate-50"
+                  value={feeHead.frequency}
+                  onChange={(e) => setFeeHead((prev) => ({ ...prev, frequency: e.target.value }))}
+                  disabled={feeHeadMutation.isPending}
+                >
+                  <option value="DAILY">Daily</option>
+                  <option value="WEEKLY">Weekly</option>
+                  <option value="MONTHLY">Monthly</option>
+                  <option value="QUARTERLY">Quarterly</option>
+                  <option value="YEARLY">Yearly</option>
+                  <option value="ONE_TIME">One Time</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Default Amount</label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:bg-slate-50"
+                  value={feeHead.defaultAmount || ''}
+                  onChange={(e) => setFeeHead((prev) => ({ ...prev, defaultAmount: Number(e.target.value) }))}
+                  disabled={feeHeadMutation.isPending}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 py-1">
+              <input
+                type="checkbox"
+                id="vatApplicable"
+                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                checked={feeHead.vatApplicable}
+                onChange={(e) => setFeeHead((prev) => ({ ...prev, vatApplicable: e.target.checked }))}
+                disabled={feeHeadMutation.isPending}
+              />
+              <label htmlFor="vatApplicable" className="text-xs font-medium text-slate-700 select-none">
+                VAT / Taxes Applicable
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
+              disabled={feeHeadMutation.isPending}
+            >
+              {feeHeadMutation.isPending ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-3.5 w-3.5" />
+                  Create Fee Head
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+
+        {/* Create Fee Plan Form */}
+        <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Create Fee Plan</h3>
+            <p className="mt-0.5 text-xs text-slate-500">Map fee heads to specific academic years and classes with custom rates.</p>
+          </div>
+
+          <form onSubmit={handleCreateFeePlan} className="space-y-4">
+            {planSuccess && (
+              <div className="flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                <Check size={14} />
+                Fee plan created successfully!
+              </div>
+            )}
+            {feePlanMutation.isError && (
+              <div className="flex items-center gap-2 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+                <AlertCircle size={14} />
+                {feePlanMutation.error.message || 'Failed to create fee plan.'}
+              </div>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Academic Year</label>
+                <select
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none bg-white disabled:bg-slate-50"
+                  value={feePlan.academicYearId}
+                  onChange={(e) => setFeePlan((prev) => ({ ...prev, academicYearId: e.target.value }))}
+                  required
+                  disabled={feePlanMutation.isPending}
+                >
+                  <option value="">Select Academic Year</option>
+                  {academicYearsQuery.data?.map((y) => (
+                    <option key={y.id} value={y.id}>
+                      {y.name} {y.isCurrent ? '(Current)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Class (Optional)</label>
+                <select
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none bg-white disabled:bg-slate-50"
+                  value={feePlan.classId}
+                  onChange={(e) => setFeePlan((prev) => ({ ...prev, classId: e.target.value }))}
+                  disabled={feePlanMutation.isPending}
+                >
+                  <option value="">All Classes</option>
+                  {classesQuery.data?.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Fee Head</label>
+                <select
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none bg-white disabled:bg-slate-50"
+                  value={feePlan.feeHeadId}
+                  onChange={(e) => {
+                    const headId = e.target.value;
+                    const selectedHead = feeHeadsQuery.data?.find(h => h.id === headId);
+                    setFeePlan((prev) => ({
+                      ...prev,
+                      feeHeadId: headId,
+                      amount: selectedHead?.defaultAmount ?? 0,
+                    }));
+                  }}
+                  required
+                  disabled={feePlanMutation.isPending}
+                >
+                  <option value="">Select Fee Head</option>
+                  {feeHeadsQuery.data?.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      {h.code} · {h.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Plan Code</label>
+                <input
+                  type="text"
+                  placeholder="e.g. PLAN-TUITION-GR1"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:bg-slate-50"
+                  value={feePlan.code}
+                  onChange={(e) => setFeePlan((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                  required
+                  disabled={feePlanMutation.isPending}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Plan Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Grade 1 Monthly Tuition Plan"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:bg-slate-50"
+                  value={feePlan.name}
+                  onChange={(e) => setFeePlan((prev) => ({ ...prev, name: e.target.value }))}
+                  required
+                  disabled={feePlanMutation.isPending}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Amount</label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:bg-slate-50"
+                  value={feePlan.amount || ''}
+                  onChange={(e) => setFeePlan((prev) => ({ ...prev, amount: Number(e.target.value) }))}
+                  required
+                  disabled={feePlanMutation.isPending}
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
+              disabled={feePlanMutation.isPending}
+            >
+              {feePlanMutation.isPending ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-3.5 w-3.5" />
+                  Create Fee Plan
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {/* Lists Column */}
+      <div className="space-y-6">
+        {/* Fee Heads List */}
+        <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+          <h3 className="text-sm font-semibold text-slate-900">Active Fee Heads</h3>
+          {feeHeadsQuery.isLoading ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+            </div>
+          ) : !feeHeadsQuery.data?.length ? (
+            <div className="py-6 text-center text-slate-400 text-xs font-medium">
+              No fee heads configured. Use the form to add one.
+            </div>
+          ) : (
+            <div className="overflow-hidden border border-slate-200 rounded-lg bg-slate-50">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="px-3 py-2">Code</th>
+                    <th className="px-3 py-2">Name</th>
+                    <th className="px-3 py-2">Frequency</th>
+                    <th className="px-3 py-2 text-right">Default Rate</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-150 bg-white">
+                  {feeHeadsQuery.data.map((head: any) => (
+                    <tr key={head.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-3 py-2 font-semibold text-slate-700">{head.code}</td>
+                      <td className="px-3 py-2 text-slate-900">{head.name}</td>
+                      <td className="px-3 py-2">
+                        <Badge variant="neutral" className="uppercase tracking-wider text-[8px] font-black px-1.5 py-0.5">
+                          {head.frequency}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-2 text-right font-bold text-slate-700">
+                        {formatCurrency(head.defaultAmount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Fee Plans List */}
+        <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-4">
+          <h3 className="text-sm font-semibold text-slate-900">Active Fee Plans</h3>
+          {feePlansQuery.isLoading ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+            </div>
+          ) : !feePlansQuery.data?.length ? (
+            <div className="py-6 text-center text-slate-400 text-xs font-medium">
+              No fee plans created yet. Setup a plan above.
+            </div>
+          ) : (
+            <div className="overflow-hidden border border-slate-200 rounded-lg bg-slate-50">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                    <th className="px-3 py-2">Plan Details</th>
+                    <th className="px-3 py-2">Applicability</th>
+                    <th className="px-3 py-2 text-right">Plan Rate</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-150 bg-white">
+                  {feePlansQuery.data.map((plan: any) => (
+                    <tr key={plan.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-3 py-2">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-slate-700">{plan.code}</span>
+                          <span className="text-[10px] text-slate-400">{plan.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap gap-1 items-center">
+                          <Badge variant="phase2" className="text-[8px] font-black px-1 py-0">
+                            {plan.academicYear?.name || 'Current Year'}
+                          </Badge>
+                          {plan.class && (
+                            <Badge className="bg-indigo-50 text-indigo-700 border-indigo-100 text-[8px] font-black px-1 py-0">
+                              Class {plan.class.name}
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-right font-bold text-slate-700">
+                        {formatCurrency(plan.amount ?? plan.items?.[0]?.amount ?? 0)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
