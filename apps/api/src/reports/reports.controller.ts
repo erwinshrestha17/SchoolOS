@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Param,
+  Query,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -17,7 +18,6 @@ import { Entitlement } from '../auth/decorators/entitlement.decorator';
 import { CurrentAuth } from '../auth/decorators/current-auth.decorator';
 import type { AuthContext } from '../auth/auth.types';
 import { ReportExportDto } from './dto/report-export.dto';
-import { Query } from '@nestjs/common';
 
 @Controller('reports')
 @UseGuards(JwtAuthGuard, RolesPermissionsGuard, EntitlementGuard)
@@ -92,10 +92,19 @@ export class ReportsController {
   @Permissions('reports:read')
   async getExportHistory(
     @CurrentAuth() auth: AuthContext,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     return this.reportsService.getExportHistory(auth.tenantId, { page, limit });
+  }
+
+  @Post('export-history/:id/retry')
+  @Permissions('reports:export')
+  async retryExportHistory(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') id: string,
+  ) {
+    return this.reportsService.retryExport(id, auth);
   }
 
   @Get('export-history/:id/download')

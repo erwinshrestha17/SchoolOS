@@ -239,10 +239,30 @@ export const studentsApi = {
       method: 'POST',
       json: body as JsonBody,
     }),
-  previewStudentDocument: (id: string) =>
-    request<{ url: string }>(`/student-documents/${id}/preview`),
-  downloadStudentDocument: (id: string) =>
-    request<{ url: string }>(`/student-documents/${id}/download`),
+  previewStudentDocument: (studentId: string, documentId: string) =>
+    request<{
+      documentId: string;
+      studentId: string;
+      fileAssetId: string;
+      fileName: string;
+      kind: string | null;
+      url: string;
+      expiresInSeconds: number;
+    }>(
+      `/students/${encodeURIComponent(studentId)}/documents/${encodeURIComponent(documentId)}/preview-url`,
+    ),
+  downloadStudentDocument: (studentId: string, documentId: string) =>
+    request<{
+      documentId: string;
+      studentId: string;
+      fileAssetId: string;
+      fileName: string;
+      kind: string | null;
+      url: string;
+      expiresInSeconds: number;
+    }>(
+      `/students/${encodeURIComponent(studentId)}/documents/${encodeURIComponent(documentId)}/download-url`,
+    ),
   deleteStudentDocument: (id: string) =>
     request(`/student-documents/${id}`, { method: 'DELETE' }),
   verifyStudentDocument: (

@@ -1,6 +1,7 @@
 'use client';
 
 import { GeneratedStudentDocumentMeta, StudentDocument } from '@schoolos/core';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { SectionCard } from '@/components/ui/section-card';
 import {
@@ -35,11 +36,32 @@ export function DocumentsTab({
   generatedDocuments,
   onOpenPdf,
 }: DocumentsTabProps) {
+  const [openingDocumentId, setOpeningDocumentId] = useState<string | null>(
+    null,
+  );
+  const [documentAccessError, setDocumentAccessError] = useState('');
   const historyQuery = useQuery({
     queryKey: ['student-document-history', studentId],
     queryFn: () => api.listStudentDocumentHistory(studentId),
     enabled: Boolean(studentId),
   });
+
+  async function openUploadedDocument(documentId: string) {
+    setDocumentAccessError('');
+    setOpeningDocumentId(documentId);
+    try {
+      const access = await api.downloadStudentDocument(studentId, documentId);
+      window.open(access.url, '_blank', 'noopener,noreferrer');
+    } catch (error: unknown) {
+      setDocumentAccessError(
+        error instanceof Error
+          ? error.message
+          : 'Student document could not be opened.',
+      );
+    } finally {
+      setOpeningDocumentId(null);
+    }
+  }
 
   return (
     <div className="grid gap-8 lg:grid-cols-2 animate-fade-in">
@@ -94,6 +116,11 @@ export function DocumentsTab({
         title="Uploaded Documents"
         description="Scanned copies and attachments provided during enrollment."
       >
+        {documentAccessError ? (
+          <div className="mb-4 rounded-2xl border border-danger-100 bg-danger-50 p-4 text-sm font-semibold text-danger-700">
+            {documentAccessError}
+          </div>
+        ) : null}
         {documents.length > 0 ? (
           <div className="grid gap-3">
             {documents.map((doc) => (
@@ -116,14 +143,17 @@ export function DocumentsTab({
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge
-                    variant="phase2"
-                    className="bg-success-50 text-success-600 border-success-100"
+                    variant={documentStatusVariant(doc.status)}
+                    className="uppercase tracking-wide"
                   >
-                    Verified
+                    {formatDocumentStatus(doc.status)}
                   </Badge>
                   <button
                     type="button"
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm hover:text-primary-500"
+                    disabled={openingDocumentId === doc.id}
+                    onClick={() => void openUploadedDocument(doc.id)}
+                    aria-label={`Open ${doc.title || doc.fileName}`}
+                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition hover:text-primary-500 disabled:cursor-wait disabled:opacity-60"
                   >
                     <Download size={18} />
                   </button>
@@ -216,6 +246,19 @@ function formatHistoryAction(action: string) {
     .toLowerCase()
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatDocumentStatus(status?: string) {
+  return (status ?? 'PENDING').replace(/_/g, ' ');
+}
+
+function documentStatusVariant(
+  status?: string,
+): 'success' | 'warning' | 'destructive' | 'neutral' {
+  if (status === 'VERIFIED') return 'success';
+  if (status === 'REJECTED' || status === 'ARCHIVED') return 'destructive';
+  if (status === 'PENDING' || status === 'UPLOADED') return 'warning';
+  return 'neutral';
 }
 
 function formatDateTime(value: string) {

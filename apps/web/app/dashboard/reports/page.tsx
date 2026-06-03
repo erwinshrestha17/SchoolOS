@@ -2,7 +2,12 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type {
+  ReportDefinition,
+  ReportFormat,
+} from '@schoolos/core';
 import { api } from '@/lib/api';
+import type { ReportSnapshot } from '@/lib/api/finance';
 import { SectionCard } from '@/components/ui/section-card';
 import { PageHeader } from '@/components/ui/page-header';
 import { Select, Input } from '@/components/ui/form-field';
@@ -17,6 +22,7 @@ import {
   Filter,
   ChevronRight,
   RefreshCw,
+  RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -35,9 +41,10 @@ export default function ReportsPage() {
 function ReportsWorkspace() {
   const queryClient = useQueryClient();
   const [selectedReportKey, setSelectedReportKey] = useState<string | null>(null);
-  const [filters, setFilters] = useState<Record<string, any>>({});
+  const [filters, setFilters] = useState<Record<string, string>>({});
   const [queueExport, setQueueExport] = useState(false);
-  const [exporting, setExporting] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<ReportFormat | null>(null);
+  const [retryingSnapshotId, setRetryingSnapshotId] = useState<string | null>(null);
   const [exportNotice, setExportNotice] = useState<{
     title: string;
     description?: string;
@@ -57,10 +64,16 @@ function ReportsWorkspace() {
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: api.listClasses });
   const examsQuery = useQuery({ queryKey: ['exam-terms'], queryFn: api.listExamTerms });
 
-  const reports = reportsQuery.data ?? [];
+  const reports = Array.isArray(reportsQuery.data) ? reportsQuery.data : [];
   const selectedReport = reports.find((r) => r.key === selectedReportKey);
+  const selectedFilters = selectedReport?.filters ?? [];
+  const selectedFormats = selectedReport?.formats ?? [];
+  const groupedReports = groupReportsByCategory(reports);
+  const snapshotItems = Array.isArray(snapshotsQuery.data?.items)
+    ? snapshotsQuery.data.items
+    : [];
 
-  const handleExport = async (format: 'csv' | 'pdf' | 'json') => {
+  const handleExport = async (format: ReportFormat) => {
     if (!selectedReportKey) return;
     setExporting(format);
     try {
@@ -105,7 +118,31 @@ function ReportsWorkspace() {
     }
   };
 
-  const handleFilterChange = (key: string, value: any) => {
+  const handleRetrySnapshot = async (snapshot: ReportSnapshot) => {
+    setRetryingSnapshotId(snapshot.id);
+    try {
+      await api.retryReportSnapshot(snapshot.id);
+      await queryClient.invalidateQueries({ queryKey: ['report-snapshots'] });
+      setExportNotice({
+        title: 'Export retry queued',
+        description: `${reportName(snapshot.reportKey, reports)} will move back into recent exports when the worker finishes it.`,
+        tone: 'success',
+      });
+    } catch (error: unknown) {
+      setExportNotice({
+        title: 'Retry failed',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'The report export could not be queued again.',
+        tone: 'danger',
+      });
+    } finally {
+      setRetryingSnapshotId(null);
+    }
+  };
+
+  const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -117,15 +154,16 @@ function ReportsWorkspace() {
           <div className="space-y-2">
             {reportsQuery.isLoading ? (
               <div className="py-8 text-center text-slate-500">Loading reports...</div>
+            ) : reportsQuery.error ? (
+              <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm font-semibold text-rose-700">
+                Report definitions could not be loaded.
+              </div>
+            ) : reports.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500">
+                No reports are available for your current modules and permissions.
+              </div>
             ) : (
-              Object.entries(
-                reports.reduce((acc, r) => {
-                  const cat = r.category || 'general';
-                  if (!acc[cat]) acc[cat] = [];
-                  acc[cat].push(r);
-                  return acc;
-                }, {} as Record<string, any[]>)
-              ).map(([category, items]) => (
+              Object.entries(groupedReports).map(([category, items]) => (
                 <div key={category} className="space-y-1">
                   <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 py-2 px-3">
                     {category}
@@ -177,7 +215,7 @@ function ReportsWorkspace() {
           >
             <div className="space-y-6">
               <div className="grid gap-4 sm:grid-cols-2">
-                {selectedReport.filters.map((filter) => (
+                {selectedFilters.map((filter) => (
                   <div key={filter.key} className="space-y-2">
                     <label className="text-xs font-bold text-slate-700">{filter.label}</label>
                     {filter.type === 'class' ? (
@@ -186,7 +224,7 @@ function ReportsWorkspace() {
                         onChange={(e) => handleFilterChange(filter.key, e.target.value)}
                       >
                         <option value="">Select Class</option>
-                        {classesQuery.data?.map(c => (
+                        {(classesQuery.data ?? []).map(c => (
                           <option key={c.id} value={c.id}>{c.name}</option>
                         ))}
                       </Select>
@@ -196,7 +234,7 @@ function ReportsWorkspace() {
                         onChange={(e) => handleFilterChange(filter.key, e.target.value)}
                       >
                         <option value="">Select Year</option>
-                        {academicYearsQuery.data?.map(y => (
+                        {(academicYearsQuery.data ?? []).map(y => (
                           <option key={y.id} value={y.id}>{y.name}</option>
                         ))}
                       </Select>
@@ -206,7 +244,7 @@ function ReportsWorkspace() {
                         onChange={(e) => handleFilterChange(filter.key, e.target.value)}
                       >
                         <option value="">Select Term</option>
-                        {examsQuery.data?.map(et => (
+                        {(examsQuery.data ?? []).map(et => (
                           <option key={et.id} value={et.id}>{et.name}</option>
                         ))}
                       </Select>
@@ -216,7 +254,7 @@ function ReportsWorkspace() {
                         onChange={(e) => handleFilterChange(filter.key, e.target.value)}
                       >
                         <option value="">Select Option</option>
-                        {filter.options.map((opt: any) => (
+                        {filter.options.map((opt) => (
                           <option key={opt.value} value={opt.value}>{opt.label}</option>
                         ))}
                       </Select>
@@ -250,7 +288,7 @@ function ReportsWorkspace() {
               </label>
 
               <div className="flex flex-wrap gap-3 pt-4 border-t border-slate-100">
-                {selectedReport.formats.includes('csv') && (
+                {selectedFormats.includes('csv') && (
                   <Button
                     onClick={() => handleExport('csv')}
                     disabled={!!exporting}
@@ -261,7 +299,7 @@ function ReportsWorkspace() {
                     {exporting === 'csv' ? 'Exporting...' : 'Download CSV'}
                   </Button>
                 )}
-                {selectedReport.formats.includes('pdf') && (
+                {selectedFormats.includes('pdf') && (
                   <Button
                     onClick={() => handleExport('pdf')}
                     disabled={!!exporting}
@@ -272,7 +310,7 @@ function ReportsWorkspace() {
                     {exporting === 'pdf' ? 'Exporting...' : 'Download PDF'}
                   </Button>
                 )}
-                {selectedReport.formats.includes('json') && (
+                {selectedFormats.includes('json') && (
                   <Button
                     onClick={() => handleExport('json')}
                     disabled={!!exporting}
@@ -323,12 +361,12 @@ function ReportsWorkspace() {
               <div className="rounded-2xl border border-rose-100 bg-rose-50 p-5 text-sm font-semibold text-rose-700">
                 Export history could not be loaded.
               </div>
-            ) : (snapshotsQuery.data?.items ?? []).length === 0 ? (
+            ) : snapshotItems.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm font-semibold text-slate-500">
                 No report exports have been recorded yet.
               </div>
             ) : (
-              snapshotsQuery.data?.items.map((snapshot) => (
+              snapshotItems.map((snapshot) => (
                 <div
                   key={snapshot.id}
                   className="flex flex-col gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
@@ -353,16 +391,30 @@ function ReportsWorkspace() {
                       {snapshot.errorSummary || summarizeFilters(snapshot.filters)}
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={snapshot.status !== 'COMPLETED' || !snapshot.fileAssetId}
-                    onClick={() => void handleDownloadSnapshot(snapshot.id)}
-                  >
-                    <Download size={14} className="mr-2" />
-                    Open Snapshot
-                  </Button>
+                  <div className="flex flex-wrap gap-2 sm:justify-end">
+                    {canRetrySnapshot(snapshot) ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        isLoading={retryingSnapshotId === snapshot.id}
+                        onClick={() => void handleRetrySnapshot(snapshot)}
+                      >
+                        <RotateCcw size={14} className="mr-2" />
+                        Retry
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={snapshot.status !== 'COMPLETED' || !snapshot.fileAssetId}
+                      onClick={() => void handleDownloadSnapshot(snapshot.id)}
+                    >
+                      <Download size={14} className="mr-2" />
+                      Open Snapshot
+                    </Button>
+                  </div>
                 </div>
               ))
             )}
@@ -371,6 +423,14 @@ function ReportsWorkspace() {
       </div>
     </div>
   );
+}
+
+function groupReportsByCategory(reports: ReportDefinition[]) {
+  return reports.reduce<Record<string, ReportDefinition[]>>((acc, report) => {
+    const category = report.category || 'general';
+    acc[category] = [...(acc[category] ?? []), report];
+    return acc;
+  }, {});
 }
 
 function reportName(reportKey: string, reports: Array<{ key: string; name: string }>) {
@@ -384,12 +444,16 @@ function statusVariant(status: string): 'success' | 'warning' | 'destructive' | 
   return 'neutral';
 }
 
+function canRetrySnapshot(snapshot: ReportSnapshot) {
+  return snapshot.status === 'FAILED' || snapshot.status === 'CANCELLED';
+}
+
 function formatDateTime(value?: string | null) {
   if (!value) return '—';
   return new Date(value).toLocaleString();
 }
 
-function summarizeFilters(filters: Record<string, unknown>) {
+function summarizeFilters(filters: ReportSnapshot['filters']) {
   const entries = Object.entries(filters ?? {}).filter(([, value]) => value);
   if (entries.length === 0) return 'No filters applied';
   return entries.map(([key, value]) => `${key}: ${String(value)}`).join(' • ');

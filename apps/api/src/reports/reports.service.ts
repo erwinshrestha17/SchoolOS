@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   ForbiddenException,
@@ -2099,6 +2100,90 @@ export class ReportsService {
     });
   }
 
+  async retryExport(
+    exportId: string,
+    actor: AuthContext,
+  ): Promise<{
+    id: string;
+    status: 'QUEUED';
+    jobId: string | number | undefined;
+  }> {
+    const exportRecord = await this.prisma.reportExport.findFirst({
+      where: { id: exportId, tenantId: actor.tenantId },
+    });
+
+    if (!exportRecord) {
+      throw new NotFoundException('Report export not found');
+    }
+
+    if (!['FAILED', 'CANCELLED'].includes(exportRecord.status)) {
+      throw new BadRequestException(
+        'Only failed or cancelled report exports can be retried',
+      );
+    }
+
+    const executor = this.registry.get(exportRecord.reportKey);
+    if (!executor) {
+      throw new NotFoundException('Report not found');
+    }
+
+    if (
+      !executor.definition.requiredPermissions.every((permission) =>
+        actor.permissions.includes(permission),
+      )
+    ) {
+      throw new ForbiddenException(
+        'Insufficient permissions to retry this report',
+      );
+    }
+
+    if (!isReportFormat(exportRecord.format)) {
+      throw new BadRequestException('Report export format is not supported');
+    }
+
+    if (!executor.definition.formats.includes(exportRecord.format)) {
+      throw new ForbiddenException(
+        `Format ${exportRecord.format} not supported for this report`,
+      );
+    }
+
+    const filters = coerceReportFilters(exportRecord.filters);
+
+    await this.prisma.reportExport.update({
+      where: { id: exportRecord.id },
+      data: {
+        status: 'QUEUED',
+        errorSummary: null,
+        completedAt: null,
+        requestedBy: actor.userId,
+      },
+    });
+
+    const job = await this.reportsQueue.add('generateReport', {
+      exportId: exportRecord.id,
+      reportKey: exportRecord.reportKey,
+      filters,
+      format: exportRecord.format,
+      actor,
+    });
+
+    await this.auditService.record({
+      action: 'retry_report_export',
+      resource: 'report_export',
+      resourceId: exportRecord.id,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      after: {
+        reportKey: exportRecord.reportKey,
+        format: exportRecord.format,
+        filters,
+        jobId: job.id,
+      },
+    });
+
+    return { id: exportRecord.id, status: 'QUEUED', jobId: job.id };
+  }
+
   private convertToCsv(data: Array<Record<string, unknown>>): string {
     if (data.length === 0) return '';
 
@@ -2276,10 +2361,10 @@ export class ReportsService {
 
   async getExportHistory(
     tenantId: string,
-    query: { page?: number; limit?: number },
+    query: { page?: number | string; limit?: number | string },
   ) {
-    const page = Number(query.page) || 1;
-    const limit = Math.min(Number(query.limit) || 25, 100);
+    const page = normalizePositiveInteger(query.page, 1);
+    const limit = Math.min(normalizePositiveInteger(query.limit, 25), 100);
     const skip = (page - 1) * limit;
 
     const where: Prisma.ReportExportWhereInput = { tenantId };
@@ -2345,4 +2430,24 @@ export class ReportsService {
       content,
     };
   }
+}
+
+function normalizePositiveInteger(
+  value: number | string | undefined,
+  fallback: number,
+) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function isReportFormat(value: string): value is ReportFormat {
+  return value === 'csv' || value === 'pdf' || value === 'json';
+}
+
+function coerceReportFilters(value: Prisma.JsonValue): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as Record<string, unknown>;
 }

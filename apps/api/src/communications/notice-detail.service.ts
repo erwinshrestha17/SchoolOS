@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { AuthContext } from '../auth/auth.types';
+import { FileRegistryService } from '../file-registry/file-registry.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface NoticeDetail {
@@ -32,7 +33,10 @@ export interface NoticeDetail {
 
 @Injectable()
 export class NoticeDetailService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly fileRegistryService: FileRegistryService,
+  ) {}
 
   async getNoticeDetail(
     noticeId: string,
@@ -84,6 +88,8 @@ export class NoticeDetailService {
       deliveryGroups.map((group) => [group.status, group._count.status]),
     );
 
+    const attachmentUrl = await this.resolveAttachmentUrl(notice, actor);
+
     return {
       id: notice.id,
       title: notice.title,
@@ -100,7 +106,7 @@ export class NoticeDetailService {
             email: notice.createdBy.email,
           }
         : null,
-      attachmentUrl: notice.attachmentUrl,
+      attachmentUrl,
       scheduledFor: notice.scheduledFor?.toISOString() ?? null,
       publishedAt: notice.publishedAt?.toISOString() ?? null,
       createdAt: notice.createdAt.toISOString(),
@@ -116,5 +122,22 @@ export class NoticeDetailService {
         skipped: deliveryCounts.get('SKIPPED') ?? 0,
       },
     };
+  }
+
+  private async resolveAttachmentUrl(
+    notice: { id: string; attachmentUrl: string | null },
+    actor: AuthContext,
+  ) {
+    const [linkedFile] = await this.fileRegistryService.listFilesByEntity(
+      actor.tenantId,
+      'notices',
+      notice.id,
+    );
+
+    if (!linkedFile) {
+      return notice.attachmentUrl;
+    }
+
+    return this.fileRegistryService.getSignedUrl(actor.tenantId, linkedFile.id);
   }
 }

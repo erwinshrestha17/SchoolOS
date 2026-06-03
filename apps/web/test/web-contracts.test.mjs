@@ -328,6 +328,37 @@ describe('SchoolOS web production contracts', () => {
     assert.doesNotMatch(polishedSurfaces, /window\.confirm|confirm\(/);
   });
 
+  it('keeps report export retry wired through the backend snapshot route', () => {
+    const reportsPage = read('app/dashboard/reports/page.tsx');
+    const financeApi = read('lib/api/finance.ts');
+
+    assert.match(financeApi, /retryReportSnapshot/);
+    assert.match(
+      financeApi,
+      /\/reports\/export-history\/\$\{encodeURIComponent\(id\)\}\/retry/,
+    );
+    assert.match(financeApi, /method:\s*'POST'/);
+
+    for (const marker of [
+      'handleRetrySnapshot',
+      'api.retryReportSnapshot(snapshot.id)',
+      'retryingSnapshotId',
+      'Export retry queued',
+      'Retry failed',
+      'canRetrySnapshot',
+      'Retry',
+    ]) {
+      assert.ok(reportsPage.includes(marker), `Missing marker: ${marker}`);
+    }
+
+    assert.match(reportsPage, /snapshot\.status === 'FAILED'/);
+    assert.match(reportsPage, /snapshot\.status === 'CANCELLED'/);
+    assert.match(
+      reportsPage,
+      /invalidateQueries\(\{\s*queryKey:\s*\['report-snapshots'\]/,
+    );
+  });
+
   it('keeps platform administration routes present and secure', () => {
     const platformRoutes = ['dashboard', 'schools'];
 
@@ -789,6 +820,7 @@ describe('SchoolOS web production contracts', () => {
     const detailPage = readMany([
       'components/students/student-detail-page.tsx',
       'components/students/profile/tabs/documents-tab.tsx',
+      'components/admissions/admissions-pipeline.tsx',
     ]);
     const apiClient = readMany(['lib/api/students.ts', 'lib/api/client.ts']);
 
@@ -804,6 +836,17 @@ describe('SchoolOS web production contracts', () => {
     assert.match(detailPage, /Leaving Certificate/);
     assert.match(detailPage, /Character Certificate/);
     assert.match(apiClient, /uploadStudentDocument:/);
+    assert.match(apiClient, /downloadStudentDocument:\s*\(studentId:\s*string,\s*documentId:\s*string\)/);
+    assert.match(
+      apiClient,
+      /\/students\/\$\{encodeURIComponent\(studentId\)\}\/documents\/\$\{encodeURIComponent\(documentId\)\}\/download-url/,
+    );
+    assert.match(detailPage, /api\.downloadStudentDocument\(studentId, documentId\)/);
+    assert.match(detailPage, /openUploadedDocument\(doc\.id\)/);
+    assert.match(detailPage, /window\.open\(access\.url/);
+    assert.match(detailPage, /formatDocumentStatus\(doc\.status\)/);
+    assert.match(detailPage, /api\.previewStudentDocument\(\s*selectedAdmission\.id,\s*match\.id/);
+    assert.doesNotMatch(detailPage, /href="#"/);
     assert.match(apiClient, /revokeGeneratedStudentDocument:/);
     assert.match(apiClient, /openStudentDocumentPdf[\s\S]*openPdfBlob/);
     assert.doesNotMatch(
@@ -1527,6 +1570,8 @@ describe('SchoolOS web production contracts', () => {
 
   it('keeps notices screen wired to real M10 APIs', () => {
     const communicationsForm = read('components/forms/communications-form.tsx');
+    const noticeDetailPage = read('app/dashboard/notices/[noticeId]/page.tsx');
+    const communicationsApi = read('lib/api/communications.ts');
     const requiredApis = [
       'api.listClasses',
       'api.listSections',
@@ -1544,6 +1589,16 @@ describe('SchoolOS web production contracts', () => {
     for (const apiCall of requiredApis) {
       assert.match(communicationsForm, new RegExp(apiCall.replace('.', '\\.')));
     }
+
+    assert.match(communicationsApi, /getNoticeDetail:/);
+    assert.match(communicationsApi, /listNoticeUnreadRecipients:/);
+    assert.match(noticeDetailPage, /api\.getNoticeDetail\(noticeId\)/);
+    assert.match(
+      noticeDetailPage,
+      /api\.listNoticeUnreadRecipients\(noticeId\)/,
+    );
+    assert.match(noticeDetailPage, /Open attachment/);
+    assert.doesNotMatch(noticeDetailPage, /fetchNoticeDetail|API_BASE_URL/);
   });
 
   it('keeps communications sections and notice audience controls available', () => {

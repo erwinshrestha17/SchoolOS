@@ -1,75 +1,22 @@
 'use client';
 
-import type { ApiResponse } from '@schoolos/core';
 import { useQuery } from '@tanstack/react-query';
+import {
+  api,
+  type NoticeDetail,
+  type NoticeUnreadRecipientsResult,
+} from '@/lib/api';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import { ArrowLeft, CalendarClock, Megaphone, Paperclip, Send, UsersRound } from 'lucide-react';
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api/v1';
-
-type NoticeDetail = {
-  id: string;
-  title: string;
-  body: string;
-  priority: string;
-  audienceType: string;
-  classId: string | null;
-  className: string | null;
-  sectionId: string | null;
-  sectionName: string | null;
-  createdBy: {
-    id: string;
-    email: string | null;
-  } | null;
-  attachmentUrl: string | null;
-  scheduledFor: string | null;
-  publishedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-  deliverySummary: {
-    total: number;
-    queued: number;
-    sent: number;
-    failed: number;
-    skipped: number;
-  };
-};
-
-type UnreadNoticeRecipient = {
-  deliveryId: string;
-  channel: string;
-  status: string;
-  destination: string | null;
-  errorMessage: string | null;
-  sentAt: string | null;
-  createdAt: string;
-  recipientUserId: string | null;
-  recipientEmail: string | null;
-  guardian: {
-    id: string;
-    fullName: string;
-    primaryPhone: string | null;
-    email: string | null;
-  } | null;
-  student: {
-    id: string;
-    studentSystemId: string;
-    fullName: string;
-    className: string | null;
-    sectionName: string | null;
-  } | null;
-};
-
-type NoticeUnreadRecipientsResult = {
-  noticeId: string;
-  totalDeliveries: number;
-  readCount: number;
-  unreadCount: number;
-  recipients: UnreadNoticeRecipient[];
-};
+import {
+  ArrowLeft,
+  CalendarClock,
+  Megaphone,
+  Paperclip,
+  Send,
+  UsersRound,
+} from 'lucide-react';
 
 export default function NoticeDetailPage() {
   const params = useParams<{ noticeId: string }>();
@@ -77,13 +24,13 @@ export default function NoticeDetailPage() {
 
   const noticeQuery = useQuery({
     queryKey: ['notice-detail', noticeId],
-    queryFn: () => fetchNoticeDetail(noticeId),
+    queryFn: () => api.getNoticeDetail(noticeId),
     enabled: Boolean(noticeId),
   });
 
   const unreadRecipientsQuery = useQuery({
     queryKey: ['notice-unread-recipients', noticeId],
-    queryFn: () => fetchUnreadRecipients(noticeId),
+    queryFn: () => api.listNoticeUnreadRecipients(noticeId),
     enabled: Boolean(noticeId),
   });
 
@@ -173,7 +120,7 @@ export default function NoticeDetailPage() {
             <a
               href={notice.attachmentUrl}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-2xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
             >
               <Paperclip size={16} />
@@ -513,61 +460,6 @@ function InfoCard({
       </dl>
     </div>
   );
-}
-
-async function fetchNoticeDetail(noticeId: string) {
-  const response = await fetch(
-    `${API_BASE_URL}/notices/${encodeURIComponent(noticeId)}`,
-    {
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    },
-  );
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(parseApiErrorMessage(text) || `Request failed with status ${response.status}`);
-  }
-
-  const payload = (await response.json()) as ApiResponse<NoticeDetail>;
-  return payload.data;
-}
-
-async function fetchUnreadRecipients(noticeId: string) {
-  const response = await fetch(
-    `${API_BASE_URL}/notices/${encodeURIComponent(noticeId)}/unread-recipients`,
-    {
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    },
-  );
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(parseApiErrorMessage(text) || `Request failed with status ${response.status}`);
-  }
-
-  const payload = (await response.json()) as ApiResponse<NoticeUnreadRecipientsResult>;
-  return payload.data;
-}
-
-function parseApiErrorMessage(text: string) {
-  if (!text) {
-    return '';
-  }
-
-  try {
-    const payload = JSON.parse(text) as { message?: string | string[]; error?: string };
-    return Array.isArray(payload.message)
-      ? payload.message.join(', ')
-      : payload.message || payload.error || text;
-  } catch {
-    return text;
-  }
 }
 
 function resolveNoticeState(notice: NoticeDetail) {

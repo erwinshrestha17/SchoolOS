@@ -12,8 +12,75 @@ import {
   request,
 } from './client';
 
+export type NoticeDetail = {
+  id: string;
+  title: string;
+  body: string;
+  priority: string;
+  audienceType: string;
+  classId: string | null;
+  className: string | null;
+  sectionId: string | null;
+  sectionName: string | null;
+  createdBy: {
+    id: string;
+    email: string | null;
+  } | null;
+  attachmentUrl: string | null;
+  scheduledFor: string | null;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deliverySummary: {
+    total: number;
+    queued: number;
+    sent: number;
+    failed: number;
+    skipped: number;
+  };
+};
+
+export type NoticeUnreadRecipient = {
+  deliveryId: string;
+  channel: string;
+  status: string;
+  destination: string | null;
+  errorMessage: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  recipientUserId: string | null;
+  recipientEmail: string | null;
+  guardian: {
+    id: string;
+    fullName: string;
+    primaryPhone: string | null;
+    email: string | null;
+  } | null;
+  student: {
+    id: string;
+    studentSystemId: string;
+    fullName: string;
+    className: string | null;
+    sectionName: string | null;
+  } | null;
+};
+
+export type NoticeUnreadRecipientsResult = {
+  noticeId: string;
+  totalDeliveries: number;
+  readCount: number;
+  unreadCount: number;
+  recipients: NoticeUnreadRecipient[];
+};
+
 export const communicationsApi = {
   listNotices: () => request<NoticeSummary[]>('/notices'),
+  getNoticeDetail: (noticeId: string) =>
+    request<NoticeDetail>(`/notices/${encodeURIComponent(noticeId)}`),
+  listNoticeUnreadRecipients: (noticeId: string) =>
+    request<NoticeUnreadRecipientsResult>(
+      `/notices/${encodeURIComponent(noticeId)}/unread-recipients`,
+    ),
   createNotice: (body: JsonBody) =>
     request<NoticeSummary>('/notices', { method: 'POST', json: body }),
   listEvents: () => request<EventSummary[]>('/events'),

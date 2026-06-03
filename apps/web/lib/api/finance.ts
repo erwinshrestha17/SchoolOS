@@ -185,6 +185,11 @@ export const financeApi = {
     request<ReportSnapshotsPage>(
       withQuery('/reports/export-history', params ?? {}),
     ),
+  retryReportSnapshot: (id: string) =>
+    request<{ id: string; status: 'QUEUED'; jobId?: string | number }>(
+      `/reports/export-history/${encodeURIComponent(id)}/retry`,
+      { method: 'POST' },
+    ),
   downloadReportSnapshot: async (id: string) => {
     const response = await fetch(
       `${API_BASE_URL}/reports/export-history/${encodeURIComponent(id)}/download`,

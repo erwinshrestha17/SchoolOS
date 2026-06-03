@@ -5,7 +5,7 @@ import { AuditService } from '../audit/audit.service';
 import { AuthContext } from '../auth/auth.types';
 import { FinanceService } from '../finance/finance.service';
 import { AuthMethod } from '@prisma/client';
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { FileRegistryService } from '../file-registry/file-registry.service';
 
@@ -14,6 +14,7 @@ describe('ReportsService', () => {
   let prisma: PrismaService;
   let audit: AuditService;
   let fileRegistry: FileRegistryService;
+  let reportsQueue: { add: jest.Mock };
 
   const actor: AuthContext = {
     tenantId: 'tenant-1',
@@ -216,6 +217,7 @@ describe('ReportsService', () => {
     prisma = module.get<PrismaService>(PrismaService);
     audit = module.get<AuditService>(AuditService);
     fileRegistry = module.get<FileRegistryService>(FileRegistryService);
+    reportsQueue = module.get(getQueueToken('reports'));
   });
 
   it('lists reports the user has permission to see', () => {
@@ -416,6 +418,103 @@ describe('ReportsService', () => {
           fileAssetId: 'file-1',
         }),
       }),
+    );
+  });
+
+  it('lists export history with tenant scope and safe pagination bounds', async () => {
+    (prisma.reportExport.findMany as jest.Mock).mockResolvedValueOnce([
+      { id: 'export-1', tenantId: actor.tenantId },
+    ]);
+    (prisma.reportExport.count as jest.Mock).mockResolvedValueOnce(250);
+
+    const result = await service.getExportHistory(actor.tenantId, {
+      page: '-5',
+      limit: '500',
+    });
+
+    expect(prisma.reportExport.findMany).toHaveBeenCalledWith({
+      where: { tenantId: actor.tenantId },
+      orderBy: { createdAt: 'desc' },
+      skip: 0,
+      take: 100,
+    });
+    expect(prisma.reportExport.count).toHaveBeenCalledWith({
+      where: { tenantId: actor.tenantId },
+    });
+    expect(result).toEqual({
+      items: [{ id: 'export-1', tenantId: actor.tenantId }],
+      total: 250,
+      page: 1,
+      limit: 100,
+      hasNextPage: true,
+    });
+  });
+
+  it('retries failed exports with original filters and tenant scope', async () => {
+    (prisma.reportExport.findFirst as jest.Mock).mockResolvedValueOnce({
+      id: 'export-1',
+      tenantId: actor.tenantId,
+      reportKey: 'student-roster',
+      format: 'csv',
+      filters: { status: 'ACTIVE' },
+      status: 'FAILED',
+    });
+
+    const result = await service.retryExport('export-1', actor);
+
+    expect(prisma.reportExport.findFirst).toHaveBeenCalledWith({
+      where: { id: 'export-1', tenantId: actor.tenantId },
+    });
+    expect(prisma.reportExport.update).toHaveBeenCalledWith({
+      where: { id: 'export-1' },
+      data: {
+        status: 'QUEUED',
+        errorSummary: null,
+        completedAt: null,
+        requestedBy: actor.userId,
+      },
+    });
+    expect(reportsQueue.add).toHaveBeenCalledWith('generateReport', {
+      exportId: 'export-1',
+      reportKey: 'student-roster',
+      filters: { status: 'ACTIVE' },
+      format: 'csv',
+      actor,
+    });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'retry_report_export',
+        resource: 'report_export',
+        resourceId: 'export-1',
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+      }),
+    );
+    expect(result).toEqual({
+      id: 'export-1',
+      status: 'QUEUED',
+      jobId: 'job-1',
+    });
+  });
+
+  it('does not retry completed exports', async () => {
+    (prisma.reportExport.findFirst as jest.Mock).mockResolvedValueOnce({
+      id: 'export-1',
+      tenantId: actor.tenantId,
+      reportKey: 'student-roster',
+      format: 'csv',
+      filters: {},
+      status: 'COMPLETED',
+    });
+
+    await expect(service.retryExport('export-1', actor)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+
+    expect(prisma.reportExport.update).not.toHaveBeenCalled();
+    expect(reportsQueue.add).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'retry_report_export' }),
     );
   });
 });

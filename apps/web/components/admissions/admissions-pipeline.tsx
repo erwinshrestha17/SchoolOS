@@ -474,15 +474,19 @@ export function AdmissionsPipeline() {
                               {/* Action Trigger / Status */}
                               {match ? (
                                 <div className="flex items-center gap-1">
-                                  <a
-                                    href={`${api.getStudentQrImageUrl ? api.getStudentQrImageUrl(selectedAdmission.id, match.fileId) : '#'}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    onClick={async (e) => {
-                                      e.preventDefault();
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
                                       try {
-                                        const res = await api.previewStudentDocument(match.id);
-                                        window.open(res.url, '_blank');
+                                        const res = await api.previewStudentDocument(
+                                          selectedAdmission.id,
+                                          match.id,
+                                        );
+                                        window.open(
+                                          res.url,
+                                          '_blank',
+                                          'noopener,noreferrer',
+                                        );
                                       } catch (err) {
                                         setActionNotice({
                                           title: 'Could not preview document',
@@ -491,11 +495,11 @@ export function AdmissionsPipeline() {
                                         });
                                       }
                                     }}
-                                    className="p-1 text-slate-400 hover:text-primary-600 transition-colors"
+                                    className="p-1 text-slate-400 transition-colors hover:text-primary-600"
                                     title="Preview"
                                   >
                                     <ExternalLink className="h-3.5 w-3.5" />
-                                  </a>
+                                  </button>
                                   <button
                                     onClick={() => deleteDocMutation.mutate(match.id)}
                                     className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
