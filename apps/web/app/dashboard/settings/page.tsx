@@ -6,7 +6,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import type { LucideIcon } from 'lucide-react';
 import {
   AlertCircle,
+  ArrowRight,
   ArrowUpRight,
+  BookOpen,
   Calculator,
   CheckCircle2,
   Clock,
@@ -17,6 +19,8 @@ import {
   FileText,
   GraduationCap,
   ImageUp,
+  Key,
+  LayoutDashboard,
   Loader2,
   Lock,
   MessageSquare,
@@ -27,16 +31,20 @@ import {
   Search,
   Shield,
   Upload,
+  UserCog,
   Users,
   X,
   Check,
+  ChevronRight,
 } from 'lucide-react';
 
 import { Button } from '../../../components/ui/button';
 import { ConfirmDialog } from '../../../components/ui/confirm-dialog';
+import { SetupForm } from '../../../components/forms/setup-form';
 import { useEntitlements } from '../../../components/entitlements-provider';
 import { api, type TenantLogoAccess } from '../../../lib/api';
 import { cn } from '../../../lib/utils';
+import { systemRoleDefinitions, systemRolePermissions } from '@schoolos/core';
 import type { TenantSettingKey, TenantSettingSummary } from '@schoolos/core';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -128,7 +136,7 @@ const SETTINGS_SECTIONS: SettingSectionConfig[] = [
   {
     id: 'branding',
     eyebrow: 'Documents',
-    title: 'Branding & Regional',
+    title: 'Branding & Documents',
     description: 'Control the school logo, document copy, currency, date format, and default paper size.',
     icon: Palette,
     tone: 'bg-violet-50 text-violet-700 border-violet-100',
@@ -193,7 +201,7 @@ const SETTINGS_SECTIONS: SettingSectionConfig[] = [
     icon: GraduationCap,
     tone: 'bg-indigo-50 text-indigo-700 border-indigo-100',
     featureLink: {
-      href: '/dashboard/setup',
+      href: '/dashboard/settings?section=school-setup',
       label: 'Open School Setup',
       description: 'Create academic years, classes, and sections.',
     },
@@ -233,7 +241,7 @@ const SETTINGS_SECTIONS: SettingSectionConfig[] = [
   {
     id: 'fees',
     eyebrow: 'Billing rules',
-    title: 'Fee Setup',
+    title: 'Fee & Payment Rules',
     description: 'Configure receipt numbering, late fee behavior, approval requirements, and accepted payment methods.',
     icon: CreditCard,
     tone: 'bg-emerald-50 text-emerald-700 border-emerald-100',
@@ -288,7 +296,7 @@ const SETTINGS_SECTIONS: SettingSectionConfig[] = [
   {
     id: 'communication',
     eyebrow: 'Parent engagement',
-    title: 'Communication',
+    title: 'Communication Rules',
     description: 'Configure notification defaults, consent requirements, quiet hours, and teacher chat availability.',
     icon: MessageSquare,
     tone: 'bg-cyan-50 text-cyan-700 border-cyan-100',
@@ -319,7 +327,7 @@ const SETTINGS_SECTIONS: SettingSectionConfig[] = [
   {
     id: 'payroll',
     eyebrow: 'Staff controls',
-    title: 'HR & Payroll',
+    title: 'HR & Payroll Rules',
     description: 'Configure leave approval, salary calculation defaults, PF/TDS readiness, and payroll approvals.',
     icon: Users,
     tone: 'bg-sky-50 text-sky-700 border-sky-100',
@@ -352,7 +360,7 @@ const SETTINGS_SECTIONS: SettingSectionConfig[] = [
   {
     id: 'accounting',
     eyebrow: 'Finance control',
-    title: 'Accounting',
+    title: 'Accounting Defaults',
     description: 'Set fiscal labels, account mappings, voucher numbering, and period lock behavior.',
     icon: Calculator,
     tone: 'bg-rose-50 text-rose-700 border-rose-100',
@@ -387,7 +395,7 @@ const SETTINGS_SECTIONS: SettingSectionConfig[] = [
   {
     id: 'security',
     eyebrow: 'Governance',
-    title: 'Security & Access',
+    title: 'Security & Privacy',
     description: 'Control export permissions, data masking, sensitive reveal reasons, and session timeout.',
     icon: Shield,
     tone: 'bg-slate-100 text-slate-700 border-slate-200',
@@ -401,7 +409,41 @@ const SETTINGS_SECTIONS: SettingSectionConfig[] = [
   },
 ];
 
-const UTILITY_SECTIONS = [
+// ─── Utility section definitions (no editable fields) ─────────────────────────
+
+const SPECIAL_SECTIONS = [
+  {
+    id: 'overview',
+    eyebrow: 'Console',
+    title: 'Overview',
+    description: 'Settings readiness dashboard. Review and configure your school\'s core operational setup.',
+    icon: LayoutDashboard,
+    tone: 'bg-slate-100 text-slate-600 border-slate-200',
+  },
+  {
+    id: 'school-setup',
+    eyebrow: 'Academic structure',
+    title: 'School Setup',
+    description: 'Configure academic years, classes, sections, and foundational academic structure.',
+    icon: BookOpen,
+    tone: 'bg-green-50 text-green-700 border-green-100',
+  },
+  {
+    id: 'users-access',
+    eyebrow: 'Access control',
+    title: 'Users & Access',
+    description: 'Manage admin, staff, parent, and student access to SchoolOS.',
+    icon: UserCog,
+    tone: 'bg-blue-50 text-blue-700 border-blue-100',
+  },
+  {
+    id: 'roles-permissions',
+    eyebrow: 'Access control',
+    title: 'Roles & Permissions',
+    description: 'Review preset roles, permission coverage, and module-level access.',
+    icon: Key,
+    tone: 'bg-purple-50 text-purple-700 border-purple-100',
+  },
   {
     id: 'data',
     eyebrow: 'Data operations',
@@ -426,17 +468,46 @@ const UTILITY_SECTIONS = [
     icon: CreditCard,
     tone: 'bg-purple-50 text-purple-700 border-purple-100',
   },
-] satisfies Array<Omit<SettingSectionConfig, 'fields'> & { fields?: never }>;
+] as const;
 
-const ALL_SECTIONS = [...SETTINGS_SECTIONS, ...UTILITY_SECTIONS];
+type SpecialSectionId = (typeof SPECIAL_SECTIONS)[number]['id'];
+
+const ALL_SECTIONS = [...SPECIAL_SECTIONS, ...SETTINGS_SECTIONS] as const;
 
 // Left nav groups define the visual grouping in the sidebar
 const NAV_GROUPS: NavGroup[] = [
-  { label: 'School', items: ['profile', 'branding'] },
+  { label: 'School', items: ['overview', 'school-setup', 'profile', 'branding'] },
+  { label: 'Access Control', items: ['users-access', 'roles-permissions'] },
   { label: 'Academic & Operations', items: ['academic', 'attendance', 'fees', 'communication'] },
   { label: 'Staff & Finance', items: ['payroll', 'accounting'] },
   { label: 'Security & Data', items: ['security', 'data', 'audit', 'subscription'] },
 ];
+
+// Map old/legacy tab/section values to new ids
+const SECTION_ALIASES: Record<string, string> = {
+  setup: 'school-setup',
+  'school-setup': 'school-setup',
+  branding: 'branding',
+  profile: 'profile',
+  academic: 'academic',
+  attendance: 'attendance',
+  fees: 'fees',
+  fee: 'fees',
+  communication: 'communication',
+  payroll: 'payroll',
+  hr: 'payroll',
+  accounting: 'accounting',
+  security: 'security',
+  data: 'data',
+  audit: 'audit',
+  subscription: 'subscription',
+  'users-access': 'users-access',
+  users: 'users-access',
+  'roles-permissions': 'roles-permissions',
+  roles: 'roles-permissions',
+};
+
+const ALL_SECTION_IDS = ALL_SECTIONS.map((s) => s.id);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -475,6 +546,12 @@ function buildInitialForm(settings: TenantSettingSummary[]) {
 
 const valuesEqual = (left: unknown, right: unknown) => JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
 
+function resolveSection(raw: string | null): string {
+  if (!raw) return 'overview';
+  const aliased = SECTION_ALIASES[raw.toLowerCase()] ?? raw;
+  return ALL_SECTION_IDS.includes(aliased) ? aliased : 'overview';
+}
+
 // ─── Page Entry ───────────────────────────────────────────────────────────────
 
 export default function TenantSettingsPage() {
@@ -490,7 +567,8 @@ export default function TenantSettingsPage() {
 function TenantSettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const requestedSection = searchParams.get('section') || searchParams.get('tab') || 'profile';
+  const requestedSection = searchParams.get('section') ?? searchParams.get('tab');
+  const activeSectionId = resolveSection(requestedSection);
 
   const [settings, setSettings] = useState<TenantSettingSummary[]>([]);
   const [form, setForm] = useState<Record<string, unknown>>({});
@@ -500,10 +578,8 @@ function TenantSettingsContent() {
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [query, setQuery] = useState('');
 
-  const sectionIds = ALL_SECTIONS.map((section) => section.id);
-  const activeSectionId = sectionIds.includes(requestedSection) ? requestedSection : 'profile';
-  const activeSection = ALL_SECTIONS.find((section) => section.id === activeSectionId) ?? ALL_SECTIONS[0];
-  const activeEditableSection = SETTINGS_SECTIONS.find((section) => section.id === activeSectionId);
+  const activeSection = ALL_SECTIONS.find((s) => s.id === activeSectionId) ?? ALL_SECTIONS[0];
+  const activeEditableSection = SETTINGS_SECTIONS.find((s) => s.id === activeSectionId);
 
   const initialForm = useMemo(() => buildInitialForm(settings), [settings]);
   const editableKeys = useMemo(
@@ -517,6 +593,7 @@ function TenantSettingsContent() {
 
   const logoSetting = settings.find((setting) => setting.key === 'school_logo');
   const logoFileAssetId = typeof logoSetting?.value === 'string' ? logoSetting.value : null;
+  const schoolName = String(form['school_name'] ?? '');
 
   useEffect(() => {
     void fetchSettings();
@@ -616,12 +693,12 @@ function TenantSettingsContent() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pb-20">
       {/* ── Compact Page Header ─────────────────────────────── */}
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Settings</h1>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Settings</h1>
+          <p className="mt-1 text-sm text-slate-500">
             Manage school profile, rules, permissions, documents, and tenant configuration.
           </p>
         </div>
@@ -636,6 +713,18 @@ function TenantSettingsContent() {
             </span>
           )}
         </div>
+      </div>
+
+      {/* ── Mobile Section Selector (visible on < xl screens) ── */}
+      <div className="mb-4 xl:hidden">
+        <MobileSectionSelector
+          allSections={ALL_SECTIONS}
+          navGroups={NAV_GROUPS}
+          activeSectionId={activeSectionId}
+          changedKeys={changedKeys}
+          settingsSections={SETTINGS_SECTIONS}
+          onSwitchSection={switchSection}
+        />
       </div>
 
       {/* ── Two-column Settings Shell ────────────────────────── */}
@@ -676,9 +765,9 @@ function TenantSettingsContent() {
           {/* Section Content */}
           <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
             {/* Section Header */}
-            <SectionHeader section={activeSection} />
+            <SectionHeader section={activeSection} settingsSections={SETTINGS_SECTIONS} />
 
-            {/* Editable Fields */}
+            {/* Editable Settings Fields */}
             {activeEditableSection && (
               <EditableSettingsSection
                 section={activeEditableSection}
@@ -689,7 +778,27 @@ function TenantSettingsContent() {
               />
             )}
 
-            {/* Utility Panels */}
+            {/* Special Panels */}
+            {activeSectionId === 'overview' && (
+              <div className="p-6">
+                <OverviewPanel settings={settings} schoolName={schoolName} logoFileAssetId={logoFileAssetId} onSwitchSection={switchSection} />
+              </div>
+            )}
+            {activeSectionId === 'school-setup' && (
+              <div className="p-6">
+                <SchoolSetupPanel />
+              </div>
+            )}
+            {activeSectionId === 'users-access' && (
+              <div className="p-6">
+                <UsersAccessPanel />
+              </div>
+            )}
+            {activeSectionId === 'roles-permissions' && (
+              <div className="p-6">
+                <RolesPermissionsPanel />
+              </div>
+            )}
             {activeSectionId === 'data' && <div className="p-6"><DataOperations /></div>}
             {activeSectionId === 'audit' && <div className="p-6"><AuditPanel /></div>}
             {activeSectionId === 'subscription' && <div className="p-6"><SubscriptionPanel /></div>}
@@ -820,12 +929,95 @@ function SettingsSidebar({
   );
 }
 
+// ─── Mobile Section Selector ─────────────────────────────────────────────────
+
+function MobileSectionSelector({
+  allSections,
+  navGroups,
+  activeSectionId,
+  changedKeys,
+  settingsSections,
+  onSwitchSection,
+}: {
+  allSections: typeof ALL_SECTIONS;
+  navGroups: NavGroup[];
+  activeSectionId: string;
+  changedKeys: string[];
+  settingsSections: SettingSectionConfig[];
+  onSwitchSection: (id: string) => void;
+}) {
+  const activeSection = allSections.find((s) => s.id === activeSectionId);
+
+  return (
+    <div className="space-y-2">
+      <div className="-mx-1 overflow-x-auto pb-1 pt-0.5">
+        <div className="flex min-w-max gap-1 px-1">
+          {navGroups.map((group) => (
+            <div key={group.label} className="flex items-center gap-1">
+              <span className="px-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                {group.label}
+              </span>
+              {group.items.map((sectionId) => {
+                const section = allSections.find((s) => s.id === sectionId);
+                if (!section) return null;
+                const isActive = sectionId === activeSectionId;
+                const editableSection = settingsSections.find((s) => s.id === sectionId);
+                const dirtyCount = editableSection
+                  ? editableSection.fields.filter((f) => changedKeys.includes(f.key)).length
+                  : 0;
+                const Icon = section.icon;
+
+                return (
+                  <button
+                    key={sectionId}
+                    type="button"
+                    onClick={() => onSwitchSection(sectionId)}
+                    className={cn(
+                      'inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition',
+                      isActive
+                        ? 'bg-slate-900 text-white'
+                        : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900',
+                    )}
+                  >
+                    <Icon size={12} className="shrink-0" />
+                    {section.title}
+                    {dirtyCount > 0 && (
+                      <span
+                        className={cn(
+                          'flex h-4 min-w-[1rem] items-center justify-center rounded-full px-1 text-[10px] font-bold',
+                          isActive ? 'bg-amber-400 text-amber-900' : 'bg-amber-100 text-amber-700',
+                        )}
+                      >
+                        {dirtyCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+      {activeSection && (
+        <p className="text-xs text-slate-400">
+          Viewing: <span className="font-medium text-slate-600">{activeSection.title}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── Section Header ───────────────────────────────────────────────────────────
 
-function SectionHeader({ section }: { section: (typeof ALL_SECTIONS)[number] }) {
+function SectionHeader({
+  section,
+  settingsSections,
+}: {
+  section: (typeof ALL_SECTIONS)[number];
+  settingsSections: SettingSectionConfig[];
+}) {
   const Icon = section.icon;
-  // Only editable sections (SETTINGS_SECTIONS) have featureLink
-  const settingsSection = SETTINGS_SECTIONS.find((s) => s.id === section.id);
+  const settingsSection = settingsSections.find((s) => s.id === section.id);
   const featureLink = settingsSection?.featureLink ?? null;
 
   return (
@@ -925,7 +1117,6 @@ function EditableSettingsSection({
   onFieldChange: (key: TenantSettingKey, value: unknown) => void;
   onLogoChanged: () => void;
 }) {
-  // Separate fields by type for layout purposes
   const textLikeFields = section.fields.filter(
     (f) => f.type !== 'checkbox' && f.type !== 'multi-check',
   );
@@ -954,7 +1145,6 @@ function EditableSettingsSection({
         </div>
       )}
 
-      {/* Text-like fields: rendered as FieldRow list */}
       {textLikeFields.length > 0 && (
         <div className="divide-y divide-slate-100">
           {textLikeFields.map((field) => (
@@ -963,7 +1153,6 @@ function EditableSettingsSection({
         </div>
       )}
 
-      {/* Checkbox toggle rows */}
       {checkboxFields.length > 0 && (
         <div className="divide-y divide-slate-100">
           {checkboxFields.map((field) => (
@@ -972,7 +1161,6 @@ function EditableSettingsSection({
         </div>
       )}
 
-      {/* Multi-check chip groups */}
       {multiCheckFields.map((field) => (
         <MultiCheckRow key={field.key} field={field} value={form[field.key]} onChange={(v) => onFieldChange(field.key, v)} />
       ))}
@@ -980,7 +1168,7 @@ function EditableSettingsSection({
   );
 }
 
-// ─── Field Row (text / select / color / number / time / email) ────────────────
+// ─── Field Row ────────────────────────────────────────────────────────────────
 
 function FieldRow({
   field,
@@ -993,15 +1181,12 @@ function FieldRow({
 }) {
   return (
     <div className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-start sm:justify-between">
-      {/* Label */}
       <div className="sm:w-[240px] sm:shrink-0">
         <p className="text-sm font-medium text-slate-800">{field.label}</p>
         {field.description && (
           <p className="mt-0.5 text-xs leading-5 text-slate-500">{field.description}</p>
         )}
       </div>
-
-      {/* Control */}
       <div className="w-full sm:max-w-sm">
         {field.type === 'color' ? (
           <ColorField value={String(value || field.defaultValue || '#6366f1')} onChange={onChange} />
@@ -1042,33 +1227,30 @@ function FieldRow({
 function ColorField({ value, onChange }: { value: string; onChange: (v: unknown) => void }) {
   return (
     <div className="flex items-center gap-2">
-      <div className="relative">
-        <input
-          type="color"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="h-9 w-14 cursor-pointer rounded-lg border border-slate-200 bg-white p-1 outline-none"
-        />
-      </div>
+      <input
+        type="color"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-9 w-14 cursor-pointer rounded-lg border border-slate-200 bg-white p-1 outline-none"
+      />
       <input
         type="text"
         value={value}
         onChange={(e) => {
           const v = e.target.value;
           if (/^#[0-9a-f]{6}$/i.test(v)) onChange(v);
-          else onChange(v); // allow partial typing
+          else onChange(v);
         }}
         maxLength={7}
         placeholder="#6366f1"
         className="h-9 w-[110px] rounded-lg border border-slate-200 bg-white px-3 font-mono text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-900/5"
       />
-      {/* Live preview strip */}
       <div className="h-9 w-14 rounded-lg border border-slate-200" style={{ backgroundColor: value }} />
     </div>
   );
 }
 
-// ─── Toggle Row (checkbox) ────────────────────────────────────────────────────
+// ─── Toggle Row ───────────────────────────────────────────────────────────────
 
 function ToggleRow({
   field,
@@ -1182,9 +1364,7 @@ function BrandingPreview({
     <div>
       <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Document Branding Preview</p>
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        {/* Receipt header strip */}
         <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: `3px solid ${primaryColor}` }}>
-          {/* Logo placeholder */}
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
             style={{ backgroundColor: `${primaryColor}18` }}
@@ -1200,7 +1380,6 @@ function BrandingPreview({
             <p className="font-mono text-xs font-semibold text-slate-700">REC-2081-0001</p>
           </div>
         </div>
-        {/* Mock body */}
         <div className="px-4 py-3">
           <div className="space-y-1.5">
             {['Student Fee', 'Transport Fee', 'Exam Fee'].map((item, i) => (
@@ -1215,7 +1394,6 @@ function BrandingPreview({
             <span className="text-slate-900">NPR 7,300</span>
           </div>
         </div>
-        {/* Footer */}
         <div className="border-t border-slate-100 px-4 py-2 text-center text-[10px] text-slate-400">
           {displayFooter}
         </div>
@@ -1325,7 +1503,6 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
       <div>
         <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">School Logo</p>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          {/* Logo preview */}
           <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
             {loading ? (
               <Loader2 size={20} className="animate-spin text-slate-300" />
@@ -1337,7 +1514,6 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
             )}
           </div>
 
-          {/* Info + actions */}
           <div className="flex-1">
             <div className="mb-2.5 flex flex-wrap gap-1.5">
               <span
@@ -1368,7 +1544,6 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
               </p>
             )}
 
-            {/* Actions */}
             <div className="mt-3 flex flex-wrap gap-2">
               <label
                 className={cn(
@@ -1411,7 +1586,6 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
               )}
             </div>
 
-            {/* Status messages */}
             {message && (
               <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-700">
                 <CheckCircle2 size={12} /> {message}
@@ -1437,6 +1611,506 @@ function LogoPanel({ logoFileAssetId, onLogoChanged }: { logoFileAssetId: string
         onClose={() => setRemoveOpen(false)}
       />
     </>
+  );
+}
+
+// ─── Overview Panel ───────────────────────────────────────────────────────────
+
+function OverviewPanel({
+  settings,
+  schoolName,
+  logoFileAssetId,
+  onSwitchSection,
+}: {
+  settings: TenantSettingSummary[];
+  schoolName: string;
+  logoFileAssetId: string | null;
+  onSwitchSection: (id: string) => void;
+}) {
+  function getSettingValue(key: TenantSettingKey): string | null {
+    const s = settings.find((item) => item.key === key);
+    if (!s || s.value === null || s.value === undefined || s.value === '') return null;
+    return String(s.value);
+  }
+
+  const hasSchoolName = Boolean(getSettingValue('school_name'));
+  const hasSchoolPhone = Boolean(getSettingValue('school_phone'));
+  const hasAcademicYear = Boolean(getSettingValue('active_academic_year_label'));
+  const hasBranding = Boolean(logoFileAssetId) || Boolean(getSettingValue('branding_primary_color'));
+
+  const readinessItems: Array<{
+    label: string;
+    description: string;
+    sectionId: string;
+    status: 'ok' | 'review' | 'pending';
+  }> = [
+    {
+      label: 'School Profile',
+      description: hasSchoolName && hasSchoolPhone ? `${getSettingValue('school_name') ?? ''} · ${getSettingValue('school_phone') ?? ''}` : 'School name and contact not set',
+      sectionId: 'profile',
+      status: hasSchoolName ? 'ok' : 'review',
+    },
+    {
+      label: 'Branding & Logo',
+      description: logoFileAssetId ? 'Logo uploaded, primary color configured' : 'No logo uploaded yet',
+      sectionId: 'branding',
+      status: hasBranding ? 'ok' : 'review',
+    },
+    {
+      label: 'Academic Setup',
+      description: hasAcademicYear ? `Active year: ${getSettingValue('active_academic_year_label') ?? ''}` : 'Set up academic years, classes, and sections',
+      sectionId: 'school-setup',
+      status: hasAcademicYear ? 'ok' : 'review',
+    },
+    {
+      label: 'Academic Defaults',
+      description: 'Grading scheme, calendar, promotion mode',
+      sectionId: 'academic',
+      status: hasAcademicYear ? 'ok' : 'review',
+    },
+    {
+      label: 'Fee & Payment Rules',
+      description: 'Receipt numbering, late fees, approval flow',
+      sectionId: 'fees',
+      status: getSettingValue('receipt_number_prefix') ? 'ok' : 'review',
+    },
+    {
+      label: 'Users & Access',
+      description: 'User management — coming soon',
+      sectionId: 'users-access',
+      status: 'pending',
+    },
+    {
+      label: 'Roles & Permissions',
+      description: 'Role catalog reviewed',
+      sectionId: 'roles-permissions',
+      status: 'review',
+    },
+    {
+      label: 'Security & Privacy',
+      description: 'Session timeout, data masking',
+      sectionId: 'security',
+      status: getSettingValue('session_timeout_minutes') ? 'ok' : 'review',
+    },
+    {
+      label: 'Subscription',
+      description: 'Plan and module entitlements',
+      sectionId: 'subscription',
+      status: 'ok',
+    },
+  ];
+
+  const okCount = readinessItems.filter((i) => i.status === 'ok').length;
+
+  return (
+    <div className="space-y-5">
+      {/* Readiness bar */}
+      <div className="flex items-center gap-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+        <div className="flex-1">
+          <div className="mb-1.5 flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-700">Setup readiness</p>
+            <p className="text-xs font-semibold text-slate-500">{okCount} / {readinessItems.length} ready</p>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+            <div
+              className="h-full rounded-full bg-emerald-500 transition-all"
+              style={{ width: `${Math.round((okCount / readinessItems.length) * 100)}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Readiness grid */}
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {readinessItems.map((item) => (
+          <button
+            key={item.sectionId}
+            type="button"
+            onClick={() => onSwitchSection(item.sectionId)}
+            className="group flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3.5 text-left transition hover:border-slate-300 hover:shadow-sm"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                {item.status === 'ok' && <CheckCircle2 size={13} className="shrink-0 text-emerald-500" />}
+                {item.status === 'review' && <AlertCircle size={13} className="shrink-0 text-amber-500" />}
+                {item.status === 'pending' && <Clock size={13} className="shrink-0 text-slate-400" />}
+                <p className="truncate text-sm font-semibold text-slate-800">{item.label}</p>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-slate-500">{item.description}</p>
+            </div>
+            <ChevronRight size={14} className="mt-0.5 shrink-0 text-slate-300 group-hover:text-slate-500 transition" />
+          </button>
+        ))}
+      </div>
+
+      {/* Quick actions */}
+      <div>
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Quick Access</p>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { label: 'School Profile', id: 'profile' },
+            { label: 'School Setup', id: 'school-setup' },
+            { label: 'Branding', id: 'branding' },
+            { label: 'Users & Access', id: 'users-access' },
+            { label: 'Roles', id: 'roles-permissions' },
+            { label: 'Subscription', id: 'subscription' },
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onSwitchSection(item.id)}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+            >
+              {item.label}
+              <ArrowRight size={11} />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── School Setup Panel ───────────────────────────────────────────────────────
+
+function SchoolSetupPanel() {
+  return (
+    <div className="space-y-4">
+      {/* Readiness notice */}
+      <div className="flex items-start gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+        <BookOpen size={15} className="mt-0.5 shrink-0 text-blue-600" />
+        <p className="text-sm leading-6 text-blue-700">
+          <span className="font-semibold">Complete this before other workflows.</span>{' '}
+          Academic years, classes, and sections must be configured before admissions, attendance,
+          exams, fees, and timetable workflows can begin.
+        </p>
+      </div>
+      {/* Render the existing SetupForm — it manages its own data fetching and mutations */}
+      <SetupForm />
+    </div>
+  );
+}
+
+// ─── Users & Access Panel ─────────────────────────────────────────────────────
+
+function UsersAccessPanel() {
+  const userCategories = [
+    {
+      title: 'Admin & Staff',
+      description: 'School administrators, teachers, subject teachers, support staff, and accountants.',
+      icon: UserCog,
+      accent: 'bg-blue-50 text-blue-700 border-blue-100',
+      count: null,
+    },
+    {
+      title: 'Parent Accounts',
+      description: 'Parents and guardians with access to student records, notices, and messaging.',
+      icon: Users,
+      accent: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+      count: null,
+    },
+    {
+      title: 'Student Accounts',
+      description: 'Students with portal access for timetable, homework, activity, and notices.',
+      icon: BookOpen,
+      accent: 'bg-violet-50 text-violet-700 border-violet-100',
+      count: null,
+    },
+    {
+      title: 'Pending Invitations',
+      description: 'Invitations sent and awaiting user acceptance.',
+      icon: Key,
+      accent: 'bg-amber-50 text-amber-700 border-amber-100',
+      count: null,
+    },
+    {
+      title: 'Disabled Accounts',
+      description: 'Suspended or deactivated user accounts. Records preserved.',
+      icon: Lock,
+      accent: 'bg-rose-50 text-rose-700 border-rose-100',
+      count: null,
+    },
+  ];
+
+  return (
+    <div className="space-y-5">
+      {/* Status notice */}
+      <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+        <Lock size={15} className="mt-0.5 shrink-0 text-slate-500" />
+        <div>
+          <p className="text-sm font-semibold text-slate-700">User management backend pending</p>
+          <p className="mt-0.5 text-xs leading-5 text-slate-500">
+            User invitation, password reset, and account management actions will be available once the Users API routes are deployed.
+            All role assignments and permission scoping are already defined in the role catalog.
+          </p>
+        </div>
+      </div>
+
+      {/* Action buttons (disabled — pending backend) */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { label: 'Invite User', icon: Users },
+          { label: 'Manage Parent Access', icon: Key },
+          { label: 'Reset Password', icon: Lock },
+          { label: 'Disable Account', icon: Shield },
+        ].map(({ label, icon: Icon }) => (
+          <button
+            key={label}
+            type="button"
+            disabled
+            title="Backend route pending"
+            className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-400 opacity-60"
+          >
+            <Icon size={14} />
+            {label}
+            <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Pending
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* User category cards */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {userCategories.map((cat) => {
+          const Icon = cat.icon;
+          return (
+            <div key={cat.title} className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="mb-3 flex items-start gap-3">
+                <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border', cat.accent)}>
+                  <Icon size={15} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800">{cat.title}</p>
+                  <p className="mt-0.5 text-xs leading-5 text-slate-500">{cat.description}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2">
+                <span className="text-xs text-slate-400">Count unavailable</span>
+                <span className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  API pending
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* MFA / security readiness */}
+      <div>
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Security Readiness</p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {[
+            { label: 'MFA enforcement status', value: 'Not configured' },
+            { label: 'Last login review', value: 'API pending' },
+            { label: 'Session timeout', value: 'Configured in Security & Privacy' },
+            { label: 'Sensitive field masking', value: 'Configured in Security & Privacy' },
+          ].map((item) => (
+            <div key={item.label} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
+              <span className="text-xs font-medium text-slate-600">{item.label}</span>
+              <span className="text-xs text-slate-400">{item.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Roles & Permissions Panel ────────────────────────────────────────────────
+
+// Build a role category map from systemRoleDefinitions
+const PLATFORM_ROLE_NAMES = new Set(['platform_super_admin', 'platform_support', 'platform_billing_admin']);
+
+const ROLE_MODULE_MAP: Record<string, string[]> = {
+  admin: ['Full tenant access'],
+  principal: ['Full tenant access'],
+  teacher: ['Academics', 'Attendance', 'Homework', 'Messaging', 'HR leave'],
+  subject_teacher: ['Academics', 'Homework', 'Messaging', 'Timetable'],
+  support_staff: ['Students (read)', 'Staff (read)', 'Notices'],
+  student: ['Timetable', 'Homework', 'Notices', 'Activity'],
+  parent: ['Students (read)', 'Messaging', 'Transport tracking'],
+  accountant: ['Fees', 'Payments', 'Accounting', 'Payroll', 'Reports'],
+  librarian: ['Library', 'Fees (manage)', 'Classes (read)'],
+  driver: ['Transport', 'Students (read)'],
+  platform_super_admin: ['All permissions'],
+  platform_support: ['Platform read', 'Tenant support'],
+  platform_billing_admin: ['Billing', 'Subscriptions', 'Plans'],
+};
+
+function RolesPermissionsPanel() {
+  const [expandedRole, setExpandedRole] = useState<string | null>(null);
+
+  const tenantRoles = systemRoleDefinitions.filter((r) => !PLATFORM_ROLE_NAMES.has(r.name));
+  const platformRoles = systemRoleDefinitions.filter((r) => PLATFORM_ROLE_NAMES.has(r.name));
+
+  function getPermissionCount(roleName: string): number {
+    const perms = systemRolePermissions[roleName];
+    return Array.isArray(perms) ? perms.length : 0;
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Notice */}
+      <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+        <Key size={15} className="mt-0.5 shrink-0 text-slate-500" />
+        <div>
+          <p className="text-sm font-semibold text-slate-700">Read-only permissions overview</p>
+          <p className="mt-0.5 text-xs leading-5 text-slate-500">
+            All roles are preset by SchoolOS. Custom role creation and permission editing will be available once the Roles API routes are deployed.
+            Role assignments are managed through the HR Staff module.
+          </p>
+        </div>
+      </div>
+
+      {/* Action buttons (disabled) */}
+      <div className="flex flex-wrap gap-2">
+        {['Create Custom Role', 'Edit Permissions', 'Preview Access'].map((label) => (
+          <button
+            key={label}
+            type="button"
+            disabled
+            title="Backend route pending"
+            className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-400 opacity-60"
+          >
+            {label}
+            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Pending
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Tenant roles */}
+      <div>
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+          School Roles ({tenantRoles.length})
+        </p>
+        <div className="space-y-1.5">
+          {tenantRoles.map((role) => {
+            const permCount = getPermissionCount(role.name);
+            const modules = ROLE_MODULE_MAP[role.name] ?? [];
+            const isExpanded = expandedRole === role.name;
+            const perms = systemRolePermissions[role.name] ?? [];
+
+            return (
+              <div key={role.name} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                <button
+                  type="button"
+                  onClick={() => setExpandedRole(isExpanded ? null : role.name)}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-50"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100">
+                    <Key size={13} className="text-slate-500" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold capitalize text-slate-800">
+                        {role.name.replace(/_/g, ' ')}
+                      </p>
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
+                        {role.name}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-slate-500">{role.description}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3 text-right">
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">{permCount}</p>
+                      <p className="text-[10px] text-slate-400">perms</p>
+                    </div>
+                    <ChevronRight
+                      size={14}
+                      className={cn('text-slate-400 transition-transform', isExpanded && 'rotate-90')}
+                    />
+                  </div>
+                </button>
+
+                {isExpanded && (
+                  <div className="border-t border-slate-100 px-4 py-3">
+                    {/* Module coverage */}
+                    {modules.length > 0 && (
+                      <div className="mb-3">
+                        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Module Coverage</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {modules.map((mod) => (
+                            <span key={mod} className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                              <Check size={10} />
+                              {mod}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* Permission list (first 20) */}
+                    <div>
+                      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                        Permissions ({permCount}){permCount > 20 ? ' — showing first 20' : ''}
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {perms.slice(0, 20).map((perm) => (
+                          <span key={perm} className="rounded bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 ring-1 ring-slate-100">
+                            {perm}
+                          </span>
+                        ))}
+                        {permCount > 20 && (
+                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+                            +{permCount - 20} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Platform roles */}
+      <div>
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+          Platform Roles ({platformRoles.length})
+        </p>
+        <div className="space-y-1.5">
+          {platformRoles.map((role) => {
+            const permCount = getPermissionCount(role.name);
+            const modules = ROLE_MODULE_MAP[role.name] ?? [];
+
+            return (
+              <div key={role.name} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-purple-100 bg-purple-50">
+                  <Shield size={13} className="text-purple-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-slate-800">{role.name.replace(/_/g, ' ')}</p>
+                    <span className="rounded bg-purple-50 px-1.5 py-0.5 font-mono text-[10px] text-purple-600">
+                      {role.name}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500">{role.description}</p>
+                  {modules.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {modules.map((mod) => (
+                        <span key={mod} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+                          {mod}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-sm font-bold text-slate-900">{permCount}</p>
+                  <p className="text-[10px] text-slate-400">perms</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1554,7 +2228,6 @@ function AuditPanel() {
         </div>
       </div>
 
-      {/* Disabled filter preview */}
       <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4">
         <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Log Filters (Coming Soon)</p>
         <div className="flex flex-wrap gap-2 opacity-40">
@@ -1635,7 +2308,6 @@ function SubscriptionPanel() {
 
   return (
     <div className="space-y-5">
-      {/* Plan card */}
       <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Current Plan</p>
@@ -1658,7 +2330,6 @@ function SubscriptionPanel() {
         </a>
       </div>
 
-      {/* Modules grid */}
       <div>
         <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
           Included Modules ({activeModules.length})
@@ -1688,3 +2359,4 @@ function SettingsLoading() {
     </div>
   );
 }
+

@@ -50,14 +50,6 @@ export type NavGroup = {
 const academicPermissions: PermissionKey[] = ['academics:read', 'academics:manage'];
 const timetablePermissions: PermissionKey[] = ['timetable:read'];
 const homeworkPermissions: PermissionKey[] = ['homework:read'];
-const schoolSetupPermissions: PermissionKey[] = [
-  'academic_years:read',
-  'academic_years:create',
-  'classes:read',
-  'classes:create',
-  'sections:read',
-  'sections:create',
-];
 
 function getRequiredModuleForHref(href: string): string | null {
   if (href.startsWith('/dashboard/students')) return 'students';
@@ -234,12 +226,6 @@ export const dashboardNavGroups: NavGroup[] = [
   {
     label: 'System',
     items: [
-      {
-        href: '/dashboard/setup',
-        label: 'School Setup',
-        icon: School,
-        permissions: schoolSetupPermissions,
-      },
       {
         href: '/dashboard/settings',
         label: 'Settings',
