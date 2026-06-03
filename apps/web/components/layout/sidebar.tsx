@@ -50,6 +50,14 @@ export type NavGroup = {
 const academicPermissions: PermissionKey[] = ['academics:read', 'academics:manage'];
 const timetablePermissions: PermissionKey[] = ['timetable:read'];
 const homeworkPermissions: PermissionKey[] = ['homework:read'];
+const schoolSetupPermissions: PermissionKey[] = [
+  'academic_years:read',
+  'academic_years:create',
+  'classes:read',
+  'classes:create',
+  'sections:read',
+  'sections:create',
+];
 
 function getRequiredModuleForHref(href: string): string | null {
   if (href.startsWith('/dashboard/students')) return 'students';
@@ -113,6 +121,12 @@ export const dashboardNavGroups: NavGroup[] = [
   {
     label: 'Academics',
     items: [
+      {
+        href: '/dashboard/setup',
+        label: 'School Setup',
+        icon: School,
+        permissions: schoolSetupPermissions,
+      },
       {
         href: '/dashboard/academics/report-cards',
         label: 'Exams, CAS & Reports',
@@ -277,26 +291,23 @@ export function Sidebar({
   const { session } = useSession();
   const { hasModule } = useEntitlements();
 
-  const filterNavGroups = (groups: NavGroup[]) => {
-    return groups
-      .map((group) => ({
-        ...group,
-        items: group.items.filter((item) => {
-          const canSee = canSeeNavItem(item, session);
-          if (!canSee) return false;
+  const visibleGroups = dashboardNavGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        const canSee = canSeeNavItem(item, session);
+        if (!canSee) return false;
 
-          const requiredModule = getRequiredModuleForHref(item.href);
-          if (requiredModule && !hasModule(requiredModule)) {
-            return false;
-          }
+        const requiredModule = getRequiredModuleForHref(item.href);
+        if (requiredModule && !hasModule(requiredModule)) {
+          return false;
+        }
 
-          return true;
-        }),
-      }))
-      .filter((group) => group.items.length > 0);
-  };
+        return true;
+      }),
+    }))
+    .filter((group) => group.items.length > 0);
 
-  const visibleGroups = filterNavGroups(dashboardNavGroups);
   const visiblePlatformItems = platformNavItems.filter((item) =>
     canSeeNavItem(item, session),
   );
